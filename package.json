@@ -6,8 +6,12 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "server": "node server.js",
+    "analyzer:start": "python-service\\.venv\\Scripts\\python.exe -m uvicorn app:app --app-dir python-service --host 127.0.0.1 --port 8000",
     "build": "vite build",
-    "start": "node server.js"
+    "start": "node server.js",
+    "research:export": "powershell -ExecutionPolicy Bypass -File scripts\\export-research-data.ps1",
+    "research:paper": "powershell -ExecutionPolicy Bypass -File scripts\\run-research-analysis.ps1",
+    "research:export-and-paper": "powershell -ExecutionPolicy Bypass -File scripts\\export-and-analyze.ps1"
   },
   "dependencies": {
     "dotenv": "^17.2.2",

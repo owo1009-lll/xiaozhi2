@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -30,6 +31,12 @@ def save_figure(fig: plt.Figure, output_dir: Path, name: str) -> None:
     fig.tight_layout()
     fig.savefig(output_dir / f"{name}.png", dpi=220, bbox_inches="tight")
     plt.close(fig)
+
+
+def round_value(value: float | int | None, digits: int = 3) -> float | None:
+    if value is None or pd.isna(value):
+        return None
+    return round(float(value), digits)
 
 
 def group_summary(participants: pd.DataFrame) -> pd.DataFrame:
@@ -113,6 +120,100 @@ def build_analysis_usage_table(analyses: pd.DataFrame) -> pd.DataFrame:
         meanConfidence=("confidence", "mean"),
     )
     return grouped.reset_index().sort_values(["participantId", "sessionStage"])
+
+
+def build_usage_correlation_table(participants: pd.DataFrame) -> pd.DataFrame:
+    subset = participants[["analysisCount", "pitchGain", "rhythmGain"]].dropna()
+    rows = []
+    for metric in ["pitchGain", "rhythmGain"]:
+        if len(subset) >= 3:
+            corr, p_value = stats.pearsonr(subset["analysisCount"], subset[metric])
+        else:
+            corr, p_value = float("nan"), float("nan")
+        rows.append(
+            {
+                "predictor": "analysisCount",
+                "outcome": metric,
+                "sampleSize": len(subset),
+                "pearsonR": corr,
+                "pValue": p_value,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def write_summary_report(
+    output_dir: Path,
+    participants: pd.DataFrame,
+    group_table: pd.DataFrame,
+    ttest_table: pd.DataFrame,
+    expert_table: pd.DataFrame,
+    usage_corr_table: pd.DataFrame,
+) -> None:
+    participant_count = len(participants)
+    experimental_count = int((participants["groupId"] == "experimental").sum())
+    control_count = int((participants["groupId"] == "control").sum())
+
+    group_lookup = {row["groupId"]: row for _, row in group_table.iterrows()}
+    exp_group = group_lookup.get("experimental", {})
+    ctl_group = group_lookup.get("control", {})
+
+    lines = [
+        "# Research Summary",
+        "",
+        f"- Participants: {participant_count}",
+        f"- Experimental group: {experimental_count}",
+        f"- Control group: {control_count}",
+        "",
+        "## Group Means",
+        f"- Experimental pitch gain mean: {round_value(exp_group.get('pitchGainMean'), 2)}",
+        f"- Control pitch gain mean: {round_value(ctl_group.get('pitchGainMean'), 2)}",
+        f"- Experimental rhythm gain mean: {round_value(exp_group.get('rhythmGainMean'), 2)}",
+        f"- Control rhythm gain mean: {round_value(ctl_group.get('rhythmGainMean'), 2)}",
+        f"- Experimental usefulness mean: {round_value(exp_group.get('usefulnessMean'), 2)}",
+        f"- Control usefulness mean: {round_value(ctl_group.get('usefulnessMean'), 2)}",
+        "",
+        "## Group Tests",
+    ]
+
+    for _, row in ttest_table.iterrows():
+        lines.append(
+            f"- {row['metric']}: experimental={round_value(row['experimentalMean'], 3)}, "
+            f"control={round_value(row['controlMean'], 3)}, "
+            f"t={round_value(row['tStatistic'], 3)}, p={round_value(row['pValue'], 4)}"
+        )
+
+    lines.extend(["", "## System vs Expert Correlations"])
+    for _, row in expert_table.iterrows():
+        lines.append(
+            f"- {row['systemMetric']} vs {row['expertMetric']}: "
+            f"n={int(row['sampleSize'])}, r={round_value(row['pearsonR'], 3)}, p={round_value(row['pValue'], 4)}"
+        )
+
+    lines.extend(["", "## Usage Correlations"])
+    for _, row in usage_corr_table.iterrows():
+        lines.append(
+            f"- analysisCount vs {row['outcome']}: "
+            f"n={int(row['sampleSize'])}, r={round_value(row['pearsonR'], 3)}, p={round_value(row['pValue'], 4)}"
+        )
+
+    (output_dir / "report.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def write_summary_json(
+    output_dir: Path,
+    group_table: pd.DataFrame,
+    ttest_table: pd.DataFrame,
+    expert_table: pd.DataFrame,
+    usage_corr_table: pd.DataFrame,
+) -> None:
+    payload = {
+        "groupSummary": group_table.to_dict(orient="records"),
+        "groupTests": ttest_table.to_dict(orient="records"),
+        "systemExpertCorrelations": expert_table.to_dict(orient="records"),
+        "usageCorrelations": usage_corr_table.to_dict(orient="records"),
+    }
+    (output_dir / "summary.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def plot_gain_by_group(participants: pd.DataFrame, output_dir: Path) -> None:
@@ -224,16 +325,26 @@ def main() -> None:
 
     save_table(participants, output_dir, "table_participant_overview")
     save_table(group_summary(participants), output_dir, "table_group_summary")
-    save_table(ttest_summary(participants), output_dir, "table_group_ttests")
+    group_table = group_summary(participants)
+    ttest_table = ttest_summary(participants)
+    expert_table = build_expert_system_table(participants)
+    usage_table = build_analysis_usage_table(analyses)
+    usage_corr_table = build_usage_correlation_table(participants)
+
+    save_table(group_table, output_dir, "table_group_summary")
+    save_table(ttest_table, output_dir, "table_group_ttests")
     save_table(questionnaire_summary(questionnaires), output_dir, "table_questionnaire_summary")
-    save_table(build_expert_system_table(participants), output_dir, "table_system_expert_correlations")
-    save_table(build_analysis_usage_table(analyses), output_dir, "table_analysis_usage")
+    save_table(expert_table, output_dir, "table_system_expert_correlations")
+    save_table(usage_table, output_dir, "table_analysis_usage")
+    save_table(usage_corr_table, output_dir, "table_usage_correlations")
     save_table(ratings.sort_values(["participantId", "stage", "submittedAt"]), output_dir, "table_expert_ratings_raw")
 
     plot_gain_by_group(participants, output_dir)
     plot_questionnaire_bars(questionnaires, output_dir)
     plot_system_vs_expert(participants, output_dir)
     plot_usage_vs_gain(participants, output_dir)
+    write_summary_report(output_dir, participants, group_table, ttest_table, expert_table, usage_corr_table)
+    write_summary_json(output_dir, group_table, ttest_table, expert_table, usage_corr_table)
 
     summary_path = output_dir / "README.txt"
     summary_path.write_text(
@@ -246,11 +357,14 @@ def main() -> None:
                 "- table_questionnaire_summary.csv",
                 "- table_system_expert_correlations.csv",
                 "- table_analysis_usage.csv",
+                "- table_usage_correlations.csv",
                 "- table_expert_ratings_raw.csv",
                 "- figure_gain_by_group.png",
                 "- figure_questionnaire_by_group.png",
                 "- figure_system_vs_expert.png",
                 "- figure_usage_vs_pitch_gain.png",
+                "- report.md",
+                "- summary.json",
             ]
         ),
         encoding="utf-8",
