@@ -214,12 +214,18 @@ button {
 }
 
 .field-grid label,
+.checkbox-field,
 .notes-field {
   display: grid;
   gap: 8px;
 }
 
+.checkbox-field {
+  align-content: start;
+}
+
 .field-grid span,
+.checkbox-field span,
 .notes-field span {
   font-size: 13px;
   font-weight: 600;
@@ -387,6 +393,23 @@ button {
   color: var(--text-main);
 }
 
+.history-columns {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  margin-top: 18px;
+}
+
+.compact-list {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.7;
+}
+
+.compact-list li + li {
+  margin-top: 8px;
+}
+
 .question-grid {
   display: grid;
   gap: 14px;
@@ -456,6 +479,49 @@ button {
   width: 100%;
 }
 
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+}
+
+.checkbox-row input {
+  width: 16px;
+  height: 16px;
+}
+
+.link-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.queue-list {
+  display: grid;
+  gap: 12px;
+}
+
+.queue-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  background: var(--bg-soft);
+}
+
+.queue-item p {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+}
+
 @media (max-width: 900px) {
   .app-shell {
     padding: 16px;
@@ -469,5 +535,10 @@ button {
   .toolbar {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .queue-item {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

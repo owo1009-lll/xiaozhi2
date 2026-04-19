@@ -28,6 +28,13 @@ function safeNumber(value, fallback = 0) {
   return Number.isFinite(numeric) ? numeric : fallback;
 }
 
+function safeBoolean(value, fallback = false) {
+  if (typeof value === "boolean") return value;
+  if (value === "true" || value === "1" || value === 1) return true;
+  if (value === "false" || value === "0" || value === 0) return false;
+  return fallback;
+}
+
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
@@ -46,7 +53,7 @@ async function readStudyStore() {
     const raw = await fs.readFile(STUDY_STORE_FILE, "utf8");
     const parsed = JSON.parse(raw);
     return {
-      participants: Array.isArray(parsed.participants) ? parsed.participants : [],
+      participants: Array.isArray(parsed.participants) ? parsed.participants.map((item) => normalizeParticipantRecord(item)) : [],
       analyses: Array.isArray(parsed.analyses) ? parsed.analyses : [],
     };
   } catch {
@@ -65,6 +72,70 @@ async function writeStudyStore(store) {
 function average(values = []) {
   if (!values.length) return 0;
   return values.reduce((sum, value) => sum + safeNumber(value), 0) / values.length;
+}
+
+function normalizeParticipantRecord(participant = {}) {
+  const questionnaires = Array.isArray(participant.questionnaires)
+    ? participant.questionnaires
+    : participant.experienceScales?.submittedAt
+      ? [participant.experienceScales]
+      : [];
+
+  return {
+    participantId: safeString(participant.participantId),
+    groupId: safeString(participant.groupId, "experimental"),
+    createdAt: safeString(participant.createdAt, nowIso()),
+    lastActiveAt: safeString(participant.lastActiveAt, participant.createdAt || nowIso()),
+    profile:
+      participant.profile && typeof participant.profile === "object"
+        ? {
+            alias: safeString(participant.profile.alias),
+            institution: safeString(participant.profile.institution),
+            major: safeString(participant.profile.major),
+            grade: safeString(participant.profile.grade),
+            yearsOfTraining: safeNumber(participant.profile.yearsOfTraining, 0),
+            weeklyPracticeMinutes: safeNumber(participant.profile.weeklyPracticeMinutes, 0),
+            deviceLabel: safeString(participant.profile.deviceLabel),
+            consentSigned: safeBoolean(participant.profile.consentSigned, false),
+            notes: safeString(participant.profile.notes),
+            updatedAt: safeString(participant.profile.updatedAt, participant.createdAt || nowIso()),
+          }
+        : null,
+    pretest: participant.pretest || null,
+    weeklySessions: getArray(participant.weeklySessions),
+    posttest: participant.posttest || null,
+    experienceScales: participant.experienceScales || null,
+    questionnaires,
+    usageLogs: getArray(participant.usageLogs),
+    expertRatings:
+      participant.expertRatings && typeof participant.expertRatings === "object"
+        ? {
+            pretest: participant.expertRatings.pretest || null,
+            posttest: participant.expertRatings.posttest || null,
+            weekly: getArray(participant.expertRatings.weekly),
+          }
+        : {
+            pretest: null,
+            posttest: null,
+            weekly: [],
+          },
+  };
+}
+
+function escapeCsvCell(value) {
+  const text = value == null ? "" : String(value);
+  if (/[",\n]/.test(text)) {
+    return `"${text.replace(/"/g, "\"\"")}"`;
+  }
+  return text;
+}
+
+function convertRowsToCsv(headers, rows) {
+  const lines = [headers.map((header) => escapeCsvCell(header)).join(",")];
+  rows.forEach((row) => {
+    lines.push(headers.map((header) => escapeCsvCell(row[header])).join(","));
+  });
+  return lines.join("\n");
 }
 
 function getExpectedDurationSeconds(section) {
@@ -195,33 +266,17 @@ async function callExternalAnalyzer(payload, section) {
 function ensureParticipantRecord(store, participantId, groupId) {
   let participant = store.participants.find((item) => item.participantId === participantId);
   if (!participant) {
-    participant = {
+    participant = normalizeParticipantRecord({
       participantId,
       groupId,
       createdAt: nowIso(),
       lastActiveAt: nowIso(),
-      pretest: null,
-      weeklySessions: [],
-      posttest: null,
-      experienceScales: null,
-      usageLogs: [],
-      expertRatings: {
-        pretest: null,
-        posttest: null,
-        weekly: [],
-      },
-    };
+    });
     store.participants.push(participant);
   } else if (groupId) {
     participant.groupId = groupId;
   }
-  if (!participant.expertRatings || typeof participant.expertRatings !== "object") {
-    participant.expertRatings = {
-      pretest: null,
-      posttest: null,
-      weekly: [],
-    };
-  }
+  participant = Object.assign(participant, normalizeParticipantRecord(participant));
   return participant;
 }
 
@@ -263,7 +318,8 @@ function appendAnalysisToParticipant(participant, payload, analysisRecord) {
 }
 
 function applyExperienceScale(participant, payload) {
-  participant.experienceScales = {
+  const questionnaire = {
+    questionnaireId: createId("questionnaire"),
     usefulness: safeNumber(payload.experienceScales?.usefulness, 0),
     easeOfUse: safeNumber(payload.experienceScales?.easeOfUse, 0),
     feedbackClarity: safeNumber(payload.experienceScales?.feedbackClarity, 0),
@@ -273,6 +329,21 @@ function applyExperienceScale(participant, payload) {
     submittedAt: nowIso(),
     sessionStage: safeString(payload.sessionStage),
   };
+  const questionnaireIndex = getArray(participant.questionnaires).findIndex(
+    (item) => item.sessionStage === questionnaire.sessionStage,
+  );
+  if (questionnaireIndex >= 0) {
+    const current = getArray(participant.questionnaires)[questionnaireIndex];
+    participant.questionnaires[questionnaireIndex] = {
+      ...current,
+      ...questionnaire,
+      questionnaireId: current.questionnaireId || questionnaire.questionnaireId,
+    };
+    participant.experienceScales = participant.questionnaires[questionnaireIndex];
+  } else {
+    participant.questionnaires = getArray(participant.questionnaires).concat(questionnaire).slice(-24);
+    participant.experienceScales = questionnaire;
+  }
   participant.lastActiveAt = participant.experienceScales.submittedAt;
 }
 
@@ -292,9 +363,36 @@ function applyExpertRating(participant, payload) {
   } else if (rating.stage === "posttest") {
     participant.expertRatings.posttest = rating;
   } else {
-    participant.expertRatings.weekly = getArray(participant.expertRatings.weekly).concat(rating).slice(-24);
+    const weekly = getArray(participant.expertRatings.weekly);
+    const existingIndex = weekly.findIndex((item) => item.stage === rating.stage && item.raterId === rating.raterId);
+    if (existingIndex >= 0) {
+      weekly[existingIndex] = {
+        ...weekly[existingIndex],
+        ...rating,
+        ratingId: weekly[existingIndex].ratingId || rating.ratingId,
+      };
+      participant.expertRatings.weekly = weekly;
+    } else {
+      participant.expertRatings.weekly = weekly.concat(rating).slice(-24);
+    }
   }
   participant.lastActiveAt = rating.submittedAt;
+}
+
+function applyParticipantProfile(participant, payload) {
+  participant.profile = {
+    alias: safeString(payload.profile?.alias),
+    institution: safeString(payload.profile?.institution),
+    major: safeString(payload.profile?.major),
+    grade: safeString(payload.profile?.grade),
+    yearsOfTraining: clamp(safeNumber(payload.profile?.yearsOfTraining, 0), 0, 80),
+    weeklyPracticeMinutes: clamp(safeNumber(payload.profile?.weeklyPracticeMinutes, 0), 0, 10080),
+    deviceLabel: safeString(payload.profile?.deviceLabel),
+    consentSigned: safeBoolean(payload.profile?.consentSigned, false),
+    notes: safeString(payload.profile?.notes),
+    updatedAt: nowIso(),
+  };
+  participant.lastActiveAt = participant.profile.updatedAt;
 }
 
 function buildParticipantView(participant, store) {
@@ -321,6 +419,9 @@ function buildParticipantView(participant, store) {
 
 function buildParticipantSummary(participant, store) {
   const view = buildParticipantView(participant, store);
+  const latestQuestionnaire = getArray(view.questionnaires)
+    .slice()
+    .sort((left, right) => String(right.submittedAt).localeCompare(String(left.submittedAt)))[0] || null;
   return {
     participantId: view.participantId,
     groupId: view.groupId,
@@ -328,6 +429,10 @@ function buildParticipantSummary(participant, store) {
     lastActiveAt: view.lastActiveAt || view.createdAt,
     analysisCount: view.analyses.length,
     weeklySessionCount: getArray(view.weeklySessions).length,
+    profileCompleted: Boolean(view.profile?.updatedAt),
+    consentSigned: Boolean(view.profile?.consentSigned),
+    institution: view.profile?.institution || "",
+    grade: view.profile?.grade || "",
     pretestPitch: view.pretest?.pitchScore ?? null,
     posttestPitch: view.posttest?.pitchScore ?? null,
     pretestRhythm: view.pretest?.rhythmScore ?? null,
@@ -339,6 +444,8 @@ function buildParticipantSummary(participant, store) {
     feedbackClarity: view.experienceScales?.feedbackClarity ?? null,
     confidence: view.experienceScales?.confidence ?? null,
     continuance: view.experienceScales?.continuance ?? null,
+    questionnaireCount: getArray(view.questionnaires).length,
+    latestQuestionnaireStage: latestQuestionnaire?.sessionStage ?? null,
     expertPretestPitch: view.expertRatings?.pretest?.pitchScore ?? null,
     expertPosttestPitch: view.expertRatings?.posttest?.pitchScore ?? null,
     expertPretestRhythm: view.expertRatings?.pretest?.rhythmScore ?? null,
@@ -346,62 +453,152 @@ function buildParticipantSummary(participant, store) {
   };
 }
 
-function convertStoreToCsv(store) {
-  const lines = [
-    [
+function buildParticipantExportRows(store) {
+  return store.participants.map((participant) => buildParticipantSummary(participant, store));
+}
+
+function buildQuestionnaireExportRows(store) {
+  return store.participants.flatMap((participant) =>
+    getArray(participant.questionnaires).map((questionnaire) => ({
+      participantId: participant.participantId,
+      groupId: participant.groupId,
+      sessionStage: questionnaire.sessionStage,
+      usefulness: questionnaire.usefulness,
+      easeOfUse: questionnaire.easeOfUse,
+      feedbackClarity: questionnaire.feedbackClarity,
+      confidence: questionnaire.confidence,
+      continuance: questionnaire.continuance,
+      notes: questionnaire.notes,
+      submittedAt: questionnaire.submittedAt,
+    })),
+  );
+}
+
+function buildExpertRatingExportRows(store) {
+  return store.participants.flatMap((participant) => {
+    const prePost = [participant.expertRatings?.pretest, participant.expertRatings?.posttest].filter(Boolean);
+    const weekly = getArray(participant.expertRatings?.weekly);
+    return prePost.concat(weekly).map((rating) => ({
+      participantId: participant.participantId,
+      groupId: participant.groupId,
+      stage: rating.stage,
+      pitchScore: rating.pitchScore,
+      rhythmScore: rating.rhythmScore,
+      raterId: rating.raterId,
+      comments: rating.comments,
+      submittedAt: rating.submittedAt,
+    }));
+  });
+}
+
+function buildAnalysisExportRows(store) {
+  return store.analyses.map((analysis) => ({
+    analysisId: analysis.analysisId,
+    participantId: analysis.participantId,
+    groupId: analysis.groupId,
+    sessionStage: analysis.sessionStage,
+    pieceId: analysis.pieceId,
+    sectionId: analysis.sectionId,
+    overallPitchScore: analysis.overallPitchScore,
+    overallRhythmScore: analysis.overallRhythmScore,
+    confidence: analysis.confidence,
+    analysisMode: analysis.analysisMode,
+    createdAt: analysis.createdAt,
+  }));
+}
+
+function buildPendingRatings(store) {
+  return store.participants
+    .map((participant) => {
+      const pendingStages = [];
+      if (participant.pretest && !participant.expertRatings?.pretest) {
+        pendingStages.push("pretest");
+      }
+      if (participant.posttest && !participant.expertRatings?.posttest) {
+        pendingStages.push("posttest");
+      }
+      return {
+        participantId: participant.participantId,
+        groupId: participant.groupId,
+        pendingStages,
+        lastActiveAt: participant.lastActiveAt || participant.createdAt,
+      };
+    })
+    .filter((item) => item.pendingStages.length)
+    .sort((left, right) => String(right.lastActiveAt).localeCompare(String(left.lastActiveAt)));
+}
+
+function buildExportPayload(store, dataset) {
+  const normalizedDataset = safeString(dataset, "participants").toLowerCase();
+  if (normalizedDataset === "questionnaires") {
+    const rows = buildQuestionnaireExportRows(store);
+    const headers = [
       "participantId",
       "groupId",
-      "pretestPitch",
-      "posttestPitch",
-      "pitchGain",
-      "pretestRhythm",
-      "posttestRhythm",
-      "rhythmGain",
-      "weeklySessionCount",
+      "sessionStage",
       "usefulness",
       "easeOfUse",
       "feedbackClarity",
       "confidence",
       "continuance",
-      "expertPretestPitch",
-      "expertPosttestPitch",
-      "expertPretestRhythm",
-      "expertPosttestRhythm",
-    ].join(","),
+      "notes",
+      "submittedAt",
+    ];
+    return { dataset: normalizedDataset, rows, headers };
+  }
+  if (normalizedDataset === "expert-ratings") {
+    const rows = buildExpertRatingExportRows(store);
+    const headers = ["participantId", "groupId", "stage", "pitchScore", "rhythmScore", "raterId", "comments", "submittedAt"];
+    return { dataset: normalizedDataset, rows, headers };
+  }
+  if (normalizedDataset === "analyses") {
+    const rows = buildAnalysisExportRows(store);
+    const headers = [
+      "analysisId",
+      "participantId",
+      "groupId",
+      "sessionStage",
+      "pieceId",
+      "sectionId",
+      "overallPitchScore",
+      "overallRhythmScore",
+      "confidence",
+      "analysisMode",
+      "createdAt",
+    ];
+    return { dataset: normalizedDataset, rows, headers };
+  }
+  const rows = buildParticipantExportRows(store);
+  const headers = [
+    "participantId",
+    "groupId",
+    "createdAt",
+    "lastActiveAt",
+    "analysisCount",
+    "weeklySessionCount",
+    "profileCompleted",
+    "consentSigned",
+    "institution",
+    "grade",
+    "pretestPitch",
+    "posttestPitch",
+    "pretestRhythm",
+    "posttestRhythm",
+    "pitchGain",
+    "rhythmGain",
+    "usefulness",
+    "easeOfUse",
+    "feedbackClarity",
+    "confidence",
+    "continuance",
+    "questionnaireCount",
+    "latestQuestionnaireStage",
+    "expertPretestPitch",
+    "expertPosttestPitch",
+    "expertPretestRhythm",
+    "expertPosttestRhythm",
   ];
-
-  store.participants.forEach((participant) => {
-    const pitchGain =
-      participant.pretest && participant.posttest
-        ? safeNumber(participant.posttest.pitchScore) - safeNumber(participant.pretest.pitchScore)
-        : "";
-    const rhythmGain =
-      participant.pretest && participant.posttest
-        ? safeNumber(participant.posttest.rhythmScore) - safeNumber(participant.pretest.rhythmScore)
-        : "";
-    lines.push([
-      participant.participantId,
-      participant.groupId,
-      participant.pretest?.pitchScore ?? "",
-      participant.posttest?.pitchScore ?? "",
-      pitchGain,
-      participant.pretest?.rhythmScore ?? "",
-      participant.posttest?.rhythmScore ?? "",
-      rhythmGain,
-      getArray(participant.weeklySessions).length,
-      participant.experienceScales?.usefulness ?? "",
-      participant.experienceScales?.easeOfUse ?? "",
-      participant.experienceScales?.feedbackClarity ?? "",
-      participant.experienceScales?.confidence ?? "",
-      participant.experienceScales?.continuance ?? "",
-      participant.expertRatings?.pretest?.pitchScore ?? "",
-      participant.expertRatings?.posttest?.pitchScore ?? "",
-      participant.expertRatings?.pretest?.rhythmScore ?? "",
-      participant.expertRatings?.posttest?.rhythmScore ?? "",
-    ].join(","));
-  });
-
-  return lines.join("\n");
+  return { dataset: "participants", rows, headers };
 }
 
 function buildGroupOverview(participants = []) {
@@ -425,8 +622,54 @@ function buildGroupOverview(participants = []) {
   });
 }
 
+async function fetchAnalyzerStatus() {
+  const analyzerUrl = safeString(process.env.ERHU_ANALYZER_URL).replace(/\/+$/, "");
+  if (!analyzerUrl) {
+    return {
+      configured: false,
+      reachable: false,
+      mode: "fallback-only",
+      serviceUrl: "",
+    };
+  }
+
+  try {
+    const response = await fetch(`${analyzerUrl}/health`);
+    if (!response.ok) {
+      return {
+        configured: true,
+        reachable: false,
+        mode: "external-unreachable",
+        serviceUrl: analyzerUrl,
+        statusCode: response.status,
+      };
+    }
+    const json = await response.json();
+    return {
+      configured: true,
+      reachable: true,
+      mode: safeString(json.mode, "external"),
+      serviceUrl: analyzerUrl,
+      details: json,
+    };
+  } catch (error) {
+    return {
+      configured: true,
+      reachable: false,
+      mode: "external-error",
+      serviceUrl: analyzerUrl,
+      error: safeString(error?.message, "unknown"),
+    };
+  }
+}
+
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, service: "ai-erhu-research-prototype", at: nowIso() });
+});
+
+app.get("/api/erhu/analyzer-status", async (req, res) => {
+  const analyzer = await fetchAnalyzerStatus();
+  res.json({ ok: true, analyzer });
 });
 
 app.get("/api/erhu/pieces", (req, res) => {
@@ -485,6 +728,7 @@ app.post("/api/erhu/analyze", async (req, res) => {
     demoSegments: getArray(analysis.demoSegments),
     confidence: clamp(safeNumber(analysis.confidence, 0), 0, 1),
     analysisMode: safeString(analysis.analysisMode, "fallback"),
+    diagnostics: analysis.diagnostics && typeof analysis.diagnostics === "object" ? analysis.diagnostics : null,
     createdAt: nowIso(),
   };
 
@@ -524,6 +768,21 @@ app.post("/api/erhu/study-record", async (req, res) => {
   return res.json({ ok: true, participant: buildParticipantView(participant, store) });
 });
 
+app.post("/api/erhu/participant-profile", async (req, res) => {
+  const payload = req.body || {};
+  const participantId = safeString(payload.participantId).trim();
+  if (!participantId) {
+    return res.status(400).json({ error: "participantId is required." });
+  }
+
+  const store = await readStudyStore();
+  const participant = ensureParticipantRecord(store, participantId, safeString(payload.groupId, "experimental"));
+  applyParticipantProfile(participant, payload);
+  await writeStudyStore(store);
+
+  return res.json({ ok: true, participant: buildParticipantView(participant, store) });
+});
+
 app.post("/api/erhu/expert-rating", async (req, res) => {
   const payload = req.body || {};
   const participantId = safeString(payload.participantId).trim();
@@ -551,8 +810,10 @@ app.get("/api/erhu/research/overview", async (req, res) => {
   const store = await readStudyStore();
   const participants = store.participants.map((participant) => buildParticipantView(participant, store));
   const withGain = participants.filter((item) => item.pitchGain != null);
-  const withQuestionnaire = participants.filter((item) => item.experienceScales?.submittedAt);
+  const withQuestionnaire = participants.filter((item) => getArray(item.questionnaires).length > 0);
   const withExpertPost = participants.filter((item) => item.expertRatings?.posttest);
+  const withProfile = participants.filter((item) => item.profile?.updatedAt);
+  const analyzer = await fetchAnalyzerStatus();
   const averagePitchGain = withGain.length
     ? withGain.reduce((sum, item) => sum + safeNumber(item.pitchGain), 0) / withGain.length
     : 0;
@@ -566,13 +827,17 @@ app.get("/api/erhu/research/overview", async (req, res) => {
       participantCount: participants.length,
       analysisCount: store.analyses.length,
       completedPairCount: withGain.length,
-       questionnaireCount: withQuestionnaire.length,
-       expertRatedCount: withExpertPost.length,
+      profileCompletedCount: withProfile.length,
+      questionnaireCount: withQuestionnaire.length,
+      questionnaireEntryCount: buildQuestionnaireExportRows(store).length,
+      expertRatedCount: withExpertPost.length,
       averagePitchGain: Number(averagePitchGain.toFixed(2)),
       averageRhythmGain: Number(averageRhythmGain.toFixed(2)),
-       averageUsefulness: Number(average(withQuestionnaire.map((item) => item.experienceScales?.usefulness)).toFixed(2)),
-       averageContinuance: Number(average(withQuestionnaire.map((item) => item.experienceScales?.continuance)).toFixed(2)),
-       groups: buildGroupOverview(participants),
+      averageUsefulness: Number(average(withQuestionnaire.map((item) => item.experienceScales?.usefulness)).toFixed(2)),
+      averageContinuance: Number(average(withQuestionnaire.map((item) => item.experienceScales?.continuance)).toFixed(2)),
+      groups: buildGroupOverview(participants),
+      pendingRatings: buildPendingRatings(store),
+      analyzer,
     },
   });
 });
@@ -585,15 +850,38 @@ app.get("/api/erhu/research/participants", async (req, res) => {
   return res.json({ ok: true, participants });
 });
 
+app.get("/api/erhu/research/questionnaires", async (req, res) => {
+  const store = await readStudyStore();
+  const questionnaires = buildQuestionnaireExportRows(store).sort((left, right) =>
+    String(right.submittedAt).localeCompare(String(left.submittedAt)),
+  );
+  return res.json({ ok: true, questionnaires });
+});
+
+app.get("/api/erhu/research/expert-ratings", async (req, res) => {
+  const store = await readStudyStore();
+  const ratings = buildExpertRatingExportRows(store).sort((left, right) =>
+    String(right.submittedAt).localeCompare(String(left.submittedAt)),
+  );
+  return res.json({ ok: true, ratings });
+});
+
+app.get("/api/erhu/research/pending-ratings", async (req, res) => {
+  const store = await readStudyStore();
+  return res.json({ ok: true, pendingRatings: buildPendingRatings(store) });
+});
+
 app.get("/api/erhu/research/export", async (req, res) => {
   const format = safeString(req.query.format, "json").toLowerCase();
+  const dataset = safeString(req.query.dataset, "participants");
   const store = await readStudyStore();
+  const payload = buildExportPayload(store, dataset);
   if (format === "csv") {
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", "attachment; filename=erhu-study-records.csv");
-    return res.send(convertStoreToCsv(store));
+    res.setHeader("Content-Disposition", `attachment; filename=erhu-study-${payload.dataset}.csv`);
+    return res.send(convertRowsToCsv(payload.headers, payload.rows));
   }
-  return res.json({ ok: true, ...store });
+  return res.json({ ok: true, dataset: payload.dataset, rows: payload.rows, store });
 });
 
 app.use(express.static(DIST_DIR));

@@ -4,3 +4,6 @@ dist/
 .DS_Store
 Thumbs.db
 data/*.json
+python-service/.venv/
+python-service/__pycache__/
+python-service/*.pyc

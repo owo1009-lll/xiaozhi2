@@ -34,12 +34,38 @@ export async function saveStudyRecord(payload) {
   );
 }
 
+export async function saveParticipantProfile(payload) {
+  return readJson(
+    await fetch("/api/erhu/participant-profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  );
+}
+
 export async function fetchResearchOverview() {
   return readJson(await fetch("/api/erhu/research/overview"));
 }
 
 export async function fetchResearchParticipants() {
   return readJson(await fetch("/api/erhu/research/participants"));
+}
+
+export async function fetchQuestionnaires() {
+  return readJson(await fetch("/api/erhu/research/questionnaires"));
+}
+
+export async function fetchExpertRatings() {
+  return readJson(await fetch("/api/erhu/research/expert-ratings"));
+}
+
+export async function fetchPendingRatings() {
+  return readJson(await fetch("/api/erhu/research/pending-ratings"));
+}
+
+export async function fetchAnalyzerStatus() {
+  return readJson(await fetch("/api/erhu/analyzer-status"));
 }
 
 export async function saveExpertRating(payload) {
