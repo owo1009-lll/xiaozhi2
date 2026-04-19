@@ -62,6 +62,11 @@ async function writeStudyStore(store) {
   await fs.writeFile(STUDY_STORE_FILE, JSON.stringify(store, null, 2), "utf8");
 }
 
+function average(values = []) {
+  if (!values.length) return 0;
+  return values.reduce((sum, value) => sum + safeNumber(value), 0) / values.length;
+}
+
 function getExpectedDurationSeconds(section) {
   const totalBeats = getArray(section?.notes).reduce((sum, note) => sum + safeNumber(note.beatDuration, 0), 0);
   return totalBeats * (60 / Math.max(30, safeNumber(section?.tempo, 72)));
@@ -194,15 +199,28 @@ function ensureParticipantRecord(store, participantId, groupId) {
       participantId,
       groupId,
       createdAt: nowIso(),
+      lastActiveAt: nowIso(),
       pretest: null,
       weeklySessions: [],
       posttest: null,
       experienceScales: null,
       usageLogs: [],
+      expertRatings: {
+        pretest: null,
+        posttest: null,
+        weekly: [],
+      },
     };
     store.participants.push(participant);
   } else if (groupId) {
     participant.groupId = groupId;
+  }
+  if (!participant.expertRatings || typeof participant.expertRatings !== "object") {
+    participant.expertRatings = {
+      pretest: null,
+      posttest: null,
+      weekly: [],
+    };
   }
   return participant;
 }
@@ -219,6 +237,7 @@ function appendAnalysisToParticipant(participant, payload, analysisRecord) {
     at: analysisRecord.createdAt,
   };
   participant.usageLogs = getArray(participant.usageLogs).concat(usageLog).slice(-100);
+  participant.lastActiveAt = analysisRecord.createdAt;
 
   const summary = {
     analysisId: analysisRecord.analysisId,
@@ -254,6 +273,28 @@ function applyExperienceScale(participant, payload) {
     submittedAt: nowIso(),
     sessionStage: safeString(payload.sessionStage),
   };
+  participant.lastActiveAt = participant.experienceScales.submittedAt;
+}
+
+function applyExpertRating(participant, payload) {
+  const rating = {
+    ratingId: createId("rating"),
+    stage: safeString(payload.stage, "pretest"),
+    pitchScore: clamp(safeNumber(payload.pitchScore, 0), 0, 100),
+    rhythmScore: clamp(safeNumber(payload.rhythmScore, 0), 0, 100),
+    raterId: safeString(payload.raterId, "expert"),
+    comments: safeString(payload.comments),
+    submittedAt: nowIso(),
+  };
+
+  if (rating.stage === "pretest") {
+    participant.expertRatings.pretest = rating;
+  } else if (rating.stage === "posttest") {
+    participant.expertRatings.posttest = rating;
+  } else {
+    participant.expertRatings.weekly = getArray(participant.expertRatings.weekly).concat(rating).slice(-24);
+  }
+  participant.lastActiveAt = rating.submittedAt;
 }
 
 function buildParticipantView(participant, store) {
@@ -278,6 +319,33 @@ function buildParticipantView(participant, store) {
   };
 }
 
+function buildParticipantSummary(participant, store) {
+  const view = buildParticipantView(participant, store);
+  return {
+    participantId: view.participantId,
+    groupId: view.groupId,
+    createdAt: view.createdAt,
+    lastActiveAt: view.lastActiveAt || view.createdAt,
+    analysisCount: view.analyses.length,
+    weeklySessionCount: getArray(view.weeklySessions).length,
+    pretestPitch: view.pretest?.pitchScore ?? null,
+    posttestPitch: view.posttest?.pitchScore ?? null,
+    pretestRhythm: view.pretest?.rhythmScore ?? null,
+    posttestRhythm: view.posttest?.rhythmScore ?? null,
+    pitchGain: view.pitchGain,
+    rhythmGain: view.rhythmGain,
+    usefulness: view.experienceScales?.usefulness ?? null,
+    easeOfUse: view.experienceScales?.easeOfUse ?? null,
+    feedbackClarity: view.experienceScales?.feedbackClarity ?? null,
+    confidence: view.experienceScales?.confidence ?? null,
+    continuance: view.experienceScales?.continuance ?? null,
+    expertPretestPitch: view.expertRatings?.pretest?.pitchScore ?? null,
+    expertPosttestPitch: view.expertRatings?.posttest?.pitchScore ?? null,
+    expertPretestRhythm: view.expertRatings?.pretest?.rhythmScore ?? null,
+    expertPosttestRhythm: view.expertRatings?.posttest?.rhythmScore ?? null,
+  };
+}
+
 function convertStoreToCsv(store) {
   const lines = [
     [
@@ -295,6 +363,10 @@ function convertStoreToCsv(store) {
       "feedbackClarity",
       "confidence",
       "continuance",
+      "expertPretestPitch",
+      "expertPosttestPitch",
+      "expertPretestRhythm",
+      "expertPosttestRhythm",
     ].join(","),
   ];
 
@@ -322,10 +394,35 @@ function convertStoreToCsv(store) {
       participant.experienceScales?.feedbackClarity ?? "",
       participant.experienceScales?.confidence ?? "",
       participant.experienceScales?.continuance ?? "",
+      participant.expertRatings?.pretest?.pitchScore ?? "",
+      participant.expertRatings?.posttest?.pitchScore ?? "",
+      participant.expertRatings?.pretest?.rhythmScore ?? "",
+      participant.expertRatings?.posttest?.rhythmScore ?? "",
     ].join(","));
   });
 
   return lines.join("\n");
+}
+
+function buildGroupOverview(participants = []) {
+  const groups = ["experimental", "control"];
+  return groups.map((groupId) => {
+    const groupParticipants = participants.filter((participant) => participant.groupId === groupId);
+    const completed = groupParticipants.filter((participant) => participant.pitchGain != null);
+    return {
+      groupId,
+      participantCount: groupParticipants.length,
+      completedPairCount: completed.length,
+      averagePitchGain: Number(average(completed.map((participant) => participant.pitchGain)).toFixed(2)),
+      averageRhythmGain: Number(average(completed.map((participant) => participant.rhythmGain)).toFixed(2)),
+      averageUsefulness: Number(
+        average(groupParticipants.map((participant) => participant.experienceScales?.usefulness)).toFixed(2),
+      ),
+      averageContinuance: Number(
+        average(groupParticipants.map((participant) => participant.experienceScales?.continuance)).toFixed(2),
+      ),
+    };
+  });
 }
 
 app.get("/api/health", (req, res) => {
@@ -427,6 +524,20 @@ app.post("/api/erhu/study-record", async (req, res) => {
   return res.json({ ok: true, participant: buildParticipantView(participant, store) });
 });
 
+app.post("/api/erhu/expert-rating", async (req, res) => {
+  const payload = req.body || {};
+  const participantId = safeString(payload.participantId).trim();
+  if (!participantId) {
+    return res.status(400).json({ error: "participantId is required." });
+  }
+
+  const store = await readStudyStore();
+  const participant = ensureParticipantRecord(store, participantId, safeString(payload.groupId, ""));
+  applyExpertRating(participant, payload);
+  await writeStudyStore(store);
+  return res.json({ ok: true, participant: buildParticipantView(participant, store) });
+});
+
 app.get("/api/erhu/study-records/:participantId", async (req, res) => {
   const store = await readStudyStore();
   const participant = store.participants.find((item) => item.participantId === req.params.participantId);
@@ -440,6 +551,8 @@ app.get("/api/erhu/research/overview", async (req, res) => {
   const store = await readStudyStore();
   const participants = store.participants.map((participant) => buildParticipantView(participant, store));
   const withGain = participants.filter((item) => item.pitchGain != null);
+  const withQuestionnaire = participants.filter((item) => item.experienceScales?.submittedAt);
+  const withExpertPost = participants.filter((item) => item.expertRatings?.posttest);
   const averagePitchGain = withGain.length
     ? withGain.reduce((sum, item) => sum + safeNumber(item.pitchGain), 0) / withGain.length
     : 0;
@@ -453,10 +566,23 @@ app.get("/api/erhu/research/overview", async (req, res) => {
       participantCount: participants.length,
       analysisCount: store.analyses.length,
       completedPairCount: withGain.length,
+       questionnaireCount: withQuestionnaire.length,
+       expertRatedCount: withExpertPost.length,
       averagePitchGain: Number(averagePitchGain.toFixed(2)),
       averageRhythmGain: Number(averageRhythmGain.toFixed(2)),
+       averageUsefulness: Number(average(withQuestionnaire.map((item) => item.experienceScales?.usefulness)).toFixed(2)),
+       averageContinuance: Number(average(withQuestionnaire.map((item) => item.experienceScales?.continuance)).toFixed(2)),
+       groups: buildGroupOverview(participants),
     },
   });
+});
+
+app.get("/api/erhu/research/participants", async (req, res) => {
+  const store = await readStudyStore();
+  const participants = store.participants
+    .map((participant) => buildParticipantSummary(participant, store))
+    .sort((left, right) => String(right.lastActiveAt).localeCompare(String(left.lastActiveAt)));
+  return res.json({ ok: true, participants });
 });
 
 app.get("/api/erhu/research/export", async (req, res) => {

@@ -50,6 +50,34 @@ button {
   padding: 24px;
 }
 
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.tab-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tab-button {
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--text-main);
+}
+
+.tab-button.is-active {
+  background: var(--accent);
+  color: #fff;
+}
+
 .hero-card,
 .panel-card,
 .status-banner,
@@ -129,6 +157,17 @@ button {
   gap: 18px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 18px;
+}
+
+.dashboard-layout,
+.protocol-layout {
+  display: grid;
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.dashboard-span {
+  grid-column: 1 / -1;
 }
 
 .panel-card {
@@ -285,6 +324,18 @@ button {
   color: var(--accent);
 }
 
+.secondary-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--accent);
+  text-decoration: none;
+}
+
 .hidden-input {
   display: none;
 }
@@ -294,7 +345,10 @@ button {
 .findings-grid,
 .demo-note-list,
 .question-grid,
-.history-card {
+.history-card,
+.summary-grid,
+.table-scroll,
+.protocol-stack {
   margin-top: 18px;
 }
 
@@ -310,14 +364,18 @@ button {
 
 .finding-card,
 .history-card,
-.empty-card {
+.empty-card,
+.summary-card,
+.protocol-card {
   padding: 16px;
   border-radius: 18px;
   background: var(--bg-soft);
 }
 
 .finding-card h3,
-.history-card h3 {
+.history-card h3,
+.summary-card h4,
+.protocol-card h3 {
   margin: 0 0 10px;
 }
 
@@ -332,6 +390,51 @@ button {
 .question-grid {
   display: grid;
   gap: 14px;
+}
+
+.summary-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.summary-card p {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 960px;
+}
+
+.data-table th,
+.data-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(17, 51, 45, 0.08);
+  text-align: left;
+  font-size: 13px;
+}
+
+.data-table th {
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.protocol-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.protocol-card ul {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.8;
 }
 
 .range-question {
@@ -361,5 +464,10 @@ button {
   .hero-card,
   .grid-layout {
     grid-template-columns: 1fr;
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
