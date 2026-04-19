@@ -2,6 +2,12 @@ from __future__ import annotations
 
 import os
 from dataclasses import asdict, dataclass
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 
 def env_bool(name: str, default: bool = False) -> bool:
@@ -16,10 +22,13 @@ class Settings:
     service_name: str = os.getenv("ERHU_SERVICE_NAME", "ai-erhu-analyzer")
     host: str = os.getenv("ERHU_HOST", "0.0.0.0")
     port: int = int(os.getenv("ERHU_PORT", "8000"))
+    target_sample_rate: int = int(os.getenv("ERHU_TARGET_SAMPLE_RATE", "16000"))
     pitch_hop_ms: int = int(os.getenv("ERHU_PITCH_HOP_MS", "10"))
+    onset_hop_length: int = int(os.getenv("ERHU_ONSET_HOP_LENGTH", "256"))
     min_confidence: float = float(os.getenv("ERHU_MIN_CONFIDENCE", "0.6"))
     enable_torchcrepe: bool = env_bool("ERHU_ENABLE_TORCHCREPE", False)
     enable_librosa_decode: bool = env_bool("ERHU_ENABLE_LIBROSA_DECODE", False)
+    ffmpeg_path: str = os.getenv("ERHU_FFMPEG_PATH", "")
     fallback_issue_limit: int = int(os.getenv("ERHU_FALLBACK_ISSUE_LIMIT", "4"))
 
     def public_dict(self) -> dict[str, object]:

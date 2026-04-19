@@ -26,8 +26,8 @@ export const ERHU_STUDY_PIECES = [
           { noteId: "a-m4-n1", measureIndex: 4, beatStart: 0, beatDuration: 1, midiPitch: 67 },
           { noteId: "a-m4-n2", measureIndex: 4, beatStart: 1, beatDuration: 1, midiPitch: 66 },
           { noteId: "a-m4-n3", measureIndex: 4, beatStart: 2, beatDuration: 1, midiPitch: 64 },
-          { noteId: "a-m4-n4", measureIndex: 4, beatStart: 3, beatDuration: 1, midiPitch: 62 }
-        ]
+          { noteId: "a-m4-n4", measureIndex: 4, beatStart: 3, beatDuration: 1, midiPitch: 62 },
+        ],
       },
       {
         sectionId: "section-b",
@@ -46,14 +46,14 @@ export const ERHU_STUDY_PIECES = [
           { noteId: "b-m2-n4", measureIndex: 2, beatStart: 3, beatDuration: 1, midiPitch: 69 },
           { noteId: "b-m3-n1", measureIndex: 3, beatStart: 0, beatDuration: 1, midiPitch: 67 },
           { noteId: "b-m3-n2", measureIndex: 3, beatStart: 1, beatDuration: 1, midiPitch: 69 },
-          { noteId: "b-m3-n3", measureIndex: 3, beatStart: 2, beatDuration: 2, midiPitch: 71 }
-        ]
-      }
-    ]
+          { noteId: "b-m3-n3", measureIndex: 3, beatStart: 2, beatDuration: 2, midiPitch: 71 },
+        ],
+      },
+    ],
   },
   {
     pieceId: "pentatonic-lyrical-study",
-    title: "五声性旋律练习",
+    title: "五声音阶旋律练习",
     composer: "研究任务曲目 B",
     targetSkills: ["连贯句法", "慢速节奏控制", "音高稳定区"],
     difficulty: "高校二胡专业中级段",
@@ -73,10 +73,10 @@ export const ERHU_STUDY_PIECES = [
           { noteId: "c-m3-n1", measureIndex: 3, beatStart: 0, beatDuration: 1, midiPitch: 74 },
           { noteId: "c-m3-n2", measureIndex: 3, beatStart: 1, beatDuration: 1, midiPitch: 71 },
           { noteId: "c-m3-n3", measureIndex: 3, beatStart: 2, beatDuration: 2, midiPitch: 69 },
-          { noteId: "c-m4-n1", measureIndex: 4, beatStart: 0, beatDuration: 4, midiPitch: 67 }
-        ]
-      }
-    ]
+          { noteId: "c-m4-n1", measureIndex: 4, beatStart: 0, beatDuration: 4, midiPitch: 67 },
+        ],
+      },
+    ],
   },
   {
     pieceId: "bowing-rhythm-cell",
@@ -103,11 +103,11 @@ export const ERHU_STUDY_PIECES = [
           { noteId: "d-m3-n1", measureIndex: 3, beatStart: 0, beatDuration: 0.5, midiPitch: 62 },
           { noteId: "d-m3-n2", measureIndex: 3, beatStart: 0.5, beatDuration: 0.5, midiPitch: 64 },
           { noteId: "d-m3-n3", measureIndex: 3, beatStart: 1, beatDuration: 0.5, midiPitch: 66 },
-          { noteId: "d-m3-n4", measureIndex: 3, beatStart: 1.5, beatDuration: 0.5, midiPitch: 69 }
-        ]
-      }
-    ]
-  }
+          { noteId: "d-m3-n4", measureIndex: 3, beatStart: 1.5, beatDuration: 0.5, midiPitch: 69 },
+        ],
+      },
+    ],
+  },
 ];
 
 function summarizeSection(section) {
