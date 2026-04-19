@@ -63,11 +63,15 @@ The default `research-analysis/output/` folder includes:
 - `table_system_expert_correlations.csv`
 - `table_analysis_usage.csv`
 - `table_usage_correlations.csv`
+- `table_prepost_long.csv`
+- `table_prepost_summary.csv`
+- `table_ancova_summary.csv`
 - `table_expert_ratings_raw.csv`
 - `figure_gain_by_group.png`
 - `figure_questionnaire_by_group.png`
 - `figure_system_vs_expert.png`
 - `figure_usage_vs_pitch_gain.png`
+- `figure_prepost_trends.png`
 - `report.md`
 - `summary.json`
 - `README.txt`
@@ -76,4 +80,5 @@ The default `research-analysis/output/` folder includes:
 
 - All CSV tables are written with `utf-8-sig` so they can be opened directly in Excel on Windows.
 - The script expects numeric score columns in the exported CSV files; missing values are handled as `NaN`.
+- The script now supports empty exported datasets and will generate placeholder figures plus empty summary tables instead of failing.
 - The current statistical outputs are designed for rapid paper drafting and should still be reviewed before submission.

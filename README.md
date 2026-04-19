@@ -12,6 +12,7 @@
 - Python 深度学习分析服务，已接入 `torchcrepe + librosa`
 - PWA 基础能力：`manifest` + `service worker`
 - 统计分析脚本，可把导出的 CSV 转成论文表格和图表
+- 统计分析脚本已支持前后测长表、ANCOVA 摘要与空数据占位输出
 
 ## 当前分析模式
 
@@ -83,6 +84,8 @@ python-service\.venv\Scripts\python.exe research-analysis\analyze_exports.py ^
 
 - 分组汇总表
 - 组间 t 检验表
+- 前后测长表与分组汇总表
+- ANCOVA 摘要表
 - 问卷汇总表
 - 系统评分与教师评分相关表
 - 分析使用情况表

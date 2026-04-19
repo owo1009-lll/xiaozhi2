@@ -115,11 +115,15 @@ npm run research:export-and-paper
 - `table_system_expert_correlations.csv`
 - `table_analysis_usage.csv`
 - `table_usage_correlations.csv`
+- `table_prepost_long.csv`
+- `table_prepost_summary.csv`
+- `table_ancova_summary.csv`
 - `table_expert_ratings_raw.csv`
 - `figure_gain_by_group.png`
 - `figure_questionnaire_by_group.png`
 - `figure_system_vs_expert.png`
 - `figure_usage_vs_pitch_gain.png`
+- `figure_prepost_trends.png`
 - `report.md`
 - `summary.json`
 
@@ -129,3 +133,4 @@ npm run research:export-and-paper
 - 诊断维度当前聚焦音准、节奏、问题音定位和示范回放
 - 运弓、音色、揉弦质量与开放式问答不在本阶段范围内
 - Python 服务已可用，但仍建议后续接入真实教师标注数据做一致性与稳健性验证
+- 统计脚本已支持空白研究库启动状态，清空测试数据后仍可正常导出空表与占位图
