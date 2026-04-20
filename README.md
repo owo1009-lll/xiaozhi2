@@ -65,6 +65,7 @@ npm start
 - `POST /api/erhu/interview-sampling`
 - `POST /api/erhu/study-record`
 - `POST /api/erhu/expert-rating`
+- `POST /api/erhu/validation-review`
 - `GET /api/erhu/study-records/:participantId`
 - `GET /api/erhu/research/overview`
 - `GET /api/erhu/research/data-quality`
@@ -75,8 +76,10 @@ npm start
 - `GET /api/erhu/research/interviews`
 - `GET /api/erhu/research/questionnaires`
 - `GET /api/erhu/research/expert-ratings`
+- `GET /api/erhu/research/validation-reviews`
+- `GET /api/erhu/research/validation-summary`
 - `GET /api/erhu/research/pending-ratings`
-- `GET /api/erhu/research/export?dataset=participants|sampling|tasks|interviews|questionnaires|expert-ratings|analyses&format=json|csv`
+- `GET /api/erhu/research/export?dataset=participants|sampling|tasks|interviews|questionnaires|expert-ratings|analyses|validation-reviews&format=json|csv`
 
 ## 统计分析脚本
 

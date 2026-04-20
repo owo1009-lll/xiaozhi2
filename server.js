@@ -56,11 +56,13 @@ async function readStudyStore() {
     return {
       participants: Array.isArray(parsed.participants) ? parsed.participants.map((item) => normalizeParticipantRecord(item)) : [],
       analyses: Array.isArray(parsed.analyses) ? parsed.analyses : [],
+      validationReviews: Array.isArray(parsed.validationReviews) ? parsed.validationReviews.map((item) => normalizeValidationReview(item)) : [],
     };
   } catch {
     return {
       participants: [],
       analyses: [],
+      validationReviews: [],
     };
   }
 }
@@ -116,6 +118,75 @@ function normalizeInterviewSamplingRecord(sampling = {}) {
     reason: safeString(sampling.reason),
     markedBy: safeString(sampling.markedBy, "researcher"),
     updatedAt: safeString(sampling.updatedAt, nowIso()),
+  };
+}
+
+function toUniqueStringList(value) {
+  if (Array.isArray(value)) {
+    return Array.from(new Set(value.map((item) => safeString(item).trim()).filter(Boolean)));
+  }
+  return Array.from(new Set(String(value || "").split(/[\s,，;；]+/).map((item) => item.trim()).filter(Boolean)));
+}
+
+function toUniqueNumberList(value) {
+  return Array.from(
+    new Set(
+      toUniqueStringList(value)
+        .map((item) => Number(item))
+        .filter((item) => Number.isFinite(item))
+        .map((item) => Math.round(item)),
+    ),
+  );
+}
+
+function calculateBinaryMetrics(systemValues = [], teacherValues = []) {
+  const systemSet = new Set(systemValues);
+  const teacherSet = new Set(teacherValues);
+  const matched = Array.from(teacherSet).filter((item) => systemSet.has(item));
+  const precision = systemSet.size ? matched.length / systemSet.size : null;
+  const recall = teacherSet.size ? matched.length / teacherSet.size : null;
+  const f1 = precision != null && recall != null && (precision + recall) > 0 ? (2 * precision * recall) / (precision + recall) : null;
+  return {
+    matched,
+    matchedCount: matched.length,
+    missedTeacherValues: Array.from(teacherSet).filter((item) => !systemSet.has(item)),
+    extraSystemValues: Array.from(systemSet).filter((item) => !teacherSet.has(item)),
+    precision,
+    recall,
+    f1,
+  };
+}
+
+function normalizeValidationReview(review = {}) {
+  return {
+    reviewId: safeString(review.reviewId),
+    analysisId: safeString(review.analysisId),
+    participantId: safeString(review.participantId),
+    groupId: safeString(review.groupId, "experimental"),
+    sessionStage: safeString(review.sessionStage),
+    pieceId: safeString(review.pieceId),
+    sectionId: safeString(review.sectionId),
+    raterId: safeString(review.raterId, "expert"),
+    overallAgreement: clamp(safeNumber(review.overallAgreement, 0), 0, 5),
+    teacherPrimaryPath: safeString(review.teacherPrimaryPath, "review-first"),
+    teacherIssueNoteIds: toUniqueStringList(review.teacherIssueNoteIds),
+    teacherIssueMeasureIndexes: toUniqueNumberList(review.teacherIssueMeasureIndexes),
+    comments: safeString(review.comments),
+    noteMatchedCount: safeNumber(review.noteMatchedCount, 0),
+    notePrecision: review.notePrecision == null ? null : safeNumber(review.notePrecision, 0),
+    noteRecall: review.noteRecall == null ? null : safeNumber(review.noteRecall, 0),
+    noteF1: review.noteF1 == null ? null : safeNumber(review.noteF1, 0),
+    measureMatchedCount: safeNumber(review.measureMatchedCount, 0),
+    measurePrecision: review.measurePrecision == null ? null : safeNumber(review.measurePrecision, 0),
+    measureRecall: review.measureRecall == null ? null : safeNumber(review.measureRecall, 0),
+    measureF1: review.measureF1 == null ? null : safeNumber(review.measureF1, 0),
+    missedTeacherNoteIds: toUniqueStringList(review.missedTeacherNoteIds),
+    extraSystemNoteIds: toUniqueStringList(review.extraSystemNoteIds),
+    missedTeacherMeasureIndexes: toUniqueNumberList(review.missedTeacherMeasureIndexes),
+    extraSystemMeasureIndexes: toUniqueNumberList(review.extraSystemMeasureIndexes),
+    systemRecommendedPath: safeString(review.systemRecommendedPath),
+    pathAgreement: safeBoolean(review.pathAgreement, false),
+    submittedAt: safeString(review.submittedAt, nowIso()),
   };
 }
 
@@ -218,6 +289,12 @@ function buildFallbackExplanation(overallPitchScore, overallRhythmScore, noteFin
 
   const practiceTargets = [];
   if (topNote) {
+    const practicePath =
+      topNote.isUncertain || topNote.pitchLabel === "pitch-review"
+        ? "review-first"
+        : topNote.rhythmLabel !== "rhythm-ok" && topNote.pitchLabel === "pitch-ok"
+          ? "rhythm-first"
+          : "pitch-first";
     practiceTargets.push({
       priority: 1,
       targetType: "note",
@@ -228,9 +305,17 @@ function buildFallbackExplanation(overallPitchScore, overallRhythmScore, noteFin
       action: topNote.action || "先听示范，再做局部循环练习。",
       severity: topNote.severity || "medium",
       evidenceLabel: topNote.evidenceLabel || null,
+      practicePath,
+      pathReason:
+        practicePath === "rhythm-first"
+          ? "教师可先检查拍点是否明显偏前或偏后。"
+          : practicePath === "pitch-first"
+            ? "教师可先检查左手落点是否偏高或偏低。"
+            : "系统建议先复核，再决定调整方向。",
     });
   }
   if (topMeasure) {
+    const practicePath = topMeasure.issueLabel === "rhythm-unstable" ? "rhythm-first" : "pitch-first";
     practiceTargets.push({
       priority: practiceTargets.length + 1,
       targetType: "measure",
@@ -241,10 +326,12 @@ function buildFallbackExplanation(overallPitchScore, overallRhythmScore, noteFin
       action: topMeasure.coachingTip || "先拆拍，再回到整小节练习。",
       severity: topMeasure.severity || "medium",
       evidenceLabel: topMeasure.issueLabel || null,
+      practicePath,
+      pathReason: practicePath === "rhythm-first" ? "该小节主要反映拍点稳定性问题。" : "该小节主要反映音高稳定性问题。",
     });
   }
 
-  return { summaryText, teacherComment, practiceTargets };
+  return { summaryText, teacherComment, recommendedPracticePath: practiceTargets[0]?.practicePath || "review-first", practiceTargets };
 }
 
 function buildFallbackAnalysis(payload, section) {
@@ -348,6 +435,7 @@ function buildFallbackAnalysis(payload, section) {
     confidence: clamp(0.62 + ((seed % 12) / 100), 0.52, 0.78),
     summaryText: explanation.summaryText,
     teacherComment: explanation.teacherComment,
+    recommendedPracticePath: explanation.recommendedPracticePath,
     practiceTargets: explanation.practiceTargets,
     analysisMode: "fallback",
   };
@@ -597,6 +685,9 @@ function buildParticipantView(participant, store) {
   const analyses = store.analyses
     .filter((item) => item.participantId === participant.participantId)
     .sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)));
+  const validationReviews = getArray(store.validationReviews)
+    .filter((item) => item.participantId === participant.participantId)
+    .sort((left, right) => String(right.submittedAt).localeCompare(String(left.submittedAt)));
 
   const pitchGain =
     participant.pretest && participant.posttest
@@ -610,6 +701,7 @@ function buildParticipantView(participant, store) {
   return {
     ...participant,
     analyses,
+    validationReviews,
     pitchGain,
     rhythmGain,
   };
@@ -623,6 +715,7 @@ function buildParticipantSummary(participant, store) {
   const latestInterview = getArray(view.interviews)
     .slice()
     .sort((left, right) => String(right.submittedAt).localeCompare(String(left.submittedAt)))[0] || null;
+  const latestValidation = getArray(view.validationReviews)[0] || null;
   return {
     participantId: view.participantId,
     groupId: view.groupId,
@@ -658,6 +751,13 @@ function buildParticipantSummary(participant, store) {
     expertPosttestPitch: view.expertRatings?.posttest?.pitchScore ?? null,
     expertPretestRhythm: view.expertRatings?.pretest?.rhythmScore ?? null,
     expertPosttestRhythm: view.expertRatings?.posttest?.rhythmScore ?? null,
+    validationReviewCount: getArray(view.validationReviews).length,
+    latestValidationAt: latestValidation?.submittedAt ?? null,
+    averageValidationAgreement:
+      getArray(view.validationReviews).length
+        ? Number(average(getArray(view.validationReviews).map((item) => item.overallAgreement)).toFixed(2))
+        : null,
+    latestValidationPathAgreement: latestValidation?.pathAgreement ?? null,
   };
 }
 
@@ -710,8 +810,42 @@ function buildAnalysisExportRows(store) {
     overallPitchScore: analysis.overallPitchScore,
     overallRhythmScore: analysis.overallRhythmScore,
     confidence: analysis.confidence,
+    recommendedPracticePath: analysis.recommendedPracticePath || "",
     analysisMode: analysis.analysisMode,
     createdAt: analysis.createdAt,
+  }));
+}
+
+function buildValidationReviewRows(store) {
+  return getArray(store.validationReviews).map((review) => ({
+    reviewId: review.reviewId,
+    analysisId: review.analysisId,
+    participantId: review.participantId,
+    groupId: review.groupId,
+    sessionStage: review.sessionStage,
+    pieceId: review.pieceId,
+    sectionId: review.sectionId,
+    raterId: review.raterId,
+    overallAgreement: review.overallAgreement,
+    teacherPrimaryPath: review.teacherPrimaryPath,
+    systemRecommendedPath: review.systemRecommendedPath,
+    pathAgreement: review.pathAgreement,
+    noteMatchedCount: review.noteMatchedCount,
+    notePrecision: review.notePrecision,
+    noteRecall: review.noteRecall,
+    noteF1: review.noteF1,
+    measureMatchedCount: review.measureMatchedCount,
+    measurePrecision: review.measurePrecision,
+    measureRecall: review.measureRecall,
+    measureF1: review.measureF1,
+    teacherIssueNoteIds: getArray(review.teacherIssueNoteIds).join("|"),
+    teacherIssueMeasureIndexes: getArray(review.teacherIssueMeasureIndexes).join("|"),
+    missedTeacherNoteIds: getArray(review.missedTeacherNoteIds).join("|"),
+    extraSystemNoteIds: getArray(review.extraSystemNoteIds).join("|"),
+    missedTeacherMeasureIndexes: getArray(review.missedTeacherMeasureIndexes).join("|"),
+    extraSystemMeasureIndexes: getArray(review.extraSystemMeasureIndexes).join("|"),
+    comments: review.comments,
+    submittedAt: review.submittedAt,
   }));
 }
 
@@ -884,6 +1018,90 @@ function buildPendingRatings(store) {
     .sort((left, right) => String(right.lastActiveAt).localeCompare(String(left.lastActiveAt)));
 }
 
+function buildPendingValidationReviews(store) {
+  return store.analyses
+    .filter((analysis) => !getArray(store.validationReviews).some((review) => review.analysisId === analysis.analysisId))
+    .sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)))
+    .map((analysis) => ({
+      analysisId: analysis.analysisId,
+      participantId: analysis.participantId,
+      groupId: analysis.groupId,
+      sessionStage: analysis.sessionStage,
+      pieceId: analysis.pieceId,
+      sectionId: analysis.sectionId,
+      createdAt: analysis.createdAt,
+      noteFindingCount: getArray(analysis.noteFindings).length,
+      measureFindingCount: getArray(analysis.measureFindings).length,
+      recommendedPracticePath: safeString(analysis.recommendedPracticePath),
+    }));
+}
+
+function createValidationReview(store, payload) {
+  const analysisId = safeString(payload.analysisId).trim();
+  const analysis = store.analyses.find((item) => item.analysisId === analysisId);
+  if (!analysis) {
+    throw new Error("analysis not found.");
+  }
+
+  const teacherIssueNoteIds = toUniqueStringList(payload.teacherIssueNoteIds);
+  const teacherIssueMeasureIndexes = toUniqueNumberList(payload.teacherIssueMeasureIndexes);
+  const systemNoteIds = Array.from(new Set(getArray(analysis.noteFindings).map((item) => safeString(item.noteId)).filter(Boolean)));
+  const systemMeasureIndexes = Array.from(new Set(getArray(analysis.measureFindings).map((item) => safeNumber(item.measureIndex)).filter((item) => Number.isFinite(item))));
+  const noteMetrics = calculateBinaryMetrics(systemNoteIds, teacherIssueNoteIds);
+  const measureMetrics = calculateBinaryMetrics(systemMeasureIndexes, teacherIssueMeasureIndexes);
+  const systemRecommendedPath =
+    safeString(analysis.recommendedPracticePath) ||
+    safeString(getArray(analysis.practiceTargets)[0]?.practicePath) ||
+    "review-first";
+
+  return normalizeValidationReview({
+    reviewId: safeString(payload.reviewId) || createId("validation"),
+    analysisId: analysis.analysisId,
+    participantId: analysis.participantId,
+    groupId: analysis.groupId,
+    sessionStage: analysis.sessionStage,
+    pieceId: analysis.pieceId,
+    sectionId: analysis.sectionId,
+    raterId: safeString(payload.raterId, "expert"),
+    overallAgreement: safeNumber(payload.overallAgreement, 0),
+    teacherPrimaryPath: safeString(payload.teacherPrimaryPath, "review-first"),
+    teacherIssueNoteIds,
+    teacherIssueMeasureIndexes,
+    comments: safeString(payload.comments),
+    noteMatchedCount: noteMetrics.matchedCount,
+    notePrecision: noteMetrics.precision,
+    noteRecall: noteMetrics.recall,
+    noteF1: noteMetrics.f1,
+    measureMatchedCount: measureMetrics.matchedCount,
+    measurePrecision: measureMetrics.precision,
+    measureRecall: measureMetrics.recall,
+    measureF1: measureMetrics.f1,
+    missedTeacherNoteIds: noteMetrics.missedTeacherValues,
+    extraSystemNoteIds: noteMetrics.extraSystemValues,
+    missedTeacherMeasureIndexes: measureMetrics.missedTeacherValues,
+    extraSystemMeasureIndexes: measureMetrics.extraSystemValues,
+    systemRecommendedPath,
+    pathAgreement: safeString(payload.teacherPrimaryPath, "review-first") === systemRecommendedPath,
+    submittedAt: nowIso(),
+  });
+}
+
+function buildValidationSummary(store) {
+  const reviews = getArray(store.validationReviews);
+  return {
+    reviewCount: reviews.length,
+    averageAgreement: reviews.length ? Number(average(reviews.map((item) => item.overallAgreement)).toFixed(2)) : 0,
+    averageNotePrecision: reviews.length ? Number(average(reviews.map((item) => item.notePrecision)).toFixed(3)) : 0,
+    averageNoteRecall: reviews.length ? Number(average(reviews.map((item) => item.noteRecall)).toFixed(3)) : 0,
+    averageNoteF1: reviews.length ? Number(average(reviews.map((item) => item.noteF1)).toFixed(3)) : 0,
+    averageMeasurePrecision: reviews.length ? Number(average(reviews.map((item) => item.measurePrecision)).toFixed(3)) : 0,
+    averageMeasureRecall: reviews.length ? Number(average(reviews.map((item) => item.measureRecall)).toFixed(3)) : 0,
+    averageMeasureF1: reviews.length ? Number(average(reviews.map((item) => item.measureF1)).toFixed(3)) : 0,
+    pathAgreementRate: reviews.length ? Number((reviews.filter((item) => item.pathAgreement).length / reviews.length).toFixed(3)) : 0,
+    pendingValidationCount: buildPendingValidationReviews(store).length,
+  };
+}
+
 function buildExportPayload(store, dataset) {
   const normalizedDataset = safeString(dataset, "participants").toLowerCase();
   if (normalizedDataset === "questionnaires") {
@@ -919,8 +1137,43 @@ function buildExportPayload(store, dataset) {
       "overallPitchScore",
       "overallRhythmScore",
       "confidence",
+      "recommendedPracticePath",
       "analysisMode",
       "createdAt",
+    ];
+    return { dataset: normalizedDataset, rows, headers };
+  }
+  if (normalizedDataset === "validation-reviews") {
+    const rows = buildValidationReviewRows(store);
+    const headers = [
+      "reviewId",
+      "analysisId",
+      "participantId",
+      "groupId",
+      "sessionStage",
+      "pieceId",
+      "sectionId",
+      "raterId",
+      "overallAgreement",
+      "teacherPrimaryPath",
+      "systemRecommendedPath",
+      "pathAgreement",
+      "noteMatchedCount",
+      "notePrecision",
+      "noteRecall",
+      "noteF1",
+      "measureMatchedCount",
+      "measurePrecision",
+      "measureRecall",
+      "measureF1",
+      "teacherIssueNoteIds",
+      "teacherIssueMeasureIndexes",
+      "missedTeacherNoteIds",
+      "extraSystemNoteIds",
+      "missedTeacherMeasureIndexes",
+      "extraSystemMeasureIndexes",
+      "comments",
+      "submittedAt",
     ];
     return { dataset: normalizedDataset, rows, headers };
   }
@@ -1136,6 +1389,7 @@ app.post("/api/erhu/analyze", async (req, res) => {
     confidence: clamp(safeNumber(analysis.confidence, 0), 0, 1),
     summaryText: safeString(analysis.summaryText),
     teacherComment: safeString(analysis.teacherComment),
+    recommendedPracticePath: safeString(analysis.recommendedPracticePath),
     practiceTargets: getArray(analysis.practiceTargets),
     analysisMode: safeString(analysis.analysisMode, "fallback"),
     diagnostics: analysis.diagnostics && typeof analysis.diagnostics === "object" ? analysis.diagnostics : null,
@@ -1220,6 +1474,7 @@ app.get("/api/erhu/research/overview", async (req, res) => {
   const store = await readStudyStore();
   const participants = store.participants.map((participant) => buildParticipantView(participant, store));
   const dataQuality = buildDataQualityOverview(store);
+  const validationSummary = buildValidationSummary(store);
   const withGain = participants.filter((item) => item.pitchGain != null);
   const withQuestionnaire = participants.filter((item) => getArray(item.questionnaires).length > 0);
   const withExpertPost = participants.filter((item) => item.expertRatings?.posttest);
@@ -1249,8 +1504,16 @@ app.get("/api/erhu/research/overview", async (req, res) => {
       averageRhythmGain: Number(averageRhythmGain.toFixed(2)),
       averageUsefulness: Number(average(withQuestionnaire.map((item) => item.experienceScales?.usefulness)).toFixed(2)),
       averageContinuance: Number(average(withQuestionnaire.map((item) => item.experienceScales?.continuance)).toFixed(2)),
+      validationReviewCount: validationSummary.reviewCount,
+      averageValidationAgreement: validationSummary.averageAgreement,
+      averageValidationNoteF1: validationSummary.averageNoteF1,
+      averageValidationMeasureF1: validationSummary.averageMeasureF1,
+      validationPathAgreementRate: validationSummary.pathAgreementRate,
+      pendingValidationCount: validationSummary.pendingValidationCount,
       groups: buildGroupOverview(participants),
       pendingRatings: buildPendingRatings(store),
+      pendingValidationReviews: buildPendingValidationReviews(store),
+      validationSummary,
       dataQuality,
       analyzer,
     },
@@ -1298,6 +1561,23 @@ app.get("/api/erhu/research/expert-ratings", async (req, res) => {
     String(right.submittedAt).localeCompare(String(left.submittedAt)),
   );
   return res.json({ ok: true, ratings });
+});
+
+app.get("/api/erhu/research/validation-reviews", async (req, res) => {
+  const store = await readStudyStore();
+  const reviews = buildValidationReviewRows(store).sort((left, right) =>
+    String(right.submittedAt).localeCompare(String(left.submittedAt)),
+  );
+  return res.json({ ok: true, reviews });
+});
+
+app.get("/api/erhu/research/validation-summary", async (req, res) => {
+  const store = await readStudyStore();
+  return res.json({
+    ok: true,
+    validationSummary: buildValidationSummary(store),
+    pendingValidationReviews: buildPendingValidationReviews(store),
+  });
 });
 
 app.get("/api/erhu/research/pending-ratings", async (req, res) => {
@@ -1371,6 +1651,42 @@ app.post("/api/erhu/interview-sampling", async (req, res) => {
   applyInterviewSampling(participant, payload);
   await writeStudyStore(store);
   return res.json({ ok: true, participant: buildParticipantView(participant, store) });
+});
+
+app.post("/api/erhu/validation-review", async (req, res) => {
+  const payload = req.body || {};
+  const analysisId = safeString(payload.analysisId).trim();
+  if (!analysisId) {
+    return res.status(400).json({ error: "analysisId is required." });
+  }
+
+  const store = await readStudyStore();
+  let review = null;
+  try {
+    review = createValidationReview(store, payload);
+  } catch (error) {
+    return res.status(404).json({ error: safeString(error?.message, "validation review failed.") });
+  }
+
+  const reviewIndex = getArray(store.validationReviews).findIndex((item) => item.analysisId === review.analysisId);
+  if (reviewIndex >= 0) {
+    store.validationReviews[reviewIndex] = {
+      ...store.validationReviews[reviewIndex],
+      ...review,
+      reviewId: store.validationReviews[reviewIndex].reviewId || review.reviewId,
+    };
+  } else {
+    store.validationReviews.push(review);
+  }
+
+  await writeStudyStore(store);
+  const participant = store.participants.find((item) => item.participantId === review.participantId) || null;
+  return res.json({
+    ok: true,
+    review,
+    participant: participant ? buildParticipantView(participant, store) : null,
+    validationSummary: buildValidationSummary(store),
+  });
 });
 
 app.post("/api/erhu/research/batch-participants", async (req, res) => {

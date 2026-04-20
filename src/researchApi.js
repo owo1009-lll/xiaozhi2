@@ -72,6 +72,14 @@ export async function fetchExpertRatings() {
   return readJson(await fetch("/api/erhu/research/expert-ratings"));
 }
 
+export async function fetchValidationReviews() {
+  return readJson(await fetch("/api/erhu/research/validation-reviews"));
+}
+
+export async function fetchValidationSummary() {
+  return readJson(await fetch("/api/erhu/research/validation-summary"));
+}
+
 export async function fetchPendingRatings() {
   return readJson(await fetch("/api/erhu/research/pending-ratings"));
 }
@@ -83,6 +91,16 @@ export async function fetchAnalyzerStatus() {
 export async function saveExpertRating(payload) {
   return readJson(
     await fetch("/api/erhu/expert-rating", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  );
+}
+
+export async function saveValidationReview(payload) {
+  return readJson(
+    await fetch("/api/erhu/validation-review", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

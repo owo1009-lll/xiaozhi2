@@ -85,6 +85,8 @@ class PracticeTarget(BaseModel):
     action: str
     severity: str | None = None
     evidenceLabel: str | None = None
+    practicePath: str | None = None
+    pathReason: str | None = None
 
 
 class DemoSegment(BaseModel):
@@ -102,6 +104,7 @@ class AnalyzeResult(BaseModel):
     confidence: float
     summaryText: str | None = None
     teacherComment: str | None = None
+    recommendedPracticePath: str | None = None
     practiceTargets: list[PracticeTarget] = Field(default_factory=list)
     analysisMode: str = "external"
     diagnostics: dict[str, Any] = Field(default_factory=dict)

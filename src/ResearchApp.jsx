@@ -14,12 +14,15 @@ import {
   fetchResearchOverview,
   fetchResearchParticipants,
   fetchTasks,
+  fetchValidationReviews,
+  fetchValidationSummary,
   saveExpertRating,
   saveInterviewNote,
   saveInterviewSampling,
   saveParticipantProfile,
   saveTaskPlan,
   saveStudyRecord,
+  saveValidationReview,
 } from "./researchApi";
 import { RESEARCH_PROTOCOL, RESEARCH_TEMPLATE_LIBRARY } from "./researchProtocolData";
 
@@ -99,6 +102,15 @@ const DEFAULT_SAMPLING_MARK = {
   reason: "",
   markedBy: "researcher-1",
 };
+const DEFAULT_VALIDATION_REVIEW = {
+  analysisId: "",
+  raterId: "expert-1",
+  overallAgreement: 4,
+  teacherPrimaryPath: "review-first",
+  teacherIssueNoteIds: "",
+  teacherIssueMeasureIndexes: "",
+  comments: "",
+};
 
 function safeNumber(value, fallback = 0) {
   const numeric = Number(value);
@@ -126,6 +138,12 @@ function confidenceText(value) {
   const numeric = safeNumber(value, NaN);
   if (!Number.isFinite(numeric)) return "未报告";
   return `${Math.round(numeric * 100)}%`;
+}
+
+function practicePathLabel(value) {
+  if (value === "pitch-first") return "先修音准";
+  if (value === "rhythm-first") return "先修节奏";
+  return "先复核";
 }
 
 function formatDateTime(value) {
@@ -295,6 +313,8 @@ export default function ResearchApp() {
   const [interviews, setInterviews] = useState([]);
   const [questionnaires, setQuestionnaires] = useState([]);
   const [expertRatings, setExpertRatings] = useState([]);
+  const [validationReviews, setValidationReviews] = useState([]);
+  const [validationSummary, setValidationSummary] = useState(null);
   const [pendingRatings, setPendingRatings] = useState([]);
   const [analyzerStatus, setAnalyzerStatus] = useState(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
@@ -306,12 +326,14 @@ export default function ResearchApp() {
   const [interviewSaving, setInterviewSaving] = useState(false);
   const [questionnaireSaving, setQuestionnaireSaving] = useState(false);
   const [expertSaving, setExpertSaving] = useState(false);
+  const [validationSaving, setValidationSaving] = useState(false);
   const [batchImporting, setBatchImporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [statusMessage, setStatusMessage] = useState("系统已就绪，可开始录音、分析与研究数据录入。");
   const [experienceScales, setExperienceScales] = useState(DEFAULT_EXPERIENCE);
   const [experienceNotes, setExperienceNotes] = useState("");
   const [expertRating, setExpertRating] = useState(DEFAULT_EXPERT_RATING);
+  const [validationReview, setValidationReview] = useState(DEFAULT_VALIDATION_REVIEW);
   const [taskPlan, setTaskPlan] = useState(DEFAULT_TASK_PLAN);
   const [interviewNote, setInterviewNote] = useState(DEFAULT_INTERVIEW_NOTE);
   const [samplingMark, setSamplingMark] = useState(DEFAULT_SAMPLING_MARK);
@@ -337,6 +359,15 @@ export default function ResearchApp() {
   const latestInterviews = interviews.slice(0, 8);
   const latestQuestionnaires = questionnaires.slice(0, 8);
   const latestRatings = expertRatings.slice(0, 8);
+  const latestValidationReviews = validationReviews.slice(0, 8);
+  const participantAnalyses = participantRecord?.analyses || [];
+  const selectedValidationAnalysis =
+    participantAnalyses.find((item) => item.analysisId === validationReview.analysisId) ||
+    (analysis && participantAnalyses.find((item) => item.analysisId === analysis.analysisId)) ||
+    participantAnalyses[0] ||
+    null;
+  const currentValidationRecord =
+    participantRecord?.validationReviews?.find((item) => item.analysisId === selectedValidationAnalysis?.analysisId) || null;
 
   useEffect(() => {
     const cachedParticipant = localStorage.getItem("ai-erhu.participant");
@@ -460,10 +491,80 @@ export default function ResearchApp() {
     }));
   }, [selectedPieceId, selectedSectionId]);
 
+  useEffect(() => {
+    const fallbackAnalysis = analysis || participantAnalyses[0] || null;
+    const knownAnalysisIds = new Set(participantAnalyses.map((item) => item.analysisId));
+    setValidationReview((prev) => {
+      const currentIsValid =
+        Boolean(prev.analysisId) &&
+        (knownAnalysisIds.has(prev.analysisId) || (analysis?.analysisId && prev.analysisId === analysis.analysisId));
+
+      if (currentIsValid || !fallbackAnalysis?.analysisId) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        analysisId: fallbackAnalysis.analysisId,
+        teacherPrimaryPath:
+          fallbackAnalysis.recommendedPracticePath ||
+          fallbackAnalysis.practiceTargets?.[0]?.practicePath ||
+          "review-first",
+        teacherIssueNoteIds: "",
+        teacherIssueMeasureIndexes: "",
+        comments: "",
+        overallAgreement: DEFAULT_VALIDATION_REVIEW.overallAgreement,
+      };
+    });
+  }, [analysis, participantAnalyses]);
+
+  useEffect(() => {
+    if (!selectedValidationAnalysis?.analysisId) return;
+
+    const existing = participantRecord?.validationReviews?.find((item) => item.analysisId === selectedValidationAnalysis.analysisId);
+    const defaultTeacherPath =
+      selectedValidationAnalysis.recommendedPracticePath ||
+      selectedValidationAnalysis.practiceTargets?.[0]?.practicePath ||
+      "review-first";
+
+    setValidationReview((prev) => {
+      const next = existing
+        ? {
+            ...prev,
+            analysisId: existing.analysisId,
+            raterId: existing.raterId || prev.raterId,
+            overallAgreement: existing.overallAgreement || DEFAULT_VALIDATION_REVIEW.overallAgreement,
+            teacherPrimaryPath: existing.teacherPrimaryPath || defaultTeacherPath,
+            teacherIssueNoteIds: (existing.teacherIssueNoteIds || []).join(", "),
+            teacherIssueMeasureIndexes: (existing.teacherIssueMeasureIndexes || []).join(", "),
+            comments: existing.comments || "",
+          }
+        : {
+            ...prev,
+            analysisId: selectedValidationAnalysis.analysisId,
+            teacherPrimaryPath: defaultTeacherPath,
+            teacherIssueNoteIds: "",
+            teacherIssueMeasureIndexes: "",
+            comments: "",
+            overallAgreement: DEFAULT_VALIDATION_REVIEW.overallAgreement,
+          };
+
+      return prev.analysisId === next.analysisId &&
+        prev.raterId === next.raterId &&
+        prev.overallAgreement === next.overallAgreement &&
+        prev.teacherPrimaryPath === next.teacherPrimaryPath &&
+        prev.teacherIssueNoteIds === next.teacherIssueNoteIds &&
+        prev.teacherIssueMeasureIndexes === next.teacherIssueMeasureIndexes &&
+        prev.comments === next.comments
+        ? prev
+        : next;
+    });
+  }, [participantRecord, selectedValidationAnalysis]);
+
   async function loadDashboardData() {
     setDashboardLoading(true);
     try {
-      const [overviewJson, participantsJson, qualityJson, taskJson, interviewJson, questionnaireJson, ratingsJson, pendingJson, analyzerJson] = await Promise.all([
+      const [overviewJson, participantsJson, qualityJson, taskJson, interviewJson, questionnaireJson, ratingsJson, validationJson, validationSummaryJson, pendingJson, analyzerJson] = await Promise.all([
         fetchResearchOverview(),
         fetchResearchParticipants(),
         fetchDataQuality(),
@@ -471,6 +572,8 @@ export default function ResearchApp() {
         fetchInterviews(),
         fetchQuestionnaires(),
         fetchExpertRatings(),
+        fetchValidationReviews(),
+        fetchValidationSummary(),
         fetchPendingRatings(),
         fetchAnalyzerStatus(),
       ]);
@@ -481,6 +584,8 @@ export default function ResearchApp() {
       setInterviews(interviewJson?.interviews || []);
       setQuestionnaires(questionnaireJson?.questionnaires || []);
       setExpertRatings(ratingsJson?.ratings || []);
+      setValidationReviews(validationJson?.reviews || []);
+      setValidationSummary(validationSummaryJson?.validationSummary || overviewJson?.overview?.validationSummary || null);
       setPendingRatings(pendingJson?.pendingRatings || overviewJson?.overview?.pendingRatings || []);
       setAnalyzerStatus(analyzerJson?.analyzer || overviewJson?.overview?.analyzer || null);
     } catch (error) {
@@ -596,6 +701,12 @@ export default function ResearchApp() {
         audioDataUrl,
       });
       setAnalysis(json.analysis || null);
+      setValidationReview((prev) => ({
+        ...DEFAULT_VALIDATION_REVIEW,
+        raterId: prev.raterId,
+        analysisId: json.analysis?.analysisId || "",
+        teacherPrimaryPath: json.analysis?.recommendedPracticePath || "review-first",
+      }));
       setStatusMessage(
         json.analysis?.analysisMode === "external"
           ? "外部 Python 分析服务已返回结果，可继续查看问题音和问题小节。"
@@ -779,6 +890,45 @@ export default function ResearchApp() {
       setErrorMessage(error.message || "教师评分保存失败。");
     } finally {
       setExpertSaving(false);
+    }
+  }
+
+  async function handleValidationReviewSubmit() {
+    if (!participantId.trim()) {
+      setErrorMessage("请先填写受试编号。");
+      return;
+    }
+    if (!validationReview.analysisId) {
+      setErrorMessage("请先选择要验证的分析记录。");
+      return;
+    }
+
+    setValidationSaving(true);
+    setErrorMessage("");
+    try {
+      const json = await saveValidationReview({
+        analysisId: validationReview.analysisId,
+        raterId: validationReview.raterId,
+        overallAgreement: validationReview.overallAgreement,
+        teacherPrimaryPath: validationReview.teacherPrimaryPath,
+        teacherIssueNoteIds: validationReview.teacherIssueNoteIds,
+        teacherIssueMeasureIndexes: validationReview.teacherIssueMeasureIndexes,
+        comments: validationReview.comments,
+      });
+      setValidationSummary(json?.validationSummary || null);
+      setStatusMessage("教师标注验证已保存，并已更新系统-教师一致性指标。");
+      setValidationReview((prev) => ({
+        ...DEFAULT_VALIDATION_REVIEW,
+        raterId: prev.raterId,
+        analysisId: prev.analysisId,
+        teacherPrimaryPath: prev.teacherPrimaryPath,
+      }));
+      await refreshParticipantRecord();
+      await loadDashboardData();
+    } catch (error) {
+      setErrorMessage(error.message || "教师标注验证保存失败。");
+    } finally {
+      setValidationSaving(false);
     }
   }
 
@@ -1133,6 +1283,9 @@ export default function ResearchApp() {
                       <h3>整体判断</h3>
                       <p>{analysis.summaryText || "当前已生成结果，但整体说明尚未形成。"}</p>
                       {analysis.teacherComment ? <p className="supporting-copy">{analysis.teacherComment}</p> : null}
+                      {analysis.recommendedPracticePath ? (
+                        <p className="supporting-copy">{`推荐练习路径：${practicePathLabel(analysis.recommendedPracticePath)}`}</p>
+                      ) : null}
                     </div>
                     <div className="history-card">
                       <h3>优先练习顺序</h3>
@@ -1141,8 +1294,9 @@ export default function ResearchApp() {
                           {analysis.practiceTargets.map((target) => (
                             <li key={`${target.targetType}-${target.targetId || target.measureIndex || target.priority}`}>
                               <strong>{target.title}</strong>
-                              <span className="practice-meta">{`${severityText(target.severity)} · ${target.evidenceLabel || "系统建议"}`}</span>
+                              <span className="practice-meta">{`${severityText(target.severity)} · ${practicePathLabel(target.practicePath)} · ${target.evidenceLabel || "系统建议"}`}</span>
                               <span>{target.why}</span>
+                              {target.pathReason ? <span>{target.pathReason}</span> : null}
                               <span>{target.action}</span>
                             </li>
                           ))}
@@ -1191,6 +1345,87 @@ export default function ResearchApp() {
                     ) : (
                       <p>当前没有定位到问题音。</p>
                     )}
+                  </div>
+                </div>
+                <div className="history-card">
+                  <h3>教师标注验证</h3>
+                  <div className="field-grid">
+                    <label>
+                      <span>分析记录</span>
+                      <select value={validationReview.analysisId} onChange={(event) => setValidationReview((prev) => ({ ...prev, analysisId: event.target.value }))}>
+                        <option value="">请选择分析记录</option>
+                        {participantAnalyses.map((item) => (
+                          <option key={item.analysisId} value={item.analysisId}>
+                            {`${item.sessionStage} · ${item.pieceId}/${item.sectionId} · ${formatDateTime(item.createdAt)}`}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>教师编号</span>
+                      <input value={validationReview.raterId} onChange={(event) => setValidationReview((prev) => ({ ...prev, raterId: event.target.value }))} />
+                    </label>
+                    <label>
+                      <span>整体一致性</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="5"
+                        value={validationReview.overallAgreement}
+                        onChange={(event) => setValidationReview((prev) => ({ ...prev, overallAgreement: Number(event.target.value) }))}
+                      />
+                    </label>
+                    <label>
+                      <span>教师首要路径</span>
+                      <select value={validationReview.teacherPrimaryPath} onChange={(event) => setValidationReview((prev) => ({ ...prev, teacherPrimaryPath: event.target.value }))}>
+                        <option value="pitch-first">先修音准</option>
+                        <option value="rhythm-first">先修节奏</option>
+                        <option value="review-first">先复核</option>
+                      </select>
+                    </label>
+                  </div>
+                  {selectedValidationAnalysis ? (
+                    <div className="demo-note-list">
+                      <span>{`系统路径：${practicePathLabel(selectedValidationAnalysis.recommendedPracticePath || selectedValidationAnalysis.practiceTargets?.[0]?.practicePath)}`}</span>
+                      <span>{`系统问题音：${(selectedValidationAnalysis.noteFindings || []).map((item) => item.noteId).join(" / ") || "无"}`}</span>
+                      <span>{`系统问题小节：${(selectedValidationAnalysis.measureFindings || []).map((item) => `M${item.measureIndex}`).join(" / ") || "无"}`}</span>
+                    </div>
+                  ) : null}
+                  <div className="field-grid">
+                    <label>
+                      <span>教师问题音</span>
+                      <input
+                        value={validationReview.teacherIssueNoteIds}
+                        onChange={(event) => setValidationReview((prev) => ({ ...prev, teacherIssueNoteIds: event.target.value }))}
+                        placeholder="例如 a-m1-n2, a-m2-n1"
+                      />
+                    </label>
+                    <label>
+                      <span>教师问题小节</span>
+                      <input
+                        value={validationReview.teacherIssueMeasureIndexes}
+                        onChange={(event) => setValidationReview((prev) => ({ ...prev, teacherIssueMeasureIndexes: event.target.value }))}
+                        placeholder="例如 1,2,4"
+                      />
+                    </label>
+                  </div>
+                  <label className="notes-field">
+                    <span>教师验证备注</span>
+                    <textarea rows="3" value={validationReview.comments} onChange={(event) => setValidationReview((prev) => ({ ...prev, comments: event.target.value }))} />
+                  </label>
+                  {currentValidationRecord ? (
+                    <div className="demo-note-list">
+                      <span>{`路径一致：${currentValidationRecord.pathAgreement ? "是" : "否"}`}</span>
+                      <span>{`音符 Precision/Recall/F1：${currentValidationRecord.notePrecision == null ? "—" : currentValidationRecord.notePrecision.toFixed(3)} / ${currentValidationRecord.noteRecall == null ? "—" : currentValidationRecord.noteRecall.toFixed(3)} / ${currentValidationRecord.noteF1 == null ? "—" : currentValidationRecord.noteF1.toFixed(3)}`}</span>
+                      <span>{`小节 Precision/Recall/F1：${currentValidationRecord.measurePrecision == null ? "—" : currentValidationRecord.measurePrecision.toFixed(3)} / ${currentValidationRecord.measureRecall == null ? "—" : currentValidationRecord.measureRecall.toFixed(3)} / ${currentValidationRecord.measureF1 == null ? "—" : currentValidationRecord.measureF1.toFixed(3)}`}</span>
+                      <span>{`教师漏标：${(currentValidationRecord.missedTeacherNoteIds || []).join(" / ") || "无"}`}</span>
+                      <span>{`系统多报：${(currentValidationRecord.extraSystemNoteIds || []).join(" / ") || "无"}`}</span>
+                    </div>
+                  ) : null}
+                  <div className="action-row">
+                    <button type="button" className="primary-button" onClick={handleValidationReviewSubmit} disabled={validationSaving}>
+                      {validationSaving ? "保存中..." : "保存教师标注验证"}
+                    </button>
                   </div>
                 </div>
                 {analysis.diagnostics ? (
@@ -1499,6 +1734,12 @@ export default function ResearchApp() {
                   <ScoreBadge label="教师后测评分" value={researchOverview.expertRatedCount} accent="#7c3aed" />
                   <ScoreBadge label="分析器连通" value={analyzerStatus?.reachable ? 100 : 0} accent="#4338ca" suffix="%" />
                 </div>
+                <div className="result-grid">
+                  <ScoreBadge label="验证条目" value={researchOverview.validationReviewCount} accent="#1d4ed8" />
+                  <ScoreBadge label="平均一致性" value={(researchOverview.averageValidationAgreement || 0) * 20} accent="#0f766e" suffix="%" />
+                  <ScoreBadge label="音符 F1" value={(researchOverview.averageValidationNoteF1 || 0) * 100} accent="#b45309" suffix="%" />
+                  <ScoreBadge label="路径一致率" value={(researchOverview.validationPathAgreementRate || 0) * 100} accent="#7c3aed" suffix="%" />
+                </div>
                 <div className="summary-grid">
                   {groupSummaries.map((group) => (
                     <GroupOverviewCard key={group.groupId} group={group} />
@@ -1567,6 +1808,7 @@ export default function ResearchApp() {
               <ExportLink dataset="questionnaires" format="csv">导出问卷 CSV</ExportLink>
               <ExportLink dataset="expert-ratings" format="csv">导出评分 CSV</ExportLink>
               <ExportLink dataset="analyses" format="csv">导出分析 CSV</ExportLink>
+              <ExportLink dataset="validation-reviews" format="csv">导出验证 CSV</ExportLink>
               <ExportLink dataset="participants" format="json">导出全量 JSON</ExportLink>
             </div>
             <div className="history-card">
@@ -1607,6 +1849,40 @@ export default function ResearchApp() {
               </div>
             ) : (
               <div className="empty-card">当前没有待评分记录。</div>
+            )}
+          </section>
+
+          <section className="panel-card">
+            <SectionTitle step="R3A" title="待验证分析" description="列出还未完成教师标注验证的分析记录，便于系统输出与教师判断对齐。" />
+            {validationSummary?.pendingValidationCount ? (
+              <div className="queue-list">
+                {(researchOverview?.pendingValidationReviews || []).slice(0, 8).map((item) => (
+                  <div key={item.analysisId} className="queue-item">
+                    <div>
+                      <strong>{item.participantId}</strong>
+                      <p>{`${item.sessionStage} · ${item.pieceId}/${item.sectionId} · 系统路径 ${practicePathLabel(item.recommendedPracticePath)}`}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => {
+                        setParticipantId(item.participantId);
+                        setValidationReview((prev) => ({
+                          ...prev,
+                          analysisId: item.analysisId,
+                          teacherPrimaryPath: item.recommendedPracticePath || "review-first",
+                        }));
+                        setActiveTab("workspace");
+                        setStatusMessage(`已载入 ${item.participantId} 的待验证分析。`);
+                      }}
+                    >
+                      打开验证
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-card">当前没有待验证分析。</div>
             )}
           </section>
 
@@ -1730,6 +2006,8 @@ export default function ResearchApp() {
                       <th>任务数</th>
                       <th>已完成任务</th>
                       <th>访谈数</th>
+                      <th>验证数</th>
+                      <th>平均验证一致性</th>
                       <th>抽样标记</th>
                       <th>抽样优先级</th>
                       <th>最新问卷阶段</th>
@@ -1752,6 +2030,8 @@ export default function ResearchApp() {
                         <td>{participant.taskPlanCount}</td>
                         <td>{participant.completedTaskCount}</td>
                         <td>{participant.interviewCount}</td>
+                        <td>{participant.validationReviewCount}</td>
+                        <td>{participant.averageValidationAgreement ?? "—"}</td>
                         <td>{participant.interviewSamplingSelected ? "是" : "否"}</td>
                         <td>{participant.interviewSamplingPriority || "—"}</td>
                         <td>{participant.latestQuestionnaireStage || "—"}</td>
@@ -1800,6 +2080,46 @@ export default function ResearchApp() {
               </div>
             ) : (
               <div className="empty-card">当前没有问卷记录。</div>
+            )}
+          </section>
+
+          <section className="panel-card dashboard-span">
+            <SectionTitle step="R6" title="最新教师验证" description="查看系统输出与教师判断的一致性结果，包括问题定位和练习路径是否一致。" />
+            {latestValidationReviews.length ? (
+              <div className="table-scroll">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>受试编号</th>
+                      <th>分析记录</th>
+                      <th>教师路径</th>
+                      <th>系统路径</th>
+                      <th>路径一致</th>
+                      <th>整体一致性</th>
+                      <th>音符 F1</th>
+                      <th>小节 F1</th>
+                      <th>提交时间</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {latestValidationReviews.map((item) => (
+                      <tr key={item.reviewId}>
+                        <td>{item.participantId}</td>
+                        <td>{item.analysisId}</td>
+                        <td>{practicePathLabel(item.teacherPrimaryPath)}</td>
+                        <td>{practicePathLabel(item.systemRecommendedPath)}</td>
+                        <td>{item.pathAgreement ? "是" : "否"}</td>
+                        <td>{item.overallAgreement}</td>
+                        <td>{item.noteF1 == null ? "—" : item.noteF1.toFixed(3)}</td>
+                        <td>{item.measureF1 == null ? "—" : item.measureF1.toFixed(3)}</td>
+                        <td>{formatDateTime(item.submittedAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="empty-card">当前还没有教师标注验证记录。</div>
             )}
           </section>
 

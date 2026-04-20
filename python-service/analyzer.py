@@ -753,6 +753,33 @@ class ErhuAnalyzer:
             return "先分离问题音，确认每个落点稳定后再恢复整小节演奏。"
         return "先放慢速度，定位最不稳的两个音后再重练。"
 
+    def _practice_path_for_note(self, note: NoteFinding) -> tuple[str, str]:
+        if note.isUncertain or note.pitchLabel == "pitch-review":
+            return "review-first", "该音证据偏弱，应先复核再决定是否调整手型或节拍。"
+        if note.rhythmLabel in {"rhythm-early", "rhythm-late"} and note.pitchLabel == "pitch-ok":
+            return "rhythm-first", "该音主要是起拍位置问题，应先修节奏。"
+        if note.pitchLabel in {"pitch-flat", "pitch-sharp"} and note.rhythmLabel == "rhythm-ok":
+            return "pitch-first", "该音主要是落点问题，应先修音准。"
+        if note.rhythmLabel in {"rhythm-early", "rhythm-late"} and note.pitchLabel in {"pitch-flat", "pitch-sharp"}:
+            if abs(note.onsetErrorMs) >= abs(note.centsError):
+                return "rhythm-first", "该音节奏偏差更突出，先把起拍放准更有效。"
+            return "pitch-first", "该音音高偏差更突出，先把落点稳定下来更有效。"
+        return "review-first", "该音接近阈值，建议先复核示范与教师判断。"
+
+    def _practice_path_for_measure(self, measure: MeasureFinding) -> tuple[str, str]:
+        if measure.issueLabel == "rhythm-unstable":
+            return "rhythm-first", "该小节的主要问题是拍点和时值稳定性。"
+        if measure.issueLabel == "pitch-unstable":
+            return "pitch-first", "该小节的主要问题是音高落点与连续稳定性。"
+        return "review-first", "该小节问题类型混合，建议先复核后再决定练习顺序。"
+
+    def _summarize_practice_path(self, practice_targets: list[PracticeTarget], note_findings: list[NoteFinding]) -> str | None:
+        if practice_targets:
+            return practice_targets[0].practicePath
+        if any(item.isUncertain for item in note_findings):
+            return "review-first"
+        return None
+
     def _build_explanation_layer(
         self,
         note_findings: list[NoteFinding],
@@ -760,11 +787,11 @@ class ErhuAnalyzer:
         overall_pitch_score: int,
         overall_rhythm_score: int,
         uncertain_pitch_count: int,
-    ) -> tuple[str, str, list[PracticeTarget]]:
+    ) -> tuple[str, str, str | None, list[PracticeTarget]]:
         if not note_findings and not measure_findings:
             summary_text = "本次录音整体较稳定，当前没有定位到明显的优先修正点。"
             teacher_comment = "建议保持当前速度，再做一遍整段录音确认稳定性。"
-            return summary_text, teacher_comment, []
+            return summary_text, teacher_comment, None, []
 
         dominant_dimension = "节奏" if overall_rhythm_score < overall_pitch_score else "音准"
         summary_parts = [
@@ -784,6 +811,7 @@ class ErhuAnalyzer:
         practice_targets: list[PracticeTarget] = []
         priority = 1
         for note in note_findings[:3]:
+            practice_path, path_reason = self._practice_path_for_note(note)
             practice_targets.append(
                 PracticeTarget(
                     priority=priority,
@@ -795,10 +823,13 @@ class ErhuAnalyzer:
                     action=note.action or "针对该音做局部循环练习。",
                     severity=note.severity,
                     evidenceLabel=note.evidenceLabel,
+                    practicePath=practice_path,
+                    pathReason=path_reason,
                 )
             )
             priority += 1
         for measure in measure_findings[:2]:
+            practice_path, path_reason = self._practice_path_for_measure(measure)
             practice_targets.append(
                 PracticeTarget(
                     priority=priority,
@@ -810,15 +841,17 @@ class ErhuAnalyzer:
                     action=measure.coachingTip or "先拆分拍点，再回到整小节练习。",
                     severity=measure.severity,
                     evidenceLabel=measure.issueLabel,
+                    practicePath=practice_path,
+                    pathReason=path_reason,
                 )
             )
             priority += 1
 
         if practice_targets:
             highest = practice_targets[0]
-            teacher_comment = f"建议先从“{highest.title}”开始，完成后再回到整段复录。"
+            teacher_comment = f"建议先按“{highest.practicePath or 'review-first'}”路径处理“{highest.title}”，完成后再回到整段复录。"
 
-        return summary_text, teacher_comment, practice_targets
+        return summary_text, teacher_comment, self._summarize_practice_path(practice_targets, note_findings), practice_targets
 
     def _dtw_align_notes(
         self,
@@ -1118,7 +1151,7 @@ class ErhuAnalyzer:
         confidence_values = [float(note["estimatedConfidence"]) for note in aligned_notes if float(note["estimatedConfidence"]) > 0]
         confidence = median(confidence_values) if confidence_values else self.settings.min_confidence
         confidence = max(0.45, min(0.95, float(confidence)))
-        summary_text, teacher_comment, practice_targets = self._build_explanation_layer(
+        summary_text, teacher_comment, recommended_practice_path, practice_targets = self._build_explanation_layer(
             note_findings,
             measure_findings,
             overall_pitch_score,
@@ -1144,6 +1177,7 @@ class ErhuAnalyzer:
             confidence=round(confidence, 3),
             summaryText=summary_text,
             teacherComment=teacher_comment,
+            recommendedPracticePath=recommended_practice_path,
             practiceTargets=practice_targets,
             analysisMode="external",
             diagnostics={
