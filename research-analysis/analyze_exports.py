@@ -41,8 +41,20 @@ PARTICIPANT_NUMERIC_COLUMNS = [
 QUESTIONNAIRE_NUMERIC_COLUMNS = ["usefulness", "easeOfUse", "feedbackClarity", "confidence", "continuance"]
 RATING_NUMERIC_COLUMNS = ["pitchScore", "rhythmScore"]
 ANALYSIS_NUMERIC_COLUMNS = ["overallPitchScore", "overallRhythmScore", "confidence"]
+VALIDATION_NUMERIC_COLUMNS = [
+    "overallAgreement",
+    "noteMatchedCount",
+    "notePrecision",
+    "noteRecall",
+    "noteF1",
+    "measureMatchedCount",
+    "measurePrecision",
+    "measureRecall",
+    "measureF1",
+]
 
 PREPOST_TIME_ORDER = ["pretest", "posttest"]
+PRACTICE_PATH_ORDER = ["pitch-first", "rhythm-first", "review-first"]
 METRIC_SPECS = [
     ("pitch", "pretestPitch", "posttestPitch"),
     ("rhythm", "pretestRhythm", "posttestRhythm"),
@@ -62,6 +74,12 @@ METRIC_LABELS = {
 def safe_read_csv(path: Path) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(f"missing file: {path}")
+    return pd.read_csv(path)
+
+
+def safe_read_optional_csv(path: Path | None, columns: list[str] | None = None) -> pd.DataFrame:
+    if path is None or not path.exists():
+        return pd.DataFrame(columns=columns or [])
     return pd.read_csv(path)
 
 
@@ -153,6 +171,22 @@ def safe_mean(series: pd.Series) -> float:
     if cleaned.empty:
         return float("nan")
     return float(cleaned.mean())
+
+
+def coerce_bool_series(series: pd.Series) -> pd.Series:
+    def _coerce(value: object) -> bool | pd.NA:
+        if pd.isna(value):
+            return pd.NA
+        if isinstance(value, bool):
+            return value
+        text = str(value).strip().lower()
+        if text in {"true", "1", "yes", "y"}:
+            return True
+        if text in {"false", "0", "no", "n"}:
+            return False
+        return pd.NA
+
+    return series.map(_coerce)
 
 
 def safe_pearsonr(x: pd.Series, y: pd.Series) -> tuple[float, float, int]:
@@ -294,6 +328,119 @@ def build_usage_correlation_table(participants: pd.DataFrame) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
+
+
+def prepare_validation_reviews(validation_reviews: pd.DataFrame) -> pd.DataFrame:
+    validation_reviews = ensure_columns(
+        validation_reviews,
+        [
+            "reviewId",
+            "participantId",
+            "groupId",
+            "sessionStage",
+            "teacherPrimaryPath",
+            "systemRecommendedPath",
+            "pathAgreement",
+            "submittedAt",
+            *VALIDATION_NUMERIC_COLUMNS,
+        ],
+    )
+    validation_reviews = ensure_numeric(validation_reviews, VALIDATION_NUMERIC_COLUMNS)
+    validation_reviews["pathAgreement"] = coerce_bool_series(validation_reviews["pathAgreement"])
+    validation_reviews["teacherPrimaryPath"] = validation_reviews["teacherPrimaryPath"].fillna("review-first")
+    validation_reviews["systemRecommendedPath"] = validation_reviews["systemRecommendedPath"].fillna("review-first")
+    return validation_reviews
+
+
+def build_validation_summary(validation_reviews: pd.DataFrame) -> pd.DataFrame:
+    validation_reviews = prepare_validation_reviews(validation_reviews)
+    if validation_reviews.empty:
+        return pd.DataFrame(
+            [
+                {
+                    "reviewCount": 0,
+                    "participantCount": 0,
+                    "averageAgreement": float("nan"),
+                    "averageAgreementNormalized": float("nan"),
+                    "averageNotePrecision": float("nan"),
+                    "averageNoteRecall": float("nan"),
+                    "averageNoteF1": float("nan"),
+                    "averageMeasurePrecision": float("nan"),
+                    "averageMeasureRecall": float("nan"),
+                    "averageMeasureF1": float("nan"),
+                    "pathAgreementRate": float("nan"),
+                }
+            ]
+        )
+
+    agreement_numeric = validation_reviews["pathAgreement"].map(
+        lambda value: float(value) if pd.notna(value) else float("nan"),
+    )
+    return pd.DataFrame(
+        [
+            {
+                "reviewCount": len(validation_reviews),
+                "participantCount": validation_reviews["participantId"].dropna().nunique(),
+                "averageAgreement": validation_reviews["overallAgreement"].mean(),
+                "averageAgreementNormalized": validation_reviews["overallAgreement"].mean() / 5 if validation_reviews["overallAgreement"].notna().any() else float("nan"),
+                "averageNotePrecision": validation_reviews["notePrecision"].mean(),
+                "averageNoteRecall": validation_reviews["noteRecall"].mean(),
+                "averageNoteF1": validation_reviews["noteF1"].mean(),
+                "averageMeasurePrecision": validation_reviews["measurePrecision"].mean(),
+                "averageMeasureRecall": validation_reviews["measureRecall"].mean(),
+                "averageMeasureF1": validation_reviews["measureF1"].mean(),
+                "pathAgreementRate": agreement_numeric.mean(),
+            }
+        ]
+    )
+
+
+def build_validation_group_summary(validation_reviews: pd.DataFrame) -> pd.DataFrame:
+    validation_reviews = prepare_validation_reviews(validation_reviews)
+    if validation_reviews.empty:
+        return pd.DataFrame(
+            columns=[
+                "groupId",
+                "reviewCount",
+                "participantCount",
+                "averageAgreement",
+                "averageAgreementNormalized",
+                "averageNoteF1",
+                "averageMeasureF1",
+                "pathAgreementRate",
+            ]
+        )
+
+    review_counts = validation_reviews.groupby("groupId", dropna=False)["reviewId"].count().rename("reviewCount")
+    participant_counts = validation_reviews.groupby("groupId", dropna=False)["participantId"].nunique().rename("participantCount")
+    grouped = validation_reviews.groupby("groupId", dropna=False).agg(
+        averageAgreement=("overallAgreement", "mean"),
+        averageNoteF1=("noteF1", "mean"),
+        averageMeasureF1=("measureF1", "mean"),
+    )
+    agreement_rate = (
+        validation_reviews.assign(pathAgreementNumeric=validation_reviews["pathAgreement"].map(lambda value: float(value) if pd.notna(value) else float("nan")))
+        .groupby("groupId", dropna=False)["pathAgreementNumeric"]
+        .mean()
+        .rename("pathAgreementRate")
+    )
+    summary = pd.concat([review_counts, participant_counts, grouped, agreement_rate], axis=1).reset_index()
+    summary["averageAgreementNormalized"] = summary["averageAgreement"] / 5
+    return summary.sort_values("groupId")
+
+
+def build_validation_path_confusion(validation_reviews: pd.DataFrame) -> pd.DataFrame:
+    validation_reviews = prepare_validation_reviews(validation_reviews)
+    if validation_reviews.empty:
+        return pd.DataFrame(columns=["teacherPrimaryPath", "systemRecommendedPath", "reviewCount"])
+
+    confusion = (
+        validation_reviews.groupby(["teacherPrimaryPath", "systemRecommendedPath"], dropna=False)
+        .size()
+        .rename("reviewCount")
+        .reset_index()
+    )
+    return confusion.sort_values(["teacherPrimaryPath", "systemRecommendedPath"])
 
 
 def build_prepost_long_table(participants: pd.DataFrame) -> pd.DataFrame:
@@ -505,6 +652,35 @@ def build_usage_sentence(metric: str, usage_corr_table: pd.DataFrame) -> str:
     )
 
 
+def build_validation_sentence(validation_summary: pd.DataFrame, validation_group_summary: pd.DataFrame) -> str:
+    if validation_summary.empty:
+        return "鏁欏笀鏍囨敞楠岃瘉鏁版嵁灏氭湭瀵煎叆锛屽綋鍓嶆棤娉曟姤鍛婄郴缁熻緭鍑轰笌鏁欏笀鍒ゆ柇鐨勪竴鑷存€с€?"
+
+    row = validation_summary.iloc[0].to_dict()
+    review_count = int(row.get("reviewCount", 0) or 0)
+    participant_count = int(row.get("participantCount", 0) or 0)
+    if review_count == 0:
+        return "鏁欏笀鏍囨敞楠岃瘉鏁版嵁灏氭湭瀵煎叆锛屽綋鍓嶆棤娉曟姤鍛婄郴缁熻緭鍑轰笌鏁欏笀鍒ゆ柇鐨勪竴鑷存€с€?"
+
+    sentence = (
+        f"鍦ㄦ暀甯堟爣娉ㄩ獙璇佸瓙鏍锋湰涓紝鍏辩撼鍏?{review_count} 鏉￠獙璇佽褰曪紝瑕嗙洊 {participant_count} 鍚嶅彈璇曡€咃紱"
+        f"绯荤粺涓庢暀甯堢殑鏁翠綋涓€鑷存€у潎鍊间负 {format_number(row.get('averageAgreement'))}/5锛?"
+        f"闊崇绾?F1 涓?{format_number(row.get('averageNoteF1'), 3)}锛?"
+        f"灏忚妭绾?F1 涓?{format_number(row.get('averageMeasureF1'), 3)}锛?"
+        f"缁冧範璺緞涓€鑷寸巼涓?{format_number((row.get('pathAgreementRate') or 0) * 100, 1)}%銆?"
+    )
+
+    if not validation_group_summary.empty:
+        exp = find_row(validation_group_summary, groupId="experimental")
+        ctl = find_row(validation_group_summary, groupId="control")
+        if exp and ctl:
+            sentence += (
+                f"鍏朵腑瀹為獙缁勮矾寰勪竴鑷寸巼涓?{format_number((exp.get('pathAgreementRate') or 0) * 100, 1)}%锛?"
+                f"瀵圭収缁勪负 {format_number((ctl.get('pathAgreementRate') or 0) * 100, 1)}%銆?"
+            )
+    return sentence
+
+
 def build_experience_sentence(group_table: pd.DataFrame, ttest_table: pd.DataFrame) -> str:
     exp_group = find_row(group_table, groupId="experimental") or {}
     ctl_group = find_row(group_table, groupId="control") or {}
@@ -544,6 +720,8 @@ def build_paper_sections(
     usage_corr_table: pd.DataFrame,
     ancova_table: pd.DataFrame,
     prepost_summary: pd.DataFrame,
+    validation_summary: pd.DataFrame,
+    validation_group_summary: pd.DataFrame,
 ) -> tuple[str, list[tuple[str, list[str]]], str]:
     participants = ensure_columns(participants, ["participantId", "groupId", "analysisCount", "weeklySessionCount"])
     participant_count = len(participants)
@@ -564,6 +742,7 @@ def build_paper_sections(
             "结果分析包括前后测描述统计、Welch t 检验、以前测为协变量的 ANCOVA、"
             "系统与专家评分相关分析以及使用次数与学习增益的相关分析。"
         ),
+        build_validation_sentence(validation_summary, validation_group_summary),
         build_main_findings(ttest_table, ancova_table),
         "研究结论部分建议结合定量结果与访谈资料，讨论 AI 反馈在器乐练习中的教学价值、接受度与适用边界。",
     ]
@@ -610,6 +789,7 @@ def build_paper_sections(
         build_ancova_sentence("rhythm", ancova_table),
         build_expert_sentence("pitch", expert_table),
         build_expert_sentence("rhythm", expert_table),
+        build_validation_sentence(validation_summary, validation_group_summary),
         build_usage_sentence("pitch", usage_corr_table),
         build_usage_sentence("rhythm", usage_corr_table),
         build_experience_sentence(group_table, ttest_table),
@@ -653,6 +833,8 @@ def write_paper_draft(
     usage_corr_table: pd.DataFrame,
     ancova_table: pd.DataFrame,
     prepost_summary: pd.DataFrame,
+    validation_summary: pd.DataFrame,
+    validation_group_summary: pd.DataFrame,
 ) -> None:
     title, sections, results_text = build_paper_sections(
         participants,
@@ -662,6 +844,8 @@ def write_paper_draft(
         usage_corr_table,
         ancova_table,
         prepost_summary,
+        validation_summary,
+        validation_group_summary,
     )
 
     markdown_lines = [f"# {title}", ""]
@@ -697,6 +881,8 @@ def write_summary_report(
     usage_corr_table: pd.DataFrame,
     ancova_table: pd.DataFrame,
     prepost_summary: pd.DataFrame,
+    validation_summary: pd.DataFrame,
+    validation_group_summary: pd.DataFrame,
 ) -> None:
     participants = ensure_columns(participants, ["groupId"])
     participant_count = len(participants)
@@ -759,6 +945,29 @@ def write_summary_report(
             f"n={int(row['sampleSize'])}, r={round_value(row['pearsonR'], 3)}, p={round_value(row['pValue'], 4)}"
         )
 
+    lines.extend(["", "## Teacher Validation Alignment"])
+    if validation_summary.empty or not int(validation_summary.iloc[0].get("reviewCount", 0) or 0):
+        lines.append("- No teacher validation reviews available yet.")
+    else:
+        row = validation_summary.iloc[0]
+        lines.extend(
+            [
+                f"- Reviews: {int(row['reviewCount'])}",
+                f"- Participants covered: {int(row['participantCount'])}",
+                f"- Mean agreement (1-5): {round_value(row['averageAgreement'], 3)}",
+                f"- Mean note F1: {round_value(row['averageNoteF1'], 3)}",
+                f"- Mean measure F1: {round_value(row['averageMeasureF1'], 3)}",
+                f"- Practice-path agreement rate: {round_value((row['pathAgreementRate'] or 0) * 100, 2)}%",
+            ]
+        )
+        for _, group_row in validation_group_summary.iterrows():
+            lines.append(
+                f"- {group_row['groupId']}: reviews={int(group_row['reviewCount'])}, "
+                f"note_f1={round_value(group_row['averageNoteF1'], 3)}, "
+                f"measure_f1={round_value(group_row['averageMeasureF1'], 3)}, "
+                f"path_agreement={round_value((group_row['pathAgreementRate'] or 0) * 100, 2)}%"
+            )
+
     lines.extend(["", "## Usage Correlations"])
     for _, row in usage_corr_table.iterrows():
         lines.append(
@@ -777,6 +986,9 @@ def write_summary_json(
     usage_corr_table: pd.DataFrame,
     ancova_table: pd.DataFrame,
     prepost_summary: pd.DataFrame,
+    validation_summary: pd.DataFrame,
+    validation_group_summary: pd.DataFrame,
+    validation_path_confusion: pd.DataFrame,
 ) -> None:
     payload = {
         "groupSummary": group_table.to_dict(orient="records"),
@@ -785,6 +997,9 @@ def write_summary_json(
         "ancova": ancova_table.to_dict(orient="records"),
         "systemExpertCorrelations": expert_table.to_dict(orient="records"),
         "usageCorrelations": usage_corr_table.to_dict(orient="records"),
+        "validationSummary": validation_summary.to_dict(orient="records"),
+        "validationByGroup": validation_group_summary.to_dict(orient="records"),
+        "validationPathConfusion": validation_path_confusion.to_dict(orient="records"),
     }
     (output_dir / "summary.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -896,12 +1111,56 @@ def plot_prepost_trends(prepost_summary: pd.DataFrame, output_dir: Path) -> None
     save_figure(fig, output_dir, "figure_prepost_trends")
 
 
+def plot_validation_metrics(validation_group_summary: pd.DataFrame, output_dir: Path) -> None:
+    validation_group_summary = ensure_columns(
+        validation_group_summary,
+        ["groupId", "averageNoteF1", "averageMeasureF1", "pathAgreementRate", "averageAgreementNormalized"],
+    )
+    plot_frame = validation_group_summary.melt(
+        id_vars=["groupId"],
+        value_vars=["averageNoteF1", "averageMeasureF1", "pathAgreementRate", "averageAgreementNormalized"],
+        var_name="metric",
+        value_name="value",
+    ).dropna()
+    if plot_frame.empty:
+        save_figure(placeholder_figure("Teacher Validation Metrics by Group"), output_dir, "figure_validation_by_group")
+        return
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    sns.barplot(data=plot_frame, x="metric", y="value", hue="groupId", ax=ax)
+    ax.set_title("Teacher Validation Metrics by Group")
+    ax.set_xlabel("")
+    ax.set_ylabel("Mean proportion")
+    ax.set_ylim(0, 1.05)
+    save_figure(fig, output_dir, "figure_validation_by_group")
+
+
+def plot_validation_path_heatmap(validation_path_confusion: pd.DataFrame, output_dir: Path) -> None:
+    validation_path_confusion = ensure_columns(validation_path_confusion, ["teacherPrimaryPath", "systemRecommendedPath", "reviewCount"])
+    if validation_path_confusion.empty:
+        save_figure(placeholder_figure("Teacher vs System Practice Path"), output_dir, "figure_validation_path_heatmap")
+        return
+
+    pivot = (
+        validation_path_confusion.pivot(index="teacherPrimaryPath", columns="systemRecommendedPath", values="reviewCount")
+        .reindex(index=PRACTICE_PATH_ORDER, columns=PRACTICE_PATH_ORDER)
+        .fillna(0)
+    )
+    fig, ax = plt.subplots(figsize=(6.5, 5.2))
+    sns.heatmap(pivot, annot=True, fmt=".0f", cmap="Blues", cbar=True, ax=ax)
+    ax.set_title("Teacher vs System Practice Path")
+    ax.set_xlabel("System recommended path")
+    ax.set_ylabel("Teacher primary path")
+    save_figure(fig, output_dir, "figure_validation_path_heatmap")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate SSCI-ready tables and figures from exported study CSV files.")
     parser.add_argument("--participants", required=True, type=Path)
     parser.add_argument("--questionnaires", required=True, type=Path)
     parser.add_argument("--ratings", required=True, type=Path)
     parser.add_argument("--analyses", required=True, type=Path)
+    parser.add_argument("--validations", required=False, type=Path, default=None)
     parser.add_argument("--output-dir", default=Path("research-analysis/output"), type=Path)
     args = parser.parse_args()
 
@@ -913,6 +1172,34 @@ def main() -> None:
     questionnaires = ensure_numeric(safe_read_csv(args.questionnaires), QUESTIONNAIRE_NUMERIC_COLUMNS)
     ratings = ensure_numeric(safe_read_csv(args.ratings), RATING_NUMERIC_COLUMNS)
     analyses = ensure_numeric(safe_read_csv(args.analyses), ANALYSIS_NUMERIC_COLUMNS)
+    validation_reviews = prepare_validation_reviews(
+        safe_read_optional_csv(
+            args.validations,
+            columns=[
+                "reviewId",
+                "analysisId",
+                "participantId",
+                "groupId",
+                "sessionStage",
+                "pieceId",
+                "sectionId",
+                "raterId",
+                "overallAgreement",
+                "teacherPrimaryPath",
+                "systemRecommendedPath",
+                "pathAgreement",
+                "noteMatchedCount",
+                "notePrecision",
+                "noteRecall",
+                "noteF1",
+                "measureMatchedCount",
+                "measurePrecision",
+                "measureRecall",
+                "measureF1",
+                "submittedAt",
+            ],
+        )
+    )
 
     group_table = group_summary(participants)
     ttest_table = ttest_summary(participants)
@@ -922,6 +1209,9 @@ def main() -> None:
     prepost_long = build_prepost_long_table(participants)
     prepost_summary = build_prepost_summary(prepost_long)
     ancova_table = build_ancova_table(participants)
+    validation_summary = build_validation_summary(validation_reviews)
+    validation_group_summary = build_validation_group_summary(validation_reviews)
+    validation_path_confusion = build_validation_path_confusion(validation_reviews)
 
     save_table(participants, output_dir, "table_participant_overview")
     save_table(group_table, output_dir, "table_group_summary")
@@ -934,15 +1224,54 @@ def main() -> None:
     save_table(prepost_summary, output_dir, "table_prepost_summary")
     save_table(ancova_table, output_dir, "table_ancova_summary")
     save_table(ratings.sort_values(["participantId", "stage", "submittedAt"]), output_dir, "table_expert_ratings_raw")
+    save_table(validation_reviews.sort_values(["participantId", "submittedAt"]), output_dir, "table_validation_reviews_raw")
+    save_table(validation_summary, output_dir, "table_validation_summary")
+    save_table(validation_group_summary, output_dir, "table_validation_group_summary")
+    save_table(validation_path_confusion, output_dir, "table_validation_path_confusion")
 
     plot_gain_by_group(participants, output_dir)
     plot_questionnaire_bars(questionnaires, output_dir)
     plot_system_vs_expert(participants, output_dir)
     plot_usage_vs_gain(participants, output_dir)
     plot_prepost_trends(prepost_summary, output_dir)
-    write_summary_report(output_dir, participants, group_table, ttest_table, expert_table, usage_corr_table, ancova_table, prepost_summary)
-    write_summary_json(output_dir, group_table, ttest_table, expert_table, usage_corr_table, ancova_table, prepost_summary)
-    write_paper_draft(output_dir, participants, group_table, ttest_table, expert_table, usage_corr_table, ancova_table, prepost_summary)
+    plot_validation_metrics(validation_group_summary, output_dir)
+    plot_validation_path_heatmap(validation_path_confusion, output_dir)
+    write_summary_report(
+        output_dir,
+        participants,
+        group_table,
+        ttest_table,
+        expert_table,
+        usage_corr_table,
+        ancova_table,
+        prepost_summary,
+        validation_summary,
+        validation_group_summary,
+    )
+    write_summary_json(
+        output_dir,
+        group_table,
+        ttest_table,
+        expert_table,
+        usage_corr_table,
+        ancova_table,
+        prepost_summary,
+        validation_summary,
+        validation_group_summary,
+        validation_path_confusion,
+    )
+    write_paper_draft(
+        output_dir,
+        participants,
+        group_table,
+        ttest_table,
+        expert_table,
+        usage_corr_table,
+        ancova_table,
+        prepost_summary,
+        validation_summary,
+        validation_group_summary,
+    )
 
     summary_path = output_dir / "README.txt"
     summary_path.write_text(
@@ -960,11 +1289,17 @@ def main() -> None:
                 "- table_prepost_summary.csv",
                 "- table_ancova_summary.csv",
                 "- table_expert_ratings_raw.csv",
+                "- table_validation_reviews_raw.csv",
+                "- table_validation_summary.csv",
+                "- table_validation_group_summary.csv",
+                "- table_validation_path_confusion.csv",
                 "- figure_gain_by_group.png",
                 "- figure_questionnaire_by_group.png",
                 "- figure_system_vs_expert.png",
                 "- figure_usage_vs_pitch_gain.png",
                 "- figure_prepost_trends.png",
+                "- figure_validation_by_group.png",
+                "- figure_validation_path_heatmap.png",
                 "- report.md",
                 "- summary.json",
                 "- paper_draft_zh.md",

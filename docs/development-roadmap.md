@@ -193,3 +193,13 @@
 3. 再做问题解释层优化
 4. 再做真实教师标注验证
 5. 最后才考虑是否训练带注意力机制的新模型
+## Current Checkpoint
+
+- Completed: `teacher validation workflow`
+  Backend now stores teacher validation reviews and computes note-level F1, measure-level F1, and practice-path agreement.
+- Completed: `practice path refinement`
+  The analyzer and UI now distinguish `pitch-first`, `rhythm-first`, and `review-first`.
+- Completed: `research analysis integration`
+  `research-analysis/analyze_exports.py` now accepts `validation-reviews.csv` and generates validation tables, path-confusion tables, and validation figures.
+- Current next step:
+  add inter-rater reliability analysis such as `Cohen's kappa` or `ICC` when you have two or more teacher raters on the same recordings.

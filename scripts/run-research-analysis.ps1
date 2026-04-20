@@ -3,6 +3,7 @@ param(
   [string]$Questionnaires = "exports\questionnaires.csv",
   [string]$Ratings = "exports\expert-ratings.csv",
   [string]$Analyses = "exports\analyses.csv",
+  [string]$Validations = "exports\validation-reviews.csv",
   [string]$OutputDir = "research-analysis\output"
 )
 
@@ -16,4 +17,5 @@ $pythonExe = Join-Path $repoRoot "python-service\.venv\Scripts\python.exe"
   --questionnaires (Join-Path $repoRoot $Questionnaires) `
   --ratings (Join-Path $repoRoot $Ratings) `
   --analyses (Join-Path $repoRoot $Analyses) `
+  --validations (Join-Path $repoRoot $Validations) `
   --output-dir (Join-Path $repoRoot $OutputDir)

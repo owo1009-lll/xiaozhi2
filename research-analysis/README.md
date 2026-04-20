@@ -15,12 +15,13 @@ pip install -r ..\research-analysis\requirements.txt
 
 ## Input files
 
-Export these four CSV files from the app:
+Export these CSV files from the app:
 
 - `participants.csv`
 - `questionnaires.csv`
 - `expert-ratings.csv`
 - `analyses.csv`
+- `validation-reviews.csv`
 
 They correspond to:
 
@@ -28,6 +29,7 @@ They correspond to:
 - `/api/erhu/research/export?dataset=questionnaires&format=csv`
 - `/api/erhu/research/export?dataset=expert-ratings&format=csv`
 - `/api/erhu/research/export?dataset=analyses&format=csv`
+- `/api/erhu/research/export?dataset=validation-reviews&format=csv`
 
 ## Run directly
 
@@ -38,6 +40,7 @@ python-service\.venv\Scripts\python.exe research-analysis\analyze_exports.py ^
   --questionnaires exports\questionnaires.csv ^
   --ratings exports\expert-ratings.csv ^
   --analyses exports\analyses.csv ^
+  --validations exports\validation-reviews.csv ^
   --output-dir research-analysis\output
 ```
 
@@ -68,11 +71,17 @@ The default `research-analysis/output/` folder includes:
 - `table_prepost_summary.csv`
 - `table_ancova_summary.csv`
 - `table_expert_ratings_raw.csv`
+- `table_validation_reviews_raw.csv`
+- `table_validation_summary.csv`
+- `table_validation_group_summary.csv`
+- `table_validation_path_confusion.csv`
 - `figure_gain_by_group.png`
 - `figure_questionnaire_by_group.png`
 - `figure_system_vs_expert.png`
 - `figure_usage_vs_pitch_gain.png`
 - `figure_prepost_trends.png`
+- `figure_validation_by_group.png`
+- `figure_validation_path_heatmap.png`
 - `report.md`
 - `summary.json`
 - `paper_draft_zh.md`
@@ -85,6 +94,7 @@ The default `research-analysis/output/` folder includes:
 
 - All CSV tables are written with `utf-8-sig` so they can be opened directly in Excel on Windows.
 - The script expects numeric score columns in the exported CSV files; missing values are handled as `NaN`.
+- `validation-reviews.csv` is optional at the script level; if it is missing, the validation tables and figures will fall back to empty placeholders.
 - The script now supports empty exported datasets and will generate placeholder figures plus empty summary tables instead of failing.
 - The current statistical outputs are designed for rapid paper drafting and should still be reviewed before submission.
 - `paper_draft_zh.docx` is intended as a Word starter draft; you can refine wording, citations, and section order directly in Word.

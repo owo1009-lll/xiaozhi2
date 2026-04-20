@@ -91,6 +91,7 @@ python-service\.venv\Scripts\python.exe research-analysis\analyze_exports.py ^
   --questionnaires exports\questionnaires.csv ^
   --ratings exports\expert-ratings.csv ^
   --analyses exports\analyses.csv ^
+  --validations exports\validation-reviews.csv ^
   --output-dir research-analysis\output
 ```
 

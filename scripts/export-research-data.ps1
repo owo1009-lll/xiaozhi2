@@ -13,7 +13,8 @@ $datasets = @(
   @{ Name = "participants"; File = "participants.csv" },
   @{ Name = "questionnaires"; File = "questionnaires.csv" },
   @{ Name = "expert-ratings"; File = "expert-ratings.csv" },
-  @{ Name = "analyses"; File = "analyses.csv" }
+  @{ Name = "analyses"; File = "analyses.csv" },
+  @{ Name = "validation-reviews"; File = "validation-reviews.csv" }
 )
 
 foreach ($dataset in $datasets) {
