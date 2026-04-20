@@ -5,3 +5,4 @@ torch==2.7.0
 torchaudio==2.7.0
 torchcrepe==0.0.24
 imageio-ffmpeg==0.6.0
+pretty_midi==0.2.10

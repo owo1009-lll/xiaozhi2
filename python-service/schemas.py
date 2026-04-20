@@ -13,6 +13,13 @@ class NoteEvent(BaseModel):
     midiPitch: int = 60
 
 
+class SymbolicScoreSource(BaseModel):
+    format: str | None = None
+    encoding: str | None = None
+    data: str | None = None
+    filename: str | None = None
+
+
 class PiecePack(BaseModel):
     pieceId: str | None = None
     sectionId: str | None = None
@@ -21,6 +28,7 @@ class PiecePack(BaseModel):
     tempo: int = 72
     demoAudio: str | None = None
     notes: list[NoteEvent] = Field(default_factory=list)
+    scoreSource: SymbolicScoreSource | None = None
 
 
 class AudioSubmission(BaseModel):

@@ -4,7 +4,7 @@
 
 - `src/ResearchApp.jsx`：研究原型前端，覆盖受试编号、录音上传、分析反馈、周任务、访谈、访谈抽样、问卷与教师评分流程
 - `server.js`：Node 网关，负责曲目数据、研究记录、导出接口，以及转发 Python 分析服务
-- `python-service/`：FastAPI 分析服务，当前已接入 `ffmpeg -> librosa -> torchcrepe`
+- `python-service/`：FastAPI 分析服务，当前已接入 `ffmpeg -> librosa -> torchcrepe -> DTW`
 - `research-analysis/`：把导出的 CSV 转成论文可用表格、图表和摘要报告
 - `data/`：本地研究记录文件，仅用于开发或实验阶段存储
 
@@ -66,6 +66,23 @@ ERHU_FFMPEG_PATH=
 - `ERHU_ENABLE_TORCHCREPE=true` 时，音高提取优先使用 `torchcrepe`
 - `ERHU_ENABLE_LIBROSA_DECODE=true` 时，服务会在需要时调用 `ffmpeg/librosa` 解码输入音频
 - `ERHU_FFMPEG_PATH` 可显式指定 ffmpeg 可执行文件；留空时会尝试使用系统或 `imageio-ffmpeg` 提供的二进制
+
+## 当前分析链
+
+当前 Python 分析服务按以下顺序工作：
+
+1. 解码录音音频
+2. 通过 `torchcrepe` 或 `librosa.pyin` 提取逐帧音高
+3. 通过 `librosa` 提取起音候选
+4. 从 `piecePack.notes`、`MusicXML` 或 `MIDI` 构建符号乐谱
+5. 通过 `DTW` 对齐演奏序列与符号乐谱
+6. 输出逐音音准偏差、节奏偏差和小节级问题
+
+说明：
+
+- `MusicXML` 目前通过内置 XML 解析器读取单旋律音符事件
+- `MIDI` 需要安装 `pretty_midi`
+- 如果未传入 `scoreSource`，服务仍会退回到内置 `notes` 序列
 
 ## 研究接口
 

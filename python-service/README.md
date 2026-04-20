@@ -1,48 +1,70 @@
-# Python Analyzer Skeleton
+# Python Analyzer Service
 
-This service provides the external analyzer contract used by the `ai二胡` prototype.
+This service is the deep-learning analysis backend for the `ai二胡` prototype.
 
-## Purpose
+## Current pipeline
 
-- Accept the same payload sent from the Node gateway
-- Return a stable analysis JSON shape for pitch and rhythm feedback
-- Provide clear insertion points for `torchcrepe`, `librosa`, `soundfile`, and future score-alignment logic
+The analyzer now follows this sequence:
 
-## Quick Start
+1. Decode uploaded audio with `soundfile` or `ffmpeg + librosa`
+2. Estimate frame-level pitch with `torchcrepe` when available, otherwise `librosa.pyin`
+3. Detect onset candidates with `librosa`
+4. Resolve the symbolic score from one of these sources:
+   - `piecePack.notes`
+   - inline `MusicXML`
+   - inline `MIDI` when `pretty_midi` is installed
+5. Convert the symbolic score into note events with expected onset/offset times
+6. Build observed note segments from the performance pitch/onset tracks
+7. Align performance to score with `DTW`
+8. Generate note-level and measure-level pitch/rhythm feedback
 
-```bash
+## Endpoints
+
+- `GET /health`
+- `GET /config`
+- `POST /analyze`
+
+## Symbolic score input
+
+`piecePack` may now include:
+
+```json
+{
+  "scoreSource": {
+    "format": "musicxml",
+    "encoding": "utf-8",
+    "data": "<score-partwise>...</score-partwise>"
+  }
+}
+```
+
+Or:
+
+```json
+{
+  "scoreSource": {
+    "format": "midi",
+    "encoding": "base64",
+    "data": "TVRoZAAAA..."
+  }
+}
+```
+
+If `scoreSource` is absent, the analyzer falls back to `piecePack.notes`.
+
+## Install
+
+```powershell
 cd python-service
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn app:app --host 0.0.0.0 --port 8000
-```
-
-Optional research dependencies:
-
-```bash
 pip install -r requirements-optional.txt
+uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
-## Endpoints
+## Research notes
 
-- `GET /health`: readiness and dependency report
-- `GET /config`: public settings snapshot
-- `POST /analyze`: external analyzer contract for the Node server
-
-## Node Integration
-
-Set the root project `.env`:
-
-```bash
-ERHU_ANALYZER_URL=http://127.0.0.1:8000
-```
-
-When `ERHU_ANALYZER_URL` is unset, the Node server falls back to the local mock analyzer.
-
-## Next Research Steps
-
-1. Replace the synthetic pitch track with real `torchcrepe` inference.
-2. Decode uploaded audio with `soundfile` and add onset extraction with `librosa`.
-3. Add score-informed alignment and stable-segment pitch scoring.
-4. Export frame-level diagnostics for teacher validation.
+- `torchcrepe` is the current deep-learning core for pitch estimation.
+- `DTW` is now the main score-performance alignment method.
+- Attention-based models are not part of the v1 pipeline; they are reserved for a later phase where you train a dedicated error-diagnosis model with real teacher-labeled data.
