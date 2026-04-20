@@ -201,5 +201,7 @@
   The analyzer and UI now distinguish `pitch-first`, `rhythm-first`, and `review-first`.
 - Completed: `research analysis integration`
   `research-analysis/analyze_exports.py` now accepts `validation-reviews.csv` and generates validation tables, path-confusion tables, and validation figures.
+- Completed: `dual-rater reliability support`
+  The backend now stores multiple validation reviews per `analysisId` keyed by `raterId`, the app can switch between teacher reviews, and the analysis script now generates `table_inter_rater_pairs.csv`, `table_inter_rater_summary.csv`, and `figure_inter_rater_metrics.png`.
 - Current next step:
-  add inter-rater reliability analysis such as `Cohen's kappa` or `ICC` when you have two or more teacher raters on the same recordings.
+  add a stronger teacher-validation protocol, such as fixed double-rating assignment rules, adjudication workflow, or `Cohen's kappa` / `ICC` reporting by week or piece.

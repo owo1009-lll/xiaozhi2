@@ -75,6 +75,8 @@ The default `research-analysis/output/` folder includes:
 - `table_validation_summary.csv`
 - `table_validation_group_summary.csv`
 - `table_validation_path_confusion.csv`
+- `table_inter_rater_pairs.csv`
+- `table_inter_rater_summary.csv`
 - `figure_gain_by_group.png`
 - `figure_questionnaire_by_group.png`
 - `figure_system_vs_expert.png`
@@ -82,6 +84,7 @@ The default `research-analysis/output/` folder includes:
 - `figure_prepost_trends.png`
 - `figure_validation_by_group.png`
 - `figure_validation_path_heatmap.png`
+- `figure_inter_rater_metrics.png`
 - `report.md`
 - `summary.json`
 - `paper_draft_zh.md`
@@ -95,6 +98,7 @@ The default `research-analysis/output/` folder includes:
 - All CSV tables are written with `utf-8-sig` so they can be opened directly in Excel on Windows.
 - The script expects numeric score columns in the exported CSV files; missing values are handled as `NaN`.
 - `validation-reviews.csv` is optional at the script level; if it is missing, the validation tables and figures will fall back to empty placeholders.
+- When the same `analysisId` has reviews from at least two distinct `raterId` values, the script will also compute dual-rater agreement outputs including `Cohen's kappa`, `ICC`, and overlap F1 scores.
 - The script now supports empty exported datasets and will generate placeholder figures plus empty summary tables instead of failing.
 - The current statistical outputs are designed for rapid paper drafting and should still be reviewed before submission.
 - `paper_draft_zh.docx` is intended as a Word starter draft; you can refine wording, citations, and section order directly in Word.

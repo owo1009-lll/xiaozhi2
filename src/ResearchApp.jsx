@@ -366,8 +366,12 @@ export default function ResearchApp() {
     (analysis && participantAnalyses.find((item) => item.analysisId === analysis.analysisId)) ||
     participantAnalyses[0] ||
     null;
+  const selectedValidationReviews =
+    participantRecord?.validationReviews
+      ?.filter((item) => item.analysisId === selectedValidationAnalysis?.analysisId)
+      ?.sort((left, right) => String(right.submittedAt).localeCompare(String(left.submittedAt))) || [];
   const currentValidationRecord =
-    participantRecord?.validationReviews?.find((item) => item.analysisId === selectedValidationAnalysis?.analysisId) || null;
+    selectedValidationReviews.find((item) => item.raterId === validationReview.raterId) || selectedValidationReviews[0] || null;
 
   useEffect(() => {
     const cachedParticipant = localStorage.getItem("ai-erhu.participant");
@@ -521,7 +525,7 @@ export default function ResearchApp() {
   useEffect(() => {
     if (!selectedValidationAnalysis?.analysisId) return;
 
-    const existing = participantRecord?.validationReviews?.find((item) => item.analysisId === selectedValidationAnalysis.analysisId);
+    const existing = selectedValidationReviews.find((item) => item.raterId === validationReview.raterId) || null;
     const defaultTeacherPath =
       selectedValidationAnalysis.recommendedPracticePath ||
       selectedValidationAnalysis.practiceTargets?.[0]?.practicePath ||
@@ -559,7 +563,7 @@ export default function ResearchApp() {
         ? prev
         : next;
     });
-  }, [participantRecord, selectedValidationAnalysis]);
+  }, [participantRecord, selectedValidationAnalysis, validationReview.raterId]);
 
   async function loadDashboardData() {
     setDashboardLoading(true);
@@ -916,12 +920,16 @@ export default function ResearchApp() {
         comments: validationReview.comments,
       });
       setValidationSummary(json?.validationSummary || null);
-      setStatusMessage("教师标注验证已保存，并已更新系统-教师一致性指标。");
+      setStatusMessage(`教师标注验证已保存：${json?.review?.raterId || validationReview.raterId}`);
       setValidationReview((prev) => ({
-        ...DEFAULT_VALIDATION_REVIEW,
-        raterId: prev.raterId,
-        analysisId: prev.analysisId,
-        teacherPrimaryPath: prev.teacherPrimaryPath,
+        ...prev,
+        analysisId: json?.review?.analysisId || prev.analysisId,
+        raterId: json?.review?.raterId || prev.raterId,
+        overallAgreement: json?.review?.overallAgreement || prev.overallAgreement,
+        teacherPrimaryPath: json?.review?.teacherPrimaryPath || prev.teacherPrimaryPath,
+        teacherIssueNoteIds: (json?.review?.teacherIssueNoteIds || []).join(", "),
+        teacherIssueMeasureIndexes: (json?.review?.teacherIssueMeasureIndexes || []).join(", "),
+        comments: json?.review?.comments || "",
       }));
       await refreshParticipantRecord();
       await loadDashboardData();
@@ -930,6 +938,21 @@ export default function ResearchApp() {
     } finally {
       setValidationSaving(false);
     }
+  }
+
+  function loadValidationReviewIntoForm(review) {
+    if (!review) return;
+    setValidationReview((prev) => ({
+      ...prev,
+      analysisId: review.analysisId || prev.analysisId,
+      raterId: review.raterId || prev.raterId,
+      overallAgreement: review.overallAgreement || DEFAULT_VALIDATION_REVIEW.overallAgreement,
+      teacherPrimaryPath: review.teacherPrimaryPath || prev.teacherPrimaryPath,
+      teacherIssueNoteIds: (review.teacherIssueNoteIds || []).join(", "),
+      teacherIssueMeasureIndexes: (review.teacherIssueMeasureIndexes || []).join(", "),
+      comments: review.comments || "",
+    }));
+    setStatusMessage(`已载入 ${review.raterId || "teacher"} 的教师验证。`);
   }
 
   async function handleBatchImport() {
@@ -1349,6 +1372,15 @@ export default function ResearchApp() {
                 </div>
                 <div className="history-card">
                   <h3>教师标注验证</h3>
+                  {selectedValidationReviews.length ? (
+                    <div className="demo-note-list">
+                      {selectedValidationReviews.map((item) => (
+                        <button key={item.reviewId} type="button" className="secondary-button" onClick={() => loadValidationReviewIntoForm(item)}>
+                          {`${item.raterId} · ${item.overallAgreement}/5 · ${item.pathAgreement ? "路径一致" : "路径不一致"}`}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                   <div className="field-grid">
                     <label>
                       <span>分析记录</span>
@@ -1415,6 +1447,7 @@ export default function ResearchApp() {
                   </label>
                   {currentValidationRecord ? (
                     <div className="demo-note-list">
+                      <span>{`当前教师：${currentValidationRecord.raterId || "teacher"}`}</span>
                       <span>{`路径一致：${currentValidationRecord.pathAgreement ? "是" : "否"}`}</span>
                       <span>{`音符 Precision/Recall/F1：${currentValidationRecord.notePrecision == null ? "—" : currentValidationRecord.notePrecision.toFixed(3)} / ${currentValidationRecord.noteRecall == null ? "—" : currentValidationRecord.noteRecall.toFixed(3)} / ${currentValidationRecord.noteF1 == null ? "—" : currentValidationRecord.noteF1.toFixed(3)}`}</span>
                       <span>{`小节 Precision/Recall/F1：${currentValidationRecord.measurePrecision == null ? "—" : currentValidationRecord.measurePrecision.toFixed(3)} / ${currentValidationRecord.measureRecall == null ? "—" : currentValidationRecord.measureRecall.toFixed(3)} / ${currentValidationRecord.measureF1 == null ? "—" : currentValidationRecord.measureF1.toFixed(3)}`}</span>

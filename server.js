@@ -13,6 +13,7 @@ const port = Number(process.env.PORT || 3000);
 const DATA_DIR = path.join(__dirname, "data");
 const STUDY_STORE_FILE = path.join(DATA_DIR, "erhu-study-records.json");
 const DIST_DIR = path.join(__dirname, "dist");
+const REQUIRED_VALIDATION_RATERS = Math.max(1, safeNumber(process.env.ERHU_VALIDATION_RATERS_REQUIRED, 2));
 
 app.use(express.json({ limit: "30mb" }));
 
@@ -1019,10 +1020,21 @@ function buildPendingRatings(store) {
 }
 
 function buildPendingValidationReviews(store) {
+  const requiredRaterCount = REQUIRED_VALIDATION_RATERS;
   return store.analyses
-    .filter((analysis) => !getArray(store.validationReviews).some((review) => review.analysisId === analysis.analysisId))
-    .sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)))
-    .map((analysis) => ({
+    .map((analysis) => {
+      const analysisReviews = getArray(store.validationReviews).filter((review) => review.analysisId === analysis.analysisId);
+      const uniqueRaters = Array.from(new Set(analysisReviews.map((review) => safeString(review.raterId)).filter(Boolean)));
+      return {
+        analysis,
+        reviewCount: analysisReviews.length,
+        uniqueRaterCount: uniqueRaters.length,
+        requiredRaterCount,
+      };
+    })
+    .filter((item) => item.uniqueRaterCount < requiredRaterCount)
+    .sort((left, right) => String(right.analysis.createdAt).localeCompare(String(left.analysis.createdAt)))
+    .map(({ analysis, reviewCount, uniqueRaterCount, requiredRaterCount: requiredCount }) => ({
       analysisId: analysis.analysisId,
       participantId: analysis.participantId,
       groupId: analysis.groupId,
@@ -1033,6 +1045,9 @@ function buildPendingValidationReviews(store) {
       noteFindingCount: getArray(analysis.noteFindings).length,
       measureFindingCount: getArray(analysis.measureFindings).length,
       recommendedPracticePath: safeString(analysis.recommendedPracticePath),
+      reviewCount,
+      uniqueRaterCount,
+      requiredRaterCount: requiredCount,
     }));
 }
 
@@ -1088,8 +1103,18 @@ function createValidationReview(store, payload) {
 
 function buildValidationSummary(store) {
   const reviews = getArray(store.validationReviews);
+  const analysesWithValidation = Array.from(new Set(reviews.map((item) => item.analysisId).filter(Boolean)));
+  const fullyValidatedAnalysisCount = store.analyses.filter((analysis) => {
+    const uniqueRaters = new Set(
+      reviews.filter((item) => item.analysisId === analysis.analysisId).map((item) => safeString(item.raterId)).filter(Boolean),
+    );
+    return uniqueRaters.size >= REQUIRED_VALIDATION_RATERS;
+  }).length;
   return {
     reviewCount: reviews.length,
+    validatedAnalysisCount: analysesWithValidation.length,
+    fullyValidatedAnalysisCount,
+    requiredRaterCount: REQUIRED_VALIDATION_RATERS,
     averageAgreement: reviews.length ? Number(average(reviews.map((item) => item.overallAgreement)).toFixed(2)) : 0,
     averageNotePrecision: reviews.length ? Number(average(reviews.map((item) => item.notePrecision)).toFixed(3)) : 0,
     averageNoteRecall: reviews.length ? Number(average(reviews.map((item) => item.noteRecall)).toFixed(3)) : 0,
@@ -1509,6 +1534,9 @@ app.get("/api/erhu/research/overview", async (req, res) => {
       averageValidationNoteF1: validationSummary.averageNoteF1,
       averageValidationMeasureF1: validationSummary.averageMeasureF1,
       validationPathAgreementRate: validationSummary.pathAgreementRate,
+      validatedAnalysisCount: validationSummary.validatedAnalysisCount,
+      fullyValidatedAnalysisCount: validationSummary.fullyValidatedAnalysisCount,
+      requiredValidationRaters: validationSummary.requiredRaterCount,
       pendingValidationCount: validationSummary.pendingValidationCount,
       groups: buildGroupOverview(participants),
       pendingRatings: buildPendingRatings(store),
@@ -1656,19 +1684,25 @@ app.post("/api/erhu/interview-sampling", async (req, res) => {
 app.post("/api/erhu/validation-review", async (req, res) => {
   const payload = req.body || {};
   const analysisId = safeString(payload.analysisId).trim();
+  const raterId = safeString(payload.raterId, "expert").trim();
   if (!analysisId) {
     return res.status(400).json({ error: "analysisId is required." });
+  }
+  if (!raterId) {
+    return res.status(400).json({ error: "raterId is required." });
   }
 
   const store = await readStudyStore();
   let review = null;
   try {
-    review = createValidationReview(store, payload);
+    review = createValidationReview(store, { ...payload, raterId });
   } catch (error) {
     return res.status(404).json({ error: safeString(error?.message, "validation review failed.") });
   }
 
-  const reviewIndex = getArray(store.validationReviews).findIndex((item) => item.analysisId === review.analysisId);
+  const reviewIndex = getArray(store.validationReviews).findIndex(
+    (item) => item.analysisId === review.analysisId && safeString(item.raterId) === safeString(review.raterId),
+  );
   if (reviewIndex >= 0) {
     store.validationReviews[reviewIndex] = {
       ...store.validationReviews[reviewIndex],

@@ -443,6 +443,195 @@ def build_validation_path_confusion(validation_reviews: pd.DataFrame) -> pd.Data
     return confusion.sort_values(["teacherPrimaryPath", "systemRecommendedPath"])
 
 
+def parse_pipe_set(value: object, numeric: bool = False) -> set[object]:
+    if pd.isna(value):
+        return set()
+    items = [item.strip() for item in str(value).split("|") if item.strip()]
+    if numeric:
+        parsed: set[object] = set()
+        for item in items:
+            try:
+                parsed.add(int(float(item)))
+            except ValueError:
+                continue
+        return parsed
+    return set(items)
+
+
+def compute_set_f1(left: set[object], right: set[object]) -> tuple[float | None, float | None, float | None]:
+    if not left and not right:
+        return None, None, None
+    matched = len(left & right)
+    precision = matched / len(left) if left else None
+    recall = matched / len(right) if right else None
+    if precision is None or recall is None or (precision + recall) == 0:
+        f1 = None
+    else:
+        f1 = (2 * precision * recall) / (precision + recall)
+    return precision, recall, f1
+
+
+def cohen_kappa_score(left: pd.Series, right: pd.Series, categories: list[str]) -> float:
+    subset = pd.DataFrame({"left": left, "right": right}).dropna()
+    if subset.empty:
+        return float("nan")
+    observed = float((subset["left"] == subset["right"]).mean())
+    expected = 0.0
+    for category in categories:
+        expected += float((subset["left"] == category).mean()) * float((subset["right"] == category).mean())
+    if expected >= 1.0:
+        return float("nan")
+    return (observed - expected) / (1.0 - expected)
+
+
+def icc_2_1(frame: pd.DataFrame) -> float:
+    matrix = frame.dropna().to_numpy(dtype=float)
+    if matrix.ndim != 2 or matrix.shape[0] < 2 or matrix.shape[1] < 2:
+        return float("nan")
+    n, k = matrix.shape
+    grand_mean = matrix.mean()
+    subject_means = matrix.mean(axis=1)
+    rater_means = matrix.mean(axis=0)
+    ss_subject = k * ((subject_means - grand_mean) ** 2).sum()
+    ss_rater = n * ((rater_means - grand_mean) ** 2).sum()
+    ss_error = ((matrix - subject_means[:, None] - rater_means[None, :] + grand_mean) ** 2).sum()
+    ms_subject = ss_subject / (n - 1)
+    ms_rater = ss_rater / (k - 1)
+    ms_error = ss_error / ((n - 1) * (k - 1))
+    denominator = ms_subject + (k - 1) * ms_error + (k * (ms_rater - ms_error) / n)
+    if denominator == 0:
+        return float("nan")
+    return float((ms_subject - ms_error) / denominator)
+
+
+def build_inter_rater_pairs(validation_reviews: pd.DataFrame) -> pd.DataFrame:
+    validation_reviews = prepare_validation_reviews(validation_reviews)
+    validation_reviews = ensure_columns(
+        validation_reviews,
+        [
+            "analysisId",
+            "participantId",
+            "groupId",
+            "sessionStage",
+            "raterId",
+            "overallAgreement",
+            "teacherPrimaryPath",
+            "teacherIssueNoteIds",
+            "teacherIssueMeasureIndexes",
+            "submittedAt",
+        ],
+    )
+    if validation_reviews.empty:
+        return pd.DataFrame(
+            columns=[
+                "analysisId",
+                "participantId",
+                "groupId",
+                "sessionStage",
+                "raterAId",
+                "raterBId",
+                "overallAgreementA",
+                "overallAgreementB",
+                "teacherPrimaryPathA",
+                "teacherPrimaryPathB",
+                "noteOverlapPrecision",
+                "noteOverlapRecall",
+                "noteOverlapF1",
+                "measureOverlapPrecision",
+                "measureOverlapRecall",
+                "measureOverlapF1",
+            ]
+        )
+
+    reviews = validation_reviews.sort_values(["analysisId", "submittedAt", "raterId"]).drop_duplicates(["analysisId", "raterId"], keep="last")
+    rows: list[dict[str, object]] = []
+    for analysis_id, analysis_frame in reviews.groupby("analysisId", dropna=False):
+        analysis_rows = analysis_frame.sort_values(["submittedAt", "raterId"]).to_dict(orient="records")
+        if len(analysis_rows) < 2:
+            continue
+        first = analysis_rows[0]
+        second = analysis_rows[1]
+        note_precision, note_recall, note_f1 = compute_set_f1(
+            parse_pipe_set(first.get("teacherIssueNoteIds")),
+            parse_pipe_set(second.get("teacherIssueNoteIds")),
+        )
+        measure_precision, measure_recall, measure_f1 = compute_set_f1(
+            parse_pipe_set(first.get("teacherIssueMeasureIndexes"), numeric=True),
+            parse_pipe_set(second.get("teacherIssueMeasureIndexes"), numeric=True),
+        )
+        rows.append(
+            {
+                "analysisId": analysis_id,
+                "participantId": first.get("participantId"),
+                "groupId": first.get("groupId"),
+                "sessionStage": first.get("sessionStage"),
+                "raterAId": first.get("raterId"),
+                "raterBId": second.get("raterId"),
+                "overallAgreementA": first.get("overallAgreement"),
+                "overallAgreementB": second.get("overallAgreement"),
+                "teacherPrimaryPathA": first.get("teacherPrimaryPath"),
+                "teacherPrimaryPathB": second.get("teacherPrimaryPath"),
+                "noteOverlapPrecision": note_precision,
+                "noteOverlapRecall": note_recall,
+                "noteOverlapF1": note_f1,
+                "measureOverlapPrecision": measure_precision,
+                "measureOverlapRecall": measure_recall,
+                "measureOverlapF1": measure_f1,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def build_inter_rater_summary(inter_rater_pairs: pd.DataFrame) -> pd.DataFrame:
+    inter_rater_pairs = ensure_columns(
+        inter_rater_pairs,
+        [
+            "analysisId",
+            "participantId",
+            "overallAgreementA",
+            "overallAgreementB",
+            "teacherPrimaryPathA",
+            "teacherPrimaryPathB",
+            "noteOverlapF1",
+            "measureOverlapF1",
+        ],
+    )
+    if inter_rater_pairs.empty:
+        return pd.DataFrame(
+            [
+                {
+                    "pairCount": 0,
+                    "analysisCount": 0,
+                    "participantCount": 0,
+                    "pathCohenKappa": float("nan"),
+                    "overallAgreementICC": float("nan"),
+                    "meanNoteOverlapF1": float("nan"),
+                    "meanMeasureOverlapF1": float("nan"),
+                }
+            ]
+        )
+
+    icc_value = icc_2_1(inter_rater_pairs[["overallAgreementA", "overallAgreementB"]])
+    kappa_value = cohen_kappa_score(
+        inter_rater_pairs["teacherPrimaryPathA"],
+        inter_rater_pairs["teacherPrimaryPathB"],
+        PRACTICE_PATH_ORDER,
+    )
+    return pd.DataFrame(
+        [
+            {
+                "pairCount": len(inter_rater_pairs),
+                "analysisCount": inter_rater_pairs["analysisId"].nunique(),
+                "participantCount": inter_rater_pairs["participantId"].nunique(),
+                "pathCohenKappa": kappa_value,
+                "overallAgreementICC": icc_value,
+                "meanNoteOverlapF1": inter_rater_pairs["noteOverlapF1"].mean(),
+                "meanMeasureOverlapF1": inter_rater_pairs["measureOverlapF1"].mean(),
+            }
+        ]
+    )
+
+
 def build_prepost_long_table(participants: pd.DataFrame) -> pd.DataFrame:
     participants = ensure_columns(participants, ["participantId", "groupId", "pretestPitch", "posttestPitch", "pretestRhythm", "posttestRhythm"])
     rows: list[dict[str, object]] = []
@@ -681,6 +870,24 @@ def build_validation_sentence(validation_summary: pd.DataFrame, validation_group
     return sentence
 
 
+def build_inter_rater_sentence(inter_rater_summary: pd.DataFrame) -> str:
+    if inter_rater_summary.empty:
+        return "褰撳墠灏氭棤鍙敤鐨勫弻璇勬暀甯堟暟鎹紝鍥犳鏃犳硶鎶ュ憡鏁欏笀闂翠竴鑷存€с€?"
+
+    row = inter_rater_summary.iloc[0].to_dict()
+    pair_count = int(row.get("pairCount", 0) or 0)
+    if pair_count == 0:
+        return "褰撳墠灏氭棤鍙敤鐨勫弻璇勬暀甯堟暟鎹紝鍥犳鏃犳硶鎶ュ憡鏁欏笀闂翠竴鑷存€с€?"
+
+    return (
+        f"鍦ㄥ弻璇勬暀甯堝瓙鏍锋湰涓紝鍏辩撼鍏?{pair_count} 瀵瑰弻璇勮褰曪紱"
+        f"缁冧範璺緞鐨?Cohen's kappa 涓?{format_number(row.get('pathCohenKappa'), 3)}锛?"
+        f"鏁翠綋涓€鑷存€ц瘎鍒嗙殑 ICC 涓?{format_number(row.get('overallAgreementICC'), 3)}锛?"
+        f"鏁欏笀闂村闂闊崇殑骞冲潎閲嶅彔 F1 涓?{format_number(row.get('meanNoteOverlapF1'), 3)}锛?"
+        f"瀵归棶棰樺皬鑺傜殑骞冲潎閲嶅彔 F1 涓?{format_number(row.get('meanMeasureOverlapF1'), 3)}銆?"
+    )
+
+
 def build_experience_sentence(group_table: pd.DataFrame, ttest_table: pd.DataFrame) -> str:
     exp_group = find_row(group_table, groupId="experimental") or {}
     ctl_group = find_row(group_table, groupId="control") or {}
@@ -722,6 +929,7 @@ def build_paper_sections(
     prepost_summary: pd.DataFrame,
     validation_summary: pd.DataFrame,
     validation_group_summary: pd.DataFrame,
+    inter_rater_summary: pd.DataFrame,
 ) -> tuple[str, list[tuple[str, list[str]]], str]:
     participants = ensure_columns(participants, ["participantId", "groupId", "analysisCount", "weeklySessionCount"])
     participant_count = len(participants)
@@ -744,6 +952,7 @@ def build_paper_sections(
         ),
         build_validation_sentence(validation_summary, validation_group_summary),
         build_main_findings(ttest_table, ancova_table),
+        build_inter_rater_sentence(inter_rater_summary),
         "研究结论部分建议结合定量结果与访谈资料，讨论 AI 反馈在器乐练习中的教学价值、接受度与适用边界。",
     ]
 
@@ -790,6 +999,7 @@ def build_paper_sections(
         build_expert_sentence("pitch", expert_table),
         build_expert_sentence("rhythm", expert_table),
         build_validation_sentence(validation_summary, validation_group_summary),
+        build_inter_rater_sentence(inter_rater_summary),
         build_usage_sentence("pitch", usage_corr_table),
         build_usage_sentence("rhythm", usage_corr_table),
         build_experience_sentence(group_table, ttest_table),
@@ -835,6 +1045,7 @@ def write_paper_draft(
     prepost_summary: pd.DataFrame,
     validation_summary: pd.DataFrame,
     validation_group_summary: pd.DataFrame,
+    inter_rater_summary: pd.DataFrame,
 ) -> None:
     title, sections, results_text = build_paper_sections(
         participants,
@@ -846,6 +1057,7 @@ def write_paper_draft(
         prepost_summary,
         validation_summary,
         validation_group_summary,
+        inter_rater_summary,
     )
 
     markdown_lines = [f"# {title}", ""]
@@ -883,6 +1095,7 @@ def write_summary_report(
     prepost_summary: pd.DataFrame,
     validation_summary: pd.DataFrame,
     validation_group_summary: pd.DataFrame,
+    inter_rater_summary: pd.DataFrame,
 ) -> None:
     participants = ensure_columns(participants, ["groupId"])
     participant_count = len(participants)
@@ -968,6 +1181,23 @@ def write_summary_report(
                 f"path_agreement={round_value((group_row['pathAgreementRate'] or 0) * 100, 2)}%"
             )
 
+    lines.extend(["", "## Inter-rater Reliability"])
+    if inter_rater_summary.empty or not int(inter_rater_summary.iloc[0].get("pairCount", 0) or 0):
+        lines.append("- No dual-rater teacher reviews available yet.")
+    else:
+        row = inter_rater_summary.iloc[0]
+        lines.extend(
+            [
+                f"- Dual-rated pairs: {int(row['pairCount'])}",
+                f"- Analyses covered: {int(row['analysisCount'])}",
+                f"- Participants covered: {int(row['participantCount'])}",
+                f"- Cohen's kappa (practice path): {round_value(row['pathCohenKappa'], 3)}",
+                f"- ICC (overall agreement): {round_value(row['overallAgreementICC'], 3)}",
+                f"- Mean note overlap F1: {round_value(row['meanNoteOverlapF1'], 3)}",
+                f"- Mean measure overlap F1: {round_value(row['meanMeasureOverlapF1'], 3)}",
+            ]
+        )
+
     lines.extend(["", "## Usage Correlations"])
     for _, row in usage_corr_table.iterrows():
         lines.append(
@@ -989,6 +1219,8 @@ def write_summary_json(
     validation_summary: pd.DataFrame,
     validation_group_summary: pd.DataFrame,
     validation_path_confusion: pd.DataFrame,
+    inter_rater_pairs: pd.DataFrame,
+    inter_rater_summary: pd.DataFrame,
 ) -> None:
     payload = {
         "groupSummary": group_table.to_dict(orient="records"),
@@ -1000,6 +1232,8 @@ def write_summary_json(
         "validationSummary": validation_summary.to_dict(orient="records"),
         "validationByGroup": validation_group_summary.to_dict(orient="records"),
         "validationPathConfusion": validation_path_confusion.to_dict(orient="records"),
+        "interRaterPairs": inter_rater_pairs.to_dict(orient="records"),
+        "interRaterSummary": inter_rater_summary.to_dict(orient="records"),
     }
     (output_dir / "summary.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -1154,6 +1388,35 @@ def plot_validation_path_heatmap(validation_path_confusion: pd.DataFrame, output
     save_figure(fig, output_dir, "figure_validation_path_heatmap")
 
 
+def plot_inter_rater_metrics(inter_rater_summary: pd.DataFrame, output_dir: Path) -> None:
+    inter_rater_summary = ensure_columns(
+        inter_rater_summary,
+        ["pathCohenKappa", "overallAgreementICC", "meanNoteOverlapF1", "meanMeasureOverlapF1"],
+    )
+    if inter_rater_summary.empty or not inter_rater_summary.iloc[0].notna().any():
+        save_figure(placeholder_figure("Inter-rater Reliability Metrics"), output_dir, "figure_inter_rater_metrics")
+        return
+
+    row = inter_rater_summary.iloc[0]
+    plot_frame = pd.DataFrame(
+        {
+            "metric": ["pathCohenKappa", "overallAgreementICC", "meanNoteOverlapF1", "meanMeasureOverlapF1"],
+            "value": [row["pathCohenKappa"], row["overallAgreementICC"], row["meanNoteOverlapF1"], row["meanMeasureOverlapF1"]],
+        }
+    ).dropna()
+    if plot_frame.empty:
+        save_figure(placeholder_figure("Inter-rater Reliability Metrics"), output_dir, "figure_inter_rater_metrics")
+        return
+
+    fig, ax = plt.subplots(figsize=(8, 4.8))
+    sns.barplot(data=plot_frame, x="metric", y="value", ax=ax, color="#4f46e5")
+    ax.set_title("Inter-rater Reliability Metrics")
+    ax.set_xlabel("")
+    ax.set_ylabel("Coefficient")
+    ax.set_ylim(0, 1.05)
+    save_figure(fig, output_dir, "figure_inter_rater_metrics")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate SSCI-ready tables and figures from exported study CSV files.")
     parser.add_argument("--participants", required=True, type=Path)
@@ -1212,6 +1475,8 @@ def main() -> None:
     validation_summary = build_validation_summary(validation_reviews)
     validation_group_summary = build_validation_group_summary(validation_reviews)
     validation_path_confusion = build_validation_path_confusion(validation_reviews)
+    inter_rater_pairs = build_inter_rater_pairs(validation_reviews)
+    inter_rater_summary = build_inter_rater_summary(inter_rater_pairs)
 
     save_table(participants, output_dir, "table_participant_overview")
     save_table(group_table, output_dir, "table_group_summary")
@@ -1228,6 +1493,8 @@ def main() -> None:
     save_table(validation_summary, output_dir, "table_validation_summary")
     save_table(validation_group_summary, output_dir, "table_validation_group_summary")
     save_table(validation_path_confusion, output_dir, "table_validation_path_confusion")
+    save_table(inter_rater_pairs, output_dir, "table_inter_rater_pairs")
+    save_table(inter_rater_summary, output_dir, "table_inter_rater_summary")
 
     plot_gain_by_group(participants, output_dir)
     plot_questionnaire_bars(questionnaires, output_dir)
@@ -1236,6 +1503,7 @@ def main() -> None:
     plot_prepost_trends(prepost_summary, output_dir)
     plot_validation_metrics(validation_group_summary, output_dir)
     plot_validation_path_heatmap(validation_path_confusion, output_dir)
+    plot_inter_rater_metrics(inter_rater_summary, output_dir)
     write_summary_report(
         output_dir,
         participants,
@@ -1247,6 +1515,7 @@ def main() -> None:
         prepost_summary,
         validation_summary,
         validation_group_summary,
+        inter_rater_summary,
     )
     write_summary_json(
         output_dir,
@@ -1259,6 +1528,8 @@ def main() -> None:
         validation_summary,
         validation_group_summary,
         validation_path_confusion,
+        inter_rater_pairs,
+        inter_rater_summary,
     )
     write_paper_draft(
         output_dir,
@@ -1271,6 +1542,7 @@ def main() -> None:
         prepost_summary,
         validation_summary,
         validation_group_summary,
+        inter_rater_summary,
     )
 
     summary_path = output_dir / "README.txt"
@@ -1293,6 +1565,8 @@ def main() -> None:
                 "- table_validation_summary.csv",
                 "- table_validation_group_summary.csv",
                 "- table_validation_path_confusion.csv",
+                "- table_inter_rater_pairs.csv",
+                "- table_inter_rater_summary.csv",
                 "- figure_gain_by_group.png",
                 "- figure_questionnaire_by_group.png",
                 "- figure_system_vs_expert.png",
@@ -1300,6 +1574,7 @@ def main() -> None:
                 "- figure_prepost_trends.png",
                 "- figure_validation_by_group.png",
                 "- figure_validation_path_heatmap.png",
+                "- figure_inter_rater_metrics.png",
                 "- report.md",
                 "- summary.json",
                 "- paper_draft_zh.md",
