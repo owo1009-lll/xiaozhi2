@@ -1,6 +1,7 @@
 # Research Analysis Scripts
 
 This folder converts exported research CSV files into paper-ready tables, figures, and summary files.
+It now also generates Word-friendly Chinese paper draft text and a `.docx` draft.
 
 ## Install
 
@@ -74,6 +75,10 @@ The default `research-analysis/output/` folder includes:
 - `figure_prepost_trends.png`
 - `report.md`
 - `summary.json`
+- `paper_draft_zh.md`
+- `paper_draft_zh.txt`
+- `paper_draft_zh.docx`
+- `results_section_zh.txt`
 - `README.txt`
 
 ## Notes
@@ -82,3 +87,4 @@ The default `research-analysis/output/` folder includes:
 - The script expects numeric score columns in the exported CSV files; missing values are handled as `NaN`.
 - The script now supports empty exported datasets and will generate placeholder figures plus empty summary tables instead of failing.
 - The current statistical outputs are designed for rapid paper drafting and should still be reviewed before submission.
+- `paper_draft_zh.docx` is intended as a Word starter draft; you can refine wording, citations, and section order directly in Word.

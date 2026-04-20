@@ -11,6 +11,11 @@ from scipy import stats
 from statsmodels.formula.api import ols
 from statsmodels.stats.anova import anova_lm
 
+try:
+    from docx import Document
+except ImportError:  # pragma: no cover - optional dependency during bootstrap
+    Document = None
+
 
 PARTICIPANT_NUMERIC_COLUMNS = [
     "analysisCount",
@@ -42,6 +47,16 @@ METRIC_SPECS = [
     ("pitch", "pretestPitch", "posttestPitch"),
     ("rhythm", "pretestRhythm", "posttestRhythm"),
 ]
+GROUP_LABELS = {"experimental": "实验组", "control": "对照组"}
+METRIC_LABELS = {
+    "pitch": "音准",
+    "rhythm": "节奏",
+    "pitchGain": "音准增益",
+    "rhythmGain": "节奏增益",
+    "usefulness": "感知有用性",
+    "continuance": "持续使用意愿",
+    "analysisCount": "分析使用次数",
+}
 
 
 def safe_read_csv(path: Path) -> pd.DataFrame:
@@ -78,6 +93,59 @@ def round_value(value: float | int | None, digits: int = 3) -> float | None:
     if value is None or pd.isna(value):
         return None
     return round(float(value), digits)
+
+
+def format_number(value: float | int | None, digits: int = 2, default: str = "未报告") -> str:
+    if value is None or pd.isna(value):
+        return default
+    return f"{float(value):.{digits}f}"
+
+
+def format_p_value(value: float | int | None) -> str:
+    if value is None or pd.isna(value):
+        return "未报告"
+    numeric = float(value)
+    if numeric < 0.001:
+        return "< .001"
+    return f"= {numeric:.3f}"
+
+
+def p_value_interpretation(value: float | int | None) -> str:
+    if value is None or pd.isna(value):
+        return "当前样本不足，尚不能判断统计显著性"
+    numeric = float(value)
+    if numeric < 0.001:
+        return "差异达到高度显著"
+    if numeric < 0.01:
+        return "差异达到显著"
+    if numeric < 0.05:
+        return "差异达到统计显著"
+    return "差异未达到统计显著"
+
+
+def find_row(frame: pd.DataFrame, **criteria) -> dict[str, object] | None:
+    if frame.empty:
+        return None
+    subset = frame.copy()
+    for key, expected in criteria.items():
+        if key not in subset.columns:
+            return None
+        subset = subset.loc[subset[key] == expected]
+    if subset.empty:
+        return None
+    return subset.iloc[0].to_dict()
+
+
+def group_label(group_id: object) -> str:
+    if pd.isna(group_id):
+        return "未分组"
+    return GROUP_LABELS.get(str(group_id), str(group_id))
+
+
+def metric_label(metric: object) -> str:
+    if pd.isna(metric):
+        return "未命名指标"
+    return METRIC_LABELS.get(str(metric), str(metric))
 
 
 def safe_mean(series: pd.Series) -> float:
@@ -361,6 +429,265 @@ def build_ancova_table(participants: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def build_prepost_sentence(metric: str, prepost_summary: pd.DataFrame) -> str:
+    exp_pre = find_row(prepost_summary, metric=metric, groupId="experimental", time="pretest")
+    exp_post = find_row(prepost_summary, metric=metric, groupId="experimental", time="posttest")
+    ctl_pre = find_row(prepost_summary, metric=metric, groupId="control", time="pretest")
+    ctl_post = find_row(prepost_summary, metric=metric, groupId="control", time="posttest")
+    label = metric_label(metric)
+    if not all([exp_pre, exp_post, ctl_pre, ctl_post]):
+        return f"{label}前后测数据尚未完整导入，当前结果段落保留为写作模板。"
+
+    return (
+        f"在{label}指标上，实验组前测均值为 {format_number(exp_pre.get('meanScore'))} "
+        f"(n = {int(exp_pre.get('sampleSize', 0))})，后测均值提升至 {format_number(exp_post.get('meanScore'))} "
+        f"(n = {int(exp_post.get('sampleSize', 0))})；对照组前测均值为 {format_number(ctl_pre.get('meanScore'))} "
+        f"(n = {int(ctl_pre.get('sampleSize', 0))})，后测均值为 {format_number(ctl_post.get('meanScore'))} "
+        f"(n = {int(ctl_post.get('sampleSize', 0))})。"
+    )
+
+
+def build_ttest_sentence(metric: str, ttest_table: pd.DataFrame) -> str:
+    row = find_row(ttest_table, metric=metric)
+    label = metric_label(metric)
+    if row is None:
+        return f"{label}的组间增益比较尚未生成。"
+    return (
+        f"{label}的组间比较显示，实验组均值为 {format_number(row.get('experimentalMean'))}，"
+        f"对照组均值为 {format_number(row.get('controlMean'))}，"
+        f"Welch t = {format_number(row.get('tStatistic'), 3)}，p {format_p_value(row.get('pValue'))}，"
+        f"{p_value_interpretation(row.get('pValue'))}。"
+    )
+
+
+def build_ancova_sentence(metric: str, ancova_table: pd.DataFrame) -> str:
+    row = find_row(ancova_table, metric=metric, term="groupId")
+    label = metric_label(metric)
+    if row is None:
+        return f"{label}的 ANCOVA 结果尚未生成。"
+    return (
+        f"以对应前测成绩为协变量后，组别对后测{label}的主效应为 "
+        f"F = {format_number(row.get('fStatistic'), 3)}，p {format_p_value(row.get('pValue'))}，"
+        f"partial η² = {format_number(row.get('partialEtaSquared'), 3)}，"
+        f"调整后 R² = {format_number(row.get('adjustedRsquared'), 3)}。"
+    )
+
+
+def build_expert_sentence(metric: str, expert_table: pd.DataFrame) -> str:
+    metric_map = {
+        "pitch": ("posttestPitch", "expertPosttestPitch"),
+        "rhythm": ("posttestRhythm", "expertPosttestRhythm"),
+    }
+    if metric not in metric_map:
+        return ""
+    system_metric, expert_metric = metric_map[metric]
+    row = find_row(expert_table, systemMetric=system_metric, expertMetric=expert_metric)
+    label = metric_label(metric)
+    if row is None:
+        return f"系统与专家在后测{label}上的一致性结果尚未生成。"
+    return (
+        f"系统后测{label}得分与专家后测{label}评分的相关系数为 "
+        f"r = {format_number(row.get('pearsonR'), 3)}，p {format_p_value(row.get('pValue'))}，"
+        f"样本量为 n = {int(row.get('sampleSize', 0))}。"
+    )
+
+
+def build_usage_sentence(metric: str, usage_corr_table: pd.DataFrame) -> str:
+    outcome = f"{metric}Gain"
+    row = find_row(usage_corr_table, predictor="analysisCount", outcome=outcome)
+    label = metric_label(outcome)
+    if row is None:
+        return f"分析使用次数与{label}之间的相关结果尚未生成。"
+    return (
+        f"分析使用次数与{label}之间的相关系数为 "
+        f"r = {format_number(row.get('pearsonR'), 3)}，p {format_p_value(row.get('pValue'))}，"
+        f"样本量为 n = {int(row.get('sampleSize', 0))}。"
+    )
+
+
+def build_experience_sentence(group_table: pd.DataFrame, ttest_table: pd.DataFrame) -> str:
+    exp_group = find_row(group_table, groupId="experimental") or {}
+    ctl_group = find_row(group_table, groupId="control") or {}
+    usefulness_test = find_row(ttest_table, metric="usefulness") or {}
+    continuance_test = find_row(ttest_table, metric="continuance") or {}
+    return (
+        f"在学习体验方面，实验组感知有用性均值为 {format_number(exp_group.get('usefulnessMean'))}，"
+        f"对照组为 {format_number(ctl_group.get('usefulnessMean'))}；"
+        f"持续使用意愿方面，实验组均值为 {format_number(exp_group.get('continuanceMean'))}，"
+        f"对照组为 {format_number(ctl_group.get('continuanceMean'))}。"
+        f"其中感知有用性的组间比较 p {format_p_value(usefulness_test.get('pValue'))}，"
+        f"持续使用意愿的组间比较 p {format_p_value(continuance_test.get('pValue'))}。"
+    )
+
+
+def build_main_findings(ttest_table: pd.DataFrame, ancova_table: pd.DataFrame) -> str:
+    significant_findings: list[str] = []
+    for metric in ["pitchGain", "rhythmGain"]:
+        row = find_row(ttest_table, metric=metric)
+        if row and pd.notna(row.get("pValue")) and float(row["pValue"]) < 0.05:
+            significant_findings.append(f"{metric_label(metric)}达到组间显著差异")
+    for metric in ["pitch", "rhythm"]:
+        row = find_row(ancova_table, metric=metric, term="groupId")
+        if row and pd.notna(row.get("pValue")) and float(row["pValue"]) < 0.05:
+            significant_findings.append(f"{metric_label(metric)}的 ANCOVA 组别主效应显著")
+
+    if not significant_findings:
+        return "当前样本下尚未观察到明确的显著主效应，论文可先按模板撰写，待正式数据进入后自动更新。"
+    return "；".join(significant_findings) + "。"
+
+
+def build_paper_sections(
+    participants: pd.DataFrame,
+    group_table: pd.DataFrame,
+    ttest_table: pd.DataFrame,
+    expert_table: pd.DataFrame,
+    usage_corr_table: pd.DataFrame,
+    ancova_table: pd.DataFrame,
+    prepost_summary: pd.DataFrame,
+) -> tuple[str, list[tuple[str, list[str]]], str]:
+    participants = ensure_columns(participants, ["participantId", "groupId", "analysisCount", "weeklySessionCount"])
+    participant_count = len(participants)
+    experimental_count = int((participants["groupId"] == "experimental").sum())
+    control_count = int((participants["groupId"] == "control").sum())
+    analysis_mean = format_number(participants["analysisCount"].mean())
+    weekly_mean = format_number(participants["weeklySessionCount"].mean())
+    title = "基于深度学习反馈的二胡 AI 教学干预研究论文草稿"
+
+    abstract_lines = [
+        "本研究旨在评估一套基于深度学习的二胡 AI 反馈工具，是否能够在高校器乐训练情境下提升学习者的音准、节奏与学习体验。",
+        (
+            f"研究采用前测-后测准实验设计，当前导入受试者共 {participant_count} 名，"
+            f"其中实验组 {experimental_count} 名，对照组 {control_count} 名。"
+            "实验组使用结合 torchcrepe、librosa 与规则诊断的非实时反馈原型进行练习，对照组接受常规练习安排。"
+        ),
+        (
+            "结果分析包括前后测描述统计、Welch t 检验、以前测为协变量的 ANCOVA、"
+            "系统与专家评分相关分析以及使用次数与学习增益的相关分析。"
+        ),
+        build_main_findings(ttest_table, ancova_table),
+        "研究结论部分建议结合定量结果与访谈资料，讨论 AI 反馈在器乐练习中的教学价值、接受度与适用边界。",
+    ]
+
+    keyword_line = "二胡；人工智能；深度学习；音乐教育；教学干预；音准反馈"
+    background_lines = [
+        "在音乐教育研究中，AI 的价值不只体现在模型精度，更体现在其是否能够提供可被学习者理解和采纳的形成性反馈。",
+        "针对二胡训练，本研究将系统分析限制在音准与节奏两个可量化维度，以降低系统复杂度并提升教育干预研究的可控性。",
+        "与强调实时识别或商业化功能的工程路线不同，本研究关注的是：深度学习驱动的非实时反馈工具，是否能够支持大学生的器乐练习成效与学习体验。",
+    ]
+    method_lines = [
+        (
+            f"本研究采用前测-后测准实验设计，按班级或工作室进行分组，当前样本共 {participant_count} 名，"
+            f"实验组 {experimental_count} 名，对照组 {control_count} 名。"
+        ),
+        (
+            "实验组在 6 至 8 周干预期内使用本研究开发的 PWA 原型系统完成任务化练习。"
+            "系统通过录音上传、乐谱对齐、逐音音高检测和节奏分析，对问题小节和问题音进行标记，并提供标准示范回放。"
+        ),
+        (
+            "分析引擎采用预训练深度学习与规则诊断结合的路线："
+            "torchcrepe/CREPE 负责逐帧 F0 估计，librosa 负责 onset 与节奏特征提取，"
+            "MusicXML/MIDI 与 DTW 负责标准乐谱对齐，最终输出逐音与逐小节反馈。"
+        ),
+        (
+            "测量指标包括系统音准/节奏得分、专家评分、问卷中的感知有用性、易用性、反馈清晰度、学习信心与持续使用意愿，"
+            "并记录每位受试者的分析次数、周任务与访谈数据。"
+        ),
+        (
+            f"当前数据中，受试者平均分析使用次数为 {analysis_mean} 次，平均周练习记录数为 {weekly_mean} 次。"
+            "统计分析采用描述统计、Welch t 检验、ANCOVA 与皮尔逊相关分析。"
+        ),
+    ]
+    results_lines = [
+        (
+            f"样本描述显示，当前数据库共纳入 {participant_count} 名受试者，"
+            f"其中实验组 {experimental_count} 名，对照组 {control_count} 名。"
+        ),
+        build_prepost_sentence("pitch", prepost_summary),
+        build_prepost_sentence("rhythm", prepost_summary),
+        build_ttest_sentence("pitchGain", ttest_table),
+        build_ttest_sentence("rhythmGain", ttest_table),
+        build_ancova_sentence("pitch", ancova_table),
+        build_ancova_sentence("rhythm", ancova_table),
+        build_expert_sentence("pitch", expert_table),
+        build_expert_sentence("rhythm", expert_table),
+        build_usage_sentence("pitch", usage_corr_table),
+        build_usage_sentence("rhythm", usage_corr_table),
+        build_experience_sentence(group_table, ttest_table),
+    ]
+    discussion_lines = [
+        "如果正式数据继续呈现实验组在音准或节奏增益上的优势，则可说明深度学习驱动的诊断反馈具有形成性教学价值。",
+        "若系统与专家评分保持中高程度相关，则说明该工具可作为教师评分之外的辅助判断来源，而非替代教师。",
+        "若使用次数与增益呈正相关，可进一步支持“持续练习中的反馈暴露强度”是影响学习结果的重要机制。",
+        "若统计结果未达到显著，也可讨论样本量、干预周期、受试者基础水平差异、二胡表达性滑音对音高评估的影响等限制。"
+        "这类解释仍然符合 SSCI 对教育技术干预研究的叙事方式。"
+    ]
+    conclusion_lines = [
+        "本研究已经形成一条可复现的研究流程：AI 原型采集练习数据，统计脚本自动导出论文图表与文本草稿，研究者据此补充理论框架与质性解释。",
+        "后续正式写作时，可在本自动草稿基础上补入文献综述、理论模型、伦理说明与访谈引文，以形成完整投稿稿件。",
+    ]
+    appendix_lines = [
+        "建议在 Word 中保留以下附件材料：教师评分 rubric、访谈提纲、受试说明书、周任务模板、原始导出表与图表清单。",
+        "如需直接写“结果”章节，可优先使用本次自动生成的 `results_section_zh.txt` 与 `paper_draft_zh.docx`。",
+    ]
+
+    sections = [
+        ("摘要", abstract_lines),
+        ("关键词", [keyword_line]),
+        ("一、研究背景与问题提出", background_lines),
+        ("二、研究设计与方法", method_lines),
+        ("三、研究结果", results_lines),
+        ("四、讨论", discussion_lines),
+        ("五、结论", conclusion_lines),
+        ("附录写作提示", appendix_lines),
+    ]
+    results_text = "\n\n".join(results_lines)
+    return title, sections, results_text
+
+
+def write_paper_draft(
+    output_dir: Path,
+    participants: pd.DataFrame,
+    group_table: pd.DataFrame,
+    ttest_table: pd.DataFrame,
+    expert_table: pd.DataFrame,
+    usage_corr_table: pd.DataFrame,
+    ancova_table: pd.DataFrame,
+    prepost_summary: pd.DataFrame,
+) -> None:
+    title, sections, results_text = build_paper_sections(
+        participants,
+        group_table,
+        ttest_table,
+        expert_table,
+        usage_corr_table,
+        ancova_table,
+        prepost_summary,
+    )
+
+    markdown_lines = [f"# {title}", ""]
+    text_lines = [title, "=" * len(title), ""]
+
+    for section_title, paragraphs in sections:
+        markdown_lines.extend([f"## {section_title}", ""])
+        text_lines.extend([section_title, "-" * len(section_title)])
+        for paragraph in paragraphs:
+            markdown_lines.extend([paragraph, ""])
+            text_lines.extend([paragraph, ""])
+
+    (output_dir / "paper_draft_zh.md").write_text("\n".join(markdown_lines).strip() + "\n", encoding="utf-8")
+    (output_dir / "paper_draft_zh.txt").write_text("\n".join(text_lines).strip() + "\n", encoding="utf-8")
+    (output_dir / "results_section_zh.txt").write_text(results_text.strip() + "\n", encoding="utf-8")
+
+    if Document is not None:
+        document = Document()
+        document.add_heading(title, level=0)
+        for section_title, paragraphs in sections:
+            document.add_heading(section_title, level=1)
+            for paragraph in paragraphs:
+                document.add_paragraph(paragraph)
+        document.save(output_dir / "paper_draft_zh.docx")
+
+
 def write_summary_report(
     output_dir: Path,
     participants: pd.DataFrame,
@@ -615,6 +942,7 @@ def main() -> None:
     plot_prepost_trends(prepost_summary, output_dir)
     write_summary_report(output_dir, participants, group_table, ttest_table, expert_table, usage_corr_table, ancova_table, prepost_summary)
     write_summary_json(output_dir, group_table, ttest_table, expert_table, usage_corr_table, ancova_table, prepost_summary)
+    write_paper_draft(output_dir, participants, group_table, ttest_table, expert_table, usage_corr_table, ancova_table, prepost_summary)
 
     summary_path = output_dir / "README.txt"
     summary_path.write_text(
@@ -639,6 +967,10 @@ def main() -> None:
                 "- figure_prepost_trends.png",
                 "- report.md",
                 "- summary.json",
+                "- paper_draft_zh.md",
+                "- paper_draft_zh.txt",
+                "- paper_draft_zh.docx",
+                "- results_section_zh.txt",
             ]
         ),
         encoding="utf-8",

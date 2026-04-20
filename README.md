@@ -12,7 +12,7 @@
 - Python 深度学习分析服务，已接入 `torchcrepe + librosa`
 - PWA 基础能力：`manifest` + `service worker`
 - 统计分析脚本，可把导出的 CSV 转成论文表格和图表
-- 统计分析脚本已支持前后测长表、ANCOVA 摘要与空数据占位输出
+- 统计分析脚本已支持前后测长表、ANCOVA 摘要、空数据占位输出，以及 Word 友好的论文草稿生成
 
 ## 当前分析模式
 
@@ -99,3 +99,5 @@ python-service\.venv\Scripts\python.exe research-analysis\analyze_exports.py ^
 - 系统评分与教师评分相关表
 - 分析使用情况表
 - 多张论文可直接使用的图表 PNG
+- 中文论文草稿：`paper_draft_zh.md`、`paper_draft_zh.txt`、`paper_draft_zh.docx`
+- 可直接粘贴进论文“结果”章节的 `results_section_zh.txt`
