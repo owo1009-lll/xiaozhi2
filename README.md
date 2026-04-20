@@ -9,7 +9,7 @@
 - 结构化曲目包接口
 - 非实时录音上传与分析流程
 - 研究数据录入、周任务计划、访谈记录、访谈抽样标记、问卷、教师评分和导出接口
-- Python 深度学习分析服务，已接入 `torchcrepe + librosa + DTW`
+- Python 深度学习分析服务，已接入 `torchcrepe + librosa + 稳定段音高评分 + DTW`
 - PWA 基础能力：`manifest` + `service worker`
 - 统计分析脚本，可把导出的 CSV 转成论文表格和图表
 - 统计分析脚本已支持前后测长表、ANCOVA 摘要、空数据占位输出，以及 Word 友好的论文草稿生成
@@ -17,7 +17,7 @@
 ## 当前分析模式
 
 - 默认由 Node 网关转发到 Python 分析服务
-- Python 服务使用 `ffmpeg -> librosa -> torchcrepe -> DTW` 的处理链
+- Python 服务使用 `ffmpeg -> librosa -> torchcrepe -> 稳定段筛选 / 滑音揉弦容忍 -> DTW` 的处理链
 - 若 `ERHU_ANALYZER_URL` 未配置或不可达，Node 会回退到本地 mock 分析
 - 详细开发执行路线见 `docs/development-roadmap.md`
 

@@ -4,7 +4,7 @@
 
 - `src/ResearchApp.jsx`：研究原型前端，覆盖受试编号、录音上传、分析反馈、周任务、访谈、访谈抽样、问卷与教师评分流程
 - `server.js`：Node 网关，负责曲目数据、研究记录、导出接口，以及转发 Python 分析服务
-- `python-service/`：FastAPI 分析服务，当前已接入 `ffmpeg -> librosa -> torchcrepe -> DTW`
+- `python-service/`：FastAPI 分析服务，当前已接入 `ffmpeg -> librosa -> torchcrepe -> 稳定段筛选 -> DTW`
 - `research-analysis/`：把导出的 CSV 转成论文可用表格、图表和摘要报告
 - `data/`：本地研究记录文件，仅用于开发或实验阶段存储
 
@@ -58,6 +58,10 @@ ERHU_ENABLE_TORCHCREPE=true
 ERHU_ENABLE_LIBROSA_DECODE=true
 ERHU_TARGET_SAMPLE_RATE=16000
 ERHU_ONSET_HOP_LENGTH=160
+ERHU_UNCERTAIN_CONFIDENCE=0.63
+ERHU_BASE_PITCH_TOLERANCE_CENTS=15
+ERHU_VIBRATO_SPREAD_THRESHOLD_CENTS=26
+ERHU_GLIDE_ENTRY_THRESHOLD_CENTS=24
 ERHU_FFMPEG_PATH=
 ```
 
@@ -75,14 +79,16 @@ ERHU_FFMPEG_PATH=
 2. 通过 `torchcrepe` 或 `librosa.pyin` 提取逐帧音高
 3. 通过 `librosa` 提取起音候选
 4. 从 `piecePack.notes`、`MusicXML` 或 `MIDI` 构建符号乐谱
-5. 通过 `DTW` 对齐演奏序列与符号乐谱
-6. 输出逐音音准偏差、节奏偏差和小节级问题
+5. 对每个音构建稳定段证据，并识别滑音样、揉弦样音符
+6. 通过 `DTW` 对齐演奏序列与符号乐谱
+7. 以自适应音准容忍阈值输出逐音偏差、节奏偏差和小节级问题
 
 说明：
 
 - `MusicXML` 目前通过内置 XML 解析器读取单旋律音符事件
 - `MIDI` 需要安装 `pretty_midi`
 - 如果未传入 `scoreSource`，服务仍会退回到内置 `notes` 序列
+- 音准误差不再只看固定阈值，而是会结合稳定段、滑音和揉弦特征动态调整容忍范围
 
 ## 研究接口
 

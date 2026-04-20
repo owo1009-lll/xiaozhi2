@@ -64,6 +64,10 @@ class NoteFinding(BaseModel):
     onsetErrorMs: int
     pitchLabel: str
     rhythmLabel: str
+    pitchToleranceCents: int | None = None
+    confidence: float | None = None
+    isUncertain: bool = False
+    evidenceLabel: str | None = None
 
 
 class DemoSegment(BaseModel):

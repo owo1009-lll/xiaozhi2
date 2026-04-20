@@ -76,6 +76,13 @@ class ObservedNote:
     median_frequency: float
     median_midi: float
     confidence: float
+    segment_point_count: int
+    stable_point_count: int
+    pitch_spread_cents: float
+    entry_cents: float
+    exit_cents: float
+    glide_like: bool
+    vibrato_like: bool
 
 
 def midi_to_frequency(midi_pitch: int) -> float:
@@ -93,6 +100,12 @@ def cents_error(frequency: float, midi_pitch: int) -> float:
     if frequency <= 0 or expected <= 0:
         return 0.0
     return 1200.0 * math.log2(frequency / expected)
+
+
+def cents_between(frequency: float, reference_frequency: float) -> float:
+    if frequency <= 0 or reference_frequency <= 0:
+        return 0.0
+    return 1200.0 * math.log2(frequency / reference_frequency)
 
 
 def beats_per_measure(meter: str | None) -> float:
@@ -124,6 +137,16 @@ def musicxml_pitch_to_midi(step: str, octave: int, alter: int = 0) -> int:
         "B": 11,
     }.get(step.upper(), 0)
     return int((octave + 1) * 12 + pitch_class + alter)
+
+
+def percentile(values: list[float], quantile: float) -> float:
+    if not values:
+        return 0.0
+    if np is not None:
+        return float(np.percentile(np.asarray(values, dtype=np.float32), quantile))
+    ordered = sorted(values)
+    index = max(0, min(len(ordered) - 1, int(round((len(ordered) - 1) * (quantile / 100.0)))))
+    return float(ordered[index])
 
 
 class ErhuAnalyzer:
@@ -516,19 +539,13 @@ class ErhuAnalyzer:
         track = []
         for note in score_notes:
             seconds = max(0.15, note.expected_offset - note.expected_onset)
-            track.append(
-                {
-                    "time": note.expected_onset,
-                    "frequency": float(midi_to_frequency(note.midi_pitch)),
-                    "confidence": 0.65,
-                }
-            )
-            if seconds > 0.18:
+            time_offsets = [0.08, 0.34, 0.58, 0.82] if seconds > 0.18 else [0.12, 0.52, 0.84]
+            for ratio in time_offsets:
                 track.append(
                     {
-                        "time": note.expected_onset + (seconds * 0.55),
+                        "time": note.expected_onset + (seconds * ratio),
                         "frequency": float(midi_to_frequency(note.midi_pitch)),
-                        "confidence": 0.64,
+                        "confidence": 0.68,
                     }
                 )
         return track
@@ -590,8 +607,9 @@ class ErhuAnalyzer:
         for start, end in zip(boundaries, boundaries[1:], strict=False):
             if end <= start:
                 continue
-            stable_start = start + ((end - start) * 0.12)
-            stable_end = max(stable_start + 0.03, end - ((end - start) * 0.08))
+            stable_start = start + ((end - start) * self.settings.stable_region_start_ratio)
+            stable_end = start + ((end - start) * self.settings.stable_region_end_ratio)
+            stable_end = max(stable_start + 0.03, stable_end)
             segment_points = [
                 item
                 for item in pitch_track
@@ -609,6 +627,26 @@ class ErhuAnalyzer:
             frequencies = [float(item["frequency"]) for item in segment_points if float(item["frequency"]) > 0]
             confidence_values = [float(item.get("confidence", 0.0)) for item in segment_points]
             median_frequency = float(median(frequencies))
+            start_window_end = start + ((end - start) * 0.28)
+            end_window_start = end - ((end - start) * 0.28)
+            entry_points = [
+                float(item["frequency"])
+                for item in pitch_track
+                if start <= float(item["time"]) <= start_window_end and float(item["frequency"]) > 0
+            ]
+            exit_points = [
+                float(item["frequency"])
+                for item in pitch_track
+                if end_window_start <= float(item["time"]) <= end and float(item["frequency"]) > 0
+            ]
+            entry_frequency = float(median(entry_points)) if entry_points else median_frequency
+            exit_frequency = float(median(exit_points)) if exit_points else median_frequency
+            center_cents = [cents_between(freq, median_frequency) for freq in frequencies]
+            pitch_spread_cents = abs(percentile(center_cents, 90) - percentile(center_cents, 10))
+            entry_cents = cents_between(entry_frequency, median_frequency)
+            exit_cents = cents_between(exit_frequency, median_frequency)
+            glide_like = abs(entry_cents) >= self.settings.glide_entry_threshold_cents or abs(exit_cents) >= self.settings.glide_entry_threshold_cents
+            vibrato_like = pitch_spread_cents >= self.settings.vibrato_spread_threshold_cents
             observed.append(
                 ObservedNote(
                     onset=float(start),
@@ -616,6 +654,19 @@ class ErhuAnalyzer:
                     median_frequency=median_frequency,
                     median_midi=float(frequency_to_midi(median_frequency)),
                     confidence=float(median(confidence_values)) if confidence_values else 0.0,
+                    segment_point_count=len(
+                        [
+                            item
+                            for item in pitch_track
+                            if start <= float(item["time"]) <= end and float(item["frequency"]) > 0
+                        ]
+                    ),
+                    stable_point_count=len(frequencies),
+                    pitch_spread_cents=float(pitch_spread_cents),
+                    entry_cents=float(entry_cents),
+                    exit_cents=float(exit_cents),
+                    glide_like=glide_like,
+                    vibrato_like=vibrato_like,
                 )
             )
         return observed
@@ -636,6 +687,21 @@ class ErhuAnalyzer:
         duration_distance = abs(score_note_norm - observed_note_norm) * 8.0
         confidence_penalty = max(0.0, self.settings.min_confidence - observed_note.confidence) * 6.0
         return pitch_distance + time_distance + duration_distance + confidence_penalty
+
+    def _pitch_tolerance_for_note(self, note: dict[str, Any]) -> float:
+        tolerance = float(self.settings.base_pitch_tolerance_cents)
+        if bool(note.get("vibratoLike")):
+            tolerance += float(self.settings.vibrato_tolerance_bonus_cents)
+        if bool(note.get("glideLike")):
+            tolerance += float(self.settings.glide_tolerance_bonus_cents)
+        spread_bonus = min(6.0, max(0.0, float(note.get("pitchSpreadCents", 0.0)) - 12.0) * 0.08)
+        tolerance += spread_bonus
+        return min(float(self.settings.max_pitch_tolerance_cents), tolerance)
+
+    def _is_pitch_uncertain(self, note: dict[str, Any]) -> bool:
+        confidence = float(note.get("estimatedConfidence", 0.0))
+        stable_point_count = int(note.get("stablePointCount", 0))
+        return confidence < float(self.settings.uncertain_confidence) or stable_point_count < int(self.settings.stable_note_min_frames)
 
     def _dtw_align_notes(
         self,
@@ -728,6 +794,13 @@ class ErhuAnalyzer:
             estimated_frequency = observed.median_frequency if observed is not None else 0.0
             estimated_confidence = observed.confidence if observed is not None else 0.0
             estimated_onset = observed.onset if observed is not None else score_note.expected_onset * tempo_ratio
+            stable_point_count = observed.stable_point_count if observed is not None else 0
+            segment_point_count = observed.segment_point_count if observed is not None else 0
+            pitch_spread_cents = observed.pitch_spread_cents if observed is not None else 0.0
+            entry_cents = observed.entry_cents if observed is not None else 0.0
+            exit_cents = observed.exit_cents if observed is not None else 0.0
+            glide_like = observed.glide_like if observed is not None else False
+            vibrato_like = observed.vibrato_like if observed is not None else False
 
             if observed is None and pitch_track:
                 window_center = score_note.expected_onset * tempo_ratio
@@ -740,7 +813,10 @@ class ErhuAnalyzer:
                 if segment_points:
                     estimated_frequency = float(median([float(item["frequency"]) for item in segment_points]))
                     estimated_confidence = float(median([float(item.get("confidence", 0.0)) for item in segment_points]))
+                    stable_point_count = len(segment_points)
+                    segment_point_count = len(segment_points)
 
+            cents_value = float(cents_error(estimated_frequency, score_note.midi_pitch))
             aligned_notes.append(
                 {
                     "noteId": score_note.note_id,
@@ -752,11 +828,25 @@ class ErhuAnalyzer:
                     "estimatedFrequency": estimated_frequency,
                     "estimatedConfidence": estimated_confidence,
                     "estimatedOnset": estimated_onset,
-                    "centsError": float(cents_error(estimated_frequency, score_note.midi_pitch)),
+                    "centsError": cents_value,
                     "onsetErrorMs": float((estimated_onset - (score_note.expected_onset * tempo_ratio)) * 1000.0),
                     "matchedObservedIndex": matched_index if matched_index is not None else -1,
+                    "stablePointCount": stable_point_count,
+                    "segmentPointCount": segment_point_count,
+                    "pitchSpreadCents": pitch_spread_cents,
+                    "entryCents": entry_cents,
+                    "exitCents": exit_cents,
+                    "glideLike": glide_like,
+                    "vibratoLike": vibrato_like,
                 }
             )
+
+        for note in aligned_notes:
+            tolerance = self._pitch_tolerance_for_note(note)
+            note["pitchToleranceCents"] = tolerance
+            note["pitchUncertain"] = self._is_pitch_uncertain(note)
+            note["pitchExcessCents"] = max(0.0, abs(float(note["centsError"])) - tolerance)
+            note["rhythmExcessMs"] = max(0.0, abs(float(note["onsetErrorMs"])) - float(self.settings.base_rhythm_tolerance_ms))
 
         return aligned_notes, "score-dtw"
 
@@ -795,27 +885,60 @@ class ErhuAnalyzer:
                 },
             )
 
-        flagged_notes = [
-            note
-            for note in aligned_notes
-            if abs(float(note["centsError"])) >= 20 or abs(float(note["onsetErrorMs"])) >= 50
-        ][: self.settings.fallback_issue_limit]
+        pitch_issue_count = 0
+        rhythm_issue_count = 0
+        uncertain_pitch_count = 0
+        glide_like_count = 0
+        vibrato_like_count = 0
+        flagged_notes: list[dict[str, Any]] = []
 
-        for note in flagged_notes:
+        for note in aligned_notes:
+            pitch_uncertain = bool(note.get("pitchUncertain"))
+            pitch_issue = not pitch_uncertain and float(note.get("pitchExcessCents", 0.0)) > 0.0
+            rhythm_issue = float(note.get("rhythmExcessMs", 0.0)) > 0.0
+            note["pitchIssue"] = pitch_issue
+            note["rhythmIssue"] = rhythm_issue
+
+            if pitch_uncertain:
+                uncertain_pitch_count += 1
+            if bool(note.get("glideLike")):
+                glide_like_count += 1
+            if bool(note.get("vibratoLike")):
+                vibrato_like_count += 1
+            if pitch_issue:
+                pitch_issue_count += 1
+            if rhythm_issue:
+                rhythm_issue_count += 1
+            if pitch_issue or rhythm_issue:
+                flagged_notes.append(note)
+
+        for note in flagged_notes[: self.settings.fallback_issue_limit]:
+            tolerance = float(note.get("pitchToleranceCents", self.settings.base_pitch_tolerance_cents))
             pitch_label = (
-                "pitch-flat"
-                if note["centsError"] <= -20
+                "pitch-review"
+                if bool(note.get("pitchUncertain"))
+                else "pitch-flat"
+                if note["centsError"] <= -tolerance
                 else "pitch-sharp"
-                if note["centsError"] >= 20
+                if note["centsError"] >= tolerance
                 else "pitch-ok"
             )
             rhythm_label = (
                 "rhythm-early"
-                if note["onsetErrorMs"] <= -50
+                if note["onsetErrorMs"] <= -float(self.settings.base_rhythm_tolerance_ms)
                 else "rhythm-late"
-                if note["onsetErrorMs"] >= 50
+                if note["onsetErrorMs"] >= float(self.settings.base_rhythm_tolerance_ms)
                 else "rhythm-ok"
             )
+            evidence_parts = []
+            if bool(note.get("glideLike")):
+                evidence_parts.append("glide-tolerant")
+            if bool(note.get("vibratoLike")):
+                evidence_parts.append("vibrato-tolerant")
+            if bool(note.get("pitchUncertain")):
+                evidence_parts.append("low-confidence")
+            if not evidence_parts:
+                evidence_parts.append("stable-segment")
             note_findings.append(
                 NoteFinding(
                     noteId=note["noteId"],
@@ -825,6 +948,10 @@ class ErhuAnalyzer:
                     onsetErrorMs=int(round(float(note["onsetErrorMs"]))),
                     pitchLabel=pitch_label,
                     rhythmLabel=rhythm_label,
+                    pitchToleranceCents=int(round(tolerance)),
+                    confidence=round(float(note.get("estimatedConfidence", 0.0)), 3),
+                    isUncertain=bool(note.get("pitchUncertain")),
+                    evidenceLabel=", ".join(evidence_parts),
                 )
             )
 
@@ -833,11 +960,12 @@ class ErhuAnalyzer:
             measure_groups.setdefault(int(note["measureIndex"]), []).append(note)
 
         for measure_index, notes in sorted(measure_groups.items()):
-            pitch_errors = [abs(float(item["centsError"])) for item in notes]
-            onset_errors = [abs(float(item["onsetErrorMs"])) for item in notes]
+            pitch_errors = [float(item.get("pitchExcessCents", 0.0)) for item in notes if not bool(item.get("pitchUncertain"))]
+            onset_errors = [float(item.get("rhythmExcessMs", 0.0)) for item in notes]
             pitch_median = median(pitch_errors or [0.0])
             onset_median = median(onset_errors or [0.0])
-            if pitch_median < 15 and onset_median < 40:
+            uncertain_count = sum(1 for item in notes if bool(item.get("pitchUncertain")))
+            if pitch_median < 4 and onset_median < 8:
                 continue
             issue_label = "rhythm-unstable" if onset_median >= pitch_median else "pitch-unstable"
             measure_findings.append(
@@ -845,14 +973,18 @@ class ErhuAnalyzer:
                     measureIndex=measure_index,
                     issueType="unstable",
                     issueLabel=issue_label,
-                    detail=f"median cents={int(round(pitch_median))}, median onset={int(round(onset_median))}ms",
+                    detail=(
+                        f"excess pitch={int(round(pitch_median))} cents, "
+                        f"excess onset={int(round(onset_median))}ms, "
+                        f"uncertainNotes={uncertain_count}"
+                    ),
                 )
             )
 
-        absolute_cents = [abs(float(note["centsError"])) for note in aligned_notes]
-        absolute_onsets = [abs(float(note["onsetErrorMs"])) for note in aligned_notes]
-        pitch_penalty = min(50.0, median(absolute_cents or [0.0]) * 1.2 + len(note_findings) * 2.5)
-        rhythm_penalty = min(50.0, median(absolute_onsets or [0.0]) * 0.55 + len(measure_findings) * 3.0)
+        pitch_excess_values = [float(note.get("pitchExcessCents", 0.0)) for note in aligned_notes if not bool(note.get("pitchUncertain"))]
+        rhythm_excess_values = [float(note.get("rhythmExcessMs", 0.0)) for note in aligned_notes]
+        pitch_penalty = min(50.0, median(pitch_excess_values or [0.0]) * 1.45 + pitch_issue_count * 2.0 + uncertain_pitch_count * 0.45)
+        rhythm_penalty = min(50.0, median(rhythm_excess_values or [0.0]) * 0.5 + rhythm_issue_count * 1.5 + len(measure_findings) * 2.4)
         overall_pitch_score = max(40, min(98, round(96 - pitch_penalty)))
         overall_rhythm_score = max(40, min(98, round(94 - rhythm_penalty)))
 
@@ -891,5 +1023,10 @@ class ErhuAnalyzer:
                 "pitchTrackCount": len(pitch_track),
                 "onsetCount": len(onset_track),
                 "alignedNoteCount": len(aligned_notes),
+                "pitchIssueCount": pitch_issue_count,
+                "rhythmIssueCount": rhythm_issue_count,
+                "uncertainPitchCount": uncertain_pitch_count,
+                "glideLikeCount": glide_like_count,
+                "vibratoLikeCount": vibrato_like_count,
             },
         )

@@ -15,8 +15,9 @@ The analyzer now follows this sequence:
    - inline `MIDI` when `pretty_midi` is installed
 5. Convert the symbolic score into note events with expected onset/offset times
 6. Build observed note segments from the performance pitch/onset tracks
-7. Align performance to score with `DTW`
-8. Generate note-level and measure-level pitch/rhythm feedback
+7. Extract stable-segment pitch evidence and detect glide-like / vibrato-like note behavior
+8. Align performance to score with `DTW`
+9. Generate note-level and measure-level pitch/rhythm feedback with adaptive tolerance
 
 ## Endpoints
 
@@ -67,4 +68,5 @@ uvicorn app:app --host 127.0.0.1 --port 8000
 
 - `torchcrepe` is the current deep-learning core for pitch estimation.
 - `DTW` is now the main score-performance alignment method.
+- The analyzer now uses stable-segment pitch scoring, glide tolerance, vibrato tolerance, and low-confidence down-weighting for erhu-specific adaptation.
 - Attention-based models are not part of the v1 pipeline; they are reserved for a later phase where you train a dedicated error-diagnosis model with real teacher-labeled data.
