@@ -52,6 +52,10 @@ export async function fetchResearchParticipants() {
   return readJson(await fetch("/api/erhu/research/participants"));
 }
 
+export async function fetchDataQuality() {
+  return readJson(await fetch("/api/erhu/research/data-quality"));
+}
+
 export async function fetchTasks() {
   return readJson(await fetch("/api/erhu/research/tasks"));
 }
@@ -99,6 +103,16 @@ export async function saveTaskPlan(payload) {
 export async function saveInterviewNote(payload) {
   return readJson(
     await fetch("/api/erhu/interview-note", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  );
+}
+
+export async function saveInterviewSampling(payload) {
+  return readJson(
+    await fetch("/api/erhu/interview-sampling", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

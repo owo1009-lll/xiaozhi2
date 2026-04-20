@@ -8,7 +8,7 @@
 - Express 后端 API
 - 结构化曲目包接口
 - 非实时录音上传与分析流程
-- 研究数据录入、周任务计划、访谈记录、问卷、教师评分和导出接口
+- 研究数据录入、周任务计划、访谈记录、访谈抽样标记、问卷、教师评分和导出接口
 - Python 深度学习分析服务，已接入 `torchcrepe + librosa`
 - PWA 基础能力：`manifest` + `service worker`
 - 统计分析脚本，可把导出的 CSV 转成论文表格和图表
@@ -60,17 +60,21 @@ npm start
 - `POST /api/erhu/research/batch-participants`
 - `POST /api/erhu/task-plan`
 - `POST /api/erhu/interview-note`
+- `POST /api/erhu/interview-sampling`
 - `POST /api/erhu/study-record`
 - `POST /api/erhu/expert-rating`
 - `GET /api/erhu/study-records/:participantId`
 - `GET /api/erhu/research/overview`
+- `GET /api/erhu/research/data-quality`
 - `GET /api/erhu/research/participants`
+- `GET /api/erhu/research/templates`
+- `GET /api/erhu/research/templates/:templateId`
 - `GET /api/erhu/research/tasks`
 - `GET /api/erhu/research/interviews`
 - `GET /api/erhu/research/questionnaires`
 - `GET /api/erhu/research/expert-ratings`
 - `GET /api/erhu/research/pending-ratings`
-- `GET /api/erhu/research/export?dataset=participants|tasks|interviews|questionnaires|expert-ratings|analyses&format=json|csv`
+- `GET /api/erhu/research/export?dataset=participants|sampling|tasks|interviews|questionnaires|expert-ratings|analyses&format=json|csv`
 
 ## 统计分析脚本
 

@@ -385,6 +385,13 @@ button {
   margin: 0 0 10px;
 }
 
+.history-card p,
+.protocol-card p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+
 .finding-card ul,
 .history-card ul {
   margin: 0;

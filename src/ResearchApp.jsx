@@ -4,6 +4,7 @@ import {
   batchCreateParticipants,
   createAnalysis,
   fetchAnalyzerStatus,
+  fetchDataQuality,
   fetchExpertRatings,
   fetchInterviews,
   fetchParticipant,
@@ -15,11 +16,12 @@ import {
   fetchTasks,
   saveExpertRating,
   saveInterviewNote,
+  saveInterviewSampling,
   saveParticipantProfile,
   saveTaskPlan,
   saveStudyRecord,
 } from "./researchApi";
-import { RESEARCH_PROTOCOL } from "./researchProtocolData";
+import { RESEARCH_PROTOCOL, RESEARCH_TEMPLATE_LIBRARY } from "./researchProtocolData";
 
 const SESSION_STAGE_OPTIONS = [
   { value: "pretest", label: "前测" },
@@ -90,6 +92,12 @@ const DEFAULT_INTERVIEW_NOTE = {
   representativeQuote: "",
   nextAction: "",
   followUpNeeded: false,
+};
+const DEFAULT_SAMPLING_MARK = {
+  selected: false,
+  priority: "candidate",
+  reason: "",
+  markedBy: "researcher-1",
 };
 
 function safeNumber(value, fallback = 0) {
@@ -174,6 +182,13 @@ function parseBatchParticipantText(text) {
 }
 
 function SectionTitle({ step, title, description }) {
+  function loadParticipantWorkspace(participant) {
+    setParticipantId(participant.participantId || "");
+    setGroupId(participant.groupId || "experimental");
+    setActiveTab("workspace");
+    setStatusMessage(`已切换到 ${participant.participantId} 的工作台。`);
+  }
+
   return (
     <div className="section-title">
       <span className="section-step">{step}</span>
@@ -239,6 +254,14 @@ function ExportLink({ dataset, format, children }) {
   );
 }
 
+function TemplateDownloadLink({ templateId, children }) {
+  return (
+    <a className="secondary-link" href={`/api/erhu/research/templates/${templateId}?format=md`} target="_blank" rel="noreferrer">
+      {children}
+    </a>
+  );
+}
+
 export default function ResearchApp() {
   const [activeTab, setActiveTab] = useState("workspace");
   const [pieces, setPieces] = useState([]);
@@ -254,6 +277,7 @@ export default function ResearchApp() {
   const [participantRecord, setParticipantRecord] = useState(null);
   const [profile, setProfile] = useState(DEFAULT_PROFILE);
   const [researchOverview, setResearchOverview] = useState(null);
+  const [dataQuality, setDataQuality] = useState(null);
   const [researchParticipants, setResearchParticipants] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [interviews, setInterviews] = useState([]);
@@ -265,6 +289,7 @@ export default function ResearchApp() {
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [recording, setRecording] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
+  const [samplingSaving, setSamplingSaving] = useState(false);
   const [taskSaving, setTaskSaving] = useState(false);
   const [interviewSaving, setInterviewSaving] = useState(false);
   const [questionnaireSaving, setQuestionnaireSaving] = useState(false);
@@ -277,6 +302,7 @@ export default function ResearchApp() {
   const [expertRating, setExpertRating] = useState(DEFAULT_EXPERT_RATING);
   const [taskPlan, setTaskPlan] = useState(DEFAULT_TASK_PLAN);
   const [interviewNote, setInterviewNote] = useState(DEFAULT_INTERVIEW_NOTE);
+  const [samplingMark, setSamplingMark] = useState(DEFAULT_SAMPLING_MARK);
   const [batchImportText, setBatchImportText] = useState("");
   const [installPromptEvent, setInstallPromptEvent] = useState(null);
   const fileInputRef = useRef(null);
@@ -341,12 +367,19 @@ export default function ResearchApp() {
     if (!participantId.trim()) {
       setParticipantRecord(null);
       setProfile(DEFAULT_PROFILE);
+      setSamplingMark(DEFAULT_SAMPLING_MARK);
       return;
     }
     fetchParticipant(participantId.trim())
       .then((json) => {
         const record = json?.participant || null;
         setParticipantRecord(record);
+        setSamplingMark({
+          selected: Boolean(record?.interviewSampling?.selected),
+          priority: record?.interviewSampling?.priority || "candidate",
+          reason: record?.interviewSampling?.reason || "",
+          markedBy: record?.interviewSampling?.markedBy || "researcher-1",
+        });
         if (record?.profile) {
           setProfile({
             alias: record.profile.alias || "",
@@ -373,6 +406,7 @@ export default function ResearchApp() {
       })
       .catch(() => {
         // allow empty participant state
+        setSamplingMark(DEFAULT_SAMPLING_MARK);
       });
   }, [participantId]);
 
@@ -417,9 +451,10 @@ export default function ResearchApp() {
   async function loadDashboardData() {
     setDashboardLoading(true);
     try {
-      const [overviewJson, participantsJson, taskJson, interviewJson, questionnaireJson, ratingsJson, pendingJson, analyzerJson] = await Promise.all([
+      const [overviewJson, participantsJson, qualityJson, taskJson, interviewJson, questionnaireJson, ratingsJson, pendingJson, analyzerJson] = await Promise.all([
         fetchResearchOverview(),
         fetchResearchParticipants(),
+        fetchDataQuality(),
         fetchTasks(),
         fetchInterviews(),
         fetchQuestionnaires(),
@@ -429,6 +464,7 @@ export default function ResearchApp() {
       ]);
       setResearchOverview(overviewJson?.overview || null);
       setResearchParticipants(participantsJson?.participants || []);
+      setDataQuality(qualityJson?.dataQuality || overviewJson?.overview?.dataQuality || null);
       setTasks(taskJson?.tasks || []);
       setInterviews(interviewJson?.interviews || []);
       setQuestionnaires(questionnaireJson?.questionnaires || []);
@@ -591,6 +627,32 @@ export default function ResearchApp() {
       setErrorMessage(error.message || "保存受试档案失败。");
     } finally {
       setProfileSaving(false);
+    }
+  }
+
+  async function handleSaveSamplingMark() {
+    if (!participantId.trim()) {
+      setErrorMessage("请先填写受试编号。");
+      return;
+    }
+
+    setSamplingSaving(true);
+    setErrorMessage("");
+    try {
+      await saveInterviewSampling({
+        participantId: participantId.trim(),
+        groupId,
+        ...samplingMark,
+      });
+      setStatusMessage("访谈抽样标记已保存。");
+      await refreshParticipantRecord();
+      if (activeTab === "dashboard") {
+        await loadDashboardData();
+      }
+    } catch (error) {
+      setErrorMessage(error.message || "保存访谈抽样标记失败。");
+    } finally {
+      setSamplingSaving(false);
     }
   }
 
@@ -920,6 +982,45 @@ export default function ResearchApp() {
                 <span>系统节奏增益</span>
                 <strong>{plusNumber(participantRecord?.rhythmGain)}</strong>
               </div>
+            </div>
+          </section>
+
+          <section className="panel-card">
+            <SectionTitle step="01B" title="访谈抽样标记" description="标记优先访谈样本，记录抽样原因与优先级，便于正式实验阶段开展质性补充。" />
+            <div className="field-grid">
+              <label className="checkbox-field">
+                <span>纳入访谈抽样</span>
+                <div className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={samplingMark.selected}
+                    onChange={(event) => setSamplingMark((prev) => ({ ...prev, selected: event.target.checked }))}
+                  />
+                  <span>将当前受试者纳入访谈候选队列</span>
+                </div>
+              </label>
+              <label>
+                <span>优先级</span>
+                <select value={samplingMark.priority} onChange={(event) => setSamplingMark((prev) => ({ ...prev, priority: event.target.value }))}>
+                  <option value="candidate">候选</option>
+                  <option value="priority">优先</option>
+                  <option value="reserve">备选</option>
+                  <option value="completed">已访谈</option>
+                </select>
+              </label>
+              <label>
+                <span>标记人</span>
+                <input value={samplingMark.markedBy} onChange={(event) => setSamplingMark((prev) => ({ ...prev, markedBy: event.target.value }))} />
+              </label>
+            </div>
+            <label className="notes-field">
+              <span>抽样原因</span>
+              <textarea rows="3" value={samplingMark.reason} onChange={(event) => setSamplingMark((prev) => ({ ...prev, reason: event.target.value }))} />
+            </label>
+            <div className="action-row">
+              <button type="button" className="primary-button" onClick={handleSaveSamplingMark} disabled={samplingSaving}>
+                {samplingSaving ? "保存中..." : "保存抽样标记"}
+              </button>
             </div>
           </section>
 
@@ -1415,6 +1516,7 @@ export default function ResearchApp() {
             </div>
             <div className="link-row">
               <ExportLink dataset="participants" format="csv">导出参与者 CSV</ExportLink>
+              <ExportLink dataset="sampling" format="csv">导出抽样 CSV</ExportLink>
               <ExportLink dataset="tasks" format="csv">导出任务 CSV</ExportLink>
               <ExportLink dataset="interviews" format="csv">导出访谈 CSV</ExportLink>
               <ExportLink dataset="questionnaires" format="csv">导出问卷 CSV</ExportLink>
@@ -1463,6 +1565,107 @@ export default function ResearchApp() {
             )}
           </section>
 
+          <section className="panel-card">
+            <SectionTitle step="R3B" title="缺测提醒与质控" description="汇总缺测、逾期任务和待访谈样本，帮助在正式实验阶段及时补录与跟进。" />
+            {dataQuality ? (
+              <>
+                <div className="result-grid">
+                  <ScoreBadge label="提醒数" value={dataQuality.reminderCount} accent="#b45309" />
+                  <ScoreBadge label="缺少档案" value={dataQuality.missingProfileCount} accent="#7c3aed" />
+                  <ScoreBadge label="缺前测" value={dataQuality.missingPretestCount} accent="#1d4ed8" />
+                  <ScoreBadge label="缺后测" value={dataQuality.missingPosttestCount} accent="#4338ca" />
+                </div>
+                <div className="result-grid">
+                  <ScoreBadge label="逾期任务样本" value={dataQuality.overdueTaskParticipantCount} accent="#b45309" />
+                  <ScoreBadge label="抽样人数" value={dataQuality.samplingCount} accent="#0f766e" />
+                  <ScoreBadge label="待访谈样本" value={dataQuality.pendingInterviewCount} accent="#7c3aed" />
+                  <ScoreBadge label="已完成抽样访谈" value={dataQuality.samplingCompletedCount} accent="#1d4ed8" />
+                </div>
+                {dataQuality.reminders.length ? (
+                  <div className="queue-list">
+                    {dataQuality.reminders.slice(0, 8).map((item) => (
+                      <div key={item.participantId} className="queue-item">
+                        <div>
+                          <strong>{item.participantId}</strong>
+                          <p>
+                            {item.groupId === "experimental" ? "实验组" : "对照组"} · 缺失项：{item.missingItems.join(" / ")}
+                          </p>
+                        </div>
+                        <button type="button" className="secondary-button" onClick={() => loadParticipantWorkspace(item)}>
+                          打开工作台
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-card">当前没有需要补录或跟进的样本。</div>
+                )}
+              </>
+            ) : (
+              <div className="empty-card">数据质量概览尚未生成。</div>
+            )}
+          </section>
+
+          <section className="panel-card dashboard-span">
+            <SectionTitle step="R3C" title="周任务完成率看板" description="按组别和周次查看任务完成率、进行中数量和逾期数量。" />
+            {dataQuality?.taskBoard?.length ? (
+              <div className="table-scroll">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>阶段</th>
+                      <th>组别</th>
+                      <th>已分配</th>
+                      <th>已完成</th>
+                      <th>进行中</th>
+                      <th>逾期</th>
+                      <th>完成率</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dataQuality.taskBoard.map((item) => (
+                      <tr key={`${item.stage}-${item.groupId}`}>
+                        <td>{item.stage}</td>
+                        <td>{item.groupId === "experimental" ? "实验组" : "对照组"}</td>
+                        <td>{item.assignedCount}</td>
+                        <td>{item.completedCount}</td>
+                        <td>{item.inProgressCount}</td>
+                        <td>{item.overdueCount}</td>
+                        <td>{item.completionRate}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="empty-card">当前没有可统计的任务计划。</div>
+            )}
+          </section>
+
+          <section className="panel-card">
+            <SectionTitle step="R3D" title="访谈抽样队列" description="查看已标记的质性样本，追踪优先级、抽样原因和完成情况。" />
+            {dataQuality?.samplingRows?.length ? (
+              <div className="queue-list">
+                {dataQuality.samplingRows.map((item) => (
+                  <div key={item.participantId} className="queue-item">
+                    <div>
+                      <strong>{item.participantId}</strong>
+                      <p>
+                        {item.groupId === "experimental" ? "实验组" : "对照组"} · {item.priority} · 已访谈 {item.interviewCount} 次
+                      </p>
+                      <p>{item.reason || "未填写抽样原因"}</p>
+                    </div>
+                    <button type="button" className="secondary-button" onClick={() => loadParticipantWorkspace(item)}>
+                      打开工作台
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-card">当前没有已标记的访谈抽样样本。</div>
+            )}
+          </section>
+
           <section className="panel-card dashboard-span">
             <SectionTitle step="R4" title="参与者列表" description="汇总每位受试的档案完成情况、系统增益、问卷数量和教师评分状态。" />
             {dashboardLoading ? (
@@ -1482,6 +1685,8 @@ export default function ResearchApp() {
                       <th>任务数</th>
                       <th>已完成任务</th>
                       <th>访谈数</th>
+                      <th>抽样标记</th>
+                      <th>抽样优先级</th>
                       <th>最新问卷阶段</th>
                       <th>最新访谈阶段</th>
                       <th>教师前测音准</th>
@@ -1502,6 +1707,8 @@ export default function ResearchApp() {
                         <td>{participant.taskPlanCount}</td>
                         <td>{participant.completedTaskCount}</td>
                         <td>{participant.interviewCount}</td>
+                        <td>{participant.interviewSamplingSelected ? "是" : "否"}</td>
+                        <td>{participant.interviewSamplingPriority || "—"}</td>
                         <td>{participant.latestQuestionnaireStage || "—"}</td>
                         <td>{participant.latestInterviewStage || "—"}</td>
                         <td>{participant.expertPretestPitch ?? "—"}</td>
@@ -1672,6 +1879,21 @@ export default function ResearchApp() {
                   </ul>
                 </article>
               ))}
+            </div>
+            <div className="history-card">
+              <h3>研究模板导出</h3>
+              <p>下面的模板可直接导出为 Markdown，适合进一步整理为论文附件、伦理申请材料或研究执行文档。</p>
+              <div className="summary-grid">
+                {RESEARCH_TEMPLATE_LIBRARY.map((template) => (
+                  <article key={template.templateId} className="protocol-card">
+                    <h3>{template.title}</h3>
+                    <p>{template.description}</p>
+                    <div className="link-row">
+                      <TemplateDownloadLink templateId={template.templateId}>导出模板</TemplateDownloadLink>
+                    </div>
+                  </article>
+                ))}
+              </div>
             </div>
           </section>
         </div>
