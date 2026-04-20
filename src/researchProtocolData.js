@@ -170,4 +170,93 @@ export const RESEARCH_TEMPLATE_LIBRARY = [
 - 所属院校：
 `,
   },
+  {
+    templateId: "teacher-validation-protocol",
+    title: "Teacher Validation Protocol",
+    description: "Double-rating assignment rules, adjudication triggers, and reporting guidance for teacher validation.",
+    filename: "teacher-validation-protocol.md",
+    content: `# Teacher Validation Protocol
+
+## Scope
+
+Use this protocol for expert review of AI-generated erhu diagnostic results during pilot testing and the main intervention study.
+
+## Recommended Assignment Rule
+
+1. Assign two independent teachers to the same recorded analysis.
+2. Keep raters blind to each other's judgment before both reviews are submitted.
+3. Keep the same scoring rubric and path labels across all stages.
+4. Record each review with a distinct \`raterId\`.
+
+## Required Review Fields
+
+- \`overallAgreement\` on a 1-5 scale
+- \`teacherPrimaryPath\`: \`pitch-first\`, \`rhythm-first\`, or \`review-first\`
+- teacher issue note ids
+- teacher issue measure indexes
+- reviewer comments
+
+## Adjudication Trigger
+
+Flag a pair for adjudication when any of the following is true:
+
+- practice-path mismatch
+- overall agreement gap is 2 or higher
+- note-overlap F1 is below 0.67
+- measure-overlap F1 is below 0.67
+
+## Adjudication Workflow
+
+1. Export the adjudication queue from the research analysis output.
+2. Ask a third teacher or the principal investigator to review only flagged pairs.
+3. Record the final decision and the reason for override or confirmation.
+4. Keep both original ratings for reliability reporting.
+
+## Reporting Recommendation
+
+- report overall inter-rater kappa and ICC
+- report breakdown by group, stage, and piece when pair counts are sufficient
+- report adjudication rate and the main reason categories
+`,
+  },
+  {
+    templateId: "adjudication-form",
+    title: "Adjudication Form",
+    description: "Template for resolving dual-rater disagreements on practice path or error localization.",
+    filename: "adjudication-form.md",
+    content: `# Adjudication Form
+
+## Analysis Metadata
+
+- analysisId:
+- participantId:
+- groupId:
+- sessionStage:
+- pieceId / sectionId:
+
+## Original Raters
+
+- rater A:
+- rater B:
+- path match:
+- overall agreement gap:
+- note overlap F1:
+- measure overlap F1:
+- adjudication reason:
+
+## Final Decision
+
+- adjudicated by:
+- final practice path:
+- final issue note ids:
+- final issue measure indexes:
+- keep both original ratings in reliability analysis: yes / no
+
+## Notes
+
+- rationale for final decision:
+- whether the disagreement reflects ambiguous performance, unclear score alignment, or teacher preference:
+- action for future protocol revision:
+`,
+  },
 ];

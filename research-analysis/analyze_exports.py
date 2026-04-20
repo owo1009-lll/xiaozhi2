@@ -59,6 +59,9 @@ METRIC_SPECS = [
     ("pitch", "pretestPitch", "posttestPitch"),
     ("rhythm", "pretestRhythm", "posttestRhythm"),
 ]
+ADJUDICATION_OVERALL_GAP_THRESHOLD = 2.0
+ADJUDICATION_NOTE_F1_THRESHOLD = 0.67
+ADJUDICATION_MEASURE_F1_THRESHOLD = 0.67
 GROUP_LABELS = {"experimental": "实验组", "control": "对照组"}
 METRIC_LABELS = {
     "pitch": "音准",
@@ -504,6 +507,22 @@ def icc_2_1(frame: pd.DataFrame) -> float:
     return float((ms_subject - ms_error) / denominator)
 
 
+def adjudication_reasons(row: dict[str, object]) -> list[str]:
+    reasons: list[str] = []
+    if not bool(row.get("pathMatch", False)):
+        reasons.append("practice-path mismatch")
+    overall_gap = row.get("overallAgreementGap")
+    if overall_gap is not None and not pd.isna(overall_gap) and float(overall_gap) >= ADJUDICATION_OVERALL_GAP_THRESHOLD:
+        reasons.append("overall-agreement gap >= 2")
+    note_overlap = row.get("noteOverlapF1")
+    if note_overlap is not None and not pd.isna(note_overlap) and float(note_overlap) < ADJUDICATION_NOTE_F1_THRESHOLD:
+        reasons.append("note-overlap F1 < 0.67")
+    measure_overlap = row.get("measureOverlapF1")
+    if measure_overlap is not None and not pd.isna(measure_overlap) and float(measure_overlap) < ADJUDICATION_MEASURE_F1_THRESHOLD:
+        reasons.append("measure-overlap F1 < 0.67")
+    return reasons
+
+
 def build_inter_rater_pairs(validation_reviews: pd.DataFrame) -> pd.DataFrame:
     validation_reviews = prepare_validation_reviews(validation_reviews)
     validation_reviews = ensure_columns(
@@ -513,6 +532,8 @@ def build_inter_rater_pairs(validation_reviews: pd.DataFrame) -> pd.DataFrame:
             "participantId",
             "groupId",
             "sessionStage",
+            "pieceId",
+            "sectionId",
             "raterId",
             "overallAgreement",
             "teacherPrimaryPath",
@@ -528,18 +549,25 @@ def build_inter_rater_pairs(validation_reviews: pd.DataFrame) -> pd.DataFrame:
                 "participantId",
                 "groupId",
                 "sessionStage",
+                "pieceId",
+                "sectionId",
+                "scoreUnit",
                 "raterAId",
                 "raterBId",
                 "overallAgreementA",
                 "overallAgreementB",
+                "overallAgreementGap",
                 "teacherPrimaryPathA",
                 "teacherPrimaryPathB",
+                "pathMatch",
                 "noteOverlapPrecision",
                 "noteOverlapRecall",
                 "noteOverlapF1",
                 "measureOverlapPrecision",
                 "measureOverlapRecall",
                 "measureOverlapF1",
+                "requiresAdjudication",
+                "adjudicationReason",
             ]
         )
 
@@ -565,12 +593,17 @@ def build_inter_rater_pairs(validation_reviews: pd.DataFrame) -> pd.DataFrame:
                 "participantId": first.get("participantId"),
                 "groupId": first.get("groupId"),
                 "sessionStage": first.get("sessionStage"),
+                "pieceId": first.get("pieceId"),
+                "sectionId": first.get("sectionId"),
+                "scoreUnit": f"{first.get('pieceId')}/{first.get('sectionId')}",
                 "raterAId": first.get("raterId"),
                 "raterBId": second.get("raterId"),
                 "overallAgreementA": first.get("overallAgreement"),
                 "overallAgreementB": second.get("overallAgreement"),
+                "overallAgreementGap": abs(float(first.get("overallAgreement") or 0) - float(second.get("overallAgreement") or 0)),
                 "teacherPrimaryPathA": first.get("teacherPrimaryPath"),
                 "teacherPrimaryPathB": second.get("teacherPrimaryPath"),
+                "pathMatch": first.get("teacherPrimaryPath") == second.get("teacherPrimaryPath"),
                 "noteOverlapPrecision": note_precision,
                 "noteOverlapRecall": note_recall,
                 "noteOverlapF1": note_f1,
@@ -579,7 +612,12 @@ def build_inter_rater_pairs(validation_reviews: pd.DataFrame) -> pd.DataFrame:
                 "measureOverlapF1": measure_f1,
             }
         )
-    return pd.DataFrame(rows)
+    pairs = pd.DataFrame(rows)
+    if pairs.empty:
+        return pairs
+    pairs["adjudicationReason"] = pairs.apply(lambda row: " | ".join(adjudication_reasons(row.to_dict())), axis=1)
+    pairs["requiresAdjudication"] = pairs["adjudicationReason"].astype(str).str.len().gt(0)
+    return pairs
 
 
 def build_inter_rater_summary(inter_rater_pairs: pd.DataFrame) -> pd.DataFrame:
@@ -590,10 +628,13 @@ def build_inter_rater_summary(inter_rater_pairs: pd.DataFrame) -> pd.DataFrame:
             "participantId",
             "overallAgreementA",
             "overallAgreementB",
+            "overallAgreementGap",
             "teacherPrimaryPathA",
             "teacherPrimaryPathB",
+            "pathMatch",
             "noteOverlapF1",
             "measureOverlapF1",
+            "requiresAdjudication",
         ],
     )
     if inter_rater_pairs.empty:
@@ -605,8 +646,12 @@ def build_inter_rater_summary(inter_rater_pairs: pd.DataFrame) -> pd.DataFrame:
                     "participantCount": 0,
                     "pathCohenKappa": float("nan"),
                     "overallAgreementICC": float("nan"),
+                    "pathMatchRate": float("nan"),
+                    "meanAgreementGap": float("nan"),
                     "meanNoteOverlapF1": float("nan"),
                     "meanMeasureOverlapF1": float("nan"),
+                    "adjudicationCount": 0,
+                    "adjudicationRate": float("nan"),
                 }
             ]
         )
@@ -625,11 +670,93 @@ def build_inter_rater_summary(inter_rater_pairs: pd.DataFrame) -> pd.DataFrame:
                 "participantCount": inter_rater_pairs["participantId"].nunique(),
                 "pathCohenKappa": kappa_value,
                 "overallAgreementICC": icc_value,
+                "pathMatchRate": inter_rater_pairs["pathMatch"].map(lambda value: float(bool(value)) if pd.notna(value) else float("nan")).mean(),
+                "meanAgreementGap": inter_rater_pairs["overallAgreementGap"].mean(),
                 "meanNoteOverlapF1": inter_rater_pairs["noteOverlapF1"].mean(),
                 "meanMeasureOverlapF1": inter_rater_pairs["measureOverlapF1"].mean(),
+                "adjudicationCount": int(inter_rater_pairs["requiresAdjudication"].fillna(False).astype(bool).sum()),
+                "adjudicationRate": inter_rater_pairs["requiresAdjudication"].map(lambda value: float(bool(value)) if pd.notna(value) else float("nan")).mean(),
             }
         ]
     )
+
+
+def build_inter_rater_breakdown(inter_rater_pairs: pd.DataFrame, group_columns: list[str]) -> pd.DataFrame:
+    required_columns = group_columns + [
+        "analysisId",
+        "participantId",
+        "overallAgreementA",
+        "overallAgreementB",
+        "overallAgreementGap",
+        "teacherPrimaryPathA",
+        "teacherPrimaryPathB",
+        "pathMatch",
+        "noteOverlapF1",
+        "measureOverlapF1",
+        "requiresAdjudication",
+    ]
+    inter_rater_pairs = ensure_columns(inter_rater_pairs, required_columns)
+    if inter_rater_pairs.empty:
+        return pd.DataFrame(
+            columns=group_columns
+            + [
+                "pairCount",
+                "analysisCount",
+                "participantCount",
+                "pathCohenKappa",
+                "overallAgreementICC",
+                "pathMatchRate",
+                "meanAgreementGap",
+                "meanNoteOverlapF1",
+                "meanMeasureOverlapF1",
+                "adjudicationCount",
+                "adjudicationRate",
+            ]
+        )
+
+    rows: list[dict[str, object]] = []
+    group_source: str | list[str] = group_columns[0] if len(group_columns) == 1 else group_columns
+    for group_key, frame in inter_rater_pairs.groupby(group_source, dropna=False):
+        summary = build_inter_rater_summary(frame).iloc[0].to_dict()
+        row: dict[str, object] = {}
+        if len(group_columns) == 1:
+            row[group_columns[0]] = group_key
+        else:
+            for column, value in zip(group_columns, group_key):
+                row[column] = value
+        row.update(summary)
+        rows.append(row)
+
+    return pd.DataFrame(rows).sort_values(group_columns)
+
+
+def build_inter_rater_adjudication_queue(inter_rater_pairs: pd.DataFrame) -> pd.DataFrame:
+    inter_rater_pairs = ensure_columns(
+        inter_rater_pairs,
+        [
+            "analysisId",
+            "participantId",
+            "groupId",
+            "sessionStage",
+            "pieceId",
+            "sectionId",
+            "scoreUnit",
+            "raterAId",
+            "raterBId",
+            "overallAgreementGap",
+            "pathMatch",
+            "noteOverlapF1",
+            "measureOverlapF1",
+            "requiresAdjudication",
+            "adjudicationReason",
+        ],
+    )
+    if inter_rater_pairs.empty:
+        return inter_rater_pairs.iloc[0:0].copy()
+    queue = inter_rater_pairs.loc[inter_rater_pairs["requiresAdjudication"].fillna(False).astype(bool)].copy()
+    if queue.empty:
+        return queue
+    return queue.sort_values(["sessionStage", "pieceId", "sectionId", "analysisId"])
 
 
 def build_prepost_long_table(participants: pd.DataFrame) -> pd.DataFrame:
@@ -1096,6 +1223,10 @@ def write_summary_report(
     validation_summary: pd.DataFrame,
     validation_group_summary: pd.DataFrame,
     inter_rater_summary: pd.DataFrame,
+    inter_rater_by_group: pd.DataFrame,
+    inter_rater_by_stage: pd.DataFrame,
+    inter_rater_by_piece: pd.DataFrame,
+    adjudication_queue: pd.DataFrame,
 ) -> None:
     participants = ensure_columns(participants, ["groupId"])
     participant_count = len(participants)
@@ -1193,10 +1324,52 @@ def write_summary_report(
                 f"- Participants covered: {int(row['participantCount'])}",
                 f"- Cohen's kappa (practice path): {round_value(row['pathCohenKappa'], 3)}",
                 f"- ICC (overall agreement): {round_value(row['overallAgreementICC'], 3)}",
+                f"- Practice-path match rate: {round_value((row['pathMatchRate'] or 0) * 100, 2)}%",
+                f"- Mean agreement gap: {round_value(row['meanAgreementGap'], 3)}",
                 f"- Mean note overlap F1: {round_value(row['meanNoteOverlapF1'], 3)}",
                 f"- Mean measure overlap F1: {round_value(row['meanMeasureOverlapF1'], 3)}",
+                f"- Adjudication queue: {int(row['adjudicationCount'])} pair(s), rate={round_value((row['adjudicationRate'] or 0) * 100, 2)}%",
             ]
         )
+    if not inter_rater_by_group.empty:
+        lines.extend(["", "## Inter-rater Reliability by Group"])
+        for _, row in inter_rater_by_group.iterrows():
+            lines.append(
+                f"- {row['groupId']}: pairs={int(row['pairCount'])}, "
+                f"kappa={round_value(row['pathCohenKappa'], 3)}, "
+                f"icc={round_value(row['overallAgreementICC'], 3)}, "
+                f"path_match={round_value((row['pathMatchRate'] or 0) * 100, 2)}%, "
+                f"adjudication_rate={round_value((row['adjudicationRate'] or 0) * 100, 2)}%"
+            )
+    if not inter_rater_by_stage.empty:
+        lines.extend(["", "## Inter-rater Reliability by Stage"])
+        for _, row in inter_rater_by_stage.iterrows():
+            lines.append(
+                f"- {row['sessionStage']}: pairs={int(row['pairCount'])}, "
+                f"kappa={round_value(row['pathCohenKappa'], 3)}, "
+                f"icc={round_value(row['overallAgreementICC'], 3)}, "
+                f"note_f1={round_value(row['meanNoteOverlapF1'], 3)}, "
+                f"adjudication_rate={round_value((row['adjudicationRate'] or 0) * 100, 2)}%"
+            )
+    if not inter_rater_by_piece.empty:
+        lines.extend(["", "## Inter-rater Reliability by Piece"])
+        for _, row in inter_rater_by_piece.head(8).iterrows():
+            lines.append(
+                f"- {row['scoreUnit']}: pairs={int(row['pairCount'])}, "
+                f"kappa={round_value(row['pathCohenKappa'], 3)}, "
+                f"icc={round_value(row['overallAgreementICC'], 3)}, "
+                f"note_f1={round_value(row['meanNoteOverlapF1'], 3)}, "
+                f"adjudication_rate={round_value((row['adjudicationRate'] or 0) * 100, 2)}%"
+            )
+    lines.extend(["", "## Adjudication Queue"])
+    if adjudication_queue.empty:
+        lines.append("- No pairs currently meet the adjudication trigger rules.")
+    else:
+        for _, row in adjudication_queue.iterrows():
+            lines.append(
+                f"- {row['analysisId']} | {row['scoreUnit']} | {row['raterAId']} vs {row['raterBId']} | "
+                f"reasons={row['adjudicationReason']}"
+            )
 
     lines.extend(["", "## Usage Correlations"])
     for _, row in usage_corr_table.iterrows():
@@ -1221,6 +1394,10 @@ def write_summary_json(
     validation_path_confusion: pd.DataFrame,
     inter_rater_pairs: pd.DataFrame,
     inter_rater_summary: pd.DataFrame,
+    inter_rater_by_group: pd.DataFrame,
+    inter_rater_by_stage: pd.DataFrame,
+    inter_rater_by_piece: pd.DataFrame,
+    adjudication_queue: pd.DataFrame,
 ) -> None:
     payload = {
         "groupSummary": group_table.to_dict(orient="records"),
@@ -1234,6 +1411,10 @@ def write_summary_json(
         "validationPathConfusion": validation_path_confusion.to_dict(orient="records"),
         "interRaterPairs": inter_rater_pairs.to_dict(orient="records"),
         "interRaterSummary": inter_rater_summary.to_dict(orient="records"),
+        "interRaterByGroup": inter_rater_by_group.to_dict(orient="records"),
+        "interRaterByStage": inter_rater_by_stage.to_dict(orient="records"),
+        "interRaterByPiece": inter_rater_by_piece.to_dict(orient="records"),
+        "adjudicationQueue": adjudication_queue.to_dict(orient="records"),
     }
     (output_dir / "summary.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -1477,6 +1658,10 @@ def main() -> None:
     validation_path_confusion = build_validation_path_confusion(validation_reviews)
     inter_rater_pairs = build_inter_rater_pairs(validation_reviews)
     inter_rater_summary = build_inter_rater_summary(inter_rater_pairs)
+    inter_rater_by_group = build_inter_rater_breakdown(inter_rater_pairs, ["groupId"])
+    inter_rater_by_stage = build_inter_rater_breakdown(inter_rater_pairs, ["sessionStage"])
+    inter_rater_by_piece = build_inter_rater_breakdown(inter_rater_pairs, ["scoreUnit"])
+    adjudication_queue = build_inter_rater_adjudication_queue(inter_rater_pairs)
 
     save_table(participants, output_dir, "table_participant_overview")
     save_table(group_table, output_dir, "table_group_summary")
@@ -1495,6 +1680,10 @@ def main() -> None:
     save_table(validation_path_confusion, output_dir, "table_validation_path_confusion")
     save_table(inter_rater_pairs, output_dir, "table_inter_rater_pairs")
     save_table(inter_rater_summary, output_dir, "table_inter_rater_summary")
+    save_table(inter_rater_by_group, output_dir, "table_inter_rater_by_group")
+    save_table(inter_rater_by_stage, output_dir, "table_inter_rater_by_stage")
+    save_table(inter_rater_by_piece, output_dir, "table_inter_rater_by_piece")
+    save_table(adjudication_queue, output_dir, "table_inter_rater_adjudication_queue")
 
     plot_gain_by_group(participants, output_dir)
     plot_questionnaire_bars(questionnaires, output_dir)
@@ -1516,6 +1705,10 @@ def main() -> None:
         validation_summary,
         validation_group_summary,
         inter_rater_summary,
+        inter_rater_by_group,
+        inter_rater_by_stage,
+        inter_rater_by_piece,
+        adjudication_queue,
     )
     write_summary_json(
         output_dir,
@@ -1530,6 +1723,10 @@ def main() -> None:
         validation_path_confusion,
         inter_rater_pairs,
         inter_rater_summary,
+        inter_rater_by_group,
+        inter_rater_by_stage,
+        inter_rater_by_piece,
+        adjudication_queue,
     )
     write_paper_draft(
         output_dir,
@@ -1567,6 +1764,10 @@ def main() -> None:
                 "- table_validation_path_confusion.csv",
                 "- table_inter_rater_pairs.csv",
                 "- table_inter_rater_summary.csv",
+                "- table_inter_rater_by_group.csv",
+                "- table_inter_rater_by_stage.csv",
+                "- table_inter_rater_by_piece.csv",
+                "- table_inter_rater_adjudication_queue.csv",
                 "- figure_gain_by_group.png",
                 "- figure_questionnaire_by_group.png",
                 "- figure_system_vs_expert.png",

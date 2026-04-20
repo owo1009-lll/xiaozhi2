@@ -203,5 +203,7 @@
   `research-analysis/analyze_exports.py` now accepts `validation-reviews.csv` and generates validation tables, path-confusion tables, and validation figures.
 - Completed: `dual-rater reliability support`
   The backend now stores multiple validation reviews per `analysisId` keyed by `raterId`, the app can switch between teacher reviews, and the analysis script now generates `table_inter_rater_pairs.csv`, `table_inter_rater_summary.csv`, and `figure_inter_rater_metrics.png`.
+- Completed: `validation protocol and stratified reliability outputs`
+  The project now includes a clean protocol reference in `docs/teacher-validation-protocol.md`, template exports for teacher validation and adjudication, and stratified inter-rater tables by group, stage, and piece plus an adjudication queue.
 - Current next step:
-  add a stronger teacher-validation protocol, such as fixed double-rating assignment rules, adjudication workflow, or `Cohen's kappa` / `ICC` reporting by week or piece.
+  connect adjudication outcomes back into the app data model so final resolved labels can be tracked alongside original dual-rater reviews.

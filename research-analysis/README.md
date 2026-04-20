@@ -77,6 +77,10 @@ The default `research-analysis/output/` folder includes:
 - `table_validation_path_confusion.csv`
 - `table_inter_rater_pairs.csv`
 - `table_inter_rater_summary.csv`
+- `table_inter_rater_by_group.csv`
+- `table_inter_rater_by_stage.csv`
+- `table_inter_rater_by_piece.csv`
+- `table_inter_rater_adjudication_queue.csv`
 - `figure_gain_by_group.png`
 - `figure_questionnaire_by_group.png`
 - `figure_system_vs_expert.png`
@@ -99,6 +103,7 @@ The default `research-analysis/output/` folder includes:
 - The script expects numeric score columns in the exported CSV files; missing values are handled as `NaN`.
 - `validation-reviews.csv` is optional at the script level; if it is missing, the validation tables and figures will fall back to empty placeholders.
 - When the same `analysisId` has reviews from at least two distinct `raterId` values, the script will also compute dual-rater agreement outputs including `Cohen's kappa`, `ICC`, and overlap F1 scores.
+- The script now also produces stratified inter-rater outputs by `groupId`, `sessionStage`, and `scoreUnit`, plus an adjudication queue based on path mismatch, agreement-gap, and overlap-F1 thresholds.
 - The script now supports empty exported datasets and will generate placeholder figures plus empty summary tables instead of failing.
 - The current statistical outputs are designed for rapid paper drafting and should still be reviewed before submission.
 - `paper_draft_zh.docx` is intended as a Word starter draft; you can refine wording, citations, and section order directly in Word.
