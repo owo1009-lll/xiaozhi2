@@ -205,6 +205,48 @@ function pickFromSeed(seed, values = []) {
   return values[Math.abs(seed) % values.length];
 }
 
+function buildFallbackExplanation(overallPitchScore, overallRhythmScore, noteFindings, measureFindings) {
+  const dominantDimension = overallRhythmScore < overallPitchScore ? "节奏" : "音准";
+  const summaryText = `本次录音优先需要处理的是${dominantDimension}问题。系统定位到 ${noteFindings.length} 个问题音和 ${measureFindings.length} 个问题小节。`;
+  const topNote = noteFindings[0];
+  const topMeasure = measureFindings[0];
+  const teacherComment = topNote
+    ? `建议先处理 ${topNote.noteId}，确认单音稳定后再回到整段。`
+    : topMeasure
+      ? `建议先重练第 ${topMeasure.measureIndex} 小节，再回到整段复录。`
+      : "当前结果较稳定，可保持当前练习方式。";
+
+  const practiceTargets = [];
+  if (topNote) {
+    practiceTargets.push({
+      priority: 1,
+      targetType: "note",
+      targetId: topNote.noteId,
+      measureIndex: topNote.measureIndex,
+      title: `先处理 ${topNote.noteId} 的落点与起拍`,
+      why: topNote.why || "该音是当前偏差最集中的位置。",
+      action: topNote.action || "先听示范，再做局部循环练习。",
+      severity: topNote.severity || "medium",
+      evidenceLabel: topNote.evidenceLabel || null,
+    });
+  }
+  if (topMeasure) {
+    practiceTargets.push({
+      priority: practiceTargets.length + 1,
+      targetType: "measure",
+      targetId: `measure-${topMeasure.measureIndex}`,
+      measureIndex: topMeasure.measureIndex,
+      title: `重练第 ${topMeasure.measureIndex} 小节`,
+      why: topMeasure.detail || "该小节内部偏差较集中。",
+      action: topMeasure.coachingTip || "先拆拍，再回到整小节练习。",
+      severity: topMeasure.severity || "medium",
+      evidenceLabel: topMeasure.issueLabel || null,
+    });
+  }
+
+  return { summaryText, teacherComment, practiceTargets };
+}
+
 function buildFallbackAnalysis(payload, section) {
   const notes = getArray(section?.notes);
   const measureCount = Math.max(1, ...notes.map((note) => safeNumber(note.measureIndex, 1)));
@@ -259,6 +301,7 @@ function buildFallbackAnalysis(payload, section) {
   const noteFindings = pickedNotes.map((note, index) => {
     const pitchDirection = pickFromSeed(seed + index * 5, pitchDirections);
     const rhythmDirection = pickFromSeed(seed + index * 11, rhythmDirections);
+    const severity = Math.abs(pitchDirection.cents) >= 28 || Math.abs(rhythmDirection.ms) >= 90 ? "high" : "medium";
     return {
       noteId: note.noteId,
       measureIndex: note.measureIndex,
@@ -267,22 +310,45 @@ function buildFallbackAnalysis(payload, section) {
       onsetErrorMs: rhythmDirection.ms,
       pitchLabel: pitchDirection.label,
       rhythmLabel: rhythmDirection.label,
+      pitchToleranceCents: 18,
+      confidence: clamp(0.62 + ((seed + index) % 10) / 100, 0.55, 0.8),
+      isUncertain: false,
+      evidenceLabel: "fallback-simulation",
+      severity,
+      why: `${pitchDirection.label}，并且${rhythmDirection.label}。`,
+      action:
+        rhythmDirection.type === "late"
+          ? "先跟节拍器重练这一音，再回到整小节。"
+          : pitchDirection.cents < 0
+            ? "先慢速拉长该音，确认落点后再连接前后音。"
+            : "先听示范，再做 3 次局部循环练习。",
     };
   });
 
-  const demoSegments = Array.from(new Set(measureFindings.map((item) => item.measureIndex))).map((measureIndex) => ({
+  const enrichedMeasureFindings = measureFindings.map((item) => ({
+    ...item,
+    severity: item.issueType === "unstable" ? "medium" : "low",
+    coachingTip: item.issueType === "late" ? "先拆拍再回到整小节练习。" : "先放慢速度确认每拍位置。",
+  }));
+
+  const demoSegments = Array.from(new Set(enrichedMeasureFindings.map((item) => item.measureIndex))).map((measureIndex) => ({
     measureIndex,
     demoAudio: safeString(section?.demoAudio),
     label: `标准示范 · 第 ${measureIndex} 小节`,
   }));
 
+  const explanation = buildFallbackExplanation(overallPitchScore, overallRhythmScore, noteFindings, enrichedMeasureFindings);
+
   return {
     overallPitchScore,
     overallRhythmScore,
-    measureFindings,
+    measureFindings: enrichedMeasureFindings,
     noteFindings,
     demoSegments,
     confidence: clamp(0.62 + ((seed % 12) / 100), 0.52, 0.78),
+    summaryText: explanation.summaryText,
+    teacherComment: explanation.teacherComment,
+    practiceTargets: explanation.practiceTargets,
     analysisMode: "fallback",
   };
 }
@@ -1068,6 +1134,9 @@ app.post("/api/erhu/analyze", async (req, res) => {
     noteFindings: getArray(analysis.noteFindings),
     demoSegments: getArray(analysis.demoSegments),
     confidence: clamp(safeNumber(analysis.confidence, 0), 0, 1),
+    summaryText: safeString(analysis.summaryText),
+    teacherComment: safeString(analysis.teacherComment),
+    practiceTargets: getArray(analysis.practiceTargets),
     analysisMode: safeString(analysis.analysisMode, "fallback"),
     diagnostics: analysis.diagnostics && typeof analysis.diagnostics === "object" ? analysis.diagnostics : null,
     createdAt: nowIso(),

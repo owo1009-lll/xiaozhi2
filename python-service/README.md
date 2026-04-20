@@ -18,6 +18,7 @@ The analyzer now follows this sequence:
 7. Extract stable-segment pitch evidence and detect glide-like / vibrato-like note behavior
 8. Align performance to score with `DTW`
 9. Generate note-level and measure-level pitch/rhythm feedback with adaptive tolerance
+10. Generate `summaryText`, `teacherComment`, and `practiceTargets` for the UI
 
 ## Endpoints
 

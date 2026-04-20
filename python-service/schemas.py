@@ -54,6 +54,8 @@ class MeasureFinding(BaseModel):
     issueType: str
     issueLabel: str
     detail: str
+    severity: str | None = None
+    coachingTip: str | None = None
 
 
 class NoteFinding(BaseModel):
@@ -67,6 +69,21 @@ class NoteFinding(BaseModel):
     pitchToleranceCents: int | None = None
     confidence: float | None = None
     isUncertain: bool = False
+    evidenceLabel: str | None = None
+    severity: str | None = None
+    why: str | None = None
+    action: str | None = None
+
+
+class PracticeTarget(BaseModel):
+    priority: int
+    targetType: str
+    targetId: str | None = None
+    measureIndex: int | None = None
+    title: str
+    why: str
+    action: str
+    severity: str | None = None
     evidenceLabel: str | None = None
 
 
@@ -83,5 +100,8 @@ class AnalyzeResult(BaseModel):
     noteFindings: list[NoteFinding]
     demoSegments: list[DemoSegment]
     confidence: float
+    summaryText: str | None = None
+    teacherComment: str | None = None
+    practiceTargets: list[PracticeTarget] = Field(default_factory=list)
     analysisMode: str = "external"
     diagnostics: dict[str, Any] = Field(default_factory=dict)

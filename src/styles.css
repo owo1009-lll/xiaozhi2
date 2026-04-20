@@ -392,12 +392,37 @@ button {
   line-height: 1.7;
 }
 
+.supporting-copy {
+  margin-top: 10px !important;
+}
+
 .finding-card ul,
 .history-card ul {
   margin: 0;
   padding-left: 18px;
   line-height: 1.75;
   color: var(--text-main);
+}
+
+.finding-help {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-muted);
+}
+
+.practice-list li + li {
+  margin-top: 12px;
+}
+
+.practice-list li span {
+  display: block;
+}
+
+.practice-meta {
+  margin: 4px 0 6px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .history-columns {

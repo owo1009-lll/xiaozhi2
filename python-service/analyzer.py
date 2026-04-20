@@ -13,7 +13,7 @@ from typing import Any
 from xml.etree import ElementTree as ET
 
 from config import Settings
-from schemas import AnalyzeRequest, AnalyzeResult, DemoSegment, MeasureFinding, NoteEvent, NoteFinding
+from schemas import AnalyzeRequest, AnalyzeResult, DemoSegment, MeasureFinding, NoteEvent, NoteFinding, PracticeTarget
 
 try:
     import numpy as np
@@ -147,6 +147,14 @@ def percentile(values: list[float], quantile: float) -> float:
     ordered = sorted(values)
     index = max(0, min(len(ordered) - 1, int(round((len(ordered) - 1) * (quantile / 100.0)))))
     return float(ordered[index])
+
+
+def severity_label(value: float, low: float, high: float) -> str:
+    if value >= high:
+        return "high"
+    if value >= low:
+        return "medium"
+    return "low"
 
 
 class ErhuAnalyzer:
@@ -703,6 +711,115 @@ class ErhuAnalyzer:
         stable_point_count = int(note.get("stablePointCount", 0))
         return confidence < float(self.settings.uncertain_confidence) or stable_point_count < int(self.settings.stable_note_min_frames)
 
+    def _build_note_reason(self, note: dict[str, Any], pitch_label: str, rhythm_label: str) -> str:
+        reasons: list[str] = []
+        if pitch_label == "pitch-flat":
+            reasons.append(f"稳定段音高比目标低 {int(round(abs(float(note['centsError']))))} cents")
+        elif pitch_label == "pitch-sharp":
+            reasons.append(f"稳定段音高比目标高 {int(round(abs(float(note['centsError']))))} cents")
+        elif pitch_label == "pitch-review":
+            reasons.append("该音的稳定段证据偏弱，系统建议结合示范和人工听辨复核")
+
+        if rhythm_label == "rhythm-early":
+            reasons.append(f"起拍比参考提前 {int(round(abs(float(note['onsetErrorMs']))))} ms")
+        elif rhythm_label == "rhythm-late":
+            reasons.append(f"起拍比参考延后 {int(round(abs(float(note['onsetErrorMs']))))} ms")
+
+        if bool(note.get("glideLike")):
+            reasons.append("检测到明显滑音进入，已自动放宽音准容忍")
+        if bool(note.get("vibratoLike")):
+            reasons.append("检测到揉弦样波动，已自动放宽音准容忍")
+        return "；".join(reasons) if reasons else "该音偏差接近阈值，建议优先结合示范回放复核。"
+
+    def _build_note_action(self, pitch_label: str, rhythm_label: str, note: dict[str, Any]) -> str:
+        if pitch_label == "pitch-review":
+            return "先听示范并慢速重复该音，确认落点后再决定是否调整指位。"
+        if pitch_label == "pitch-flat":
+            return "先单独拉长该音，略提前准备左手落点，再回到原速连接前后音。"
+        if pitch_label == "pitch-sharp":
+            return "保持弓速不变，减小左手按弦高度或回收指位后再重复该音。"
+        if rhythm_label == "rhythm-early":
+            return "先跟拍器慢速重练，把该音放到拍点后再逐步恢复原速。"
+        if rhythm_label == "rhythm-late":
+            return "把前一音收短一些，提前准备弓段和左手，避免该音落后。"
+        if bool(note.get("glideLike")):
+            return "保持滑音表达，但把落点后的稳定段拉得更清楚。"
+        return "先保留当前速度，针对该音做 3 到 5 次局部循环练习。"
+
+    def _build_measure_coaching(self, issue_label: str) -> str:
+        if issue_label == "rhythm-unstable":
+            return "先拆成拍点练习，再跟示范或节拍器做小节循环。"
+        if issue_label == "pitch-unstable":
+            return "先分离问题音，确认每个落点稳定后再恢复整小节演奏。"
+        return "先放慢速度，定位最不稳的两个音后再重练。"
+
+    def _build_explanation_layer(
+        self,
+        note_findings: list[NoteFinding],
+        measure_findings: list[MeasureFinding],
+        overall_pitch_score: int,
+        overall_rhythm_score: int,
+        uncertain_pitch_count: int,
+    ) -> tuple[str, str, list[PracticeTarget]]:
+        if not note_findings and not measure_findings:
+            summary_text = "本次录音整体较稳定，当前没有定位到明显的优先修正点。"
+            teacher_comment = "建议保持当前速度，再做一遍整段录音确认稳定性。"
+            return summary_text, teacher_comment, []
+
+        dominant_dimension = "节奏" if overall_rhythm_score < overall_pitch_score else "音准"
+        summary_parts = [
+            f"本次录音优先需要处理的是{dominant_dimension}问题。",
+            f"系统共定位到 {len(note_findings)} 个问题音和 {len(measure_findings)} 个问题小节。",
+        ]
+        if uncertain_pitch_count:
+            summary_parts.append(f"其中有 {uncertain_pitch_count} 个音的证据偏弱，建议结合示范和教师判断复核。")
+        summary_text = "".join(summary_parts)
+
+        teacher_comment = (
+            "建议先修优先级最高的 1 到 2 个点，不要同时改整段。"
+            if note_findings or measure_findings
+            else "建议继续保持当前练习方式。"
+        )
+
+        practice_targets: list[PracticeTarget] = []
+        priority = 1
+        for note in note_findings[:3]:
+            practice_targets.append(
+                PracticeTarget(
+                    priority=priority,
+                    targetType="note",
+                    targetId=note.noteId,
+                    measureIndex=note.measureIndex,
+                    title=f"先处理 {note.noteId} 的落点与起拍",
+                    why=note.why or "该音是当前偏差最集中的位置。",
+                    action=note.action or "针对该音做局部循环练习。",
+                    severity=note.severity,
+                    evidenceLabel=note.evidenceLabel,
+                )
+            )
+            priority += 1
+        for measure in measure_findings[:2]:
+            practice_targets.append(
+                PracticeTarget(
+                    priority=priority,
+                    targetType="measure",
+                    targetId=f"measure-{measure.measureIndex}",
+                    measureIndex=measure.measureIndex,
+                    title=f"重练第 {measure.measureIndex} 小节",
+                    why=measure.detail or "该小节内部偏差较集中。",
+                    action=measure.coachingTip or "先拆分拍点，再回到整小节练习。",
+                    severity=measure.severity,
+                    evidenceLabel=measure.issueLabel,
+                )
+            )
+            priority += 1
+
+        if practice_targets:
+            highest = practice_targets[0]
+            teacher_comment = f"建议先从“{highest.title}”开始，完成后再回到整段复录。"
+
+        return summary_text, teacher_comment, practice_targets
+
     def _dtw_align_notes(
         self,
         score_notes: list[SymbolicNote],
@@ -914,6 +1031,8 @@ class ErhuAnalyzer:
 
         for note in flagged_notes[: self.settings.fallback_issue_limit]:
             tolerance = float(note.get("pitchToleranceCents", self.settings.base_pitch_tolerance_cents))
+            excess_value = max(float(note.get("pitchExcessCents", 0.0)), float(note.get("rhythmExcessMs", 0.0)) / 2.0)
+            severity = severity_label(excess_value, 10.0, 22.0)
             pitch_label = (
                 "pitch-review"
                 if bool(note.get("pitchUncertain"))
@@ -939,6 +1058,8 @@ class ErhuAnalyzer:
                 evidence_parts.append("low-confidence")
             if not evidence_parts:
                 evidence_parts.append("stable-segment")
+            why_text = self._build_note_reason(note, pitch_label, rhythm_label)
+            action_text = self._build_note_action(pitch_label, rhythm_label, note)
             note_findings.append(
                 NoteFinding(
                     noteId=note["noteId"],
@@ -952,6 +1073,9 @@ class ErhuAnalyzer:
                     confidence=round(float(note.get("estimatedConfidence", 0.0)), 3),
                     isUncertain=bool(note.get("pitchUncertain")),
                     evidenceLabel=", ".join(evidence_parts),
+                    severity=severity,
+                    why=why_text,
+                    action=action_text,
                 )
             )
 
@@ -968,16 +1092,19 @@ class ErhuAnalyzer:
             if pitch_median < 4 and onset_median < 8:
                 continue
             issue_label = "rhythm-unstable" if onset_median >= pitch_median else "pitch-unstable"
+            detail = (
+                f"excess pitch={int(round(pitch_median))} cents, "
+                f"excess onset={int(round(onset_median))}ms, "
+                f"uncertainNotes={uncertain_count}"
+            )
             measure_findings.append(
                 MeasureFinding(
                     measureIndex=measure_index,
                     issueType="unstable",
                     issueLabel=issue_label,
-                    detail=(
-                        f"excess pitch={int(round(pitch_median))} cents, "
-                        f"excess onset={int(round(onset_median))}ms, "
-                        f"uncertainNotes={uncertain_count}"
-                    ),
+                    detail=detail,
+                    severity=severity_label(max(pitch_median, onset_median / 2.0), 8.0, 18.0),
+                    coachingTip=self._build_measure_coaching(issue_label),
                 )
             )
 
@@ -991,6 +1118,13 @@ class ErhuAnalyzer:
         confidence_values = [float(note["estimatedConfidence"]) for note in aligned_notes if float(note["estimatedConfidence"]) > 0]
         confidence = median(confidence_values) if confidence_values else self.settings.min_confidence
         confidence = max(0.45, min(0.95, float(confidence)))
+        summary_text, teacher_comment, practice_targets = self._build_explanation_layer(
+            note_findings,
+            measure_findings,
+            overall_pitch_score,
+            overall_rhythm_score,
+            uncertain_pitch_count,
+        )
 
         demo_segments = [
             DemoSegment(
@@ -1008,6 +1142,9 @@ class ErhuAnalyzer:
             noteFindings=note_findings,
             demoSegments=demo_segments,
             confidence=round(confidence, 3),
+            summaryText=summary_text,
+            teacherComment=teacher_comment,
+            practiceTargets=practice_targets,
             analysisMode="external",
             diagnostics={
                 "dependencyReport": self.dependency_report(),

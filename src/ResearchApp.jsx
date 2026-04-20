@@ -116,6 +116,18 @@ function plusNumber(value) {
   return numeric > 0 ? `+${numeric}` : `${numeric}`;
 }
 
+function severityText(value) {
+  if (value === "high") return "高优先级";
+  if (value === "medium") return "中优先级";
+  return "低优先级";
+}
+
+function confidenceText(value) {
+  const numeric = safeNumber(value, NaN);
+  if (!Number.isFinite(numeric)) return "未报告";
+  return `${Math.round(numeric * 100)}%`;
+}
+
 function formatDateTime(value) {
   if (!value) return "未记录";
   const date = new Date(value);
@@ -1115,6 +1127,32 @@ export default function ResearchApp() {
                   <ScoreBadge label="置信度" value={safeNumber((analysis.confidence || 0) * 100)} accent="#4338ca" suffix="%" />
                   <ScoreBadge label="分析模式" value={analysis.analysisMode === "external" ? 100 : 60} accent="#7c3aed" suffix="%" />
                 </div>
+                {(analysis.summaryText || analysis.teacherComment || (analysis.practiceTargets || []).length) ? (
+                  <div className="summary-grid">
+                    <div className="history-card">
+                      <h3>整体判断</h3>
+                      <p>{analysis.summaryText || "当前已生成结果，但整体说明尚未形成。"}</p>
+                      {analysis.teacherComment ? <p className="supporting-copy">{analysis.teacherComment}</p> : null}
+                    </div>
+                    <div className="history-card">
+                      <h3>优先练习顺序</h3>
+                      {(analysis.practiceTargets || []).length ? (
+                        <ol className="compact-list practice-list">
+                          {analysis.practiceTargets.map((target) => (
+                            <li key={`${target.targetType}-${target.targetId || target.measureIndex || target.priority}`}>
+                              <strong>{target.title}</strong>
+                              <span className="practice-meta">{`${severityText(target.severity)} · ${target.evidenceLabel || "系统建议"}`}</span>
+                              <span>{target.why}</span>
+                              <span>{target.action}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      ) : (
+                        <p>当前没有形成明确的优先练习顺序。</p>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
                 <div className="findings-grid">
                   <div className="finding-card">
                     <h3>问题小节</h3>
@@ -1124,7 +1162,9 @@ export default function ResearchApp() {
                           <li key={`${item.measureIndex}-${item.issueType}`}>
                             <strong>第 {item.measureIndex} 小节：</strong>
                             {item.issueLabel}
+                            {item.severity ? ` · ${severityText(item.severity)}` : ""}
                             {item.detail ? ` (${item.detail})` : ""}
+                            {item.coachingTip ? <span className="finding-help">{`建议：${item.coachingTip}`}</span> : null}
                           </li>
                         ))}
                       </ul>
@@ -1140,6 +1180,11 @@ export default function ResearchApp() {
                           <li key={item.noteId}>
                             <strong>{item.noteId}</strong>
                             {`，第 ${item.measureIndex} 小节，${item.pitchLabel}，${item.rhythmLabel}`}
+                            {item.severity ? ` · ${severityText(item.severity)}` : ""}
+                            {item.evidenceLabel ? <span className="finding-help">{`证据：${item.evidenceLabel}`}</span> : null}
+                            {item.confidence != null ? <span className="finding-help">{`置信度：${confidenceText(item.confidence)}`}</span> : null}
+                            {item.why ? <span className="finding-help">{`原因：${item.why}`}</span> : null}
+                            {item.action ? <span className="finding-help">{`怎么练：${item.action}`}</span> : null}
                           </li>
                         ))}
                       </ul>
