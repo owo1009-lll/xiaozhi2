@@ -52,6 +52,14 @@ export async function fetchResearchParticipants() {
   return readJson(await fetch("/api/erhu/research/participants"));
 }
 
+export async function fetchTasks() {
+  return readJson(await fetch("/api/erhu/research/tasks"));
+}
+
+export async function fetchInterviews() {
+  return readJson(await fetch("/api/erhu/research/interviews"));
+}
+
 export async function fetchQuestionnaires() {
   return readJson(await fetch("/api/erhu/research/questionnaires"));
 }
@@ -71,6 +79,36 @@ export async function fetchAnalyzerStatus() {
 export async function saveExpertRating(payload) {
   return readJson(
     await fetch("/api/erhu/expert-rating", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  );
+}
+
+export async function saveTaskPlan(payload) {
+  return readJson(
+    await fetch("/api/erhu/task-plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  );
+}
+
+export async function saveInterviewNote(payload) {
+  return readJson(
+    await fetch("/api/erhu/interview-note", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  );
+}
+
+export async function batchCreateParticipants(payload) {
+  return readJson(
+    await fetch("/api/erhu/research/batch-participants", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

@@ -2,7 +2,7 @@
 
 ## 项目结构
 
-- `src/ResearchApp.jsx`：研究原型前端，覆盖受试编号、录音上传、分析反馈、问卷与教师评分流程
+- `src/ResearchApp.jsx`：研究原型前端，覆盖受试编号、录音上传、分析反馈、周任务、访谈、问卷与教师评分流程
 - `server.js`：Node 网关，负责曲目数据、研究记录、导出接口，以及转发 Python 分析服务
 - `python-service/`：FastAPI 分析服务，当前已接入 `ffmpeg -> librosa -> torchcrepe`
 - `research-analysis/`：把导出的 CSV 转成论文可用表格、图表和摘要报告
@@ -70,17 +70,22 @@ ERHU_FFMPEG_PATH=
 ## 研究接口
 
 - `POST /api/erhu/participant-profile`
+- `POST /api/erhu/research/batch-participants`
 - `POST /api/erhu/analyze`
+- `POST /api/erhu/task-plan`
+- `POST /api/erhu/interview-note`
 - `POST /api/erhu/study-record`
 - `POST /api/erhu/expert-rating`
 - `GET /api/erhu/analysis/:analysisId`
 - `GET /api/erhu/research/overview`
 - `GET /api/erhu/research/participants`
+- `GET /api/erhu/research/tasks`
+- `GET /api/erhu/research/interviews`
 - `GET /api/erhu/research/questionnaires`
 - `GET /api/erhu/research/expert-ratings`
 - `GET /api/erhu/research/pending-ratings`
 - `GET /api/erhu/analyzer-status`
-- `GET /api/erhu/research/export?dataset=participants|questionnaires|expert-ratings|analyses&format=json|csv`
+- `GET /api/erhu/research/export?dataset=participants|tasks|interviews|questionnaires|expert-ratings|analyses&format=json|csv`
 
 ## 研究数据导出与统计分析
 
@@ -131,6 +136,7 @@ npm run research:export-and-paper
 
 - 反馈默认为非实时录音分析
 - 诊断维度当前聚焦音准、节奏、问题音定位和示范回放
+- 正式实验工作台已支持批量导入受试者、周任务计划和访谈记录
 - 运弓、音色、揉弦质量与开放式问答不在本阶段范围内
 - Python 服务已可用，但仍建议后续接入真实教师标注数据做一致性与稳健性验证
 - 统计脚本已支持空白研究库启动状态，清空测试数据后仍可正常导出空表与占位图

@@ -1,17 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { playReferenceNotes, unlockAudio } from "./audioSynth";
 import {
+  batchCreateParticipants,
   createAnalysis,
   fetchAnalyzerStatus,
   fetchExpertRatings,
+  fetchInterviews,
   fetchParticipant,
   fetchPendingRatings,
   fetchPieces,
   fetchQuestionnaires,
   fetchResearchOverview,
   fetchResearchParticipants,
+  fetchTasks,
   saveExpertRating,
+  saveInterviewNote,
   saveParticipantProfile,
+  saveTaskPlan,
   saveStudyRecord,
 } from "./researchApi";
 import { RESEARCH_PROTOCOL } from "./researchProtocolData";
@@ -62,6 +67,29 @@ const DEFAULT_EXPERT_RATING = {
   rhythmScore: 80,
   raterId: "expert-1",
   comments: "",
+};
+const DEFAULT_TASK_PLAN = {
+  taskId: "",
+  stage: "week1",
+  pieceId: "",
+  sectionId: "",
+  focus: "",
+  instructions: "",
+  practiceTargetMinutes: 30,
+  dueDate: "",
+  status: "assigned",
+  assignedBy: "researcher-1",
+};
+const DEFAULT_INTERVIEW_NOTE = {
+  interviewId: "",
+  stage: "posttest",
+  interviewerId: "researcher-1",
+  summary: "",
+  barriers: "",
+  strategyChanges: "",
+  representativeQuote: "",
+  nextAction: "",
+  followUpNeeded: false,
 };
 
 function safeNumber(value, fallback = 0) {
@@ -125,6 +153,24 @@ function getAudioDuration(file) {
       resolve(null);
     };
   });
+}
+
+function parseBatchParticipantText(text) {
+  return String(text || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.split(/\t|,/).map((item) => item.trim()))
+    .filter((parts) => parts[0] && parts[0].toLowerCase() !== "participantid")
+    .map((parts) => ({
+      participantId: parts[0],
+      groupId: parts[1] || "experimental",
+      profile: {
+        alias: parts[2] || "",
+        institution: parts[3] || "",
+        grade: parts[4] || "",
+      },
+    }));
 }
 
 function SectionTitle({ step, title, description }) {
@@ -209,6 +255,8 @@ export default function ResearchApp() {
   const [profile, setProfile] = useState(DEFAULT_PROFILE);
   const [researchOverview, setResearchOverview] = useState(null);
   const [researchParticipants, setResearchParticipants] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [interviews, setInterviews] = useState([]);
   const [questionnaires, setQuestionnaires] = useState([]);
   const [expertRatings, setExpertRatings] = useState([]);
   const [pendingRatings, setPendingRatings] = useState([]);
@@ -217,13 +265,19 @@ export default function ResearchApp() {
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [recording, setRecording] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
+  const [taskSaving, setTaskSaving] = useState(false);
+  const [interviewSaving, setInterviewSaving] = useState(false);
   const [questionnaireSaving, setQuestionnaireSaving] = useState(false);
   const [expertSaving, setExpertSaving] = useState(false);
+  const [batchImporting, setBatchImporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [statusMessage, setStatusMessage] = useState("系统已就绪，可开始录音、分析与研究数据录入。");
   const [experienceScales, setExperienceScales] = useState(DEFAULT_EXPERIENCE);
   const [experienceNotes, setExperienceNotes] = useState("");
   const [expertRating, setExpertRating] = useState(DEFAULT_EXPERT_RATING);
+  const [taskPlan, setTaskPlan] = useState(DEFAULT_TASK_PLAN);
+  const [interviewNote, setInterviewNote] = useState(DEFAULT_INTERVIEW_NOTE);
+  const [batchImportText, setBatchImportText] = useState("");
   const [installPromptEvent, setInstallPromptEvent] = useState(null);
   const fileInputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -232,9 +286,17 @@ export default function ResearchApp() {
 
   const selectedPiece = pieces.find((piece) => piece.pieceId === selectedPieceId) || null;
   const selectedSection = selectedPiece?.sections?.find((section) => section.sectionId === selectedSectionId) || null;
+  const taskPlanPiece = pieces.find((piece) => piece.pieceId === (taskPlan.pieceId || selectedPieceId)) || selectedPiece || null;
+  const taskPlanSections = taskPlanPiece?.sections || [];
   const recentLogs = participantRecord?.usageLogs?.slice(-6).reverse() || [];
+  const participantTaskPlans =
+    participantRecord?.taskPlans?.slice().sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt))) || [];
+  const participantInterviews =
+    participantRecord?.interviews?.slice().sort((left, right) => String(right.submittedAt).localeCompare(String(left.submittedAt))) || [];
   const participantQuestionnaires = participantRecord?.questionnaires?.slice().reverse() || [];
   const groupSummaries = researchOverview?.groups || [];
+  const latestTasks = tasks.slice(0, 8);
+  const latestInterviews = interviews.slice(0, 8);
   const latestQuestionnaires = questionnaires.slice(0, 8);
   const latestRatings = expertRatings.slice(0, 8);
 
@@ -344,12 +406,22 @@ export default function ResearchApp() {
     }
   }, [activeTab]);
 
+  useEffect(() => {
+    setTaskPlan((prev) => ({
+      ...prev,
+      pieceId: prev.pieceId || selectedPieceId,
+      sectionId: prev.sectionId || selectedSectionId,
+    }));
+  }, [selectedPieceId, selectedSectionId]);
+
   async function loadDashboardData() {
     setDashboardLoading(true);
     try {
-      const [overviewJson, participantsJson, questionnaireJson, ratingsJson, pendingJson, analyzerJson] = await Promise.all([
+      const [overviewJson, participantsJson, taskJson, interviewJson, questionnaireJson, ratingsJson, pendingJson, analyzerJson] = await Promise.all([
         fetchResearchOverview(),
         fetchResearchParticipants(),
+        fetchTasks(),
+        fetchInterviews(),
         fetchQuestionnaires(),
         fetchExpertRatings(),
         fetchPendingRatings(),
@@ -357,6 +429,8 @@ export default function ResearchApp() {
       ]);
       setResearchOverview(overviewJson?.overview || null);
       setResearchParticipants(participantsJson?.participants || []);
+      setTasks(taskJson?.tasks || []);
+      setInterviews(interviewJson?.interviews || []);
       setQuestionnaires(questionnaireJson?.questionnaires || []);
       setExpertRatings(ratingsJson?.ratings || []);
       setPendingRatings(pendingJson?.pendingRatings || overviewJson?.overview?.pendingRatings || []);
@@ -520,6 +594,66 @@ export default function ResearchApp() {
     }
   }
 
+  async function handleSaveTaskPlan() {
+    if (!participantId.trim()) {
+      setErrorMessage("请先填写受试编号。");
+      return;
+    }
+
+    setTaskSaving(true);
+    setErrorMessage("");
+    try {
+      await saveTaskPlan({
+        participantId: participantId.trim(),
+        groupId,
+        ...taskPlan,
+        pieceId: taskPlan.pieceId || selectedPieceId,
+        sectionId: taskPlan.sectionId || selectedSectionId,
+      });
+      setStatusMessage("周任务计划已保存。");
+      setTaskPlan((prev) => ({
+        ...DEFAULT_TASK_PLAN,
+        stage: prev.stage,
+        pieceId: selectedPieceId,
+        sectionId: selectedSectionId,
+        assignedBy: prev.assignedBy,
+      }));
+      await refreshParticipantRecord();
+    } catch (error) {
+      setErrorMessage(error.message || "保存周任务计划失败。");
+    } finally {
+      setTaskSaving(false);
+    }
+  }
+
+  async function handleSaveInterviewNote() {
+    if (!participantId.trim()) {
+      setErrorMessage("请先填写受试编号。");
+      return;
+    }
+
+    setInterviewSaving(true);
+    setErrorMessage("");
+    try {
+      await saveInterviewNote({
+        participantId: participantId.trim(),
+        groupId,
+        ...interviewNote,
+      });
+      setStatusMessage("访谈记录已保存。");
+      setInterviewNote((prev) => ({
+        ...DEFAULT_INTERVIEW_NOTE,
+        stage: prev.stage,
+        interviewerId: prev.interviewerId,
+      }));
+      await refreshParticipantRecord();
+    } catch (error) {
+      setErrorMessage(error.message || "保存访谈记录失败。");
+    } finally {
+      setInterviewSaving(false);
+    }
+  }
+
   async function handleSaveQuestionnaire() {
     if (!participantId.trim()) {
       setErrorMessage("请先填写受试编号。");
@@ -574,6 +708,27 @@ export default function ResearchApp() {
     }
   }
 
+  async function handleBatchImport() {
+    const participants = parseBatchParticipantText(batchImportText);
+    if (!participants.length) {
+      setErrorMessage("请输入批量参与者清单，每行格式为 participantId,groupId,alias,institution,grade");
+      return;
+    }
+
+    setBatchImporting(true);
+    setErrorMessage("");
+    try {
+      const json = await batchCreateParticipants({ participants });
+      setStatusMessage(`已导入 ${json.importedCount || participants.length} 名参与者。`);
+      setBatchImportText("");
+      await loadDashboardData();
+    } catch (error) {
+      setErrorMessage(error.message || "批量导入失败。");
+    } finally {
+      setBatchImporting(false);
+    }
+  }
+
   function loadPendingRating(item) {
     setExpertRating((prev) => ({
       ...prev,
@@ -581,6 +736,37 @@ export default function ResearchApp() {
       stage: item.pendingStages?.[0] || "pretest",
     }));
     setStatusMessage(`已载入 ${item.participantId} 的待评分记录。`);
+  }
+
+  function loadTaskIntoEditor(task) {
+    setTaskPlan({
+      taskId: task.taskId || "",
+      stage: task.stage || "week1",
+      pieceId: task.pieceId || selectedPieceId,
+      sectionId: task.sectionId || selectedSectionId,
+      focus: task.focus || "",
+      instructions: task.instructions || "",
+      practiceTargetMinutes: safeNumber(task.practiceTargetMinutes, 30),
+      dueDate: task.dueDate || "",
+      status: task.status || "assigned",
+      assignedBy: task.assignedBy || "researcher-1",
+    });
+    setStatusMessage(`已载入 ${task.stage} 的周任务计划。`);
+  }
+
+  function loadInterviewIntoEditor(interview) {
+    setInterviewNote({
+      interviewId: interview.interviewId || "",
+      stage: interview.stage || "posttest",
+      interviewerId: interview.interviewerId || "researcher-1",
+      summary: interview.summary || "",
+      barriers: interview.barriers || "",
+      strategyChanges: interview.strategyChanges || "",
+      representativeQuote: interview.representativeQuote || "",
+      nextAction: interview.nextAction || "",
+      followUpNeeded: Boolean(interview.followUpNeeded),
+    });
+    setStatusMessage(`已载入 ${interview.stage} 的访谈记录。`);
   }
 
   return (
@@ -897,7 +1083,185 @@ export default function ResearchApp() {
           </section>
 
           <section className="panel-card">
-            <SectionTitle step="06" title="问卷与使用日志" description="按阶段保存学习体验问卷，并保留最近分析记录，服务于研究统计与访谈抽样。" />
+            <SectionTitle step="06" title="周任务计划" description="为每位受试者分配周次任务、练习重点和截止时间，支撑 6-8 周任务化练习设计。" />
+            <div className="field-grid">
+              <label>
+                <span>任务阶段</span>
+                <select value={taskPlan.stage} onChange={(event) => setTaskPlan((prev) => ({ ...prev, stage: event.target.value }))}>
+                  {SESSION_STAGE_OPTIONS.filter((item) => item.value.startsWith("week") || item.value === "pretest" || item.value === "posttest").map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>曲目</span>
+                <select
+                  value={taskPlan.pieceId || selectedPieceId}
+                  onChange={(event) =>
+                    setTaskPlan((prev) => ({
+                      ...prev,
+                      pieceId: event.target.value,
+                      sectionId: pieces.find((piece) => piece.pieceId === event.target.value)?.sections?.[0]?.sectionId || "",
+                    }))
+                  }
+                >
+                  {pieces.map((piece) => (
+                    <option key={piece.pieceId} value={piece.pieceId}>
+                      {piece.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>段落</span>
+                <select value={taskPlan.sectionId || selectedSectionId} onChange={(event) => setTaskPlan((prev) => ({ ...prev, sectionId: event.target.value }))}>
+                  {taskPlanSections.map((section) => (
+                    <option key={section.sectionId} value={section.sectionId}>
+                      {section.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>目标分钟数</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="600"
+                  value={taskPlan.practiceTargetMinutes}
+                  onChange={(event) => setTaskPlan((prev) => ({ ...prev, practiceTargetMinutes: Number(event.target.value) }))}
+                />
+              </label>
+              <label>
+                <span>截止日期</span>
+                <input type="date" value={taskPlan.dueDate} onChange={(event) => setTaskPlan((prev) => ({ ...prev, dueDate: event.target.value }))} />
+              </label>
+              <label>
+                <span>任务状态</span>
+                <select value={taskPlan.status} onChange={(event) => setTaskPlan((prev) => ({ ...prev, status: event.target.value }))}>
+                  <option value="assigned">已分配</option>
+                  <option value="in-progress">进行中</option>
+                  <option value="completed">已完成</option>
+                </select>
+              </label>
+              <label>
+                <span>指派人</span>
+                <input value={taskPlan.assignedBy} onChange={(event) => setTaskPlan((prev) => ({ ...prev, assignedBy: event.target.value }))} />
+              </label>
+            </div>
+            <label className="notes-field">
+              <span>训练重点</span>
+              <textarea rows="3" value={taskPlan.focus} onChange={(event) => setTaskPlan((prev) => ({ ...prev, focus: event.target.value }))} />
+            </label>
+            <label className="notes-field">
+              <span>教师/研究者指令</span>
+              <textarea rows="4" value={taskPlan.instructions} onChange={(event) => setTaskPlan((prev) => ({ ...prev, instructions: event.target.value }))} />
+            </label>
+            <div className="action-row">
+              <button type="button" className="primary-button" onClick={handleSaveTaskPlan} disabled={taskSaving}>
+                {taskSaving ? "保存中..." : "保存周任务"}
+              </button>
+            </div>
+            <div className="queue-list">
+              {participantTaskPlans.length ? (
+                participantTaskPlans.map((item) => (
+                  <div key={item.taskId || `${item.stage}-${item.updatedAt}`} className="queue-item">
+                    <div>
+                      <strong>{item.stage}</strong>
+                      <p>
+                        {item.pieceId}/{item.sectionId} · {item.status} · {item.practiceTargetMinutes} 分钟 · 截止 {item.dueDate || "未设置"}
+                      </p>
+                    </div>
+                    <button type="button" className="secondary-button" onClick={() => loadTaskIntoEditor(item)}>
+                      载入任务
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="empty-card">当前还没有该受试者的周任务计划。</div>
+              )}
+            </div>
+          </section>
+
+          <section className="panel-card">
+            <SectionTitle step="07" title="访谈记录" description="记录半结构访谈摘要、学习障碍、策略变化和后续跟进建议，支撑体验与机制解释。" />
+            <div className="field-grid">
+              <label>
+                <span>访谈阶段</span>
+                <select value={interviewNote.stage} onChange={(event) => setInterviewNote((prev) => ({ ...prev, stage: event.target.value }))}>
+                  {SESSION_STAGE_OPTIONS.filter((item) => item.value.startsWith("week") || item.value === "pretest" || item.value === "posttest").map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>访谈人</span>
+                <input value={interviewNote.interviewerId} onChange={(event) => setInterviewNote((prev) => ({ ...prev, interviewerId: event.target.value }))} />
+              </label>
+              <label className="checkbox-field">
+                <span>需要后续跟进</span>
+                <div className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={interviewNote.followUpNeeded}
+                    onChange={(event) => setInterviewNote((prev) => ({ ...prev, followUpNeeded: event.target.checked }))}
+                  />
+                  <span>标记为后续追访样本</span>
+                </div>
+              </label>
+            </div>
+            <label className="notes-field">
+              <span>访谈摘要</span>
+              <textarea rows="3" value={interviewNote.summary} onChange={(event) => setInterviewNote((prev) => ({ ...prev, summary: event.target.value }))} />
+            </label>
+            <label className="notes-field">
+              <span>主要障碍</span>
+              <textarea rows="3" value={interviewNote.barriers} onChange={(event) => setInterviewNote((prev) => ({ ...prev, barriers: event.target.value }))} />
+            </label>
+            <label className="notes-field">
+              <span>练习策略变化</span>
+              <textarea rows="3" value={interviewNote.strategyChanges} onChange={(event) => setInterviewNote((prev) => ({ ...prev, strategyChanges: event.target.value }))} />
+            </label>
+            <label className="notes-field">
+              <span>代表性引语</span>
+              <textarea rows="2" value={interviewNote.representativeQuote} onChange={(event) => setInterviewNote((prev) => ({ ...prev, representativeQuote: event.target.value }))} />
+            </label>
+            <label className="notes-field">
+              <span>后续建议</span>
+              <textarea rows="2" value={interviewNote.nextAction} onChange={(event) => setInterviewNote((prev) => ({ ...prev, nextAction: event.target.value }))} />
+            </label>
+            <div className="action-row">
+              <button type="button" className="primary-button" onClick={handleSaveInterviewNote} disabled={interviewSaving}>
+                {interviewSaving ? "保存中..." : "保存访谈记录"}
+              </button>
+            </div>
+            <div className="queue-list">
+              {participantInterviews.length ? (
+                participantInterviews.map((item) => (
+                  <div key={item.interviewId || `${item.stage}-${item.submittedAt}`} className="queue-item">
+                    <div>
+                      <strong>{item.stage}</strong>
+                      <p>
+                        {item.interviewerId} · {item.followUpNeeded ? "需要跟进" : "常规记录"} · {formatDateTime(item.submittedAt)}
+                      </p>
+                    </div>
+                    <button type="button" className="secondary-button" onClick={() => loadInterviewIntoEditor(item)}>
+                      载入记录
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="empty-card">当前还没有该受试者的访谈记录。</div>
+              )}
+            </div>
+          </section>
+
+          <section className="panel-card">
+            <SectionTitle step="08" title="问卷与使用日志" description="按阶段保存学习体验问卷，并保留最近分析记录，服务于研究统计与访谈抽样。" />
             <div className="question-grid">
               {EXPERIENCE_QUESTIONS.map((item) => (
                 <RangeQuestion
@@ -974,6 +1338,11 @@ export default function ResearchApp() {
                 </div>
                 <div className="result-grid">
                   <ScoreBadge label="问卷条目" value={researchOverview.questionnaireEntryCount} accent="#7c3aed" />
+                  <ScoreBadge label="任务计划" value={researchOverview.taskPlanCount} accent="#1d4ed8" />
+                  <ScoreBadge label="已完成任务" value={researchOverview.completedTaskCount} accent="#0f766e" />
+                  <ScoreBadge label="访谈记录" value={researchOverview.interviewCount} accent="#7c3aed" />
+                </div>
+                <div className="result-grid">
                   <ScoreBadge label="配对完成" value={researchOverview.completedPairCount} accent="#7c3aed" />
                   <ScoreBadge label="平均音准增益" value={researchOverview.averagePitchGain} accent="#0f766e" />
                   <ScoreBadge label="平均节奏增益" value={researchOverview.averageRhythmGain} accent="#b45309" />
@@ -1046,10 +1415,30 @@ export default function ResearchApp() {
             </div>
             <div className="link-row">
               <ExportLink dataset="participants" format="csv">导出参与者 CSV</ExportLink>
+              <ExportLink dataset="tasks" format="csv">导出任务 CSV</ExportLink>
+              <ExportLink dataset="interviews" format="csv">导出访谈 CSV</ExportLink>
               <ExportLink dataset="questionnaires" format="csv">导出问卷 CSV</ExportLink>
               <ExportLink dataset="expert-ratings" format="csv">导出评分 CSV</ExportLink>
               <ExportLink dataset="analyses" format="csv">导出分析 CSV</ExportLink>
               <ExportLink dataset="participants" format="json">导出全量 JSON</ExportLink>
+            </div>
+            <div className="history-card">
+              <h3>批量导入参与者</h3>
+              <p>每行格式：participantId,groupId,alias,institution,grade</p>
+              <label className="notes-field">
+                <span>导入文本</span>
+                <textarea
+                  rows="5"
+                  value={batchImportText}
+                  onChange={(event) => setBatchImportText(event.target.value)}
+                  placeholder={"EH-001,experimental,P01,Music University,Year 1\nEH-002,control,P02,Music University,Year 1"}
+                />
+              </label>
+              <div className="action-row">
+                <button type="button" className="primary-button" onClick={handleBatchImport} disabled={batchImporting}>
+                  {batchImporting ? "导入中..." : "批量导入参与者"}
+                </button>
+              </div>
             </div>
           </section>
 
@@ -1090,7 +1479,11 @@ export default function ResearchApp() {
                       <th>音准增益</th>
                       <th>节奏增益</th>
                       <th>问卷数</th>
+                      <th>任务数</th>
+                      <th>已完成任务</th>
+                      <th>访谈数</th>
                       <th>最新问卷阶段</th>
+                      <th>最新访谈阶段</th>
                       <th>教师前测音准</th>
                       <th>教师后测音准</th>
                       <th>最近活跃</th>
@@ -1106,7 +1499,11 @@ export default function ResearchApp() {
                         <td>{plusNumber(participant.pitchGain)}</td>
                         <td>{plusNumber(participant.rhythmGain)}</td>
                         <td>{participant.questionnaireCount}</td>
+                        <td>{participant.taskPlanCount}</td>
+                        <td>{participant.completedTaskCount}</td>
+                        <td>{participant.interviewCount}</td>
                         <td>{participant.latestQuestionnaireStage || "—"}</td>
+                        <td>{participant.latestInterviewStage || "—"}</td>
                         <td>{participant.expertPretestPitch ?? "—"}</td>
                         <td>{participant.expertPosttestPitch ?? "—"}</td>
                         <td>{formatDateTime(participant.lastActiveAt)}</td>
@@ -1185,6 +1582,76 @@ export default function ResearchApp() {
               </div>
             ) : (
               <div className="empty-card">当前没有教师评分记录。</div>
+            )}
+          </section>
+
+          <section className="panel-card">
+            <SectionTitle step="R7" title="最新任务计划" description="查看最近更新的周任务计划，确认实验组与对照组任务安排是否按周推进。" />
+            {latestTasks.length ? (
+              <div className="table-scroll">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>受试编号</th>
+                      <th>阶段</th>
+                      <th>曲目/段落</th>
+                      <th>状态</th>
+                      <th>目标分钟数</th>
+                      <th>截止日期</th>
+                      <th>更新时间</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {latestTasks.map((item) => (
+                      <tr key={item.taskId}>
+                        <td>{item.participantId}</td>
+                        <td>{item.stage}</td>
+                        <td>{`${item.pieceId}/${item.sectionId}`}</td>
+                        <td>{item.status}</td>
+                        <td>{item.practiceTargetMinutes}</td>
+                        <td>{item.dueDate || "—"}</td>
+                        <td>{formatDateTime(item.updatedAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="empty-card">当前没有任务计划记录。</div>
+            )}
+          </section>
+
+          <section className="panel-card">
+            <SectionTitle step="R8" title="最新访谈记录" description="查看最近保存的访谈条目，便于抽样分析 AI 反馈接受度与学习机制。" />
+            {latestInterviews.length ? (
+              <div className="table-scroll">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>受试编号</th>
+                      <th>阶段</th>
+                      <th>访谈人</th>
+                      <th>需要跟进</th>
+                      <th>摘要</th>
+                      <th>提交时间</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {latestInterviews.map((item) => (
+                      <tr key={item.interviewId}>
+                        <td>{item.participantId}</td>
+                        <td>{item.stage}</td>
+                        <td>{item.interviewerId}</td>
+                        <td>{item.followUpNeeded ? "是" : "否"}</td>
+                        <td>{item.summary || "—"}</td>
+                        <td>{formatDateTime(item.submittedAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="empty-card">当前没有访谈记录。</div>
             )}
           </section>
         </div>

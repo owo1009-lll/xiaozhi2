@@ -74,6 +74,40 @@ function average(values = []) {
   return values.reduce((sum, value) => sum + safeNumber(value), 0) / values.length;
 }
 
+function normalizeTaskPlanRecord(taskPlan = {}) {
+  const status = safeString(taskPlan.status, "assigned");
+  return {
+    taskId: safeString(taskPlan.taskId),
+    stage: safeString(taskPlan.stage, "week1"),
+    pieceId: safeString(taskPlan.pieceId),
+    sectionId: safeString(taskPlan.sectionId),
+    focus: safeString(taskPlan.focus),
+    instructions: safeString(taskPlan.instructions),
+    practiceTargetMinutes: clamp(safeNumber(taskPlan.practiceTargetMinutes, 30), 0, 600),
+    dueDate: safeString(taskPlan.dueDate),
+    status,
+    assignedBy: safeString(taskPlan.assignedBy, "researcher"),
+    createdAt: safeString(taskPlan.createdAt, nowIso()),
+    updatedAt: safeString(taskPlan.updatedAt, taskPlan.createdAt || nowIso()),
+    completedAt: status === "completed" ? safeString(taskPlan.completedAt, taskPlan.updatedAt || nowIso()) : safeString(taskPlan.completedAt),
+  };
+}
+
+function normalizeInterviewRecord(interview = {}) {
+  return {
+    interviewId: safeString(interview.interviewId),
+    stage: safeString(interview.stage, "posttest"),
+    interviewerId: safeString(interview.interviewerId, "researcher"),
+    summary: safeString(interview.summary),
+    barriers: safeString(interview.barriers),
+    strategyChanges: safeString(interview.strategyChanges),
+    representativeQuote: safeString(interview.representativeQuote),
+    nextAction: safeString(interview.nextAction),
+    followUpNeeded: safeBoolean(interview.followUpNeeded, false),
+    submittedAt: safeString(interview.submittedAt, nowIso()),
+  };
+}
+
 function normalizeParticipantRecord(participant = {}) {
   const questionnaires = Array.isArray(participant.questionnaires)
     ? participant.questionnaires
@@ -107,6 +141,8 @@ function normalizeParticipantRecord(participant = {}) {
     experienceScales: participant.experienceScales || null,
     questionnaires,
     usageLogs: getArray(participant.usageLogs),
+    taskPlans: getArray(participant.taskPlans).map((item) => normalizeTaskPlanRecord(item)),
+    interviews: getArray(participant.interviews).map((item) => normalizeInterviewRecord(item)),
     expertRatings:
       participant.expertRatings && typeof participant.expertRatings === "object"
         ? {
@@ -395,6 +431,79 @@ function applyParticipantProfile(participant, payload) {
   participant.lastActiveAt = participant.profile.updatedAt;
 }
 
+function applyTaskPlan(participant, payload) {
+  const nextTask = normalizeTaskPlanRecord({
+    taskId: safeString(payload.taskId) || createId("task"),
+    stage: safeString(payload.stage, "week1"),
+    pieceId: safeString(payload.pieceId),
+    sectionId: safeString(payload.sectionId),
+    focus: safeString(payload.focus),
+    instructions: safeString(payload.instructions),
+    practiceTargetMinutes: safeNumber(payload.practiceTargetMinutes, 30),
+    dueDate: safeString(payload.dueDate),
+    status: safeString(payload.status, "assigned"),
+    assignedBy: safeString(payload.assignedBy, "researcher"),
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  });
+
+  const existingTasks = getArray(participant.taskPlans);
+  const taskIndex = existingTasks.findIndex(
+    (item) => item.taskId === nextTask.taskId || (!payload.taskId && item.stage === nextTask.stage),
+  );
+
+  if (taskIndex >= 0) {
+    const current = normalizeTaskPlanRecord(existingTasks[taskIndex]);
+    existingTasks[taskIndex] = normalizeTaskPlanRecord({
+      ...current,
+      ...nextTask,
+      taskId: current.taskId || nextTask.taskId,
+      createdAt: current.createdAt || nextTask.createdAt,
+      completedAt: nextTask.status === "completed" ? nowIso() : current.completedAt,
+    });
+    participant.taskPlans = existingTasks;
+  } else {
+    participant.taskPlans = existingTasks.concat(nextTask).slice(-48);
+  }
+
+  participant.lastActiveAt = nowIso();
+}
+
+function applyInterviewNote(participant, payload) {
+  const nextInterview = normalizeInterviewRecord({
+    interviewId: safeString(payload.interviewId) || createId("interview"),
+    stage: safeString(payload.stage, "posttest"),
+    interviewerId: safeString(payload.interviewerId, "researcher"),
+    summary: safeString(payload.summary),
+    barriers: safeString(payload.barriers),
+    strategyChanges: safeString(payload.strategyChanges),
+    representativeQuote: safeString(payload.representativeQuote),
+    nextAction: safeString(payload.nextAction),
+    followUpNeeded: safeBoolean(payload.followUpNeeded, false),
+    submittedAt: nowIso(),
+  });
+
+  const interviews = getArray(participant.interviews);
+  const interviewIndex = interviews.findIndex(
+    (item) =>
+      item.interviewId === nextInterview.interviewId ||
+      (!payload.interviewId && item.stage === nextInterview.stage && item.interviewerId === nextInterview.interviewerId),
+  );
+
+  if (interviewIndex >= 0) {
+    interviews[interviewIndex] = normalizeInterviewRecord({
+      ...interviews[interviewIndex],
+      ...nextInterview,
+      interviewId: interviews[interviewIndex].interviewId || nextInterview.interviewId,
+    });
+    participant.interviews = interviews;
+  } else {
+    participant.interviews = interviews.concat(nextInterview).slice(-24);
+  }
+
+  participant.lastActiveAt = nextInterview.submittedAt;
+}
+
 function buildParticipantView(participant, store) {
   const analyses = store.analyses
     .filter((item) => item.participantId === participant.participantId)
@@ -422,6 +531,9 @@ function buildParticipantSummary(participant, store) {
   const latestQuestionnaire = getArray(view.questionnaires)
     .slice()
     .sort((left, right) => String(right.submittedAt).localeCompare(String(left.submittedAt)))[0] || null;
+  const latestInterview = getArray(view.interviews)
+    .slice()
+    .sort((left, right) => String(right.submittedAt).localeCompare(String(left.submittedAt)))[0] || null;
   return {
     participantId: view.participantId,
     groupId: view.groupId,
@@ -446,6 +558,10 @@ function buildParticipantSummary(participant, store) {
     continuance: view.experienceScales?.continuance ?? null,
     questionnaireCount: getArray(view.questionnaires).length,
     latestQuestionnaireStage: latestQuestionnaire?.sessionStage ?? null,
+    taskPlanCount: getArray(view.taskPlans).length,
+    completedTaskCount: getArray(view.taskPlans).filter((item) => item.status === "completed").length,
+    interviewCount: getArray(view.interviews).length,
+    latestInterviewStage: latestInterview?.stage ?? null,
     expertPretestPitch: view.expertRatings?.pretest?.pitchScore ?? null,
     expertPosttestPitch: view.expertRatings?.posttest?.pitchScore ?? null,
     expertPretestRhythm: view.expertRatings?.pretest?.rhythmScore ?? null,
@@ -505,6 +621,47 @@ function buildAnalysisExportRows(store) {
     analysisMode: analysis.analysisMode,
     createdAt: analysis.createdAt,
   }));
+}
+
+function buildTaskExportRows(store) {
+  return store.participants.flatMap((participant) =>
+    getArray(participant.taskPlans).map((task) => ({
+      participantId: participant.participantId,
+      groupId: participant.groupId,
+      taskId: task.taskId,
+      stage: task.stage,
+      pieceId: task.pieceId,
+      sectionId: task.sectionId,
+      focus: task.focus,
+      instructions: task.instructions,
+      practiceTargetMinutes: task.practiceTargetMinutes,
+      dueDate: task.dueDate,
+      status: task.status,
+      assignedBy: task.assignedBy,
+      createdAt: task.createdAt,
+      updatedAt: task.updatedAt,
+      completedAt: task.completedAt,
+    })),
+  );
+}
+
+function buildInterviewExportRows(store) {
+  return store.participants.flatMap((participant) =>
+    getArray(participant.interviews).map((interview) => ({
+      participantId: participant.participantId,
+      groupId: participant.groupId,
+      interviewId: interview.interviewId,
+      stage: interview.stage,
+      interviewerId: interview.interviewerId,
+      summary: interview.summary,
+      barriers: interview.barriers,
+      strategyChanges: interview.strategyChanges,
+      representativeQuote: interview.representativeQuote,
+      nextAction: interview.nextAction,
+      followUpNeeded: interview.followUpNeeded,
+      submittedAt: interview.submittedAt,
+    })),
+  );
 }
 
 function buildPendingRatings(store) {
@@ -568,6 +725,45 @@ function buildExportPayload(store, dataset) {
     ];
     return { dataset: normalizedDataset, rows, headers };
   }
+  if (normalizedDataset === "tasks") {
+    const rows = buildTaskExportRows(store);
+    const headers = [
+      "participantId",
+      "groupId",
+      "taskId",
+      "stage",
+      "pieceId",
+      "sectionId",
+      "focus",
+      "instructions",
+      "practiceTargetMinutes",
+      "dueDate",
+      "status",
+      "assignedBy",
+      "createdAt",
+      "updatedAt",
+      "completedAt",
+    ];
+    return { dataset: normalizedDataset, rows, headers };
+  }
+  if (normalizedDataset === "interviews") {
+    const rows = buildInterviewExportRows(store);
+    const headers = [
+      "participantId",
+      "groupId",
+      "interviewId",
+      "stage",
+      "interviewerId",
+      "summary",
+      "barriers",
+      "strategyChanges",
+      "representativeQuote",
+      "nextAction",
+      "followUpNeeded",
+      "submittedAt",
+    ];
+    return { dataset: normalizedDataset, rows, headers };
+  }
   const rows = buildParticipantExportRows(store);
   const headers = [
     "participantId",
@@ -593,6 +789,10 @@ function buildExportPayload(store, dataset) {
     "continuance",
     "questionnaireCount",
     "latestQuestionnaireStage",
+    "taskPlanCount",
+    "completedTaskCount",
+    "interviewCount",
+    "latestInterviewStage",
     "expertPretestPitch",
     "expertPosttestPitch",
     "expertPretestRhythm",
@@ -830,6 +1030,9 @@ app.get("/api/erhu/research/overview", async (req, res) => {
       profileCompletedCount: withProfile.length,
       questionnaireCount: withQuestionnaire.length,
       questionnaireEntryCount: buildQuestionnaireExportRows(store).length,
+      taskPlanCount: buildTaskExportRows(store).length,
+      completedTaskCount: buildTaskExportRows(store).filter((item) => item.status === "completed").length,
+      interviewCount: buildInterviewExportRows(store).length,
       expertRatedCount: withExpertPost.length,
       averagePitchGain: Number(averagePitchGain.toFixed(2)),
       averageRhythmGain: Number(averageRhythmGain.toFixed(2)),
@@ -848,6 +1051,20 @@ app.get("/api/erhu/research/participants", async (req, res) => {
     .map((participant) => buildParticipantSummary(participant, store))
     .sort((left, right) => String(right.lastActiveAt).localeCompare(String(left.lastActiveAt)));
   return res.json({ ok: true, participants });
+});
+
+app.get("/api/erhu/research/tasks", async (req, res) => {
+  const store = await readStudyStore();
+  const tasks = buildTaskExportRows(store).sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt)));
+  return res.json({ ok: true, tasks });
+});
+
+app.get("/api/erhu/research/interviews", async (req, res) => {
+  const store = await readStudyStore();
+  const interviews = buildInterviewExportRows(store).sort((left, right) =>
+    String(right.submittedAt).localeCompare(String(left.submittedAt)),
+  );
+  return res.json({ ok: true, interviews });
 });
 
 app.get("/api/erhu/research/questionnaires", async (req, res) => {
@@ -869,6 +1086,73 @@ app.get("/api/erhu/research/expert-ratings", async (req, res) => {
 app.get("/api/erhu/research/pending-ratings", async (req, res) => {
   const store = await readStudyStore();
   return res.json({ ok: true, pendingRatings: buildPendingRatings(store) });
+});
+
+app.post("/api/erhu/task-plan", async (req, res) => {
+  const payload = req.body || {};
+  const participantId = safeString(payload.participantId).trim();
+  if (!participantId) {
+    return res.status(400).json({ error: "participantId is required." });
+  }
+
+  const store = await readStudyStore();
+  const participant = ensureParticipantRecord(store, participantId, safeString(payload.groupId, "experimental"));
+  applyTaskPlan(participant, payload);
+  await writeStudyStore(store);
+  return res.json({ ok: true, participant: buildParticipantView(participant, store) });
+});
+
+app.post("/api/erhu/interview-note", async (req, res) => {
+  const payload = req.body || {};
+  const participantId = safeString(payload.participantId).trim();
+  if (!participantId) {
+    return res.status(400).json({ error: "participantId is required." });
+  }
+
+  const store = await readStudyStore();
+  const participant = ensureParticipantRecord(store, participantId, safeString(payload.groupId, "experimental"));
+  applyInterviewNote(participant, payload);
+  await writeStudyStore(store);
+  return res.json({ ok: true, participant: buildParticipantView(participant, store) });
+});
+
+app.post("/api/erhu/research/batch-participants", async (req, res) => {
+  const entries = getArray(req.body?.participants);
+  if (!entries.length) {
+    return res.status(400).json({ error: "participants array is required." });
+  }
+
+  const store = await readStudyStore();
+  const imported = [];
+
+  entries.forEach((entry) => {
+    const participantId = safeString(entry.participantId).trim();
+    if (!participantId) return;
+    const participant = ensureParticipantRecord(store, participantId, safeString(entry.groupId, "experimental"));
+    if (entry.profile && typeof entry.profile === "object") {
+      participant.profile = {
+        alias: safeString(entry.profile.alias, participant.profile?.alias || ""),
+        institution: safeString(entry.profile.institution, participant.profile?.institution || ""),
+        major: safeString(entry.profile.major, participant.profile?.major || ""),
+        grade: safeString(entry.profile.grade, participant.profile?.grade || ""),
+        yearsOfTraining: clamp(safeNumber(entry.profile.yearsOfTraining, participant.profile?.yearsOfTraining || 0), 0, 80),
+        weeklyPracticeMinutes: clamp(
+          safeNumber(entry.profile.weeklyPracticeMinutes, participant.profile?.weeklyPracticeMinutes || 0),
+          0,
+          10080,
+        ),
+        deviceLabel: safeString(entry.profile.deviceLabel, participant.profile?.deviceLabel || ""),
+        consentSigned: safeBoolean(entry.profile.consentSigned, participant.profile?.consentSigned || false),
+        notes: safeString(entry.profile.notes, participant.profile?.notes || ""),
+        updatedAt: nowIso(),
+      };
+      participant.lastActiveAt = participant.profile.updatedAt;
+    }
+    imported.push(buildParticipantSummary(participant, store));
+  });
+
+  await writeStudyStore(store);
+  return res.json({ ok: true, importedCount: imported.length, participants: imported });
 });
 
 app.get("/api/erhu/research/export", async (req, res) => {
