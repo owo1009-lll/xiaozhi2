@@ -905,6 +905,67 @@ button {
     0 0 24px rgba(245, 158, 11, 0.18);
 }
 
+.score-note-highlight.is-selected {
+  animation: issue-note-pulse 1.25s ease-in-out infinite;
+}
+
+@keyframes issue-note-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow:
+      0 0 0 6px rgba(245, 158, 11, 0.24),
+      0 0 24px rgba(245, 158, 11, 0.18);
+  }
+  50% {
+    transform: scale(1.18);
+    box-shadow:
+      0 0 0 10px rgba(245, 158, 11, 0.28),
+      0 0 36px rgba(245, 158, 11, 0.26);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow:
+      0 0 0 6px rgba(245, 158, 11, 0.24),
+      0 0 24px rgba(245, 158, 11, 0.18);
+  }
+}
+
+.issue-list-block {
+  display: grid;
+  gap: 10px;
+}
+
+.issue-list-button {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(17, 51, 45, 0.12);
+  background: var(--bg-soft);
+  color: var(--text-main);
+}
+
+.issue-list-button strong {
+  font-size: 14px;
+}
+
+.issue-list-button span {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.issue-list-button.is-active {
+  border-color: #f59e0b;
+  background: #fff7e6;
+  color: #9a6700;
+}
+
+.issue-list-button.is-active span {
+  color: #9a6700;
+}
+
 @media (max-width: 900px) {
   .app-shell {
     padding: 16px;

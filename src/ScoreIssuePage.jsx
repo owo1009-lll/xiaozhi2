@@ -147,6 +147,7 @@ export default function ScoreIssuePage() {
   const [pageCount, setPageCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(extractSectionPageNumber(stored?.section || {}));
   const [selectedMeasureIndex, setSelectedMeasureIndex] = useState(null);
+  const [selectedNoteKey, setSelectedNoteKey] = useState("");
   const [pageImageFailed, setPageImageFailed] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
@@ -269,11 +270,13 @@ export default function ScoreIssuePage() {
           if (exact && exact.staffIndex === dominantStaffIndex) {
             return {
               key: `${item?.noteId || index}-${exact.measureIndex}`,
+              noteId: item?.noteId || "",
               measureIndex: exact.measureIndex,
               left: Math.min(Math.max(exact.normalizedX * 100, 0), 100),
               top: Math.min(Math.max(exact.normalizedY * 100, 0), 100),
               exact: true,
               pageNumber: exact.pageNumber,
+              tags: item?.tags || [],
             };
           }
           const { measureIndex, noteIndex } = getApproximateNotePosition(item?.noteId, item?.measureIndex, index + 1);
@@ -283,11 +286,13 @@ export default function ScoreIssuePage() {
           const bandIndex = (noteIndex - 1) % 3;
           return {
             key: `${item?.noteId || index}-${measureIndex}-${noteIndex}`,
+            noteId: item?.noteId || "",
             measureIndex,
             left: Math.min(measureLeft + slotWidth * relativeStep, 98),
             top: 18 + bandIndex * 18,
             exact: false,
             pageNumber: measurePageMap.get(measureIndex) || baseSectionPage,
+            tags: item?.tags || [],
           };
         })
         .filter(Boolean),
@@ -349,7 +354,8 @@ export default function ScoreIssuePage() {
     const viewport = viewportRef.current;
     if (!viewport || !effectiveWidth || !effectiveHeight) return;
     const focusNote =
-      noteOverlayItems.find((item) => item.pageNumber === currentPage && item.measureIndex === activeMeasureIndex && item.exact)
+      noteOverlayItems.find((item) => item.key === selectedNoteKey && item.pageNumber === currentPage)
+      || noteOverlayItems.find((item) => item.pageNumber === currentPage && item.measureIndex === activeMeasureIndex && item.exact)
       || noteOverlayItems.find((item) => item.pageNumber === currentPage && item.measureIndex === activeMeasureIndex)
       || null;
     const focusMeasure = overlayItems.find((item) => item.measureIndex === activeMeasureIndex) || null;
@@ -363,11 +369,23 @@ export default function ScoreIssuePage() {
       top: Math.max(0, targetTop),
       behavior: "smooth",
     });
-  }, [activeMeasureIndex, currentPage, effectiveHeight, effectiveWidth, noteOverlayItems, overlayItems, zoom]);
+  }, [activeMeasureIndex, currentPage, effectiveHeight, effectiveWidth, noteOverlayItems, overlayItems, selectedNoteKey, zoom]);
 
   function handleMeasureJump(measureIndex) {
     setCurrentPage(measurePageMap.get(measureIndex) || baseSectionPage);
     setSelectedMeasureIndex(measureIndex);
+    setSelectedNoteKey("");
+  }
+
+  function handleNoteJump(noteItem, overlayItem) {
+    if (!noteItem) return;
+    const resolvedOverlay =
+      overlayItem
+      || noteOverlayItems.find((item) => String(item.noteId || "") === String(noteItem.noteId || "") && item.measureIndex === noteItem.measureIndex)
+      || null;
+    setCurrentPage(resolvedOverlay?.pageNumber || measurePageMap.get(noteItem.measureIndex) || baseSectionPage);
+    setSelectedMeasureIndex(noteItem.measureIndex || null);
+    setSelectedNoteKey(resolvedOverlay?.key || "");
   }
 
   function handleImageLoad(event) {
@@ -441,18 +459,36 @@ export default function ScoreIssuePage() {
 
           <div className="history-card">
             <h3>问题列表</h3>
-            <ul className="compact-list">
+            <div className="issue-list-block">
               {measureIssues.map((item) => (
-                <li key={`measure-${item.measureIndex}`}>
-                  {formatMeasureLabel(item.measureIndex)}：{item.label}
-                </li>
+                <button
+                  type="button"
+                  key={`measure-${item.measureIndex}`}
+                  className={`issue-list-button${activeMeasureIndex === item.measureIndex && !selectedNoteKey ? " is-active" : ""}`}
+                  onClick={() => handleMeasureJump(item.measureIndex)}
+                >
+                  <strong>{formatMeasureLabel(item.measureIndex)}</strong>
+                  <span>{item.label}</span>
+                </button>
               ))}
-              {noteIssues.map((item, index) => (
-                <li key={`note-${item.noteId || index}-${item.measureIndex}`}>
-                  {formatNoteLabel(item.noteId, item.measureIndex)}：{item.tags.join("、")}
-                </li>
-              ))}
-            </ul>
+              {noteIssues.map((item, index) => {
+                const overlayItem =
+                  noteOverlayItems.find((overlay) => String(overlay.noteId || "") === String(item.noteId || "") && overlay.measureIndex === item.measureIndex)
+                  || null;
+                const overlayKey = overlayItem?.key || "";
+                return (
+                  <button
+                    type="button"
+                    key={`note-${item.noteId || index}-${item.measureIndex}`}
+                    className={`issue-list-button${selectedNoteKey && selectedNoteKey === overlayKey ? " is-active" : ""}`}
+                    onClick={() => handleNoteJump(item, overlayItem)}
+                  >
+                    <strong>{formatNoteLabel(item.noteId, item.measureIndex)}</strong>
+                    <span>{item.tags.join("、")}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </section>
 
@@ -565,7 +601,7 @@ export default function ScoreIssuePage() {
                   .map((item) => (
                     <div
                       key={item.key}
-                      className={`score-note-highlight${item.exact ? " is-exact" : ""}`}
+                      className={`score-note-highlight${item.exact ? " is-exact" : ""}${selectedNoteKey === item.key ? " is-selected" : ""}`}
                       style={{ left: `${item.left}%`, top: `${item.top}%` }}
                     />
                   ))}
