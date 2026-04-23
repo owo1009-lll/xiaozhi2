@@ -300,6 +300,44 @@ export default function ScoreIssuePage() {
     [baseSectionPage, dominantStaffIndex, measureCount, measurePageMap, noteIssues, section],
   );
 
+  const measureIssueEntries = useMemo(
+    () =>
+      measureIssues.map((item, index) => ({
+        ...item,
+        issueKey: `measure-${item.measureIndex}`,
+        issueNumber: index + 1,
+      })),
+    [measureIssues],
+  );
+
+  const noteIssueEntries = useMemo(
+    () =>
+      noteIssues.map((item, index) => {
+        const overlayItem =
+          noteOverlayItems.find((overlay) => String(overlay.noteId || "") === String(item.noteId || "") && overlay.measureIndex === item.measureIndex)
+          || null;
+        const overlayKey = overlayItem?.key || `note-${item.noteId || index}-${item.measureIndex}`;
+        return {
+          ...item,
+          overlayItem,
+          overlayKey,
+          issueKey: `note-${overlayKey}`,
+          issueNumber: measureIssueEntries.length + index + 1,
+        };
+      }),
+    [measureIssueEntries.length, noteIssues, noteOverlayItems],
+  );
+
+  const measureIssueNumberMap = useMemo(
+    () => new Map(measureIssueEntries.map((item) => [item.measureIndex, item.issueNumber])),
+    [measureIssueEntries],
+  );
+
+  const noteIssueNumberMap = useMemo(
+    () => new Map(noteIssueEntries.map((item) => [item.overlayKey, item.issueNumber])),
+    [noteIssueEntries],
+  );
+
   const hasExactNoteOverlay = noteOverlayItems.some((item) => item.exact);
 
   const overlayItems = useMemo(() => {
@@ -481,23 +519,24 @@ export default function ScoreIssuePage() {
           <div className="history-card">
             <h3>问题列表</h3>
             <div className="issue-list-block">
-              {measureIssues.map((item) => (
+              {measureIssueEntries.map((item) => (
                 <button
                   type="button"
-                  key={`measure-${item.measureIndex}`}
-                  ref={(element) => setIssueListRef(`measure-${item.measureIndex}`, element)}
+                  key={item.issueKey}
+                  ref={(element) => setIssueListRef(item.issueKey, element)}
                   className={`issue-list-button${activeMeasureIndex === item.measureIndex && !selectedNoteKey ? " is-active" : ""}`}
                   onClick={() => handleMeasureJump(item.measureIndex)}
                 >
-                  <strong>{formatMeasureLabel(item.measureIndex)}</strong>
+                  <strong>
+                    <span className="issue-number-chip">{item.issueNumber}</span>
+                    {formatMeasureLabel(item.measureIndex)}
+                  </strong>
                   <span>{item.label}</span>
                 </button>
               ))}
-              {noteIssues.map((item, index) => {
-                const overlayItem =
-                  noteOverlayItems.find((overlay) => String(overlay.noteId || "") === String(item.noteId || "") && overlay.measureIndex === item.measureIndex)
-                  || null;
-                const overlayKey = overlayItem?.key || "";
+              {noteIssueEntries.map((item, index) => {
+                const overlayItem = item.overlayItem || null;
+                const overlayKey = item.overlayKey || "";
                 return (
                   <button
                     type="button"
@@ -506,7 +545,10 @@ export default function ScoreIssuePage() {
                     className={`issue-list-button${selectedNoteKey && selectedNoteKey === overlayKey ? " is-active" : ""}`}
                     onClick={() => handleNoteJump(item, overlayItem)}
                   >
-                    <strong>{formatNoteLabel(item.noteId, item.measureIndex)}</strong>
+                    <strong>
+                      <span className="issue-number-chip">{item.issueNumber}</span>
+                      {formatNoteLabel(item.noteId, item.measureIndex)}
+                    </strong>
                     <span>{item.tags.join("、")}</span>
                   </button>
                 );
@@ -618,14 +660,14 @@ export default function ScoreIssuePage() {
                       height: `${item.height}%`,
                     }}
                   >
-                    <span>{item.measureIndex}</span>
+                    <span>{measureIssueNumberMap.get(item.measureIndex) || item.measureIndex}</span>
                   </button>
                 ))}
                 {noteOverlayItems
                   .filter((item) => item.pageNumber === currentPage && (activeMeasureIndex == null || item.measureIndex === activeMeasureIndex))
                   .map((item) => {
                     const relatedIssue =
-                      noteIssues.find((noteIssue) => String(noteIssue.noteId || "") === String(item.noteId || "") && noteIssue.measureIndex === item.measureIndex)
+                      noteIssueEntries.find((noteIssue) => String(noteIssue.noteId || "") === String(item.noteId || "") && noteIssue.measureIndex === item.measureIndex)
                       || { noteId: item.noteId, measureIndex: item.measureIndex };
                     return (
                       <button
@@ -635,7 +677,9 @@ export default function ScoreIssuePage() {
                         style={{ left: `${item.left}%`, top: `${item.top}%` }}
                         onClick={() => handleNoteJump(relatedIssue, item)}
                         aria-label={formatNoteLabel(item.noteId, item.measureIndex)}
-                      />
+                      >
+                        <span className="score-note-index">{noteIssueNumberMap.get(item.key) || "•"}</span>
+                      </button>
                     );
                   })}
               </div>

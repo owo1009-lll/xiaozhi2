@@ -915,6 +915,25 @@ button {
   animation: issue-note-pulse 1.25s ease-in-out infinite;
 }
 
+.score-note-index {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(17, 51, 45, 0.96);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 @keyframes issue-note-pulse {
   0% {
     transform: scale(1);
@@ -954,7 +973,24 @@ button {
 }
 
 .issue-list-button strong {
+  display: inline-flex;
+  align-items: center;
   font-size: 14px;
+}
+
+.issue-number-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  margin-right: 8px;
+  border-radius: 999px;
+  background: rgba(17, 51, 45, 0.92);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .issue-list-button span {
