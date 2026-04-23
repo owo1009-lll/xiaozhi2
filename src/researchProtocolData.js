@@ -259,4 +259,136 @@ Flag a pair for adjudication when any of the following is true:
 - action for future protocol revision:
 `,
   },
+  {
+    templateId: "pilot-run-sheet",
+    title: "Pilot Run Sheet",
+    description: "Small-sample pilot execution checklist for participant flow, device setup, and researcher logging.",
+    filename: "pilot-run-sheet.md",
+    content: `# Pilot Run Sheet
+
+## Session Metadata
+
+- participantId:
+- groupId:
+- date:
+- piece / section:
+- device used:
+- preprocess mode: off / melody-focus
+
+## Before Recording
+
+- confirm the participant can open the app and enter the correct id
+- confirm the target score section or whole-piece workflow
+- confirm whether the recording is solo erhu or erhu + piano
+- if mixed audio is used, enable \`melody-focus\`
+- confirm the participant understands where to find problem notes, problem measures, and demo playback
+
+## During Recording
+
+- record take 1
+- run the analysis
+- ask the participant to explain what they think the main problem is
+- if needed, play the demo segment once
+- record take 2 only after the participant has seen the structured feedback
+
+## After Recording
+
+- export the analysis id
+- mark whether the participant understood the feedback
+- note whether the participant followed the recommended practice path
+- flag whether teacher review is needed for this take
+
+## Researcher Notes
+
+- clarity issues:
+- technical issues:
+- participant comments:
+`,
+  },
+  {
+    templateId: "teacher-validation-batch-sheet",
+    title: "Teacher Validation Batch Sheet",
+    description: "Blank batch sheet for teachers to review the weakest sections from a pilot or whole-piece pass.",
+    filename: "teacher-validation-batch-sheet.md",
+    content: `# Teacher Validation Batch Sheet
+
+Use this sheet when reviewing the weakest sections from a pilot or whole-piece pass.
+
+## Batch Metadata
+
+- batch id:
+- teacher id:
+- piece:
+- stage:
+- date:
+
+## Per-section fields
+
+For each section, record:
+
+- sequenceIndex
+- sectionId / sectionTitle
+- system combined score
+- system recommended path
+- teacher primary path: \`pitch-first\`, \`rhythm-first\`, or \`review-first\`
+- teacher issue note ids
+- teacher issue measure indexes
+- whether the system advice is acceptable without change
+- whether the case should enter adjudication
+
+## Quick rubric
+
+- use \`pitch-first\` when the main issue is landing pitch or stable pitch center
+- use \`rhythm-first\` when the main issue is onset timing, duration drift, or unstable pulse
+- use \`review-first\` when the evidence is weak, ambiguous, or mixed enough that a direct correction path would be risky
+`,
+  },
+  {
+    templateId: "self-practice-reflection-sheet",
+    title: "Self-Practice Reflection Sheet",
+    description: "Participant-facing reflection template for AI-supported independent practice sessions.",
+    filename: "self-practice-reflection-sheet.md",
+    content: `# Self-Practice Reflection Sheet
+
+## Session Metadata
+
+- participantId:
+- date:
+- piece / section:
+- take number:
+- analysis id:
+
+## After Viewing the AI Feedback
+
+1. What did the system say was the main problem?
+2. Did you agree with that judgment?
+3. Which feedback did you actually use first?
+   - problem notes
+   - problem measures
+   - practice path
+   - demo playback
+   - summary text
+
+## Self-Practice Decision
+
+- What did you decide to change before the next take?
+- Did you focus on pitch first, rhythm first, or review first?
+- Did the AI feedback make the next practice step clearer?
+
+## Perceived Experience
+
+Rate 1-5:
+
+- usefulness
+- clarity
+- confidence after feedback
+- willingness to use the tool again
+
+## Open Reflection
+
+- What part of the AI feedback helped most?
+- What part was confusing or not convincing?
+- What would you want the system to explain more clearly next time?
+`,
+  },
 ];

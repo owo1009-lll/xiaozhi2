@@ -54,6 +54,45 @@ function confidenceText(value) {
   return `${Math.round(numeric * 100)}%`;
 }
 
+function pitchLabelText(value) {
+  if (value === "pitch-flat") return "音高偏低";
+  if (value === "pitch-sharp") return "音高偏高";
+  if (value === "pitch-review") return "音高需复核";
+  if (value === "pitch-ok") return "音高基本正确";
+  return value || "音高未标注";
+}
+
+function rhythmLabelText(item) {
+  const value = item?.rhythmType || item?.rhythmLabel;
+  if (item?.rhythmTypeLabel) return item.rhythmTypeLabel;
+  if (value === "rhythm-rush") return "节奏抢拍";
+  if (value === "rhythm-drag") return "节奏拖拍";
+  if (value === "rhythm-duration-short") return "时值偏短";
+  if (value === "rhythm-duration-long") return "时值偏长";
+  if (value === "rhythm-rush-short") return "抢拍且时值偏短";
+  if (value === "rhythm-drag-long") return "拖拍且时值偏长";
+  if (value === "rhythm-missing") return "疑似漏音或起拍未捕获";
+  if (value === "rhythm-unstable") return "节奏不稳";
+  if (value === "rhythm-ok") return "节奏基本正确";
+  return value || "节奏未标注";
+}
+
+function measureIssueLabelText(item) {
+  const value = item?.issueType || item?.issueLabel;
+  if (value === "rhythm-measure-rush") return "小节整体偏快";
+  if (value === "rhythm-measure-drag") return "小节整体偏慢";
+  if (value === "rhythm-measure-short") return "小节时值普遍偏短";
+  if (value === "rhythm-measure-long") return "小节时值普遍偏长";
+  if (value === "rhythm-unstable") return "节奏不稳";
+  if (value === "pitch-unstable") return "音准不稳";
+  return item?.issueLabel || "问题类型未标注";
+}
+
+function preprocessModeLabel(value) {
+  if (value === "melody-focus") return "伴奏抑制 / 旋律增强";
+  return "关闭";
+}
+
 function formatDateTime(value) {
   if (!value) return "未记录";
   const date = new Date(value);
@@ -170,6 +209,7 @@ export default function App() {
   const [audioFile, setAudioFile] = useState(null);
   const [audioPreviewUrl, setAudioPreviewUrl] = useState("");
   const [audioDuration, setAudioDuration] = useState(null);
+  const [preprocessMode, setPreprocessMode] = useState("off");
   const [analysis, setAnalysis] = useState(null);
   const [participantRecord, setParticipantRecord] = useState(null);
   const [researchOverview, setResearchOverview] = useState(null);
@@ -379,25 +419,25 @@ export default function App() {
     setErrorMessage("");
     setStatusMessage("系统正在执行音准与节奏诊断，请稍候。");
     try {
-      const audioDataUrl = await fileToDataUrl(audioFile);
       const json = await createAnalysis({
         participantId: participantId.trim(),
         groupId,
         sessionStage,
         pieceId: selectedPiece.pieceId,
         sectionId: selectedSection.sectionId,
+        preprocessMode,
         audioSubmission: {
           name: audioFile.name,
           mimeType: audioFile.type || "audio/webm",
           size: audioFile.size,
           duration: audioDuration,
         },
-        audioDataUrl,
+        audioFile,
       });
       setAnalysis(json.analysis || null);
       setStatusMessage(
         json.analysis?.analysisMode === "external"
-          ? "深度学习分析已完成，可查看错音/错拍并进行重练。"
+          ? `深度学习分析已完成${preprocessMode === "melody-focus" ? "，并启用了伴奏抑制。" : ""}，可查看错音/错拍并进行重练。`
           : "已返回研究原型结果。若配置外部分析器，可切换到深度学习分析。",
       );
       await refreshParticipantRecord();
@@ -624,6 +664,15 @@ export default function App() {
               <span>时长：{audioDuration == null ? "待解析" : `${audioDuration.toFixed(1)} 秒`}</span>
               <span>大小：{audioFile ? `${(audioFile.size / 1024 / 1024).toFixed(2)} MB` : "0 MB"}</span>
             </div>
+            <div className="field-grid">
+              <label>
+                <span>混合音频预处理</span>
+                <select value={preprocessMode} onChange={(event) => setPreprocessMode(event.target.value)}>
+                  <option value="off">关闭，适合纯二胡录音</option>
+                  <option value="melody-focus">启用伴奏抑制 / 旋律增强，适合带伴奏或合奏音频</option>
+                </select>
+              </label>
+            </div>
             {audioPreviewUrl ? (
               <audio controls className="audio-player" src={audioPreviewUrl}>
                 当前浏览器不支持音频预览。
@@ -673,7 +722,7 @@ export default function App() {
                         {analysis.measureFindings.map((item) => (
                           <li key={`${item.measureIndex}-${item.issueType}`}>
                             <strong>第 {item.measureIndex} 小节：</strong>
-                            {item.issueLabel}
+                            {measureIssueLabelText(item)}
                             {item.severity ? ` · ${severityText(item.severity)}` : ""}
                             {item.detail ? `；${item.detail}` : ""}
                             {item.coachingTip ? <span className="finding-help">{`建议：${item.coachingTip}`}</span> : null}
@@ -689,10 +738,13 @@ export default function App() {
                         {analysis.noteFindings.map((item) => (
                           <li key={item.noteId}>
                             <strong>{item.noteId}</strong>
-                            {`：第 ${item.measureIndex} 小节，${item.pitchLabel}，${item.rhythmLabel}`}
+                            {`：第 ${item.measureIndex} 小节，${pitchLabelText(item.pitchLabel)}，${rhythmLabelText(item)}`}
                             {item.severity ? ` · ${severityText(item.severity)}` : ""}
                             {item.evidenceLabel ? <span className="finding-help">{`证据：${item.evidenceLabel}`}</span> : null}
                             {item.confidence != null ? <span className="finding-help">{`置信度：${confidenceText(item.confidence)}`}</span> : null}
+                            {item.durationErrorMs != null && Math.abs(safeNumber(item.durationErrorMs)) > 0 ? (
+                              <span className="finding-help">{`时值偏差：${item.durationErrorMs > 0 ? "+" : ""}${item.durationErrorMs} ms`}</span>
+                            ) : null}
                             {item.why ? <span className="finding-help">{`原因：${item.why}`}</span> : null}
                             {item.action ? <span className="finding-help">{`怎么练：${item.action}`}</span> : null}
                           </li>

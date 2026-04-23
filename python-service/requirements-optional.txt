@@ -6,3 +6,6 @@ torchaudio==2.7.0
 torchcrepe==0.0.24
 imageio-ffmpeg==0.6.0
 pretty_midi==0.2.10
+madmom==0.16.1
+pypdf==6.10.2
+PyMuPDF==1.27.2

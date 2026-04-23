@@ -205,5 +205,124 @@
   The backend now stores multiple validation reviews per `analysisId` keyed by `raterId`, the app can switch between teacher reviews, and the analysis script now generates `table_inter_rater_pairs.csv`, `table_inter_rater_summary.csv`, and `figure_inter_rater_metrics.png`.
 - Completed: `validation protocol and stratified reliability outputs`
   The project now includes a clean protocol reference in `docs/teacher-validation-protocol.md`, template exports for teacher validation and adjudication, and stratified inter-rater tables by group, stage, and piece plus an adjudication queue.
+- Completed: `adjudication closure in app + exports`
+  The app now stores final adjudication records, exposes adjudication APIs and exports, and writes adjudication summaries into the research analysis pipeline.
+- Completed: `automatic rhythm error typing`
+  The analyzer, Node fallback, and UI now distinguish `rhythm-rush`, `rhythm-drag`, `rhythm-duration-short`, `rhythm-duration-long`, `rhythm-missing`, and measure-level rhythm trends, with duration drift shown in the findings UI.
+- Completed: `mixture-audio preprocessing`
+  The analyzer and UI now support optional `melody-focus` preprocessing for accompaniment suppression / melody enhancement before pitch and rhythm analysis.
+- Completed: `PDF manual score helper`
+  The app now includes a client-side PDF preview and manual note-entry helper that can generate a temporary `piecePackOverride` and send it through the same Node + Python analysis flow for score-aware testing.
+- Completed: `Taohuawu built-in fragment + slice harness`
+  The project now ships a reusable built-in `taohuawu-test-fragment / entry-phrase` score pack and a repeatable multi-slice test script for running the same phrase against mixed-audio windows without writing results into the study store.
+- Completed: `Taohuawu major-section pack + score export`
+  The built-in `taohuawu-test-fragment` pack now carries seven ordered major sections, exports aggregate `notes.json`, `MusicXML`, `MIDI`, and `structure.json`, and can be reused as a whole-piece test scaffold rather than a single temporary fragment.
+- Completed: `automatic section detection + long-audio scan`
+  The backend now exposes `/api/erhu/auto-detect-section` for clip-level section ranking, and the optimized `scan-piece-segments.py` harness can scan a long mixed recording against all structured sections with bounded candidate windows.
+- Completed: `PDF page rendering pipeline`
+  The project now includes `scripts/render-pdf-pages.mjs`, so additional score pages can be rendered locally from the PDF and used to continue manual transcription beyond the first previewed page.
+- Completed: `Taohuawu extended major-section coverage`
+  The built-in `taohuawu-test-fragment` pack now covers nineteen ordered sections, extending from the opening material into later modulation / con-brio passages and re-exporting as aggregate `notes`, `MusicXML`, `MIDI`, and `structure` outputs.
+- Completed: `time-prior and sequence-aware section scoring`
+  Automatic section detection now supports optional `windowStartSeconds` and `expectedSequenceIndex` priors, and the long-audio scan harness now emits a sequence-aware path instead of only flat per-section rankings.
+- Completed: `Taohuawu 25-section structured scaffold`
+  The built-in `taohuawu-test-fragment` pack now carries twenty-five ordered sections, extending the structured score scaffold deeper into the later PDF pages and raising the aggregate exported scaffold to 180 notes.
+- Completed: `whole-piece pass orchestration`
+  The project now includes `scripts/run-piece-pass.py`, which first runs a sequence-aware scan and then re-analyzes the chosen windows section by section to produce whole-piece JSON, CSV, and Markdown summaries.
+- Completed: `Windows-safe section filter forwarding`
+  `scan-piece-segments.py` now accepts `--section-ids a,b,c`, which avoids repeated-flag forwarding issues on Windows shells and keeps targeted scans reproducible from npm scripts.
+- Completed: `Taohuawu 33-section scaffold`
+  The built-in `taohuawu-test-fragment` pack now carries thirty-three ordered sections, extending structured coverage into the later Allegro Vivace material and raising the aggregate exported scaffold to 257 notes.
+- Completed: `late-section validation scan`
+  The new post-250s sections were validated against the mixed recording with targeted `--section-ids` scans, confirming stable candidate windows across the new late-piece segment cluster.
+- Completed: `whole-piece pass v2`
+  A refreshed full-song pass now runs across all thirty-three sections and writes updated whole-piece JSON, CSV, and Markdown outputs under `data/piece-pass/taohuawu-whole-v2`.
 - Current next step:
-  connect adjudication outcomes back into the app data model so final resolved labels can be tracked alongside original dual-rater reviews.
+  continue manual transcription through the remaining PDF pages until the structured pack becomes a true whole-score representation of `桃花坞`, then validate a full-song pass before moving into the real-sample pilot and formal adjudication stage.
+
+## 2026-04-21 Update
+
+- Completed: `Taohuawu 41-section late-page scaffold`
+  The built-in `taohuawu-test-fragment` pack now extends through the remaining late-page main material, carrying forty-one ordered sections and 328 structured notes across the whole-piece scaffold.
+- Completed: `whole-piece pass v3`
+  A new whole-piece pass now runs across all forty-one sections and writes refreshed JSON, CSV, and Markdown outputs under `data/piece-pass/taohuawu-whole-v3`.
+- Completed: `whole-piece summary export integration`
+  The research export pipeline now copies the newest whole-piece pass summary into `exports/piece-pass-summary.json` and `exports/piece-pass-sections.csv`, and `research-analysis/analyze_exports.py` now emits dedicated piece-pass tables, figures, and report sections.
+- Completed: `pilot execution pack generation`
+  The project now includes `scripts/build-pilot-pack.mjs`, pilot run-sheet templates, and teacher batch validation templates so the weakest whole-piece sections can be exported into an operational pilot packet instead of being copied by hand from reports.
+- Current next step:
+  run a real-sample pilot with the generated pilot pack, collect teacher validation on the weakest sections, and decide whether the remaining PDF pages need full literal transcription or only targeted reinforcement.
+
+## 2026-04-21 Research Focus Update
+
+- Main study framing:
+  The project should now be framed primarily as `AI-supported self-practice` rather than `teacher-evaluation-first`.
+- Primary outcome domains:
+  pitch gain, rhythm gain, self-practice behavior, questionnaire responses, and interview evidence on feedback use.
+- Teacher-related modules:
+  keep teacher validation, dual-rater reliability, and adjudication as optional secondary validation tools, not as the required main path.
+- Current next step:
+  run a self-practice pilot with repeated learner takes, logs, questionnaires, and interviews, then decide later whether any teacher-side validity check is still needed.
+
+## 2026-04-21 Mainline Priority Reset
+
+- Highest-priority product line:
+  build the student-facing `Web / PWA / shell-app` flow around `PDF score -> recording/upload -> diagnosis -> feedback`.
+- Deep-learning requirement:
+  both `pitch` and `rhythm` are now considered required deep-learning directions for the mainline product.
+- Current gap:
+  pitch already uses a deep-learning model path (`torchcrepe`), but rhythm is still mainly `onset + DTW + rule typing`, so rhythm deep learning remains an unfinished mainline requirement.
+- Secondary systems:
+  teacher validation, adjudication, and research-management workflows remain available but should no longer outrank the student-facing diagnosis product line.
+- Current next step:
+  push the project toward formal PDF intake and a student-facing diagnosis app, while planning the next upgrade step for a deep-learning rhythm model.
+
+## 2026-04-21 Student Mainline Implementation
+
+- Completed: `student-first app shell`
+  The default root app is now a student-facing `PDF -> section -> upload/record -> diagnosis` flow, while the old research workspace is kept as a secondary mode.
+- Completed: `score import job flow`
+  The Node gateway now exposes `POST /api/erhu/scores/import-pdf`, `GET /api/erhu/scores/import-pdf/:jobId`, and `GET /api/erhu/scores/:scoreId`, and stores imported score jobs plus normalized structured scores in `data/erhu-score-imports.json`.
+- Completed: `known-piece PDF fallback`
+  When Audiveris is not configured locally, known PDFs such as `桃花坞` can still enter the mainline automatically by matching against the built-in structured score library instead of forcing the student into manual note entry.
+- Completed: `erhu-focus separation outputs`
+  The Python analyzer now exposes `POST /audio/separate-erhu`, upgrades preprocessing to `erhu-focus`, persists raw / enhanced / accompaniment residual audio previews under `/data/generated-audio/...`, and returns separation metadata in `analysis.diagnostics`.
+- Completed: `score-aware analyze by scoreId`
+  The main `POST /api/erhu/analyze` flow now accepts `scoreId` plus `separationMode=auto|off|erhu-focus`, so imported PDF scores can go through the same deep-learning pitch + DTW diagnosis chain without relying on built-in piece selection.
+- Current next step:
+  keep `Audiveris` as the preferred real OMR backend, continue trying to enable a true `madmom` rhythm-model environment on this machine, and polish the student UI/UX around automatic score import and diagnosis history.
+
+## 2026-04-21 OMR + Whole-piece Stability Update
+
+- Completed: `Audiveris pagewise OMR fallback`
+  The Python score-import path now falls back from whole-PDF OMR to pagewise Audiveris runs, so `桃花坞` can complete automatic import with detected parts such as `Voice` and `Piano` instead of silently dropping back to the old manual path.
+- Completed: `madmom rhythm model activation`
+  The local Python environment now reports `madmom=true`, and the student-facing diagnosis path uses `madmom-rnn-onset` and `madmom-rnn-beat` in real runs rather than only the old librosa fallback.
+- Completed: `imported-score section identity fixes`
+  Imported score sections now retain the real `scorejob-*` piece id, and auto-detected section ids are written back correctly into the saved student analysis records.
+- Completed: `whole-piece pass cache + summary artifact`
+  `scripts/run-piece-pass.py` now writes a dedicated `*-whole-piece-summary.json` plus per-section cache files under `section-cache/`, so repeated whole-song deep passes can reuse prior section analyses instead of recomputing every matched section from scratch.
+- Completed: `student whole-piece summary visibility`
+  The student app can now fetch the newest whole-piece summary by `pieceId/title` and surface the current whole-song coverage, weighted scores, dominant practice path, and weakest sections inside the diagnosis history area.
+- Current next step:
+  run repeated whole-piece passes against the cached `桃花坞` scaffold to verify speed gains, then decide whether to bring whole-song pass triggering directly into the student UI.
+## 2026-04-21 Mainline Priority Snapshot
+
+- Mainline mission:
+  keep the student-facing `PDF score -> record/upload -> deep-learning diagnosis -> localized feedback` flow as the highest-priority product line.
+- Latest whole-piece baseline:
+  the refreshed `妗冭姳鍧瀈 whole-piece pass now reports `41/41` matched sections, `weightedPitchScore=62.82`, `weightedRhythmScore=77.84`, `weightedCombinedScore=72.14`, and `weightedStudentCombinedScore=83.47`.
+- Completed: `focused weak-section calibration round`
+  Added section-level calibration profiles for `answer-loop`, `folk-dance-answer`, `pedal-tension-loop`, `descending-beacon`, and `con-brio-entry`, then reran a fresh whole-piece pass plus a cached verification pass.
+- Calibration outcome:
+  `folk-dance-answer` is no longer in the weakest-section list, while `answer-loop`, `descending-beacon`, `pedal-tension-loop`, and `con-brio-entry` still need another targeted pass; `bright-recap-fanfare` entered the new weakest group.
+- Priority P0:
+  keep improving core diagnosis quality on the current weakest sections: `answer-loop`, `bright-recap-fanfare`, `descending-beacon`, `pedal-tension-loop`, and `con-brio-entry`.
+- Priority P1:
+  continue polishing the student result page, diagnosis history, and re-record flow so the student-facing app feels like a product rather than a research console.
+- Priority P2:
+  improve unknown-PDF robustness in the automatic OMR pipeline so the mainline does not depend on piece-specific reinforcement.
+- Priority P3:
+  improve the diagnosis-first `erhu-focus` separation path, especially on mixed recordings with persistent piano residuals.
+- Priority P4:
+  package the current Web/PWA flow into a more installable shell-app experience after the diagnosis quality is stable enough.

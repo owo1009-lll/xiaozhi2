@@ -15,6 +15,18 @@ export async function fetchParticipant(participantId) {
 }
 
 export async function createAnalysis(payload) {
+  if (payload?.audioFile instanceof File) {
+    const formData = new FormData();
+    formData.append("audio", payload.audioFile);
+    const { audioFile, ...rest } = payload;
+    formData.append("payload", JSON.stringify(rest));
+    return readJson(
+      await fetch("/api/erhu/analyze", {
+        method: "POST",
+        body: formData,
+      }),
+    );
+  }
   return readJson(
     await fetch("/api/erhu/analyze", {
       method: "POST",
@@ -22,6 +34,36 @@ export async function createAnalysis(payload) {
       body: JSON.stringify(payload),
     }),
   );
+}
+
+export async function importScorePdf(file, titleHint = "") {
+  const formData = new FormData();
+  formData.append("pdf", file);
+  if (titleHint) {
+    formData.append("titleHint", titleHint);
+  }
+  return readJson(
+    await fetch("/api/erhu/scores/import-pdf", {
+      method: "POST",
+      body: formData,
+    }),
+  );
+}
+
+export async function fetchScoreImportJob(jobId) {
+  return readJson(await fetch(`/api/erhu/scores/import-pdf/${encodeURIComponent(jobId)}`));
+}
+
+export async function fetchScore(scoreId) {
+  return readJson(await fetch(`/api/erhu/scores/${encodeURIComponent(scoreId)}`));
+}
+
+export async function fetchLatestPiecePassSummary({ pieceId = "", title = "" } = {}) {
+  const searchParams = new URLSearchParams();
+  if (pieceId) searchParams.set("pieceId", pieceId);
+  if (title) searchParams.set("title", title);
+  const suffix = searchParams.toString() ? `?${searchParams.toString()}` : "";
+  return readJson(await fetch(`/api/erhu/piece-pass/latest${suffix}`));
 }
 
 export async function saveStudyRecord(payload) {
@@ -80,6 +122,14 @@ export async function fetchValidationSummary() {
   return readJson(await fetch("/api/erhu/research/validation-summary"));
 }
 
+export async function fetchAdjudications() {
+  return readJson(await fetch("/api/erhu/research/adjudications"));
+}
+
+export async function fetchAdjudicationSummary() {
+  return readJson(await fetch("/api/erhu/research/adjudication-summary"));
+}
+
 export async function fetchPendingRatings() {
   return readJson(await fetch("/api/erhu/research/pending-ratings"));
 }
@@ -101,6 +151,16 @@ export async function saveExpertRating(payload) {
 export async function saveValidationReview(payload) {
   return readJson(
     await fetch("/api/erhu/validation-review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  );
+}
+
+export async function saveAdjudication(payload) {
+  return readJson(
+    await fetch("/api/erhu/adjudication", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

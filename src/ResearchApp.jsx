@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { playReferenceNotes, unlockAudio } from "./audioSynth";
+import PdfScoreHelper from "./PdfScoreHelper";
 import {
   batchCreateParticipants,
   createAnalysis,
+  fetchAdjudicationSummary,
+  fetchAdjudications,
   fetchAnalyzerStatus,
   fetchDataQuality,
   fetchExpertRatings,
@@ -16,6 +19,7 @@ import {
   fetchTasks,
   fetchValidationReviews,
   fetchValidationSummary,
+  saveAdjudication,
   saveExpertRating,
   saveInterviewNote,
   saveInterviewSampling,
@@ -111,6 +115,15 @@ const DEFAULT_VALIDATION_REVIEW = {
   teacherIssueMeasureIndexes: "",
   comments: "",
 };
+const DEFAULT_ADJUDICATION = {
+  analysisId: "",
+  adjudicatorId: "researcher-1",
+  finalPrimaryPath: "review-first",
+  finalIssueNoteIds: "",
+  finalIssueMeasureIndexes: "",
+  triggerReasons: "",
+  comments: "",
+};
 
 function safeNumber(value, fallback = 0) {
   const numeric = Number(value);
@@ -144,6 +157,45 @@ function practicePathLabel(value) {
   if (value === "pitch-first") return "先修音准";
   if (value === "rhythm-first") return "先修节奏";
   return "先复核";
+}
+
+function pitchLabelText(value) {
+  if (value === "pitch-flat") return "音高偏低";
+  if (value === "pitch-sharp") return "音高偏高";
+  if (value === "pitch-review") return "音高需复核";
+  if (value === "pitch-ok") return "音高基本正确";
+  return value || "音高未标注";
+}
+
+function rhythmLabelText(item) {
+  const value = item?.rhythmType || item?.rhythmLabel;
+  if (item?.rhythmTypeLabel) return item.rhythmTypeLabel;
+  if (value === "rhythm-rush") return "节奏抢拍";
+  if (value === "rhythm-drag") return "节奏拖拍";
+  if (value === "rhythm-duration-short") return "时值偏短";
+  if (value === "rhythm-duration-long") return "时值偏长";
+  if (value === "rhythm-rush-short") return "抢拍且时值偏短";
+  if (value === "rhythm-drag-long") return "拖拍且时值偏长";
+  if (value === "rhythm-missing") return "疑似漏音或起拍未捕获";
+  if (value === "rhythm-unstable") return "节奏不稳";
+  if (value === "rhythm-ok") return "节奏基本正确";
+  return value || "节奏未标注";
+}
+
+function measureIssueLabelText(item) {
+  const value = item?.issueType || item?.issueLabel;
+  if (value === "rhythm-measure-rush") return "小节整体偏快";
+  if (value === "rhythm-measure-drag") return "小节整体偏慢";
+  if (value === "rhythm-measure-short") return "小节时值普遍偏短";
+  if (value === "rhythm-measure-long") return "小节时值普遍偏长";
+  if (value === "rhythm-unstable") return "节奏不稳";
+  if (value === "pitch-unstable") return "音准不稳";
+  return item?.issueLabel || "问题类型未标注";
+}
+
+function preprocessModeLabel(value) {
+  if (value === "melody-focus") return "伴奏抑制 / 旋律增强";
+  return "关闭";
 }
 
 function formatDateTime(value) {
@@ -212,13 +264,6 @@ function parseBatchParticipantText(text) {
 }
 
 function SectionTitle({ step, title, description }) {
-  function loadParticipantWorkspace(participant) {
-    setParticipantId(participant.participantId || "");
-    setGroupId(participant.groupId || "experimental");
-    setActiveTab("workspace");
-    setStatusMessage(`已切换到 ${participant.participantId} 的工作台。`);
-  }
-
   return (
     <div className="section-title">
       <span className="section-step">{step}</span>
@@ -292,7 +337,7 @@ function TemplateDownloadLink({ templateId, children }) {
   );
 }
 
-export default function ResearchApp() {
+export default function ResearchApp({ onBackToStudent }) {
   const [activeTab, setActiveTab] = useState("workspace");
   const [pieces, setPieces] = useState([]);
   const [participantId, setParticipantId] = useState("");
@@ -303,6 +348,8 @@ export default function ResearchApp() {
   const [audioFile, setAudioFile] = useState(null);
   const [audioPreviewUrl, setAudioPreviewUrl] = useState("");
   const [audioDuration, setAudioDuration] = useState(null);
+  const [preprocessMode, setPreprocessMode] = useState("off");
+  const [manualPiecePack, setManualPiecePack] = useState(null);
   const [analysis, setAnalysis] = useState(null);
   const [participantRecord, setParticipantRecord] = useState(null);
   const [profile, setProfile] = useState(DEFAULT_PROFILE);
@@ -315,6 +362,8 @@ export default function ResearchApp() {
   const [expertRatings, setExpertRatings] = useState([]);
   const [validationReviews, setValidationReviews] = useState([]);
   const [validationSummary, setValidationSummary] = useState(null);
+  const [adjudications, setAdjudications] = useState([]);
+  const [adjudicationSummary, setAdjudicationSummary] = useState(null);
   const [pendingRatings, setPendingRatings] = useState([]);
   const [analyzerStatus, setAnalyzerStatus] = useState(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
@@ -327,6 +376,7 @@ export default function ResearchApp() {
   const [questionnaireSaving, setQuestionnaireSaving] = useState(false);
   const [expertSaving, setExpertSaving] = useState(false);
   const [validationSaving, setValidationSaving] = useState(false);
+  const [adjudicationSaving, setAdjudicationSaving] = useState(false);
   const [batchImporting, setBatchImporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [statusMessage, setStatusMessage] = useState("系统已就绪，可开始录音、分析与研究数据录入。");
@@ -334,6 +384,7 @@ export default function ResearchApp() {
   const [experienceNotes, setExperienceNotes] = useState("");
   const [expertRating, setExpertRating] = useState(DEFAULT_EXPERT_RATING);
   const [validationReview, setValidationReview] = useState(DEFAULT_VALIDATION_REVIEW);
+  const [adjudication, setAdjudication] = useState(DEFAULT_ADJUDICATION);
   const [taskPlan, setTaskPlan] = useState(DEFAULT_TASK_PLAN);
   const [interviewNote, setInterviewNote] = useState(DEFAULT_INTERVIEW_NOTE);
   const [samplingMark, setSamplingMark] = useState(DEFAULT_SAMPLING_MARK);
@@ -346,6 +397,7 @@ export default function ResearchApp() {
 
   const selectedPiece = pieces.find((piece) => piece.pieceId === selectedPieceId) || null;
   const selectedSection = selectedPiece?.sections?.find((section) => section.sectionId === selectedSectionId) || null;
+  const activeScorePack = manualPiecePack?.notes?.length ? manualPiecePack : selectedSection;
   const taskPlanPiece = pieces.find((piece) => piece.pieceId === (taskPlan.pieceId || selectedPieceId)) || selectedPiece || null;
   const taskPlanSections = taskPlanPiece?.sections || [];
   const recentLogs = participantRecord?.usageLogs?.slice(-6).reverse() || [];
@@ -360,7 +412,20 @@ export default function ResearchApp() {
   const latestQuestionnaires = questionnaires.slice(0, 8);
   const latestRatings = expertRatings.slice(0, 8);
   const latestValidationReviews = validationReviews.slice(0, 8);
+  const latestAdjudications = adjudications.slice(0, 8);
   const participantAnalyses = participantRecord?.analyses || [];
+  const participantAdjudications =
+    participantRecord?.adjudications?.slice().sort((left, right) => String(right.resolvedAt).localeCompare(String(left.resolvedAt))) || [];
+  const requiredValidationRaters = researchOverview?.requiredValidationRaters || validationSummary?.requiredRaterCount || 2;
+  const fullyValidatedAnalyses = participantAnalyses.filter((item) => {
+    const uniqueRaters = new Set(
+      (participantRecord?.validationReviews || [])
+        .filter((review) => review.analysisId === item.analysisId)
+        .map((review) => review.raterId)
+        .filter(Boolean),
+    );
+    return uniqueRaters.size >= requiredValidationRaters;
+  });
   const selectedValidationAnalysis =
     participantAnalyses.find((item) => item.analysisId === validationReview.analysisId) ||
     (analysis && participantAnalyses.find((item) => item.analysisId === analysis.analysisId)) ||
@@ -372,6 +437,21 @@ export default function ResearchApp() {
       ?.sort((left, right) => String(right.submittedAt).localeCompare(String(left.submittedAt))) || [];
   const currentValidationRecord =
     selectedValidationReviews.find((item) => item.raterId === validationReview.raterId) || selectedValidationReviews[0] || null;
+  const selectedAdjudicationAnalysis =
+    fullyValidatedAnalyses.find((item) => item.analysisId === adjudication.analysisId) ||
+    fullyValidatedAnalyses.find((item) => item.analysisId === selectedValidationAnalysis?.analysisId) ||
+    fullyValidatedAnalyses[0] ||
+    null;
+  const selectedAdjudicationReviews =
+    participantRecord?.validationReviews
+      ?.filter((item) => item.analysisId === selectedAdjudicationAnalysis?.analysisId)
+      ?.sort((left, right) => String(left.raterId).localeCompare(String(right.raterId))) || [];
+  const currentAdjudicationRecord =
+    participantAdjudications.find((item) => item.analysisId === selectedAdjudicationAnalysis?.analysisId) || null;
+  const selectedPendingAdjudication =
+    (researchOverview?.pendingAdjudications || adjudicationSummary?.pendingAdjudications || []).find(
+      (item) => item.analysisId === selectedAdjudicationAnalysis?.analysisId,
+    ) || null;
 
   useEffect(() => {
     const cachedParticipant = localStorage.getItem("ai-erhu.participant");
@@ -565,10 +645,88 @@ export default function ResearchApp() {
     });
   }, [participantRecord, selectedValidationAnalysis, validationReview.raterId]);
 
+  useEffect(() => {
+    const fallbackAnalysis = selectedAdjudicationAnalysis || null;
+    setAdjudication((prev) => {
+      if (!fallbackAnalysis?.analysisId) {
+        return prev.analysisId ? { ...DEFAULT_ADJUDICATION, adjudicatorId: prev.adjudicatorId } : prev;
+      }
+
+      if (prev.analysisId === fallbackAnalysis.analysisId) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        analysisId: fallbackAnalysis.analysisId,
+        finalPrimaryPath:
+          fallbackAnalysis.recommendedPracticePath || fallbackAnalysis.practiceTargets?.[0]?.practicePath || "review-first",
+        finalIssueNoteIds: "",
+        finalIssueMeasureIndexes: "",
+        triggerReasons: "",
+        comments: "",
+      };
+    });
+  }, [selectedAdjudicationAnalysis]);
+
+  useEffect(() => {
+    if (!selectedAdjudicationAnalysis?.analysisId) return;
+
+    setAdjudication((prev) => {
+      const next = currentAdjudicationRecord
+        ? {
+            ...prev,
+            analysisId: currentAdjudicationRecord.analysisId,
+            adjudicatorId: currentAdjudicationRecord.adjudicatorId || prev.adjudicatorId,
+            finalPrimaryPath: currentAdjudicationRecord.finalPrimaryPath || prev.finalPrimaryPath,
+            finalIssueNoteIds: (currentAdjudicationRecord.finalIssueNoteIds || []).join(", "),
+            finalIssueMeasureIndexes: (currentAdjudicationRecord.finalIssueMeasureIndexes || []).join(", "),
+            triggerReasons: (currentAdjudicationRecord.triggerReasons || []).join(" | "),
+            comments: currentAdjudicationRecord.comments || "",
+          }
+        : {
+            ...prev,
+            analysisId: selectedAdjudicationAnalysis.analysisId,
+            finalPrimaryPath:
+              selectedAdjudicationAnalysis.recommendedPracticePath ||
+              selectedAdjudicationAnalysis.practiceTargets?.[0]?.practicePath ||
+              "review-first",
+            finalIssueNoteIds: "",
+            finalIssueMeasureIndexes: "",
+            triggerReasons: selectedPendingAdjudication?.adjudicationReason || "",
+            comments: "",
+          };
+
+      return prev.analysisId === next.analysisId &&
+        prev.adjudicatorId === next.adjudicatorId &&
+        prev.finalPrimaryPath === next.finalPrimaryPath &&
+        prev.finalIssueNoteIds === next.finalIssueNoteIds &&
+        prev.finalIssueMeasureIndexes === next.finalIssueMeasureIndexes &&
+        prev.triggerReasons === next.triggerReasons &&
+        prev.comments === next.comments
+        ? prev
+        : next;
+    });
+  }, [currentAdjudicationRecord, selectedAdjudicationAnalysis, selectedPendingAdjudication]);
+
   async function loadDashboardData() {
     setDashboardLoading(true);
     try {
-      const [overviewJson, participantsJson, qualityJson, taskJson, interviewJson, questionnaireJson, ratingsJson, validationJson, validationSummaryJson, pendingJson, analyzerJson] = await Promise.all([
+      const [
+        overviewJson,
+        participantsJson,
+        qualityJson,
+        taskJson,
+        interviewJson,
+        questionnaireJson,
+        ratingsJson,
+        validationJson,
+        validationSummaryJson,
+        adjudicationJson,
+        adjudicationSummaryJson,
+        pendingJson,
+        analyzerJson,
+      ] = await Promise.all([
         fetchResearchOverview(),
         fetchResearchParticipants(),
         fetchDataQuality(),
@@ -578,6 +736,8 @@ export default function ResearchApp() {
         fetchExpertRatings(),
         fetchValidationReviews(),
         fetchValidationSummary(),
+        fetchAdjudications(),
+        fetchAdjudicationSummary(),
         fetchPendingRatings(),
         fetchAnalyzerStatus(),
       ]);
@@ -590,6 +750,8 @@ export default function ResearchApp() {
       setExpertRatings(ratingsJson?.ratings || []);
       setValidationReviews(validationJson?.reviews || []);
       setValidationSummary(validationSummaryJson?.validationSummary || overviewJson?.overview?.validationSummary || null);
+      setAdjudications(adjudicationJson?.adjudications || []);
+      setAdjudicationSummary(adjudicationSummaryJson?.adjudicationSummary || overviewJson?.overview?.adjudicationSummary || null);
       setPendingRatings(pendingJson?.pendingRatings || overviewJson?.overview?.pendingRatings || []);
       setAnalyzerStatus(analyzerJson?.analyzer || overviewJson?.overview?.analyzer || null);
     } catch (error) {
@@ -689,20 +851,21 @@ export default function ResearchApp() {
     setErrorMessage("");
     setStatusMessage("正在执行音准与节奏分析，请稍候。");
     try {
-      const audioDataUrl = await fileToDataUrl(audioFile);
       const json = await createAnalysis({
         participantId: participantId.trim(),
         groupId,
         sessionStage,
         pieceId: selectedPiece.pieceId,
         sectionId: selectedSection.sectionId,
+        preprocessMode,
+        piecePackOverride: manualPiecePack?.notes?.length ? manualPiecePack : null,
         audioSubmission: {
           name: audioFile.name,
           mimeType: audioFile.type || "audio/webm",
           size: audioFile.size,
           duration: audioDuration,
         },
-        audioDataUrl,
+        audioFile,
       });
       setAnalysis(json.analysis || null);
       setValidationReview((prev) => ({
@@ -713,7 +876,7 @@ export default function ResearchApp() {
       }));
       setStatusMessage(
         json.analysis?.analysisMode === "external"
-          ? "外部 Python 分析服务已返回结果，可继续查看问题音和问题小节。"
+          ? `外部 Python 分析服务已返回结果${preprocessMode === "melody-focus" ? "，并启用了伴奏抑制。" : ""}，可继续查看问题音和问题小节。`
           : "当前使用本地回退分析结果。配置 Python 服务后可切换到深度学习分析。",
       );
       await refreshParticipantRecord();
@@ -725,10 +888,10 @@ export default function ResearchApp() {
   }
 
   async function handlePlayDemo() {
-    if (!selectedSection?.notes?.length) return;
+    if (!activeScorePack?.notes?.length) return;
     try {
       stopDemoRef.current?.();
-      stopDemoRef.current = await playReferenceNotes(selectedSection.notes, selectedSection.tempo);
+      stopDemoRef.current = await playReferenceNotes(activeScorePack.notes, activeScorePack.tempo);
       setStatusMessage("正在播放标准示范，可对照结果进行重练。");
     } catch {
       setErrorMessage("标准示范播放失败。");
@@ -955,6 +1118,76 @@ export default function ResearchApp() {
     setStatusMessage(`已载入 ${review.raterId || "teacher"} 的教师验证。`);
   }
 
+  function loadParticipantWorkspace(participant) {
+    if (!participant?.participantId) return;
+    setParticipantId(participant.participantId);
+    setGroupId(participant.groupId || "experimental");
+    setActiveTab("workspace");
+    setStatusMessage(`已切换到 ${participant.participantId} 的工作台。`);
+  }
+
+  async function handleAdjudicationSubmit() {
+    if (!participantId.trim()) {
+      setErrorMessage("请先填写受试编号。");
+      return;
+    }
+    if (!adjudication.analysisId) {
+      setErrorMessage("请先选择要裁决的分析记录。");
+      return;
+    }
+
+    setAdjudicationSaving(true);
+    setErrorMessage("");
+    try {
+      const json = await saveAdjudication({
+        analysisId: adjudication.analysisId,
+        adjudicatorId: adjudication.adjudicatorId,
+        finalPrimaryPath: adjudication.finalPrimaryPath,
+        finalIssueNoteIds: adjudication.finalIssueNoteIds,
+        finalIssueMeasureIndexes: adjudication.finalIssueMeasureIndexes,
+        triggerReasons: adjudication.triggerReasons,
+        comments: adjudication.comments,
+      });
+      setAdjudicationSummary(json?.adjudicationSummary || null);
+      setStatusMessage(`已保存最终裁决：${json?.adjudication?.analysisId || adjudication.analysisId}`);
+      setAdjudication((prev) => ({
+        ...prev,
+        analysisId: json?.adjudication?.analysisId || prev.analysisId,
+        adjudicatorId: json?.adjudication?.adjudicatorId || prev.adjudicatorId,
+        finalPrimaryPath: json?.adjudication?.finalPrimaryPath || prev.finalPrimaryPath,
+        finalIssueNoteIds: (json?.adjudication?.finalIssueNoteIds || []).join(", "),
+        finalIssueMeasureIndexes: (json?.adjudication?.finalIssueMeasureIndexes || []).join(", "),
+        triggerReasons: (json?.adjudication?.triggerReasons || []).join(" | "),
+        comments: json?.adjudication?.comments || "",
+      }));
+      await refreshParticipantRecord();
+      await loadDashboardData();
+    } catch (error) {
+      setErrorMessage(error.message || "最终裁决保存失败。");
+    } finally {
+      setAdjudicationSaving(false);
+    }
+  }
+
+  function loadAdjudicationIntoForm(record) {
+    if (!record) return;
+    setAdjudication((prev) => ({
+      ...prev,
+      analysisId: record.analysisId || prev.analysisId,
+      adjudicatorId: record.adjudicatorId || prev.adjudicatorId,
+      finalPrimaryPath: record.finalPrimaryPath || prev.finalPrimaryPath,
+      finalIssueNoteIds: Array.isArray(record.finalIssueNoteIds)
+        ? record.finalIssueNoteIds.join(", ")
+        : String(record.finalIssueNoteIds || ""),
+      finalIssueMeasureIndexes: Array.isArray(record.finalIssueMeasureIndexes)
+        ? record.finalIssueMeasureIndexes.join(", ")
+        : String(record.finalIssueMeasureIndexes || ""),
+      triggerReasons: Array.isArray(record.triggerReasons) ? record.triggerReasons.join(" | ") : String(record.triggerReasons || ""),
+      comments: record.comments || "",
+    }));
+    setStatusMessage(`已载入 ${record.analysisId} 的最终裁决。`);
+  }
+
   async function handleBatchImport() {
     const participants = parseBatchParticipantText(batchImportText);
     if (!participants.length) {
@@ -1047,6 +1280,11 @@ export default function ResearchApp() {
             </TabButton>
           ))}
         </div>
+        {onBackToStudent ? (
+          <button type="button" className="secondary-button" onClick={onBackToStudent}>
+            返回学生主界面
+          </button>
+        ) : null}
         {installPromptEvent ? (
           <button type="button" className="secondary-button" onClick={handleInstallApp}>
             安装到手机桌面
@@ -1283,6 +1521,15 @@ export default function ResearchApp() {
               <span>时长：{audioDuration == null ? "待解析" : `${audioDuration.toFixed(1)} 秒`}</span>
               <span>大小：{audioFile ? `${(audioFile.size / 1024 / 1024).toFixed(2)} MB` : "0 MB"}</span>
             </div>
+            <div className="field-grid">
+              <label>
+                <span>混合音频预处理</span>
+                <select value={preprocessMode} onChange={(event) => setPreprocessMode(event.target.value)}>
+                  <option value="off">关闭，适合纯二胡录音</option>
+                  <option value="melody-focus">启用伴奏抑制 / 旋律增强，适合带伴奏或合奏音频</option>
+                </select>
+              </label>
+            </div>
             {audioPreviewUrl ? (
               <audio controls className="audio-player" src={audioPreviewUrl}>
                 当前浏览器不支持音频预览。
@@ -1338,7 +1585,7 @@ export default function ResearchApp() {
                         {analysis.measureFindings.map((item) => (
                           <li key={`${item.measureIndex}-${item.issueType}`}>
                             <strong>第 {item.measureIndex} 小节：</strong>
-                            {item.issueLabel}
+                            {measureIssueLabelText(item)}
                             {item.severity ? ` · ${severityText(item.severity)}` : ""}
                             {item.detail ? ` (${item.detail})` : ""}
                             {item.coachingTip ? <span className="finding-help">{`建议：${item.coachingTip}`}</span> : null}
@@ -1356,10 +1603,13 @@ export default function ResearchApp() {
                         {analysis.noteFindings.map((item) => (
                           <li key={item.noteId}>
                             <strong>{item.noteId}</strong>
-                            {`，第 ${item.measureIndex} 小节，${item.pitchLabel}，${item.rhythmLabel}`}
+                            {`，第 ${item.measureIndex} 小节，${pitchLabelText(item.pitchLabel)}，${rhythmLabelText(item)}`}
                             {item.severity ? ` · ${severityText(item.severity)}` : ""}
                             {item.evidenceLabel ? <span className="finding-help">{`证据：${item.evidenceLabel}`}</span> : null}
                             {item.confidence != null ? <span className="finding-help">{`置信度：${confidenceText(item.confidence)}`}</span> : null}
+                            {item.durationErrorMs != null && Math.abs(safeNumber(item.durationErrorMs)) > 0 ? (
+                              <span className="finding-help">{`时值偏差：${item.durationErrorMs > 0 ? "+" : ""}${item.durationErrorMs} ms`}</span>
+                            ) : null}
                             {item.why ? <span className="finding-help">{`原因：${item.why}`}</span> : null}
                             {item.action ? <span className="finding-help">{`怎么练：${item.action}`}</span> : null}
                           </li>
@@ -1461,6 +1711,98 @@ export default function ResearchApp() {
                     </button>
                   </div>
                 </div>
+                <div className="history-card">
+                  <h3>最终裁决</h3>
+                  {participantAdjudications.length ? (
+                    <div className="demo-note-list">
+                      {participantAdjudications.map((item) => (
+                        <button key={item.adjudicationId} type="button" className="secondary-button" onClick={() => loadAdjudicationIntoForm(item)}>
+                          {`${item.analysisId} · ${practicePathLabel(item.finalPrimaryPath)} · ${item.pathAgreement ? "系统一致" : "系统不一致"}`}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="field-grid">
+                    <label>
+                      <span>裁决分析记录</span>
+                      <select value={adjudication.analysisId} onChange={(event) => setAdjudication((prev) => ({ ...prev, analysisId: event.target.value }))}>
+                        <option value="">请选择裁决记录</option>
+                        {fullyValidatedAnalyses.map((item) => (
+                          <option key={item.analysisId} value={item.analysisId}>
+                            {`${item.sessionStage} · ${item.pieceId}/${item.sectionId} · ${formatDateTime(item.createdAt)}`}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>裁决者编号</span>
+                      <input value={adjudication.adjudicatorId} onChange={(event) => setAdjudication((prev) => ({ ...prev, adjudicatorId: event.target.value }))} />
+                    </label>
+                    <label>
+                      <span>最终首要路径</span>
+                      <select value={adjudication.finalPrimaryPath} onChange={(event) => setAdjudication((prev) => ({ ...prev, finalPrimaryPath: event.target.value }))}>
+                        <option value="pitch-first">先修音准</option>
+                        <option value="rhythm-first">先修节奏</option>
+                        <option value="review-first">先复核</option>
+                      </select>
+                    </label>
+                  </div>
+                  {selectedAdjudicationAnalysis ? (
+                    <div className="demo-note-list">
+                      <span>{`系统路径：${practicePathLabel(selectedAdjudicationAnalysis.recommendedPracticePath || selectedAdjudicationAnalysis.practiceTargets?.[0]?.practicePath)}`}</span>
+                      <span>{`教师 A：${selectedAdjudicationReviews[0]?.raterId || "—"} · ${practicePathLabel(selectedAdjudicationReviews[0]?.teacherPrimaryPath)}`}</span>
+                      <span>{`教师 B：${selectedAdjudicationReviews[1]?.raterId || "—"} · ${practicePathLabel(selectedAdjudicationReviews[1]?.teacherPrimaryPath)}`}</span>
+                      <span>{`裁决状态：${currentAdjudicationRecord ? "已裁决" : selectedPendingAdjudication ? "待裁决" : "可手动裁决"}`}</span>
+                    </div>
+                  ) : null}
+                  {selectedPendingAdjudication ? (
+                    <div className="demo-note-list">
+                      <span>{`触发原因：${selectedPendingAdjudication.adjudicationReason || "manual-review"}`}</span>
+                      <span>{`路径一致：${selectedPendingAdjudication.pathMatch ? "是" : "否"}`}</span>
+                      <span>{`音符重叠 F1：${selectedPendingAdjudication.noteOverlapF1 == null ? "—" : selectedPendingAdjudication.noteOverlapF1.toFixed(3)}`}</span>
+                      <span>{`小节重叠 F1：${selectedPendingAdjudication.measureOverlapF1 == null ? "—" : selectedPendingAdjudication.measureOverlapF1.toFixed(3)}`}</span>
+                    </div>
+                  ) : null}
+                  <div className="field-grid">
+                    <label>
+                      <span>最终问题音</span>
+                      <input
+                        value={adjudication.finalIssueNoteIds}
+                        onChange={(event) => setAdjudication((prev) => ({ ...prev, finalIssueNoteIds: event.target.value }))}
+                        placeholder="例如 a-m1-n2, a-m2-n1"
+                      />
+                    </label>
+                    <label>
+                      <span>最终问题小节</span>
+                      <input
+                        value={adjudication.finalIssueMeasureIndexes}
+                        onChange={(event) => setAdjudication((prev) => ({ ...prev, finalIssueMeasureIndexes: event.target.value }))}
+                        placeholder="例如 1,2,4"
+                      />
+                    </label>
+                  </div>
+                  <label className="notes-field">
+                    <span>裁决原因</span>
+                    <textarea rows="2" value={adjudication.triggerReasons} onChange={(event) => setAdjudication((prev) => ({ ...prev, triggerReasons: event.target.value }))} />
+                  </label>
+                  <label className="notes-field">
+                    <span>裁决备注</span>
+                    <textarea rows="3" value={adjudication.comments} onChange={(event) => setAdjudication((prev) => ({ ...prev, comments: event.target.value }))} />
+                  </label>
+                  {currentAdjudicationRecord ? (
+                    <div className="demo-note-list">
+                      <span>{`当前裁决者：${currentAdjudicationRecord.adjudicatorId || "researcher"}`}</span>
+                      <span>{`路径一致：${currentAdjudicationRecord.pathAgreement ? "是" : "否"}`}</span>
+                      <span>{`音符 Precision/Recall/F1：${currentAdjudicationRecord.notePrecision == null ? "—" : currentAdjudicationRecord.notePrecision.toFixed(3)} / ${currentAdjudicationRecord.noteRecall == null ? "—" : currentAdjudicationRecord.noteRecall.toFixed(3)} / ${currentAdjudicationRecord.noteF1 == null ? "—" : currentAdjudicationRecord.noteF1.toFixed(3)}`}</span>
+                      <span>{`小节 Precision/Recall/F1：${currentAdjudicationRecord.measurePrecision == null ? "—" : currentAdjudicationRecord.measurePrecision.toFixed(3)} / ${currentAdjudicationRecord.measureRecall == null ? "—" : currentAdjudicationRecord.measureRecall.toFixed(3)} / ${currentAdjudicationRecord.measureF1 == null ? "—" : currentAdjudicationRecord.measureF1.toFixed(3)}`}</span>
+                    </div>
+                  ) : null}
+                  <div className="action-row">
+                    <button type="button" className="primary-button" onClick={handleAdjudicationSubmit} disabled={adjudicationSaving}>
+                      {adjudicationSaving ? "保存中..." : "保存最终裁决"}
+                    </button>
+                  </div>
+                </div>
                 {analysis.diagnostics ? (
                   <div className="history-card">
                     <h3>分析诊断</h3>
@@ -1468,6 +1810,7 @@ export default function ResearchApp() {
                       <span>依赖数：{Object.values(analysis.diagnostics.dependencyReport || {}).filter(Boolean).length}</span>
                       <span>音频字节：{analysis.diagnostics.decodedAudioBytes ?? 0}</span>
                       <span>对齐音符：{analysis.diagnostics.alignedNoteCount ?? 0}</span>
+                      <span>{`预处理：${preprocessModeLabel(analysis.diagnostics.appliedPreprocessMode || analysis.diagnostics.requestedPreprocessMode)}`}</span>
                     </div>
                   </div>
                 ) : null}
@@ -1773,6 +2116,12 @@ export default function ResearchApp() {
                   <ScoreBadge label="音符 F1" value={(researchOverview.averageValidationNoteF1 || 0) * 100} accent="#b45309" suffix="%" />
                   <ScoreBadge label="路径一致率" value={(researchOverview.validationPathAgreementRate || 0) * 100} accent="#7c3aed" suffix="%" />
                 </div>
+                <div className="result-grid">
+                  <ScoreBadge label="待裁决" value={researchOverview.adjudicationPendingCount} accent="#b45309" />
+                  <ScoreBadge label="已裁决" value={researchOverview.adjudicationResolvedCount} accent="#0f766e" />
+                  <ScoreBadge label="裁决后音符 F1" value={(researchOverview.averageAdjudicationNoteF1 || 0) * 100} accent="#1d4ed8" suffix="%" />
+                  <ScoreBadge label="裁决路径一致率" value={(researchOverview.adjudicationPathAgreementRate || 0) * 100} accent="#7c3aed" suffix="%" />
+                </div>
                 <div className="summary-grid">
                   {groupSummaries.map((group) => (
                     <GroupOverviewCard key={group.groupId} group={group} />
@@ -1842,6 +2191,7 @@ export default function ResearchApp() {
               <ExportLink dataset="expert-ratings" format="csv">导出评分 CSV</ExportLink>
               <ExportLink dataset="analyses" format="csv">导出分析 CSV</ExportLink>
               <ExportLink dataset="validation-reviews" format="csv">导出验证 CSV</ExportLink>
+              <ExportLink dataset="adjudications" format="csv">导出裁决 CSV</ExportLink>
               <ExportLink dataset="participants" format="json">导出全量 JSON</ExportLink>
             </div>
             <div className="history-card">
@@ -1919,8 +2269,60 @@ export default function ResearchApp() {
             )}
           </section>
 
+          <PdfScoreHelper
+            defaultPieceId={selectedPiece?.pieceId || "manual-pdf-piece"}
+            defaultSectionId={selectedSection?.sectionId || "manual-section"}
+            defaultTitle={selectedSection?.title || selectedPiece?.title || ""}
+            defaultTempo={selectedSection?.tempo || 72}
+            defaultMeter={selectedSection?.meter || "4/4"}
+            templateNotes={selectedSection?.notes || []}
+            activeManualPiecePack={manualPiecePack}
+            onApplyManualPiecePack={(piecePack) => {
+              setManualPiecePack(piecePack);
+              setStatusMessage(`已启用人工录入乐谱：${piecePack.title}。后续分析会优先使用该乐谱。`);
+            }}
+            onClearManualPiecePack={() => {
+              setManualPiecePack(null);
+              setStatusMessage("已恢复使用内置曲目段落进行分析。");
+            }}
+          />
+
           <section className="panel-card">
-            <SectionTitle step="R3B" title="缺测提醒与质控" description="汇总缺测、逾期任务和待访谈样本，帮助在正式实验阶段及时补录与跟进。" />
+            <SectionTitle step="R3B" title="待裁决分析" description="列出已完成双评且触发裁决规则的分析记录，可直接跳转到工作台完成最终裁决。" />
+            {adjudicationSummary?.pendingAdjudicationCount ? (
+              <div className="queue-list">
+                {(researchOverview?.pendingAdjudications || adjudicationSummary?.pendingAdjudications || []).slice(0, 8).map((item) => (
+                  <div key={item.analysisId} className="queue-item">
+                    <div>
+                      <strong>{item.participantId}</strong>
+                      <p>{`${item.sessionStage} · ${item.pieceId}/${item.sectionId} · ${item.adjudicationReason || "manual-review"}`}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => {
+                        setParticipantId(item.participantId);
+                        setAdjudication((prev) => ({
+                          ...prev,
+                          analysisId: item.analysisId,
+                          triggerReasons: item.adjudicationReason || "",
+                        }));
+                        setActiveTab("workspace");
+                        setStatusMessage(`已载入 ${item.participantId} 的待裁决分析。`);
+                      }}
+                    >
+                      打开裁决
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-card">当前没有待裁决分析。</div>
+            )}
+          </section>
+
+          <section className="panel-card">
+            <SectionTitle step="R3C" title="缺测提醒与质控" description="汇总缺测、逾期任务和待访谈样本，帮助在正式实验阶段及时补录与跟进。" />
             {dataQuality ? (
               <>
                 <div className="result-grid">
@@ -2041,12 +2443,16 @@ export default function ResearchApp() {
                       <th>访谈数</th>
                       <th>验证数</th>
                       <th>平均验证一致性</th>
+                      <th>裁决状态</th>
+                      <th>裁决数</th>
+                      <th>待裁决</th>
                       <th>抽样标记</th>
                       <th>抽样优先级</th>
                       <th>最新问卷阶段</th>
                       <th>最新访谈阶段</th>
                       <th>教师前测音准</th>
                       <th>教师后测音准</th>
+                      <th>最新裁决</th>
                       <th>最近活跃</th>
                     </tr>
                   </thead>
@@ -2065,12 +2471,16 @@ export default function ResearchApp() {
                         <td>{participant.interviewCount}</td>
                         <td>{participant.validationReviewCount}</td>
                         <td>{participant.averageValidationAgreement ?? "—"}</td>
+                        <td>{participant.adjudicationStatus || "—"}</td>
+                        <td>{participant.adjudicationCount ?? 0}</td>
+                        <td>{participant.pendingAdjudicationCount ?? 0}</td>
                         <td>{participant.interviewSamplingSelected ? "是" : "否"}</td>
                         <td>{participant.interviewSamplingPriority || "—"}</td>
                         <td>{participant.latestQuestionnaireStage || "—"}</td>
                         <td>{participant.latestInterviewStage || "—"}</td>
                         <td>{participant.expertPretestPitch ?? "—"}</td>
                         <td>{participant.expertPosttestPitch ?? "—"}</td>
+                        <td>{participant.latestAdjudicationAt ? `${participant.latestAdjudicationPathAgreement ? "一致" : "偏离"} · ${formatDateTime(participant.latestAdjudicationAt)}` : "—"}</td>
                         <td>{formatDateTime(participant.lastActiveAt)}</td>
                       </tr>
                     ))}
@@ -2153,6 +2563,46 @@ export default function ResearchApp() {
               </div>
             ) : (
               <div className="empty-card">当前还没有教师标注验证记录。</div>
+            )}
+          </section>
+
+          <section className="panel-card dashboard-span">
+            <SectionTitle step="R6A" title="最新最终裁决" description="查看最近保存的最终裁决结果，确认双评后的最终标签已经写回系统。" />
+            {latestAdjudications.length ? (
+              <div className="table-scroll">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>受试编号</th>
+                      <th>分析记录</th>
+                      <th>裁决者</th>
+                      <th>最终路径</th>
+                      <th>系统路径</th>
+                      <th>路径一致</th>
+                      <th>音符 F1</th>
+                      <th>小节 F1</th>
+                      <th>裁决时间</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {latestAdjudications.map((item) => (
+                      <tr key={item.adjudicationId}>
+                        <td>{item.participantId}</td>
+                        <td>{item.analysisId}</td>
+                        <td>{item.adjudicatorId}</td>
+                        <td>{practicePathLabel(item.finalPrimaryPath)}</td>
+                        <td>{practicePathLabel(item.systemRecommendedPath)}</td>
+                        <td>{item.pathAgreement ? "是" : "否"}</td>
+                        <td>{item.noteF1 == null ? "—" : Number(item.noteF1).toFixed(3)}</td>
+                        <td>{item.measureF1 == null ? "—" : Number(item.measureF1).toFixed(3)}</td>
+                        <td>{formatDateTime(item.resolvedAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="empty-card">当前还没有最终裁决记录。</div>
             )}
           </section>
 

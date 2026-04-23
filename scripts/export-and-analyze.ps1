@@ -13,4 +13,5 @@ $scriptDir = $PSScriptRoot
   -Ratings (Join-Path $ExportDir "expert-ratings.csv") `
   -Analyses (Join-Path $ExportDir "analyses.csv") `
   -Validations (Join-Path $ExportDir "validation-reviews.csv") `
+  -Adjudications (Join-Path $ExportDir "adjudications.csv") `
   -OutputDir $OutputDir

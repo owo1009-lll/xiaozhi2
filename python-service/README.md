@@ -8,23 +8,27 @@ The analyzer now follows this sequence:
 
 1. Decode uploaded audio with `soundfile` or `ffmpeg + librosa`
 2. Estimate frame-level pitch with `torchcrepe` when available, otherwise `librosa.pyin`
-3. Detect onset candidates with `librosa`
+3. Detect onset candidates with `madmom RNN onset` when available, otherwise `librosa`
 4. Resolve the symbolic score from one of these sources:
    - `piecePack.notes`
    - inline `MusicXML`
    - inline `MIDI` when `pretty_midi` is installed
+   - imported PDF score jobs via the Node gateway
 5. Convert the symbolic score into note events with expected onset/offset times
-6. Build observed note segments from the performance pitch/onset tracks
-7. Extract stable-segment pitch evidence and detect glide-like / vibrato-like note behavior
-8. Align performance to score with `DTW`
-9. Generate note-level and measure-level pitch/rhythm feedback with adaptive tolerance
-10. Generate `summaryText`, `teacherComment`, and `practiceTargets` for the UI
+6. Optionally run `erhu-focus` separation to enhance the erhu line against piano accompaniment
+7. Build observed note segments from the performance pitch/onset tracks
+8. Extract stable-segment pitch evidence and detect glide-like / vibrato-like note behavior
+9. Align performance to score with `DTW`
+10. Generate note-level and measure-level pitch/rhythm feedback with adaptive tolerance
+11. Generate `summaryText`, `teacherComment`, and `practiceTargets` for the UI
 
 ## Endpoints
 
 - `GET /health`
 - `GET /config`
 - `POST /analyze`
+- `POST /score/import-pdf`
+- `POST /audio/separate-erhu`
 
 ## Symbolic score input
 
@@ -68,6 +72,8 @@ uvicorn app:app --host 127.0.0.1 --port 8000
 ## Research notes
 
 - `torchcrepe` is the current deep-learning core for pitch estimation.
+- `madmom` is now the preferred deep-learning rhythm front end when it is installable in the local Python environment; `librosa` remains the fallback.
 - `DTW` is now the main score-performance alignment method.
 - The analyzer now uses stable-segment pitch scoring, glide tolerance, vibrato tolerance, and low-confidence down-weighting for erhu-specific adaptation.
+- `erhu-focus` is now the diagnosis-priority erhu/piano separation mode and can emit raw / enhanced / accompaniment residual preview audio files under `/data/generated-audio`.
 - Attention-based models are not part of the v1 pipeline; they are reserved for a later phase where you train a dedicated error-diagnosis model with real teacher-labeled data.

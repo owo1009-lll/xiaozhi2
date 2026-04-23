@@ -52,6 +52,16 @@ VALIDATION_NUMERIC_COLUMNS = [
     "measureRecall",
     "measureF1",
 ]
+ADJUDICATION_NUMERIC_COLUMNS = [
+    "noteMatchedCount",
+    "notePrecision",
+    "noteRecall",
+    "noteF1",
+    "measureMatchedCount",
+    "measurePrecision",
+    "measureRecall",
+    "measureF1",
+]
 
 PREPOST_TIME_ORDER = ["pretest", "posttest"]
 PRACTICE_PATH_ORDER = ["pitch-first", "rhythm-first", "review-first"]
@@ -84,6 +94,12 @@ def safe_read_optional_csv(path: Path | None, columns: list[str] | None = None) 
     if path is None or not path.exists():
         return pd.DataFrame(columns=columns or [])
     return pd.read_csv(path)
+
+
+def safe_read_optional_json(path: Path | None) -> dict:
+    if path is None or not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def ensure_columns(frame: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
@@ -759,6 +775,100 @@ def build_inter_rater_adjudication_queue(inter_rater_pairs: pd.DataFrame) -> pd.
     return queue.sort_values(["sessionStage", "pieceId", "sectionId", "analysisId"])
 
 
+def prepare_adjudications(adjudications: pd.DataFrame) -> pd.DataFrame:
+    adjudications = ensure_columns(
+        adjudications,
+        [
+            "adjudicationId",
+            "analysisId",
+            "participantId",
+            "groupId",
+            "sessionStage",
+            "pieceId",
+            "sectionId",
+            "adjudicatorId",
+            "sourceRaterIds",
+            "triggerReasons",
+            "finalPrimaryPath",
+            "systemRecommendedPath",
+            "pathAgreement",
+            "resolvedAt",
+        ],
+    )
+    adjudications = ensure_numeric(adjudications, ADJUDICATION_NUMERIC_COLUMNS)
+    adjudications["pathAgreement"] = coerce_bool_series(adjudications["pathAgreement"])
+    adjudications["finalPrimaryPath"] = adjudications["finalPrimaryPath"].fillna("review-first")
+    adjudications["systemRecommendedPath"] = adjudications["systemRecommendedPath"].fillna("review-first")
+    adjudications["scoreUnit"] = adjudications["pieceId"].fillna("").astype(str) + "/" + adjudications["sectionId"].fillna("").astype(str)
+    return adjudications
+
+
+def build_adjudication_summary(adjudications: pd.DataFrame) -> pd.DataFrame:
+    adjudications = prepare_adjudications(adjudications)
+    if adjudications.empty:
+        return pd.DataFrame(
+            [
+                {
+                    "decisionCount": 0,
+                    "participantCount": 0,
+                    "analysisCount": 0,
+                    "pathAgreementRate": float("nan"),
+                    "averageNoteF1": float("nan"),
+                    "averageMeasureF1": float("nan"),
+                }
+            ]
+        )
+
+    path_agreement_numeric = adjudications["pathAgreement"].map(lambda value: float(bool(value)) if pd.notna(value) else float("nan"))
+    return pd.DataFrame(
+        [
+            {
+                "decisionCount": len(adjudications),
+                "participantCount": adjudications["participantId"].dropna().nunique(),
+                "analysisCount": adjudications["analysisId"].dropna().nunique(),
+                "pathAgreementRate": path_agreement_numeric.mean(),
+                "averageNoteF1": adjudications["noteF1"].mean(),
+                "averageMeasureF1": adjudications["measureF1"].mean(),
+            }
+        ]
+    )
+
+
+def build_adjudication_group_summary(adjudications: pd.DataFrame) -> pd.DataFrame:
+    adjudications = prepare_adjudications(adjudications)
+    if adjudications.empty:
+        return pd.DataFrame(
+            columns=["groupId", "decisionCount", "participantCount", "analysisCount", "pathAgreementRate", "averageNoteF1", "averageMeasureF1"]
+        )
+
+    grouped = adjudications.groupby("groupId", dropna=False).agg(
+        decisionCount=("adjudicationId", "count"),
+        participantCount=("participantId", "nunique"),
+        analysisCount=("analysisId", "nunique"),
+        averageNoteF1=("noteF1", "mean"),
+        averageMeasureF1=("measureF1", "mean"),
+    )
+    path_agreement = (
+        adjudications.assign(pathAgreementNumeric=adjudications["pathAgreement"].map(lambda value: float(bool(value)) if pd.notna(value) else float("nan")))
+        .groupby("groupId", dropna=False)["pathAgreementNumeric"]
+        .mean()
+        .rename("pathAgreementRate")
+    )
+    return grouped.join(path_agreement, how="left").reset_index().sort_values("groupId")
+
+
+def build_adjudication_system_alignment(adjudications: pd.DataFrame) -> pd.DataFrame:
+    adjudications = prepare_adjudications(adjudications)
+    if adjudications.empty:
+        return pd.DataFrame(columns=["finalPrimaryPath", "systemRecommendedPath", "decisionCount"])
+    return (
+        adjudications.groupby(["finalPrimaryPath", "systemRecommendedPath"], dropna=False)
+        .size()
+        .reset_index(name="decisionCount")
+        .sort_values(["finalPrimaryPath", "systemRecommendedPath"])
+    )
+
+
 def build_prepost_long_table(participants: pd.DataFrame) -> pd.DataFrame:
     participants = ensure_columns(participants, ["participantId", "groupId", "pretestPitch", "posttestPitch", "pretestRhythm", "posttestRhythm"])
     rows: list[dict[str, object]] = []
@@ -796,7 +906,7 @@ def build_prepost_summary(long_table: pd.DataFrame) -> pd.DataFrame:
     long_table = ensure_columns(long_table, ["metric", "groupId", "time", "score"])
     if long_table.empty:
         return pd.DataFrame(columns=["metric", "groupId", "time", "sampleSize", "meanScore", "sd", "sem"])
-    grouped = long_table.groupby(["metric", "groupId", "time"], dropna=False).agg(
+    grouped = long_table.groupby(["metric", "groupId", "time"], dropna=False, observed=False).agg(
         sampleSize=("score", "count"),
         meanScore=("score", "mean"),
         sd=("score", "std"),
@@ -1015,6 +1125,33 @@ def build_inter_rater_sentence(inter_rater_summary: pd.DataFrame) -> str:
     )
 
 
+def build_adjudication_sentence(adjudication_summary: pd.DataFrame, adjudication_group_summary: pd.DataFrame) -> str:
+    if adjudication_summary.empty:
+        return "最终裁决结果尚未生成。"
+    row = adjudication_summary.iloc[0].to_dict()
+    decision_count = int(row.get("decisionCount", 0) or 0)
+    if decision_count == 0:
+        return "当前尚无最终裁决记录。"
+
+    sentence = (
+        f"当前共有 {decision_count} 条最终裁决记录，覆盖 {int(row.get('analysisCount', 0) or 0)} 条分析与 "
+        f"{int(row.get('participantCount', 0) or 0)} 名受试者；"
+        f"裁决后系统路径一致率为 {format_number((row.get('pathAgreementRate') or 0) * 100, 1)}%，"
+        f"音符级 F1 为 {format_number(row.get('averageNoteF1'), 3)}，"
+        f"小节级 F1 为 {format_number(row.get('averageMeasureF1'), 3)}。"
+    )
+
+    if not adjudication_group_summary.empty:
+        exp = find_row(adjudication_group_summary, groupId="experimental")
+        ctl = find_row(adjudication_group_summary, groupId="control")
+        if exp and ctl:
+            sentence += (
+                f"其中实验组路径一致率为 {format_number((exp.get('pathAgreementRate') or 0) * 100, 1)}%，"
+                f"对照组为 {format_number((ctl.get('pathAgreementRate') or 0) * 100, 1)}%。"
+            )
+    return sentence
+
+
 def build_experience_sentence(group_table: pd.DataFrame, ttest_table: pd.DataFrame) -> str:
     exp_group = find_row(group_table, groupId="experimental") or {}
     ctl_group = find_row(group_table, groupId="control") or {}
@@ -1057,6 +1194,8 @@ def build_paper_sections(
     validation_summary: pd.DataFrame,
     validation_group_summary: pd.DataFrame,
     inter_rater_summary: pd.DataFrame,
+    adjudication_summary: pd.DataFrame,
+    adjudication_group_summary: pd.DataFrame,
 ) -> tuple[str, list[tuple[str, list[str]]], str]:
     participants = ensure_columns(participants, ["participantId", "groupId", "analysisCount", "weeklySessionCount"])
     participant_count = len(participants)
@@ -1080,6 +1219,7 @@ def build_paper_sections(
         build_validation_sentence(validation_summary, validation_group_summary),
         build_main_findings(ttest_table, ancova_table),
         build_inter_rater_sentence(inter_rater_summary),
+        build_adjudication_sentence(adjudication_summary, adjudication_group_summary),
         "研究结论部分建议结合定量结果与访谈资料，讨论 AI 反馈在器乐练习中的教学价值、接受度与适用边界。",
     ]
 
@@ -1127,6 +1267,7 @@ def build_paper_sections(
         build_expert_sentence("rhythm", expert_table),
         build_validation_sentence(validation_summary, validation_group_summary),
         build_inter_rater_sentence(inter_rater_summary),
+        build_adjudication_sentence(adjudication_summary, adjudication_group_summary),
         build_usage_sentence("pitch", usage_corr_table),
         build_usage_sentence("rhythm", usage_corr_table),
         build_experience_sentence(group_table, ttest_table),
@@ -1173,6 +1314,8 @@ def write_paper_draft(
     validation_summary: pd.DataFrame,
     validation_group_summary: pd.DataFrame,
     inter_rater_summary: pd.DataFrame,
+    adjudication_summary: pd.DataFrame,
+    adjudication_group_summary: pd.DataFrame,
 ) -> None:
     title, sections, results_text = build_paper_sections(
         participants,
@@ -1185,6 +1328,8 @@ def write_paper_draft(
         validation_summary,
         validation_group_summary,
         inter_rater_summary,
+        adjudication_summary,
+        adjudication_group_summary,
     )
 
     markdown_lines = [f"# {title}", ""]
@@ -1227,6 +1372,10 @@ def write_summary_report(
     inter_rater_by_stage: pd.DataFrame,
     inter_rater_by_piece: pd.DataFrame,
     adjudication_queue: pd.DataFrame,
+    adjudication_summary: pd.DataFrame,
+    adjudication_group_summary: pd.DataFrame,
+    piece_pass_summary: pd.DataFrame,
+    piece_pass_sections: pd.DataFrame,
 ) -> None:
     participants = ensure_columns(participants, ["groupId"])
     participant_count = len(participants)
@@ -1371,12 +1520,65 @@ def write_summary_report(
                 f"reasons={row['adjudicationReason']}"
             )
 
+    lines.extend(["", "## Adjudication Outcomes"])
+    if adjudication_summary.empty or not int(adjudication_summary.iloc[0].get("decisionCount", 0) or 0):
+        lines.append("- No final adjudication records available yet.")
+    else:
+        row = adjudication_summary.iloc[0]
+        lines.extend(
+            [
+                f"- Decisions: {int(row['decisionCount'])}",
+                f"- Participants covered: {int(row['participantCount'])}",
+                f"- Analyses covered: {int(row['analysisCount'])}",
+                f"- Path agreement with system: {round_value((row['pathAgreementRate'] or 0) * 100, 2)}%",
+                f"- Mean note F1: {round_value(row['averageNoteF1'], 3)}",
+                f"- Mean measure F1: {round_value(row['averageMeasureF1'], 3)}",
+            ]
+        )
+        for _, group_row in adjudication_group_summary.iterrows():
+            lines.append(
+                f"- {group_row['groupId']}: decisions={int(group_row['decisionCount'])}, "
+                f"path_agreement={round_value((group_row['pathAgreementRate'] or 0) * 100, 2)}%, "
+                f"note_f1={round_value(group_row['averageNoteF1'], 3)}, "
+                f"measure_f1={round_value(group_row['averageMeasureF1'], 3)}"
+            )
+
     lines.extend(["", "## Usage Correlations"])
     for _, row in usage_corr_table.iterrows():
         lines.append(
             f"- analysisCount vs {row['outcome']}: "
             f"n={int(row['sampleSize'])}, r={round_value(row['pearsonR'], 3)}, p={round_value(row['pValue'], 4)}"
         )
+
+    lines.extend(["", "## Whole-piece Pass"])
+    if piece_pass_summary.empty or piece_pass_summary.iloc[0].isna().all():
+        lines.append("- No whole-piece pass summary available yet.")
+    else:
+        row = piece_pass_summary.iloc[0]
+        lines.extend(
+            [
+                f"- Piece: {row.get('pieceTitle')} ({row.get('pieceId')})",
+                f"- Structured coverage: {round_value((row.get('sectionCoverageRatio') or 0) * 100, 2)}% "
+                f"({int(row.get('matchedSectionCount') or 0)}/{int(row.get('structuredSectionCount') or 0)} sections)",
+                f"- Note coverage: {round_value((row.get('noteCoverageRatio') or 0) * 100, 2)}% "
+                f"({int(row.get('matchedNoteCount') or 0)}/{int(row.get('structuredNoteCount') or 0)} notes)",
+                f"- Weighted pitch / rhythm / combined: {round_value(row.get('weightedPitchScore'), 2)} / "
+                f"{round_value(row.get('weightedRhythmScore'), 2)} / {round_value(row.get('weightedCombinedScore'), 2)}",
+                f"- Dominant practice path: {row.get('dominantPracticePath')}",
+            ]
+        )
+        if not piece_pass_sections.empty:
+            weakest = (
+                ensure_columns(piece_pass_sections.copy(), ["sectionTitle", "sectionId", "combinedScore", "recommendedPracticePath"])
+                .sort_values("combinedScore", ascending=True)
+                .head(5)
+            )
+            for _, weak_row in weakest.iterrows():
+                lines.append(
+                    f"- Weak section: {weak_row['sectionTitle']} ({weak_row['sectionId']}), "
+                    f"score={round_value(weak_row['combinedScore'], 2)}, "
+                    f"path={weak_row['recommendedPracticePath']}"
+                )
 
     (output_dir / "report.md").write_text("\n".join(lines), encoding="utf-8")
 
@@ -1398,6 +1600,12 @@ def write_summary_json(
     inter_rater_by_stage: pd.DataFrame,
     inter_rater_by_piece: pd.DataFrame,
     adjudication_queue: pd.DataFrame,
+    adjudication_summary: pd.DataFrame,
+    adjudication_group_summary: pd.DataFrame,
+    adjudication_system_alignment: pd.DataFrame,
+    adjudications: pd.DataFrame,
+    piece_pass_summary: pd.DataFrame,
+    piece_pass_sections: pd.DataFrame,
 ) -> None:
     payload = {
         "groupSummary": group_table.to_dict(orient="records"),
@@ -1415,6 +1623,12 @@ def write_summary_json(
         "interRaterByStage": inter_rater_by_stage.to_dict(orient="records"),
         "interRaterByPiece": inter_rater_by_piece.to_dict(orient="records"),
         "adjudicationQueue": adjudication_queue.to_dict(orient="records"),
+        "adjudicationSummary": adjudication_summary.to_dict(orient="records"),
+        "adjudicationByGroup": adjudication_group_summary.to_dict(orient="records"),
+        "adjudicationSystemAlignment": adjudication_system_alignment.to_dict(orient="records"),
+        "adjudications": adjudications.to_dict(orient="records"),
+        "piecePassSummary": piece_pass_summary.to_dict(orient="records"),
+        "piecePassSections": piece_pass_sections.to_dict(orient="records"),
     }
     (output_dir / "summary.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -1598,6 +1812,112 @@ def plot_inter_rater_metrics(inter_rater_summary: pd.DataFrame, output_dir: Path
     save_figure(fig, output_dir, "figure_inter_rater_metrics")
 
 
+def plot_adjudication_status(adjudication_summary: pd.DataFrame, output_dir: Path) -> None:
+    adjudication_summary = ensure_columns(adjudication_summary, ["pathAgreementRate", "averageNoteF1", "averageMeasureF1"])
+    if adjudication_summary.empty or not adjudication_summary.iloc[0].notna().any():
+        save_figure(placeholder_figure("Adjudication Outcome Metrics"), output_dir, "figure_adjudication_status")
+        return
+
+    row = adjudication_summary.iloc[0]
+    plot_frame = pd.DataFrame(
+        {
+            "metric": ["pathAgreementRate", "averageNoteF1", "averageMeasureF1"],
+            "value": [row["pathAgreementRate"], row["averageNoteF1"], row["averageMeasureF1"]],
+        }
+    ).dropna()
+    if plot_frame.empty:
+        save_figure(placeholder_figure("Adjudication Outcome Metrics"), output_dir, "figure_adjudication_status")
+        return
+
+    fig, ax = plt.subplots(figsize=(7.5, 4.8))
+    sns.barplot(data=plot_frame, x="metric", y="value", ax=ax, color="#0f766e")
+    ax.set_title("Adjudication Outcome Metrics")
+    ax.set_xlabel("")
+    ax.set_ylabel("Coefficient")
+    ax.set_ylim(0, 1.05)
+    save_figure(fig, output_dir, "figure_adjudication_status")
+
+
+def build_piece_pass_summary_table(piece_pass_payload: dict) -> pd.DataFrame:
+    summary = piece_pass_payload.get("summary") if isinstance(piece_pass_payload, dict) else None
+    if not isinstance(summary, dict) or not summary:
+        return pd.DataFrame(
+            [
+                {
+                    "pieceId": pd.NA,
+                    "pieceTitle": pd.NA,
+                    "structuredSectionCount": pd.NA,
+                    "structuredNoteCount": pd.NA,
+                    "matchedSectionCount": pd.NA,
+                    "matchedNoteCount": pd.NA,
+                    "sectionCoverageRatio": pd.NA,
+                    "noteCoverageRatio": pd.NA,
+                    "weightedPitchScore": pd.NA,
+                    "weightedRhythmScore": pd.NA,
+                    "weightedCombinedScore": pd.NA,
+                    "weightedConfidence": pd.NA,
+                    "dominantPracticePath": pd.NA,
+                    "summaryText": pd.NA,
+                }
+            ]
+        )
+    return pd.DataFrame([summary])
+
+
+def build_piece_pass_sections_table(piece_pass_payload: dict, piece_pass_sections: pd.DataFrame) -> pd.DataFrame:
+    if not piece_pass_sections.empty:
+        return piece_pass_sections.copy()
+    section_rows = piece_pass_payload.get("sectionPasses") if isinstance(piece_pass_payload, dict) else None
+    if isinstance(section_rows, list) and section_rows:
+        return pd.DataFrame(section_rows)
+    return pd.DataFrame(
+        columns=[
+            "pieceId",
+            "pieceTitle",
+            "sequenceIndex",
+            "sectionId",
+            "sectionTitle",
+            "startSeconds",
+            "endSeconds",
+            "durationSeconds",
+            "noteCount",
+            "measureCount",
+            "rawScanScore",
+            "priorAdjustedScore",
+            "nearestHintDistance",
+            "overallPitchScore",
+            "overallRhythmScore",
+            "confidence",
+            "combinedScore",
+            "recommendedPracticePath",
+            "measureFindingCount",
+            "noteFindingCount",
+            "summaryText",
+        ]
+    )
+
+
+def plot_piece_pass_scores(piece_pass_sections: pd.DataFrame, output_dir: Path) -> None:
+    piece_pass_sections = ensure_columns(
+        piece_pass_sections,
+        ["sequenceIndex", "combinedScore", "recommendedPracticePath", "sectionTitle"],
+    ).copy()
+    piece_pass_sections["sequenceIndex"] = pd.to_numeric(piece_pass_sections["sequenceIndex"], errors="coerce")
+    piece_pass_sections["combinedScore"] = pd.to_numeric(piece_pass_sections["combinedScore"], errors="coerce")
+    plot_frame = piece_pass_sections.dropna(subset=["sequenceIndex", "combinedScore"])
+    if plot_frame.empty:
+        save_figure(placeholder_figure("Whole-piece Section Scores"), output_dir, "figure_piece_pass_section_scores")
+        return
+
+    fig, ax = plt.subplots(figsize=(10, 4.8))
+    sns.lineplot(data=plot_frame, x="sequenceIndex", y="combinedScore", marker="o", hue="recommendedPracticePath", ax=ax)
+    ax.set_title("Whole-piece Section Scores")
+    ax.set_xlabel("Sequence index")
+    ax.set_ylabel("Combined score")
+    ax.set_ylim(0, max(100, float(plot_frame["combinedScore"].max()) + 5))
+    save_figure(fig, output_dir, "figure_piece_pass_section_scores")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate SSCI-ready tables and figures from exported study CSV files.")
     parser.add_argument("--participants", required=True, type=Path)
@@ -1605,6 +1925,9 @@ def main() -> None:
     parser.add_argument("--ratings", required=True, type=Path)
     parser.add_argument("--analyses", required=True, type=Path)
     parser.add_argument("--validations", required=False, type=Path, default=None)
+    parser.add_argument("--adjudications", required=False, type=Path, default=None)
+    parser.add_argument("--piece-pass-summary", required=False, type=Path, default=None)
+    parser.add_argument("--piece-pass-sections", required=False, type=Path, default=None)
     parser.add_argument("--output-dir", default=Path("research-analysis/output"), type=Path)
     args = parser.parse_args()
 
@@ -1644,6 +1967,42 @@ def main() -> None:
             ],
         )
     )
+    adjudications = prepare_adjudications(
+        safe_read_optional_csv(
+            args.adjudications,
+            columns=[
+                "adjudicationId",
+                "analysisId",
+                "participantId",
+                "groupId",
+                "sessionStage",
+                "pieceId",
+                "sectionId",
+                "adjudicatorId",
+                "sourceRaterIds",
+                "triggerReasons",
+                "finalPrimaryPath",
+                "systemRecommendedPath",
+                "pathAgreement",
+                "noteMatchedCount",
+                "notePrecision",
+                "noteRecall",
+                "noteF1",
+                "measureMatchedCount",
+                "measurePrecision",
+                "measureRecall",
+                "measureF1",
+                "finalIssueNoteIds",
+                "finalIssueMeasureIndexes",
+                "comments",
+                "resolvedAt",
+            ],
+        )
+    )
+    piece_pass_payload = safe_read_optional_json(args.piece_pass_summary)
+    piece_pass_sections = safe_read_optional_csv(args.piece_pass_sections)
+    piece_pass_summary = build_piece_pass_summary_table(piece_pass_payload)
+    piece_pass_sections = build_piece_pass_sections_table(piece_pass_payload, piece_pass_sections)
 
     group_table = group_summary(participants)
     ttest_table = ttest_summary(participants)
@@ -1662,6 +2021,9 @@ def main() -> None:
     inter_rater_by_stage = build_inter_rater_breakdown(inter_rater_pairs, ["sessionStage"])
     inter_rater_by_piece = build_inter_rater_breakdown(inter_rater_pairs, ["scoreUnit"])
     adjudication_queue = build_inter_rater_adjudication_queue(inter_rater_pairs)
+    adjudication_summary = build_adjudication_summary(adjudications)
+    adjudication_group_summary = build_adjudication_group_summary(adjudications)
+    adjudication_system_alignment = build_adjudication_system_alignment(adjudications)
 
     save_table(participants, output_dir, "table_participant_overview")
     save_table(group_table, output_dir, "table_group_summary")
@@ -1684,6 +2046,12 @@ def main() -> None:
     save_table(inter_rater_by_stage, output_dir, "table_inter_rater_by_stage")
     save_table(inter_rater_by_piece, output_dir, "table_inter_rater_by_piece")
     save_table(adjudication_queue, output_dir, "table_inter_rater_adjudication_queue")
+    save_table(adjudications.sort_values(["participantId", "resolvedAt"]), output_dir, "table_adjudication_decisions")
+    save_table(adjudication_summary, output_dir, "table_adjudication_summary")
+    save_table(adjudication_group_summary, output_dir, "table_adjudication_by_group")
+    save_table(adjudication_system_alignment, output_dir, "table_adjudication_system_alignment")
+    save_table(piece_pass_summary, output_dir, "table_piece_pass_summary")
+    save_table(piece_pass_sections, output_dir, "table_piece_pass_sections")
 
     plot_gain_by_group(participants, output_dir)
     plot_questionnaire_bars(questionnaires, output_dir)
@@ -1693,6 +2061,8 @@ def main() -> None:
     plot_validation_metrics(validation_group_summary, output_dir)
     plot_validation_path_heatmap(validation_path_confusion, output_dir)
     plot_inter_rater_metrics(inter_rater_summary, output_dir)
+    plot_adjudication_status(adjudication_summary, output_dir)
+    plot_piece_pass_scores(piece_pass_sections, output_dir)
     write_summary_report(
         output_dir,
         participants,
@@ -1709,6 +2079,10 @@ def main() -> None:
         inter_rater_by_stage,
         inter_rater_by_piece,
         adjudication_queue,
+        adjudication_summary,
+        adjudication_group_summary,
+        piece_pass_summary,
+        piece_pass_sections,
     )
     write_summary_json(
         output_dir,
@@ -1727,6 +2101,12 @@ def main() -> None:
         inter_rater_by_stage,
         inter_rater_by_piece,
         adjudication_queue,
+        adjudication_summary,
+        adjudication_group_summary,
+        adjudication_system_alignment,
+        adjudications,
+        piece_pass_summary,
+        piece_pass_sections,
     )
     write_paper_draft(
         output_dir,
@@ -1740,6 +2120,8 @@ def main() -> None:
         validation_summary,
         validation_group_summary,
         inter_rater_summary,
+        adjudication_summary,
+        adjudication_group_summary,
     )
 
     summary_path = output_dir / "README.txt"
@@ -1768,6 +2150,12 @@ def main() -> None:
                 "- table_inter_rater_by_stage.csv",
                 "- table_inter_rater_by_piece.csv",
                 "- table_inter_rater_adjudication_queue.csv",
+                "- table_adjudication_decisions.csv",
+                "- table_adjudication_summary.csv",
+                "- table_adjudication_by_group.csv",
+                "- table_adjudication_system_alignment.csv",
+                "- table_piece_pass_summary.csv",
+                "- table_piece_pass_sections.csv",
                 "- figure_gain_by_group.png",
                 "- figure_questionnaire_by_group.png",
                 "- figure_system_vs_expert.png",
@@ -1776,6 +2164,8 @@ def main() -> None:
                 "- figure_validation_by_group.png",
                 "- figure_validation_path_heatmap.png",
                 "- figure_inter_rater_metrics.png",
+                "- figure_adjudication_status.png",
+                "- figure_piece_pass_section_scores.png",
                 "- report.md",
                 "- summary.json",
                 "- paper_draft_zh.md",

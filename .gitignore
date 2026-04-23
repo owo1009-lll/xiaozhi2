@@ -3,11 +3,14 @@ dist/
 .env
 .DS_Store
 Thumbs.db
-data/*.json
+data/
 python-service/.venv/
+python-service/.venv-local/
 python-service/__pycache__/
 python-service/*.pyc
 python-service/.env
 research-analysis/output/
 research-analysis/__pycache__/
 exports/
+scripts/__pycache__/
+hs_err_pid*.log
