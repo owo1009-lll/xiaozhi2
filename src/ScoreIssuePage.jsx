@@ -148,7 +148,10 @@ export default function ScoreIssuePage() {
   const [currentPage, setCurrentPage] = useState(extractSectionPageNumber(stored?.section || {}));
   const [selectedMeasureIndex, setSelectedMeasureIndex] = useState(null);
   const [pageImageFailed, setPageImageFailed] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const canvasRef = useRef(null);
+  const viewportRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -212,6 +215,7 @@ export default function ScoreIssuePage() {
         const context = canvas.getContext("2d");
         canvas.width = viewport.width;
         canvas.height = viewport.height;
+        setStageSize({ width: viewport.width, height: viewport.height });
         renderTask = page.render({ canvasContext: context, viewport });
         await renderTask.promise;
       } catch {
@@ -270,7 +274,6 @@ export default function ScoreIssuePage() {
               top: Math.min(Math.max(exact.normalizedY * 100, 0), 100),
               exact: true,
               pageNumber: exact.pageNumber,
-              staffIndex: exact.staffIndex,
             };
           }
           const { measureIndex, noteIndex } = getApproximateNotePosition(item?.noteId, item?.measureIndex, index + 1);
@@ -285,7 +288,6 @@ export default function ScoreIssuePage() {
             top: 18 + bandIndex * 18,
             exact: false,
             pageNumber: measurePageMap.get(measureIndex) || baseSectionPage,
-            staffIndex: dominantStaffIndex,
           };
         })
         .filter(Boolean),
@@ -340,6 +342,42 @@ export default function ScoreIssuePage() {
       });
   }, [baseSectionPage, currentPage, dominantStaffIndex, hasExactNoteOverlay, issueMeasureIndexes, measureCount, measurePageMap, section]);
 
+  const effectiveWidth = stageSize.width > 0 ? stageSize.width * zoom : 0;
+  const effectiveHeight = stageSize.height > 0 ? stageSize.height * zoom : 0;
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || !effectiveWidth || !effectiveHeight) return;
+    const focusNote =
+      noteOverlayItems.find((item) => item.pageNumber === currentPage && item.measureIndex === activeMeasureIndex && item.exact)
+      || noteOverlayItems.find((item) => item.pageNumber === currentPage && item.measureIndex === activeMeasureIndex)
+      || null;
+    const focusMeasure = overlayItems.find((item) => item.measureIndex === activeMeasureIndex) || null;
+    const focusLeftPercent = focusNote ? focusNote.left : focusMeasure ? focusMeasure.left + focusMeasure.width / 2 : null;
+    const focusTopPercent = focusNote ? focusNote.top : focusMeasure ? focusMeasure.top + focusMeasure.height / 2 : null;
+    if (focusLeftPercent == null || focusTopPercent == null) return;
+    const targetLeft = (focusLeftPercent / 100) * effectiveWidth - viewport.clientWidth / 2;
+    const targetTop = (focusTopPercent / 100) * effectiveHeight - viewport.clientHeight / 2;
+    viewport.scrollTo({
+      left: Math.max(0, targetLeft),
+      top: Math.max(0, targetTop),
+      behavior: "smooth",
+    });
+  }, [activeMeasureIndex, currentPage, effectiveHeight, effectiveWidth, noteOverlayItems, overlayItems, zoom]);
+
+  function handleMeasureJump(measureIndex) {
+    setCurrentPage(measurePageMap.get(measureIndex) || baseSectionPage);
+    setSelectedMeasureIndex(measureIndex);
+  }
+
+  function handleImageLoad(event) {
+    const image = event.currentTarget;
+    setStageSize({
+      width: image.naturalWidth || image.width || 0,
+      height: image.naturalHeight || image.height || 0,
+    });
+  }
+
   if (!analysis || !stored) {
     return (
       <div className="app-shell">
@@ -357,7 +395,7 @@ export default function ScoreIssuePage() {
         <div>
           <span className="eyebrow">ISSUE SCORE VIEW</span>
           <h1>问题谱面页</h1>
-          <p className="supporting-copy">这里只保留原音回放、谱面高亮，以及音准问题和节奏问题。</p>
+          <p className="supporting-copy">这里只保留原音、总体反馈和问题谱面高亮。</p>
         </div>
         <div className="score-issue-actions">
           <button type="button" className="secondary-button" onClick={() => window.close()}>
@@ -379,7 +417,7 @@ export default function ScoreIssuePage() {
             <span className="section-step">A</span>
             <div>
               <h2>本轮结果</h2>
-              <p>主页面只保留总分和总体反馈，所有问题都放在谱面页统一查看。</p>
+              <p>主结果页只保留总分和总体反馈，详细问题统一放到谱面页查看。</p>
             </div>
           </div>
 
@@ -423,7 +461,7 @@ export default function ScoreIssuePage() {
             <span className="section-step">B</span>
             <div>
               <h2>问题谱面高亮</h2>
-              <p>问题只在这里显示，并优先按当前二胡声部的音符坐标高亮。</p>
+              <p>支持缩放、翻页，并会自动滚到当前问题音附近。</p>
             </div>
           </div>
 
@@ -440,10 +478,7 @@ export default function ScoreIssuePage() {
                   type="button"
                   key={`measure-chip-${measureIndex}`}
                   className={`issue-chip${activeMeasureIndex === measureIndex ? " is-active" : ""}`}
-                  onClick={() => {
-                    setCurrentPage(measurePageMap.get(measureIndex) || baseSectionPage);
-                    setSelectedMeasureIndex(measureIndex);
-                  }}
+                  onClick={() => handleMeasureJump(measureIndex)}
                 >
                   {formatMeasureLabel(measureIndex)}
                 </button>
@@ -466,38 +501,75 @@ export default function ScoreIssuePage() {
             >
               下一页
             </button>
+            <div className="score-zoom-group">
+              <button type="button" className="secondary-button" onClick={() => setZoom((value) => Math.max(0.8, Number((value - 0.1).toFixed(2))))}>
+                缩小
+              </button>
+              <span className="score-zoom-label">{Math.round(zoom * 100)}%</span>
+              <button type="button" className="secondary-button" onClick={() => setZoom((value) => Math.min(2.2, Number((value + 0.1).toFixed(2))))}>
+                放大
+              </button>
+              <button type="button" className="secondary-button" onClick={() => setZoom(1)}>
+                100%
+              </button>
+            </div>
           </div>
 
-          <div className="score-page-canvas-wrap">
-            {usePageImage ? (
-              <img className="score-page-image" src={pageImagePath} alt={`score-page-${currentPage}`} onError={() => setPageImageFailed(true)} />
-            ) : (
-              <canvas ref={canvasRef} className="pdf-preview-canvas" />
-            )}
-            <div className="score-measure-overlay" aria-hidden="true">
-              {overlayItems.map((item) => (
-                <div
-                  key={`measure-${item.measureIndex}`}
-                  className={`score-measure-highlight${activeMeasureIndex === item.measureIndex ? " is-active" : ""}`}
+          <div ref={viewportRef} className="score-page-viewport">
+            <div
+              className="score-page-stage"
+              style={{
+                width: effectiveWidth ? `${effectiveWidth}px` : undefined,
+                height: effectiveHeight ? `${effectiveHeight}px` : undefined,
+              }}
+            >
+              {usePageImage ? (
+                <img
+                  className="score-page-image"
+                  src={pageImagePath}
+                  alt={`score-page-${currentPage}`}
+                  onError={() => setPageImageFailed(true)}
+                  onLoad={handleImageLoad}
                   style={{
-                    left: `${item.left}%`,
-                    top: `${item.top}%`,
-                    width: `${item.width}%`,
-                    height: `${item.height}%`,
+                    width: effectiveWidth ? `${effectiveWidth}px` : undefined,
+                    height: effectiveHeight ? `${effectiveHeight}px` : undefined,
                   }}
-                >
-                  <span>{item.measureIndex}</span>
-                </div>
-              ))}
-              {noteOverlayItems
-                .filter((item) => item.pageNumber === currentPage && (activeMeasureIndex == null || item.measureIndex === activeMeasureIndex))
-                .map((item) => (
+                />
+              ) : (
+                <canvas
+                  ref={canvasRef}
+                  className="pdf-preview-canvas"
+                  style={{
+                    width: effectiveWidth ? `${effectiveWidth}px` : undefined,
+                    height: effectiveHeight ? `${effectiveHeight}px` : undefined,
+                  }}
+                />
+              )}
+              <div className="score-measure-overlay" aria-hidden="true">
+                {overlayItems.map((item) => (
                   <div
-                    key={item.key}
-                    className={`score-note-highlight${item.exact ? " is-exact" : ""}`}
-                    style={{ left: `${item.left}%`, top: `${item.top}%` }}
-                  />
+                    key={`measure-${item.measureIndex}`}
+                    className={`score-measure-highlight${activeMeasureIndex === item.measureIndex ? " is-active" : ""}`}
+                    style={{
+                      left: `${item.left}%`,
+                      top: `${item.top}%`,
+                      width: `${item.width}%`,
+                      height: `${item.height}%`,
+                    }}
+                  >
+                    <span>{item.measureIndex}</span>
+                  </div>
                 ))}
+                {noteOverlayItems
+                  .filter((item) => item.pageNumber === currentPage && (activeMeasureIndex == null || item.measureIndex === activeMeasureIndex))
+                  .map((item) => (
+                    <div
+                      key={item.key}
+                      className={`score-note-highlight${item.exact ? " is-exact" : ""}`}
+                      style={{ left: `${item.left}%`, top: `${item.top}%` }}
+                    />
+                  ))}
+              </div>
             </div>
           </div>
         </section>

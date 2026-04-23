@@ -811,17 +811,41 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  align-items: center;
 }
 
-.score-page-canvas-wrap {
+.score-zoom-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.score-zoom-label {
+  min-width: 56px;
+  text-align: center;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.score-page-viewport {
   position: relative;
-  overflow: hidden;
+  overflow: auto;
   border-radius: 18px;
+  border: 1px solid rgba(17, 51, 45, 0.08);
+  background: rgba(255, 255, 255, 0.75);
+  max-height: 72vh;
+  padding: 12px;
+}
+
+.score-page-stage {
+  position: relative;
 }
 
 .score-page-image {
   display: block;
-  width: 100%;
+  max-width: none;
   height: auto;
 }
 
@@ -914,5 +938,9 @@ button {
   .score-issue-layout {
     grid-template-columns: 1fr;
     flex-direction: column;
+  }
+
+  .score-zoom-group {
+    margin-left: 0;
   }
 }
