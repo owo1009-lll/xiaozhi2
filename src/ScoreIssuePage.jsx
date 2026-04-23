@@ -24,7 +24,8 @@ function getIssueSessionId() {
 function readStoredSession(issueSessionId) {
   if (!issueSessionId || typeof window === "undefined") return null;
   try {
-    const raw = window.sessionStorage.getItem(`ai-erhu.issue-session.${issueSessionId}`);
+    const storageKey = `ai-erhu.issue-session.${issueSessionId}`;
+    const raw = window.localStorage.getItem(storageKey) || window.sessionStorage.getItem(storageKey);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;

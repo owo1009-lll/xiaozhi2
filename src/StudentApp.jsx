@@ -538,10 +538,9 @@ export default function StudentApp({ onOpenResearch }) {
   function handleOpenIssueScorePage() {
     if (!analysis || !score || !selectedSection) return;
     const issueSessionId = `issue-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-    window.sessionStorage.setItem(
-      `ai-erhu.issue-session.${issueSessionId}`,
-      JSON.stringify(buildIssueSessionPayload({ analysis, score, section: selectedSection })),
-    );
+    const payload = JSON.stringify(buildIssueSessionPayload({ analysis, score, section: selectedSection }));
+    window.sessionStorage.setItem(`ai-erhu.issue-session.${issueSessionId}`, payload);
+    window.localStorage.setItem(`ai-erhu.issue-session.${issueSessionId}`, payload);
     const url = new URL(window.location.href);
     url.searchParams.set("mode", "score-issues");
     url.searchParams.set("issueSession", issueSessionId);
