@@ -742,6 +742,92 @@ button {
   font-weight: 600;
 }
 
+.score-issue-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.score-issue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.score-issue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.score-issue-layout {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+}
+
+.score-page-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.score-page-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--text-muted);
+}
+
+.score-page-toolbar span {
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.score-page-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.score-page-canvas-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+}
+
+.score-measure-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.score-measure-highlight {
+  position: absolute;
+  top: 8%;
+  bottom: 8%;
+  border-radius: 14px;
+  border: 2px solid rgba(245, 158, 11, 0.92);
+  background: rgba(245, 158, 11, 0.18);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45) inset;
+}
+
+.score-measure-highlight span {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  min-width: 26px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(17, 51, 45, 0.92);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
 @media (max-width: 900px) {
   .app-shell {
     padding: 16px;
@@ -769,5 +855,11 @@ button {
 
   .pdf-helper-grid {
     grid-template-columns: 1fr;
+  }
+
+  .score-issue-header,
+  .score-issue-layout {
+    grid-template-columns: 1fr;
+    flex-direction: column;
   }
 }

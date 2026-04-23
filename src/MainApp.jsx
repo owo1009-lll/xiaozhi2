@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import ResearchApp from "./ResearchApp.jsx";
+import ScoreIssuePage from "./ScoreIssuePage.jsx";
 import StudentApp from "./StudentApp.jsx";
 
 function getModeFromLocation() {
   if (typeof window === "undefined") return "student";
   const params = new URLSearchParams(window.location.search);
+  if (params.get("mode") === "score-issues") return "score-issues";
   return params.get("mode") === "research" ? "research" : "student";
 }
 
@@ -30,6 +32,10 @@ export default function MainApp() {
 
   if (mode === "research") {
     return <ResearchApp onBackToStudent={() => switchMode("student")} />;
+  }
+
+  if (mode === "score-issues") {
+    return <ScoreIssuePage />;
   }
 
   return <StudentApp onOpenResearch={() => switchMode("research")} />;
