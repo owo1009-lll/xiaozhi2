@@ -20,6 +20,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base-url", default="http://127.0.0.1:3000", help="Node gateway base URL.")
     parser.add_argument("--analyzer-url", default="http://127.0.0.1:8000", help="Python analyzer base URL.")
     parser.add_argument("--piece-id", default="taohuawu-test-fragment", help="Piece id to scan.")
+    parser.add_argument("--score-id", default="", help="Imported score id to scan.")
     parser.add_argument("--audio", default="data/test_audio_mix.mp3", help="Audio file to slice.")
     parser.add_argument("--output-dir", default="data/piece-segment-scan", help="Directory for scan outputs.")
     parser.add_argument("--hint-radius", type=float, default=2.0, help="Seconds around each hint to probe.")
@@ -252,7 +253,10 @@ def main() -> int:
     try:
         read_json(f"{args.base_url}/api/health")
         read_json(f"{args.analyzer_url}/health")
-        piece_json = read_json(f"{args.base_url}/api/erhu/pieces/{args.piece_id}")
+        if args.score_id:
+            piece_json = read_json(f"{args.base_url}/api/erhu/pieces/from-score/{args.score_id}")
+        else:
+            piece_json = read_json(f"{args.base_url}/api/erhu/pieces/{args.piece_id}")
     except error.URLError as exc:
         raise SystemExit(f"service check failed: {exc}") from exc
 

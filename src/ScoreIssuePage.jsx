@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { GlobalWorkerOptions, getDocument } from "pdfjs-dist";
 import {
   extractSectionPageNumber,
@@ -126,15 +126,34 @@ function ScoreBlock({ label, value }) {
   );
 }
 
-function getDominantStaffIndex(section) {
-  const counts = new Map();
-  for (const note of Array.isArray(section?.notes) ? section.notes : []) {
-    const staffIndex = Number(note?.notePosition?.staffIndex);
-    if (!Number.isFinite(staffIndex) || staffIndex <= 0) continue;
-    counts.set(staffIndex, (counts.get(staffIndex) || 0) + 1);
+function getDominantStaffIndex(section, analysis) {
+  const sectionNotes = Array.isArray(section?.notes) ? section.notes : [];
+  // Issue notes come from the student's erhu performance — their staffIndex is the erhu staff.
+  const issueNoteIds = new Set(
+    (analysis?.noteFindings || []).map((item) => String(item?.noteId || "")).filter(Boolean),
+  );
+  if (issueNoteIds.size > 0) {
+    const staffCounts = new Map();
+    for (const note of sectionNotes) {
+      if (!issueNoteIds.has(String(note?.noteId || ""))) continue;
+      const staffIndex = Number(note?.notePosition?.staffIndex);
+      if (Number.isFinite(staffIndex) && staffIndex >= 1) {
+        staffCounts.set(staffIndex, (staffCounts.get(staffIndex) || 0) + 1);
+      }
+    }
+    if (staffCounts.size > 0) {
+      return [...staffCounts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    }
   }
-  if (!counts.size) return 1;
-  return [...counts.entries()].sort((left, right) => right[1] - left[1] || left[0] - right[0])[0][0];
+  // Fallback: erhu is the solo instrument and appears first (top staff = smallest index).
+  let minStaff = Infinity;
+  for (const note of sectionNotes) {
+    const staffIndex = Number(note?.notePosition?.staffIndex);
+    if (Number.isFinite(staffIndex) && staffIndex >= 1 && staffIndex < minStaff) {
+      minStaff = staffIndex;
+    }
+  }
+  return Number.isFinite(minStaff) ? minStaff : 1;
 }
 
 export default function ScoreIssuePage() {
@@ -149,7 +168,7 @@ export default function ScoreIssuePage() {
   const [selectedMeasureIndex, setSelectedMeasureIndex] = useState(null);
   const [selectedNoteKey, setSelectedNoteKey] = useState("");
   const [pageImageFailed, setPageImageFailed] = useState(false);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(1.5);
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const canvasRef = useRef(null);
   const viewportRef = useRef(null);
@@ -188,14 +207,14 @@ export default function ScoreIssuePage() {
   const baseSectionPage = extractSectionPageNumber(section || {});
   const pageImagePath = buildImportedPageImagePath(score, section, currentPage);
   const usePageImage = Boolean(pageImagePath && !pageImageFailed);
-  const dominantStaffIndex = useMemo(() => getDominantStaffIndex(section), [section]);
+  const dominantStaffIndex = useMemo(() => getDominantStaffIndex(section, analysis), [analysis, section]);
 
   useEffect(() => {
     if (!usePageImage) return;
     const previewCount = Array.isArray(score?.previewPages) ? score.previewPages.length : 0;
     const omrPageCount = Number(score?.omrStats?.pageCount);
     const effectivePageCount = Number.isFinite(omrPageCount) && omrPageCount > 0 ? omrPageCount : previewCount;
-    setPageCount(Math.max(currentPage || 1, effectivePageCount || 0));
+    setPageCount(effectivePageCount || 0);
   }, [currentPage, score?.omrStats?.pageCount, score?.previewPages, usePageImage]);
 
   useEffect(() => {
@@ -469,19 +488,19 @@ export default function ScoreIssuePage() {
   return (
     <div className="app-shell score-issue-shell">
       <header className="panel-card score-issue-header">
-        <div>
-          <span className="eyebrow">ISSUE SCORE VIEW</span>
-          <h1>问题谱面页</h1>
-          <p className="supporting-copy">这里只保留原音、总体反馈和问题谱面高亮。</p>
+        <div className="score-issue-title">
+          <h1>{section?.title || "问题谱面"}</h1>
+          <div className="score-inline-scores">
+            <span className="score-inline-chip">音准 <strong>{getDisplayPitchScore(analysis)}</strong></span>
+            <span className="score-inline-chip">节奏 <strong>{getDisplayRhythmScore(analysis)}</strong></span>
+            <span className="score-inline-chip">综合 <strong>{getDisplayCombinedScore(analysis)}</strong></span>
+            <span className="score-inline-chip is-muted">{formatPracticePathLabel(analysis?.recommendedPracticePath)}</span>
+          </div>
         </div>
         <div className="score-issue-actions">
-          <button type="button" className="secondary-button" onClick={() => window.close()}>
-            关闭页面
-          </button>
+          <button type="button" className="secondary-button" onClick={() => window.close()}>关闭</button>
           {score?.sourcePdfPath ? (
-            <a className="secondary-link" href={score.sourcePdfPath} target="_blank" rel="noreferrer">
-              打开 PDF
-            </a>
+            <a className="secondary-link" href={score.sourcePdfPath} target="_blank" rel="noreferrer">打开 PDF</a>
           ) : null}
         </div>
       </header>
@@ -489,35 +508,22 @@ export default function ScoreIssuePage() {
       {error ? <div className="error-banner">{error}</div> : null}
 
       <div className="score-issue-layout">
-        <section className="panel-card">
-          <div className="section-title">
-            <span className="section-step">A</span>
-            <div>
-              <h2>本轮结果</h2>
-              <p>主结果页只保留总分和总体反馈，详细问题统一放到谱面页查看。</p>
+        <aside className="panel-card score-sidebar">
+          {analysis?.rawAudioPath ? (
+            <div className="sidebar-block">
+              <p className="sidebar-label">原音</p>
+              <audio controls className="audio-player" src={analysis.rawAudioPath} />
             </div>
+          ) : null}
+
+          <div className="sidebar-block">
+            <p className="sidebar-label">总体反馈</p>
+            <p className="sidebar-text">{summarizeOverallFeedback(analysis)}</p>
+            <p className="sidebar-meta">{formatDateTime(analysis?.createdAt || stored?.savedAt)}</p>
           </div>
 
-          <div className="result-grid">
-            <ScoreBlock label="音准" value={getDisplayPitchScore(analysis)} />
-            <ScoreBlock label="节奏" value={getDisplayRhythmScore(analysis)} />
-            <ScoreBlock label="综合" value={getDisplayCombinedScore(analysis)} />
-            <ScoreBlock label="练习路径" value={formatPracticePathLabel(analysis?.recommendedPracticePath)} />
-          </div>
-
-          <div className="history-card">
-            <h3>原音</h3>
-            {analysis?.rawAudioPath ? <audio controls className="audio-player" src={analysis.rawAudioPath} /> : <p>当前没有可播放的原音。</p>}
-          </div>
-
-          <div className="history-card">
-            <h3>总体反馈</h3>
-            <p>{summarizeOverallFeedback(analysis)}</p>
-            <p className="supporting-copy">分析时间：{formatDateTime(analysis?.createdAt || stored?.savedAt)}</p>
-          </div>
-
-          <div className="history-card">
-            <h3>问题列表</h3>
+          <div className="sidebar-block sidebar-issues">
+            <p className="sidebar-label">问题列表</p>
             <div className="issue-list-block">
               {measureIssueEntries.map((item) => (
                 <button
@@ -555,37 +561,14 @@ export default function ScoreIssuePage() {
               })}
             </div>
           </div>
-        </section>
+        </aside>
 
         <section className="panel-card score-page-panel">
-          <div className="section-title">
-            <span className="section-step">B</span>
-            <div>
-              <h2>问题谱面高亮</h2>
-              <p>支持缩放、翻页，并会自动滚到当前问题音附近。</p>
-            </div>
-          </div>
-
           <div className="score-page-toolbar">
             <span>{section?.title || "当前段落"}</span>
-            <span>页码：{currentPage}/{pageCount || currentPage}</span>
-            <span>问题小节：{issueMeasureIndexes.length || 0}</span>
+            <span>第 {currentPage} 页{pageCount > 0 ? ` / ${pageCount}` : ""}</span>
+            <span>{issueMeasureIndexes.length} 个问题小节</span>
           </div>
-
-          {issueMeasureIndexes.length ? (
-            <div className="issue-chip-row">
-              {issueMeasureIndexes.map((measureIndex) => (
-                <button
-                  type="button"
-                  key={`measure-chip-${measureIndex}`}
-                  className={`issue-chip${activeMeasureIndex === measureIndex ? " is-active" : ""}`}
-                  onClick={() => handleMeasureJump(measureIndex)}
-                >
-                  {formatMeasureLabel(measureIndex)}
-                </button>
-              ))}
-            </div>
-          ) : null}
 
           <div className="score-page-nav">
             <button type="button" className="secondary-button" onClick={() => setCurrentPage((value) => Math.max(1, value - 1))} disabled={currentPage <= 1}>
@@ -597,21 +580,21 @@ export default function ScoreIssuePage() {
             <button
               type="button"
               className="secondary-button"
-              onClick={() => setCurrentPage((value) => Math.min(Math.max(pageCount, 1), value + 1))}
+              onClick={() => setCurrentPage((value) => value + 1)}
               disabled={pageCount > 0 && currentPage >= pageCount}
             >
               下一页
             </button>
             <div className="score-zoom-group">
-              <button type="button" className="secondary-button" onClick={() => setZoom((value) => Math.max(0.8, Number((value - 0.1).toFixed(2))))}>
+              <button type="button" className="secondary-button" onClick={() => setZoom((value) => Math.max(0.5, Number((value - 0.15).toFixed(2))))}>
                 缩小
               </button>
               <span className="score-zoom-label">{Math.round(zoom * 100)}%</span>
-              <button type="button" className="secondary-button" onClick={() => setZoom((value) => Math.min(2.2, Number((value + 0.1).toFixed(2))))}>
+              <button type="button" className="secondary-button" onClick={() => setZoom((value) => Math.min(3.5, Number((value + 0.15).toFixed(2))))}>
                 放大
               </button>
-              <button type="button" className="secondary-button" onClick={() => setZoom(1)}>
-                100%
+              <button type="button" className="secondary-button" onClick={() => setZoom(1.5)}>
+                重置
               </button>
             </div>
           </div>

@@ -6,6 +6,7 @@ import fs from "node:fs/promises";
 import http from "node:http";
 import https from "node:https";
 import path from "node:path";
+import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import multer from "multer";
 import { getErhuPiece, getErhuPieceSummaries, getErhuSection } from "./src/erhuStudyPieces.js";
@@ -18,6 +19,8 @@ const port = Number(process.env.PORT || 3000);
 const DATA_DIR = path.join(__dirname, "data");
 const STUDY_STORE_FILE = path.join(DATA_DIR, "erhu-study-records.json");
 const SCORE_STORE_FILE = path.join(DATA_DIR, "erhu-score-imports.json");
+const ANALYSIS_JOB_STORE_FILE = path.join(DATA_DIR, "erhu-analysis-jobs.json");
+const PIECE_PASS_JOB_STORE_FILE = path.join(DATA_DIR, "erhu-piece-pass-jobs.json");
 const SCORE_IMPORTS_DIR = path.join(DATA_DIR, "score-imports");
 const PIECE_PASS_DIR = path.join(DATA_DIR, "piece-pass");
 const AUDIO_CACHE_DIR = path.join(DATA_DIR, "analysis-audio-cache");
@@ -379,6 +382,40 @@ async function writeScoreStore(store) {
   await fs.writeFile(SCORE_STORE_FILE, JSON.stringify(store, null, 2), "utf8");
 }
 
+async function readAnalysisJobStore() {
+  try {
+    const raw = await fs.readFile(ANALYSIS_JOB_STORE_FILE, "utf8");
+    const parsed = JSON.parse(raw);
+    return {
+      jobs: Array.isArray(parsed.jobs) ? parsed.jobs.map((item) => normalizeAnalysisJob(item)) : [],
+    };
+  } catch {
+    return { jobs: [] };
+  }
+}
+
+async function writeAnalysisJobStore(store) {
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.writeFile(ANALYSIS_JOB_STORE_FILE, JSON.stringify(store, null, 2), "utf8");
+}
+
+async function readPiecePassJobStore() {
+  try {
+    const raw = await fs.readFile(PIECE_PASS_JOB_STORE_FILE, "utf8");
+    const parsed = JSON.parse(raw);
+    return {
+      jobs: Array.isArray(parsed.jobs) ? parsed.jobs.map((item) => normalizePiecePassJob(item)) : [],
+    };
+  } catch {
+    return { jobs: [] };
+  }
+}
+
+async function writePiecePassJobStore(store) {
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.writeFile(PIECE_PASS_JOB_STORE_FILE, JSON.stringify(store, null, 2), "utf8");
+}
+
 async function collectFilesRecursive(rootDir, matcher) {
   const results = [];
 
@@ -629,6 +666,68 @@ function normalizeScoreImportJob(job = {}) {
     };
   }
 
+function normalizeAnalysisJob(job = {}) {
+  return {
+    jobId: safeString(job.jobId),
+    participantId: safeString(job.participantId),
+    groupId: safeString(job.groupId),
+    sessionStage: safeString(job.sessionStage),
+    scoreId: safeString(job.scoreId),
+    pieceId: safeString(job.pieceId),
+    sectionId: safeString(job.sectionId),
+    sectionTitle: safeString(job.sectionTitle),
+    status: safeString(job.status, safeString(job.analysisId) ? "completed" : "processing"),
+    progress: clamp(safeNumber(job.progress, 0), 0, 1),
+    stage: safeString(job.stage, "queued"),
+    message: safeString(job.message),
+    warnings: normalizeWarningList(job.warnings),
+    error: safeString(job.error),
+    audioHash: safeString(job.audioHash),
+    analysisId: safeString(job.analysisId),
+    candidateCount: Math.max(0, Math.round(safeNumber(job.candidateCount, 0))),
+    bestSectionId: safeString(job.bestSectionId),
+    createdAt: safeString(job.createdAt, nowIso()),
+    updatedAt: safeString(job.updatedAt, job.createdAt || nowIso()),
+    completedAt: safeString(job.completedAt),
+    durationMs: Math.max(0, Math.round(safeNumber(job.durationMs, 0))),
+  };
+}
+
+function normalizePiecePassJob(job = {}) {
+  return {
+    jobId: safeString(job.jobId),
+    participantId: safeString(job.participantId),
+    scoreId: safeString(job.scoreId),
+    pieceId: safeString(job.pieceId),
+    pieceTitle: safeString(job.pieceTitle),
+    status: safeString(job.status, safeString(job.summary?.pieceId) ? "completed" : "processing"),
+    progress: clamp(safeNumber(job.progress, 0), 0, 1),
+    stage: safeString(job.stage, "queued"),
+    message: safeString(job.message),
+    warnings: normalizeWarningList(job.warnings),
+    error: safeString(job.error),
+    audioHash: safeString(job.audioHash),
+    outputDir: safeString(job.outputDir),
+    summaryPath: safeString(job.summaryPath),
+    passJsonPath: safeString(job.passJsonPath),
+    summary: job.summary && typeof job.summary === "object" ? job.summary : null,
+    createdAt: safeString(job.createdAt, nowIso()),
+    updatedAt: safeString(job.updatedAt, job.createdAt || nowIso()),
+    completedAt: safeString(job.completedAt),
+    durationMs: Math.max(0, Math.round(safeNumber(job.durationMs, 0))),
+  };
+}
+
+function piecePassStageMessage(stage = "", fallback = "") {
+  const normalizedStage = safeString(stage);
+  if (normalizedStage === "checking-services") return "正在检查整曲分析服务。";
+  if (normalizedStage === "scanning-sections") return "正在定位整曲中各段落的最佳窗口。";
+  if (normalizedStage === "analyzing-sections") return "正在分析整曲各段落。";
+  if (normalizedStage === "writing-results") return "正在写入整曲分析结果。";
+  if (normalizedStage === "completed") return "整曲分析完成。";
+  return safeString(fallback, "整曲分析进行中。");
+}
+
 function findReusableImportedScore(store, { pdfHash = "", selectedPart = "erhu" } = {}) {
   const normalizedHash = safeString(pdfHash).trim();
   if (!normalizedHash) return null;
@@ -650,6 +749,8 @@ function findReusableImportedScore(store, { pdfHash = "", selectedPart = "erhu" 
 }
 
 const activeScoreImportTasks = new Map();
+const activeAnalysisTasks = new Map();
+const activePiecePassTasks = new Map();
 
 async function upsertScoreImportJob(job) {
   const store = await readScoreStore();
@@ -662,6 +763,234 @@ async function upsertScoreImportJob(job) {
   }
   await writeScoreStore(store);
   return normalizedJob;
+}
+
+async function upsertAnalysisJob(job) {
+  const store = await readAnalysisJobStore();
+  const normalizedJob = normalizeAnalysisJob(job);
+  const existingJobIndex = store.jobs.findIndex((item) => item.jobId === normalizedJob.jobId);
+  if (existingJobIndex >= 0) {
+    store.jobs[existingJobIndex] = normalizedJob;
+  } else {
+    store.jobs.push(normalizedJob);
+  }
+  await writeAnalysisJobStore(store);
+  return normalizedJob;
+}
+
+async function hydrateAnalysisJob(job) {
+  const normalizedJob = normalizeAnalysisJob(job);
+  if (!normalizedJob.analysisId) {
+    return normalizedJob;
+  }
+  const store = await readStudyStore();
+  const analysis = store.analyses.find((item) => item.analysisId === normalizedJob.analysisId) || null;
+  return {
+    ...normalizedJob,
+    analysis,
+  };
+}
+
+async function upsertPiecePassJob(job) {
+  const store = await readPiecePassJobStore();
+  const normalizedJob = normalizePiecePassJob(job);
+  const existingIndex = store.jobs.findIndex((item) => item.jobId === normalizedJob.jobId);
+  if (existingIndex >= 0) {
+    store.jobs[existingIndex] = normalizedJob;
+  } else {
+    store.jobs.push(normalizedJob);
+  }
+  await writePiecePassJobStore(store);
+  return normalizedJob;
+}
+
+async function resolvePiecePassTarget({ scoreId = "", pieceId = "", title = "" } = {}) {
+  const scoreStore = await readScoreStore();
+  if (scoreId) {
+    const importedScore = getImportedScore(scoreStore, scoreId);
+    if (importedScore) {
+      return {
+        pieceKey: importedScore.scoreId,
+        pieceTitle: safeString(importedScore.title, importedScore.scoreId),
+        sourceType: "score",
+      };
+    }
+  }
+
+  if (pieceId) {
+    const libraryPiece = getErhuPiece(pieceId);
+    if (libraryPiece) {
+      return {
+        pieceKey: libraryPiece.pieceId,
+        pieceTitle: safeString(libraryPiece.title, libraryPiece.pieceId),
+        sourceType: "piece",
+      };
+    }
+    const importedScore = getImportedScore(scoreStore, pieceId)
+      || scoreStore.scores.find((item) => safeString(item.pieceId) === pieceId)
+      || null;
+    if (importedScore) {
+      return {
+        pieceKey: importedScore.scoreId,
+        pieceTitle: safeString(importedScore.title, importedScore.scoreId),
+        sourceType: "score",
+      };
+    }
+  }
+
+  if (title) {
+    const importedScore = scoreStore.scores.find((item) => safeString(item.title) === title) || null;
+    if (importedScore) {
+      return {
+        pieceKey: importedScore.scoreId,
+        pieceTitle: safeString(importedScore.title, importedScore.scoreId),
+        sourceType: "score",
+      };
+    }
+  }
+
+  return null;
+}
+
+function launchPiecePassTask(task) {
+  const existingTask = activePiecePassTasks.get(task.jobId);
+  if (existingTask) return existingTask;
+
+  const runner = (async () => {
+    const startedAt = Date.now();
+    const outputDir = path.join(PIECE_PASS_DIR, "jobs", task.jobId);
+    const baseJob = {
+      jobId: task.jobId,
+      participantId: safeString(task.payload?.participantId),
+      scoreId: safeString(task.payload?.scoreId),
+      pieceId: safeString(task.pieceKey),
+      pieceTitle: safeString(task.pieceTitle),
+      status: "processing",
+      progress: 0.04,
+      stage: "queued",
+      message: "整曲分析任务已提交，正在排队。",
+      audioHash: safeString(task.payload?.audioHash),
+      outputDir,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+    await upsertPiecePassJob(baseJob);
+
+    const scriptPath = path.join(__dirname, "scripts", "run-piece-pass.py");
+    const runnerScript = path.join(__dirname, "scripts", "run-python.ps1");
+    const args = [
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      runnerScript,
+      scriptPath,
+      "--base-url",
+      `http://127.0.0.1:${port}`,
+      "--analyzer-url",
+      "http://127.0.0.1:8000",
+      ...(task.sourceType === "score"
+        ? ["--score-id", task.pieceKey]
+        : ["--piece-id", task.pieceKey]),
+      "--audio",
+      safeString(task.payload?.audioPath),
+      "--output-dir",
+      outputDir,
+      "--preprocess-mode",
+      safeString(task.payload?.preprocessMode, "auto"),
+    ];
+
+    const warnings = [];
+    const child = spawn("powershell", args, {
+      cwd: __dirname,
+      windowsHide: true,
+    });
+
+    let stdoutBuffer = "";
+    let stderrBuffer = "";
+
+    const handleProgressLine = async (line) => {
+      if (!line.startsWith("__PROGRESS__")) return;
+      try {
+        const payload = JSON.parse(line.slice("__PROGRESS__".length));
+        await upsertPiecePassJob({
+          ...baseJob,
+          status: "processing",
+          progress: clamp(safeNumber(payload.progress, 0), 0, 1),
+          stage: safeString(payload.stage, "running"),
+          message: piecePassStageMessage(payload.stage, payload.message),
+          warnings,
+          outputDir,
+          updatedAt: nowIso(),
+        });
+      } catch {
+        // ignore malformed progress payloads
+      }
+    };
+
+    child.stdout.on("data", (chunk) => {
+      stdoutBuffer += chunk.toString("utf8");
+      const lines = stdoutBuffer.split(/\r?\n/);
+      stdoutBuffer = lines.pop() || "";
+      for (const line of lines) {
+        void handleProgressLine(line.trim());
+      }
+    });
+
+    child.stderr.on("data", (chunk) => {
+      stderrBuffer += chunk.toString("utf8");
+      const lines = stderrBuffer.split(/\r?\n/);
+      stderrBuffer = lines.pop() || "";
+      for (const line of lines) {
+        const nextLine = line.trim();
+        if (nextLine) warnings.push(nextLine);
+      }
+    });
+
+    await new Promise((resolve) => {
+      child.on("close", resolve);
+      child.on("error", resolve);
+    });
+
+    const summaryPath = path.join(outputDir, `${task.pieceKey}-whole-piece-summary.json`);
+    const passJsonPath = path.join(outputDir, `${task.pieceKey}-whole-piece-pass.json`);
+    try {
+      const summaryPayload = JSON.parse(await fs.readFile(summaryPath, "utf8"));
+      await upsertPiecePassJob({
+        ...baseJob,
+        status: "completed",
+        progress: 1,
+        stage: "completed",
+        message: "整曲分析完成。",
+        warnings,
+        outputDir,
+        summaryPath,
+        passJsonPath,
+        summary: summaryPayload?.summary || null,
+        durationMs: Date.now() - startedAt,
+        completedAt: nowIso(),
+        updatedAt: nowIso(),
+      });
+    } catch (error) {
+      await upsertPiecePassJob({
+        ...baseJob,
+        status: "failed",
+        progress: 1,
+        stage: "failed",
+        message: "整曲分析失败。",
+        warnings,
+        error: safeString(error?.message, "piece-pass failed"),
+        outputDir,
+        durationMs: Date.now() - startedAt,
+        completedAt: nowIso(),
+        updatedAt: nowIso(),
+      });
+    }
+  })().finally(() => {
+    activePiecePassTasks.delete(task.jobId);
+  });
+
+  activePiecePassTasks.set(task.jobId, runner);
+  return runner;
 }
 
 async function finalizeScoreImportArtifacts({ job, scoreRecord }) {
@@ -915,6 +1244,55 @@ function getImportedScoreSection(store, scoreId, sectionId) {
   const score = getImportedScore(store, scoreId);
   if (!score) return null;
   return score.sections.find((item) => item.sectionId === sectionId) || null;
+}
+
+function meterBeatsValue(meter = "4/4") {
+  const beats = safeString(meter, "4/4").split("/")[0];
+  const numeric = Number(beats);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : 4;
+}
+
+function estimateSectionDurationSeconds(section = {}) {
+  const notes = getArray(section.notes);
+  const tempo = Math.max(30, safeNumber(section.tempo, 72));
+  const beatsPerMeasure = meterBeatsValue(section.meter);
+  let maxBeatOffset = beatsPerMeasure;
+  for (const note of notes) {
+    const measureIndex = Math.max(1, safeNumber(note?.measureIndex, 1));
+    const beatStart = safeNumber(note?.beatStart, 0);
+    const beatDuration = Math.max(0.25, safeNumber(note?.beatDuration, 1));
+    const endBeat = (measureIndex - 1) * beatsPerMeasure + beatStart + beatDuration;
+    maxBeatOffset = Math.max(maxBeatOffset, endBeat);
+  }
+  return (maxBeatOffset * 60) / tempo;
+}
+
+function buildDerivedPieceFromScore(score = {}) {
+  let cumulativeSeconds = 0;
+  const sections = getArray(score.sections).map((section, index) => {
+    const durationSeconds = estimateSectionDurationSeconds(section);
+    const existingHints = getArray(section?.researchWindowHints)
+      .map((value) => safeNumber(value, Number.NaN))
+      .filter((value) => Number.isFinite(value));
+    const derivedHint = Number(cumulativeSeconds.toFixed(2));
+    const nextSection = {
+      ...section,
+      pieceId: safeString(score.scoreId || score.pieceId),
+      title: safeString(section.title, `第 ${index + 1} 段`),
+      sequenceIndex: Math.max(1, Math.round(safeNumber(section.sequenceIndex, index + 1))),
+      noteCount: Math.max(getArray(section.notes).length, Math.round(safeNumber(section.noteCount, 0))),
+      measureCount: Math.max(1, Math.round(safeNumber(section.measureCount, 0))),
+      researchWindowHints: existingHints.length ? existingHints : [derivedHint],
+    };
+    cumulativeSeconds += Math.max(2, durationSeconds);
+    return nextSection;
+  });
+  return {
+    pieceId: safeString(score.scoreId || score.pieceId),
+    title: safeString(score.title, "导入曲谱"),
+    composer: safeString(score.composer),
+    sections,
+  };
 }
 
 function cloneLibraryPieceForImport(piece) {
@@ -2025,6 +2403,13 @@ function applyCandidateDetectedWindow(payload = {}, candidate = null, section = 
 
 function shouldUseDetectedWindowAnalysis(candidate = null, section = null) {
   return !!buildCandidateAnalysisWindow(candidate, section);
+}
+
+async function prepareAnalysisPayload(payload = {}, file = null) {
+  return normalizePreparedPayloadForAnalyzer(buildPreparedAudioPayload(
+    payload,
+    file ? await persistUploadedAudioFile(file) : await persistPayloadAudio(payload),
+  ));
 }
 
 function getSectionGroupId(section = {}) {
@@ -4155,16 +4540,102 @@ app.get("/api/erhu/piece-pass/latest", async (req, res) => {
   return res.json({ ok: true, piecePass });
 });
 
+app.post("/api/erhu/piece-pass-jobs", upload.single("audio"), async (req, res) => {
+  const incomingPayload = parseIncomingPayload(req);
+  const payload = {
+    ...incomingPayload,
+    audioSubmission: buildAudioSubmissionFromUpload(req.file, incomingPayload.audioSubmission),
+  };
+  const preparedPayload = await prepareAnalysisPayload(payload, req.file || null);
+  if (!safeString(preparedPayload.audioPath)) {
+    return res.status(400).json({ error: "audio is required." });
+  }
+
+  const target = await resolvePiecePassTarget({
+    scoreId: safeString(payload.scoreId),
+    pieceId: safeString(payload.pieceId),
+    title: safeString(payload.title),
+  });
+  if (!target) {
+    return res.status(404).json({ error: "piece for whole-piece analysis not found." });
+  }
+
+  const jobId = createId("piecepassjob");
+  const initialJob = await upsertPiecePassJob({
+    jobId,
+    participantId: safeString(payload.participantId),
+    scoreId: safeString(payload.scoreId),
+    pieceId: safeString(target.pieceKey),
+    pieceTitle: safeString(target.pieceTitle),
+    status: "processing",
+    progress: 0.04,
+    stage: "queued",
+    message: "整曲分析任务已提交，正在排队。",
+    audioHash: safeString(preparedPayload.audioHash),
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  });
+
+  void launchPiecePassTask({
+    jobId,
+    payload: preparedPayload,
+    pieceKey: target.pieceKey,
+    pieceTitle: target.pieceTitle,
+    sourceType: target.sourceType,
+  });
+
+  return res.status(202).json({ ok: true, piecePassJobId: jobId, job: initialJob });
+});
+
+app.get("/api/erhu/piece-pass-jobs/:jobId", async (req, res) => {
+  const store = await readPiecePassJobStore();
+  const job = store.jobs.find((item) => item.jobId === req.params.jobId);
+  if (!job) {
+    if (activePiecePassTasks.has(req.params.jobId)) {
+      return res.json({
+        ok: true,
+        job: normalizePiecePassJob({
+          jobId: req.params.jobId,
+          status: "processing",
+          progress: 0.1,
+          stage: "queued",
+          message: "整曲分析任务已提交，正在排队。",
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+        }),
+      });
+    }
+    return res.status(404).json({ error: "piece-pass job not found." });
+  }
+  return res.json({ ok: true, job: normalizePiecePassJob(job) });
+});
+
 app.get("/api/erhu/pieces", (req, res) => {
   res.json({ ok: true, pieces: getErhuPieceSummaries() });
 });
 
-app.get("/api/erhu/pieces/:pieceId", (req, res) => {
+app.get("/api/erhu/pieces/from-score/:scoreId", async (req, res) => {
+  const store = await readScoreStore();
+  const score = getImportedScore(store, req.params.scoreId);
+  if (!score) {
+    return res.status(404).json({ error: "score not found" });
+  }
+  return res.json({ ok: true, piece: buildDerivedPieceFromScore(score) });
+});
+
+app.get("/api/erhu/pieces/:pieceId", async (req, res) => {
   const piece = getErhuPiece(req.params.pieceId);
-  if (!piece) {
+  if (piece) {
+    return res.json({ ok: true, piece });
+  }
+  const store = await readScoreStore();
+  const importedScore = getImportedScore(store, req.params.pieceId)
+    || store.scores.find((item) => safeString(item.pieceId) === req.params.pieceId)
+    || null;
+  if (!importedScore) {
     return res.status(404).json({ error: "piece not found" });
   }
-  return res.json({ ok: true, piece });
+  return res.json({ ok: true, piece: buildDerivedPieceFromScore(importedScore) });
 });
 
 app.post("/api/erhu/auto-detect-section", upload.single("audio"), async (req, res) => {
@@ -4217,13 +4688,8 @@ app.post("/api/erhu/auto-detect-section", upload.single("audio"), async (req, re
   });
 });
 
-app.post("/api/erhu/analyze", upload.single("audio"), async (req, res) => {
+async function executePreparedAnalysisRequest(payload, { onProgress } = {}) {
   const requestStartedAt = Date.now();
-  const incomingPayload = parseIncomingPayload(req);
-  const payload = {
-    ...incomingPayload,
-    audioSubmission: buildAudioSubmissionFromUpload(req.file, incomingPayload.audioSubmission),
-  };
   const participantId = safeString(payload.participantId).trim();
   const groupId = safeString(payload.groupId, "experimental");
   const scoreId = safeString(payload.scoreId);
@@ -4232,8 +4698,14 @@ app.post("/api/erhu/analyze", upload.single("audio"), async (req, res) => {
   const autoDetectSection = safeBoolean(payload.autoDetectSection, false);
 
   if (!participantId) {
-    return res.status(400).json({ error: "participantId is required." });
+    throw new Error("participantId is required.");
   }
+
+  await onProgress?.({
+    progress: 0.08,
+    stage: "loading-score",
+    message: "正在读取曲谱与分析配置。",
+  });
 
   const scoreStore = await readScoreStore();
   const importedScore = scoreId ? getImportedScore(scoreStore, scoreId) : null;
@@ -4242,14 +4714,8 @@ app.post("/api/erhu/analyze", upload.single("audio"), async (req, res) => {
     appendPerfTrace(
       `[analyze] start participant=${participantId || "unknown"} scoreId=${scoreId || "-"} pieceId=${pieceId || "-"} autoDetect=${autoDetectSection} at=${new Date().toISOString()}`,
     );
-  }
-  const preparedPayload = await normalizePreparedPayloadForAnalyzer(buildPreparedAudioPayload(
-    payload,
-    req.file ? await persistUploadedAudioFile(req.file) : await persistPayloadAudio(payload),
-  ));
-  if (scoreId || pieceId) {
     appendPerfTrace(
-      `[analyze] payload-ready elapsedMs=${Date.now() - requestStartedAt} audioHash=${safeString(preparedPayload.audioHash).slice(0, 12)}`,
+      `[analyze] payload-ready elapsedMs=${Date.now() - requestStartedAt} audioHash=${safeString(payload.audioHash).slice(0, 12)}`,
     );
   }
   const librarySection = getErhuSection(pieceId, sectionId);
@@ -4260,8 +4726,13 @@ app.post("/api/erhu/analyze", upload.single("audio"), async (req, res) => {
 
   if (!section && autoDetectSection && (importedScore || piece)) {
     const detectStartedAt = Date.now();
+    await onProgress?.({
+      progress: 0.32,
+      stage: "detecting-section",
+      message: "正在定位最匹配的段落。",
+    });
     autoDetection = await autoDetectPieceSection(
-      { ...preparedPayload, scoreId },
+      { ...payload, scoreId },
       importedScore || piece,
       {
         candidateSectionIds: payload.candidateSectionIds,
@@ -4277,14 +4748,28 @@ app.post("/api/erhu/analyze", upload.single("audio"), async (req, res) => {
     }
     section = autoDetection.bestSection;
     analysis = autoDetection.bestAnalysis;
+    await onProgress?.({
+      progress: 0.52,
+      stage: "detecting-section",
+      message: `已定位段落：${safeString(section?.title || section?.sectionId || "未命名段落")}。`,
+      candidateCount: getArray(autoDetection?.candidates).length,
+      bestSectionId: safeString(section?.sectionId),
+    });
     if (analysis && safeString(analysis.analysisMode) === "detection-summary") {
       analysis = null;
     }
   }
 
   if (!section) {
-    return res.status(404).json({ error: "piece section not found." });
+    throw new Error("piece section not found.");
   }
+
+  await onProgress?.({
+    progress: 0.68,
+    stage: "analyzing",
+    message: "正在执行音高、节奏和二胡技法分析。",
+    bestSectionId: safeString(section?.sectionId),
+  });
 
   if (!analysis) {
     const sectionAnalyzeStartedAt = Date.now();
@@ -4292,8 +4777,8 @@ app.post("/api/erhu/analyze", upload.single("audio"), async (req, res) => {
       (candidate) => safeString(candidate?.sectionId) === safeString(section?.sectionId),
     ) || getArray(autoDetection?.candidates)[0] || null;
     const scopedPayload = shouldUseDetectedWindowAnalysis(autoDetectedCandidate, section)
-      ? applyCandidateDetectedWindow(preparedPayload, autoDetectedCandidate, section)
-      : preparedPayload;
+      ? applyCandidateDetectedWindow(payload, autoDetectedCandidate, section)
+      : payload;
     analysis = await runSectionAnalysis(scopedPayload, section);
     if (scoreId || pieceId) {
       appendPerfTrace(
@@ -4301,6 +4786,13 @@ app.post("/api/erhu/analyze", upload.single("audio"), async (req, res) => {
       );
     }
   }
+
+  await onProgress?.({
+    progress: 0.9,
+    stage: "saving",
+    message: "正在保存分析结果。",
+    bestSectionId: safeString(section?.sectionId),
+  });
 
   const analysisRecord = {
     analysisId: createId("analysis"),
@@ -4388,9 +4880,163 @@ app.post("/api/erhu/analyze", upload.single("audio"), async (req, res) => {
     );
   }
 
+  await onProgress?.({
+    progress: 1,
+    stage: "completed",
+    message: "分析完成，可以查看问题谱面页。",
+    bestSectionId: safeString(section?.sectionId),
+  });
+
+  return {
+    analysisRecord,
+    autoDetection,
+    elapsedMs: Date.now() - requestStartedAt,
+    participant,
+    store,
+    section,
+  };
+}
+
+function launchAnalysisTask(task) {
+  const existingTask = activeAnalysisTasks.get(task.jobId);
+  if (existingTask) return existingTask;
+
+  const runner = (async () => {
+    const startedAt = Date.now();
+    const baseJob = {
+      jobId: task.jobId,
+      participantId: safeString(task.payload?.participantId),
+      groupId: safeString(task.payload?.groupId),
+      sessionStage: safeString(task.payload?.sessionStage),
+      scoreId: safeString(task.payload?.scoreId),
+      pieceId: safeString(task.payload?.pieceId),
+      sectionId: safeString(task.payload?.sectionId),
+      audioHash: safeString(task.payload?.audioHash),
+      status: "processing",
+      progress: 0.04,
+      stage: "queued",
+      message: "分析任务已提交，正在排队。",
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+    await upsertAnalysisJob(baseJob);
+    try {
+      const result = await executePreparedAnalysisRequest(task.payload, {
+        onProgress: async (next) => {
+          await upsertAnalysisJob({
+            ...baseJob,
+            ...next,
+            status: next?.stage === "completed" ? "completed" : "processing",
+            updatedAt: nowIso(),
+          });
+        },
+      });
+      await upsertAnalysisJob({
+        ...baseJob,
+        status: "completed",
+        progress: 1,
+        stage: "completed",
+        message: "分析完成，可以查看问题谱面页。",
+        analysisId: safeString(result?.analysisRecord?.analysisId),
+        bestSectionId: safeString(result?.section?.sectionId),
+        candidateCount: getArray(result?.autoDetection?.candidates).length,
+        durationMs: Date.now() - startedAt,
+        completedAt: nowIso(),
+        updatedAt: nowIso(),
+      });
+    } catch (error) {
+      await upsertAnalysisJob({
+        ...baseJob,
+        status: "failed",
+        progress: 1,
+        stage: "failed",
+        message: "分析失败，请稍后重试。",
+        error: safeString(error?.message, "analysis failed"),
+        durationMs: Date.now() - startedAt,
+        completedAt: nowIso(),
+        updatedAt: nowIso(),
+      });
+    }
+  })().finally(() => {
+    activeAnalysisTasks.delete(task.jobId);
+  });
+
+  activeAnalysisTasks.set(task.jobId, runner);
+  return runner;
+}
+
+app.post("/api/erhu/analyze", upload.single("audio"), async (req, res) => {
+  const incomingPayload = parseIncomingPayload(req);
+  const payload = {
+    ...incomingPayload,
+    audioSubmission: buildAudioSubmissionFromUpload(req.file, incomingPayload.audioSubmission),
+  };
+  const preparedPayload = await prepareAnalysisPayload(payload, req.file || null);
+  if (safeBoolean(payload.async, false)) {
+    const jobId = createId("analysisjob");
+    const initialJob = await upsertAnalysisJob({
+      jobId,
+      participantId: safeString(payload.participantId),
+      groupId: safeString(payload.groupId, "self-practice"),
+      sessionStage: safeString(payload.sessionStage, "self-practice"),
+      scoreId: safeString(payload.scoreId),
+      pieceId: safeString(payload.pieceId),
+      sectionId: safeString(payload.sectionId),
+      audioHash: safeString(preparedPayload.audioHash),
+      status: "processing",
+      progress: 0.04,
+      stage: "queued",
+      message: "分析任务已提交，正在排队。",
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    });
+    void launchAnalysisTask({
+      jobId,
+      payload: preparedPayload,
+    });
+    return res.status(202).json({ ok: true, analysisJobId: jobId, job: initialJob });
+  }
+
+  try {
+    const result = await executePreparedAnalysisRequest(preparedPayload);
+    return res.json({
+      ok: true,
+      analysis: result.analysisRecord,
+    });
+  } catch (error) {
+    if (String(error?.message || "").includes("piece section not found")) {
+      return res.status(404).json({ error: "piece section not found." });
+    }
+    if (String(error?.message || "").includes("participantId is required")) {
+      return res.status(400).json({ error: "participantId is required." });
+    }
+    return res.status(500).json({ error: safeString(error?.message, "analysis failed") });
+  }
+});
+
+app.get("/api/erhu/analyze-jobs/:jobId", async (req, res) => {
+  const store = await readAnalysisJobStore();
+  const job = store.jobs.find((item) => item.jobId === req.params.jobId);
+  if (!job) {
+    if (activeAnalysisTasks.has(req.params.jobId)) {
+      return res.json({
+        ok: true,
+        job: normalizeAnalysisJob({
+          jobId: req.params.jobId,
+          status: "processing",
+          progress: 0.1,
+          stage: "queued",
+          message: "分析任务已提交，正在排队。",
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+        }),
+      });
+    }
+    return res.status(404).json({ error: "analysis job not found." });
+  }
   return res.json({
     ok: true,
-    analysis: analysisRecord,
+    job: await hydrateAnalysisJob(job),
   });
 });
 

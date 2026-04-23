@@ -3801,62 +3801,78 @@ class ErhuAnalyzer:
         octave_flex_steps = max(0, int(section_calibration.get("octaveFlexMaxSteps", 0)))
         mask = np.full(np.abs(harmonic).shape, residual_mix, dtype=np.float32)
 
-        for frame_index, time_value in enumerate(frame_times):
-            frame_frequency = 0.0
-            frame_confidence = 0.0
-            if pitch_times.size:
-                nearest_index = int(np.argmin(np.abs(pitch_times - time_value)))
-                if abs(float(pitch_times[nearest_index]) - float(time_value)) <= 0.12:
-                    frame_frequency = float(pitch_freqs[nearest_index])
-                    frame_confidence = float(pitch_confidences[nearest_index])
-            score_frequency = self._score_frequency_at_time(float(time_value), score_notes, performance_duration)
-            effective_frequency = frame_frequency
-            if effective_frequency <= 0 or frame_confidence < confidence_threshold:
-                effective_frequency = score_frequency
-            if effective_frequency <= 0:
-                continue
+        # Vectorized harmonic masking — replaces per-frame Python loop with bulk NumPy ops.
+        n_frames = harmonic.shape[1]
 
-            frame_mask = np.full(freqs.shape, residual_mix, dtype=np.float32)
-            added_band = False
+        # Nearest detected pitch for every frame at once (searchsorted vs argmin per frame).
+        if pitch_times.size > 0:
+            ins = np.searchsorted(pitch_times, frame_times, side="left")
+            ins_hi = np.clip(ins, 0, len(pitch_times) - 1)
+            ins_lo = np.clip(ins - 1, 0, len(pitch_times) - 1)
+            d_hi = np.abs(pitch_times[ins_hi] - frame_times)
+            d_lo = np.abs(pitch_times[ins_lo] - frame_times)
+            best = np.where(d_hi <= d_lo, ins_hi, ins_lo)
+            within = np.minimum(d_hi, d_lo) <= 0.12
+            det_freqs = np.where(within, pitch_freqs[best], 0.0).astype(np.float32)
+            det_confs = np.where(within, pitch_confidences[best], 0.0).astype(np.float32)
+        else:
+            det_freqs = np.zeros(n_frames, dtype=np.float32)
+            det_confs = np.zeros(n_frames, dtype=np.float32)
 
-            def add_frequency_bands(base_frequency: float, weight: float, bandwidth_scale: float) -> None:
-                nonlocal frame_mask, added_band
-                if base_frequency <= 0.0 or weight <= 0.0:
-                    return
-                band_weight = max(residual_mix, min(1.0, float(weight)))
-                for harmonic_index in range(1, harmonic_count + 1):
-                    center_frequency = base_frequency * harmonic_index
-                    if center_frequency > freqs[-1]:
-                        break
-                    bandwidth_hz = max(20.0, center_frequency * bandwidth_scale)
-                    gaussian_band = np.exp(-0.5 * ((freqs - center_frequency) / bandwidth_hz) ** 2).astype(np.float32)
-                    frame_mask = np.maximum(frame_mask, gaussian_band * band_weight)
-                    added_band = True
+        # Score guide frequency for every frame (vectorized interval lookup).
+        if score_notes:
+            _sdur = max((n.expected_offset for n in score_notes), default=0.0)
+            _tr = performance_duration / _sdur if performance_duration > 0 and _sdur > 0 else 1.0
+            _srt = sorted(score_notes, key=lambda n: n.expected_onset)
+            _ns = np.array([n.expected_onset * _tr for n in _srt], dtype=np.float32)
+            _ne = np.array([n.expected_offset * _tr for n in _srt], dtype=np.float32)
+            _nf = np.array([float(midi_to_frequency(n.midi_pitch)) for n in _srt], dtype=np.float32)
+            _si = np.clip(np.searchsorted(_ns, frame_times, side="right") - 1, 0, len(_srt) - 1)
+            _in_note = (frame_times >= _ns[_si]) & (frame_times <= _ne[_si])
+            scr_freqs = np.where(_in_note, _nf[_si], 0.0).astype(np.float32)
+        else:
+            scr_freqs = np.zeros(n_frames, dtype=np.float32)
 
-            add_frequency_bands(effective_frequency, 1.0, bandwidth_ratio)
-            if score_frequency > 0.0 and guide_gain > 0.0:
-                score_weight = guide_gain
-                if frame_frequency <= 0.0 or frame_confidence < guide_confidence_floor:
-                    score_weight = max(score_weight, 0.34 if bool(section_calibration.get("scoreCoarse")) else 0.2)
-                add_frequency_bands(score_frequency, score_weight, guide_bandwidth_ratio)
-                for octave_step in range(1, octave_flex_steps + 1):
-                    lower_frequency = score_frequency / (2.0 ** octave_step)
-                    upper_frequency = score_frequency * (2.0 ** octave_step)
-                    if lower_frequency >= low_cut * 0.8:
-                        add_frequency_bands(
-                            lower_frequency,
-                            score_weight * (0.72 if octave_step == 1 else 0.45),
-                            guide_bandwidth_ratio,
-                        )
-                    if upper_frequency <= high_cut * 1.05:
-                        add_frequency_bands(
-                            upper_frequency,
-                            score_weight * (0.28 if octave_step == 1 else 0.18),
-                            guide_bandwidth_ratio,
-                        )
-            if not added_band:
-                continue
-            mask[:, frame_index] = np.maximum(mask[:, frame_index], frame_mask * band_mask)
+        # Effective frequency: fall back to score guide when detection is uncertain.
+        low_conf = (det_freqs <= 0) | (det_confs < confidence_threshold)
+        eff_freqs = np.where(low_conf, scr_freqs, det_freqs)
+
+        def _add_bands(base_f: "np.ndarray", weights: "np.ndarray", bw_ratio: float) -> None:
+            """Apply Gaussian harmonic bands for all frames in a single bulk pass."""
+            for h in range(1, harmonic_count + 1):
+                centers = base_f * h
+                active = (base_f > 0) & (centers <= freqs[-1])
+                if not np.any(active):
+                    break
+                iv = np.where(active)[0]
+                c = centers[iv]
+                w = weights[iv]
+                bw = np.maximum(20.0, c * bw_ratio)
+                diff = freqs[:, None] - c[None, :]
+                gauss = np.exp(-0.5 * (diff / bw[None, :]) ** 2).astype(np.float32)
+                mask[:, iv] = np.maximum(mask[:, iv], gauss * band_mask[:, None] * w[None, :])
+
+        _add_bands(eff_freqs, np.where(eff_freqs > 0, 1.0, 0.0).astype(np.float32), bandwidth_ratio)
+
+        if guide_gain > 0.0 and np.any(scr_freqs > 0):
+            score_coarse = bool(section_calibration.get("scoreCoarse"))
+            coarse_w = 0.34 if score_coarse else 0.2
+            low_guide = (det_freqs <= 0) | (det_confs < guide_confidence_floor)
+            guide_w = np.where(
+                scr_freqs > 0,
+                np.where(low_guide, np.maximum(guide_gain, coarse_w), guide_gain),
+                0.0,
+            ).astype(np.float32)
+            _add_bands(scr_freqs, guide_w, guide_bandwidth_ratio)
+            for octave_step in range(1, octave_flex_steps + 1):
+                lo_f = np.where(scr_freqs > 0, scr_freqs / (2.0 ** octave_step), 0.0)
+                hi_f = np.where(scr_freqs > 0, scr_freqs * (2.0 ** octave_step), 0.0)
+                lo_mult = 0.72 if octave_step == 1 else 0.45
+                hi_mult = 0.28 if octave_step == 1 else 0.18
+                if np.any(lo_f >= low_cut * 0.8):
+                    _add_bands(np.where(lo_f >= low_cut * 0.8, lo_f, 0.0), guide_w * lo_mult, guide_bandwidth_ratio)
+                if np.any(hi_f <= high_cut * 1.05):
+                    _add_bands(np.where(hi_f <= high_cut * 1.05, hi_f, 0.0), guide_w * hi_mult, guide_bandwidth_ratio)
 
         # Piano co-frequency suppression: piano attacks decay naturally while erhu sustains;
         # briefly attenuating the mask at onset frames removes most co-frequency bleed.
@@ -3869,14 +3885,12 @@ class ErhuAnalyzer:
                 onset_peak = float(np.percentile(onset_env, 97)) + 1e-6
                 onset_norm = np.clip(onset_env / onset_peak, 0.0, 1.0).astype(np.float32)
                 decay_frames = max(1, int(float(self.settings.piano_onset_decay_ms) / 1000.0 * audio.sample_rate / hop_length))
-                n_frames = mask.shape[1]
                 temporal_suppression = np.zeros(n_frames, dtype=np.float32)
-                for i in range(min(len(onset_norm), n_frames)):
-                    if onset_norm[i] > 0.5:
-                        for j in range(min(decay_frames, n_frames - i)):
-                            fade = onset_norm[i] * (1.0 - j / decay_frames) * suppression_strength
-                            if fade > temporal_suppression[i + j]:
-                                temporal_suppression[i + j] = fade
+                for pi in np.where(onset_norm[:n_frames] > 0.5)[0]:
+                    end = min(int(pi) + decay_frames, n_frames)
+                    j_arr = np.arange(end - int(pi), dtype=np.float32)
+                    fade = float(onset_norm[pi]) * (1.0 - j_arr / decay_frames) * suppression_strength
+                    temporal_suppression[pi:end] = np.maximum(temporal_suppression[pi:end], fade)
                 mask *= (1.0 - temporal_suppression)[np.newaxis, :]
             except Exception:
                 pass

@@ -36,6 +36,32 @@ export async function createAnalysis(payload) {
   );
 }
 
+export async function createAnalysisJob(payload) {
+  if (payload?.audioFile instanceof File) {
+    const formData = new FormData();
+    formData.append("audio", payload.audioFile);
+    const { audioFile, ...rest } = payload;
+    formData.append("payload", JSON.stringify({ ...rest, async: true }));
+    return readJson(
+      await fetch("/api/erhu/analyze", {
+        method: "POST",
+        body: formData,
+      }),
+    );
+  }
+  return readJson(
+    await fetch("/api/erhu/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...payload, async: true }),
+    }),
+  );
+}
+
+export async function fetchAnalysisJob(jobId) {
+  return readJson(await fetch(`/api/erhu/analyze-jobs/${encodeURIComponent(jobId)}`));
+}
+
 export async function importScorePdf(file, titleHint = "") {
   const formData = new FormData();
   formData.append("pdf", file);
@@ -64,6 +90,32 @@ export async function fetchLatestPiecePassSummary({ pieceId = "", title = "" } =
   if (title) searchParams.set("title", title);
   const suffix = searchParams.toString() ? `?${searchParams.toString()}` : "";
   return readJson(await fetch(`/api/erhu/piece-pass/latest${suffix}`));
+}
+
+export async function createPiecePassJob(payload) {
+  if (payload?.audioFile instanceof File) {
+    const formData = new FormData();
+    formData.append("audio", payload.audioFile);
+    const { audioFile, ...rest } = payload;
+    formData.append("payload", JSON.stringify(rest));
+    return readJson(
+      await fetch("/api/erhu/piece-pass-jobs", {
+        method: "POST",
+        body: formData,
+      }),
+    );
+  }
+  return readJson(
+    await fetch("/api/erhu/piece-pass-jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  );
+}
+
+export async function fetchPiecePassJob(jobId) {
+  return readJson(await fetch(`/api/erhu/piece-pass-jobs/${encodeURIComponent(jobId)}`));
 }
 
 export async function saveStudyRecord(payload) {

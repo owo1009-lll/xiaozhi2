@@ -27,6 +27,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base-url", default="http://127.0.0.1:3000", help="Node gateway base URL.")
     parser.add_argument("--analyzer-url", default="http://127.0.0.1:8000", help="Python analyzer base URL.")
     parser.add_argument("--piece-id", default="taohuawu-test-fragment", help="Piece id to evaluate.")
+    parser.add_argument("--score-id", default="", help="Imported score id to evaluate as a whole piece.")
     parser.add_argument("--audio", default="data/test_audio_mix.mp3", help="Whole-song audio file.")
     parser.add_argument("--output-dir", default="data/piece-pass", help="Directory for generated outputs.")
     parser.add_argument("--preprocess-mode", default="auto", help="Preprocess mode forwarded to the analyzer.")
@@ -41,6 +42,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cache-dir", default="", help="Optional directory for per-section cached pass rows. Defaults to <output-dir>/section-cache.")
     parser.add_argument("--refresh-cache", action="store_true", help="Ignore existing per-section cache and recompute all section passes.")
     return parser.parse_args()
+
+
+def emit_progress(progress: float, stage: str, message: str) -> None:
+    print(
+        "__PROGRESS__" + json.dumps(
+            {
+                "progress": round(max(0.0, min(1.0, float(progress))), 4),
+                "stage": stage,
+                "message": message,
+            },
+            ensure_ascii=False,
+        ),
+        flush=True,
+    )
 
 
 def read_json(url: str) -> dict:
@@ -126,7 +141,8 @@ def mean_weighted(rows: list[dict], key: str, weight_key: str) -> float:
 
 def run_scan(args: argparse.Namespace, scan_output_dir: Path) -> Path:
     scan_output_dir.mkdir(parents=True, exist_ok=True)
-    scan_json = scan_output_dir / f"{args.piece_id}-segment-scan.json"
+    output_key = args.score_id or args.piece_id
+    scan_json = scan_output_dir / f"{output_key}-segment-scan.json"
     if args.skip_scan and scan_json.exists():
         return scan_json
 
@@ -137,8 +153,6 @@ def run_scan(args: argparse.Namespace, scan_output_dir: Path) -> Path:
         args.base_url,
         "--analyzer-url",
         args.analyzer_url,
-        "--piece-id",
-        args.piece_id,
         "--audio",
         args.audio,
         "--output-dir",
@@ -152,6 +166,10 @@ def run_scan(args: argparse.Namespace, scan_output_dir: Path) -> Path:
         "--max-candidates-per-section",
         str(args.max_candidates_per_section),
     ]
+    if args.score_id:
+        command.extend(["--score-id", args.score_id])
+    else:
+        command.extend(["--piece-id", args.piece_id])
     if args.max_sections and args.max_sections > 0:
         command.extend(["--max-sections", str(args.max_sections)])
 
@@ -431,18 +449,24 @@ def main() -> int:
     scan_output_dir = output_dir / "scan"
     cache_dir = resolve_cache_dir(output_dir, args.cache_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    output_key = args.score_id or args.piece_id
 
     try:
+        emit_progress(0.04, "checking-services", "正在检查整曲分析服务。")
         read_json(f"{args.base_url}/api/health")
         read_json(f"{args.analyzer_url}/health")
-        piece_json = read_json(f"{args.base_url}/api/erhu/pieces/{args.piece_id}")
+        if args.score_id:
+            piece_json = read_json(f"{args.base_url}/api/erhu/pieces/from-score/{args.score_id}")
+        else:
+            piece_json = read_json(f"{args.base_url}/api/erhu/pieces/{args.piece_id}")
     except error.URLError as exc:
         raise SystemExit(f"service check failed: {exc}") from exc
 
     piece = piece_json.get("piece") or {}
     if not piece:
-        raise SystemExit(f"piece not found: {args.piece_id}")
+        raise SystemExit(f"piece not found: {args.score_id or args.piece_id}")
 
+    emit_progress(0.18, "scanning-sections", "正在定位整曲中各段落的最佳窗口。")
     scan_json_path = run_scan(args, scan_output_dir)
     scan_payload = json.loads(scan_json_path.read_text(encoding="utf-8"))
     sequence_path = scan_payload.get("sequenceAwarePath") or []
@@ -451,6 +475,7 @@ def main() -> int:
 
     section_rows = []
     cache_hits = 0
+    total_sections = max(1, len(sequence_path))
     for item in sequence_path:
         section_id = item.get("sectionId")
         section = section_lookup.get(section_id)
@@ -475,6 +500,11 @@ def main() -> int:
             row["priorAdjustedScore"] = item.get("priorAdjustedScore")
             row["nearestHintDistance"] = item.get("nearestHintDistance")
             section_rows.append(row)
+            emit_progress(
+                0.35 + (len(section_rows) / total_sections) * 0.5,
+                "analyzing-sections",
+                f"正在复用并汇总第 {len(section_rows)}/{total_sections} 个段落。",
+            )
             continue
 
         wav_bytes, actual_duration = slice_audio(audio_path, start_seconds, duration_seconds)
@@ -541,6 +571,11 @@ def main() -> int:
             args.preprocess_mode,
             row,
         )
+        emit_progress(
+            0.35 + (len(section_rows) / total_sections) * 0.5,
+            "analyzing-sections",
+            f"正在分析第 {len(section_rows)}/{total_sections} 个段落。",
+        )
 
     section_rows.sort(key=lambda row: (row.get("sequenceIndex") or 0, row.get("startSeconds") or 0))
     summary = summarize_piece_pass(piece, section_rows)
@@ -554,15 +589,18 @@ def main() -> int:
         "sectionPasses": section_rows,
     }
 
-    json_path = output_dir / f"{args.piece_id}-whole-piece-pass.json"
-    summary_path = output_dir / f"{args.piece_id}-whole-piece-summary.json"
-    csv_path = output_dir / f"{args.piece_id}-whole-piece-pass.csv"
-    md_path = output_dir / f"{args.piece_id}-whole-piece-pass.md"
+    emit_progress(0.92, "writing-results", "正在写入整曲分析结果。")
+
+    json_path = output_dir / f"{output_key}-whole-piece-pass.json"
+    summary_path = output_dir / f"{output_key}-whole-piece-summary.json"
+    csv_path = output_dir / f"{output_key}-whole-piece-pass.csv"
+    md_path = output_dir / f"{output_key}-whole-piece-pass.md"
     json_path.write_text(json.dumps(json_payload, ensure_ascii=False, indent=2), encoding="utf-8")
     summary_path.write_text(
         json.dumps(
             {
                 "pieceId": args.piece_id,
+                "scoreId": args.score_id,
                 "audio": str(audio_path),
                 "scanJsonPath": str(scan_json_path),
                 "summary": summary,
@@ -581,6 +619,7 @@ def main() -> int:
         json.dumps(
             {
                 "pieceId": args.piece_id,
+                "scoreId": args.score_id,
                 "matchedSectionCount": summary.get("matchedSectionCount"),
                 "structuredSectionCount": summary.get("structuredSectionCount"),
                 "weightedPitchScore": summary.get("weightedPitchScore"),
@@ -594,6 +633,7 @@ def main() -> int:
             indent=2,
         )
     )
+    emit_progress(1.0, "completed", "整曲分析完成。")
     return 0
 
 
