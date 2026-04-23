@@ -1,5 +1,5 @@
-const CACHE_NAME = "ai-erhu-shell-v1";
-const CORE_ASSETS = ["/", "/manifest.webmanifest", "/icons/icon-192.svg", "/icons/icon-512.svg"];
+const CACHE_NAME = "ai-erhu-shell-v2";
+const CORE_ASSETS = ["/manifest.webmanifest", "/icons/icon-192.svg", "/icons/icon-512.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -19,6 +19,31 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const requestUrl = new URL(event.request.url);
   if (requestUrl.origin !== self.location.origin || requestUrl.pathname.startsWith("/api/")) return;
+
+  const isNavigation = event.request.mode === "navigate" || requestUrl.pathname === "/";
+  const isAsset = requestUrl.pathname.startsWith("/assets/");
+
+  if (isNavigation || isAsset) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const cloned = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
+          }
+          return networkResponse;
+        })
+        .catch(async () => {
+          const cachedResponse = await caches.match(event.request);
+          if (cachedResponse) return cachedResponse;
+          if (isNavigation) {
+            return caches.match("/");
+          }
+          throw new Error("offline");
+        }),
+    );
+    return;
+  }
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
