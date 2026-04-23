@@ -107,7 +107,7 @@ function StepTitle({ step, title, description }) {
 
 function buildScoreDisplayTitle(score, titleHint, scorePdfFile) {
   const rawTitle = String(score?.title || "").trim();
-  const suspiciousCount = (rawTitle.match(/[ÃÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßà-ÿ�]/g) || []).length;
+  const suspiciousCount = (rawTitle.match(/�/g) || []).length + (rawTitle.includes("锟") ? 2 : 0);
   const chineseCount = (rawTitle.match(/[\u4e00-\u9fff]/g) || []).length;
   if (rawTitle && !(chineseCount === 0 && suspiciousCount >= 2)) {
     return rawTitle;
@@ -181,7 +181,9 @@ export default function StudentApp({ onOpenResearch }) {
             const progress = Number(nextJob?.progress);
             setStatusMessage(
               nextJob?.warnings?.[0]
-              || (Number.isFinite(progress) ? `后台识谱进行中：${Math.max(1, Math.round(progress * 100))}%` : "后台识谱进行中，请稍候。"),
+              || (Number.isFinite(progress)
+                ? `后台识谱进行中：${Math.max(1, Math.round(progress * 100))}%`
+                : "后台识谱进行中，请稍候。"),
             );
             continue;
           }
@@ -587,7 +589,7 @@ export default function StudentApp({ onOpenResearch }) {
         </section>
 
         <section className="panel-card">
-          <StepTitle step="02" title="确认识谱结果 / 选段落" description="这里展示整份 PDF 识别出的曲目和可分析段落。系统不会把整页内部原始 ID 直接给学生。"/>
+          <StepTitle step="02" title="确认识谱结果 / 选段落" description="这里展示整份 PDF 识别出的曲目和可分析段落。系统不会把整页内部原始 ID 直接给学生。" />
           {score ? (
             <>
               <div className="piece-summary">
@@ -610,7 +612,7 @@ export default function StudentApp({ onOpenResearch }) {
               {selectedSection ? (
                 <div className="section-meta">
                   <span>拍号：{selectedSection.meter || "4/4"}</span>
-                  <span>速度：♩ = {selectedSection.tempo || 72}</span>
+                  <span>速度：♪ = {selectedSection.tempo || 72}</span>
                   <span>音符数：{selectedSection.noteCount || selectedSection.notes?.length || 0}</span>
                   <span>小节数：{selectedSection.measureCount || 0}</span>
                 </div>
@@ -653,7 +655,7 @@ export default function StudentApp({ onOpenResearch }) {
         </section>
 
         <section className="panel-card">
-          <StepTitle step="04" title="查看诊断结果" description="结果统一按“小节 / 音位”表达，不再向学生暴露 `xml-m8-n3` 这种原始内部 ID。"/>
+          <StepTitle step="04" title="查看诊断结果" description="结果统一按“小节 / 音位”表达，不再向学生暴露 `xml-m8-n3` 这种内部 ID。" />
           {analysis ? (
             <>
               <div className="result-grid">
@@ -767,7 +769,7 @@ export default function StudentApp({ onOpenResearch }) {
         </section>
 
         <section className="panel-card">
-          <StepTitle step="05" title="最近诊断记录" description="这里保留最近几次分析记录，便于回看分数变化和对比不同录音。"/>
+          <StepTitle step="05" title="最近诊断记录" description="这里保留最近几次分析记录，便于回看分数变化和对比不同录音。" />
           <div className="upload-meta">
             <span>学生编号：{studentId || "未设置"}</span>
             <span>历史条数：{recentHistory.length}</span>
