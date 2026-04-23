@@ -100,7 +100,7 @@ if (-not $SkipBuild) {
 $serverProcess = Find-ProcessByCommandLine -Patterns @($repoRoot, "node", "server.js")
 if (-not $serverProcess) {
   $startedServer = Start-Process -FilePath "powershell" `
-    -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "$env:NODE_ENV='production'; $env:PORT='3000'; node server.js" `
+    -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "& { `$env:NODE_ENV='production'; `$env:PORT='3000'; node server.js }" `
     -WorkingDirectory $repoRoot `
     -RedirectStandardOutput $serverLog `
     -RedirectStandardError $serverErrLog `
