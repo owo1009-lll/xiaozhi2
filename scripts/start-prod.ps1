@@ -1,5 +1,6 @@
 param(
-  [switch]$SkipBuild
+  [switch]$SkipBuild,
+  [switch]$OpenBrowser
 )
 
 $ErrorActionPreference = "Stop"
@@ -156,3 +157,7 @@ Write-Host "  $analyzerLog"
 Write-Host "  $analyzerErrLog"
 Write-Host "PID file:"
 Write-Host "  $pidFile"
+
+if ($OpenBrowser -and $siteReady) {
+  Start-Process $serverUrl | Out-Null
+}
