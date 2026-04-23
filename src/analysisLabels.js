@@ -37,7 +37,7 @@ export function formatMeasureLabel(measureIndex) {
 export function formatNoteLabel(noteId, fallbackMeasureIndex) {
   const parsed = parseXmlNoteId(noteId);
   if (parsed) {
-    return `第 ${parsed.measureIndex} 小节 第 ${parsed.noteIndex} 音`;
+    return `第 ${parsed.measureIndex} 小节第 ${parsed.noteIndex} 音`;
   }
   const numericMeasure = Number(fallbackMeasureIndex);
   if (Number.isFinite(numericMeasure)) {
@@ -73,7 +73,7 @@ export function formatSourceLabel(value) {
 export function formatPitchLabelText(value) {
   if (value === "pitch-flat") return "音准偏低";
   if (value === "pitch-sharp") return "音准偏高";
-  if (value === "pitch-review") return "音高需要复核";
+  if (value === "pitch-review") return "音准需要复核";
   if (value === "pitch-ok") return "音准基本正常";
   return "音准问题";
 }
@@ -104,16 +104,20 @@ export function formatMeasureIssueLabelText(item) {
 }
 
 export function formatSectionDisplayName(section) {
+  const title = String(section?.title || "").trim();
+  if (title && !/^page-\d+/i.test(title)) {
+    return title;
+  }
   const sectionId = String(section?.sectionId || section?.sourceSectionId || "");
   const pageChunkMatch = sectionId.match(/^page-(\d+)-s(\d+)$/i);
   if (pageChunkMatch) {
-    return `自动识谱 第 ${Number(pageChunkMatch[1])} 页 片段 ${Number(pageChunkMatch[2])}`;
+    return `自动识谱第 ${Number(pageChunkMatch[1])} 页片段 ${Number(pageChunkMatch[2])}`;
   }
   const pageMatch = sectionId.match(/^page-(\d+)$/i);
   if (pageMatch) {
-    return `自动识谱 第 ${Number(pageMatch[1])} 页`;
+    return `自动识谱第 ${Number(pageMatch[1])} 页`;
   }
-  return String(section?.title || sectionId || "未命名段落");
+  return title || "未命名段落";
 }
 
 export function extractSectionPageNumber(section) {
@@ -159,10 +163,7 @@ export function formatPracticeTargetTitle(target) {
 }
 
 export function replaceXmlIdsInText(text) {
-  return String(text || "").replace(
-    /xml-m(\d+)-n(\d+)/gi,
-    (_, measureIndex, noteIndex) => `第 ${Number(measureIndex)} 小节 第 ${Number(noteIndex)} 音`,
-  );
+  return String(text || "").replace(/xml-m(\d+)-n(\d+)/gi, (_, measureIndex, noteIndex) => `第 ${Number(measureIndex)} 小节第 ${Number(noteIndex)} 音`);
 }
 
 export function buildIssueSessionPayload({ analysis, score, section }) {

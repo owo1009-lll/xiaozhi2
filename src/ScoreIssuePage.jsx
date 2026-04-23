@@ -38,14 +38,21 @@ function formatDateTime(value) {
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("zh-CN");
 }
 
-function buildImportedPageImagePath(score, section, pageNumber) {
-  const explicit = String(section?.pageImagePath || "").trim();
-  if (explicit) return explicit;
+function getDerivedPageImagePath(score, pageNumber) {
   const pdfUrl = String(score?.sourcePdfPath || "").trim();
   if (!pdfUrl) return "";
   const match = pdfUrl.match(/^(.*)\/source\.pdf$/i);
   if (!match) return "";
   return `${match[1]}/pagewise/page-${String(Math.max(1, Number(pageNumber) || 1)).padStart(3, "0")}.png`;
+}
+
+function buildImportedPageImagePath(score, section, pageNumber) {
+  const baseSectionPage = extractSectionPageNumber(section || {});
+  const derived = getDerivedPageImagePath(score, pageNumber);
+  if (derived) return derived;
+  const explicit = String(section?.pageImagePath || "").trim();
+  if (explicit && (Number(pageNumber) || 1) === baseSectionPage) return explicit;
+  return explicit;
 }
 
 function readExactNotePosition(section, noteId) {
@@ -59,6 +66,7 @@ function readExactNotePosition(section, noteId) {
   return {
     measureIndex: Number(matched?.measureIndex) || 1,
     pageNumber: Number(matched?.notePosition?.pageNumber) || extractSectionPageNumber(section || {}),
+    staffIndex: Number(matched?.notePosition?.staffIndex) || 1,
     normalizedX,
     normalizedY,
   };
@@ -99,12 +107,8 @@ function buildMeasureIssues(analysis) {
 function buildNoteIssues(analysis) {
   return (analysis?.noteFindings || []).map((item) => {
     const tags = [];
-    if (item?.pitchLabel && item.pitchLabel !== "pitch-ok") {
-      tags.push("音准问题");
-    }
-    if (item?.rhythmType || item?.rhythmLabel) {
-      tags.push("节奏问题");
-    }
+    if (item?.pitchLabel && item.pitchLabel !== "pitch-ok") tags.push("音准问题");
+    if (item?.rhythmType || item?.rhythmLabel) tags.push("节奏问题");
     return {
       noteId: item?.noteId,
       measureIndex: Number(item?.measureIndex) || 1,
@@ -120,6 +124,17 @@ function ScoreBlock({ label, value }) {
       <strong>{typeof value === "number" ? value : String(value || "")}</strong>
     </div>
   );
+}
+
+function getDominantStaffIndex(section) {
+  const counts = new Map();
+  for (const note of Array.isArray(section?.notes) ? section.notes : []) {
+    const staffIndex = Number(note?.notePosition?.staffIndex);
+    if (!Number.isFinite(staffIndex) || staffIndex <= 0) continue;
+    counts.set(staffIndex, (counts.get(staffIndex) || 0) + 1);
+  }
+  if (!counts.size) return 1;
+  return [...counts.entries()].sort((left, right) => right[1] - left[1] || left[0] - right[0])[0][0];
 }
 
 export default function ScoreIssuePage() {
@@ -165,9 +180,10 @@ export default function ScoreIssuePage() {
     setPageImageFailed(false);
   }, [score?.sourcePdfPath, section?.pageImagePath, currentPage]);
 
-  const pageNumber = extractSectionPageNumber(section || {});
+  const baseSectionPage = extractSectionPageNumber(section || {});
   const pageImagePath = buildImportedPageImagePath(score, section, currentPage);
   const usePageImage = Boolean(pageImagePath && !pageImageFailed);
+  const dominantStaffIndex = useMemo(() => getDominantStaffIndex(section), [section]);
 
   useEffect(() => {
     if (!usePageImage) return;
@@ -226,35 +242,54 @@ export default function ScoreIssuePage() {
   );
   const activeMeasureIndex = selectedMeasureIndex || issueMeasureIndexes[0] || null;
 
+  const measurePageMap = useMemo(() => {
+    const pageMap = new Map();
+    for (const note of Array.isArray(section?.notes) ? section.notes : []) {
+      const measureIndex = Number(note?.measureIndex);
+      const pageNumber = Number(note?.notePosition?.pageNumber);
+      const staffIndex = Number(note?.notePosition?.staffIndex) || 1;
+      if (!Number.isFinite(measureIndex) || !Number.isFinite(pageNumber)) continue;
+      if (staffIndex !== dominantStaffIndex) continue;
+      if (!pageMap.has(measureIndex)) {
+        pageMap.set(measureIndex, pageNumber);
+      }
+    }
+    return pageMap;
+  }, [dominantStaffIndex, section]);
+
   const noteOverlayItems = useMemo(
     () =>
-      noteIssues.map((item, index) => {
-        const exact = readExactNotePosition(section, item?.noteId);
-        if (exact) {
+      noteIssues
+        .map((item, index) => {
+          const exact = readExactNotePosition(section, item?.noteId);
+          if (exact && exact.staffIndex === dominantStaffIndex) {
+            return {
+              key: `${item?.noteId || index}-${exact.measureIndex}`,
+              measureIndex: exact.measureIndex,
+              left: Math.min(Math.max(exact.normalizedX * 100, 0), 100),
+              top: Math.min(Math.max(exact.normalizedY * 100, 0), 100),
+              exact: true,
+              pageNumber: exact.pageNumber,
+              staffIndex: exact.staffIndex,
+            };
+          }
+          const { measureIndex, noteIndex } = getApproximateNotePosition(item?.noteId, item?.measureIndex, index + 1);
+          const slotWidth = 100 / Math.max(1, measureCount);
+          const measureLeft = Math.max(0, (measureIndex - 1) * slotWidth);
+          const relativeStep = Math.min(0.85, 0.18 + ((noteIndex - 1) % 6) * 0.12);
+          const bandIndex = (noteIndex - 1) % 3;
           return {
-            key: `${item?.noteId || index}-${exact.measureIndex}`,
-            measureIndex: exact.measureIndex,
-            left: Math.min(Math.max(exact.normalizedX * 100, 0), 100),
-            top: Math.min(Math.max(exact.normalizedY * 100, 0), 100),
-            exact: true,
-            pageNumber: exact.pageNumber,
+            key: `${item?.noteId || index}-${measureIndex}-${noteIndex}`,
+            measureIndex,
+            left: Math.min(measureLeft + slotWidth * relativeStep, 98),
+            top: 18 + bandIndex * 18,
+            exact: false,
+            pageNumber: measurePageMap.get(measureIndex) || baseSectionPage,
+            staffIndex: dominantStaffIndex,
           };
-        }
-        const { measureIndex, noteIndex } = getApproximateNotePosition(item?.noteId, item?.measureIndex, index + 1);
-        const slotWidth = 100 / Math.max(1, measureCount);
-        const measureLeft = Math.max(0, (measureIndex - 1) * slotWidth);
-        const relativeStep = Math.min(0.85, 0.18 + ((noteIndex - 1) % 6) * 0.12);
-        const bandIndex = (noteIndex - 1) % 3;
-        return {
-          key: `${item?.noteId || index}-${measureIndex}-${noteIndex}`,
-          measureIndex,
-          left: Math.min(measureLeft + slotWidth * relativeStep, 98),
-          top: 18 + bandIndex * 18,
-          exact: false,
-          pageNumber,
-        };
-      }),
-    [noteIssues, measureCount, pageNumber, section],
+        })
+        .filter(Boolean),
+    [baseSectionPage, dominantStaffIndex, measureCount, measurePageMap, noteIssues, section],
   );
 
   const hasExactNoteOverlay = noteOverlayItems.some((item) => item.exact);
@@ -264,9 +299,13 @@ export default function ScoreIssuePage() {
       return issueMeasureIndexes
         .map((measureIndex) => {
           const measureNotes = (Array.isArray(section?.notes) ? section.notes : [])
-            .filter((item) => Number(item?.measureIndex) === measureIndex)
+            .filter(
+              (item) =>
+                Number(item?.measureIndex) === measureIndex
+                && (Number(item?.notePosition?.staffIndex) || 1) === dominantStaffIndex,
+            )
             .map((item) => ({
-              pageNumber: Number(item?.notePosition?.pageNumber) || pageNumber,
+              pageNumber: Number(item?.notePosition?.pageNumber) || baseSectionPage,
               x: Number(item?.notePosition?.normalizedX),
               y: Number(item?.notePosition?.normalizedY),
             }))
@@ -278,26 +317,28 @@ export default function ScoreIssuePage() {
           const maxY = Math.max(...measureNotes.map((item) => item.y * 100));
           return {
             measureIndex,
-            left: Math.max(0, minX - 2.6),
-            top: Math.max(0, minY - 7.5),
-            width: Math.max(5.5, (maxX - minX) + 5.2),
-            height: Math.max(14, (maxY - minY) + 15),
+            left: Math.max(0, minX - 2.2),
+            top: Math.max(0, minY - 5.5),
+            width: Math.max(4.5, (maxX - minX) + 4.4),
+            height: Math.max(10, (maxY - minY) + 11),
           };
         })
         .filter(Boolean);
     }
-    return issueMeasureIndexes.map((measureIndex) => {
-      const slotWidth = 100 / Math.max(1, measureCount);
-      const left = Math.max(0, (measureIndex - 1) * slotWidth);
-      return {
-        measureIndex,
-        left: Math.min(left, 96),
-        top: 8,
-        width: Math.max(5.5, Math.min(slotWidth, 18)),
-        height: 84,
-      };
-    });
-  }, [currentPage, hasExactNoteOverlay, issueMeasureIndexes, measureCount, pageNumber, section]);
+    return issueMeasureIndexes
+      .filter((measureIndex) => (measurePageMap.get(measureIndex) || baseSectionPage) === currentPage)
+      .map((measureIndex) => {
+        const slotWidth = 100 / Math.max(1, measureCount);
+        const left = Math.max(0, (measureIndex - 1) * slotWidth);
+        return {
+          measureIndex,
+          left: Math.min(left, 96),
+          top: 8,
+          width: Math.max(5.5, Math.min(slotWidth, 18)),
+          height: 84,
+        };
+      });
+  }, [baseSectionPage, currentPage, dominantStaffIndex, hasExactNoteOverlay, issueMeasureIndexes, measureCount, measurePageMap, section]);
 
   if (!analysis || !stored) {
     return (
@@ -316,7 +357,7 @@ export default function ScoreIssuePage() {
         <div>
           <span className="eyebrow">ISSUE SCORE VIEW</span>
           <h1>问题谱面页</h1>
-          <p className="supporting-copy">这里仅保留原音回放、谱面高亮，以及音准问题和节奏问题两类结果。</p>
+          <p className="supporting-copy">这里只保留原音回放、谱面高亮，以及音准问题和节奏问题。</p>
         </div>
         <div className="score-issue-actions">
           <button type="button" className="secondary-button" onClick={() => window.close()}>
@@ -338,15 +379,15 @@ export default function ScoreIssuePage() {
             <span className="section-step">A</span>
             <div>
               <h2>本轮结果</h2>
-              <p>仅保留总分、原音和总体反馈。</p>
+              <p>主页面只保留总分和总体反馈，所有问题都放在谱面页统一查看。</p>
             </div>
           </div>
 
           <div className="result-grid">
-            <ScoreBlock label="音高" value={getDisplayPitchScore(analysis)} />
+            <ScoreBlock label="音准" value={getDisplayPitchScore(analysis)} />
             <ScoreBlock label="节奏" value={getDisplayRhythmScore(analysis)} />
             <ScoreBlock label="综合" value={getDisplayCombinedScore(analysis)} />
-            <ScoreBlock label="路径" value={formatPracticePathLabel(analysis?.recommendedPracticePath)} />
+            <ScoreBlock label="练习路径" value={formatPracticePathLabel(analysis?.recommendedPracticePath)} />
           </div>
 
           <div className="history-card">
@@ -382,7 +423,7 @@ export default function ScoreIssuePage() {
             <span className="section-step">B</span>
             <div>
               <h2>问题谱面高亮</h2>
-              <p>所有问题都放在这里高亮显示，主结果页不再重复展示详细解释。</p>
+              <p>问题只在这里显示，并优先按当前二胡声部的音符坐标高亮。</p>
             </div>
           </div>
 
@@ -400,7 +441,7 @@ export default function ScoreIssuePage() {
                   key={`measure-chip-${measureIndex}`}
                   className={`issue-chip${activeMeasureIndex === measureIndex ? " is-active" : ""}`}
                   onClick={() => {
-                    setCurrentPage(pageNumber);
+                    setCurrentPage(measurePageMap.get(measureIndex) || baseSectionPage);
                     setSelectedMeasureIndex(measureIndex);
                   }}
                 >
@@ -414,7 +455,7 @@ export default function ScoreIssuePage() {
             <button type="button" className="secondary-button" onClick={() => setCurrentPage((value) => Math.max(1, value - 1))} disabled={currentPage <= 1}>
               上一页
             </button>
-            <button type="button" className="secondary-button" onClick={() => setCurrentPage(pageNumber)}>
+            <button type="button" className="secondary-button" onClick={() => setCurrentPage(baseSectionPage)}>
               回到问题页
             </button>
             <button
@@ -433,33 +474,31 @@ export default function ScoreIssuePage() {
             ) : (
               <canvas ref={canvasRef} className="pdf-preview-canvas" />
             )}
-            {currentPage === pageNumber ? (
-              <div className="score-measure-overlay" aria-hidden="true">
-                {overlayItems.map((item) => (
+            <div className="score-measure-overlay" aria-hidden="true">
+              {overlayItems.map((item) => (
+                <div
+                  key={`measure-${item.measureIndex}`}
+                  className={`score-measure-highlight${activeMeasureIndex === item.measureIndex ? " is-active" : ""}`}
+                  style={{
+                    left: `${item.left}%`,
+                    top: `${item.top}%`,
+                    width: `${item.width}%`,
+                    height: `${item.height}%`,
+                  }}
+                >
+                  <span>{item.measureIndex}</span>
+                </div>
+              ))}
+              {noteOverlayItems
+                .filter((item) => item.pageNumber === currentPage && (activeMeasureIndex == null || item.measureIndex === activeMeasureIndex))
+                .map((item) => (
                   <div
-                    key={`measure-${item.measureIndex}`}
-                    className={`score-measure-highlight${activeMeasureIndex === item.measureIndex ? " is-active" : ""}`}
-                    style={{
-                      left: `${item.left}%`,
-                      top: `${item.top}%`,
-                      width: `${item.width}%`,
-                      height: `${item.height}%`,
-                    }}
-                  >
-                    <span>{item.measureIndex}</span>
-                  </div>
+                    key={item.key}
+                    className={`score-note-highlight${item.exact ? " is-exact" : ""}`}
+                    style={{ left: `${item.left}%`, top: `${item.top}%` }}
+                  />
                 ))}
-                {noteOverlayItems
-                  .filter((item) => item.pageNumber === currentPage && (activeMeasureIndex == null || item.measureIndex === activeMeasureIndex))
-                  .map((item) => (
-                    <div
-                      key={item.key}
-                      className={`score-note-highlight${item.exact ? " is-exact" : ""}`}
-                      style={{ left: `${item.left}%`, top: `${item.top}%` }}
-                    />
-                  ))}
-              </div>
-            ) : null}
+            </div>
           </div>
         </section>
       </div>
