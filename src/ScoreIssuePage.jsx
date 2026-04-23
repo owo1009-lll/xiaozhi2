@@ -48,11 +48,16 @@ function getDerivedPageImagePath(score, pageNumber) {
 
 function buildImportedPageImagePath(score, section, pageNumber) {
   const baseSectionPage = extractSectionPageNumber(section || {});
-  const derived = getDerivedPageImagePath(score, pageNumber);
-  if (derived) return derived;
   const explicit = String(section?.pageImagePath || "").trim();
+  // Return explicit path for the section's base page
   if (explicit && (Number(pageNumber) || 1) === baseSectionPage) return explicit;
-  return explicit;
+  // Only derive pagewise path for adjacent pages when section confirms images exist
+  if (explicit) {
+    const derived = getDerivedPageImagePath(score, pageNumber);
+    if (derived) return derived;
+  }
+  // No confirmed pagewise images — use PDF.js directly
+  return "";
 }
 
 function readExactNotePosition(section, noteId) {
@@ -168,10 +173,11 @@ export default function ScoreIssuePage() {
   const [selectedMeasureIndex, setSelectedMeasureIndex] = useState(null);
   const [selectedNoteKey, setSelectedNoteKey] = useState("");
   const [pageImageFailed, setPageImageFailed] = useState(false);
-  const [zoom, setZoom] = useState(1.5);
+  const [zoom, setZoom] = useState(1.0);
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const canvasRef = useRef(null);
   const viewportRef = useRef(null);
+  const hasAutoFittedRef = useRef(false);
   const issueListRefs = useRef(new Map());
 
   useEffect(() => {
@@ -202,6 +208,7 @@ export default function ScoreIssuePage() {
 
   useEffect(() => {
     setPageImageFailed(false);
+    hasAutoFittedRef.current = false;
   }, [score?.sourcePdfPath, section?.pageImagePath, currentPage]);
 
   const baseSectionPage = extractSectionPageNumber(section || {});
@@ -231,17 +238,26 @@ export default function ScoreIssuePage() {
         const safePage = Math.min(Math.max(1, currentPage || 1), document.numPages || 1);
         const page = await document.getPage(safePage);
         if (cancelled) return;
-        const viewport = page.getViewport({ scale: 1.45 });
+        const containerWidth = viewportRef.current ? viewportRef.current.clientWidth - 24 : 0;
+        const baseViewport = page.getViewport({ scale: 1 });
+        const fitScale = containerWidth > 0 ? containerWidth / baseViewport.width : 1.5;
+        const renderScale = Math.max(fitScale, 1.5);
+        const viewport = page.getViewport({ scale: renderScale });
         const canvas = canvasRef.current;
+        if (!canvas) return;
         const context = canvas.getContext("2d");
         canvas.width = viewport.width;
         canvas.height = viewport.height;
         setStageSize({ width: viewport.width, height: viewport.height });
+        if (!hasAutoFittedRef.current) {
+          setZoom(1.0);
+          hasAutoFittedRef.current = true;
+        }
         renderTask = page.render({ canvasContext: context, viewport });
         await renderTask.promise;
-      } catch {
-        if (!cancelled) {
-          setError("无法加载乐谱页面，请返回上一页重新打开。");
+      } catch (err) {
+        if (!cancelled && !(String(err?.message || err).includes("cancel") || String(err?.name || "").includes("cancel"))) {
+          setError("无法加载乐谱页面，请尝试点击上方【打开 PDF】按钮在新窗口查看。");
         }
       }
     }
@@ -459,10 +475,14 @@ export default function ScoreIssuePage() {
 
   function handleImageLoad(event) {
     const image = event.currentTarget;
-    setStageSize({
-      width: image.naturalWidth || image.width || 0,
-      height: image.naturalHeight || image.height || 0,
-    });
+    const naturalW = image.naturalWidth || image.width || 0;
+    const naturalH = image.naturalHeight || image.height || 0;
+    setStageSize({ width: naturalW, height: naturalH });
+    if (!hasAutoFittedRef.current && viewportRef.current && naturalW > 0) {
+      const available = viewportRef.current.clientWidth - 24;
+      setZoom(Math.max(0.5, Math.min(3.5, parseFloat((available / naturalW).toFixed(2)))));
+      hasAutoFittedRef.current = true;
+    }
   }
 
   function setIssueListRef(key, element) {
@@ -593,8 +613,16 @@ export default function ScoreIssuePage() {
               <button type="button" className="secondary-button" onClick={() => setZoom((value) => Math.min(3.5, Number((value + 0.15).toFixed(2))))}>
                 放大
               </button>
-              <button type="button" className="secondary-button" onClick={() => setZoom(1.5)}>
-                重置
+              <button type="button" className="secondary-button" onClick={() => {
+                const w = stageSize.width;
+                const cw = viewportRef.current?.clientWidth;
+                if (w && cw) {
+                  setZoom(Math.max(0.5, Math.min(3.5, parseFloat(((cw - 24) / w).toFixed(2)))));
+                } else {
+                  setZoom(1.0);
+                }
+              }}>
+                适应宽度
               </button>
             </div>
           </div>

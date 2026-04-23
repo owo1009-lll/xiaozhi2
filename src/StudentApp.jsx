@@ -878,7 +878,10 @@ export default function StudentApp({ onOpenResearch }) {
               上传音频
             </button>
             <button type="button" className="secondary-button" onClick={handleAnalyze} disabled={analysisBusy}>
-              {analysisBusy ? "分析中..." : "开始诊断"}
+              {analysisBusy ? "分析中..." : "分段诊断"}
+            </button>
+            <button type="button" className="secondary-button" onClick={handleRunWholePiece} disabled={wholePieceBusy}>
+              {wholePieceBusy ? "整曲分析中..." : "整曲分析"}
             </button>
           </div>
           <input
@@ -910,9 +913,12 @@ export default function StudentApp({ onOpenResearch }) {
                 <strong>{percentText(analysisJob.progress)}</strong>
               </div>
               <div className="omr-progress-track" aria-hidden="true">
-                <span className="omr-progress-fill" style={{ width: percentText(analysisJob.progress) }} />
+                <span
+                  className={`omr-progress-fill${analysisJob.stage === "analyzing" ? " is-analyzing" : ""}`}
+                  style={{ width: percentText(analysisJob.progress) }}
+                />
               </div>
-              <p>{buildAnalysisStatusMessage(analysisJob)}</p>
+              <p>{buildAnalysisStatusMessage(analysisJob)}{analysisJob.stage === "analyzing" ? " 音频分析需要 2–8 分钟，请耐心等待。" : ""}</p>
             </div>
           ) : null}
           {audioPreviewUrl ? <audio controls className="audio-player" src={audioPreviewUrl} /> : null}
@@ -948,7 +954,7 @@ export default function StudentApp({ onOpenResearch }) {
               </div>
             </>
           ) : (
-            <div className="empty-card">完成 PDF 导入、选段和音频上传后，点击“开始诊断”。</div>
+            <div className="empty-card">完成 PDF 导入、上传音频后，点击【分段诊断】对当前选段诊断，或点击【整曲分析】对整首曲子逐段分析。</div>
           )}
         </section>
 

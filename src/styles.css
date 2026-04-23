@@ -415,6 +415,18 @@ button {
   height: 100%;
   border-radius: inherit;
   background: var(--accent);
+  transition: width 0.6s ease;
+}
+
+.omr-progress-fill.is-analyzing {
+  background: linear-gradient(90deg, var(--accent) 0%, #4b5563 50%, var(--accent) 100%);
+  background-size: 200% 100%;
+  animation: progress-analyzing 1.8s linear infinite;
+}
+
+@keyframes progress-analyzing {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .omr-step-list {
