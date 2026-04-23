@@ -41,6 +41,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-scan", action="store_true", help="Reuse an existing scan JSON in the output directory instead of re-running the scan.")
     parser.add_argument("--cache-dir", default="", help="Optional directory for per-section cached pass rows. Defaults to <output-dir>/section-cache.")
     parser.add_argument("--refresh-cache", action="store_true", help="Ignore existing per-section cache and recompute all section passes.")
+    parser.add_argument("--scan-preprocess-mode", default="off", help="preprocessMode used during scan windows. 'off' skips source separation for speed.")
     return parser.parse_args()
 
 
@@ -165,6 +166,8 @@ def run_scan(args: argparse.Namespace, scan_output_dir: Path) -> Path:
         str(args.window_padding),
         "--max-candidates-per-section",
         str(args.max_candidates_per_section),
+        "--scan-preprocess-mode",
+        args.scan_preprocess_mode,
     ]
     if args.score_id:
         command.extend(["--score-id", args.score_id])
@@ -325,12 +328,6 @@ def write_cached_section_row(
             indent=2,
         ),
         encoding="utf-8",
-    )
-    return (
-        f"当前整曲 pass 已覆盖 {summary.get('matchedSectionCount')}/{summary.get('structuredSectionCount')} 个结构化段落，"
-        f"加权音准 {summary.get('weightedPitchScore')}，加权节奏 {summary.get('weightedRhythmScore')}，"
-        f"整曲优先路径为 {summary.get('dominantPracticePath')}。"
-        + (f" 当前最弱的段落是 {weakest_labels}。" if weakest_labels else "")
     )
 
 

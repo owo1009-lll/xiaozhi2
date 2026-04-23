@@ -30,6 +30,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-sections", type=int, default=0, help="Optional hard cap on section count for faster scans.")
     parser.add_argument("--section-id", action="append", default=[], help="Only scan selected section ids. Repeatable.")
     parser.add_argument("--section-ids", default="", help="Comma-separated section ids. Prefer this on Windows shells that mangle repeated flags.")
+    parser.add_argument("--scan-preprocess-mode", default="off", help="preprocessMode sent to the analyzer during scan windows. 'off' skips source separation for speed.")
     return parser.parse_args()
 
 
@@ -75,7 +76,7 @@ def slice_audio(audio_path: Path, start_seconds: float, duration_seconds: float)
     return buffer.getvalue(), len(waveform) / sample_rate
 
 
-def analyze_window(analyzer_url: str, piece: dict, section: dict, wav_bytes: bytes, duration_seconds: float, label: str) -> dict:
+def analyze_window(analyzer_url: str, piece: dict, section: dict, wav_bytes: bytes, duration_seconds: float, label: str, scan_preprocess_mode: str = "off") -> dict:
     piece_pack = {
         "pieceId": piece.get("pieceId"),
         "sectionId": section.get("sectionId"),
@@ -92,7 +93,7 @@ def analyze_window(analyzer_url: str, piece: dict, section: dict, wav_bytes: byt
         "sessionStage": "pretest",
         "pieceId": piece.get("pieceId"),
         "sectionId": section.get("sectionId"),
-        "preprocessMode": "auto",
+        "preprocessMode": scan_preprocess_mode,
         "piecePack": piece_pack,
         "audioSubmission": {
             "name": f"{label}.wav",
@@ -167,6 +168,7 @@ def scan_section(
     hint_step: float,
     window_padding: float,
     max_candidates: int,
+    scan_preprocess_mode: str = "off",
 ) -> dict:
     hints = section.get("researchWindowHints") or [0.0]
     expected_duration = section_length_beats(section) * (60.0 / max(30.0, float(section.get("tempo") or 72)))
@@ -178,7 +180,7 @@ def scan_section(
     attempts = []
     for start_seconds in candidates:
         wav_bytes, actual_duration = slice_audio(audio_path, start_seconds, window_duration)
-        analysis = analyze_window(analyzer_url, piece, section, wav_bytes, actual_duration, f"{section.get('sectionId')}-{start_seconds}")
+        analysis = analyze_window(analyzer_url, piece, section, wav_bytes, actual_duration, f"{section.get('sectionId')}-{start_seconds}", scan_preprocess_mode)
         score = score_analysis(analysis)
         hint_distance = nearest_hint_distance(start_seconds, [float(hint) for hint in hints])
         summary = {
@@ -286,6 +288,7 @@ def main() -> int:
                 args.hint_step,
                 args.window_padding,
                 args.max_candidates_per_section,
+                args.scan_preprocess_mode,
             )
         )
 
