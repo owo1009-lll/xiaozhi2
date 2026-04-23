@@ -292,12 +292,26 @@ function normalizePiecePackOverride(piecePack = {}, fallback = {}) {
       const beatDuration = Math.max(0.125, safeNumber(note?.beatDuration, 1));
       const midiPitch = clamp(Math.round(safeNumber(note?.midiPitch, 69)), 21, 108);
       const noteId = safeString(note?.noteId).trim() || `manual-m${measureIndex}-n${index + 1}`;
+      const normalizedX = safeNumber(note?.notePosition?.normalizedX, NaN);
+      const normalizedY = safeNumber(note?.notePosition?.normalizedY, NaN);
+      const notePosition =
+        Number.isFinite(normalizedX) && Number.isFinite(normalizedY)
+          ? {
+              pageNumber: Math.max(1, Math.round(safeNumber(note?.notePosition?.pageNumber, 1))),
+              systemIndex: Math.max(1, Math.round(safeNumber(note?.notePosition?.systemIndex, 1))),
+              staffIndex: Math.max(1, Math.round(safeNumber(note?.notePosition?.staffIndex, 1))),
+              normalizedX: clamp(normalizedX, 0, 1),
+              normalizedY: clamp(normalizedY, 0, 1),
+              source: safeString(note?.notePosition?.source, "musicxml-layout"),
+            }
+          : null;
       return {
         noteId,
         measureIndex,
         beatStart,
         beatDuration,
         midiPitch,
+        notePosition,
       };
     })
     .filter((note) => note.noteId);
@@ -314,6 +328,7 @@ function normalizePiecePackOverride(piecePack = {}, fallback = {}) {
     tempo: clamp(safeNumber(piecePack.tempo, fallback.tempo || 72), 30, 220),
     meter: safeString(piecePack.meter, fallback.meter || "4/4") || fallback.meter || "4/4",
     demoAudio: safeString(piecePack.demoAudio, fallback.demoAudio),
+    pageImagePath: safeString(piecePack.pageImagePath, fallback.pageImagePath),
     notes,
     noteCount: notes.length,
     measureCount: Math.max(...notes.map((note) => note.measureIndex)),
@@ -469,6 +484,7 @@ function normalizeImportedSections(sections = [], scoreFallback = {}) {
       researchWindowHints: getArray(raw?.researchWindowHints).map((item) => safeNumber(item)).filter((item) => Number.isFinite(item)),
       sourceSectionId: safeString(raw?.sourceSectionId),
       measureRange: getArray(raw?.measureRange).map((item) => Math.round(safeNumber(item))).filter((item) => Number.isFinite(item)),
+      pageImagePath: safeString(raw?.pageImagePath, normalized.pageImagePath),
     }));
 }
 
@@ -573,6 +589,19 @@ function normalizeImportedScoreRecord(score = {}) {
   };
 }
 
+function importedScoreHasExactNotePositions(score = {}) {
+  const sections = getArray(score.sections);
+  const hasExactNotePositions = sections.some((section) =>
+    getArray(section?.notes).some(
+      (note) =>
+        Number.isFinite(safeNumber(note?.notePosition?.normalizedX, NaN)) &&
+        Number.isFinite(safeNumber(note?.notePosition?.normalizedY, NaN)),
+    ),
+  );
+  const hasPageImages = sections.some((section) => safeString(section?.pageImagePath).length > 0);
+  return hasExactNotePositions && hasPageImages;
+}
+
 function normalizeScoreImportJob(job = {}) {
   return {
     jobId: safeString(job.jobId),
@@ -614,6 +643,7 @@ function findReusableImportedScore(store, { pdfHash = "", selectedPart = "erhu" 
           getArray(score.detectedParts).some((item) => safeString(item).toLowerCase() === desiredPart.toLowerCase()) ||
           desiredPart.toLowerCase() === "erhu"
         ) &&
+        importedScoreHasExactNotePositions(score) &&
         getArray(score.sections).length > 0,
     ) || null
   );

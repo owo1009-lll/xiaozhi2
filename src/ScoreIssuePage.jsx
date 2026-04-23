@@ -42,6 +42,33 @@ function formatDateTime(value) {
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("zh-CN");
 }
 
+function buildImportedPageImagePath(score, section, pageNumber) {
+  const explicit = String(section?.pageImagePath || "").trim();
+  if (explicit) return explicit;
+  const pdfUrl = String(score?.sourcePdfPath || "").trim();
+  if (!pdfUrl) return "";
+  const match = pdfUrl.match(/^(.*)\/source\.pdf$/i);
+  if (!match) return "";
+  return `${match[1]}/pagewise/page-${String(Math.max(1, Number(pageNumber) || 1)).padStart(3, "0")}.png`;
+}
+
+function readExactNotePosition(section, noteId) {
+  const notes = Array.isArray(section?.notes) ? section.notes : [];
+  const matched = notes.find((item) => String(item?.noteId || "") === String(noteId || ""));
+  const normalizedX = Number(matched?.notePosition?.normalizedX);
+  const normalizedY = Number(matched?.notePosition?.normalizedY);
+  if (!Number.isFinite(normalizedX) || !Number.isFinite(normalizedY)) {
+    return null;
+  }
+  return {
+    measureIndex: Number(matched?.measureIndex) || 1,
+    pageNumber: Number(matched?.notePosition?.pageNumber) || extractSectionPageNumber(section || {}),
+    normalizedX,
+    normalizedY,
+    systemIndex: Number(matched?.notePosition?.systemIndex) || 1,
+  };
+}
+
 function buildIssueMeasures(analysis) {
   const measureMap = new Map();
 
@@ -86,6 +113,7 @@ export default function ScoreIssuePage() {
   const [pageCount, setPageCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(extractSectionPageNumber(stored?.section || {}));
   const [selectedMeasureIndex, setSelectedMeasureIndex] = useState(null);
+  const [pageImageFailed, setPageImageFailed] = useState(false);
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -115,12 +143,28 @@ export default function ScoreIssuePage() {
   }, [score?.sourcePdfPath, stored]);
 
   useEffect(() => {
+    setPageImageFailed(false);
+  }, [score?.sourcePdfPath, section?.pageImagePath, currentPage]);
+
+  const pageNumber = extractSectionPageNumber(section || {});
+  const pageImagePath = buildImportedPageImagePath(score, section, currentPage);
+  const usePageImage = Boolean(pageImagePath && !pageImageFailed);
+
+  useEffect(() => {
+    if (!usePageImage) return;
+    const previewCount = Array.isArray(score?.previewPages) ? score.previewPages.length : 0;
+    const omrPageCount = Number(score?.omrStats?.pageCount);
+    const effectivePageCount = Number.isFinite(omrPageCount) && omrPageCount > 0 ? omrPageCount : previewCount;
+    setPageCount(Math.max(currentPage || 1, effectivePageCount || 0));
+  }, [currentPage, score?.omrStats?.pageCount, score?.previewPages, usePageImage]);
+
+  useEffect(() => {
     let cancelled = false;
     let renderTask = null;
 
     async function renderPdf() {
       const pdfUrl = score?.sourcePdfPath;
-      if (!pdfUrl || !canvasRef.current) return;
+      if (!pdfUrl || !canvasRef.current || usePageImage) return;
       try {
         const document = await getDocument(pdfUrl).promise;
         if (cancelled) return;
@@ -153,38 +197,89 @@ export default function ScoreIssuePage() {
         }
       }
     };
-  }, [currentPage, score?.sourcePdfPath]);
+  }, [currentPage, score?.sourcePdfPath, usePageImage]);
 
-  const pageNumber = extractSectionPageNumber(section || {});
   const measureCount = getSectionMeasureCount(section || {});
   const groupedIssues = useMemo(() => buildIssueMeasures(analysis), [analysis]);
   const issueMeasureIndexes = groupedIssues.map((item) => item.measureIndex);
-  const overlayItems = issueMeasureIndexes.map((measureIndex) => {
-    const slotWidth = 100 / Math.max(1, measureCount);
-    const left = Math.max(0, (measureIndex - 1) * slotWidth);
-    return {
-      measureIndex,
-      left: Math.min(left, 96),
-      width: Math.max(5.5, Math.min(slotWidth, 18)),
-    };
-  });
   const activeMeasureIndex = selectedMeasureIndex || issueMeasureIndexes[0] || null;
-  const noteOverlayItems = (analysis?.noteFindings || [])
-    .filter((item) => Number(item?.measureIndex) > 0)
-    .map((item, index) => {
-      const { measureIndex, noteIndex } = getApproximateNotePosition(item?.noteId, item?.measureIndex, index + 1);
+
+  const noteOverlayItems = useMemo(
+    () =>
+      (analysis?.noteFindings || [])
+        .filter((item) => Number(item?.measureIndex) > 0)
+        .map((item, index) => {
+          const exact = readExactNotePosition(section, item?.noteId);
+          if (exact) {
+            return {
+              key: `${item?.noteId || index}-${exact.measureIndex}`,
+              measureIndex: exact.measureIndex,
+              left: Math.min(Math.max(exact.normalizedX * 100, 0), 100),
+              top: Math.min(Math.max(exact.normalizedY * 100, 0), 100),
+              label: formatNoteLabel(item?.noteId, item?.measureIndex),
+              exact: true,
+              pageNumber: exact.pageNumber,
+            };
+          }
+          const { measureIndex, noteIndex } = getApproximateNotePosition(item?.noteId, item?.measureIndex, index + 1);
+          const slotWidth = 100 / Math.max(1, measureCount);
+          const measureLeft = Math.max(0, (measureIndex - 1) * slotWidth);
+          const relativeStep = Math.min(0.85, 0.18 + ((noteIndex - 1) % 6) * 0.12);
+          const bandIndex = (noteIndex - 1) % 3;
+          return {
+            key: `${item?.noteId || index}-${measureIndex}-${noteIndex}`,
+            measureIndex,
+            left: Math.min(measureLeft + slotWidth * relativeStep, 98),
+            top: 18 + bandIndex * 18,
+            label: formatNoteLabel(item?.noteId, item?.measureIndex),
+            exact: false,
+            pageNumber,
+          };
+        }),
+    [analysis, measureCount, pageNumber, section],
+  );
+
+  const hasExactNoteOverlay = noteOverlayItems.some((item) => item.exact);
+
+  const overlayItems = useMemo(() => {
+    if (hasExactNoteOverlay) {
+      return issueMeasureIndexes
+        .map((measureIndex) => {
+          const measureNotes = (Array.isArray(section?.notes) ? section.notes : [])
+            .filter((item) => Number(item?.measureIndex) === measureIndex)
+            .map((item) => ({
+              pageNumber: Number(item?.notePosition?.pageNumber) || pageNumber,
+              x: Number(item?.notePosition?.normalizedX),
+              y: Number(item?.notePosition?.normalizedY),
+            }))
+            .filter((item) => item.pageNumber === currentPage && Number.isFinite(item.x) && Number.isFinite(item.y));
+          if (!measureNotes.length) return null;
+          const minX = Math.min(...measureNotes.map((item) => item.x * 100));
+          const maxX = Math.max(...measureNotes.map((item) => item.x * 100));
+          const minY = Math.min(...measureNotes.map((item) => item.y * 100));
+          const maxY = Math.max(...measureNotes.map((item) => item.y * 100));
+          return {
+            measureIndex,
+            left: Math.max(0, minX - 2.6),
+            top: Math.max(0, minY - 7.5),
+            width: Math.max(5.5, (maxX - minX) + 5.2),
+            height: Math.max(14, (maxY - minY) + 15),
+          };
+        })
+        .filter(Boolean);
+    }
+    return issueMeasureIndexes.map((measureIndex) => {
       const slotWidth = 100 / Math.max(1, measureCount);
-      const measureLeft = Math.max(0, (measureIndex - 1) * slotWidth);
-      const relativeStep = Math.min(0.85, 0.18 + ((noteIndex - 1) % 6) * 0.12);
-      const bandIndex = (noteIndex - 1) % 3;
+      const left = Math.max(0, (measureIndex - 1) * slotWidth);
       return {
-        key: `${item?.noteId || index}-${measureIndex}-${noteIndex}`,
         measureIndex,
-        left: Math.min(measureLeft + slotWidth * relativeStep, 98),
-        top: 18 + bandIndex * 18,
-        label: formatNoteLabel(item?.noteId, item?.measureIndex),
+        left: Math.min(left, 96),
+        top: 8,
+        width: Math.max(5.5, Math.min(slotWidth, 18)),
+        height: 84,
       };
     });
+  }, [currentPage, hasExactNoteOverlay, issueMeasureIndexes, measureCount, pageNumber, section]);
 
   if (!analysis || !stored) {
     return (
@@ -204,7 +299,7 @@ export default function ScoreIssuePage() {
           <span className="eyebrow">ISSUE SCORE VIEW</span>
           <h1>问题乐谱页</h1>
           <p className="supporting-copy">
-            {formatSectionDisplayName(section || {})}。当前页面会把问题小节直接覆盖到乐谱上，并且只保留原音回放。
+            {formatSectionDisplayName(section || {})}。当前页面会把问题小节和问题音直接高亮到乐谱上，并且只保留原音回放。
           </p>
         </div>
         <div className="score-issue-actions">
@@ -227,7 +322,7 @@ export default function ScoreIssuePage() {
             <span className="section-step">A</span>
             <div>
               <h2>本轮结果</h2>
-              <p>只保留学生真正需要的内容：音高、节奏、综合分、原音和练习路径。</p>
+              <p>这里只保留学生真正需要的内容：音高、节奏、综合分、原音和练习路径。</p>
             </div>
           </div>
 
@@ -240,11 +335,7 @@ export default function ScoreIssuePage() {
 
           <div className="history-card">
             <h3>原音</h3>
-            {analysis?.rawAudioPath ? (
-              <audio controls className="audio-player" src={analysis.rawAudioPath} />
-            ) : (
-              <p>当前没有可播放的原音。</p>
-            )}
+            {analysis?.rawAudioPath ? <audio controls className="audio-player" src={analysis.rawAudioPath} /> : <p>当前没有可播放的原音。</p>}
           </div>
 
           <div className="history-card">
@@ -259,7 +350,7 @@ export default function ScoreIssuePage() {
             <span className="section-step">B</span>
             <div>
               <h2>乐谱高亮</h2>
-              <p>系统会在当前页把问题小节高亮出来，便于直接对照乐谱复练。</p>
+              <p>系统会在当前页把问题小节和问题音直接高亮出来，便于对照乐谱复练。</p>
             </div>
           </div>
 
@@ -305,24 +396,38 @@ export default function ScoreIssuePage() {
           </div>
 
           <div className="score-page-canvas-wrap">
-            <canvas ref={canvasRef} className="pdf-preview-canvas" />
+            {usePageImage ? (
+              <img
+                className="score-page-image"
+                src={pageImagePath}
+                alt={`score-page-${currentPage}`}
+                onError={() => setPageImageFailed(true)}
+              />
+            ) : (
+              <canvas ref={canvasRef} className="pdf-preview-canvas" />
+            )}
             {currentPage === pageNumber ? (
               <div className="score-measure-overlay" aria-hidden="true">
                 {overlayItems.map((item) => (
                   <div
                     key={`measure-${item.measureIndex}`}
                     className={`score-measure-highlight${activeMeasureIndex === item.measureIndex ? " is-active" : ""}`}
-                    style={{ left: `${item.left}%`, width: `${item.width}%` }}
+                    style={{
+                      left: `${item.left}%`,
+                      top: `${item.top}%`,
+                      width: `${item.width}%`,
+                      height: `${item.height}%`,
+                    }}
                   >
                     <span>{item.measureIndex}</span>
                   </div>
                 ))}
                 {noteOverlayItems
-                  .filter((item) => activeMeasureIndex == null || item.measureIndex === activeMeasureIndex)
+                  .filter((item) => item.pageNumber === currentPage && (activeMeasureIndex == null || item.measureIndex === activeMeasureIndex))
                   .map((item) => (
                     <div
                       key={item.key}
-                      className="score-note-highlight"
+                      className={`score-note-highlight${item.exact ? " is-exact" : ""}`}
                       style={{ left: `${item.left}%`, top: `${item.top}%` }}
                       title={item.label}
                     />
@@ -338,7 +443,7 @@ export default function ScoreIssuePage() {
           <span className="section-step">C</span>
           <div>
             <h2>问题明细</h2>
-            <p>这里统一改成“小节 / 第几音”的表达，不再显示内部 XML ID。</p>
+            <p>这里统一使用“小节 / 第几音”的表达，不再显示内部 XML ID。</p>
           </div>
         </div>
 

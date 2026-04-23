@@ -117,11 +117,7 @@ export function formatSectionDisplayName(section) {
 }
 
 export function extractSectionPageNumber(section) {
-  const candidates = [
-    section?.sourceSectionId,
-    section?.sectionId,
-    section?.title,
-  ].map((item) => String(item || ""));
+  const candidates = [section?.sourceSectionId, section?.sectionId, section?.title].map((item) => String(item || ""));
   for (const candidate of candidates) {
     const match = candidate.match(/page[-\s]?0*(\d+)/i);
     if (match) return Number(match[1]);
@@ -163,7 +159,10 @@ export function formatPracticeTargetTitle(target) {
 }
 
 export function replaceXmlIdsInText(text) {
-  return String(text || "").replace(/xml-m(\d+)-n(\d+)/gi, (_, measureIndex, noteIndex) => `第 ${Number(measureIndex)} 小节 第 ${Number(noteIndex)} 音`);
+  return String(text || "").replace(
+    /xml-m(\d+)-n(\d+)/gi,
+    (_, measureIndex, noteIndex) => `第 ${Number(measureIndex)} 小节 第 ${Number(noteIndex)} 音`,
+  );
 }
 
 export function buildIssueSessionPayload({ analysis, score, section }) {

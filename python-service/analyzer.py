@@ -127,6 +127,7 @@ class SymbolicNote:
     midi_pitch: int
     expected_onset: float
     expected_offset: float
+    note_position: dict[str, Any] | None = None
 
 
 @dataclass(slots=True)
@@ -219,6 +220,31 @@ def musicxml_pitch_to_midi(step: str, octave: int, alter: int = 0) -> int:
         "B": 11,
     }.get(step.upper(), 0)
     return int((octave + 1) * 12 + pitch_class + alter)
+
+
+def musicxml_step_to_diatonic(step: str, octave: int) -> int:
+    step_index = {
+        "C": 0,
+        "D": 1,
+        "E": 2,
+        "F": 3,
+        "G": 4,
+        "A": 5,
+        "B": 6,
+    }.get(str(step or "").upper(), 0)
+    return (int(octave) * 7) + step_index
+
+
+def musicxml_clef_reference(sign: str, line: int, octave_change: int = 0) -> tuple[int, int]:
+    normalized_sign = str(sign or "G").strip().upper()
+    normalized_line = max(1, min(5, int(line or 2)))
+    if normalized_sign == "F":
+        base_step, base_octave = "F", 3
+    elif normalized_sign == "C":
+        base_step, base_octave = "C", 4
+    else:
+        base_step, base_octave = "G", 4
+    return musicxml_step_to_diatonic(base_step, base_octave + int(octave_change or 0)), normalized_line
 
 
 def percentile(values: list[float], quantile: float) -> float:
@@ -338,6 +364,42 @@ class ErhuAnalyzer:
 
     def _page_result_cache_path(self, page_fingerprint: str) -> Path:
         return self._omr_page_result_cache_dir() / f"{self._page_cache_key(page_fingerprint, 'musicxml')}.musicxml"
+
+    def _ensure_page_preview_image(
+        self,
+        output_dir: Path,
+        page_index: int,
+        page_fingerprint: str,
+        fitz_page: Any | None = None,
+        pdf_path: Path | None = None,
+    ) -> tuple[Path | None, str]:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / f"page-{page_index:03d}.png"
+        if output_path.exists():
+            return output_path, "ready"
+
+        render_cache_path = self._page_render_cache_path(page_fingerprint)
+        if render_cache_path.exists():
+            try:
+                shutil.copy2(render_cache_path, output_path)
+                return output_path, "cache-hit"
+            except Exception:
+                return render_cache_path, "cache-hit"
+
+        rendered_path: Path | None = None
+        if fitz_page is not None:
+            rendered_path = self._render_page_image_from_page(fitz_page, page_index - 1, output_dir)
+        elif pdf_path is not None:
+            rendered_path = self._render_pdf_page_image(pdf_path, page_index - 1, output_dir)
+        if rendered_path is None or not rendered_path.exists():
+            return None, "missing"
+
+        try:
+            if not render_cache_path.exists():
+                shutil.copy2(rendered_path, render_cache_path)
+        except Exception:
+            pass
+        return rendered_path, "rendered"
 
     def _score_notes_fingerprint(self, score_notes: list[SymbolicNote]) -> str:
         payload = [
@@ -848,6 +910,30 @@ class ErhuAnalyzer:
                 page_result_cache_path = self._page_result_cache_path(page_fingerprint)
                 if page_result_cache_path.exists():
                     page_result_cache_hits += 1
+                    preview_status = "missing"
+                    if fitz_document is not None:
+                        try:
+                            if 0 <= (page_index - 1) < fitz_document.page_count:
+                                fitz_page = fitz_document.load_page(page_index - 1)
+                                _, preview_status = self._ensure_page_preview_image(
+                                    output_dir,
+                                    page_index,
+                                    page_fingerprint,
+                                    fitz_page=fitz_page,
+                                )
+                        except Exception:
+                            preview_status = "missing"
+                    else:
+                        _, preview_status = self._ensure_page_preview_image(
+                            output_dir,
+                            page_index,
+                            page_fingerprint,
+                            pdf_path=pdf_path,
+                        )
+                    if preview_status == "cache-hit":
+                        render_cache_hits += 1
+                    elif preview_status == "rendered":
+                        render_cache_misses += 1
                     generated_sources_with_order.append((page_index, str(page_result_cache_path)))
                     continue
                 page_result_cache_misses += 1
@@ -862,6 +948,12 @@ class ErhuAnalyzer:
                             if render_cache_path.exists():
                                 render_cache_hits += 1
                                 audiveris_input_path = render_cache_path
+                                try:
+                                    preview_path = output_dir / f"page-{page_index:03d}.png"
+                                    if not preview_path.exists():
+                                        shutil.copy2(render_cache_path, preview_path)
+                                except Exception:
+                                    pass
                             else:
                                 render_cache_misses += 1
                                 rendered_page_path = self._render_page_image_from_page(fitz_page, page_index - 1, output_dir)
@@ -1079,6 +1171,7 @@ class ErhuAnalyzer:
                     "beatStart": note.beat_start,
                     "beatDuration": note.beat_duration,
                     "midiPitch": note.midi_pitch,
+                    "notePosition": dict(note.note_position or {}) if getattr(note, "note_position", None) else None,
                 }
                 for note in parsed_notes
             ],
@@ -1112,6 +1205,13 @@ class ErhuAnalyzer:
                     detected_parts.append(part_name)
             resolved_part = next_resolved_part or resolved_part
             if section:
+                page_image_path = ""
+                if request.outputDir:
+                    candidate_image = Path(request.outputDir) / "pagewise" / f"page-{index:03d}.png"
+                    if candidate_image.exists():
+                        page_image_path = f"/data/score-imports/{request.jobId}/pagewise/{candidate_image.name}"
+                if page_image_path:
+                    section["pageImagePath"] = page_image_path
                 sections.extend(self._chunk_imported_section(section))
 
         if not sections:
@@ -4047,6 +4147,7 @@ class ErhuAnalyzer:
                     midi_pitch=int(note.midiPitch),
                     expected_onset=onset,
                     expected_offset=onset + duration_seconds,
+                    note_position=dict(note.notePosition or {}) if getattr(note, "notePosition", None) else None,
                 )
             )
         return hydrated
@@ -4098,18 +4199,87 @@ class ErhuAnalyzer:
             None,
         ) or part_candidates[0]
 
+        defaults_node = child(root, "defaults")
+        page_layout = child(defaults_node, "page-layout") if defaults_node is not None else None
+        page_width = max(1.0, safe_float(child(page_layout, "page-width").text if page_layout is not None and child(page_layout, "page-width") is not None else 0.0, 1000.0))
+        page_height = max(1.0, safe_float(child(page_layout, "page-height").text if page_layout is not None and child(page_layout, "page-height") is not None else 0.0, 1400.0))
+        page_left_margin = 0.0
+        page_top_margin = 0.0
+        if page_layout is not None:
+            page_margins = children(page_layout, "page-margins")
+            selected_margins = page_margins[0] if page_margins else None
+            if selected_margins is not None:
+                page_left_margin = safe_float(child(selected_margins, "left-margin").text if child(selected_margins, "left-margin") is not None else 0.0, 0.0)
+                page_top_margin = safe_float(child(selected_margins, "top-margin").text if child(selected_margins, "top-margin") is not None else 0.0, 0.0)
+
         note_events: list[NoteEvent] = []
         divisions = 1.0
         last_note_start = 0.0
+        current_clef_sign = "G"
+        current_clef_line = 2
+        current_clef_octave_change = 0
+        current_system_index = 0
+        current_system_top_line = page_top_margin + 140.0
+        current_system_left = page_left_margin
+        current_measure_offset = 0.0
+        current_staff_distance = 70.0
+        last_system_top_line: float | None = None
+        staff_height = 40.0
+        page_number_match = re.search(r"page[-\s]?0*(\d+)", str(getattr(request, "sectionId", "") or getattr(request.piecePack, "sectionId", "") or ""), flags=re.IGNORECASE)
+        page_number = int(page_number_match.group(1)) if page_number_match else 1
+
         for measure_position, measure in enumerate(children(part, "measure"), start=1):
+            print_node = child(measure, "print")
+            new_system = measure_position == 1
+            system_layout = child(print_node, "system-layout") if print_node is not None else None
+            if print_node is not None and str(print_node.attrib.get("new-system", "")).strip().lower() == "yes":
+                new_system = True
+            if system_layout is not None:
+                new_system = True
+            if new_system:
+                current_system_index += 1
+                left_margin = safe_float(child(child(system_layout, "system-margins"), "left-margin").text if system_layout is not None and child(system_layout, "system-margins") is not None and child(child(system_layout, "system-margins"), "left-margin") is not None else 0.0, 0.0)
+                if last_system_top_line is None:
+                    top_distance = safe_float(child(system_layout, "top-system-distance").text if system_layout is not None and child(system_layout, "top-system-distance") is not None else 0.0, 0.0)
+                    current_system_top_line = page_top_margin + (top_distance if top_distance > 0 else 140.0)
+                else:
+                    system_distance = safe_float(child(system_layout, "system-distance").text if system_layout is not None and child(system_layout, "system-distance") is not None else 0.0, 0.0)
+                    top_distance = safe_float(child(system_layout, "top-system-distance").text if system_layout is not None and child(system_layout, "top-system-distance") is not None else 0.0, 0.0)
+                    next_gap = system_distance if system_distance > 0 else (top_distance if top_distance > 0 else 180.0)
+                    current_system_top_line = last_system_top_line + staff_height + max(60.0, next_gap)
+                current_system_left = page_left_margin + max(0.0, left_margin)
+                current_measure_offset = 0.0
+                last_system_top_line = current_system_top_line
+
             attributes = child(measure, "attributes")
             if attributes is not None:
                 divisions_node = child(attributes, "divisions")
                 if divisions_node is not None and divisions_node.text:
                     divisions = max(1.0, safe_float(divisions_node.text, 1.0))
+                staves_node = child(attributes, "staves")
+                if staves_node is not None and staves_node.text:
+                    staves_count = max(1, int(safe_float(staves_node.text, 1)))
+                    current_staff_distance = 70.0 if staves_count <= 1 else 90.0
+                clef_nodes = children(attributes, "clef")
+                if clef_nodes:
+                    clef_node = clef_nodes[0]
+                    sign_node = child(clef_node, "sign")
+                    line_node = child(clef_node, "line")
+                    octave_change_node = child(clef_node, "clef-octave-change")
+                    if sign_node is not None and sign_node.text:
+                        current_clef_sign = sign_node.text.strip() or current_clef_sign
+                    if line_node is not None and line_node.text:
+                        current_clef_line = max(1, min(5, int(safe_float(line_node.text, current_clef_line))))
+                    current_clef_octave_change = int(safe_float(octave_change_node.text if octave_change_node is not None else 0, 0))
 
             current_beat = 0.0
             measure_index = int(measure.attrib.get("number", measure_position) or measure_position)
+            clef_reference_diatonic, clef_reference_line = musicxml_clef_reference(
+                current_clef_sign,
+                current_clef_line,
+                current_clef_octave_change,
+            )
+            top_line_diatonic = clef_reference_diatonic + ((5 - clef_reference_line) * 2)
             for note_index, note in enumerate(children(measure, "note"), start=1):
                 is_rest = child(note, "rest") is not None
                 is_chord = child(note, "chord") is not None
@@ -4126,11 +4296,23 @@ class ErhuAnalyzer:
                         alter_node = child(pitch, "alter")
                         octave_node = child(pitch, "octave")
                         if step_node is not None and octave_node is not None and step_node.text and octave_node.text:
+                            step_text = step_node.text.strip()
+                            octave_value = int(safe_float(octave_node.text, 4))
+                            alter_value = int(safe_float(alter_node.text if alter_node is not None else 0, 0))
                             midi_pitch = musicxml_pitch_to_midi(
-                                step_node.text,
-                                int(safe_float(octave_node.text, 4)),
-                                int(safe_float(alter_node.text if alter_node is not None else 0, 0)),
+                                step_text,
+                                octave_value,
+                                alter_value,
                             )
+                            default_x = safe_float(note.attrib.get("default-x"), 0.0, )
+                            staff_node = child(note, "staff")
+                            staff_index = max(1, int(safe_float(staff_node.text if staff_node is not None else 1, 1)))
+                            note_diatonic = musicxml_step_to_diatonic(step_text, octave_value)
+                            staff_offset = float(staff_index - 1) * current_staff_distance
+                            absolute_x = current_system_left + current_measure_offset + max(0.0, default_x)
+                            absolute_y = current_system_top_line + staff_offset + ((top_line_diatonic - note_diatonic) * 5.0)
+                            normalized_x = max(0.0, min(1.0, absolute_x / page_width))
+                            normalized_y = max(0.0, min(1.0, absolute_y / page_height))
                             note_events.append(
                                 NoteEvent(
                                     noteId=f"xml-m{measure_index}-n{note_index}",
@@ -4138,10 +4320,21 @@ class ErhuAnalyzer:
                                     beatStart=beat_start,
                                     beatDuration=max(duration_beats, 0.25),
                                     midiPitch=midi_pitch,
+                                    notePosition={
+                                        "pageNumber": page_number,
+                                        "systemIndex": current_system_index or 1,
+                                        "staffIndex": staff_index,
+                                        "normalizedX": round(float(normalized_x), 6),
+                                        "normalizedY": round(float(normalized_y), 6),
+                                        "pageWidth": round(float(page_width), 3),
+                                        "pageHeight": round(float(page_height), 3),
+                                        "source": "musicxml-layout",
+                                    },
                                 )
                             )
                 if not is_chord:
                     current_beat += max(duration_beats, 0.0)
+            current_measure_offset += max(0.0, safe_float(measure.attrib.get("width"), 0.0))
 
         note_events = self._collapse_erhu_melody_events(note_events)
         return self._hydrate_piece_notes(note_events, request)
@@ -4216,6 +4409,7 @@ class ErhuAnalyzer:
                     beatStart=float(note.beatStart),
                     beatDuration=max(float(note.beatDuration), 0.25),
                     midiPitch=int(note.midiPitch),
+                    notePosition=dict(note.notePosition or {}) if getattr(note, "notePosition", None) else None,
                 )
             )
         return normalized

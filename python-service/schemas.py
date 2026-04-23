@@ -11,6 +11,7 @@ class NoteEvent(BaseModel):
     beatStart: float = 0.0
     beatDuration: float = 1.0
     midiPitch: int = 60
+    notePosition: dict[str, Any] | None = None
 
 
 class SymbolicScoreSource(BaseModel):
