@@ -9,6 +9,7 @@ import {
   formatPracticePathLabel,
   formatRhythmLabelText,
   formatSectionDisplayName,
+  getApproximateNotePosition,
   getDisplayCombinedScore,
   getDisplayPitchScore,
   getDisplayRhythmScore,
@@ -84,6 +85,7 @@ export default function ScoreIssuePage() {
   const [error, setError] = useState("");
   const [pageCount, setPageCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(extractSectionPageNumber(stored?.section || {}));
+  const [selectedMeasureIndex, setSelectedMeasureIndex] = useState(null);
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -166,6 +168,23 @@ export default function ScoreIssuePage() {
       width: Math.max(5.5, Math.min(slotWidth, 18)),
     };
   });
+  const activeMeasureIndex = selectedMeasureIndex || issueMeasureIndexes[0] || null;
+  const noteOverlayItems = (analysis?.noteFindings || [])
+    .filter((item) => Number(item?.measureIndex) > 0)
+    .map((item, index) => {
+      const { measureIndex, noteIndex } = getApproximateNotePosition(item?.noteId, item?.measureIndex, index + 1);
+      const slotWidth = 100 / Math.max(1, measureCount);
+      const measureLeft = Math.max(0, (measureIndex - 1) * slotWidth);
+      const relativeStep = Math.min(0.85, 0.18 + ((noteIndex - 1) % 6) * 0.12);
+      const bandIndex = (noteIndex - 1) % 3;
+      return {
+        key: `${item?.noteId || index}-${measureIndex}-${noteIndex}`,
+        measureIndex,
+        left: Math.min(measureLeft + slotWidth * relativeStep, 98),
+        top: 18 + bandIndex * 18,
+        label: formatNoteLabel(item?.noteId, item?.measureIndex),
+      };
+    });
 
   if (!analysis || !stored) {
     return (
@@ -250,6 +269,24 @@ export default function ScoreIssuePage() {
             <span>问题小节：{issueMeasureIndexes.length || 0}</span>
           </div>
 
+          {issueMeasureIndexes.length ? (
+            <div className="issue-chip-row">
+              {issueMeasureIndexes.map((measureIndex) => (
+                <button
+                  type="button"
+                  key={`measure-chip-${measureIndex}`}
+                  className={`issue-chip${activeMeasureIndex === measureIndex ? " is-active" : ""}`}
+                  onClick={() => {
+                    setCurrentPage(pageNumber);
+                    setSelectedMeasureIndex(measureIndex);
+                  }}
+                >
+                  {formatMeasureLabel(measureIndex)}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
           <div className="score-page-nav">
             <button type="button" className="secondary-button" onClick={() => setCurrentPage((value) => Math.max(1, value - 1))} disabled={currentPage <= 1}>
               上一页
@@ -274,12 +311,22 @@ export default function ScoreIssuePage() {
                 {overlayItems.map((item) => (
                   <div
                     key={`measure-${item.measureIndex}`}
-                    className="score-measure-highlight"
+                    className={`score-measure-highlight${activeMeasureIndex === item.measureIndex ? " is-active" : ""}`}
                     style={{ left: `${item.left}%`, width: `${item.width}%` }}
                   >
                     <span>{item.measureIndex}</span>
                   </div>
                 ))}
+                {noteOverlayItems
+                  .filter((item) => activeMeasureIndex == null || item.measureIndex === activeMeasureIndex)
+                  .map((item) => (
+                    <div
+                      key={item.key}
+                      className="score-note-highlight"
+                      style={{ left: `${item.left}%`, top: `${item.top}%` }}
+                      title={item.label}
+                    />
+                  ))}
               </div>
             ) : null}
           </div>

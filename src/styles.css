@@ -786,6 +786,27 @@ button {
   color: var(--accent);
 }
 
+.issue-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.issue-chip {
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: var(--text-main);
+}
+
+.issue-chip.is-active {
+  border-color: #f59e0b;
+  background: #fff7e6;
+  color: #9a6700;
+}
+
 .score-page-nav {
   display: flex;
   flex-wrap: wrap;
@@ -814,6 +835,11 @@ button {
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45) inset;
 }
 
+.score-measure-highlight.is-active {
+  border-width: 3px;
+  background: rgba(245, 158, 11, 0.28);
+}
+
 .score-measure-highlight span {
   position: absolute;
   top: 8px;
@@ -826,6 +852,18 @@ button {
   font-size: 12px;
   font-weight: 700;
   text-align: center;
+}
+
+.score-note-highlight {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  margin-top: -7px;
+  border-radius: 50%;
+  border: 2px solid rgba(17, 51, 45, 0.95);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.32);
 }
 
 @media (max-width: 900px) {

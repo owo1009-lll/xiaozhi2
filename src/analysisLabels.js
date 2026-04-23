@@ -14,6 +14,20 @@ export function parseXmlNoteId(noteId) {
   };
 }
 
+export function getApproximateNotePosition(noteId, fallbackMeasureIndex, fallbackOrder = 0) {
+  const parsed = parseXmlNoteId(noteId);
+  if (parsed) {
+    return {
+      measureIndex: parsed.measureIndex,
+      noteIndex: parsed.noteIndex,
+    };
+  }
+  return {
+    measureIndex: Number(fallbackMeasureIndex) || 1,
+    noteIndex: Math.max(1, Number(fallbackOrder) || 1),
+  };
+}
+
 export function formatMeasureLabel(measureIndex) {
   const numeric = Number(measureIndex);
   if (!Number.isFinite(numeric) || numeric <= 0) return "未定位小节";
