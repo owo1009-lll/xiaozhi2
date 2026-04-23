@@ -8,7 +8,9 @@ import io
 import json
 import subprocess
 import sys
+import threading
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from urllib import error, request
 
@@ -42,6 +44,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cache-dir", default="", help="Optional directory for per-section cached pass rows. Defaults to <output-dir>/section-cache.")
     parser.add_argument("--refresh-cache", action="store_true", help="Ignore existing per-section cache and recompute all section passes.")
     parser.add_argument("--scan-preprocess-mode", default="off", help="preprocessMode used during scan windows. 'off' skips source separation for speed.")
+    parser.add_argument("--analysis-concurrency", type=int, default=4, help="Number of sections to analyze in parallel during the analysis pass.")
     return parser.parse_args()
 
 
@@ -440,6 +443,86 @@ def write_cached_section_row(
     )
 
 
+def _analyze_section_item(
+    item: dict,
+    section: dict,
+    audio_path: Path,
+    cache_dir: Path,
+    piece: dict,
+    analyzer_url: str,
+    preprocess_mode: str,
+    refresh_cache: bool,
+) -> tuple[dict, bool]:
+    section_id = item.get("sectionId")
+    start_seconds = safe_number(item.get("startSeconds"), 0.0)
+    duration_seconds = max(1.0, safe_number(item.get("durationSeconds"), 8.0))
+    note_count = len(section.get("notes") or [])
+    measure_count = len({note.get("measureIndex") for note in section.get("notes") or []})
+    piece_id = str(piece.get("pieceId"))
+
+    row = None if refresh_cache else load_cached_section_row(
+        cache_dir, piece_id, str(section_id), start_seconds, duration_seconds, preprocess_mode,
+    )
+    if row:
+        row = dict(row)
+        row["rawScanScore"] = item.get("score")
+        row["priorAdjustedScore"] = item.get("priorAdjustedScore")
+        row["nearestHintDistance"] = item.get("nearestHintDistance")
+        return row, True
+
+    wav_bytes, actual_duration = slice_audio(audio_path, start_seconds, duration_seconds)
+    analysis = analyze_window(
+        analyzer_url, piece, section, wav_bytes, actual_duration, preprocess_mode,
+        f"{section_id}-{start_seconds}",
+    )
+    combined_score = round(
+        safe_number(analysis.get("overallPitchScore"), 0) * 0.45
+        + safe_number(analysis.get("overallRhythmScore"), 0) * 0.45
+        + safe_number(analysis.get("confidence"), 0) * 10,
+        2,
+    )
+    row = {
+        "pieceId": piece.get("pieceId"),
+        "pieceTitle": piece.get("title"),
+        "sequenceIndex": int(section.get("sequenceIndex") or 0),
+        "sectionId": section_id,
+        "sectionTitle": section.get("title"),
+        "startSeconds": round(start_seconds, 2),
+        "endSeconds": round(start_seconds + actual_duration, 2),
+        "durationSeconds": round(actual_duration, 2),
+        "noteCount": note_count,
+        "measureCount": measure_count,
+        "rawScanScore": item.get("score"),
+        "priorAdjustedScore": item.get("priorAdjustedScore"),
+        "nearestHintDistance": item.get("nearestHintDistance"),
+        "overallPitchScore": analysis.get("overallPitchScore"),
+        "overallRhythmScore": analysis.get("overallRhythmScore"),
+        "studentPitchScore": analysis.get("studentPitchScore", analysis.get("overallPitchScore")),
+        "studentRhythmScore": analysis.get("studentRhythmScore", analysis.get("overallRhythmScore")),
+        "confidence": analysis.get("confidence"),
+        "combinedScore": combined_score,
+        "studentCombinedScore": analysis.get(
+            "studentCombinedScore",
+            round(
+                (
+                    safe_number(analysis.get("studentPitchScore", analysis.get("overallPitchScore")), 0)
+                    + safe_number(analysis.get("studentRhythmScore", analysis.get("overallRhythmScore")), 0)
+                )
+                / 2.0
+            ),
+        ),
+        "recommendedPracticePath": analysis.get("recommendedPracticePath"),
+        "measureFindingCount": len(analysis.get("measureFindings") or []),
+        "noteFindingCount": len(analysis.get("noteFindings") or []),
+        "summaryText": analysis.get("summaryText") or "",
+        "teacherComment": analysis.get("teacherComment") or "",
+        "practiceTargets": analysis.get("practiceTargets") or [],
+        "diagnostics": analysis.get("diagnostics") or {},
+    }
+    write_cached_section_row(cache_dir, piece_id, str(section_id), start_seconds, duration_seconds, preprocess_mode, row)
+    return row, False
+
+
 def main() -> int:
     args = parse_args()
     output_dir = (REPO_ROOT / args.output_dir).resolve()
@@ -470,109 +553,49 @@ def main() -> int:
     section_lookup = {section.get("sectionId"): section for section in piece.get("sections") or []}
     audio_path = (REPO_ROOT / args.audio).resolve()
 
+    valid_items = [(item, section_lookup.get(item.get("sectionId"))) for item in sequence_path]
+    valid_items = [(item, sec) for item, sec in valid_items if sec]
+    total_sections = max(1, len(valid_items))
     section_rows = []
     cache_hits = 0
-    total_sections = max(1, len(sequence_path))
-    for item in sequence_path:
-        section_id = item.get("sectionId")
-        section = section_lookup.get(section_id)
-        if not section:
-            continue
-        start_seconds = safe_number(item.get("startSeconds"), 0.0)
-        duration_seconds = max(1.0, safe_number(item.get("durationSeconds"), 8.0))
-        note_count = len(section.get("notes") or [])
-        measure_count = len({note.get("measureIndex") for note in section.get("notes") or []})
+    completed_count = 0
+    progress_lock = threading.Lock()
 
-        row = None if args.refresh_cache else load_cached_section_row(
-            cache_dir,
-            str(piece.get("pieceId")),
-            str(section_id),
-            start_seconds,
-            duration_seconds,
-            args.preprocess_mode,
+    def _run_item(pair: tuple) -> tuple[dict, bool]:
+        item, sec = pair
+        return _analyze_section_item(
+            item, sec, audio_path, cache_dir, piece,
+            args.analyzer_url, args.preprocess_mode, args.refresh_cache,
         )
-        if row:
-            cache_hits += 1
-            row["rawScanScore"] = item.get("score")
-            row["priorAdjustedScore"] = item.get("priorAdjustedScore")
-            row["nearestHintDistance"] = item.get("nearestHintDistance")
+
+    concurrency = max(1, args.analysis_concurrency)
+    if concurrency <= 1 or len(valid_items) <= 1:
+        for pair in valid_items:
+            row, hit = _run_item(pair)
             section_rows.append(row)
+            cache_hits += hit
+            completed_count += 1
+            label = "复用并汇总" if hit else "分析"
             emit_progress(
-                0.35 + (len(section_rows) / total_sections) * 0.5,
+                0.35 + (completed_count / total_sections) * 0.5,
                 "analyzing-sections",
-                f"正在复用并汇总第 {len(section_rows)}/{total_sections} 个段落。",
+                f"正在{label}第 {completed_count}/{total_sections} 个段落。",
             )
-            continue
-
-        wav_bytes, actual_duration = slice_audio(audio_path, start_seconds, duration_seconds)
-        analysis = analyze_window(
-            args.analyzer_url,
-            piece,
-            section,
-            wav_bytes,
-            actual_duration,
-            args.preprocess_mode,
-            f"{section_id}-{start_seconds}",
-        )
-        combined_score = round(
-            safe_number(analysis.get("overallPitchScore"), 0) * 0.45
-            + safe_number(analysis.get("overallRhythmScore"), 0) * 0.45
-            + safe_number(analysis.get("confidence"), 0) * 10,
-            2,
-        )
-        row = {
-            "pieceId": piece.get("pieceId"),
-            "pieceTitle": piece.get("title"),
-            "sequenceIndex": int(section.get("sequenceIndex") or 0),
-            "sectionId": section_id,
-            "sectionTitle": section.get("title"),
-            "startSeconds": round(start_seconds, 2),
-            "endSeconds": round(start_seconds + actual_duration, 2),
-            "durationSeconds": round(actual_duration, 2),
-            "noteCount": note_count,
-            "measureCount": measure_count,
-            "rawScanScore": item.get("score"),
-            "priorAdjustedScore": item.get("priorAdjustedScore"),
-            "nearestHintDistance": item.get("nearestHintDistance"),
-            "overallPitchScore": analysis.get("overallPitchScore"),
-            "overallRhythmScore": analysis.get("overallRhythmScore"),
-            "studentPitchScore": analysis.get("studentPitchScore", analysis.get("overallPitchScore")),
-            "studentRhythmScore": analysis.get("studentRhythmScore", analysis.get("overallRhythmScore")),
-            "confidence": analysis.get("confidence"),
-            "combinedScore": combined_score,
-            "studentCombinedScore": analysis.get(
-                "studentCombinedScore",
-                round(
-                    (
-                        safe_number(analysis.get("studentPitchScore", analysis.get("overallPitchScore")), 0)
-                        + safe_number(analysis.get("studentRhythmScore", analysis.get("overallRhythmScore")), 0)
-                    )
-                    / 2.0
-                ),
-            ),
-            "recommendedPracticePath": analysis.get("recommendedPracticePath"),
-            "measureFindingCount": len(analysis.get("measureFindings") or []),
-            "noteFindingCount": len(analysis.get("noteFindings") or []),
-            "summaryText": analysis.get("summaryText") or "",
-            "teacherComment": analysis.get("teacherComment") or "",
-            "practiceTargets": analysis.get("practiceTargets") or [],
-            "diagnostics": analysis.get("diagnostics") or {},
-        }
-        section_rows.append(row)
-        write_cached_section_row(
-            cache_dir,
-            str(piece.get("pieceId")),
-            str(section_id),
-            start_seconds,
-            duration_seconds,
-            args.preprocess_mode,
-            row,
-        )
-        emit_progress(
-            0.35 + (len(section_rows) / total_sections) * 0.5,
-            "analyzing-sections",
-            f"正在分析第 {len(section_rows)}/{total_sections} 个段落。",
-        )
+    else:
+        with ThreadPoolExecutor(max_workers=concurrency) as executor:
+            future_map = {executor.submit(_run_item, pair): pair for pair in valid_items}
+            for future in as_completed(future_map):
+                row, hit = future.result()
+                with progress_lock:
+                    section_rows.append(row)
+                    cache_hits += hit
+                    completed_count += 1
+                    n = completed_count
+                emit_progress(
+                    0.35 + (n / total_sections) * 0.5,
+                    "analyzing-sections",
+                    f"正在分析整曲各段落（{n}/{total_sections}）。",
+                )
 
     section_rows.sort(key=lambda row: (row.get("sequenceIndex") or 0, row.get("startSeconds") or 0))
     summary = summarize_piece_pass(piece, section_rows)

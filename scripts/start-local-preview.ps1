@@ -112,7 +112,7 @@ if (Test-Path $pythonRunner) {
   $analyzerProcess = Find-ProcessByCommandLine -Patterns @($repoRoot, "uvicorn", "python-service")
   if (-not $analyzerProcess) {
     $startedAnalyzer = Start-Process -FilePath "powershell" `
-      -ArgumentList "-ExecutionPolicy", "Bypass", "-File", $pythonRunner, "-m", "uvicorn", "app:app", "--app-dir", "python-service", "--host", "127.0.0.1", "--port", "8000" `
+      -ArgumentList "-ExecutionPolicy", "Bypass", "-File", $pythonRunner, "-m", "uvicorn", "app:app", "--app-dir", "python-service", "--host", "127.0.0.1", "--port", "8000", "--workers", "4" `
       -WorkingDirectory $repoRoot `
       -RedirectStandardOutput $analyzerLog `
       -RedirectStandardError $analyzerErrLog `

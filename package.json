@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "server": "node server.js",
-    "analyzer:start": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 -m uvicorn app:app --app-dir python-service --host 127.0.0.1 --port 8000",
+    "analyzer:start": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 -m uvicorn app:app --app-dir python-service --host 127.0.0.1 --port 8000 --workers 4",
     "build": "vite build",
     "start": "node server.js",
     "start-prod": "powershell -ExecutionPolicy Bypass -File scripts\\start-prod.ps1",

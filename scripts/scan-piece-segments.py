@@ -4,6 +4,7 @@ import argparse
 import base64
 import io
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from urllib import error, request
 
@@ -31,6 +32,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--section-id", action="append", default=[], help="Only scan selected section ids. Repeatable.")
     parser.add_argument("--section-ids", default="", help="Comma-separated section ids. Prefer this on Windows shells that mangle repeated flags.")
     parser.add_argument("--scan-preprocess-mode", default="off", help="preprocessMode sent to the analyzer during scan windows. 'off' skips source separation for speed.")
+    parser.add_argument("--concurrency", type=int, default=4, help="Number of sections to scan in parallel.")
     return parser.parse_args()
 
 
@@ -274,23 +276,30 @@ def main() -> int:
     if args.max_sections and args.max_sections > 0:
         sections = sections[: args.max_sections]
 
+    sections_to_scan = [s for s in sections if s.get("notes")]
     scan_results = []
-    for section in sections:
-        if not section.get("notes"):
-            continue
-        scan_results.append(
-            scan_section(
-                args.analyzer_url,
-                audio_path,
-                piece,
-                section,
-                args.hint_radius,
-                args.hint_step,
-                args.window_padding,
-                args.max_candidates_per_section,
-                args.scan_preprocess_mode,
-            )
+
+    def _scan_one(section: dict) -> dict:
+        return scan_section(
+            args.analyzer_url,
+            audio_path,
+            piece,
+            section,
+            args.hint_radius,
+            args.hint_step,
+            args.window_padding,
+            args.max_candidates_per_section,
+            args.scan_preprocess_mode,
         )
+
+    if args.concurrency <= 1 or len(sections_to_scan) <= 1:
+        for section in sections_to_scan:
+            scan_results.append(_scan_one(section))
+    else:
+        with ThreadPoolExecutor(max_workers=args.concurrency) as executor:
+            future_map = {executor.submit(_scan_one, section): section for section in sections_to_scan}
+            for future in as_completed(future_map):
+                scan_results.append(future.result())
 
     ranked = sorted(
         [
