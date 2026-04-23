@@ -4120,6 +4120,20 @@ app.get("/api/erhu/scores/import-pdf/:jobId", async (req, res) => {
   const store = await readScoreStore();
   const job = store.jobs.find((item) => item.jobId === req.params.jobId);
   if (!job) {
+    if (activeScoreImportTasks.has(req.params.jobId)) {
+      return res.json({
+        ok: true,
+        job: normalizeScoreImportJob({
+          jobId: req.params.jobId,
+          omrStatus: "processing",
+          warnings: ["正在后台识谱，请稍候。"],
+          progress: 0.2,
+          stage: "queued",
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+        }),
+      });
+    }
     return res.status(404).json({ error: "score import job not found." });
   }
   return res.json({ ok: true, job });

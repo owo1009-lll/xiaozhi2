@@ -3,20 +3,13 @@ import { playReferenceNotes, unlockAudio } from "./audioSynth";
 import {
   buildIssueSessionPayload,
   clampScore,
-  formatMeasureIssueLabelText,
-  formatMeasureLabel,
-  formatNoteLabel,
-  formatPitchLabelText,
   formatPracticePathLabel,
-  formatPracticeTargetTitle,
   formatPreprocessModeLabel,
-  formatRhythmLabelText,
   formatSectionDisplayName,
   formatSourceLabel,
   getDisplayCombinedScore,
   getDisplayPitchScore,
   getDisplayRhythmScore,
-  replaceXmlIdsInText,
 } from "./analysisLabels.js";
 import {
   createAnalysis,
@@ -39,7 +32,7 @@ function percentText(value) {
 }
 
 function importProgressHeadline(job) {
-  if (job?.cacheHit) return "已复用已有识谱结果";
+  if (job?.cacheHit) return "已复用识谱结果";
   if (job?.omrStatus === "failed") return "识谱失败";
   if (job?.omrStatus === "completed") return "识谱完成";
   if (job?.stage === "omr-running") return "正在识谱";
@@ -104,24 +97,10 @@ function StepTitle({ step, title, description }) {
   );
 }
 
-function buildScoreDisplayTitle(score, titleHint, scorePdfFile) {
-  const rawTitle = String(score?.title || "").trim();
-  const suspiciousCount = (rawTitle.match(/�/g) || []).length + (rawTitle.includes("锟") ? 2 : 0);
-  const chineseCount = (rawTitle.match(/[\u4e00-\u9fff]/g) || []).length;
-  if (rawTitle && !(chineseCount === 0 && suspiciousCount >= 2)) {
-    return rawTitle;
-  }
-  if (titleHint.trim()) return titleHint.trim();
-  if (scorePdfFile?.name) {
-    return scorePdfFile.name.replace(/\.pdf$/i, "");
-  }
-  return "已导入曲谱";
-}
-
 function buildImportStatusMessage(job) {
   if (!job) return "先导入 PDF 曲谱，再选择段落并上传音频。";
-  if (job.cacheHit) return "已复用同一份 PDF 的识谱结果，可以直接继续选段分析。";
-  if (job.omrStatus === "completed") return job.warnings?.[0] || "识谱完成，可以继续选择段落。";
+  if (job.cacheHit) return "已复用同一份 PDF 的识谱结果，可以直接继续选择段落。";
+  if (job.omrStatus === "completed") return "识谱完成，可以开始选择段落。";
   if (job.omrStatus === "failed") return job.error || "自动识谱失败，请更换 PDF 或稍后重试。";
   if (job.stage === "omr-running") {
     return `识谱进行中：${percentText(job.progress)}，请稍候。`;
@@ -129,20 +108,37 @@ function buildImportStatusMessage(job) {
   return "识谱任务已提交，系统会自动更新进度。";
 }
 
-function buildAnalysisStatusMessage(result) {
-  if (!result) return "完成 PDF 导入、选段和音频上传后，点击“开始诊断”。";
-  return "诊断完成。你可以先看总体反馈，再按优先练习顺序逐项重练。";
+function summarizePrimaryFocus(analysis) {
+  if (!analysis) return "节奏问题";
+  if (analysis.recommendedPracticePath === "pitch-first") return "音准问题";
+  if (analysis.recommendedPracticePath === "rhythm-first") return "节奏问题";
+  return getDisplayRhythmScore(analysis) <= getDisplayPitchScore(analysis) ? "节奏问题" : "音准问题";
 }
 
-function safeSummaryText(value, fallback) {
-  const text = replaceXmlIdsInText(value || "").trim();
-  return text || fallback;
+function buildOverallFeedback(analysis) {
+  if (!analysis) return "";
+  const focus = summarizePrimaryFocus(analysis);
+  const noteCount = Array.isArray(analysis.noteFindings) ? analysis.noteFindings.length : Number(analysis?.diagnostics?.noteFindingCount || 0);
+  const measureCount = Array.isArray(analysis.measureFindings)
+    ? analysis.measureFindings.length
+    : Number(analysis?.diagnostics?.measureFindingCount || 0);
+  const uncertainCount =
+    Number(analysis?.diagnostics?.uncertainPitchCount)
+    || (Array.isArray(analysis.noteFindings) ? analysis.noteFindings.filter((item) => item?.isUncertain).length : 0)
+    || 0;
+  const sentences = [
+    `本次录音优先需要处理的是${focus}。`,
+    `系统共定位到 ${noteCount} 个问题音和 ${measureCount} 个问题小节。`,
+  ];
+  if (uncertainCount > 0) {
+    sentences.push(`其中有 ${uncertainCount} 个音的证据偏弱，建议结合示范和教师判断复核。`);
+  }
+  return sentences.join("");
 }
 
 export default function StudentApp({ onOpenResearch }) {
   const [studentId, setStudentId] = useState("");
   const [scorePdfFile, setScorePdfFile] = useState(null);
-  const [titleHint, setTitleHint] = useState("");
   const [scoreJob, setScoreJob] = useState(null);
   const [score, setScore] = useState(null);
   const [selectedSectionId, setSelectedSectionId] = useState("");
@@ -187,6 +183,8 @@ export default function StudentApp({ onOpenResearch }) {
   useEffect(() => {
     if (!scoreJob?.jobId || scoreJob?.omrStatus !== "processing") return undefined;
     let cancelled = false;
+    let retryCount = 0;
+
     const poll = async () => {
       while (!cancelled) {
         await new Promise((resolve) => window.setTimeout(resolve, 1500));
@@ -195,13 +193,19 @@ export default function StudentApp({ onOpenResearch }) {
           const refresh = await fetchScoreImportJob(scoreJob.jobId);
           const nextJob = refresh?.job || null;
           if (!nextJob) continue;
+          retryCount = 0;
           if (cancelled) return;
           setScoreJob(nextJob);
           setStatusMessage(buildImportStatusMessage(nextJob));
           if (nextJob?.omrStatus !== "processing") {
             return;
           }
-        } catch {
+        } catch (error) {
+          const message = String(error?.message || "");
+          if (message.includes("score import job not found")) {
+            retryCount += 1;
+            if (retryCount <= 5) continue;
+          }
           return;
         }
       }
@@ -354,18 +358,12 @@ export default function StudentApp({ onOpenResearch }) {
     };
   }, [currentSectionHistory]);
 
-  const displayScoreTitle = buildScoreDisplayTitle(score, titleHint, scorePdfFile);
-
-  const resultSummary = safeSummaryText(analysis?.summaryText, "本轮诊断已经完成。");
-  const resultComment = safeSummaryText(analysis?.teacherComment, "");
-  const practiceTargets = analysis?.practiceTargets || [];
-  const focusMeasures = (analysis?.measureFindings || []).slice(0, 5);
-  const focusNotes = (analysis?.noteFindings || []).slice(0, 6);
+  const overallFeedback = buildOverallFeedback(analysis);
 
   function describeHistorySection(item) {
     const knownSection = sectionMap.get(item.sectionId);
     if (knownSection) return formatSectionDisplayName(knownSection);
-    return replaceXmlIdsInText(item.sectionId || "未命名段落");
+    return formatSectionDisplayName({ sectionId: item.sectionId, title: item.sectionTitle });
   }
 
   async function refreshParticipantSnapshot(nextParticipantId = studentId) {
@@ -395,7 +393,7 @@ export default function StudentApp({ onOpenResearch }) {
     setAnalysis(null);
     setStatusMessage("正在导入 PDF 并启动自动识谱，请稍候。");
     try {
-      const json = await importScorePdf(scorePdfFile, titleHint.trim());
+      const json = await importScorePdf(scorePdfFile);
       const job = json?.job || null;
       setScoreJob(job);
       if (job?.scoreId) {
@@ -406,10 +404,7 @@ export default function StudentApp({ onOpenResearch }) {
         setStatusMessage(buildImportStatusMessage(job));
         setImportingScore(false);
       } else {
-        const refresh = await fetchScoreImportJob(json?.scoreImportJobId || job?.jobId);
-        const nextJob = refresh?.job || job;
-        setScoreJob(nextJob);
-        setStatusMessage(buildImportStatusMessage(nextJob));
+        setStatusMessage(buildImportStatusMessage(job));
       }
     } catch (error) {
       setImportingScore(false);
@@ -511,7 +506,7 @@ export default function StudentApp({ onOpenResearch }) {
         audioFile,
       });
       setAnalysis(json?.analysis || null);
-      setStatusMessage(buildAnalysisStatusMessage(json?.analysis));
+      setStatusMessage("诊断完成，可以打开问题谱面查看高亮结果。");
       await refreshParticipantSnapshot(resolvedStudentId);
     } catch (error) {
       setErrorMessage(error.message || "分析失败。");
@@ -526,7 +521,7 @@ export default function StudentApp({ onOpenResearch }) {
     if (item.sectionId) {
       setSelectedSectionId(item.sectionId);
     }
-    setStatusMessage("已载入这次练习结果，可以继续查看反馈或重新录音。");
+    setStatusMessage("已载入这次练习结果，可以继续查看问题谱面或重新录音。");
   }
 
   async function handlePlayDemo() {
@@ -534,7 +529,7 @@ export default function StudentApp({ onOpenResearch }) {
     try {
       stopDemoRef.current?.();
       stopDemoRef.current = await playReferenceNotes(selectedSection.notes, selectedSection.tempo);
-      setStatusMessage("正在播放示范音，请对照结果页进行重练。");
+      setStatusMessage("正在播放示范音，请对照问题谱面进行重练。");
     } catch {
       setErrorMessage("示范音播放失败。");
     }
@@ -559,7 +554,7 @@ export default function StudentApp({ onOpenResearch }) {
         <div className="hero-copy">
           <span className="eyebrow">AI ERHU SELF-PRACTICE</span>
           <h1>二胡 AI 练习 App</h1>
-          <p>导入 PDF 曲谱，上传演奏音频，系统会自动识谱、增强二胡主旋律，并把音高与节奏问题定位到小节和音位。</p>
+          <p>导入 PDF 曲谱，选择段落，上传演奏音频。系统会自动识谱、增强二胡主旋律，并把音准与节奏问题高亮到谱面上。</p>
           <div className="hero-badges">
             <span>PDF 自动识谱</span>
             <span>二胡 / 钢琴分离</span>
@@ -590,10 +585,6 @@ export default function StudentApp({ onOpenResearch }) {
             <label>
               <span>学生编号</span>
               <input value={studentId} onChange={(event) => setStudentId(event.target.value)} placeholder="例如 student-001" />
-            </label>
-            <label>
-              <span>曲目标题提示</span>
-              <input value={titleHint} onChange={(event) => setTitleHint(event.target.value)} placeholder="可留空，系统会结合 PDF 文件名识别" />
             </label>
           </div>
           <div className="action-row">
@@ -632,14 +623,9 @@ export default function StudentApp({ onOpenResearch }) {
         </section>
 
         <section className="panel-card">
-          <StepTitle step="02" title="确认识谱结果 / 选段" description="这里展示整份 PDF 识别出的曲目和可分析段落，学生只看正常的段落名称，不会看到内部 ID。" />
+          <StepTitle step="02" title="选择练习段落" description="识谱完成后，只保留正常段落名称供学生选择，不显示内部 ID。" />
           {score ? (
             <>
-              <div className="piece-summary">
-                <h3>{displayScoreTitle}</h3>
-                <p>声部：{score.selectedPart || "Voice"}</p>
-                <p>可分析段落：{score.sections?.length || 0}</p>
-              </div>
               <div className="field-grid">
                 <label>
                   <span>分析段落</span>
@@ -662,7 +648,7 @@ export default function StudentApp({ onOpenResearch }) {
               ) : null}
             </>
           ) : (
-            <div className="empty-card">还没有可用的结构化曲谱。先完成 PDF 导入。</div>
+            <div className="empty-card">还没有可用的识谱结果。先完成 PDF 导入。</div>
           )}
         </section>
 
@@ -698,95 +684,23 @@ export default function StudentApp({ onOpenResearch }) {
         </section>
 
         <section className="panel-card">
-          <StepTitle step="04" title="诊断结果" description="只保留真正影响练习的结论：总分、优先练习顺序、关键问题小节和关键问题音位。" />
+          <StepTitle step="04" title="诊断结果" description="结果页只保留本轮的总体结论。所有问题位置都放到问题谱面页中高亮显示。" />
           {analysis ? (
             <>
               <div className="result-grid">
                 <MetricCard label="综合" value={getDisplayCombinedScore(analysis)} />
                 <MetricCard label="音高" value={getDisplayPitchScore(analysis)} />
                 <MetricCard label="节奏" value={getDisplayRhythmScore(analysis)} />
-                <MetricCard label="练习路径" value={formatPracticePathLabel(analysis.recommendedPracticePath)} />
               </div>
-
-              <div className="summary-grid">
-                <div className="history-card">
-                  <h3>总体反馈</h3>
-                  <p>{resultSummary}</p>
-                  {resultComment ? <p className="supporting-copy">{resultComment}</p> : null}
-                  <p className="supporting-copy">
-                    本次处理：{formatPreprocessModeLabel(analysis.separationMode || analysis.diagnostics?.appliedPreprocessMode || "off")}
-                  </p>
-                </div>
-
-                <div className="history-card">
-                  <h3>优先练习顺序</h3>
-                  {practiceTargets.length ? (
-                    <ol className="compact-list practice-list">
-                      {practiceTargets.slice(0, 4).map((target) => (
-                        <li key={`${target.priority}-${target.targetId || target.measureIndex || target.title}`}>
-                          <strong>{formatPracticeTargetTitle(target)}</strong>
-                          {target.why ? <span className="finding-help">{replaceXmlIdsInText(target.why)}</span> : null}
-                          {target.action ? <span className="finding-help">建议：{replaceXmlIdsInText(target.action)}</span> : null}
-                        </li>
-                      ))}
-                    </ol>
-                  ) : (
-                    <p>当前没有生成明确的优先练习顺序。</p>
-                  )}
-                </div>
+              <div className="history-card">
+                <h3>总体反馈</h3>
+                <p>{overallFeedback}</p>
               </div>
-
-              <div className="findings-grid">
-                <div className="finding-card">
-                  <h3>关键问题小节</h3>
-                  {focusMeasures.length ? (
-                    <ul>
-                      {focusMeasures.map((item) => (
-                        <li key={`${item.measureIndex}-${item.issueType}`}>
-                          <strong>{formatMeasureLabel(item.measureIndex)}</strong>
-                          <span className="finding-help">{formatMeasureIssueLabelText(item)}</span>
-                          {item.detail ? <span className="finding-help">{replaceXmlIdsInText(item.detail)}</span> : null}
-                          {item.coachingTip ? <span className="finding-help">建议：{replaceXmlIdsInText(item.coachingTip)}</span> : null}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p>当前没有明显的小节级问题。</p>
-                  )}
-                </div>
-
-                <div className="finding-card">
-                  <h3>关键问题音位</h3>
-                  {focusNotes.length ? (
-                    <ul>
-                      {focusNotes.map((item) => (
-                        <li key={`${item.noteId}-${item.measureIndex}`}>
-                          <strong>{formatNoteLabel(item.noteId, item.measureIndex)}</strong>
-                          <span className="finding-help">
-                            {formatPitchLabelText(item.pitchLabel)}，{formatRhythmLabelText(item)}
-                          </span>
-                          {item.durationErrorMs != null ? (
-                            <span className="finding-help">
-                              时值偏差：{item.durationErrorMs > 0 ? "+" : ""}
-                              {item.durationErrorMs} ms
-                            </span>
-                          ) : null}
-                          {item.why ? <span className="finding-help">{replaceXmlIdsInText(item.why)}</span> : null}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p>当前没有定位到明确的关键问题音位。</p>
-                  )}
-                </div>
-              </div>
-
               <div className="history-card">
                 <h3>下一步</h3>
-                <p>先打开问题乐谱页确认高亮位置，再听示范音，最后回到这里重新录一遍同一段落。</p>
                 <div className="action-row">
                   <button type="button" className="primary-button" onClick={handleOpenIssueScorePage}>
-                    打开问题乐谱页
+                    打开问题谱面页
                   </button>
                   <button type="button" className="secondary-button" onClick={handlePlayDemo} disabled={!selectedSection}>
                     播放示范音
@@ -796,8 +710,8 @@ export default function StudentApp({ onOpenResearch }) {
                   </button>
                 </div>
                 <p className="supporting-copy">
-                  分析时间：{formatAnalysisTime(analysis.createdAt)} · 音高模型 {formatSourceLabel(analysis.diagnostics?.pitchSource)} · 节奏模型{" "}
-                  {formatSourceLabel(analysis.diagnostics?.beatSource || analysis.diagnostics?.onsetSource)}
+                  分析时间：{formatAnalysisTime(analysis.createdAt)} · 处理方式 {formatPreprocessModeLabel(analysis.separationMode || analysis.diagnostics?.appliedPreprocessMode || "off")} · 音高模型{" "}
+                  {formatSourceLabel(analysis.diagnostics?.pitchSource)} · 节奏模型 {formatSourceLabel(analysis.diagnostics?.beatSource || analysis.diagnostics?.onsetSource)}
                 </p>
               </div>
             </>
@@ -807,7 +721,7 @@ export default function StudentApp({ onOpenResearch }) {
         </section>
 
         <section className="panel-card">
-          <StepTitle step="05" title="练习记录" description="这里保留最近几次练习，方便回看这一段的分数变化、最佳表现和整曲概览。" />
+          <StepTitle step="05" title="练习记录" description="这里保留最近几次练习，方便回看这一段的变化、最佳表现和整曲概览。" />
           <div className="upload-meta">
             <span>学生编号：{studentId || "未设置"}</span>
             <span>当前段落：{selectedSection ? formatSectionDisplayName(selectedSection) : "未选择"}</span>
@@ -822,7 +736,6 @@ export default function StudentApp({ onOpenResearch }) {
                   <p>平均音高：{historySummary.averagePitch}</p>
                   <p>平均节奏：{historySummary.averageRhythm}</p>
                 </div>
-
                 <div className="history-card">
                   <h3>最近一次</h3>
                   {historySummary.latest ? (
@@ -838,7 +751,6 @@ export default function StudentApp({ onOpenResearch }) {
                     <p>当前没有最近一次记录。</p>
                   )}
                 </div>
-
                 <div className="history-card">
                   <h3>最佳一次</h3>
                   {historySummary.best ? (
@@ -854,7 +766,6 @@ export default function StudentApp({ onOpenResearch }) {
                     <p>当前没有可用的最佳记录。</p>
                   )}
                 </div>
-
                 <div className="history-card">
                   <h3>整曲概览</h3>
                   {piecePassLoading ? (
@@ -877,7 +788,6 @@ export default function StudentApp({ onOpenResearch }) {
                   )}
                 </div>
               </div>
-
               <div className="history-list">
                 {recentHistory.map((item) => (
                   <div className="history-item" key={item.analysisId}>
@@ -885,14 +795,12 @@ export default function StudentApp({ onOpenResearch }) {
                       <strong>{describeHistorySection(item)}</strong>
                       <p>{formatAnalysisTime(item.createdAt)}</p>
                       <p>
-                        综合 {clampScore(getDisplayCombinedScore(item))} · 音高 {clampScore(getDisplayPitchScore(item))} · 节奏{" "}
-                        {clampScore(getDisplayRhythmScore(item))}
+                        综合 {clampScore(getDisplayCombinedScore(item))} · 音高 {clampScore(getDisplayPitchScore(item))} · 节奏 {clampScore(getDisplayRhythmScore(item))}
                       </p>
                       <p>
                         路径 {formatPracticePathLabel(item.recommendedPracticePath)} · 处理方式{" "}
                         {formatPreprocessModeLabel(item.diagnostics?.appliedPreprocessMode || item.preprocessMode || "off")}
                       </p>
-                      <p>{safeSummaryText(item.summaryText, "这次记录没有附带摘要。")}</p>
                     </div>
                     <button type="button" className="secondary-button" onClick={() => handleLoadHistoryItem(item)}>
                       查看结果

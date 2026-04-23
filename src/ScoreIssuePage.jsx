@@ -2,19 +2,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { GlobalWorkerOptions, getDocument } from "pdfjs-dist";
 import {
   extractSectionPageNumber,
-  formatMeasureIssueLabelText,
   formatMeasureLabel,
   formatNoteLabel,
-  formatPitchLabelText,
   formatPracticePathLabel,
-  formatRhythmLabelText,
-  formatSectionDisplayName,
   getApproximateNotePosition,
   getDisplayCombinedScore,
   getDisplayPitchScore,
   getDisplayRhythmScore,
   getSectionMeasureCount,
-  replaceXmlIdsInText,
 } from "./analysisLabels.js";
 import { fetchScore } from "./researchApi.js";
 
@@ -65,42 +60,65 @@ function readExactNotePosition(section, noteId) {
     pageNumber: Number(matched?.notePosition?.pageNumber) || extractSectionPageNumber(section || {}),
     normalizedX,
     normalizedY,
-    systemIndex: Number(matched?.notePosition?.systemIndex) || 1,
   };
 }
 
-function buildIssueMeasures(analysis) {
-  const measureMap = new Map();
-
-  for (const finding of analysis?.measureFindings || []) {
-    const measureIndex = Number(finding?.measureIndex);
-    if (!Number.isFinite(measureIndex)) continue;
-    const bucket = measureMap.get(measureIndex) || [];
-    bucket.push({
-      type: "measure",
-      label: formatMeasureIssueLabelText(finding),
-      detail: finding?.detail || "",
-      tip: finding?.coachingTip || "",
-    });
-    measureMap.set(measureIndex, bucket);
+function summarizeOverallFeedback(analysis) {
+  const focus =
+    analysis?.recommendedPracticePath === "pitch-first"
+      ? "音准问题"
+      : analysis?.recommendedPracticePath === "rhythm-first"
+        ? "节奏问题"
+        : getDisplayRhythmScore(analysis) <= getDisplayPitchScore(analysis)
+          ? "节奏问题"
+          : "音准问题";
+  const noteCount = Array.isArray(analysis?.noteFindings) ? analysis.noteFindings.length : 0;
+  const measureCount = Array.isArray(analysis?.measureFindings) ? analysis.measureFindings.length : 0;
+  const uncertainCount =
+    Number(analysis?.diagnostics?.uncertainPitchCount)
+    || (Array.isArray(analysis?.noteFindings) ? analysis.noteFindings.filter((item) => item?.isUncertain).length : 0)
+    || 0;
+  const lines = [
+    `本次录音优先需要处理的是${focus}。`,
+    `系统共定位到 ${noteCount} 个问题音和 ${measureCount} 个问题小节。`,
+  ];
+  if (uncertainCount > 0) {
+    lines.push(`其中有 ${uncertainCount} 个音的证据偏弱，建议结合示范和教师判断复核。`);
   }
+  return lines.join("");
+}
 
-  for (const finding of analysis?.noteFindings || []) {
-    const measureIndex = Number(finding?.measureIndex);
-    if (!Number.isFinite(measureIndex)) continue;
-    const bucket = measureMap.get(measureIndex) || [];
-    bucket.push({
-      type: "note",
-      label: formatNoteLabel(finding?.noteId, finding?.measureIndex),
-      detail: `${formatPitchLabelText(finding?.pitchLabel)}，${formatRhythmLabelText(finding)}`,
-      tip: finding?.action || "",
-    });
-    measureMap.set(measureIndex, bucket);
-  }
+function buildMeasureIssues(analysis) {
+  return (analysis?.measureFindings || []).map((item) => ({
+    measureIndex: Number(item?.measureIndex) || 1,
+    label: String(item?.issueType || "").startsWith("pitch") ? "音准问题" : "节奏问题",
+  }));
+}
 
-  return [...measureMap.entries()]
-    .sort((left, right) => left[0] - right[0])
-    .map(([measureIndex, issues]) => ({ measureIndex, issues }));
+function buildNoteIssues(analysis) {
+  return (analysis?.noteFindings || []).map((item) => {
+    const tags = [];
+    if (item?.pitchLabel && item.pitchLabel !== "pitch-ok") {
+      tags.push("音准问题");
+    }
+    if (item?.rhythmType || item?.rhythmLabel) {
+      tags.push("节奏问题");
+    }
+    return {
+      noteId: item?.noteId,
+      measureIndex: Number(item?.measureIndex) || 1,
+      tags: tags.length ? [...new Set(tags)] : ["音准问题"],
+    };
+  });
+}
+
+function ScoreBlock({ label, value }) {
+  return (
+    <div className="score-badge">
+      <span>{label}</span>
+      <strong>{typeof value === "number" ? value : String(value || "")}</strong>
+    </div>
+  );
 }
 
 export default function ScoreIssuePage() {
@@ -132,7 +150,7 @@ export default function ScoreIssuePage() {
         }
       } catch {
         if (!cancelled) {
-          setError("问题乐谱数据已失效，请返回结果页重新打开。");
+          setError("问题谱面数据已失效，请返回结果页重新打开。");
         }
       }
     }
@@ -200,43 +218,42 @@ export default function ScoreIssuePage() {
   }, [currentPage, score?.sourcePdfPath, usePageImage]);
 
   const measureCount = getSectionMeasureCount(section || {});
-  const groupedIssues = useMemo(() => buildIssueMeasures(analysis), [analysis]);
-  const issueMeasureIndexes = groupedIssues.map((item) => item.measureIndex);
+  const measureIssues = useMemo(() => buildMeasureIssues(analysis), [analysis]);
+  const noteIssues = useMemo(() => buildNoteIssues(analysis), [analysis]);
+  const issueMeasureIndexes = [...new Set(measureIssues.map((item) => item.measureIndex).concat(noteIssues.map((item) => item.measureIndex)))].sort(
+    (left, right) => left - right,
+  );
   const activeMeasureIndex = selectedMeasureIndex || issueMeasureIndexes[0] || null;
 
   const noteOverlayItems = useMemo(
     () =>
-      (analysis?.noteFindings || [])
-        .filter((item) => Number(item?.measureIndex) > 0)
-        .map((item, index) => {
-          const exact = readExactNotePosition(section, item?.noteId);
-          if (exact) {
-            return {
-              key: `${item?.noteId || index}-${exact.measureIndex}`,
-              measureIndex: exact.measureIndex,
-              left: Math.min(Math.max(exact.normalizedX * 100, 0), 100),
-              top: Math.min(Math.max(exact.normalizedY * 100, 0), 100),
-              label: formatNoteLabel(item?.noteId, item?.measureIndex),
-              exact: true,
-              pageNumber: exact.pageNumber,
-            };
-          }
-          const { measureIndex, noteIndex } = getApproximateNotePosition(item?.noteId, item?.measureIndex, index + 1);
-          const slotWidth = 100 / Math.max(1, measureCount);
-          const measureLeft = Math.max(0, (measureIndex - 1) * slotWidth);
-          const relativeStep = Math.min(0.85, 0.18 + ((noteIndex - 1) % 6) * 0.12);
-          const bandIndex = (noteIndex - 1) % 3;
+      noteIssues.map((item, index) => {
+        const exact = readExactNotePosition(section, item?.noteId);
+        if (exact) {
           return {
-            key: `${item?.noteId || index}-${measureIndex}-${noteIndex}`,
-            measureIndex,
-            left: Math.min(measureLeft + slotWidth * relativeStep, 98),
-            top: 18 + bandIndex * 18,
-            label: formatNoteLabel(item?.noteId, item?.measureIndex),
-            exact: false,
-            pageNumber,
+            key: `${item?.noteId || index}-${exact.measureIndex}`,
+            measureIndex: exact.measureIndex,
+            left: Math.min(Math.max(exact.normalizedX * 100, 0), 100),
+            top: Math.min(Math.max(exact.normalizedY * 100, 0), 100),
+            exact: true,
+            pageNumber: exact.pageNumber,
           };
-        }),
-    [analysis, measureCount, pageNumber, section],
+        }
+        const { measureIndex, noteIndex } = getApproximateNotePosition(item?.noteId, item?.measureIndex, index + 1);
+        const slotWidth = 100 / Math.max(1, measureCount);
+        const measureLeft = Math.max(0, (measureIndex - 1) * slotWidth);
+        const relativeStep = Math.min(0.85, 0.18 + ((noteIndex - 1) % 6) * 0.12);
+        const bandIndex = (noteIndex - 1) % 3;
+        return {
+          key: `${item?.noteId || index}-${measureIndex}-${noteIndex}`,
+          measureIndex,
+          left: Math.min(measureLeft + slotWidth * relativeStep, 98),
+          top: 18 + bandIndex * 18,
+          exact: false,
+          pageNumber,
+        };
+      }),
+    [noteIssues, measureCount, pageNumber, section],
   );
 
   const hasExactNoteOverlay = noteOverlayItems.some((item) => item.exact);
@@ -285,8 +302,8 @@ export default function ScoreIssuePage() {
     return (
       <div className="app-shell">
         <section className="panel-card">
-          <h2>问题乐谱页不可用</h2>
-          <p className="supporting-copy">没有找到当前分析结果。请从学生端结果页重新打开“问题乐谱页”。</p>
+          <h2>问题谱面页不可用</h2>
+          <p className="supporting-copy">没有找到当前分析结果。请从学生端结果页重新打开“问题谱面页”。</p>
         </section>
       </div>
     );
@@ -297,10 +314,8 @@ export default function ScoreIssuePage() {
       <header className="panel-card score-issue-header">
         <div>
           <span className="eyebrow">ISSUE SCORE VIEW</span>
-          <h1>问题乐谱页</h1>
-          <p className="supporting-copy">
-            {formatSectionDisplayName(section || {})}。当前页面会把问题小节和问题音直接高亮到乐谱上，并且只保留原音回放。
-          </p>
+          <h1>问题谱面页</h1>
+          <p className="supporting-copy">这里仅保留原音回放、谱面高亮，以及音准问题和节奏问题两类结果。</p>
         </div>
         <div className="score-issue-actions">
           <button type="button" className="secondary-button" onClick={() => window.close()}>
@@ -322,7 +337,7 @@ export default function ScoreIssuePage() {
             <span className="section-step">A</span>
             <div>
               <h2>本轮结果</h2>
-              <p>这里只保留学生真正需要的内容：音高、节奏、综合分、原音和练习路径。</p>
+              <p>仅保留总分、原音和总体反馈。</p>
             </div>
           </div>
 
@@ -339,9 +354,25 @@ export default function ScoreIssuePage() {
           </div>
 
           <div className="history-card">
-            <h3>问题摘要</h3>
-            <p>{replaceXmlIdsInText(analysis?.summaryText || "本轮分析已完成。")}</p>
+            <h3>总体反馈</h3>
+            <p>{summarizeOverallFeedback(analysis)}</p>
             <p className="supporting-copy">分析时间：{formatDateTime(analysis?.createdAt || stored?.savedAt)}</p>
+          </div>
+
+          <div className="history-card">
+            <h3>问题列表</h3>
+            <ul className="compact-list">
+              {measureIssues.map((item) => (
+                <li key={`measure-${item.measureIndex}`}>
+                  {formatMeasureLabel(item.measureIndex)}：{item.label}
+                </li>
+              ))}
+              {noteIssues.map((item, index) => (
+                <li key={`note-${item.noteId || index}-${item.measureIndex}`}>
+                  {formatNoteLabel(item.noteId, item.measureIndex)}：{item.tags.join("、")}
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
 
@@ -349,13 +380,13 @@ export default function ScoreIssuePage() {
           <div className="section-title">
             <span className="section-step">B</span>
             <div>
-              <h2>乐谱高亮</h2>
-              <p>系统会在当前页把问题小节和问题音直接高亮出来，便于对照乐谱复练。</p>
+              <h2>问题谱面高亮</h2>
+              <p>所有问题都放在这里高亮显示，主结果页不再重复展示详细解释。</p>
             </div>
           </div>
 
           <div className="score-page-toolbar">
-            <span>{formatSectionDisplayName(section || {})}</span>
+            <span>{section?.title || "当前段落"}</span>
             <span>页码：{currentPage}/{pageCount || currentPage}</span>
             <span>问题小节：{issueMeasureIndexes.length || 0}</span>
           </div>
@@ -397,12 +428,7 @@ export default function ScoreIssuePage() {
 
           <div className="score-page-canvas-wrap">
             {usePageImage ? (
-              <img
-                className="score-page-image"
-                src={pageImagePath}
-                alt={`score-page-${currentPage}`}
-                onError={() => setPageImageFailed(true)}
-              />
+              <img className="score-page-image" src={pageImagePath} alt={`score-page-${currentPage}`} onError={() => setPageImageFailed(true)} />
             ) : (
               <canvas ref={canvasRef} className="pdf-preview-canvas" />
             )}
@@ -429,7 +455,6 @@ export default function ScoreIssuePage() {
                       key={item.key}
                       className={`score-note-highlight${item.exact ? " is-exact" : ""}`}
                       style={{ left: `${item.left}%`, top: `${item.top}%` }}
-                      title={item.label}
                     />
                   ))}
               </div>
@@ -437,65 +462,6 @@ export default function ScoreIssuePage() {
           </div>
         </section>
       </div>
-
-      <section className="panel-card">
-        <div className="section-title">
-          <span className="section-step">C</span>
-          <div>
-            <h2>问题明细</h2>
-            <p>这里统一使用“小节 / 第几音”的表达，不再显示内部 XML ID。</p>
-          </div>
-        </div>
-
-        <div className="findings-grid">
-          {groupedIssues.map((group) => (
-            <div className="finding-card" key={`group-${group.measureIndex}`}>
-              <h3>{formatMeasureLabel(group.measureIndex)}</h3>
-              <ul>
-                {group.issues.map((item, index) => (
-                  <li key={`${group.measureIndex}-${index}`}>
-                    <strong>{item.label}</strong>
-                    {item.detail ? <span className="finding-help">{replaceXmlIdsInText(item.detail)}</span> : null}
-                    {item.tip ? <span className="finding-help">建议：{replaceXmlIdsInText(item.tip)}</span> : null}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-
-        {!groupedIssues.length ? <div className="empty-card">当前没有需要高亮的问题小节。</div> : null}
-
-        {(analysis?.practiceTargets || []).length ? (
-          <div className="history-card">
-            <h3>优先练习顺序</h3>
-            <ol className="compact-list practice-list">
-              {(analysis.practiceTargets || []).map((target) => (
-                <li key={`${target.priority}-${target.targetId || target.measureIndex || target.title}`}>
-                  <strong>
-                    {target?.targetType === "note"
-                      ? formatNoteLabel(target?.targetId, target?.measureIndex)
-                      : target?.measureIndex
-                        ? `重练第 ${target.measureIndex} 小节`
-                        : target?.title}
-                  </strong>
-                  <span className="finding-help">{replaceXmlIdsInText(target?.why)}</span>
-                  <span className="finding-help">建议：{replaceXmlIdsInText(target?.action)}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
-        ) : null}
-      </section>
-    </div>
-  );
-}
-
-function ScoreBlock({ label, value }) {
-  return (
-    <div className="score-badge">
-      <span>{label}</span>
-      <strong>{typeof value === "number" ? value : String(value || "")}</strong>
     </div>
   );
 }

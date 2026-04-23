@@ -43,12 +43,12 @@ export function formatNoteLabel(noteId, fallbackMeasureIndex) {
   if (Number.isFinite(numericMeasure)) {
     return `第 ${Math.round(numericMeasure)} 小节`;
   }
-  return String(noteId || "未定位音符");
+  return String(noteId || "未定位音位");
 }
 
 export function formatPracticePathLabel(value) {
-  if (value === "pitch-first") return "先修音准";
-  if (value === "rhythm-first") return "先修节奏";
+  if (value === "pitch-first") return "先处理音准";
+  if (value === "rhythm-first") return "先处理节奏";
   return "先复核";
 }
 
@@ -71,11 +71,11 @@ export function formatSourceLabel(value) {
 }
 
 export function formatPitchLabelText(value) {
-  if (value === "pitch-flat") return "音高偏低";
-  if (value === "pitch-sharp") return "音高偏高";
-  if (value === "pitch-review") return "音高需复核";
-  if (value === "pitch-ok") return "音高基本正确";
-  return "音高未标注";
+  if (value === "pitch-flat") return "音准偏低";
+  if (value === "pitch-sharp") return "音准偏高";
+  if (value === "pitch-review") return "音高需要复核";
+  if (value === "pitch-ok") return "音准基本正常";
+  return "音准问题";
 }
 
 export function formatRhythmLabelText(item) {
@@ -89,29 +89,29 @@ export function formatRhythmLabelText(item) {
   if (value === "rhythm-drag-long") return "拖拍且时值偏长";
   if (value === "rhythm-missing") return "疑似漏音";
   if (value === "rhythm-unstable") return "节奏不稳";
-  return "节奏未标注";
+  return "节奏问题";
 }
 
 export function formatMeasureIssueLabelText(item) {
   const value = item?.issueType || item?.issueLabel;
-  if (value === "rhythm-measure-rush") return "小节整体偏快";
-  if (value === "rhythm-measure-drag") return "小节整体偏慢";
-  if (value === "rhythm-measure-short") return "小节时值普遍偏短";
-  if (value === "rhythm-measure-long") return "小节时值普遍偏长";
-  if (value === "rhythm-unstable") return "节奏不稳";
-  if (value === "pitch-unstable") return "音准不稳";
-  return item?.issueLabel || "未标注问题类型";
+  if (value === "rhythm-measure-rush") return "本小节整体偏快";
+  if (value === "rhythm-measure-drag") return "本小节整体偏慢";
+  if (value === "rhythm-measure-short") return "本小节时值普遍偏短";
+  if (value === "rhythm-measure-long") return "本小节时值普遍偏长";
+  if (value === "rhythm-unstable") return "本小节节奏不稳";
+  if (value === "pitch-unstable") return "本小节音准不稳";
+  return item?.issueLabel || "问题小节";
 }
 
 export function formatSectionDisplayName(section) {
   const sectionId = String(section?.sectionId || section?.sourceSectionId || "");
   const pageChunkMatch = sectionId.match(/^page-(\d+)-s(\d+)$/i);
   if (pageChunkMatch) {
-    return `自动识谱第 ${Number(pageChunkMatch[1])} 页 片段 ${Number(pageChunkMatch[2])}`;
+    return `自动识谱 第 ${Number(pageChunkMatch[1])} 页 片段 ${Number(pageChunkMatch[2])}`;
   }
   const pageMatch = sectionId.match(/^page-(\d+)$/i);
   if (pageMatch) {
-    return `自动识谱第 ${Number(pageMatch[1])} 页`;
+    return `自动识谱 第 ${Number(pageMatch[1])} 页`;
   }
   return String(section?.title || sectionId || "未命名段落");
 }
