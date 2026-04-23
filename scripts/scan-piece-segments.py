@@ -305,10 +305,11 @@ def main() -> int:
     )
     sequence_path = select_sequence_path(scan_results)
 
-    (output_dir / f"{args.piece_id}-segment-scan.json").write_text(
+    output_key = args.score_id or args.piece_id
+    (output_dir / f"{output_key}-segment-scan.json").write_text(
         json.dumps(
             {
-                "pieceId": args.piece_id,
+                "pieceId": output_key,
                 "audio": str(audio_path),
                 "scanResults": scan_results,
                 "rankedMatches": ranked,
@@ -323,7 +324,7 @@ def main() -> int:
     lines = [
         "# Piece Segment Scan Report",
         "",
-        f"- Piece: {piece.get('title')} ({args.piece_id})",
+        f"- Piece: {piece.get('title')} ({output_key})",
         f"- Audio: {audio_path}",
         "",
         "## Ranked best matches",
@@ -358,9 +359,9 @@ def main() -> int:
                 "",
             ]
         )
-    (output_dir / f"{args.piece_id}-segment-scan.md").write_text("\n".join(lines), encoding="utf-8")
+    (output_dir / f"{output_key}-segment-scan.md").write_text("\n".join(lines), encoding="utf-8")
 
-    print(json.dumps({"pieceId": args.piece_id, "sectionCount": len(scan_results), "topMatch": ranked[0] if ranked else None, "sequencePathLength": len(sequence_path), "outputDir": str(output_dir)}, ensure_ascii=False, indent=2))
+    print(json.dumps({"pieceId": output_key, "sectionCount": len(scan_results), "topMatch": ranked[0] if ranked else None, "sequencePathLength": len(sequence_path), "outputDir": str(output_dir)}, ensure_ascii=False, indent=2))
     return 0
 
 
