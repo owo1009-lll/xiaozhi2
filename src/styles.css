@@ -857,10 +857,13 @@ button {
 
 .score-measure-highlight {
   position: absolute;
+  padding: 0;
   border-radius: 14px;
   border: 2px solid rgba(245, 158, 11, 0.92);
   background: rgba(245, 158, 11, 0.18);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45) inset;
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 .score-measure-highlight.is-active {
@@ -886,12 +889,15 @@ button {
   position: absolute;
   width: 14px;
   height: 14px;
+  padding: 0;
   margin-left: -7px;
   margin-top: -7px;
   border-radius: 50%;
   border: 2px solid rgba(17, 51, 45, 0.95);
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.32);
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 .score-note-highlight.is-exact {

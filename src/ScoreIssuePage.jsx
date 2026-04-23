@@ -153,6 +153,7 @@ export default function ScoreIssuePage() {
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const canvasRef = useRef(null);
   const viewportRef = useRef(null);
+  const issueListRefs = useRef(new Map());
 
   useEffect(() => {
     let cancelled = false;
@@ -371,6 +372,17 @@ export default function ScoreIssuePage() {
     });
   }, [activeMeasureIndex, currentPage, effectiveHeight, effectiveWidth, noteOverlayItems, overlayItems, selectedNoteKey, zoom]);
 
+  useEffect(() => {
+    const targetKey = selectedNoteKey || (activeMeasureIndex != null ? `measure-${activeMeasureIndex}` : "");
+    if (!targetKey) return;
+    const target = issueListRefs.current.get(targetKey);
+    if (!target?.scrollIntoView) return;
+    target.scrollIntoView({
+      block: "nearest",
+      behavior: "smooth",
+    });
+  }, [activeMeasureIndex, selectedNoteKey]);
+
   function handleMeasureJump(measureIndex) {
     setCurrentPage(measurePageMap.get(measureIndex) || baseSectionPage);
     setSelectedMeasureIndex(measureIndex);
@@ -394,6 +406,15 @@ export default function ScoreIssuePage() {
       width: image.naturalWidth || image.width || 0,
       height: image.naturalHeight || image.height || 0,
     });
+  }
+
+  function setIssueListRef(key, element) {
+    if (!key) return;
+    if (element) {
+      issueListRefs.current.set(key, element);
+      return;
+    }
+    issueListRefs.current.delete(key);
   }
 
   if (!analysis || !stored) {
@@ -464,6 +485,7 @@ export default function ScoreIssuePage() {
                 <button
                   type="button"
                   key={`measure-${item.measureIndex}`}
+                  ref={(element) => setIssueListRef(`measure-${item.measureIndex}`, element)}
                   className={`issue-list-button${activeMeasureIndex === item.measureIndex && !selectedNoteKey ? " is-active" : ""}`}
                   onClick={() => handleMeasureJump(item.measureIndex)}
                 >
@@ -480,6 +502,7 @@ export default function ScoreIssuePage() {
                   <button
                     type="button"
                     key={`note-${item.noteId || index}-${item.measureIndex}`}
+                    ref={(element) => setIssueListRef(overlayKey, element)}
                     className={`issue-list-button${selectedNoteKey && selectedNoteKey === overlayKey ? " is-active" : ""}`}
                     onClick={() => handleNoteJump(item, overlayItem)}
                   >
@@ -583,9 +606,11 @@ export default function ScoreIssuePage() {
               )}
               <div className="score-measure-overlay" aria-hidden="true">
                 {overlayItems.map((item) => (
-                  <div
+                  <button
+                    type="button"
                     key={`measure-${item.measureIndex}`}
                     className={`score-measure-highlight${activeMeasureIndex === item.measureIndex ? " is-active" : ""}`}
+                    onClick={() => handleMeasureJump(item.measureIndex)}
                     style={{
                       left: `${item.left}%`,
                       top: `${item.top}%`,
@@ -594,17 +619,25 @@ export default function ScoreIssuePage() {
                     }}
                   >
                     <span>{item.measureIndex}</span>
-                  </div>
+                  </button>
                 ))}
                 {noteOverlayItems
                   .filter((item) => item.pageNumber === currentPage && (activeMeasureIndex == null || item.measureIndex === activeMeasureIndex))
-                  .map((item) => (
-                    <div
-                      key={item.key}
-                      className={`score-note-highlight${item.exact ? " is-exact" : ""}${selectedNoteKey === item.key ? " is-selected" : ""}`}
-                      style={{ left: `${item.left}%`, top: `${item.top}%` }}
-                    />
-                  ))}
+                  .map((item) => {
+                    const relatedIssue =
+                      noteIssues.find((noteIssue) => String(noteIssue.noteId || "") === String(item.noteId || "") && noteIssue.measureIndex === item.measureIndex)
+                      || { noteId: item.noteId, measureIndex: item.measureIndex };
+                    return (
+                      <button
+                        type="button"
+                        key={item.key}
+                        className={`score-note-highlight${item.exact ? " is-exact" : ""}${selectedNoteKey === item.key ? " is-selected" : ""}`}
+                        style={{ left: `${item.left}%`, top: `${item.top}%` }}
+                        onClick={() => handleNoteJump(relatedIssue, item)}
+                        aria-label={formatNoteLabel(item.noteId, item.measureIndex)}
+                      />
+                    );
+                  })}
               </div>
             </div>
           </div>
