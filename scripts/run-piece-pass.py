@@ -209,7 +209,7 @@ def run_scan(args: argparse.Namespace, scan_output_dir: Path) -> Path:
     return scan_json
 
 
-def summarize_piece_pass(piece: dict, section_rows: list[dict]) -> dict:
+def summarize_piece_pass(piece: dict, section_rows: list[dict], audio_coverage: dict | None = None) -> dict:
     structured_sections = piece.get("sections") or []
     structured_section_count = len(structured_sections)
     structured_note_count = sum(len(section.get("notes") or []) for section in structured_sections)
@@ -258,6 +258,7 @@ def summarize_piece_pass(piece: dict, section_rows: list[dict]) -> dict:
             }
             for row in weakest_sections
         ],
+        **({"audioCoverage": audio_coverage} if audio_coverage else {}),
     }
 
 
@@ -266,11 +267,23 @@ def build_summary_text(summary: dict) -> str:
     weakest_labels = ", ".join(
         f"{item.get('sequenceIndex')}.{item.get('sectionTitle')}({item.get('combinedScore')})" for item in weakest[:3]
     )
+    coverage = summary.get("audioCoverage") or {}
+    coverage_note = ""
+    if coverage.get("isPartial"):
+        audio_dur = safe_number(coverage.get("audioDurationSeconds"), 0)
+        piece_dur = safe_number(coverage.get("estimatedPieceDurationSeconds"), 0)
+        last_sec = coverage.get("lastScannedSectionId") or ""
+        pct = int(100 * audio_dur / piece_dur) if piece_dur > 0 else 0
+        coverage_note = (
+            f" 当前为部分录音（{audio_dur:.0f}秒，约全曲 {pct}%），"
+            f"覆盖至段落 {last_sec}，后续 {coverage.get('skippedSectionCount', 0)} 个段落超出音频范围已跳过。"
+        )
     return (
         f"当前整曲 pass 已覆盖 {summary.get('matchedSectionCount')}/{summary.get('structuredSectionCount')} 个结构化段落，"
         f"加权音准 {summary.get('weightedPitchScore')}，加权节奏 {summary.get('weightedRhythmScore')}，"
         f"整曲优先练习路径为 {summary.get('dominantPracticePath')}。"
         + (f" 当前最弱的段落是 {weakest_labels}。" if weakest_labels else "")
+        + coverage_note
     )
 
 
@@ -554,6 +567,7 @@ def main() -> int:
     scan_json_path = run_scan(args, scan_output_dir)
     scan_payload = json.loads(scan_json_path.read_text(encoding="utf-8"))
     sequence_path = scan_payload.get("sequenceAwarePath") or []
+    audio_coverage = scan_payload.get("audioCoverage")
     section_lookup = {section.get("sectionId"): section for section in piece.get("sections") or []}
     audio_path = (REPO_ROOT / args.audio).resolve()
 
@@ -618,7 +632,7 @@ def main() -> int:
                 )
 
     section_rows.sort(key=lambda row: (row.get("sequenceIndex") or 0, row.get("startSeconds") or 0))
-    summary = summarize_piece_pass(piece, section_rows)
+    summary = summarize_piece_pass(piece, section_rows, audio_coverage=audio_coverage)
     summary["summaryText"] = build_summary_text(summary)
 
     json_payload = {

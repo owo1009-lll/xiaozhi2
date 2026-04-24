@@ -282,33 +282,54 @@ def main() -> int:
 
     sections_to_scan = [s for s in sections if s.get("notes")]
 
-    # Rescale hints if they exceed the audio duration (e.g. score tempo ≠ recording tempo).
+    # Coverage detection: if audio is shorter than the piece, only scan reachable sections.
+    audio_duration = 0.0
+    estimated_piece_duration = 0.0
+    is_partial = False
+    skipped_beyond_audio: list[dict] = []
+
     try:
         audio_info = sf.info(str(audio_path))
         audio_duration = audio_info.duration
+
         all_hints = [float(h) for s in sections_to_scan for h in (s.get("researchWindowHints") or [])]
         if all_hints:
             max_hint = max(all_hints)
-            if max_hint > audio_duration * 0.95:
-                scale = (audio_duration * 0.88) / max_hint
-                sys.stderr.write(
-                    f"INFO: hints rescaled by {scale:.3f} "
-                    f"(max_hint={max_hint:.1f}s > audio={audio_duration:.1f}s)\n"
-                )
-                rescaled = []
+            estimated_piece_duration = max_hint
+
+            # Partial audio: hints exceed audio by more than 80% — clearly a short clip.
+            if max_hint > audio_duration * 1.8:
+                is_partial = True
+                coverage_limit = audio_duration * 1.35  # generous buffer for tempo variation
+                within: list[dict] = []
+                beyond: list[dict] = []
                 for s in sections_to_scan:
-                    old_hints = s.get("researchWindowHints") or []
-                    if old_hints:
-                        ns = dict(s)
-                        ns["researchWindowHints"] = [
-                            round(max(0.0, float(h) * scale), 2) for h in old_hints
-                        ]
-                        rescaled.append(ns)
-                    else:
-                        rescaled.append(s)
-                sections_to_scan = rescaled
+                    sec_max_hint = max(float(h) for h in (s.get("researchWindowHints") or [0.0]))
+                    (within if sec_max_hint <= coverage_limit else beyond).append(s)
+                sections_to_scan = within
+                skipped_beyond_audio = beyond
+                sys.stderr.write(
+                    f"INFO: partial audio ({audio_duration:.1f}s / ~{estimated_piece_duration:.1f}s piece). "
+                    f"Scanning {len(within)} sections, skipping {len(beyond)} beyond audio.\n"
+                )
+
+            # Rescale hints within the coverage range if they still exceed audio duration.
+            within_hints = [float(h) for s in sections_to_scan for h in (s.get("researchWindowHints") or [])]
+            if within_hints:
+                within_max = max(within_hints)
+                if within_max > audio_duration * 0.95:
+                    scale = (audio_duration * 0.88) / within_max
+                    sys.stderr.write(
+                        f"INFO: hints rescaled by {scale:.3f} "
+                        f"(max_hint={within_max:.1f}s > audio={audio_duration:.1f}s)\n"
+                    )
+                    sections_to_scan = [
+                        {**s, "researchWindowHints": [round(max(0.0, float(h) * scale), 2) for h in (s.get("researchWindowHints") or [])]}
+                        if s.get("researchWindowHints") else s
+                        for s in sections_to_scan
+                    ]
     except Exception as _hint_exc:
-        sys.stderr.write(f"WARNING: hint rescaling failed: {_hint_exc}\n")
+        sys.stderr.write(f"WARNING: coverage detection failed: {_hint_exc}\n")
 
     scan_results = []
 
@@ -376,11 +397,22 @@ def main() -> int:
     sequence_path = select_sequence_path(scan_results)
 
     output_key = args.score_id or args.piece_id
+    last_scanned_section_id = sequence_path[-1]["sectionId"] if sequence_path else None
+    audio_coverage = {
+        "audioDurationSeconds": round(audio_duration, 2),
+        "estimatedPieceDurationSeconds": round(estimated_piece_duration, 2),
+        "isPartial": is_partial,
+        "scannedSectionCount": len(scan_results),
+        "skippedSectionCount": len(skipped_beyond_audio),
+        "lastScannedSectionId": last_scanned_section_id,
+        "skippedSectionIds": [s.get("sectionId") for s in skipped_beyond_audio],
+    }
     (output_dir / f"{output_key}-segment-scan.json").write_text(
         json.dumps(
             {
                 "pieceId": output_key,
                 "audio": str(audio_path),
+                "audioCoverage": audio_coverage,
                 "scanResults": scan_results,
                 "rankedMatches": ranked,
                 "sequenceAwarePath": sequence_path,

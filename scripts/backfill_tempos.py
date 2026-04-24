@@ -113,12 +113,9 @@ def main() -> None:
     with store_path.open("r", encoding="utf-8") as f:
         data = json.load(f)
 
-    target_ids = {"score-mo8vw5mc-y2ldjp", "score-moaxgd9v-gj6vsv", "score-mo9xju6b-ygpugm"}
-
+    # Process all scores that have any tempo=72 sections
     total_changed = 0
     for score in data["scores"]:
-        if score.get("scoreId") not in target_ids:
-            continue
         sections = score.get("sections", [])
         pdf_parts = score.get("sourcePdfPath", "").replace("\\", "/").split("/")
         pdf_parts = [p for p in pdf_parts if p]
@@ -126,6 +123,10 @@ def main() -> None:
             continue
         job_dir = pdf_parts[2]
         pagewise_dir = ROOT / "data" / "score-imports" / job_dir / "pagewise"
+
+        # Skip if no tempo=72 sections
+        if not any(s.get("tempo", 72) == 72 for s in sections):
+            continue
 
         # Group tempo=72 sections by page number
         page_to_indices: dict[int, list[int]] = {}
