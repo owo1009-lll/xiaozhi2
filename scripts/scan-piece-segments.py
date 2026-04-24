@@ -34,7 +34,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--section-id", action="append", default=[], help="Only scan selected section ids. Repeatable.")
     parser.add_argument("--section-ids", default="", help="Comma-separated section ids. Prefer this on Windows shells that mangle repeated flags.")
     parser.add_argument("--scan-preprocess-mode", default="off", help="preprocessMode sent to the analyzer during scan windows. 'off' skips source separation for speed.")
-    parser.add_argument("--concurrency", type=int, default=2, help="Number of sections to scan in parallel.")
+    parser.add_argument("--concurrency", type=int, default=3, help="Number of sections to scan in parallel.")
     parser.add_argument("--retry", type=int, default=2, help="Max retries per section on connection errors.")
     return parser.parse_args()
 
@@ -280,6 +280,35 @@ def main() -> int:
         sections = sections[: args.max_sections]
 
     sections_to_scan = [s for s in sections if s.get("notes")]
+
+    # Rescale hints if they exceed the audio duration (e.g. score tempo ≠ recording tempo).
+    try:
+        audio_info = sf.info(str(audio_path))
+        audio_duration = audio_info.duration
+        all_hints = [float(h) for s in sections_to_scan for h in (s.get("researchWindowHints") or [])]
+        if all_hints:
+            max_hint = max(all_hints)
+            if max_hint > audio_duration * 0.95:
+                scale = (audio_duration * 0.88) / max_hint
+                sys.stderr.write(
+                    f"INFO: hints rescaled by {scale:.3f} "
+                    f"(max_hint={max_hint:.1f}s > audio={audio_duration:.1f}s)\n"
+                )
+                rescaled = []
+                for s in sections_to_scan:
+                    old_hints = s.get("researchWindowHints") or []
+                    if old_hints:
+                        ns = dict(s)
+                        ns["researchWindowHints"] = [
+                            round(max(0.0, float(h) * scale), 2) for h in old_hints
+                        ]
+                        rescaled.append(ns)
+                    else:
+                        rescaled.append(s)
+                sections_to_scan = rescaled
+    except Exception as _hint_exc:
+        sys.stderr.write(f"WARNING: hint rescaling failed: {_hint_exc}\n")
+
     scan_results = []
 
     def _scan_one(section: dict) -> dict:

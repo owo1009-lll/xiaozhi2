@@ -34,7 +34,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--audio", default="data/test_audio_mix.mp3", help="Whole-song audio file.")
     parser.add_argument("--output-dir", default="data/piece-pass", help="Directory for generated outputs.")
     parser.add_argument("--preprocess-mode", default="auto", help="Preprocess mode forwarded to the analyzer.")
-    parser.add_argument("--hint-radius", type=float, default=1.0, help="Seconds around each research hint to probe during the scan.")
+    parser.add_argument("--hint-radius", type=float, default=2.0, help="Seconds around each research hint to probe during the scan.")
     parser.add_argument("--hint-step", type=float, default=1.0, help="Step size between hint probes.")
     parser.add_argument("--window-padding", type=float, default=3.0, help="Padding seconds added to each section window.")
     parser.add_argument("--max-candidates-per-section", type=int, default=2, help="Maximum scan windows per section.")
@@ -45,7 +45,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cache-dir", default="", help="Optional directory for per-section cached pass rows. Defaults to <output-dir>/section-cache.")
     parser.add_argument("--refresh-cache", action="store_true", help="Ignore existing per-section cache and recompute all section passes.")
     parser.add_argument("--scan-preprocess-mode", default="off", help="preprocessMode used during scan windows. 'off' skips source separation for speed.")
-    parser.add_argument("--analysis-concurrency", type=int, default=2, help="Number of sections to analyze in parallel during the analysis pass.")
+    parser.add_argument("--analysis-concurrency", type=int, default=3, help="Number of sections to analyze in parallel during the analysis pass.")
     parser.add_argument("--analysis-retry", type=int, default=2, help="Max retries per section on transient connection errors.")
     return parser.parse_args()
 
