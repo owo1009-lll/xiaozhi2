@@ -1124,6 +1124,46 @@ class ErhuAnalyzer:
                 except Exception:
                     pass
 
+    def _extract_musicxml_tempo(self, xml_text: str) -> int:
+        """Return the first tempo (BPM) found in a musicxml string, or 72 as fallback."""
+        try:
+            root = ET.fromstring(xml_text)
+            # Strip namespace for simpler search
+            for elem in root.iter():
+                tag = elem.tag.split("}")[-1] if "}" in elem.tag else elem.tag
+                # <sound tempo="120"/>
+                if tag == "sound":
+                    t = elem.get("tempo") or elem.get("Tempo")
+                    if t:
+                        try:
+                            bpm = round(float(t))
+                            if 20 <= bpm <= 300:
+                                return bpm
+                        except ValueError:
+                            pass
+                # <metronome><beat-unit>quarter</beat-unit><per-minute>120</per-minute></metronome>
+                if tag == "per-minute":
+                    try:
+                        bpm = round(float(elem.text or ""))
+                        if 20 <= bpm <= 300:
+                            return bpm
+                    except (ValueError, TypeError):
+                        pass
+                # <words>♩=120</words> or <words>q=120</words> or <words>= 120</words>
+                if tag == "words" and elem.text:
+                    import re
+                    m = re.search(r"[=＝]\s*(\d+)", elem.text)
+                    if m:
+                        try:
+                            bpm = int(m.group(1))
+                            if 20 <= bpm <= 300:
+                                return bpm
+                        except ValueError:
+                            pass
+        except Exception:
+            pass
+        return 72
+
     def _parse_musicxml_source_to_section(
         self,
         source_path: Path,
@@ -1139,6 +1179,7 @@ class ErhuAnalyzer:
 
         detected_parts = self._extract_musicxml_parts(xml_text)
         resolved_part = self._resolve_selected_part(detected_parts, selected_part_hint)
+        detected_tempo = self._extract_musicxml_tempo(xml_text)
         temp_request = AnalyzeRequest(
             participantId="score-import",
             pieceId=request.jobId,
@@ -1148,7 +1189,7 @@ class ErhuAnalyzer:
                 "sectionId": section_id,
                 "title": request.titleHint or request.originalFilename or request.jobId,
                 "meter": "4/4",
-                "tempo": 72,
+                "tempo": detected_tempo,
                 "notes": [],
                 "scoreSource": {"format": "musicxml", "encoding": "utf-8", "data": xml_text},
             },
@@ -1160,7 +1201,7 @@ class ErhuAnalyzer:
         section = {
             "sectionId": section_id,
             "title": section_title,
-            "tempo": 72,
+            "tempo": detected_tempo,
             "meter": "4/4",
             "demoAudio": "",
             "sequenceIndex": sequence_index,

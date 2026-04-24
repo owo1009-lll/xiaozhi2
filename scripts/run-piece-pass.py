@@ -8,6 +8,7 @@ import io
 import json
 import subprocess
 import sys
+import random
 import threading
 import time
 from collections import Counter
@@ -45,7 +46,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cache-dir", default="", help="Optional directory for per-section cached pass rows. Defaults to <output-dir>/section-cache.")
     parser.add_argument("--refresh-cache", action="store_true", help="Ignore existing per-section cache and recompute all section passes.")
     parser.add_argument("--scan-preprocess-mode", default="off", help="preprocessMode used during scan windows. 'off' skips source separation for speed.")
-    parser.add_argument("--analysis-concurrency", type=int, default=3, help="Number of sections to analyze in parallel during the analysis pass.")
+    parser.add_argument("--analysis-concurrency", type=int, default=2, help="Number of sections to analyze in parallel during the analysis pass.")
     parser.add_argument("--analysis-retry", type=int, default=2, help="Max retries per section on transient connection errors.")
     return parser.parse_args()
 
@@ -193,14 +194,15 @@ def run_scan(args: argparse.Namespace, scan_output_dir: Path) -> Path:
         check=False,
         capture_output=True,
     )
+    # Always forward scan stderr so warnings appear in job logs regardless of exit code.
+    if completed.stderr:
+        for line in completed.stderr.decode("utf-8", errors="replace").splitlines():
+            if line.strip():
+                sys.stderr.write(line + "\n")
+
     if completed.returncode != 0:
         stdout = completed.stdout.decode("utf-8", errors="replace") if completed.stdout else ""
-        stderr = completed.stderr.decode("utf-8", errors="replace") if completed.stderr else ""
-        raise SystemExit(
-            "whole-piece scan failed:\n"
-            f"STDOUT:\n{stdout}\n"
-            f"STDERR:\n{stderr}"
-        )
+        raise SystemExit(f"whole-piece scan failed (exit {completed.returncode}):\n{stdout}")
 
     if not scan_json.exists():
         raise SystemExit(f"scan finished without producing {scan_json}")
@@ -575,7 +577,7 @@ def main() -> int:
             except Exception as exc:
                 last_exc = exc
                 if attempt < args.analysis_retry:
-                    time.sleep(2 * (attempt + 1))
+                    time.sleep(3 * (attempt + 1) + random.uniform(0, 2))
         raise last_exc  # type: ignore[misc]
 
     concurrency = max(1, args.analysis_concurrency)

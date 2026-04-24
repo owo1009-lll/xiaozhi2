@@ -4,6 +4,7 @@ import argparse
 import base64
 import io
 import json
+import random
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -34,7 +35,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--section-id", action="append", default=[], help="Only scan selected section ids. Repeatable.")
     parser.add_argument("--section-ids", default="", help="Comma-separated section ids. Prefer this on Windows shells that mangle repeated flags.")
     parser.add_argument("--scan-preprocess-mode", default="off", help="preprocessMode sent to the analyzer during scan windows. 'off' skips source separation for speed.")
-    parser.add_argument("--concurrency", type=int, default=3, help="Number of sections to scan in parallel.")
+    parser.add_argument("--concurrency", type=int, default=2, help="Number of sections to scan in parallel.")
     parser.add_argument("--retry", type=int, default=2, help="Max retries per section on connection errors.")
     return parser.parse_args()
 
@@ -329,9 +330,11 @@ def main() -> int:
             except Exception as exc:
                 last_exc = exc
                 if attempt < args.retry:
-                    time.sleep(2 * (attempt + 1))
+                    # Jittered backoff: base delay + random offset to avoid thundering herd
+                    time.sleep(3 * (attempt + 1) + random.uniform(0, 2))
         raise last_exc  # type: ignore[misc]
 
+    skipped_count = 0
     if args.concurrency <= 1 or len(sections_to_scan) <= 1:
         for section in sections_to_scan:
             scan_results.append(_scan_one(section))
@@ -343,9 +346,18 @@ def main() -> int:
                 try:
                     scan_results.append(future.result())
                 except Exception as exc:
+                    skipped_count += 1
                     sys.stderr.write(
                         f"WARNING: scan skipped {section.get('sectionId')} after retries: {exc}\n"
                     )
+
+    # Fail loudly if too many sections were skipped — prevents silent garbage results.
+    min_ok = max(1, int(len(sections_to_scan) * 0.5))
+    if len(scan_results) < min_ok:
+        raise SystemExit(
+            f"scan aborted: only {len(scan_results)}/{len(sections_to_scan)} sections succeeded "
+            f"({skipped_count} skipped after retries). Reduce --concurrency or check analyzer health."
+        )
 
     ranked = sorted(
         [
