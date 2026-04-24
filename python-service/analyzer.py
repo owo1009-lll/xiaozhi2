@@ -1126,38 +1126,72 @@ class ErhuAnalyzer:
 
     def _extract_tempo_from_pdf_image(self, pdf_path: Path, page_index: int = 0) -> int | None:
         """
-        Render one page of a PDF and use connected-component analysis to locate the '= NNN'
-        tempo marking (e.g. ♩ = 138). Returns BPM (int) or None.
+        Extract tempo from a score page (PDF or PNG/image).
 
-        Strategy: find pairs of short thin horizontal bars (the '=' sign) in the upper half of
-        the page, then crop just to the right of each '=' and run ddddocr on that tight crop.
-        Short bars are distinguished from long staff lines via morphological filtering.
+        Strategy:
+        1. Text extraction (fast): parse '(D=NNN)' patterns from PDF text layer.
+        2. Image OCR: find pairs of '=' bars via connected-component analysis, run ddddocr.
+        PNG/image files are loaded directly; missing PDFs fall back to a sibling PNG.
         """
         try:
+            import re as _re
             import fitz as _fitz
+
+            actual_path = pdf_path
+            is_image = actual_path.suffix.lower() in {".png", ".jpg", ".jpeg", ".bmp"}
+
+            # Resolve: if PDF not found, try sibling PNG
+            if not is_image and not actual_path.exists():
+                png_sibling = actual_path.with_suffix(".png")
+                if png_sibling.exists():
+                    actual_path = png_sibling
+                    is_image = True
+
+            if not actual_path.exists():
+                return None
+
+            # Strategy 1: text extraction (Western-font PDFs)
+            if not is_image:
+                try:
+                    doc = _fitz.open(str(actual_path))
+                    text = doc[min(page_index, len(doc) - 1)].get_text()
+                    doc.close()
+                    # Match: (D=56), (q=138), =138 etc.
+                    for m in _re.finditer(r"[=(]\s*[A-Za-z]?\s*=\s*(\d{2,3})", text):
+                        bpm = int(m.group(1))
+                        if 40 <= bpm <= 300:
+                            return bpm
+                except Exception:
+                    pass
+
+            # Strategy 2: image-based OCR
             import cv2 as _cv2
             import numpy as _np
             import io as _io
-            import re as _re
             import ddddocr as _ddddocr
 
             _ocr = _ddddocr.DdddOcr(show_ad=False)
             SCALE = 3.0
 
-            doc = _fitz.open(str(pdf_path))
-            try:
-                if page_index >= len(doc):
-                    return None
-                page = doc[page_index]
-                mat = _fitz.Matrix(SCALE, SCALE)
-                pix = page.get_pixmap(matrix=mat)
-                arr = _np.frombuffer(pix.samples, dtype=_np.uint8).reshape(
-                    pix.height, pix.width, pix.n
-                )
-                if pix.n == 4:
-                    arr = arr[:, :, :3]
-            finally:
-                doc.close()
+            if is_image:
+                from PIL import Image as _PILImage
+                raw_img = _PILImage.open(str(actual_path)).convert("RGB")
+                arr = _np.array(raw_img)
+            else:
+                doc = _fitz.open(str(actual_path))
+                try:
+                    if page_index >= len(doc):
+                        return None
+                    page = doc[page_index]
+                    mat = _fitz.Matrix(SCALE, SCALE)
+                    pix = page.get_pixmap(matrix=mat)
+                    arr = _np.frombuffer(pix.samples, dtype=_np.uint8).reshape(
+                        pix.height, pix.width, pix.n
+                    )
+                    if pix.n == 4:
+                        arr = arr[:, :, :3]
+                finally:
+                    doc.close()
 
             h, w = arr.shape[:2]
             gray = _cv2.cvtColor(arr, _cv2.COLOR_RGB2GRAY)

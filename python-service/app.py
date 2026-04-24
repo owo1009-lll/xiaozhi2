@@ -78,6 +78,21 @@ def separate_erhu(payload: SeparateErhuRequest) -> dict[str, object]:
     return {"ok": True, "separation": result.model_dump()}
 
 
+@app.post("/score/patch-tempos")
+def patch_score_tempos(payload: dict) -> dict[str, object]:
+    from pathlib import Path as _Path
+    patches: dict[str, int] = {}
+    for item in (payload.get("pages") or []):
+        section_id = str(item.get("sectionId") or "")
+        pdf_path = _Path(str(item.get("pagePdfPath") or ""))
+        if not section_id or not pdf_path.exists():
+            continue
+        tempo = analyzer._extract_tempo_from_pdf_image(pdf_path)
+        if tempo and 40 <= tempo <= 300:
+            patches[section_id] = tempo
+    return {"ok": True, "patches": patches}
+
+
 @app.post("/detect-sections")
 def detect_sections(payload: RankSectionsRequest) -> dict[str, object]:
     if not payload.piecePacks:

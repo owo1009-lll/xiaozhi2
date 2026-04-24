@@ -1012,6 +1012,7 @@ async function finalizeScoreImportArtifacts({ job, scoreRecord }) {
     store.jobs.push(normalizedJob);
   }
   await writeScoreStore(store);
+  setTimeout(() => void backfillMissingTempos(), 3000);
   return normalizedJob;
 }
 
@@ -2164,6 +2165,95 @@ async function callExternalSectionRankLongTimeout(payload, sections, piece) {
   });
 
   return Array.isArray(json?.candidates) ? json.candidates : [];
+}
+
+async function callPatchTempos(pages) {
+  const analyzerUrl = safeString(process.env.ERHU_ANALYZER_URL).replace(/\/+$/, "");
+  if (!analyzerUrl || !pages.length) return {};
+  try {
+    const response = await fetch(`${analyzerUrl}/score/patch-tempos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pages }),
+    });
+    if (!response.ok) return {};
+    const json = await response.json();
+    return json?.patches || {};
+  } catch {
+    return {};
+  }
+}
+
+async function backfillMissingTempos() {
+  try {
+    const store = await readScoreStore();
+    let changed = false;
+
+    for (const score of store.scores) {
+      const sections = getArray(score.sections);
+      if (!sections.some((s) => safeNumber(s?.tempo, 72) === 72)) continue;
+
+      const pdfParts = safeString(score.sourcePdfPath).replace(/\\/g, "/").split("/").filter(Boolean);
+      if (pdfParts.length < 3) continue;
+      const jobDir = pdfParts[2];
+      const pagwiseDir = path.join(SCORE_IMPORTS_DIR, jobDir, "pagewise");
+      const sourcePdfAbs =
+        safeString(score.sourcePdfPath).startsWith("/data/")
+          ? path.join(__dirname, safeString(score.sourcePdfPath).slice(1))
+          : "";
+
+      const pageToIndices = new Map();
+      for (let i = 0; i < sections.length; i++) {
+        if (safeNumber(sections[i]?.tempo, 72) !== 72) continue;
+        const sectionId = safeString(sections[i]?.sectionId);
+        const m = sectionId.match(/^page-(\d+)/);
+        const pageNum = m ? parseInt(m[1], 10) : 0;
+        if (!pageToIndices.has(pageNum)) pageToIndices.set(pageNum, []);
+        pageToIndices.get(pageNum).push(i);
+      }
+
+      const requestPages = [];
+      const pageNumToMeta = new Map();
+      for (const [pageNum, indices] of pageToIndices) {
+        let pdfPath;
+        if (pageNum === 0) {
+          pdfPath = sourcePdfAbs;
+        } else {
+          const base = path.join(pagwiseDir, `page-${String(pageNum).padStart(3, "0")}`);
+          // Prefer PDF; fall back to PNG (some imports generate PNG previews only)
+          pdfPath = base + ".pdf";
+          if (!fsSync.existsSync(pdfPath)) {
+            const pngPath = base + ".png";
+            if (fsSync.existsSync(pngPath)) pdfPath = pngPath;
+          }
+        }
+        const pageKey =
+          pageNum === 0 ? "section-a" : `page-${String(pageNum).padStart(2, "0")}`;
+        requestPages.push({ sectionId: pageKey, pagePdfPath: pdfPath });
+        pageNumToMeta.set(pageNum, { pageKey, indices });
+      }
+
+      if (!requestPages.length) continue;
+      const patches = await callPatchTempos(requestPages);
+
+      for (const [, { pageKey, indices }] of pageNumToMeta) {
+        const tempo = patches[pageKey];
+        if (tempo && tempo !== 72) {
+          for (const idx of indices) {
+            score.sections[idx] = { ...score.sections[idx], tempo };
+          }
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      await writeScoreStore(store);
+      console.log("[backfillMissingTempos] tempo patches written to store.");
+    }
+  } catch (err) {
+    console.error("[backfillMissingTempos] error:", safeString(err?.message));
+  }
 }
 
 async function runSectionAnalysis(payload, section) {
@@ -5456,4 +5546,5 @@ app.get(/.*/, async (req, res) => {
 
 app.listen(port, () => {
   console.log(`AI Erhu prototype listening on http://localhost:${port}`);
+  setTimeout(() => void backfillMissingTempos(), 30000);
 });
