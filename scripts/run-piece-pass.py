@@ -9,6 +9,7 @@ import json
 import subprocess
 import sys
 import threading
+import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -44,7 +45,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cache-dir", default="", help="Optional directory for per-section cached pass rows. Defaults to <output-dir>/section-cache.")
     parser.add_argument("--refresh-cache", action="store_true", help="Ignore existing per-section cache and recompute all section passes.")
     parser.add_argument("--scan-preprocess-mode", default="off", help="preprocessMode used during scan windows. 'off' skips source separation for speed.")
-    parser.add_argument("--analysis-concurrency", type=int, default=4, help="Number of sections to analyze in parallel during the analysis pass.")
+    parser.add_argument("--analysis-concurrency", type=int, default=2, help="Number of sections to analyze in parallel during the analysis pass.")
+    parser.add_argument("--analysis-retry", type=int, default=2, help="Max retries per section on transient connection errors.")
     return parser.parse_args()
 
 
@@ -563,10 +565,18 @@ def main() -> int:
 
     def _run_item(pair: tuple) -> tuple[dict, bool]:
         item, sec = pair
-        return _analyze_section_item(
-            item, sec, audio_path, cache_dir, piece,
-            args.analyzer_url, args.preprocess_mode, args.refresh_cache,
-        )
+        last_exc: Exception | None = None
+        for attempt in range(max(1, args.analysis_retry + 1)):
+            try:
+                return _analyze_section_item(
+                    item, sec, audio_path, cache_dir, piece,
+                    args.analyzer_url, args.preprocess_mode, args.refresh_cache,
+                )
+            except Exception as exc:
+                last_exc = exc
+                if attempt < args.analysis_retry:
+                    time.sleep(2 * (attempt + 1))
+        raise last_exc  # type: ignore[misc]
 
     concurrency = max(1, args.analysis_concurrency)
     if concurrency <= 1 or len(valid_items) <= 1:
@@ -585,7 +595,15 @@ def main() -> int:
         with ThreadPoolExecutor(max_workers=concurrency) as executor:
             future_map = {executor.submit(_run_item, pair): pair for pair in valid_items}
             for future in as_completed(future_map):
-                row, hit = future.result()
+                pair = future_map[future]
+                try:
+                    row, hit = future.result()
+                except Exception as exc:
+                    item, sec = pair
+                    sys.stderr.write(
+                        f"WARNING: analysis skipped {sec.get('sectionId')} after retries: {exc}\n"
+                    )
+                    continue
                 with progress_lock:
                     section_rows.append(row)
                     cache_hits += hit

@@ -4,6 +4,8 @@ import argparse
 import base64
 import io
 import json
+import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from urllib import error, request
@@ -32,7 +34,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--section-id", action="append", default=[], help="Only scan selected section ids. Repeatable.")
     parser.add_argument("--section-ids", default="", help="Comma-separated section ids. Prefer this on Windows shells that mangle repeated flags.")
     parser.add_argument("--scan-preprocess-mode", default="off", help="preprocessMode sent to the analyzer during scan windows. 'off' skips source separation for speed.")
-    parser.add_argument("--concurrency", type=int, default=4, help="Number of sections to scan in parallel.")
+    parser.add_argument("--concurrency", type=int, default=2, help="Number of sections to scan in parallel.")
+    parser.add_argument("--retry", type=int, default=2, help="Max retries per section on connection errors.")
     return parser.parse_args()
 
 
@@ -280,17 +283,25 @@ def main() -> int:
     scan_results = []
 
     def _scan_one(section: dict) -> dict:
-        return scan_section(
-            args.analyzer_url,
-            audio_path,
-            piece,
-            section,
-            args.hint_radius,
-            args.hint_step,
-            args.window_padding,
-            args.max_candidates_per_section,
-            args.scan_preprocess_mode,
-        )
+        last_exc: Exception | None = None
+        for attempt in range(max(1, args.retry + 1)):
+            try:
+                return scan_section(
+                    args.analyzer_url,
+                    audio_path,
+                    piece,
+                    section,
+                    args.hint_radius,
+                    args.hint_step,
+                    args.window_padding,
+                    args.max_candidates_per_section,
+                    args.scan_preprocess_mode,
+                )
+            except Exception as exc:
+                last_exc = exc
+                if attempt < args.retry:
+                    time.sleep(2 * (attempt + 1))
+        raise last_exc  # type: ignore[misc]
 
     if args.concurrency <= 1 or len(sections_to_scan) <= 1:
         for section in sections_to_scan:
@@ -299,7 +310,13 @@ def main() -> int:
         with ThreadPoolExecutor(max_workers=args.concurrency) as executor:
             future_map = {executor.submit(_scan_one, section): section for section in sections_to_scan}
             for future in as_completed(future_map):
-                scan_results.append(future.result())
+                section = future_map[future]
+                try:
+                    scan_results.append(future.result())
+                except Exception as exc:
+                    sys.stderr.write(
+                        f"WARNING: scan skipped {section.get('sectionId')} after retries: {exc}\n"
+                    )
 
     ranked = sorted(
         [
