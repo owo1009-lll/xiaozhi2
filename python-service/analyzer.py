@@ -1124,6 +1124,113 @@ class ErhuAnalyzer:
                 except Exception:
                     pass
 
+    def _extract_tempo_from_pdf_image(self, pdf_path: Path, page_index: int = 0) -> int | None:
+        """
+        Render one page of a PDF and use connected-component analysis to locate the '= NNN'
+        tempo marking (e.g. ♩ = 138). Returns BPM (int) or None.
+
+        Strategy: find pairs of short thin horizontal bars (the '=' sign) in the upper half of
+        the page, then crop just to the right of each '=' and run ddddocr on that tight crop.
+        Short bars are distinguished from long staff lines via morphological filtering.
+        """
+        try:
+            import fitz as _fitz
+            import cv2 as _cv2
+            import numpy as _np
+            import io as _io
+            import re as _re
+            import ddddocr as _ddddocr
+
+            _ocr = _ddddocr.DdddOcr(show_ad=False)
+            SCALE = 3.0
+
+            doc = _fitz.open(str(pdf_path))
+            try:
+                if page_index >= len(doc):
+                    return None
+                page = doc[page_index]
+                mat = _fitz.Matrix(SCALE, SCALE)
+                pix = page.get_pixmap(matrix=mat)
+                arr = _np.frombuffer(pix.samples, dtype=_np.uint8).reshape(
+                    pix.height, pix.width, pix.n
+                )
+                if pix.n == 4:
+                    arr = arr[:, :, :3]
+            finally:
+                doc.close()
+
+            h, w = arr.shape[:2]
+            gray = _cv2.cvtColor(arr, _cv2.COLOR_RGB2GRAY)
+            _, binary = _cv2.threshold(gray, 200, 255, _cv2.THRESH_BINARY_INV)
+
+            # Only look in the top 35% of the page (tempo marks never in lower portion)
+            search_h = int(h * 0.35)
+            binary_top = binary[:search_h, :]
+
+            # Find connected components in top region
+            num_labels, _labels, stats, _centroids = _cv2.connectedComponentsWithStats(binary_top)
+
+            # Tempo marks appear in left 65% of page; ignore right side (barlines, repeat signs)
+            search_w = int(w * 0.65)
+
+            # Collect thin, short horizontal bars that could be '=' bars
+            # '=' bar: width 8–60px at 3x, height 2–7px, width > height*2
+            eq_bar_candidates: list[tuple[int, int, int, int]] = []  # (x, y, w, h)
+            for i in range(1, num_labels):
+                cx, cy, cw, ch, area = stats[i]
+                if cx + cw > search_w:
+                    continue  # skip bars in right portion of page
+                if 8 <= cw <= 60 and 2 <= ch <= 7 and cw >= ch * 2 and area >= 12:
+                    eq_bar_candidates.append((cx, cy, cw, ch))
+
+            # Pair up bars that form '=': same x region, close vertically (4–18px apart)
+            eq_signs: list[tuple[int, int, int]] = []  # (x_left, y_mid, bar_width)
+            used = set()
+            for i, (x1, y1, w1, h1) in enumerate(eq_bar_candidates):
+                if i in used:
+                    continue
+                for j, (x2, y2, w2, h2) in enumerate(eq_bar_candidates):
+                    if j <= i or j in used:
+                        continue
+                    if abs(x1 - x2) <= 8 and 4 <= abs(y1 - y2) <= 18:
+                        x_left = min(x1, x2)
+                        y_mid = (y1 + y2) // 2
+                        bar_w = max(w1, w2)
+                        eq_signs.append((x_left, y_mid, bar_w))
+                        used.add(i)
+                        used.add(j)
+                        break
+
+            for eq_x, eq_y, eq_w in eq_signs:
+                # Digits are to the right of '=': extend ~80px for up to 3 digits
+                dx1 = eq_x + eq_w + 2
+                dx2 = min(w, eq_x + eq_w + 90)
+                dy1 = max(0, eq_y - 20)
+                dy2 = min(search_h, eq_y + 22)
+                if dx2 <= dx1 or dy2 <= dy1:
+                    continue
+                crop = arr[dy1:dy2, dx1:dx2]
+                if crop.size == 0:
+                    continue
+                # Include the '=' itself for context
+                full_x1 = max(0, eq_x - 5)
+                full_crop = arr[dy1:dy2, full_x1:dx2]
+                from PIL import Image as _PILImage
+                pil = _PILImage.fromarray(full_crop)
+                # Upscale to aid OCR on small digits
+                pil = pil.resize((max(80, pil.width * 2), max(20, pil.height * 2)), _PILImage.LANCZOS)
+                buf = _io.BytesIO()
+                pil.save(buf, format="PNG")
+                raw = _ocr.classification(buf.getvalue())
+                for m in _re.finditer(r"(\d{2,3})", raw or ""):
+                    bpm = int(m.group(1))
+                    if 40 <= bpm <= 300:
+                        return bpm
+
+        except Exception:
+            pass
+        return None
+
     def _extract_musicxml_tempo(self, xml_text: str) -> int:
         """Return the first tempo (BPM) found in a musicxml string, or 72 as fallback."""
         try:
@@ -1180,6 +1287,19 @@ class ErhuAnalyzer:
         detected_parts = self._extract_musicxml_parts(xml_text)
         resolved_part = self._resolve_selected_part(detected_parts, selected_part_hint)
         detected_tempo = self._extract_musicxml_tempo(xml_text)
+        # If MusicXML has no tempo (Audiveris missed it), try image-based OCR on the page PDF.
+        # Typical layout: pagewise/page-NNN/page-NNN.mxl → PDF at pagewise/page-NNN.pdf
+        if detected_tempo == 72:
+            page_stem = source_path.stem.split(".")[0]  # "page-001" from "page-001.mvt2"
+            page_pdf = source_path.parent.parent / (page_stem + ".pdf")
+            if not page_pdf.exists():
+                page_pdf = source_path.parent / (page_stem + ".pdf")
+            if not page_pdf.exists():
+                page_pdf = source_path.with_suffix(".pdf")
+            if page_pdf.exists():
+                ocr_tempo = self._extract_tempo_from_pdf_image(page_pdf)
+                if ocr_tempo:
+                    detected_tempo = ocr_tempo
         temp_request = AnalyzeRequest(
             participantId="score-import",
             pieceId=request.jobId,
