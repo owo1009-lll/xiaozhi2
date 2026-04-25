@@ -822,6 +822,37 @@ button {
   gap: 7px;
 }
 
+.issue-line-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.issue-line-mode.is-ambiguous {
+  background: rgba(245, 158, 11, 0.14);
+  color: #92400e;
+}
+
+.issue-line-mode span {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.issue-line-mode select {
+  border: 1px solid rgba(17, 51, 45, 0.14);
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--text-main);
+  font-size: 12px;
+}
+
 .legend-dot {
   display: inline-block;
   width: 10px;
