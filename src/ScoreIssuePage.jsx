@@ -85,11 +85,13 @@ function buildImportedPageImagePath(score, section, pageNumber) {
 }
 
 function getAbsoluteIssuePage(section, issue = null) {
-  const issuePage = Number(issue?.pageNumber);
-  if (Number.isFinite(issuePage) && issuePage > 0) return Math.round(issuePage);
   const sectionPage = Number(section?.pageNumber);
   if (Number.isFinite(sectionPage) && sectionPage > 0) return Math.round(sectionPage);
-  return extractSectionPageNumber(section || {});
+  const extractedPage = extractSectionPageNumber(section || {});
+  if (Number.isFinite(extractedPage) && extractedPage > 0) return Math.round(extractedPage);
+  const issuePage = Number(issue?.pageNumber);
+  if (Number.isFinite(issuePage) && issuePage > 0) return Math.round(issuePage);
+  return 1;
 }
 
 function readNotePosition(note, section, pageOverride = 0) {
@@ -137,40 +139,57 @@ function shouldProjectImportedFullScoreSection(section) {
   return /page[-\s]?0*\d+/i.test(descriptor) || /自动识谱第\s*\d+\s*页/i.test(descriptor);
 }
 
-function isErhuMelodySystemIndex(systemIndex) {
+function getSelectedPartCandidate(score) {
+  const candidates = Array.isArray(score?.partCandidates) ? score.partCandidates : [];
+  if (!candidates.length) return null;
+  const selected = String(score?.selectedPart || score?.selectedPartId || "").trim().toLowerCase();
+  return candidates.find((candidate) => (
+    [candidate?.id, candidate?.name, candidate?.label]
+      .map((item) => String(item || "").trim().toLowerCase())
+      .includes(selected)
+  )) || candidates[0] || null;
+}
+
+function shouldUseAlternatingSoloSystemPattern(score) {
+  const candidate = getSelectedPartCandidate(score);
+  return Boolean(candidate?.isLikelyPiano) || Number(candidate?.chordRatio) >= 0.25;
+}
+
+function isErhuMelodySystemIndex(systemIndex, score = null) {
   const numeric = Math.round(Number(systemIndex) || 0);
   if (!numeric) return true;
+  if (shouldUseAlternatingSoloSystemPattern(score)) return numeric % 2 === 1;
   return (numeric - 1) % 3 === 0;
 }
 
-function isErhuMelodyNote(note, section) {
+function isErhuMelodyNote(note, section, score = null) {
   const descriptor = `${note?.partName || ""} ${note?.partLabel || ""} ${note?.instrument || ""} ${section?.selectedPart || ""}`;
   if (/\b(piano|pno|accompaniment)\b|钢琴|伴奏/i.test(descriptor)) return false;
   if (!shouldProjectImportedFullScoreSection(section)) return true;
-  return isErhuMelodySystemIndex(note?.notePosition?.systemIndex);
+  return isErhuMelodySystemIndex(note?.notePosition?.systemIndex, score);
 }
 
-function getErhuMelodyNotes(section) {
-  return (Array.isArray(section?.notes) ? section.notes : []).filter((note) => isErhuMelodyNote(note, section));
+function getErhuMelodyNotes(section, score = null) {
+  return (Array.isArray(section?.notes) ? section.notes : []).filter((note) => isErhuMelodyNote(note, section, score));
 }
 
-function hasErhuMelodyMeasure(section, measureIndex) {
+function hasErhuMelodyMeasure(section, measureIndex, score = null) {
   if (!shouldProjectImportedFullScoreSection(section)) return true;
   const numericMeasure = Number(measureIndex) || 1;
-  return getErhuMelodyNotes(section).some((note) => Number(note?.measureIndex) === numericMeasure);
+  return getErhuMelodyNotes(section, score).some((note) => Number(note?.measureIndex) === numericMeasure);
 }
 
-function getSectionSystemOrder(section) {
+function getSectionSystemOrder(section, score = null) {
   const systems = new Set();
-  for (const note of getErhuMelodyNotes(section)) {
+  for (const note of getErhuMelodyNotes(section, score)) {
     const systemIndex = Number(note?.notePosition?.systemIndex);
     if (Number.isFinite(systemIndex) && systemIndex > 0) systems.add(Math.round(systemIndex));
   }
   return [...systems].sort((left, right) => left - right);
 }
 
-function getSystemMedianY(section, systemIndex) {
-  const values = getErhuMelodyNotes(section)
+function getSystemMedianY(section, systemIndex, score = null) {
+  const values = getErhuMelodyNotes(section, score)
     .filter((note) => Math.round(Number(note?.notePosition?.systemIndex) || 0) === Math.round(Number(systemIndex) || 0))
     .map((note) => Number(note?.notePosition?.normalizedY))
     .filter((value) => Number.isFinite(value))
@@ -194,7 +213,7 @@ function isLikelyNonScoreLeadPage(section, score) {
   return isAutoPage && noteCount > 0 && noteCount < 12;
 }
 
-function isLikelyAccompanimentOnlySection(section) {
+function isLikelyAccompanimentOnlySection(section, score = null) {
   const descriptor = `${section?.selectedPart || ""} ${section?.partName || ""} ${section?.partLabel || ""} ${section?.title || ""}`;
   if (/\b(piano|pno|accompaniment)\b|钢琴|伴奏/i.test(descriptor)) return true;
   if (!shouldProjectImportedFullScoreSection(section)) return false;
@@ -202,15 +221,33 @@ function isLikelyAccompanimentOnlySection(section) {
   if (!notes.length) return false;
   const notesWithSystem = notes.filter((note) => Number.isFinite(Number(note?.notePosition?.systemIndex)));
   if (!notesWithSystem.length) return false;
-  return !notesWithSystem.some((note) => isErhuMelodySystemIndex(note?.notePosition?.systemIndex));
+  return !notesWithSystem.some((note) => isErhuMelodySystemIndex(note?.notePosition?.systemIndex, score));
 }
 
-function findErhuNotePosition(section, issue, preferredStaffIndex) {
+function findErhuNotePosition(section, issue, preferredStaffIndex, score = null) {
   const notes = Array.isArray(section?.notes) ? section.notes : [];
   const targetStaff = Number(preferredStaffIndex) || getErhuStaffIndex(section);
-  const melodyNotes = notes.filter((item) => getNoteStaffIndex(item) === targetStaff && isErhuMelodyNote(item, section));
+  const melodyNotes = notes.filter((item) => getNoteStaffIndex(item) === targetStaff && isErhuMelodyNote(item, section, score));
   const absolutePage = getAbsoluteIssuePage(section, issue);
   const measureIndex = Number(issue?.measureIndex) || getApproximateNotePosition(issue?.noteId, 1).measureIndex;
+  const importedFullScore = shouldProjectImportedFullScoreSection(section);
+  const issueNoteId = String(issue?.noteId || "");
+
+  if (importedFullScore) {
+    const exactImportedNote = issueNoteId
+      ? notes.find((item) => (
+        String(item?.noteId || "") === issueNoteId
+        && Number(item?.measureIndex) === measureIndex
+        && readNotePosition(item, section, absolutePage)
+      ))
+      : null;
+    if (!exactImportedNote) return null;
+    if (getNoteStaffIndex(exactImportedNote) !== targetStaff || !isErhuMelodyNote(exactImportedNote, section, score)) {
+      return null;
+    }
+    return readNotePosition(exactImportedNote, section, absolutePage);
+  }
+
   const sameMeasure = melodyNotes
     .filter((item) => Number(item?.measureIndex) === measureIndex && readNotePosition(item, section, absolutePage))
     .sort((left, right) => {
@@ -218,8 +255,6 @@ function findErhuNotePosition(section, issue, preferredStaffIndex) {
       if (Math.abs(beatDelta) > 0.0001) return beatDelta;
       return Number(left?.notePosition?.normalizedX || 0) - Number(right?.notePosition?.normalizedX || 0);
     });
-
-  if (!sameMeasure.length && shouldProjectImportedFullScoreSection(section)) return null;
 
   const exact = sameMeasure.find((item) => String(item?.noteId || "") === String(issue?.noteId || ""));
   if (exact) return readNotePosition(exact, section, absolutePage);
@@ -275,7 +310,8 @@ function buildMeasureIssues(analysis) {
     return {
       sectionId: String(item?.sectionId || ""),
       sectionTitle: repairMojibakeText(item?.sectionTitle || ""),
-      pageNumber: Number(item?.pageNumber) || 0,
+      sourcePageNumber: Number(item?.pageNumber) || 0,
+      pageNumber: 0,
       measureIndex: Number(item?.measureIndex) || 1,
       label,
       issueTone: getIssueTone([label]),
@@ -297,7 +333,8 @@ function buildNoteIssues(analysis) {
     return {
       sectionId: String(item?.sectionId || ""),
       sectionTitle: repairMojibakeText(item?.sectionTitle || ""),
-      pageNumber: Number(item?.pageNumber) || 0,
+      sourcePageNumber: Number(item?.pageNumber) || 0,
+      pageNumber: 0,
       noteId: item?.noteId,
       measureIndex: Number(item?.measureIndex) || 1,
       tags: tags.length ? [...new Set(tags)] : ["需复核"],
@@ -470,7 +507,7 @@ export default function ScoreIssuePage() {
   const effectiveSections = useMemo(
     () => {
       const sections = isWholePieceMode ? (Array.isArray(score?.sections) ? score.sections : []) : (section ? [section] : []);
-      return sections.filter((item) => !isWholePieceMode || (!isLikelyNonScoreLeadPage(item, score) && !isLikelyAccompanimentOnlySection(item)));
+      return sections.filter((item) => !isWholePieceMode || (!isLikelyNonScoreLeadPage(item, score) && !isLikelyAccompanimentOnlySection(item, score)));
     },
     [isWholePieceMode, score, section],
   );
@@ -555,8 +592,8 @@ export default function ScoreIssuePage() {
       const issueSection = resolveIssueSection(score, section, item);
       return !isWholePieceMode || (
         !isLikelyNonScoreLeadPage(issueSection, score)
-        && !isLikelyAccompanimentOnlySection(issueSection)
-        && hasErhuMelodyMeasure(issueSection, item.measureIndex)
+        && !isLikelyAccompanimentOnlySection(issueSection, score)
+        && hasErhuMelodyMeasure(issueSection, item.measureIndex, score)
       );
     }),
     [analysis, isWholePieceMode, score, section],
@@ -566,8 +603,8 @@ export default function ScoreIssuePage() {
       const issueSection = resolveIssueSection(score, section, item);
       return !isWholePieceMode || (
         !isLikelyNonScoreLeadPage(issueSection, score)
-        && !isLikelyAccompanimentOnlySection(issueSection)
-        && hasErhuMelodyMeasure(issueSection, item.measureIndex)
+        && !isLikelyAccompanimentOnlySection(issueSection, score)
+        && hasErhuMelodyMeasure(issueSection, item.measureIndex, score)
       );
     }),
     [analysis, isWholePieceMode, score, section],
@@ -582,8 +619,8 @@ export default function ScoreIssuePage() {
   );
   const firstIssuePage = useMemo(() => {
     const pages = measureIssues
-      .map((item) => item.pageNumber || extractSectionPageNumber(resolveIssueSection(score, section, item)))
-      .concat(noteIssues.map((item) => item.pageNumber || extractSectionPageNumber(resolveIssueSection(score, section, item))))
+      .map((item) => extractSectionPageNumber(resolveIssueSection(score, section, item)))
+      .concat(noteIssues.map((item) => extractSectionPageNumber(resolveIssueSection(score, section, item))))
       .filter((value) => Number.isFinite(Number(value)) && Number(value) > 0)
       .map((value) => Number(value));
     return pages.length ? Math.min(...pages) : baseSectionPage;
@@ -619,6 +656,7 @@ export default function ScoreIssuePage() {
         const staffIndex = getNoteStaffIndex(note);
         if (!Number.isFinite(measureIndex) || !Number.isFinite(pageNumber)) continue;
         if (staffIndex !== sectionStaffIndex) continue;
+        if (!isErhuMelodyNote(note, currentSection, score)) continue;
         const key = sectionKey(currentSectionId, measureIndex);
         if (!pageMap.has(key)) {
           pageMap.set(key, pageNumber);
@@ -626,7 +664,7 @@ export default function ScoreIssuePage() {
       }
     }
     return pageMap;
-  }, [dominantStaffIndex, effectiveSections]);
+  }, [dominantStaffIndex, effectiveSections, score]);
 
   const noteOverlayItems = useMemo(
     () =>
@@ -635,7 +673,7 @@ export default function ScoreIssuePage() {
           const issueSection = resolveIssueSection(score, section, item);
           const issueSectionId = String(issueSection?.sectionId || item?.sectionId || "");
           const sectionStaffIndex = getErhuStaffIndex(issueSection, dominantStaffIndex);
-          const exact = findErhuNotePosition(issueSection, item, sectionStaffIndex);
+          const exact = findErhuNotePosition(issueSection, item, sectionStaffIndex, score);
           if (exact) {
             return {
               key: `${issueSectionId}-${item?.noteId || index}-${exact.measureIndex}`,
@@ -668,7 +706,7 @@ export default function ScoreIssuePage() {
             left: Math.min(measureLeft + slotWidth * relativeStep, 98),
             top: 18 + bandIndex * 18,
             exact: false,
-            pageNumber: item?.pageNumber || measurePageMap.get(sectionKey(issueSectionId, measureIndex)) || extractSectionPageNumber(issueSection) || baseSectionPage,
+            pageNumber: measurePageMap.get(sectionKey(issueSectionId, measureIndex)) || extractSectionPageNumber(issueSection) || baseSectionPage,
             tags: item?.tags || [],
             issueTone: item?.issueTone || getIssueTone(item?.tags || []),
           };
@@ -686,7 +724,7 @@ export default function ScoreIssuePage() {
           ...item,
           sectionId: issueSectionId,
           sectionTitle: item.sectionTitle || formatSectionDisplayName(issueSection),
-          pageNumber: item.pageNumber || measurePageMap.get(sectionKey(issueSectionId, item.measureIndex)) || extractSectionPageNumber(issueSection),
+          pageNumber: measurePageMap.get(sectionKey(issueSectionId, item.measureIndex)) || extractSectionPageNumber(issueSection),
           measureKey: sectionKey(issueSectionId, item.measureIndex),
           issueKey: `measure-${sectionKey(issueSectionId, item.measureIndex)}`,
           issueNumber: index + 1,
@@ -709,7 +747,7 @@ export default function ScoreIssuePage() {
           ...item,
           sectionId: issueSectionId,
           sectionTitle: item.sectionTitle || formatSectionDisplayName(issueSection),
-          pageNumber: overlayItem?.pageNumber || item.pageNumber || extractSectionPageNumber(issueSection),
+          pageNumber: overlayItem?.pageNumber || extractSectionPageNumber(issueSection),
           overlayItem,
           overlayKey,
           issueKey: `note-${overlayKey}`,
@@ -787,10 +825,11 @@ export default function ScoreIssuePage() {
         const [measureSectionId, measureText] = String(measureKey).split("::");
         const measureIndex = Number(measureText) || 1;
         const measureSection = effectiveSections.find((item) => String(item?.sectionId || "") === measureSectionId) || section;
+        if (shouldProjectImportedFullScoreSection(measureSection)) return null;
         const sectionStaffIndex = getErhuStaffIndex(measureSection, dominantStaffIndex);
         const absolutePage = getAbsoluteIssuePage(measureSection);
         const measureNotes = (Array.isArray(measureSection?.notes) ? measureSection.notes : [])
-          .filter((item) => Number(item?.measureIndex) === measureIndex && getNoteStaffIndex(item) === sectionStaffIndex && isErhuMelodyNote(item, measureSection))
+          .filter((item) => Number(item?.measureIndex) === measureIndex && getNoteStaffIndex(item) === sectionStaffIndex && isErhuMelodyNote(item, measureSection, score))
           .map((item) => {
             const position = readNotePosition(item, measureSection, absolutePage);
             return {
@@ -824,6 +863,8 @@ export default function ScoreIssuePage() {
       .filter((measureKey) => (measurePageMap.get(measureKey) || baseSectionPage) === currentPage)
       .map((measureKey) => {
         const [measureSectionId, measureText] = String(measureKey).split("::");
+        const measureSection = effectiveSections.find((item) => String(item?.sectionId || "") === measureSectionId) || section;
+        if (shouldProjectImportedFullScoreSection(measureSection)) return null;
         const measureIndex = Number(measureText) || 1;
         const slotWidth = 100 / Math.max(1, measureCount);
         const left = Math.max(0, (measureIndex - 1) * slotWidth);
@@ -837,8 +878,9 @@ export default function ScoreIssuePage() {
           width: Math.max(5.5, Math.min(slotWidth, 18)),
           height: 18,
         };
-      });
-  }, [baseSectionPage, currentPage, dominantStaffIndex, effectiveSections, measureCount, measureIssueToneMap, measureOverlayKeys, measurePageMap, section]);
+      })
+      .filter(Boolean);
+  }, [baseSectionPage, currentPage, dominantStaffIndex, effectiveSections, measureCount, measureIssueToneMap, measureOverlayKeys, measurePageMap, score, section]);
 
   const effectiveWidth = stageSize.width > 0 ? stageSize.width * zoom : 0;
   const effectiveHeight = stageSize.height > 0 ? stageSize.height * zoom : 0;
@@ -1015,7 +1057,11 @@ export default function ScoreIssuePage() {
                       <span className="issue-number-chip">{item.issueNumber}</span>
                       {formatNoteLabel(item.noteId, item.measureIndex)}
                     </strong>
-                    <span>{isWholePieceMode ? `${item.sectionTitle || "整曲"} · ` : ""}{item.tags.join("、")}</span>
+                    <span>
+                      {isWholePieceMode ? `${item.sectionTitle || "整曲"} · ` : ""}
+                      {item.tags.join("、")}
+                      {!overlayItem ? "，未定位到可靠二胡音符坐标" : ""}
+                    </span>
                   </button>
                 );
               })}
