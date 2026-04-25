@@ -4,8 +4,8 @@ export function clampScore(value) {
   return Math.max(0, Math.min(100, Math.round(numeric)));
 }
 
-export const ISSUE_SESSION_SCHEMA_VERSION = 7;
-export const ISSUE_SESSION_STORAGE_PREFIX = "ai-erhu.issue-session.v7.";
+export const ISSUE_SESSION_SCHEMA_VERSION = 8;
+export const ISSUE_SESSION_STORAGE_PREFIX = "ai-erhu.issue-session.v8.";
 export const LEGACY_ISSUE_SESSION_STORAGE_PREFIX = "ai-erhu.issue-session.";
 
 export function repairMojibakeText(value) {

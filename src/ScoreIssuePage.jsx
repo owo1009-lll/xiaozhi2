@@ -150,15 +150,32 @@ function getSelectedPartCandidate(score) {
   )) || candidates[0] || null;
 }
 
-function shouldUseAlternatingSoloSystemPattern(score) {
+function isExplicitErhuPartCandidate(candidate) {
+  const label = `${candidate?.id || ""} ${candidate?.name || ""} ${candidate?.label || ""}`;
+  return /\berhu\b|二胡/i.test(label);
+}
+
+function isCleanSoloSelectedPart(score) {
   const candidate = getSelectedPartCandidate(score);
-  return Boolean(candidate?.isLikelyPiano) || Number(candidate?.chordRatio) >= 0.25;
+  if (!candidate) return false;
+  if (isExplicitErhuPartCandidate(candidate)) return true;
+  return !candidate?.isLikelyPiano
+    && Number(candidate?.chordRatio || 0) < 0.18
+    && Math.max(1, Number(candidate?.staffCount || 1)) <= 1;
+}
+
+function isAmbiguousImportedPart(score) {
+  const candidate = getSelectedPartCandidate(score);
+  if (!candidate) return false;
+  if (isExplicitErhuPartCandidate(candidate)) return false;
+  return Boolean(candidate?.isLikelyPiano) || Number(candidate?.chordRatio || 0) >= 0.18;
 }
 
 function isErhuMelodySystemIndex(systemIndex, score = null) {
   const numeric = Math.round(Number(systemIndex) || 0);
   if (!numeric) return true;
-  if (shouldUseAlternatingSoloSystemPattern(score)) return numeric % 2 === 1;
+  if (isCleanSoloSelectedPart(score)) return true;
+  if (isAmbiguousImportedPart(score)) return false;
   return (numeric - 1) % 3 === 0;
 }
 
@@ -175,6 +192,7 @@ function getErhuMelodyNotes(section, score = null) {
 
 function hasErhuMelodyMeasure(section, measureIndex, score = null) {
   if (!shouldProjectImportedFullScoreSection(section)) return true;
+  if (isAmbiguousImportedPart(score)) return true;
   const numericMeasure = Number(measureIndex) || 1;
   return getErhuMelodyNotes(section, score).some((note) => Number(note?.measureIndex) === numericMeasure);
 }
@@ -217,6 +235,7 @@ function isLikelyAccompanimentOnlySection(section, score = null) {
   const descriptor = `${section?.selectedPart || ""} ${section?.partName || ""} ${section?.partLabel || ""} ${section?.title || ""}`;
   if (/\b(piano|pno|accompaniment)\b|钢琴|伴奏/i.test(descriptor)) return true;
   if (!shouldProjectImportedFullScoreSection(section)) return false;
+  if (isAmbiguousImportedPart(score)) return false;
   const notes = Array.isArray(section?.notes) ? section.notes : [];
   if (!notes.length) return false;
   const notesWithSystem = notes.filter((note) => Number.isFinite(Number(note?.notePosition?.systemIndex)));

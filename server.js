@@ -1755,23 +1755,49 @@ function isImportedFullScoreSection(section = {}) {
   return /page[-\s]?0*\d+/i.test(descriptor) || /自动识谱第\s*\d+\s*页/i.test(descriptor);
 }
 
-function isErhuMelodySystemIndex(systemIndex) {
+function getSelectedPartCandidate(score = {}) {
+  const candidates = getArray(score?.partCandidates);
+  if (!candidates.length) return null;
+  const selected = safeString(score?.selectedPart || score?.selectedPartId).trim().toLowerCase();
+  return candidates.find((candidate) => (
+    [candidate?.id, candidate?.name, candidate?.label]
+      .map((item) => safeString(item).trim().toLowerCase())
+      .includes(selected)
+  )) || candidates[0] || null;
+}
+
+function isExplicitErhuPartCandidate(candidate = {}) {
+  const label = `${safeString(candidate?.id)} ${safeString(candidate?.name)} ${safeString(candidate?.label)}`;
+  return /\berhu\b|二胡/i.test(label);
+}
+
+function isCleanSoloSelectedPart(score = {}) {
+  const candidate = getSelectedPartCandidate(score);
+  if (!candidate) return false;
+  if (isExplicitErhuPartCandidate(candidate)) return true;
+  return !safeBoolean(candidate?.isLikelyPiano, false)
+    && safeNumber(candidate?.chordRatio, 0) < 0.18
+    && Math.max(1, safeNumber(candidate?.staffCount, 1)) <= 1;
+}
+
+function isErhuMelodySystemIndex(systemIndex, score = {}) {
   const numeric = Math.round(safeNumber(systemIndex, 0));
   if (!numeric) return true;
+  if (isCleanSoloSelectedPart(score)) return true;
   return (numeric - 1) % 3 === 0;
 }
 
-function isErhuMelodyNote(note = {}, section = {}) {
+function isErhuMelodyNote(note = {}, section = {}, score = {}) {
   if (!isImportedFullScoreSection(section)) return true;
-  return isErhuMelodySystemIndex(note?.notePosition?.systemIndex);
+  return isErhuMelodySystemIndex(note?.notePosition?.systemIndex, score);
 }
 
-function buildErhuOnlyImportedSection(section = {}) {
+function buildErhuOnlyImportedSection(section = {}, score = {}) {
   if (!isImportedFullScoreSection(section)) return section;
   const notes = getArray(section?.notes);
   const notesWithSystem = notes.filter((note) => Number.isFinite(safeNumber(note?.notePosition?.systemIndex, Number.NaN)));
   if (!notesWithSystem.length) return section;
-  const erhuNotes = notes.filter((note) => isErhuMelodyNote(note, section));
+  const erhuNotes = notes.filter((note) => isErhuMelodyNote(note, section, score));
   if (!erhuNotes.length) return null;
   const measureCount = Math.max(1, ...erhuNotes.map((note) => Math.round(safeNumber(note?.measureIndex, 1))));
   return {
@@ -1797,7 +1823,7 @@ function buildDerivedPieceFromScore(score = {}) {
   let cumulativeSeconds = 0;
   const sourceSections = getArray(score.sections)
     .filter((section) => !isLikelyNonScoreLeadPageSection(section, score))
-    .map((section) => buildErhuOnlyImportedSection(section))
+    .map((section) => buildErhuOnlyImportedSection(section, score))
     .filter(Boolean);
   const orderedSections = sourceSections
     .map((section, index) => ({
