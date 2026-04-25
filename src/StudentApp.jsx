@@ -1225,6 +1225,12 @@ export default function StudentApp({ onOpenResearch }) {
                 {" · "}
                 综合评分：{getDisplayCombinedScore(wholePieceSummary)}
               </p>
+              {wholePieceSummary.analysisReliable === false ? (
+                <p className="error-text">
+                  本次整曲分析不完整：有效段落 {wholePieceSummary.matchedSectionCount || 0} / {wholePieceSummary.attemptedSectionCount || wholePieceSummary.structuredSectionCount || 0}，
+                  失败或超时 {wholePieceSummary.failedSectionCount || 0} 段。请重新分析或改用分段诊断，不要直接采用该整曲评分。
+                </p>
+              ) : null}
               <p>建议路径：{formatPracticePathLabel(wholePieceSummary.dominantPracticePath)}</p>
               {wholePieceSummary.audioCoverage?.isPartial ? (
                 <p style={{ color: "var(--text-muted)", fontSize: 13 }}>

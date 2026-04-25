@@ -256,6 +256,17 @@ def mean_weighted(rows: list[dict], key: str, weight_key: str) -> float:
     return round(numerator / denominator, 2)
 
 
+def is_failed_section_row(row: dict) -> bool:
+    if not row:
+        return True
+    return bool(
+        row.get("failed")
+        or row.get("analysisFailed")
+        or row.get("error")
+        or row.get("failureReason")
+    )
+
+
 def run_scan(args: argparse.Namespace, scan_output_dir: Path) -> Path:
     scan_output_dir.mkdir(parents=True, exist_ok=True)
     output_key = args.score_id or args.piece_id
@@ -527,37 +538,53 @@ def summarize_piece_pass(piece: dict, section_rows: list[dict], audio_coverage: 
     structured_sections = piece.get("sections") or []
     structured_section_count = len(structured_sections)
     structured_note_count = sum(len(section.get("notes") or []) for section in structured_sections)
-    matched_section_count = len(section_rows)
-    matched_note_count = sum(int(row.get("noteCount") or 0) for row in section_rows)
-    practice_counter = Counter(row.get("recommendedPracticePath") or "review-first" for row in section_rows)
+    successful_rows = [row for row in section_rows if not is_failed_section_row(row)]
+    failed_rows = [row for row in section_rows if is_failed_section_row(row)]
+    matched_section_count = len(successful_rows)
+    matched_note_count = sum(int(row.get("noteCount") or 0) for row in successful_rows)
+    attempted_section_count = len(section_rows)
+    failed_section_count = len(failed_rows)
+    timed_out_section_count = sum(
+        1 for row in failed_rows if "timed out" in str(row.get("failureReason") or row.get("error") or "").lower()
+    )
+    practice_counter = Counter(row.get("recommendedPracticePath") or "review-first" for row in successful_rows)
 
     weakest_sections = sorted(
-        section_rows,
+        successful_rows,
         key=lambda row: (safe_number(row.get("combinedScore"), 999), safe_number(row.get("confidence"), 0)),
     )[:5]
 
     dominant_path = practice_counter.most_common(1)[0][0] if practice_counter else "review-first"
     coverage_ratio = round(matched_section_count / structured_section_count, 3) if structured_section_count else 0.0
     note_coverage_ratio = round(matched_note_count / structured_note_count, 3) if structured_note_count else 0.0
+    attempted_ratio = round(attempted_section_count / structured_section_count, 3) if structured_section_count else 0.0
+    analysis_completeness_ratio = round(matched_section_count / attempted_section_count, 3) if attempted_section_count else 0.0
+    reliable = analysis_completeness_ratio >= 0.85 and matched_section_count > 0
 
     return {
         "pieceId": piece.get("pieceId"),
         "pieceTitle": piece.get("title"),
         "structuredSectionCount": structured_section_count,
         "structuredNoteCount": structured_note_count,
+        "attemptedSectionCount": attempted_section_count,
+        "failedSectionCount": failed_section_count,
+        "timedOutSectionCount": timed_out_section_count,
         "matchedSectionCount": matched_section_count,
         "matchedNoteCount": matched_note_count,
         "sectionCoverageRatio": coverage_ratio,
         "noteCoverageRatio": note_coverage_ratio,
-        "weightedPitchScore": mean_weighted(section_rows, "overallPitchScore", "noteCount"),
-        "weightedRhythmScore": mean_weighted(section_rows, "overallRhythmScore", "noteCount"),
-        "weightedStudentPitchScore": mean_weighted(section_rows, "studentPitchScore", "noteCount"),
-        "weightedStudentRhythmScore": mean_weighted(section_rows, "studentRhythmScore", "noteCount"),
-        "weightedConfidence": mean_weighted(section_rows, "confidence", "noteCount"),
-        "weightedCombinedScore": mean_weighted(section_rows, "combinedScore", "noteCount"),
-        "weightedStudentCombinedScore": mean_weighted(section_rows, "studentCombinedScore", "noteCount"),
-        "totalMeasureFindings": int(sum(safe_number(row.get("measureFindingCount"), 0) for row in section_rows)),
-        "totalNoteFindings": int(sum(safe_number(row.get("noteFindingCount"), 0) for row in section_rows)),
+        "attemptedSectionRatio": attempted_ratio,
+        "analysisCompletenessRatio": analysis_completeness_ratio,
+        "analysisReliable": reliable,
+        "weightedPitchScore": mean_weighted(successful_rows, "overallPitchScore", "noteCount"),
+        "weightedRhythmScore": mean_weighted(successful_rows, "overallRhythmScore", "noteCount"),
+        "weightedStudentPitchScore": mean_weighted(successful_rows, "studentPitchScore", "noteCount"),
+        "weightedStudentRhythmScore": mean_weighted(successful_rows, "studentRhythmScore", "noteCount"),
+        "weightedConfidence": mean_weighted(successful_rows, "confidence", "noteCount"),
+        "weightedCombinedScore": mean_weighted(successful_rows, "combinedScore", "noteCount"),
+        "weightedStudentCombinedScore": mean_weighted(successful_rows, "studentCombinedScore", "noteCount"),
+        "totalMeasureFindings": int(sum(safe_number(row.get("measureFindingCount"), 0) for row in successful_rows)),
+        "totalNoteFindings": int(sum(safe_number(row.get("noteFindingCount"), 0) for row in successful_rows)),
         "dominantPracticePath": dominant_path,
         "practicePathCounts": dict(practice_counter),
         "weakestSections": [
@@ -581,10 +608,18 @@ def build_summary_text(summary: dict) -> str:
     weakest_labels = ", ".join(
         f"{item.get('sequenceIndex')}.{item.get('sectionTitle')}({item.get('combinedScore')})" for item in weakest[:3]
     )
+    reliability = ""
+    if not summary.get("analysisReliable"):
+        reliability = (
+            f" 本次整曲分析只完成 {summary.get('matchedSectionCount')}/"
+            f"{summary.get('attemptedSectionCount')} 个候选段落，"
+            f"其中 {summary.get('failedSectionCount')} 段失败或超时，结果需复核。"
+        )
     return (
         f"当前整曲 pass 已覆盖 {summary.get('matchedSectionCount')}/{summary.get('structuredSectionCount')} 个结构化段落，"
         f"加权音准 {summary.get('weightedPitchScore')}，加权节奏 {summary.get('weightedRhythmScore')}，"
         f"整曲优先练习路径为 {summary.get('dominantPracticePath')}。"
+        + reliability
         + (f" 当前最弱的段落是 {weakest_labels}。" if weakest_labels else "")
     )
 
@@ -997,6 +1032,8 @@ def build_failed_section_row(item: dict, section: dict, piece: dict, exc: Except
         "summaryText": f"该段落分析超时或失败，已跳过深度诊断：{error_text}",
         "teacherComment": "",
         "practiceTargets": [],
+        "failed": True,
+        "error": error_text,
         "analysisFailed": True,
         "failureReason": error_text,
         "diagnostics": {

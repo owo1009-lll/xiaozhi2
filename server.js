@@ -1048,8 +1048,12 @@ async function resolvePiecePassTarget({ scoreId = "", pieceId = "", title = "" }
 function buildPiecePassPrimaryAnalysis({ task = {}, passPayload = {}, summary = null } = {}) {
   const rows = getArray(passPayload.sectionPasses);
   if (!rows.length) return null;
-  const issueRows = rows.filter((row) => getArray(row.noteFindings).length || getArray(row.measureFindings).length);
-  const sourceRow = (issueRows.length ? issueRows : rows)
+  const successfulRows = rows.filter(
+    (row) => !(safeBoolean(row.failed, false) || safeBoolean(row.analysisFailed, false) || safeString(row.error) || safeString(row.failureReason)),
+  );
+  if (!successfulRows.length) return null;
+  const issueRows = successfulRows.filter((row) => getArray(row.noteFindings).length || getArray(row.measureFindings).length);
+  const sourceRow = (issueRows.length ? issueRows : successfulRows)
     .slice()
     .sort((left, right) => {
       const leftScore = safeNumber(left.studentCombinedScore, safeNumber(left.combinedScore, 999));
@@ -1116,6 +1120,9 @@ function buildWholePieceAnalysis({ task = {}, passPayload = {}, summary = null }
     .slice()
     .sort((left, right) => safeNumber(left.sequenceIndex, 0) - safeNumber(right.sequenceIndex, 0));
   if (!rows.length) return null;
+  const successfulRows = rows.filter(
+    (row) => !(safeBoolean(row.failed, false) || safeBoolean(row.analysisFailed, false) || safeString(row.error) || safeString(row.failureReason)),
+  );
 
   const noteFindings = [];
   const measureFindings = [];
@@ -1131,6 +1138,10 @@ function buildWholePieceAnalysis({ task = {}, passPayload = {}, summary = null }
     const pageNumber = extractPageNumberFromSectionLike(row);
     const rowStartSeconds = safeNumber(row.startSeconds, null);
     const rowEndSeconds = safeNumber(row.endSeconds, null);
+    const rowFailed = safeBoolean(row.failed, false)
+      || safeBoolean(row.analysisFailed, false)
+      || Boolean(safeString(row.error))
+      || Boolean(safeString(row.failureReason));
     sectionSummaries.push({
       sectionId,
       sectionTitle,
@@ -1144,8 +1155,8 @@ function buildWholePieceAnalysis({ task = {}, passPayload = {}, summary = null }
       noteFindingCount: getArray(row.noteFindings).length,
       measureFindingCount: getArray(row.measureFindings).length,
       confidence: safeNumber(row.confidence, 0),
-      failed: safeBoolean(row.failed, false),
-      error: safeString(row.error),
+      failed: rowFailed,
+      error: safeString(row.error, safeString(row.failureReason)),
     });
     for (const item of getArray(row.noteFindings)) {
       noteIssueIndex += 1;
@@ -1191,12 +1202,12 @@ function buildWholePieceAnalysis({ task = {}, passPayload = {}, summary = null }
 
   const firstDiagnostics = rows.find((row) => row?.diagnostics)?.diagnostics || {};
   const overallPitchScore = clamp(
-    safeNumber(summary?.weightedPitchScore, safeNumber(summary?.overallPitchScore, medianNumber(rows.map((row) => row.overallPitchScore)))),
+    safeNumber(summary?.weightedPitchScore, safeNumber(summary?.overallPitchScore, medianNumber(successfulRows.map((row) => row.overallPitchScore)))),
     0,
     100,
   );
   const overallRhythmScore = clamp(
-    safeNumber(summary?.weightedRhythmScore, safeNumber(summary?.overallRhythmScore, medianNumber(rows.map((row) => row.overallRhythmScore)))),
+    safeNumber(summary?.weightedRhythmScore, safeNumber(summary?.overallRhythmScore, medianNumber(successfulRows.map((row) => row.overallRhythmScore)))),
     0,
     100,
   );
@@ -1234,7 +1245,11 @@ function buildWholePieceAnalysis({ task = {}, passPayload = {}, summary = null }
     measureFindings,
     noteFindings,
     demoSegments,
-    confidence: clamp(safeNumber(summary?.confidence, medianNumber(rows.map((row) => row.confidence))), 0, 1),
+    confidence: clamp(
+      safeNumber(summary?.weightedConfidence, safeNumber(summary?.confidence, medianNumber(successfulRows.map((row) => row.confidence)))),
+      0,
+      1,
+    ),
     summaryText: safeString(summary?.summaryText),
     teacherComment: "",
     recommendedPracticePath: safeString(summary?.dominantPracticePath, "review-first"),
@@ -1244,7 +1259,11 @@ function buildWholePieceAnalysis({ task = {}, passPayload = {}, summary = null }
       wholePieceJobId: safeString(task.jobId),
       wholePieceSource: "piece-pass",
       sectionCount: rows.length,
+      successfulSectionCount: successfulRows.length,
       failedSectionCount: sectionSummaries.filter((item) => item.failed || item.error).length,
+      analysisCompletenessRatio: safeNumber(summary?.analysisCompletenessRatio, rows.length ? successfulRows.length / rows.length : 0),
+      analysisReliable: safeBoolean(summary?.analysisReliable, false),
+      timedOutSectionCount: safeNumber(summary?.timedOutSectionCount, 0),
       sectionSummaries,
       audioCoverage: summary?.audioCoverage || passPayload.audioCoverage || null,
     },
@@ -1317,11 +1336,11 @@ function launchPiecePassTask(task) {
             "--scan-concurrency",
             "1",
             "--analysis-concurrency",
-            "8",
+            "3",
             "--analysis-retry",
-            "0",
+            "1",
             "--analysis-timeout-seconds",
-            "60",
+            "90",
           ]
         : []),
     ];
@@ -1384,27 +1403,35 @@ function launchPiecePassTask(task) {
     try {
       const summaryPayload = JSON.parse(await fs.readFile(summaryPath, "utf8"));
       const passPayload = JSON.parse(await fs.readFile(passJsonPath, "utf8"));
+      const passSummary = summaryPayload?.summary || null;
+      const analysisReliable = safeBoolean(passSummary?.analysisReliable, true);
       const primaryAnalysis = buildPiecePassPrimaryAnalysis({
         task,
         passPayload,
-        summary: summaryPayload?.summary || null,
+        summary: passSummary,
       });
       const wholePieceAnalysis = buildWholePieceAnalysis({
         task,
         passPayload,
-        summary: summaryPayload?.summary || null,
+        summary: passSummary,
       });
+      const nextWarnings = analysisReliable
+        ? warnings
+        : [
+            ...warnings,
+            `整曲分析完整度偏低：完成 ${safeNumber(passSummary?.matchedSectionCount, 0)} / ${safeNumber(passSummary?.attemptedSectionCount, 0)} 段，失败或超时 ${safeNumber(passSummary?.failedSectionCount, 0)} 段。`,
+          ];
       await upsertPiecePassJob({
         ...baseJob,
         status: "completed",
         progress: 1,
         stage: "completed",
-        message: "整曲分析完成。",
-        warnings,
+        message: analysisReliable ? "整曲分析完成。" : "整曲分析完成，但部分段落失败或超时，结果需复核。",
+        warnings: nextWarnings,
         outputDir,
         summaryPath,
         passJsonPath,
-        summary: summaryPayload?.summary || null,
+        summary: passSummary,
         primaryAnalysis,
         wholePieceAnalysis,
         durationMs: Date.now() - startedAt,

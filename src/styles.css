@@ -149,6 +149,12 @@ button {
   color: #b42318;
 }
 
+.error-text {
+  color: #b42318;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
 .grid-layout {
   display: grid;
   gap: 18px;
