@@ -1782,13 +1782,30 @@ function buildErhuOnlyImportedSection(section = {}) {
   };
 }
 
+function getImportedSectionSequenceIndex(section = {}, fallbackIndex = 0) {
+  const descriptor = `${safeString(section?.sectionId)} ${safeString(section?.sourceSectionId)} ${safeString(section?.title)}`;
+  const pageMatch = descriptor.match(/page[-\s]?0*(\d+)(?:[-_\s]?s0*(\d+))?/i);
+  if (pageMatch) {
+    const pageNumber = Math.max(1, Math.round(safeNumber(pageMatch[1], 1)));
+    const fragmentNumber = Math.max(0, Math.round(safeNumber(pageMatch[2], 0)));
+    return pageNumber * 100 + fragmentNumber;
+  }
+  return Math.max(1, Math.round(safeNumber(section?.sequenceIndex, fallbackIndex + 1)));
+}
+
 function buildDerivedPieceFromScore(score = {}) {
   let cumulativeSeconds = 0;
   const sourceSections = getArray(score.sections)
     .filter((section) => !isLikelyNonScoreLeadPageSection(section, score))
     .map((section) => buildErhuOnlyImportedSection(section))
     .filter(Boolean);
-  const sections = sourceSections.map((section, index) => {
+  const orderedSections = sourceSections
+    .map((section, index) => ({
+      section,
+      normalizedSequenceIndex: getImportedSectionSequenceIndex(section, index),
+    }))
+    .sort((left, right) => left.normalizedSequenceIndex - right.normalizedSequenceIndex);
+  const sections = orderedSections.map(({ section, normalizedSequenceIndex }, index) => {
     const durationSeconds = estimateSectionDurationSeconds(section);
     const existingHints = getArray(section?.researchWindowHints)
       .map((value) => safeNumber(value, Number.NaN))
@@ -1798,7 +1815,7 @@ function buildDerivedPieceFromScore(score = {}) {
       ...section,
       pieceId: safeString(score.scoreId || score.pieceId),
       title: safeString(section.title, `第 ${index + 1} 段`),
-      sequenceIndex: Math.max(1, Math.round(safeNumber(section.sequenceIndex, index + 1))),
+      sequenceIndex: normalizedSequenceIndex,
       noteCount: Math.max(getArray(section.notes).length, Math.round(safeNumber(section.noteCount, 0))),
       measureCount: Math.max(1, Math.round(safeNumber(section.measureCount, 0))),
       researchWindowHints: existingHints.length ? existingHints : [derivedHint],
@@ -2365,7 +2382,7 @@ function buildSectionFingerprint(section = {}) {
 
 function buildSectionAnalysisCacheKey(payload = {}, section = {}) {
   return hashJson({
-    analysisVersion: "v29-score-markings-whole-piece",
+    analysisVersion: "v33-imported-rhythm-outlier-review",
     audioHash: safeString(payload.audioHash),
     scoreId: safeString(payload.scoreId),
     pieceId: safeString(section?.pieceId, payload.pieceId),
@@ -2384,7 +2401,7 @@ function buildSectionAnalysisCacheKey(payload = {}, section = {}) {
 
 function buildSectionDetectionCacheKey(payload = {}, piece = {}, sections = [], options = {}) {
   return hashJson({
-    detectionVersion: "v29-score-markings-whole-piece",
+    detectionVersion: "v33-imported-rhythm-outlier-review",
     audioHash: safeString(payload.audioHash),
     scoreId: safeString(payload.scoreId),
     pieceId: safeString(piece?.pieceId, payload.pieceId),

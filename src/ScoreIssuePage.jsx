@@ -286,16 +286,22 @@ function buildMeasureIssues(analysis) {
 function buildNoteIssues(analysis) {
   return (analysis?.noteFindings || []).map((item) => {
     const tags = [];
-    if (item?.pitchLabel && item.pitchLabel !== "pitch-ok") tags.push("音准问题");
-    if (item?.rhythmType || item?.rhythmLabel) tags.push("节奏问题");
+    const pitchLabel = String(item?.pitchLabel || "");
+    const isPitchReview = pitchLabel === "pitch-review";
+    const rhythmType = String(item?.rhythmType || "");
+    const rhythmReview =
+      Boolean(item?.rhythmReview) || String(item?.evidenceLabel || "").includes("coarse-rhythm-review");
+    if (pitchLabel && pitchLabel !== "pitch-ok" && !isPitchReview) tags.push("音准问题");
+    if (rhythmType && rhythmType !== "rhythm-ok" && !rhythmReview) tags.push("节奏问题");
+    if (isPitchReview || rhythmReview || item?.isUncertain) tags.push("需复核");
     return {
       sectionId: String(item?.sectionId || ""),
       sectionTitle: repairMojibakeText(item?.sectionTitle || ""),
       pageNumber: Number(item?.pageNumber) || 0,
       noteId: item?.noteId,
       measureIndex: Number(item?.measureIndex) || 1,
-      tags: tags.length ? [...new Set(tags)] : ["音准问题"],
-      issueTone: getIssueTone(tags.length ? tags : ["音准问题"]),
+      tags: tags.length ? [...new Set(tags)] : ["需复核"],
+      issueTone: getIssueTone(tags.length ? tags : ["需复核"]),
     };
   });
 }

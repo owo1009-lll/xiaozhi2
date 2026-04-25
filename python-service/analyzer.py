@@ -3323,7 +3323,7 @@ class ErhuAnalyzer:
         note_count = len(getattr(request.piecePack, "notes", []) or [])
         max_measure_index = max((int(note.measureIndex) for note in (getattr(request.piecePack, "notes", []) or [])), default=1)
         note_density = float(note_count) / max(1, max_measure_index)
-        is_imported_piece = piece_id.startswith("scorejob-") or score_id.startswith("score-")
+        is_imported_piece = piece_id.startswith("score-") or piece_id.startswith("scorejob-") or score_id.startswith("score-")
         generic_imported: dict[str, Any] = {}
         if is_imported_piece:
             dense_import = note_count >= 120 or note_density >= 10.0
@@ -4784,9 +4784,15 @@ class ErhuAnalyzer:
     def _hydrate_piece_notes(self, notes: list[NoteEvent], request: AnalyzeRequest) -> list[SymbolicNote]:
         measure_beats = beats_per_measure(request.piecePack.meter)
         seconds_per_beat = 60.0 / max(request.piecePack.tempo, 30)
+        min_measure_index = min((int(note.measureIndex) for note in notes), default=1)
         hydrated: list[SymbolicNote] = []
         for index, note in enumerate(notes, start=1):
-            absolute_beat = ((int(note.measureIndex) - 1) * measure_beats) + float(note.beatStart)
+            # Imported PDF page/section clips can keep their original page-local
+            # measure numbers (for display), but timing must be relative to the
+            # analyzed clip. Otherwise a section starting at measure 9 is scored
+            # as if eight full measures had elapsed before the clip begins.
+            local_measure_offset = max(0, int(note.measureIndex) - min_measure_index)
+            absolute_beat = (local_measure_offset * measure_beats) + float(note.beatStart)
             onset = absolute_beat * seconds_per_beat
             duration_seconds = max(0.05, float(note.beatDuration) * seconds_per_beat)
             hydrated.append(
@@ -6041,6 +6047,8 @@ class ErhuAnalyzer:
                 return True
             if imported_score_profile and raw_cents_value >= 1500.0 and cents_value <= max(tolerance + 64.0, 480.0):
                 return True
+            if imported_score_profile and raw_cents_value >= 1200.0:
+                return True
             if low_separation_threshold > 0.0 and section_separation_confidence < low_separation_threshold and cents_value <= max(tolerance + 30.0, 260.0):
                 return True
         if not (bool(note.get("glideLike")) or bool(note.get("vibratoLike")) or bool(note.get("tapLike")) or bool(note.get("pluckLike"))):
@@ -6119,6 +6127,8 @@ class ErhuAnalyzer:
         low_conf_threshold = float(note.get("lowConfidenceRhythmReviewThresholdMs", 0.0))
         estimated_confidence = float(note.get("estimatedConfidence", 0.0))
         low_confidence_floor = float(note.get("scoreGuideConfidenceFloor", self.settings.uncertain_confidence))
+        if bool(note.get("importedScoreProfile")) and max_raw_error >= 2400.0:
+            return True
         if bool(note.get("denseImportedScoreProfile")) and (
             bool(note.get("pitchUncertain")) or estimated_confidence < (low_confidence_floor + 0.08)
         ):
@@ -6556,6 +6566,7 @@ class ErhuAnalyzer:
                     "measureIndex": score_note.measure_index,
                     "expectedMidi": score_note.midi_pitch,
                     "expectedBeatStart": score_note.beat_start,
+                    "expectedBeatDuration": score_note.beat_duration,
                     "expectedOnset": score_note.expected_onset * tempo_ratio,
                     "expectedOffset": score_note.expected_offset * tempo_ratio,
                     "estimatedFrequency": estimated_frequency,
@@ -6785,8 +6796,8 @@ class ErhuAnalyzer:
                 NoteFinding(
                     noteId=note["noteId"],
                     measureIndex=int(note["measureIndex"]),
-                    beatStart=round(float(note.get("beatStart", 0.0)), 4),
-                    beatDuration=round(float(note.get("beatDuration", 0.0)), 4),
+                    beatStart=round(float(note.get("expectedBeatStart", note.get("beatStart", 0.0))), 4),
+                    beatDuration=round(float(note.get("expectedBeatDuration", note.get("beatDuration", 0.0))), 4),
                     expectedMidi=int(note["expectedMidi"]),
                     centsError=int(round(float(note["centsError"]))),
                     rawCentsError=int(round(float(note.get("rawCentsError", note["centsError"])))),

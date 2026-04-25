@@ -739,7 +739,7 @@ def write_cached_section_row(
     cache_path.write_text(
         json.dumps(
             {
-                "cacheVersion": "piece-pass-section-v3",
+                "cacheVersion": "piece-pass-section-v7-imported-rhythm-outlier-review",
                 "audioHash": audio_hash,
                 "pieceFingerprint": piece_hash,
                 "sectionFingerprint": section_hash,
