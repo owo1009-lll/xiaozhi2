@@ -270,13 +270,17 @@ function summarizeOverallFeedback(analysis) {
 }
 
 function buildMeasureIssues(analysis) {
-  return (analysis?.measureFindings || []).map((item) => ({
-    sectionId: String(item?.sectionId || ""),
-    sectionTitle: repairMojibakeText(item?.sectionTitle || ""),
-    pageNumber: Number(item?.pageNumber) || 0,
-    measureIndex: Number(item?.measureIndex) || 1,
-    label: String(item?.issueType || "").startsWith("pitch") ? "音准问题" : "节奏问题",
-  }));
+  return (analysis?.measureFindings || []).map((item) => {
+    const label = String(item?.issueType || "").startsWith("pitch") ? "音准问题" : "节奏问题";
+    return {
+      sectionId: String(item?.sectionId || ""),
+      sectionTitle: repairMojibakeText(item?.sectionTitle || ""),
+      pageNumber: Number(item?.pageNumber) || 0,
+      measureIndex: Number(item?.measureIndex) || 1,
+      label,
+      issueTone: getIssueTone([label]),
+    };
+  });
 }
 
 function buildNoteIssues(analysis) {
@@ -291,8 +295,34 @@ function buildNoteIssues(analysis) {
       noteId: item?.noteId,
       measureIndex: Number(item?.measureIndex) || 1,
       tags: tags.length ? [...new Set(tags)] : ["音准问题"],
+      issueTone: getIssueTone(tags.length ? tags : ["音准问题"]),
     };
   });
+}
+
+function getIssueTone(labels = []) {
+  const text = labels.join(" ");
+  const hasPitch = /音准|pitch/i.test(text);
+  const hasRhythm = /节奏|rhythm/i.test(text);
+  if (hasPitch && hasRhythm) return "both";
+  if (hasPitch) return "pitch";
+  if (hasRhythm) return "rhythm";
+  return "review";
+}
+
+function mergeIssueTones(tones = []) {
+  const cleaned = tones.filter(Boolean);
+  if (!cleaned.length) return "review";
+  if (cleaned.includes("both")) return "both";
+  if (cleaned.includes("pitch") && cleaned.includes("rhythm")) return "both";
+  return cleaned[0] || "review";
+}
+
+function issueToneClass(tone) {
+  if (tone === "pitch") return " issue-tone-pitch";
+  if (tone === "rhythm") return " issue-tone-rhythm";
+  if (tone === "both") return " issue-tone-both";
+  return " issue-tone-review";
 }
 
 function ScoreBlock({ label, value }) {
@@ -612,6 +642,7 @@ export default function ScoreIssuePage() {
               exact: true,
               pageNumber: exact.pageNumber,
               tags: item?.tags || [],
+              issueTone: item?.issueTone || getIssueTone(item?.tags || []),
             };
           }
           if (shouldProjectImportedFullScoreSection(issueSection)) {
@@ -633,6 +664,7 @@ export default function ScoreIssuePage() {
             exact: false,
             pageNumber: item?.pageNumber || measurePageMap.get(sectionKey(issueSectionId, measureIndex)) || extractSectionPageNumber(issueSection) || baseSectionPage,
             tags: item?.tags || [],
+            issueTone: item?.issueTone || getIssueTone(item?.tags || []),
           };
         })
         .filter(Boolean),
@@ -652,6 +684,7 @@ export default function ScoreIssuePage() {
           measureKey: sectionKey(issueSectionId, item.measureIndex),
           issueKey: `measure-${sectionKey(issueSectionId, item.measureIndex)}`,
           issueNumber: index + 1,
+          issueTone: item.issueTone || getIssueTone([item.label]),
         };
       }),
     [measureIssues, measurePageMap, score, section],
@@ -675,6 +708,7 @@ export default function ScoreIssuePage() {
           overlayKey,
           issueKey: `note-${overlayKey}`,
           issueNumber: measureIssueEntries.length + index + 1,
+          issueTone: item.issueTone || overlayItem?.issueTone || getIssueTone(item.tags || []),
         };
       }),
     [measureIssueEntries.length, noteIssues, noteOverlayItems, score, section],
@@ -731,6 +765,16 @@ export default function ScoreIssuePage() {
     [issueEntries],
   );
 
+  const measureIssueToneMap = useMemo(() => {
+    const toneMap = new Map();
+    for (const item of issueEntries) {
+      const key = item.measureKey || sectionKey(item.sectionId, item.measureIndex);
+      if (!key) continue;
+      toneMap.set(key, mergeIssueTones([toneMap.get(key), item.issueTone]));
+    }
+    return toneMap;
+  }, [issueEntries]);
+
   const overlayItems = useMemo(() => {
     const exactMeasureOverlays = measureOverlayKeys
       .map((measureKey) => {
@@ -759,6 +803,7 @@ export default function ScoreIssuePage() {
           measureKey,
           sectionId: measureSectionId,
           measureIndex,
+          issueTone: measureIssueToneMap.get(measureKey) || "review",
           left: Math.max(0, minX - 2.2),
           top: Math.max(0, minY - 3.2),
           width: Math.max(4.5, (maxX - minX) + 4.4),
@@ -780,13 +825,14 @@ export default function ScoreIssuePage() {
           measureKey,
           sectionId: measureSectionId,
           measureIndex,
+          issueTone: measureIssueToneMap.get(measureKey) || "review",
           left: Math.min(left, 96),
           top: 10,
           width: Math.max(5.5, Math.min(slotWidth, 18)),
           height: 18,
         };
       });
-  }, [baseSectionPage, currentPage, dominantStaffIndex, effectiveSections, measureCount, measureOverlayKeys, measurePageMap, section]);
+  }, [baseSectionPage, currentPage, dominantStaffIndex, effectiveSections, measureCount, measureIssueToneMap, measureOverlayKeys, measurePageMap, section]);
 
   const effectiveWidth = stageSize.width > 0 ? stageSize.width * zoom : 0;
   const effectiveHeight = stageSize.height > 0 ? stageSize.height * zoom : 0;
@@ -938,7 +984,7 @@ export default function ScoreIssuePage() {
                       type="button"
                       key={item.issueKey}
                       ref={(element) => setIssueListRef(item.issueKey, element)}
-                      className={`issue-list-button${activeMeasureKey === item.measureKey && !selectedNoteKey ? " is-active" : ""}`}
+                      className={`issue-list-button${issueToneClass(item.issueTone)}${activeMeasureKey === item.measureKey && !selectedNoteKey ? " is-active" : ""}`}
                       onClick={() => handleMeasureJump(item.measureIndex, item)}
                     >
                       <strong>
@@ -956,7 +1002,7 @@ export default function ScoreIssuePage() {
                     type="button"
                     key={`note-${item.noteId || index}-${item.measureIndex}`}
                     ref={(element) => setIssueListRef(overlayKey, element)}
-                    className={`issue-list-button${selectedNoteKey && selectedNoteKey === overlayKey ? " is-active" : ""}`}
+                    className={`issue-list-button${issueToneClass(item.issueTone)}${selectedNoteKey && selectedNoteKey === overlayKey ? " is-active" : ""}`}
                     onClick={() => handleNoteJump(item, overlayItem)}
                   >
                     <strong>
@@ -976,6 +1022,11 @@ export default function ScoreIssuePage() {
             <span>{sectionDisplayName || "当前段落"}</span>
             <span>第 {currentPage} 页{pageCount > 0 ? ` / ${pageCount}` : ""}</span>
             <span>{issueMeasureIndexes.length} 个问题小节</span>
+            <span className="issue-color-legend">
+              <i className="legend-dot issue-tone-pitch" />音准
+              <i className="legend-dot issue-tone-rhythm" />节奏
+              <i className="legend-dot issue-tone-both" />二者
+            </span>
           </div>
 
           <div className="score-page-nav">
@@ -1050,7 +1101,7 @@ export default function ScoreIssuePage() {
                   <button
                     type="button"
                     key={`measure-${item.measureKey}`}
-                    className={`score-measure-highlight${activeMeasureKey === item.measureKey ? " is-active" : ""}`}
+                    className={`score-measure-highlight${issueToneClass(item.issueTone)}${activeMeasureKey === item.measureKey ? " is-active" : ""}`}
                     onClick={() => handleMeasureJump(item.measureIndex, item)}
                     style={{
                       left: `${item.left}%`,
@@ -1072,7 +1123,7 @@ export default function ScoreIssuePage() {
                       <button
                         type="button"
                         key={item.key}
-                        className={`score-note-highlight${item.exact ? " is-exact" : ""}${selectedNoteKey === item.key ? " is-selected" : ""}`}
+                        className={`score-note-highlight${issueToneClass(item.issueTone)}${item.exact ? " is-exact" : ""}${selectedNoteKey === item.key ? " is-selected" : ""}`}
                         style={{ left: `${item.left}%`, top: `${item.top}%` }}
                         onClick={() => handleNoteJump(relatedIssue, item)}
                         aria-label={formatNoteLabel(item.noteId, item.measureIndex)}
