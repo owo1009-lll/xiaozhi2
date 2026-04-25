@@ -85,8 +85,10 @@ function Wait-HttpReady {
   return $false
 }
 
-Stop-ManagedListener -Port 3000 -CommandPatterns @("node", "server.js")
-Stop-ManagedListener -Port 8000 -CommandPatterns @("uvicorn", "app:app", "python-service")
+Stop-ManagedListener -Port 3000 -CommandPatterns @("server.js")
+Stop-ManagedListener -Port 8000 -CommandPatterns @("uvicorn")
+Stop-ManagedListener -Port 8000 -CommandPatterns @("python-service")
+Stop-ManagedListener -Port 8000 -CommandPatterns @("ai二胡")
 
 if (-not $SkipBuild) {
   Push-Location $repoRoot
@@ -97,8 +99,8 @@ if (-not $SkipBuild) {
   }
 }
 
-$serverProcess = Find-ProcessByCommandLine -Patterns @($repoRoot, "node", "server.js")
-if (-not $serverProcess) {
+$serverListenerBeforeStart = @(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue)
+if ($serverListenerBeforeStart.Count -eq 0) {
   $startedServer = Start-Process -FilePath "powershell" `
     -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "& { `$env:NODE_ENV='production'; `$env:PORT='3000'; node server.js }" `
     -WorkingDirectory $repoRoot `
@@ -110,10 +112,11 @@ if (-not $serverProcess) {
 
 $analyzerProcess = $null
 if (Test-Path $pythonRunner) {
-  $analyzerProcess = Find-ProcessByCommandLine -Patterns @($repoRoot, "uvicorn", "python-service")
-  if (-not $analyzerProcess) {
+  $analyzerListenerBeforeStart = @(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue)
+  if ($analyzerListenerBeforeStart.Count -eq 0) {
+    $analyzerCommand = "& { `$env:ERHU_ENABLE_TORCHCREPE='true'; `$env:ERHU_ENABLE_MADMOM='true'; & '$pythonRunner' -m uvicorn app:app --app-dir python-service --host 127.0.0.1 --port 8000 --workers 2 --log-level warning }"
     $startedAnalyzer = Start-Process -FilePath "powershell" `
-      -ArgumentList "-ExecutionPolicy", "Bypass", "-File", $pythonRunner, "-m", "uvicorn", "app:app", "--app-dir", "python-service", "--host", "127.0.0.1", "--port", "8000", "--workers", "4" `
+      -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $analyzerCommand `
       -WorkingDirectory $repoRoot `
       -RedirectStandardOutput $analyzerLog `
       -RedirectStandardError $analyzerErrLog `

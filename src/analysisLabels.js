@@ -4,24 +4,38 @@ export function clampScore(value) {
   return Math.max(0, Math.min(100, Math.round(numeric)));
 }
 
+export const ISSUE_SESSION_SCHEMA_VERSION = 6;
+export const ISSUE_SESSION_STORAGE_PREFIX = "ai-erhu.issue-session.v6.";
+export const LEGACY_ISSUE_SESSION_STORAGE_PREFIX = "ai-erhu.issue-session.";
+
+export function repairMojibakeText(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (!/[\u00c0-\u00ff]/.test(text)) return text;
+  try {
+    const bytes = Uint8Array.from(Array.from(text).map((char) => char.charCodeAt(0) & 0xff));
+    const decoded = new TextDecoder("utf-8", { fatal: false }).decode(bytes).trim();
+    return decoded && !/[\u00c0-\u00ff]/.test(decoded) ? decoded : text;
+  } catch {
+    return text;
+  }
+}
+
+export function formatScoreTitle(scoreOrTitle) {
+  const rawTitle = typeof scoreOrTitle === "string" ? scoreOrTitle : scoreOrTitle?.title;
+  return repairMojibakeText(rawTitle) || "未命名曲目";
+}
+
 export function parseXmlNoteId(noteId) {
   const text = String(noteId || "").trim();
   const match = text.match(/^xml-m(\d+)-n(\d+)$/i);
   if (!match) return null;
-  return {
-    measureIndex: Number(match[1]),
-    noteIndex: Number(match[2]),
-  };
+  return { measureIndex: Number(match[1]), noteIndex: Number(match[2]) };
 }
 
 export function getApproximateNotePosition(noteId, fallbackMeasureIndex, fallbackOrder = 0) {
   const parsed = parseXmlNoteId(noteId);
-  if (parsed) {
-    return {
-      measureIndex: parsed.measureIndex,
-      noteIndex: parsed.noteIndex,
-    };
-  }
+  if (parsed) return parsed;
   return {
     measureIndex: Number(fallbackMeasureIndex) || 1,
     noteIndex: Math.max(1, Number(fallbackOrder) || 1),
@@ -36,13 +50,9 @@ export function formatMeasureLabel(measureIndex) {
 
 export function formatNoteLabel(noteId, fallbackMeasureIndex) {
   const parsed = parseXmlNoteId(noteId);
-  if (parsed) {
-    return `第 ${parsed.measureIndex} 小节第 ${parsed.noteIndex} 音`;
-  }
+  if (parsed) return `第 ${parsed.measureIndex} 小节第 ${parsed.noteIndex} 音`;
   const numericMeasure = Number(fallbackMeasureIndex);
-  if (Number.isFinite(numericMeasure)) {
-    return `第 ${Math.round(numericMeasure)} 小节`;
-  }
+  if (Number.isFinite(numericMeasure)) return `第 ${Math.round(numericMeasure)} 小节`;
   return String(noteId || "未定位音位");
 }
 
@@ -104,20 +114,27 @@ export function formatMeasureIssueLabelText(item) {
 }
 
 export function formatSectionDisplayName(section) {
-  const title = String(section?.title || "").trim();
-  if (title && !/^page-\d+/i.test(title)) {
-    return title;
-  }
+  const title = repairMojibakeText(section?.displayTitle || section?.title);
+  const isInternalTitle =
+    /^page-\d+/i.test(title) ||
+    /^xml-/i.test(title) ||
+    /^自动识谱第\s*\d+\s*页/i.test(title);
+  if (title && !isInternalTitle) return title;
   const sectionId = String(section?.sectionId || section?.sourceSectionId || "");
+  const explicitOrder = Number(section?.displayIndex);
+  const sequenceIndex = Number(section?.sequenceIndex);
+  const sectionOrder = Number(section?.order ?? section?.index);
+  const readableOrder =
+    (Number.isFinite(explicitOrder) && explicitOrder > 0 && explicitOrder) ||
+    (Number.isFinite(sectionOrder) && sectionOrder > 0 && sectionOrder) ||
+    (Number.isFinite(sequenceIndex) && sequenceIndex > 0 && sequenceIndex < 100 && sequenceIndex) ||
+    null;
+  if (readableOrder) return `第 ${Math.round(readableOrder)} 段`;
   const pageChunkMatch = sectionId.match(/^page-(\d+)-s(\d+)$/i);
-  if (pageChunkMatch) {
-    return `自动识谱第 ${Number(pageChunkMatch[1])} 页片段 ${Number(pageChunkMatch[2])}`;
-  }
+  if (pageChunkMatch) return `第 ${Number(pageChunkMatch[1])}-${Number(pageChunkMatch[2])} 段`;
   const pageMatch = sectionId.match(/^page-(\d+)$/i);
-  if (pageMatch) {
-    return `自动识谱第 ${Number(pageMatch[1])} 页`;
-  }
-  return title || "未命名段落";
+  if (pageMatch) return `第 ${Number(pageMatch[1])} 段`;
+  return title && !isInternalTitle ? title : "未命名段落";
 }
 
 export function extractSectionPageNumber(section) {
@@ -126,7 +143,7 @@ export function extractSectionPageNumber(section) {
     const match = candidate.match(/page[-\s]?0*(\d+)/i);
     if (match) return Number(match[1]);
   }
-  return 1;
+  return Number(section?.pageNumber) || 1;
 }
 
 export function getSectionMeasureCount(section) {
@@ -154,23 +171,25 @@ export function getDisplayCombinedScore(item) {
 
 export function formatPracticeTargetTitle(target) {
   const rawTitle = String(target?.title || "").trim();
-  if (!rawTitle) {
-    return target?.measureIndex ? `重练第 ${target.measureIndex} 小节` : "优先处理本轮问题";
-  }
+  if (!rawTitle) return target?.measureIndex ? `重练第 ${target.measureIndex} 小节` : "优先处理本轮问题";
   const targetId = String(target?.targetId || "");
-  const readable = formatNoteLabel(targetId, target?.measureIndex);
-  return rawTitle.replace(targetId, readable);
+  return rawTitle.replace(targetId, formatNoteLabel(targetId, target?.measureIndex));
 }
 
 export function replaceXmlIdsInText(text) {
   return String(text || "").replace(/xml-m(\d+)-n(\d+)/gi, (_, measureIndex, noteIndex) => `第 ${Number(measureIndex)} 小节第 ${Number(noteIndex)} 音`);
 }
 
-export function buildIssueSessionPayload({ analysis, score, section }) {
+export function buildIssueSessionPayload({ analysis, score, section, mode = "section", originalAudio = null, issueItems = [] }) {
   return {
+    schemaVersion: ISSUE_SESSION_SCHEMA_VERSION,
+    scoreIssueSchemaVersion: ISSUE_SESSION_SCHEMA_VERSION,
+    mode,
     analysis,
     score,
-    section,
+    section: mode === "whole-piece" ? null : section,
+    originalAudio,
+    issueItems,
     savedAt: new Date().toISOString(),
   };
 }

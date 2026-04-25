@@ -1,7 +1,7 @@
 {
-  "name": "AI二胡研究原型",
-  "short_name": "AI二胡",
-  "description": "面向 SSCI 教育干预研究的 AI 二胡音准与节奏反馈原型",
+  "name": "AI Erhu Research Prototype",
+  "short_name": "AI Erhu",
+  "description": "AI Erhu self-practice and score analysis prototype.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#edf3ea",

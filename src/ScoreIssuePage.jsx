@@ -2,14 +2,20 @@
 import { GlobalWorkerOptions, getDocument } from "pdfjs-dist";
 import {
   extractSectionPageNumber,
+  ISSUE_SESSION_SCHEMA_VERSION,
+  ISSUE_SESSION_STORAGE_PREFIX,
   formatMeasureLabel,
   formatNoteLabel,
   formatPracticePathLabel,
+  formatScoreTitle,
+  formatSectionDisplayName,
   getApproximateNotePosition,
   getDisplayCombinedScore,
   getDisplayPitchScore,
   getDisplayRhythmScore,
   getSectionMeasureCount,
+  parseXmlNoteId,
+  repairMojibakeText,
 } from "./analysisLabels.js";
 import { fetchScore } from "./researchApi.js";
 
@@ -21,12 +27,30 @@ function getIssueSessionId() {
   return params.get("issueSession") || "";
 }
 
+function attachOriginalAudio(analysis, originalAudio) {
+  if (!analysis || !originalAudio?.url) return analysis || null;
+  const durationSeconds = Number(originalAudio.durationSeconds);
+  return {
+    ...analysis,
+    originalAudio,
+    audioUrl: originalAudio.url,
+    originalAudioUrl: originalAudio.url,
+    audioDurationSeconds: Number.isFinite(durationSeconds) ? durationSeconds : analysis.audioDurationSeconds,
+    audioSubmission: {
+      ...(analysis.audioSubmission || {}),
+      name: originalAudio.filename || analysis.audioSubmission?.name || "",
+      duration: Number.isFinite(durationSeconds) ? durationSeconds : analysis.audioSubmission?.duration,
+    },
+  };
+}
+
 function readStoredSession(issueSessionId) {
   if (!issueSessionId || typeof window === "undefined") return null;
   try {
-    const storageKey = `ai-erhu.issue-session.${issueSessionId}`;
+    const storageKey = `${ISSUE_SESSION_STORAGE_PREFIX}${issueSessionId}`;
     const raw = window.localStorage.getItem(storageKey) || window.sessionStorage.getItem(storageKey);
-    return raw ? JSON.parse(raw) : null;
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed?.schemaVersion === ISSUE_SESSION_SCHEMA_VERSION ? parsed : null;
   } catch {
     return null;
   }
@@ -60,21 +84,164 @@ function buildImportedPageImagePath(score, section, pageNumber) {
   return "";
 }
 
-function readExactNotePosition(section, noteId) {
-  const notes = Array.isArray(section?.notes) ? section.notes : [];
-  const matched = notes.find((item) => String(item?.noteId || "") === String(noteId || ""));
-  const normalizedX = Number(matched?.notePosition?.normalizedX);
-  const normalizedY = Number(matched?.notePosition?.normalizedY);
+function getAbsoluteIssuePage(section, issue = null) {
+  const issuePage = Number(issue?.pageNumber);
+  if (Number.isFinite(issuePage) && issuePage > 0) return Math.round(issuePage);
+  const sectionPage = Number(section?.pageNumber);
+  if (Number.isFinite(sectionPage) && sectionPage > 0) return Math.round(sectionPage);
+  return extractSectionPageNumber(section || {});
+}
+
+function readNotePosition(note, section, pageOverride = 0) {
+  const normalizedX = Number(note?.notePosition?.normalizedX);
+  const normalizedY = Number(note?.notePosition?.normalizedY);
   if (!Number.isFinite(normalizedX) || !Number.isFinite(normalizedY)) {
     return null;
   }
+  const absolutePage = Number(pageOverride) || getAbsoluteIssuePage(section);
   return {
-    measureIndex: Number(matched?.measureIndex) || 1,
-    pageNumber: Number(matched?.notePosition?.pageNumber) || extractSectionPageNumber(section || {}),
-    staffIndex: Number(matched?.notePosition?.staffIndex) || 1,
+    measureIndex: Number(note?.measureIndex) || 1,
+    beatStart: Number(note?.beatStart) || 0,
+    pageNumber: absolutePage,
+    systemIndex: Number(note?.notePosition?.systemIndex) || 1,
+    staffIndex: Number(note?.notePosition?.staffIndex) || 1,
     normalizedX,
     normalizedY,
   };
+}
+
+function getNoteStaffIndex(note) {
+  const staffIndex = Number(note?.notePosition?.staffIndex);
+  return Number.isFinite(staffIndex) && staffIndex >= 1 ? Math.round(staffIndex) : 1;
+}
+
+function getErhuStaffIndex(section, fallback = 1) {
+  const explicit = Number(section?.selectedStaffIndex || section?.erhuStaffIndex);
+  if (Number.isFinite(explicit) && explicit >= 1) return Math.round(explicit);
+  const notes = Array.isArray(section?.notes) ? section.notes : [];
+  const staffs = new Set();
+  for (const note of notes) {
+    staffs.add(getNoteStaffIndex(note));
+  }
+  if (!staffs.size) return fallback;
+  // In full scores the solo erhu line is the top staff; piano accompaniment is below.
+  return Math.min(...staffs);
+}
+
+function getSectionNoteCount(section) {
+  return Array.isArray(section?.notes) ? section.notes.length : Number(section?.noteCount) || 0;
+}
+
+function shouldProjectImportedFullScoreSection(section) {
+  const descriptor = `${section?.sectionId || ""} ${section?.sourceSectionId || ""} ${section?.title || ""}`;
+  return /page[-\s]?0*\d+/i.test(descriptor) || /自动识谱第\s*\d+\s*页/i.test(descriptor);
+}
+
+function isErhuMelodySystemIndex(systemIndex) {
+  const numeric = Math.round(Number(systemIndex) || 0);
+  if (!numeric) return true;
+  return (numeric - 1) % 3 === 0;
+}
+
+function isErhuMelodyNote(note, section) {
+  const descriptor = `${note?.partName || ""} ${note?.partLabel || ""} ${note?.instrument || ""} ${section?.selectedPart || ""}`;
+  if (/\b(piano|pno|accompaniment)\b|钢琴|伴奏/i.test(descriptor)) return false;
+  if (!shouldProjectImportedFullScoreSection(section)) return true;
+  return isErhuMelodySystemIndex(note?.notePosition?.systemIndex);
+}
+
+function getErhuMelodyNotes(section) {
+  return (Array.isArray(section?.notes) ? section.notes : []).filter((note) => isErhuMelodyNote(note, section));
+}
+
+function hasErhuMelodyMeasure(section, measureIndex) {
+  if (!shouldProjectImportedFullScoreSection(section)) return true;
+  const numericMeasure = Number(measureIndex) || 1;
+  return getErhuMelodyNotes(section).some((note) => Number(note?.measureIndex) === numericMeasure);
+}
+
+function getSectionSystemOrder(section) {
+  const systems = new Set();
+  for (const note of getErhuMelodyNotes(section)) {
+    const systemIndex = Number(note?.notePosition?.systemIndex);
+    if (Number.isFinite(systemIndex) && systemIndex > 0) systems.add(Math.round(systemIndex));
+  }
+  return [...systems].sort((left, right) => left - right);
+}
+
+function getSystemMedianY(section, systemIndex) {
+  const values = getErhuMelodyNotes(section)
+    .filter((note) => Math.round(Number(note?.notePosition?.systemIndex) || 0) === Math.round(Number(systemIndex) || 0))
+    .map((note) => Number(note?.notePosition?.normalizedY))
+    .filter((value) => Number.isFinite(value))
+    .sort((left, right) => left - right);
+  if (!values.length) return null;
+  const mid = Math.floor(values.length / 2);
+  return values.length % 2 ? values[mid] : (values[mid - 1] + values[mid]) / 2;
+}
+
+function projectImportedFullScorePositionToErhuBand(position, section) {
+  return position;
+}
+
+function isLikelyNonScoreLeadPage(section, score) {
+  const pageNumber = getAbsoluteIssuePage(section);
+  const totalPages = Number(score?.omrStats?.pageCount) || (Array.isArray(score?.previewPages) ? score.previewPages.length : 0);
+  if (totalPages < 4 || pageNumber > 2) return false;
+  const noteCount = getSectionNoteCount(section);
+  const title = String(section?.title || section?.displayTitle || "");
+  const isAutoPage = /自动识谱第\s*[12]\s*页|page[-\s]?0?[12]\b/i.test(`${section?.sectionId || ""} ${section?.sourceSectionId || ""} ${title}`);
+  return isAutoPage && noteCount > 0 && noteCount < 12;
+}
+
+function isLikelyAccompanimentOnlySection(section) {
+  const descriptor = `${section?.selectedPart || ""} ${section?.partName || ""} ${section?.partLabel || ""} ${section?.title || ""}`;
+  if (/\b(piano|pno|accompaniment)\b|钢琴|伴奏/i.test(descriptor)) return true;
+  if (!shouldProjectImportedFullScoreSection(section)) return false;
+  const notes = Array.isArray(section?.notes) ? section.notes : [];
+  if (!notes.length) return false;
+  const notesWithSystem = notes.filter((note) => Number.isFinite(Number(note?.notePosition?.systemIndex)));
+  if (!notesWithSystem.length) return false;
+  return !notesWithSystem.some((note) => isErhuMelodySystemIndex(note?.notePosition?.systemIndex));
+}
+
+function findErhuNotePosition(section, issue, preferredStaffIndex) {
+  const notes = Array.isArray(section?.notes) ? section.notes : [];
+  const targetStaff = Number(preferredStaffIndex) || getErhuStaffIndex(section);
+  const melodyNotes = notes.filter((item) => getNoteStaffIndex(item) === targetStaff && isErhuMelodyNote(item, section));
+  const absolutePage = getAbsoluteIssuePage(section, issue);
+  const measureIndex = Number(issue?.measureIndex) || getApproximateNotePosition(issue?.noteId, 1).measureIndex;
+  const sameMeasure = melodyNotes
+    .filter((item) => Number(item?.measureIndex) === measureIndex && readNotePosition(item, section, absolutePage))
+    .sort((left, right) => {
+      const beatDelta = Number(left?.beatStart || 0) - Number(right?.beatStart || 0);
+      if (Math.abs(beatDelta) > 0.0001) return beatDelta;
+      return Number(left?.notePosition?.normalizedX || 0) - Number(right?.notePosition?.normalizedX || 0);
+    });
+
+  if (!sameMeasure.length && shouldProjectImportedFullScoreSection(section)) return null;
+
+  const exact = sameMeasure.find((item) => String(item?.noteId || "") === String(issue?.noteId || ""));
+  if (exact) return readNotePosition(exact, section, absolutePage);
+
+  const issueBeat = Number(issue?.beatStart);
+  if (Number.isFinite(issueBeat) && sameMeasure.length) {
+    const closest = sameMeasure.reduce((winner, item) => {
+      if (!winner) return item;
+      return Math.abs(Number(item?.beatStart || 0) - issueBeat) < Math.abs(Number(winner?.beatStart || 0) - issueBeat)
+        ? item
+        : winner;
+    }, null);
+    return readNotePosition(closest, section, absolutePage);
+  }
+
+  const parsed = parseXmlNoteId(issue?.noteId);
+  if (parsed && sameMeasure.length) {
+    const targetIndex = Math.max(0, Math.min(sameMeasure.length - 1, parsed.noteIndex - 1));
+    return readNotePosition(sameMeasure[targetIndex], section, absolutePage);
+  }
+
+  return sameMeasure.length ? readNotePosition(sameMeasure[0], section, absolutePage) : null;
 }
 
 function summarizeOverallFeedback(analysis) {
@@ -97,13 +264,16 @@ function summarizeOverallFeedback(analysis) {
     `系统共定位到 ${noteCount} 个问题音和 ${measureCount} 个问题小节。`,
   ];
   if (uncertainCount > 0) {
-    lines.push(`其中有 ${uncertainCount} 个音的证据偏弱，建议结合示范和教师判断复核。`);
+    lines.push(`其中有 ${uncertainCount} 个音的证据偏弱，建议结合示范回放复核。`);
   }
   return lines.join("");
 }
 
 function buildMeasureIssues(analysis) {
   return (analysis?.measureFindings || []).map((item) => ({
+    sectionId: String(item?.sectionId || ""),
+    sectionTitle: repairMojibakeText(item?.sectionTitle || ""),
+    pageNumber: Number(item?.pageNumber) || 0,
     measureIndex: Number(item?.measureIndex) || 1,
     label: String(item?.issueType || "").startsWith("pitch") ? "音准问题" : "节奏问题",
   }));
@@ -115,6 +285,9 @@ function buildNoteIssues(analysis) {
     if (item?.pitchLabel && item.pitchLabel !== "pitch-ok") tags.push("音准问题");
     if (item?.rhythmType || item?.rhythmLabel) tags.push("节奏问题");
     return {
+      sectionId: String(item?.sectionId || ""),
+      sectionTitle: repairMojibakeText(item?.sectionTitle || ""),
+      pageNumber: Number(item?.pageNumber) || 0,
       noteId: item?.noteId,
       measureIndex: Number(item?.measureIndex) || 1,
       tags: tags.length ? [...new Set(tags)] : ["音准问题"],
@@ -131,54 +304,64 @@ function ScoreBlock({ label, value }) {
   );
 }
 
-function getDominantStaffIndex(section, analysis) {
-  const sectionNotes = Array.isArray(section?.notes) ? section.notes : [];
-  // Issue notes come from the student's erhu performance — their staffIndex is the erhu staff.
-  const issueNoteIds = new Set(
-    (analysis?.noteFindings || []).map((item) => String(item?.noteId || "")).filter(Boolean),
-  );
-  if (issueNoteIds.size > 0) {
-    const staffCounts = new Map();
-    for (const note of sectionNotes) {
-      if (!issueNoteIds.has(String(note?.noteId || ""))) continue;
-      const staffIndex = Number(note?.notePosition?.staffIndex);
-      if (Number.isFinite(staffIndex) && staffIndex >= 1) {
-        staffCounts.set(staffIndex, (staffCounts.get(staffIndex) || 0) + 1);
-      }
-    }
-    if (staffCounts.size > 0) {
-      return [...staffCounts.entries()].sort((a, b) => b[1] - a[1])[0][0];
-    }
+function getDominantStaffIndex(section) {
+  return getErhuStaffIndex(section, 1);
+}
+
+function sectionKey(sectionId, measureIndex) {
+  return `${String(sectionId || "section")}::${Number(measureIndex) || 1}`;
+}
+
+function resolveIssueSection(score, fallbackSection, issue) {
+  const sections = Array.isArray(score?.sections) ? score.sections : [];
+  const requestedId = String(issue?.sectionId || "").trim();
+  if (requestedId) {
+    const matched = sections.find((item) => String(item?.sectionId || "") === requestedId || String(item?.sourceSectionId || "") === requestedId);
+    if (matched) return matched;
   }
-  // Fallback: erhu is the solo instrument and appears first (top staff = smallest index).
-  let minStaff = Infinity;
-  for (const note of sectionNotes) {
-    const staffIndex = Number(note?.notePosition?.staffIndex);
-    if (Number.isFinite(staffIndex) && staffIndex >= 1 && staffIndex < minStaff) {
-      minStaff = staffIndex;
-    }
+  return fallbackSection || sections[0] || null;
+}
+
+function resolvePreferredSection(score, fallbackSection, analysis) {
+  const sections = Array.isArray(score?.sections) ? score.sections : [];
+  const analysisSectionId = String(analysis?.sectionId || "").trim();
+  if (analysisSectionId) {
+    const matchedAnalysisSection = sections.find(
+      (item) => String(item?.sectionId || "") === analysisSectionId || String(item?.sourceSectionId || "") === analysisSectionId,
+    );
+    if (matchedAnalysisSection) return matchedAnalysisSection;
   }
-  return Number.isFinite(minStaff) ? minStaff : 1;
+  const fallbackSectionId = String(fallbackSection?.sectionId || "").trim();
+  if (fallbackSectionId) {
+    const matchedFallbackSection = sections.find(
+      (item) => String(item?.sectionId || "") === fallbackSectionId || String(item?.sourceSectionId || "") === fallbackSectionId,
+    );
+    if (matchedFallbackSection) return matchedFallbackSection;
+  }
+  return fallbackSection || sections[0] || null;
 }
 
 export default function ScoreIssuePage() {
   const issueSessionId = getIssueSessionId();
   const stored = readStoredSession(issueSessionId);
   const [score, setScore] = useState(stored?.score || null);
-  const [analysis] = useState(stored?.analysis || null);
-  const [section, setSection] = useState(stored?.section || null);
+  const [analysis, setAnalysis] = useState(() => attachOriginalAudio(stored?.analysis, stored?.originalAudio));
+  const [section, setSection] = useState(() => resolvePreferredSection(stored?.score, stored?.section, stored?.analysis));
   const [error, setError] = useState("");
   const [pageCount, setPageCount] = useState(0);
-  const [currentPage, setCurrentPage] = useState(extractSectionPageNumber(stored?.section || {}));
+  const [currentPage, setCurrentPage] = useState(() => extractSectionPageNumber(resolvePreferredSection(stored?.score, stored?.section, stored?.analysis) || {}));
   const [selectedMeasureIndex, setSelectedMeasureIndex] = useState(null);
   const [selectedNoteKey, setSelectedNoteKey] = useState("");
   const [pageImageFailed, setPageImageFailed] = useState(false);
   const [zoom, setZoom] = useState(1.0);
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const canvasRef = useRef(null);
+  const audioRef = useRef(null);
   const viewportRef = useRef(null);
   const hasAutoFittedRef = useRef(false);
+  const hasAutoSelectedInitialIssuePageRef = useRef(false);
   const issueListRefs = useRef(new Map());
+  const isWholePieceMode = stored?.mode === "whole-piece" || analysis?.analysisMode === "whole-piece";
 
   useEffect(() => {
     let cancelled = false;
@@ -189,11 +372,9 @@ export default function ScoreIssuePage() {
         if (cancelled) return;
         const nextScore = json?.score || null;
         setScore(nextScore);
-        if (stored?.section?.sectionId && nextScore?.sections?.length) {
-          const nextSection = nextScore.sections.find((item) => item.sectionId === stored.section.sectionId) || stored.section;
-          setSection(nextSection);
-          setCurrentPage(extractSectionPageNumber(nextSection));
-        }
+        const nextSection = resolvePreferredSection(nextScore, stored?.section, stored?.analysis);
+        setSection(nextSection);
+        setCurrentPage(extractSectionPageNumber(nextSection || {}));
       } catch {
         if (!cancelled) {
           setError("问题谱面数据已失效，请返回结果页重新打开。");
@@ -207,14 +388,69 @@ export default function ScoreIssuePage() {
   }, [score?.sourcePdfPath, stored]);
 
   useEffect(() => {
+    const scoreId = String(score?.scoreId || "").trim();
+    const analysisScoreId = String(analysis?.scoreId || "").trim();
+    if (!scoreId || !analysisScoreId) return;
+    if (scoreId === analysisScoreId) return;
+    setAnalysis(null);
+    setError("当前问题谱会话与分析结果不一致，请返回学生端结果页重新打开。");
+  }, [analysis, score]);
+
+  // Re-read analysis when the main app writes a new result to the same storage key.
+  useEffect(() => {
+    if (!issueSessionId) return undefined;
+    const storageKey = `${ISSUE_SESSION_STORAGE_PREFIX}${issueSessionId}`;
+    function onStorage(event) {
+      if (event.key !== storageKey) return;
+      const fresh = readStoredSession(issueSessionId);
+      if (!fresh?.analysis) return;
+      setAnalysis(attachOriginalAudio(fresh.analysis, fresh.originalAudio));
+      const nextSection = resolvePreferredSection(score || fresh.score, fresh.section, fresh.analysis);
+      if (nextSection) {
+        setSection(nextSection);
+        setCurrentPage(extractSectionPageNumber(nextSection));
+      }
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [issueSessionId, score]);
+
+  useEffect(() => {
+    if (isWholePieceMode) return;
+    const nextSection = resolvePreferredSection(score, section, analysis);
+    if (!nextSection) return;
+    const currentSectionId = String(section?.sectionId || "");
+    const nextSectionId = String(nextSection?.sectionId || "");
+    if (currentSectionId === nextSectionId) return;
+    setSection(nextSection);
+    setCurrentPage(extractSectionPageNumber(nextSection));
+  }, [analysis, isWholePieceMode, score, section]);
+
+  useEffect(() => {
     setPageImageFailed(false);
     hasAutoFittedRef.current = false;
   }, [score?.sourcePdfPath, section?.pageImagePath, currentPage]);
 
-  const baseSectionPage = extractSectionPageNumber(section || {});
+  const effectiveSections = useMemo(
+    () => {
+      const sections = isWholePieceMode ? (Array.isArray(score?.sections) ? score.sections : []) : (section ? [section] : []);
+      return sections.filter((item) => !isWholePieceMode || (!isLikelyNonScoreLeadPage(item, score) && !isLikelyAccompanimentOnlySection(item)));
+    },
+    [isWholePieceMode, score, section],
+  );
+  const firstEffectivePage = useMemo(
+    () => {
+      const pages = effectiveSections
+        .map((item) => getAbsoluteIssuePage(item))
+        .filter((value) => Number.isFinite(value) && value > 0);
+      return pages.length ? Math.min(...pages) : 1;
+    },
+    [effectiveSections],
+  );
+  const baseSectionPage = isWholePieceMode ? firstEffectivePage : extractSectionPageNumber(section || {});
   const pageImagePath = buildImportedPageImagePath(score, section, currentPage);
   const usePageImage = Boolean(pageImagePath && !pageImageFailed);
-  const dominantStaffIndex = useMemo(() => getDominantStaffIndex(section, analysis), [analysis, section]);
+  const dominantStaffIndex = useMemo(() => getDominantStaffIndex(section || effectiveSections[0]), [effectiveSections, section]);
 
   useEffect(() => {
     if (!usePageImage) return;
@@ -238,10 +474,10 @@ export default function ScoreIssuePage() {
         const safePage = Math.min(Math.max(1, currentPage || 1), document.numPages || 1);
         const page = await document.getPage(safePage);
         if (cancelled) return;
-        const containerWidth = viewportRef.current ? viewportRef.current.clientWidth - 24 : 0;
+        const containerWidth = viewportRef.current ? viewportRef.current.clientWidth - 8 : 0;
         const baseViewport = page.getViewport({ scale: 1 });
-        const fitScale = containerWidth > 0 ? containerWidth / baseViewport.width : 1.5;
-        const renderScale = Math.max(fitScale, 1.5);
+        const fitScale = containerWidth > 0 ? containerWidth / baseViewport.width : 1.8;
+        const renderScale = Math.max(fitScale, 1.8);
         const viewport = page.getViewport({ scale: renderScale });
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -275,37 +511,100 @@ export default function ScoreIssuePage() {
     };
   }, [currentPage, score?.sourcePdfPath, usePageImage]);
 
-  const measureCount = getSectionMeasureCount(section || {});
-  const measureIssues = useMemo(() => buildMeasureIssues(analysis), [analysis]);
-  const noteIssues = useMemo(() => buildNoteIssues(analysis), [analysis]);
-  const issueMeasureIndexes = [...new Set(measureIssues.map((item) => item.measureIndex).concat(noteIssues.map((item) => item.measureIndex)))].sort(
-    (left, right) => left - right,
+  const measureCount = isWholePieceMode
+    ? Math.max(1, ...effectiveSections.map((item) => getSectionMeasureCount(item)))
+    : getSectionMeasureCount(section || {});
+  const measureIssues = useMemo(
+    () => buildMeasureIssues(analysis).filter((item) => {
+      const issueSection = resolveIssueSection(score, section, item);
+      return !isWholePieceMode || (
+        !isLikelyNonScoreLeadPage(issueSection, score)
+        && !isLikelyAccompanimentOnlySection(issueSection)
+        && hasErhuMelodyMeasure(issueSection, item.measureIndex)
+      );
+    }),
+    [analysis, isWholePieceMode, score, section],
   );
-  const activeMeasureIndex = selectedMeasureIndex || issueMeasureIndexes[0] || null;
+  const noteIssues = useMemo(
+    () => buildNoteIssues(analysis).filter((item) => {
+      const issueSection = resolveIssueSection(score, section, item);
+      return !isWholePieceMode || (
+        !isLikelyNonScoreLeadPage(issueSection, score)
+        && !isLikelyAccompanimentOnlySection(issueSection)
+        && hasErhuMelodyMeasure(issueSection, item.measureIndex)
+      );
+    }),
+    [analysis, isWholePieceMode, score, section],
+  );
+  const visibleAnalysisForSummary = useMemo(
+    () => ({
+      ...analysis,
+      measureFindings: measureIssues,
+      noteFindings: noteIssues,
+    }),
+    [analysis, measureIssues, noteIssues],
+  );
+  const firstIssuePage = useMemo(() => {
+    const pages = measureIssues
+      .map((item) => item.pageNumber || extractSectionPageNumber(resolveIssueSection(score, section, item)))
+      .concat(noteIssues.map((item) => item.pageNumber || extractSectionPageNumber(resolveIssueSection(score, section, item))))
+      .filter((value) => Number.isFinite(Number(value)) && Number(value) > 0)
+      .map((value) => Number(value));
+    return pages.length ? Math.min(...pages) : baseSectionPage;
+  }, [baseSectionPage, measureIssues, noteIssues, score, section]);
+
+  useEffect(() => {
+    if (!isWholePieceMode) return;
+    if (hasAutoSelectedInitialIssuePageRef.current) return;
+    hasAutoSelectedInitialIssuePageRef.current = true;
+    if (currentPage === firstIssuePage) return;
+    setCurrentPage(firstIssuePage);
+  }, [currentPage, firstIssuePage, isWholePieceMode, score]);
+  const issueMeasureKeys = [
+    ...new Set(
+      measureIssues
+        .map((item) => sectionKey(item.sectionId || resolveIssueSection(score, section, item)?.sectionId, item.measureIndex))
+        .concat(noteIssues.map((item) => sectionKey(item.sectionId || resolveIssueSection(score, section, item)?.sectionId, item.measureIndex))),
+    ),
+  ];
+  const issueMeasureIndexes = [...new Set(measureIssues.map((item) => item.measureIndex).concat(noteIssues.map((item) => item.measureIndex)))].sort((left, right) => left - right);
+  const activeMeasureKey = selectedMeasureIndex || issueMeasureKeys[0] || "";
+  const activeMeasureIndex = activeMeasureKey ? Number(String(activeMeasureKey).split("::").pop()) || null : null;
 
   const measurePageMap = useMemo(() => {
     const pageMap = new Map();
-    for (const note of Array.isArray(section?.notes) ? section.notes : []) {
-      const measureIndex = Number(note?.measureIndex);
-      const pageNumber = Number(note?.notePosition?.pageNumber);
-      const staffIndex = Number(note?.notePosition?.staffIndex) || 1;
-      if (!Number.isFinite(measureIndex) || !Number.isFinite(pageNumber)) continue;
-      if (staffIndex !== dominantStaffIndex) continue;
-      if (!pageMap.has(measureIndex)) {
-        pageMap.set(measureIndex, pageNumber);
+    for (const currentSection of effectiveSections) {
+      const currentSectionId = String(currentSection?.sectionId || "");
+      const sectionStaffIndex = getErhuStaffIndex(currentSection, dominantStaffIndex);
+      const absolutePage = getAbsoluteIssuePage(currentSection);
+      for (const note of Array.isArray(currentSection?.notes) ? currentSection.notes : []) {
+        const measureIndex = Number(note?.measureIndex);
+        const pageNumber = absolutePage;
+        const staffIndex = getNoteStaffIndex(note);
+        if (!Number.isFinite(measureIndex) || !Number.isFinite(pageNumber)) continue;
+        if (staffIndex !== sectionStaffIndex) continue;
+        const key = sectionKey(currentSectionId, measureIndex);
+        if (!pageMap.has(key)) {
+          pageMap.set(key, pageNumber);
+        }
       }
     }
     return pageMap;
-  }, [dominantStaffIndex, section]);
+  }, [dominantStaffIndex, effectiveSections]);
 
   const noteOverlayItems = useMemo(
     () =>
       noteIssues
         .map((item, index) => {
-          const exact = readExactNotePosition(section, item?.noteId);
-          if (exact && exact.staffIndex === dominantStaffIndex) {
+          const issueSection = resolveIssueSection(score, section, item);
+          const issueSectionId = String(issueSection?.sectionId || item?.sectionId || "");
+          const sectionStaffIndex = getErhuStaffIndex(issueSection, dominantStaffIndex);
+          const exact = findErhuNotePosition(issueSection, item, sectionStaffIndex);
+          if (exact) {
             return {
-              key: `${item?.noteId || index}-${exact.measureIndex}`,
+              key: `${issueSectionId}-${item?.noteId || index}-${exact.measureIndex}`,
+              sectionId: issueSectionId,
+              sectionTitle: formatSectionDisplayName(issueSection),
               noteId: item?.noteId || "",
               measureIndex: exact.measureIndex,
               left: Math.min(Math.max(exact.normalizedX * 100, 0), 100),
@@ -315,124 +614,199 @@ export default function ScoreIssuePage() {
               tags: item?.tags || [],
             };
           }
+          if (shouldProjectImportedFullScoreSection(issueSection)) {
+            return null;
+          }
           const { measureIndex, noteIndex } = getApproximateNotePosition(item?.noteId, item?.measureIndex, index + 1);
           const slotWidth = 100 / Math.max(1, measureCount);
           const measureLeft = Math.max(0, (measureIndex - 1) * slotWidth);
           const relativeStep = Math.min(0.85, 0.18 + ((noteIndex - 1) % 6) * 0.12);
           const bandIndex = (noteIndex - 1) % 3;
           return {
-            key: `${item?.noteId || index}-${measureIndex}-${noteIndex}`,
+            key: `${issueSectionId}-${item?.noteId || index}-${measureIndex}-${noteIndex}`,
+            sectionId: issueSectionId,
+            sectionTitle: formatSectionDisplayName(issueSection),
             noteId: item?.noteId || "",
             measureIndex,
             left: Math.min(measureLeft + slotWidth * relativeStep, 98),
             top: 18 + bandIndex * 18,
             exact: false,
-            pageNumber: measurePageMap.get(measureIndex) || baseSectionPage,
+            pageNumber: item?.pageNumber || measurePageMap.get(sectionKey(issueSectionId, measureIndex)) || extractSectionPageNumber(issueSection) || baseSectionPage,
             tags: item?.tags || [],
           };
         })
         .filter(Boolean),
-    [baseSectionPage, dominantStaffIndex, measureCount, measurePageMap, noteIssues, section],
+    [baseSectionPage, dominantStaffIndex, measureCount, measurePageMap, noteIssues, score, section],
   );
 
   const measureIssueEntries = useMemo(
     () =>
-      measureIssues.map((item, index) => ({
-        ...item,
-        issueKey: `measure-${item.measureIndex}`,
-        issueNumber: index + 1,
-      })),
-    [measureIssues],
+      measureIssues.map((item, index) => {
+        const issueSection = resolveIssueSection(score, section, item);
+        const issueSectionId = String(issueSection?.sectionId || item.sectionId || "");
+        return {
+          ...item,
+          sectionId: issueSectionId,
+          sectionTitle: item.sectionTitle || formatSectionDisplayName(issueSection),
+          pageNumber: item.pageNumber || measurePageMap.get(sectionKey(issueSectionId, item.measureIndex)) || extractSectionPageNumber(issueSection),
+          measureKey: sectionKey(issueSectionId, item.measureIndex),
+          issueKey: `measure-${sectionKey(issueSectionId, item.measureIndex)}`,
+          issueNumber: index + 1,
+        };
+      }),
+    [measureIssues, measurePageMap, score, section],
   );
 
   const noteIssueEntries = useMemo(
     () =>
       noteIssues.map((item, index) => {
+        const issueSection = resolveIssueSection(score, section, item);
+        const issueSectionId = String(issueSection?.sectionId || item.sectionId || "");
         const overlayItem =
-          noteOverlayItems.find((overlay) => String(overlay.noteId || "") === String(item.noteId || "") && overlay.measureIndex === item.measureIndex)
+          noteOverlayItems.find((overlay) => String(overlay.noteId || "") === String(item.noteId || "") && overlay.measureIndex === item.measureIndex && overlay.sectionId === issueSectionId)
           || null;
         const overlayKey = overlayItem?.key || `note-${item.noteId || index}-${item.measureIndex}`;
         return {
           ...item,
+          sectionId: issueSectionId,
+          sectionTitle: item.sectionTitle || formatSectionDisplayName(issueSection),
+          pageNumber: overlayItem?.pageNumber || item.pageNumber || extractSectionPageNumber(issueSection),
           overlayItem,
           overlayKey,
           issueKey: `note-${overlayKey}`,
           issueNumber: measureIssueEntries.length + index + 1,
         };
       }),
-    [measureIssueEntries.length, noteIssues, noteOverlayItems],
+    [measureIssueEntries.length, noteIssues, noteOverlayItems, score, section],
   );
 
-  const measureIssueNumberMap = useMemo(
-    () => new Map(measureIssueEntries.map((item) => [item.measureIndex, item.issueNumber])),
+  const issueNumberLookup = useMemo(() => {
+    const combined = [
+      ...measureIssueEntries.map((item) => ({ ...item, issueKind: "measure" })),
+      ...noteIssueEntries.map((item) => ({ ...item, issueKind: "note" })),
+    ].sort((left, right) => {
+      const pageDelta = (Number(left.pageNumber) || 1) - (Number(right.pageNumber) || 1);
+      if (pageDelta) return pageDelta;
+      const sectionDelta = String(left.sectionId || "").localeCompare(String(right.sectionId || ""));
+      if (sectionDelta) return sectionDelta;
+      const measureDelta = (Number(left.measureIndex) || 1) - (Number(right.measureIndex) || 1);
+      if (measureDelta) return measureDelta;
+      const kindDelta = (left.issueKind === "measure" ? 0 : 1) - (right.issueKind === "measure" ? 0 : 1);
+      if (kindDelta) return kindDelta;
+      return String(left.noteId || left.issueKey || "").localeCompare(String(right.noteId || right.issueKey || ""));
+    });
+    return new Map(combined.map((item, index) => [item.issueKey, index + 1]));
+  }, [measureIssueEntries, noteIssueEntries]);
+
+  const measureOverlayKeys = useMemo(
+    () => [...new Set(measureIssueEntries.map((item) => item.measureKey))],
     [measureIssueEntries],
   );
 
-  const noteIssueNumberMap = useMemo(
-    () => new Map(noteIssueEntries.map((item) => [item.overlayKey, item.issueNumber])),
-    [noteIssueEntries],
+  const issueEntries = useMemo(
+    () => [
+      ...measureIssueEntries.map((item) => ({
+        ...item,
+        issueKind: "measure",
+        listKey: item.issueKey,
+        issueNumber: issueNumberLookup.get(item.issueKey) || item.issueNumber,
+      })),
+      ...noteIssueEntries.map((item) => ({
+        ...item,
+        issueKind: "note",
+        listKey: item.overlayKey,
+        issueNumber: issueNumberLookup.get(item.issueKey) || item.issueNumber,
+      })),
+    ].sort((left, right) => (left.issueNumber || 0) - (right.issueNumber || 0)),
+    [issueNumberLookup, measureIssueEntries, noteIssueEntries],
   );
 
-  const hasExactNoteOverlay = noteOverlayItems.some((item) => item.exact);
+  const measureIssueNumberMap = useMemo(
+    () => new Map(issueEntries.filter((item) => item.issueKind === "measure").map((item) => [item.measureKey, item.issueNumber])),
+    [issueEntries],
+  );
+
+  const noteIssueNumberMap = useMemo(
+    () => new Map(issueEntries.filter((item) => item.issueKind === "note").map((item) => [item.overlayKey, item.issueNumber])),
+    [issueEntries],
+  );
 
   const overlayItems = useMemo(() => {
-    if (hasExactNoteOverlay) {
-      return issueMeasureIndexes
-        .map((measureIndex) => {
-          const measureNotes = (Array.isArray(section?.notes) ? section.notes : [])
-            .filter(
-              (item) =>
-                Number(item?.measureIndex) === measureIndex
-                && (Number(item?.notePosition?.staffIndex) || 1) === dominantStaffIndex,
-            )
-            .map((item) => ({
-              pageNumber: Number(item?.notePosition?.pageNumber) || baseSectionPage,
-              x: Number(item?.notePosition?.normalizedX),
-              y: Number(item?.notePosition?.normalizedY),
-            }))
-            .filter((item) => item.pageNumber === currentPage && Number.isFinite(item.x) && Number.isFinite(item.y));
-          if (!measureNotes.length) return null;
-          const minX = Math.min(...measureNotes.map((item) => item.x * 100));
-          const maxX = Math.max(...measureNotes.map((item) => item.x * 100));
-          const minY = Math.min(...measureNotes.map((item) => item.y * 100));
-          const maxY = Math.max(...measureNotes.map((item) => item.y * 100));
-          return {
-            measureIndex,
-            left: Math.max(0, minX - 2.2),
-            top: Math.max(0, minY - 5.5),
-            width: Math.max(4.5, (maxX - minX) + 4.4),
-            height: Math.max(10, (maxY - minY) + 11),
-          };
-        })
-        .filter(Boolean);
+    const exactMeasureOverlays = measureOverlayKeys
+      .map((measureKey) => {
+        const [measureSectionId, measureText] = String(measureKey).split("::");
+        const measureIndex = Number(measureText) || 1;
+        const measureSection = effectiveSections.find((item) => String(item?.sectionId || "") === measureSectionId) || section;
+        const sectionStaffIndex = getErhuStaffIndex(measureSection, dominantStaffIndex);
+        const absolutePage = getAbsoluteIssuePage(measureSection);
+        const measureNotes = (Array.isArray(measureSection?.notes) ? measureSection.notes : [])
+          .filter((item) => Number(item?.measureIndex) === measureIndex && getNoteStaffIndex(item) === sectionStaffIndex && isErhuMelodyNote(item, measureSection))
+          .map((item) => {
+            const position = readNotePosition(item, measureSection, absolutePage);
+            return {
+              pageNumber: position?.pageNumber || absolutePage,
+              x: Number(position?.normalizedX),
+              y: Number(position?.normalizedY),
+            };
+          })
+          .filter((item) => item.pageNumber === currentPage && Number.isFinite(item.x) && Number.isFinite(item.y));
+        if (!measureNotes.length) return null;
+        const minX = Math.min(...measureNotes.map((item) => item.x * 100));
+        const maxX = Math.max(...measureNotes.map((item) => item.x * 100));
+        const minY = Math.min(...measureNotes.map((item) => item.y * 100));
+        const maxY = Math.max(...measureNotes.map((item) => item.y * 100));
+        return {
+          measureKey,
+          sectionId: measureSectionId,
+          measureIndex,
+          left: Math.max(0, minX - 2.2),
+          top: Math.max(0, minY - 3.2),
+          width: Math.max(4.5, (maxX - minX) + 4.4),
+          height: Math.max(6.2, (maxY - minY) + 6.4),
+        };
+      })
+      .filter(Boolean);
+    if (exactMeasureOverlays.length) {
+      return exactMeasureOverlays;
     }
-    return issueMeasureIndexes
-      .filter((measureIndex) => (measurePageMap.get(measureIndex) || baseSectionPage) === currentPage)
-      .map((measureIndex) => {
+    return measureOverlayKeys
+      .filter((measureKey) => (measurePageMap.get(measureKey) || baseSectionPage) === currentPage)
+      .map((measureKey) => {
+        const [measureSectionId, measureText] = String(measureKey).split("::");
+        const measureIndex = Number(measureText) || 1;
         const slotWidth = 100 / Math.max(1, measureCount);
         const left = Math.max(0, (measureIndex - 1) * slotWidth);
         return {
+          measureKey,
+          sectionId: measureSectionId,
           measureIndex,
           left: Math.min(left, 96),
-          top: 8,
+          top: 10,
           width: Math.max(5.5, Math.min(slotWidth, 18)),
-          height: 84,
+          height: 18,
         };
       });
-  }, [baseSectionPage, currentPage, dominantStaffIndex, hasExactNoteOverlay, issueMeasureIndexes, measureCount, measurePageMap, section]);
+  }, [baseSectionPage, currentPage, dominantStaffIndex, effectiveSections, measureCount, measureOverlayKeys, measurePageMap, section]);
 
   const effectiveWidth = stageSize.width > 0 ? stageSize.width * zoom : 0;
   const effectiveHeight = stageSize.height > 0 ? stageSize.height * zoom : 0;
+  const sectionDisplayName = isWholePieceMode ? `${formatScoreTitle(score)} · 整曲问题谱面` : formatSectionDisplayName(section);
+  const originalAudioSource = analysis?.originalAudio?.url || analysis?.originalAudioUrl || analysis?.audioUrl || "";
+
+  useEffect(() => {
+    if (!originalAudioSource || !audioRef.current) return;
+    audioRef.current.load();
+  }, [originalAudioSource]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport || !effectiveWidth || !effectiveHeight) return;
     const focusNote =
       noteOverlayItems.find((item) => item.key === selectedNoteKey && item.pageNumber === currentPage)
-      || noteOverlayItems.find((item) => item.pageNumber === currentPage && item.measureIndex === activeMeasureIndex && item.exact)
-      || noteOverlayItems.find((item) => item.pageNumber === currentPage && item.measureIndex === activeMeasureIndex)
+      || noteOverlayItems.find((item) => item.pageNumber === currentPage && sectionKey(item.sectionId, item.measureIndex) === activeMeasureKey && item.exact)
+      || noteOverlayItems.find((item) => item.pageNumber === currentPage && sectionKey(item.sectionId, item.measureIndex) === activeMeasureKey)
       || null;
-    const focusMeasure = overlayItems.find((item) => item.measureIndex === activeMeasureIndex) || null;
+    const focusMeasure = overlayItems.find((item) => item.measureKey === activeMeasureKey) || null;
     const focusLeftPercent = focusNote ? focusNote.left : focusMeasure ? focusMeasure.left + focusMeasure.width / 2 : null;
     const focusTopPercent = focusNote ? focusNote.top : focusMeasure ? focusMeasure.top + focusMeasure.height / 2 : null;
     if (focusLeftPercent == null || focusTopPercent == null) return;
@@ -443,10 +817,10 @@ export default function ScoreIssuePage() {
       top: Math.max(0, targetTop),
       behavior: "smooth",
     });
-  }, [activeMeasureIndex, currentPage, effectiveHeight, effectiveWidth, noteOverlayItems, overlayItems, selectedNoteKey, zoom]);
+  }, [activeMeasureKey, currentPage, effectiveHeight, effectiveWidth, noteOverlayItems, overlayItems, selectedNoteKey, zoom]);
 
   useEffect(() => {
-    const targetKey = selectedNoteKey || (activeMeasureIndex != null ? `measure-${activeMeasureIndex}` : "");
+    const targetKey = selectedNoteKey || (activeMeasureKey ? `measure-${activeMeasureKey}` : "");
     if (!targetKey) return;
     const target = issueListRefs.current.get(targetKey);
     if (!target?.scrollIntoView) return;
@@ -454,22 +828,34 @@ export default function ScoreIssuePage() {
       block: "nearest",
       behavior: "smooth",
     });
-  }, [activeMeasureIndex, selectedNoteKey]);
+  }, [activeMeasureKey, selectedNoteKey]);
 
-  function handleMeasureJump(measureIndex) {
-    setCurrentPage(measurePageMap.get(measureIndex) || baseSectionPage);
-    setSelectedMeasureIndex(measureIndex);
+  function handleMeasureJump(measureIndex, item = null) {
+    const key = item?.measureKey || sectionKey(item?.sectionId || resolveIssueSection(score, section, item)?.sectionId, measureIndex);
+    setCurrentPage(item?.pageNumber || measurePageMap.get(key) || baseSectionPage);
+    setSelectedMeasureIndex(key);
     setSelectedNoteKey("");
+  }
+
+  function handlePageNavigation(nextPage) {
+    setSelectedMeasureIndex(null);
+    setSelectedNoteKey("");
+    setCurrentPage(Math.max(1, Math.min(pageCount || nextPage, nextPage)));
   }
 
   function handleNoteJump(noteItem, overlayItem) {
     if (!noteItem) return;
     const resolvedOverlay =
       overlayItem
-      || noteOverlayItems.find((item) => String(item.noteId || "") === String(noteItem.noteId || "") && item.measureIndex === noteItem.measureIndex)
+      || noteOverlayItems.find((item) => (
+        String(item.noteId || "") === String(noteItem.noteId || "")
+        && item.measureIndex === noteItem.measureIndex
+        && (!noteItem.sectionId || item.sectionId === noteItem.sectionId)
+      ))
       || null;
-    setCurrentPage(resolvedOverlay?.pageNumber || measurePageMap.get(noteItem.measureIndex) || baseSectionPage);
-    setSelectedMeasureIndex(noteItem.measureIndex || null);
+    const key = sectionKey(resolvedOverlay?.sectionId || noteItem.sectionId || resolveIssueSection(score, section, noteItem)?.sectionId, noteItem.measureIndex);
+    setCurrentPage(resolvedOverlay?.pageNumber || noteItem.pageNumber || measurePageMap.get(key) || baseSectionPage);
+    setSelectedMeasureIndex(key);
     setSelectedNoteKey(resolvedOverlay?.key || "");
   }
 
@@ -479,8 +865,8 @@ export default function ScoreIssuePage() {
     const naturalH = image.naturalHeight || image.height || 0;
     setStageSize({ width: naturalW, height: naturalH });
     if (!hasAutoFittedRef.current && viewportRef.current && naturalW > 0) {
-      const available = viewportRef.current.clientWidth - 24;
-      setZoom(Math.max(0.5, Math.min(3.5, parseFloat((available / naturalW).toFixed(2)))));
+      const available = viewportRef.current.clientWidth - 8;
+      setZoom(Math.max(0.75, Math.min(4, parseFloat((available / naturalW).toFixed(2)))));
       hasAutoFittedRef.current = true;
     }
   }
@@ -509,7 +895,7 @@ export default function ScoreIssuePage() {
     <div className="app-shell score-issue-shell">
       <header className="panel-card score-issue-header">
         <div className="score-issue-title">
-          <h1>{section?.title || "问题谱面"}</h1>
+          <h1>{sectionDisplayName || "问题谱面"}</h1>
           <div className="score-inline-scores">
             <span className="score-inline-chip">音准 <strong>{getDisplayPitchScore(analysis)}</strong></span>
             <span className="score-inline-chip">节奏 <strong>{getDisplayRhythmScore(analysis)}</strong></span>
@@ -529,40 +915,42 @@ export default function ScoreIssuePage() {
 
       <div className="score-issue-layout">
         <aside className="panel-card score-sidebar">
-          {analysis?.rawAudioPath ? (
+          {originalAudioSource ? (
             <div className="sidebar-block">
               <p className="sidebar-label">原音</p>
-              <audio controls className="audio-player" src={analysis.rawAudioPath} />
+              <audio ref={audioRef} controls preload="metadata" className="audio-player" src={originalAudioSource} />
             </div>
           ) : null}
 
           <div className="sidebar-block">
             <p className="sidebar-label">总体反馈</p>
-            <p className="sidebar-text">{summarizeOverallFeedback(analysis)}</p>
+            <p className="sidebar-text">{summarizeOverallFeedback(visibleAnalysisForSummary)}</p>
             <p className="sidebar-meta">{formatDateTime(analysis?.createdAt || stored?.savedAt)}</p>
           </div>
 
           <div className="sidebar-block sidebar-issues">
             <p className="sidebar-label">问题列表</p>
             <div className="issue-list-block">
-              {measureIssueEntries.map((item) => (
-                <button
-                  type="button"
-                  key={item.issueKey}
-                  ref={(element) => setIssueListRef(item.issueKey, element)}
-                  className={`issue-list-button${activeMeasureIndex === item.measureIndex && !selectedNoteKey ? " is-active" : ""}`}
-                  onClick={() => handleMeasureJump(item.measureIndex)}
-                >
-                  <strong>
-                    <span className="issue-number-chip">{item.issueNumber}</span>
-                    {formatMeasureLabel(item.measureIndex)}
-                  </strong>
-                  <span>{item.label}</span>
-                </button>
-              ))}
-              {noteIssueEntries.map((item, index) => {
+              {issueEntries.map((item, index) => {
+                if (item.issueKind === "measure") {
+                  return (
+                    <button
+                      type="button"
+                      key={item.issueKey}
+                      ref={(element) => setIssueListRef(item.issueKey, element)}
+                      className={`issue-list-button${activeMeasureKey === item.measureKey && !selectedNoteKey ? " is-active" : ""}`}
+                      onClick={() => handleMeasureJump(item.measureIndex, item)}
+                    >
+                      <strong>
+                        <span className="issue-number-chip">{item.issueNumber}</span>
+                        {formatMeasureLabel(item.measureIndex)}
+                      </strong>
+                      <span>{isWholePieceMode ? `${item.sectionTitle || "整曲"} · ` : ""}{item.label}</span>
+                    </button>
+                  );
+                }
                 const overlayItem = item.overlayItem || null;
-                const overlayKey = item.overlayKey || "";
+                const overlayKey = item.overlayKey || item.listKey || "";
                 return (
                   <button
                     type="button"
@@ -575,7 +963,7 @@ export default function ScoreIssuePage() {
                       <span className="issue-number-chip">{item.issueNumber}</span>
                       {formatNoteLabel(item.noteId, item.measureIndex)}
                     </strong>
-                    <span>{item.tags.join("、")}</span>
+                    <span>{isWholePieceMode ? `${item.sectionTitle || "整曲"} · ` : ""}{item.tags.join("、")}</span>
                   </button>
                 );
               })}
@@ -585,39 +973,39 @@ export default function ScoreIssuePage() {
 
         <section className="panel-card score-page-panel">
           <div className="score-page-toolbar">
-            <span>{section?.title || "当前段落"}</span>
+            <span>{sectionDisplayName || "当前段落"}</span>
             <span>第 {currentPage} 页{pageCount > 0 ? ` / ${pageCount}` : ""}</span>
             <span>{issueMeasureIndexes.length} 个问题小节</span>
           </div>
 
           <div className="score-page-nav">
-            <button type="button" className="secondary-button" onClick={() => setCurrentPage((value) => Math.max(1, value - 1))} disabled={currentPage <= 1}>
+            <button type="button" className="secondary-button" onClick={() => handlePageNavigation(currentPage - 1)} disabled={currentPage <= 1}>
               上一页
             </button>
-            <button type="button" className="secondary-button" onClick={() => setCurrentPage(baseSectionPage)}>
+            <button type="button" className="secondary-button" onClick={() => handlePageNavigation(firstIssuePage)}>
               回到问题页
             </button>
             <button
               type="button"
               className="secondary-button"
-              onClick={() => setCurrentPage((value) => value + 1)}
+              onClick={() => handlePageNavigation(currentPage + 1)}
               disabled={pageCount > 0 && currentPage >= pageCount}
             >
               下一页
             </button>
             <div className="score-zoom-group">
-              <button type="button" className="secondary-button" onClick={() => setZoom((value) => Math.max(0.5, Number((value - 0.15).toFixed(2))))}>
+              <button type="button" className="secondary-button" onClick={() => setZoom((value) => Math.max(0.75, Number((value - 0.15).toFixed(2))))}>
                 缩小
               </button>
               <span className="score-zoom-label">{Math.round(zoom * 100)}%</span>
-              <button type="button" className="secondary-button" onClick={() => setZoom((value) => Math.min(3.5, Number((value + 0.15).toFixed(2))))}>
+              <button type="button" className="secondary-button" onClick={() => setZoom((value) => Math.min(4, Number((value + 0.15).toFixed(2))))}>
                 放大
               </button>
               <button type="button" className="secondary-button" onClick={() => {
                 const w = stageSize.width;
                 const cw = viewportRef.current?.clientWidth;
                 if (w && cw) {
-                  setZoom(Math.max(0.5, Math.min(3.5, parseFloat(((cw - 24) / w).toFixed(2)))));
+                  setZoom(Math.max(0.75, Math.min(4, parseFloat(((cw - 8) / w).toFixed(2)))));
                 } else {
                   setZoom(1.0);
                 }
@@ -661,9 +1049,9 @@ export default function ScoreIssuePage() {
                 {overlayItems.map((item) => (
                   <button
                     type="button"
-                    key={`measure-${item.measureIndex}`}
-                    className={`score-measure-highlight${activeMeasureIndex === item.measureIndex ? " is-active" : ""}`}
-                    onClick={() => handleMeasureJump(item.measureIndex)}
+                    key={`measure-${item.measureKey}`}
+                    className={`score-measure-highlight${activeMeasureKey === item.measureKey ? " is-active" : ""}`}
+                    onClick={() => handleMeasureJump(item.measureIndex, item)}
                     style={{
                       left: `${item.left}%`,
                       top: `${item.top}%`,
@@ -671,14 +1059,14 @@ export default function ScoreIssuePage() {
                       height: `${item.height}%`,
                     }}
                   >
-                    <span>{measureIssueNumberMap.get(item.measureIndex) || item.measureIndex}</span>
+                    <span>{measureIssueNumberMap.get(item.measureKey) || item.measureIndex}</span>
                   </button>
                 ))}
                 {noteOverlayItems
-                  .filter((item) => item.pageNumber === currentPage && (activeMeasureIndex == null || item.measureIndex === activeMeasureIndex))
+                  .filter((item) => item.pageNumber === currentPage)
                   .map((item) => {
                     const relatedIssue =
-                      noteIssueEntries.find((noteIssue) => String(noteIssue.noteId || "") === String(item.noteId || "") && noteIssue.measureIndex === item.measureIndex)
+                      noteIssueEntries.find((noteIssue) => String(noteIssue.noteId || "") === String(item.noteId || "") && noteIssue.measureIndex === item.measureIndex && noteIssue.sectionId === item.sectionId)
                       || { noteId: item.noteId, measureIndex: item.measureIndex };
                     return (
                       <button

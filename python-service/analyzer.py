@@ -128,6 +128,12 @@ class SymbolicNote:
     expected_onset: float
     expected_offset: float
     note_position: dict[str, Any] | None = None
+    articulations: list[str] | None = None
+    notations: list[str] | None = None
+    techniques: list[str] | None = None
+    active_tempo: int | None = None
+    active_dynamic: str | None = None
+    dynamic_value: float | None = None
 
 
 @dataclass(slots=True)
@@ -1124,6 +1130,27 @@ class ErhuAnalyzer:
                 except Exception:
                     pass
 
+    def _estimate_pagewise_omr_confidence(self, pagewise_stats: dict[str, Any], source_count: int) -> float:
+        page_count = max(1, int(safe_float(pagewise_stats.get("pageCount"), 0)))
+        result_count = max(0, int(safe_float(pagewise_stats.get("resultCount"), source_count)))
+        coverage = min(1.0, float(result_count) / float(page_count))
+        page_cache_hit_rate = max(0.0, min(1.0, safe_float(pagewise_stats.get("pageResultCacheHitRate"), 0.0)))
+        render_cache_hit_rate = max(0.0, min(1.0, safe_float(pagewise_stats.get("renderCacheHitRate"), 0.0)))
+        tile_runs = max(0.0, safe_float(pagewise_stats.get("tileOmrRuns"), 0.0))
+        tile_pressure = min(1.0, tile_runs / float(page_count))
+        workers = max(1.0, safe_float(pagewise_stats.get("workers"), 1.0))
+
+        confidence = (
+            0.56
+            + (coverage * 0.28)
+            + (page_cache_hit_rate * 0.08)
+            + (render_cache_hit_rate * 0.04)
+            - (tile_pressure * 0.06)
+        )
+        if workers > 1 and coverage >= 0.9:
+            confidence += 0.02
+        return max(0.44, min(0.9, round(confidence, 3)))
+
     def _extract_tempo_from_pdf_image(self, pdf_path: Path, page_index: int = 0) -> int | None:
         """
         Extract tempo from a score page (PDF or PNG/image).
@@ -1305,6 +1332,351 @@ class ErhuAnalyzer:
             pass
         return 72
 
+    def _xml_local_tag(self, node: ET.Element | None) -> str:
+        if node is None:
+            return ""
+        return node.tag.rsplit("}", 1)[-1]
+
+    def _xml_child(self, node: ET.Element | None, tag: str) -> ET.Element | None:
+        if node is None:
+            return None
+        for element in list(node):
+            if self._xml_local_tag(element) == tag:
+                return element
+        return None
+
+    def _xml_children(self, node: ET.Element | None, tag: str) -> list[ET.Element]:
+        if node is None:
+            return []
+        return [element for element in list(node) if self._xml_local_tag(element) == tag]
+
+    def _extract_musicxml_part_candidates(self, xml_text: str, selected_hint: str | None = None) -> list[dict[str, Any]]:
+        if not xml_text.strip():
+            return []
+        try:
+            root = ET.fromstring(xml_text)
+        except ET.ParseError:
+            return []
+
+        part_names: dict[str, str] = {}
+        for element in root.iter():
+            if self._xml_local_tag(element) != "score-part":
+                continue
+            part_id = element.attrib.get("id", "").strip()
+            part_name_node = self._xml_child(element, "part-name")
+            part_name = (part_name_node.text or "").strip() if part_name_node is not None else ""
+            if part_id:
+                part_names[part_id] = part_name or part_id
+
+        candidates: list[dict[str, Any]] = []
+        normalized_hint = normalize_part_label(selected_hint)
+        for part in [element for element in root.iter() if self._xml_local_tag(element) == "part"]:
+            part_id = part.attrib.get("id", "").strip()
+            part_name = part_names.get(part_id, part_id or "Voice")
+            pitches: list[int] = []
+            staff_indices: set[int] = set()
+            note_count = 0
+            measure_count = 0
+            chord_count = 0
+            previous_measure_note_onsets: set[tuple[int, float]] = set()
+
+            for measure_position, measure in enumerate(self._xml_children(part, "measure"), start=1):
+                measure_count += 1
+                attributes = self._xml_child(measure, "attributes")
+                divisions_node = self._xml_child(attributes, "divisions")
+                divisions = max(1.0, safe_float(divisions_node.text if divisions_node is not None else 1.0, 1.0))
+                current_beat = 0.0
+                last_note_start = 0.0
+                for note in self._xml_children(measure, "note"):
+                    is_rest = self._xml_child(note, "rest") is not None
+                    is_chord = self._xml_child(note, "chord") is not None
+                    duration_node = self._xml_child(note, "duration")
+                    duration_beats = safe_float(duration_node.text if duration_node is not None else 0.0) / divisions
+                    if not is_chord:
+                        last_note_start = current_beat
+                    onset_key = (measure_position, round(last_note_start, 4))
+                    if onset_key in previous_measure_note_onsets:
+                        chord_count += 1
+                    previous_measure_note_onsets.add(onset_key)
+                    if not is_rest:
+                        pitch = self._xml_child(note, "pitch")
+                        step_node = self._xml_child(pitch, "step")
+                        octave_node = self._xml_child(pitch, "octave")
+                        alter_node = self._xml_child(pitch, "alter")
+                        if step_node is not None and octave_node is not None and step_node.text and octave_node.text:
+                            note_count += 1
+                            staff_node = self._xml_child(note, "staff")
+                            staff_indices.add(max(1, int(safe_float(staff_node.text if staff_node is not None else 1, 1))))
+                            pitches.append(
+                                musicxml_pitch_to_midi(
+                                    step_node.text.strip(),
+                                    int(safe_float(octave_node.text, 4)),
+                                    int(safe_float(alter_node.text if alter_node is not None else 0, 0)),
+                                )
+                            )
+                    if not is_chord:
+                        current_beat += max(duration_beats, 0.0)
+
+            min_pitch = min(pitches) if pitches else 0
+            max_pitch = max(pitches) if pitches else 0
+            pitch_span = max_pitch - min_pitch if pitches else 0
+            staff_count = len(staff_indices) or 1
+            normalized_name = normalize_part_label(part_name)
+            name_lower = part_name.lower()
+            erhu_name = ("erhu" in name_lower) or ("二胡" in part_name) or ("浜岃儭" in part_name)
+            piano_name = "piano" in name_lower or "钢琴" in part_name or "鋼琴" in part_name or "閽㈢惔" in part_name
+            voice_name = "voice" in name_lower or normalized_name == "voice"
+            range_hits = sum(1 for value in pitches if 52 <= value <= 96)
+            range_ratio = (range_hits / len(pitches)) if pitches else 0.0
+            chord_ratio = (chord_count / max(1, note_count)) if note_count else 0.0
+            score = (
+                0.18
+                + min(0.22, note_count / 480.0)
+                + (range_ratio * 0.28)
+                + (0.16 if staff_count == 1 else -0.16)
+                + (0.14 if pitch_span <= 36 else -0.04)
+                - min(0.18, chord_ratio * 0.7)
+                + (0.25 if erhu_name else 0.0)
+                + (0.08 if voice_name else 0.0)
+                - (0.35 if piano_name else 0.0)
+            )
+            if normalized_hint and normalized_hint in normalize_part_label(part_name):
+                score += 0.12
+            candidates.append(
+                {
+                    "id": part_id,
+                    "name": part_name,
+                    "label": part_name,
+                    "score": round(max(0.0, min(1.0, score)), 3),
+                    "noteCount": note_count,
+                    "measureCount": measure_count,
+                    "staffCount": staff_count,
+                    "pitchRange": [min_pitch, max_pitch] if pitches else [],
+                    "erhuRangeRatio": round(range_ratio, 3),
+                    "chordRatio": round(chord_ratio, 3),
+                    "isLikelyPiano": bool(piano_name or staff_count >= 2 or chord_ratio > 0.18),
+                }
+            )
+        candidates.sort(key=lambda item: (float(item.get("score", 0.0)), int(item.get("noteCount", 0))), reverse=True)
+        if len(candidates) >= 2:
+            gap = float(candidates[0].get("score", 0.0)) - float(candidates[1].get("score", 0.0))
+            confidence = max(0.45, min(0.96, 0.58 + gap))
+        elif candidates:
+            confidence = max(0.55, min(0.96, float(candidates[0].get("score", 0.0))))
+        else:
+            confidence = 0.0
+        for index, candidate in enumerate(candidates):
+            candidate["rank"] = index + 1
+            candidate["selectedPartConfidence"] = round(confidence if index == 0 else max(0.25, confidence - 0.18), 3)
+        return candidates
+
+    def _resolve_selected_part_from_candidates(
+        self,
+        candidates: list[dict[str, Any]],
+        selected_hint: str | None,
+    ) -> tuple[str, float]:
+        if not candidates:
+            return self._resolve_selected_part([], selected_hint), 0.0
+        normalized_hint = normalize_part_label(selected_hint)
+        if normalized_hint:
+            for candidate in candidates:
+                label = str(candidate.get("label") or candidate.get("name") or "").strip()
+                normalized_label = normalize_part_label(label)
+                if normalized_label and (normalized_hint in normalized_label or normalized_label in normalized_hint):
+                    return label, float(candidate.get("selectedPartConfidence", candidate.get("score", 0.65)))
+        best = candidates[0]
+        return str(best.get("label") or best.get("name") or "erhu"), float(best.get("selectedPartConfidence", best.get("score", 0.5)))
+
+    def _extract_dynamic_label(self, dynamics_node: ET.Element | None, sound_value: str | None = None) -> tuple[str, float | None]:
+        if dynamics_node is not None:
+            for child in list(dynamics_node):
+                tag = self._xml_local_tag(child).strip()
+                if tag:
+                    return tag, safe_float(sound_value, 0.0) or None
+        value = safe_float(sound_value, 0.0)
+        if value > 0:
+            if value <= 45:
+                return "p", value
+            if value <= 65:
+                return "mp", value
+            if value <= 85:
+                return "mf", value
+            if value <= 110:
+                return "f", value
+            return "ff", value
+        return "", None
+
+    def _extract_musicxml_markings(
+        self,
+        xml_text: str,
+        selected_part_hint: str | None,
+        section_id: str,
+        page_number: int,
+        default_tempo: int,
+    ) -> dict[str, Any]:
+        if not xml_text.strip():
+            return {"markings": [], "tempoChanges": [], "dynamicChanges": [], "repeatStructure": [], "markingStats": {}}
+        try:
+            root = ET.fromstring(xml_text)
+        except ET.ParseError:
+            return {"markings": [], "tempoChanges": [], "dynamicChanges": [], "repeatStructure": [], "markingStats": {}}
+
+        part_names = {}
+        for element in root.iter():
+            if self._xml_local_tag(element) != "score-part":
+                continue
+            part_id = element.attrib.get("id", "").strip()
+            name_node = self._xml_child(element, "part-name")
+            if part_id:
+                part_names[part_id] = (name_node.text or part_id).strip() if name_node is not None else part_id
+        candidates = self._extract_musicxml_part_candidates(xml_text, selected_part_hint)
+        selected_label, _ = self._resolve_selected_part_from_candidates(candidates, selected_part_hint)
+        selected_part_id = next((part_id for part_id, name in part_names.items() if name == selected_label), "")
+        parts = [element for element in root.iter() if self._xml_local_tag(element) == "part"]
+        part = next((element for element in parts if element.attrib.get("id", "").strip() == selected_part_id), parts[0] if parts else None)
+        if part is None:
+            return {"markings": [], "tempoChanges": [], "dynamicChanges": [], "repeatStructure": [], "markingStats": {}}
+
+        markings: list[dict[str, Any]] = []
+        tempo_changes: list[dict[str, Any]] = []
+        dynamic_changes: list[dict[str, Any]] = []
+        repeat_structure: list[dict[str, Any]] = []
+        divisions = 1.0
+        current_tempo = int(default_tempo or 72)
+        current_dynamic = ""
+        for measure_position, measure in enumerate(self._xml_children(part, "measure"), start=1):
+            attributes = self._xml_child(measure, "attributes")
+            divisions_node = self._xml_child(attributes, "divisions")
+            if divisions_node is not None and divisions_node.text:
+                divisions = max(1.0, safe_float(divisions_node.text, divisions))
+            measure_index = int(measure.attrib.get("number", measure_position) or measure_position)
+            for direction in self._xml_children(measure, "direction"):
+                offset_node = self._xml_child(direction, "offset")
+                beat_start = max(0.0, safe_float(offset_node.text if offset_node is not None else 0.0, 0.0) / divisions)
+                placement = direction.attrib.get("placement", "")
+                sound_node = self._xml_child(direction, "sound")
+                sound_tempo = sound_node.attrib.get("tempo") if sound_node is not None else None
+                sound_dynamic = sound_node.attrib.get("dynamics") if sound_node is not None else None
+                for direction_type in self._xml_children(direction, "direction-type"):
+                    words_node = self._xml_child(direction_type, "words")
+                    if words_node is not None and (words_node.text or "").strip():
+                        text = (words_node.text or "").strip()
+                        markings.append(
+                            {
+                                "type": "text",
+                                "text": text,
+                                "measureIndex": measure_index,
+                                "beatStart": beat_start,
+                                "pageNumber": page_number,
+                                "placement": placement,
+                                "sectionId": section_id,
+                            }
+                        )
+                    metronome = self._xml_child(direction_type, "metronome")
+                    per_minute = self._xml_child(metronome, "per-minute")
+                    tempo_value = safe_float(sound_tempo, 0.0) or safe_float(per_minute.text if per_minute is not None else None, 0.0)
+                    if tempo_value > 0:
+                        current_tempo = int(round(tempo_value))
+                        change = {
+                            "type": "tempo",
+                            "tempo": current_tempo,
+                            "measureIndex": measure_index,
+                            "beatStart": beat_start,
+                            "pageNumber": page_number,
+                            "sectionId": section_id,
+                        }
+                        tempo_changes.append(change)
+                        markings.append({**change, "text": f"♩={current_tempo}"})
+                    dynamics = self._xml_child(direction_type, "dynamics")
+                    dynamic_label, dynamic_value = self._extract_dynamic_label(dynamics, sound_dynamic)
+                    if dynamic_label:
+                        current_dynamic = dynamic_label
+                        change = {
+                            "type": "dynamic",
+                            "dynamic": dynamic_label,
+                            "dynamicValue": dynamic_value,
+                            "measureIndex": measure_index,
+                            "beatStart": beat_start,
+                            "pageNumber": page_number,
+                            "placement": placement,
+                            "sectionId": section_id,
+                        }
+                        dynamic_changes.append(change)
+                        markings.append({**change, "text": dynamic_label})
+                    wedge = self._xml_child(direction_type, "wedge")
+                    if wedge is not None:
+                        wedge_type = wedge.attrib.get("type", "").strip()
+                        if wedge_type:
+                            markings.append(
+                                {
+                                    "type": "wedge",
+                                    "wedgeType": wedge_type,
+                                    "text": "渐强" if wedge_type == "crescendo" else "渐弱" if wedge_type == "diminuendo" else wedge_type,
+                                    "measureIndex": measure_index,
+                                    "beatStart": beat_start,
+                                    "pageNumber": page_number,
+                                    "placement": placement,
+                                    "sectionId": section_id,
+                                }
+                            )
+                if sound_tempo and not any(item.get("measureIndex") == measure_index and item.get("beatStart") == beat_start for item in tempo_changes):
+                    tempo_value = safe_float(sound_tempo, 0.0)
+                    if tempo_value > 0:
+                        current_tempo = int(round(tempo_value))
+                        change = {
+                            "type": "tempo",
+                            "tempo": current_tempo,
+                            "measureIndex": measure_index,
+                            "beatStart": beat_start,
+                            "pageNumber": page_number,
+                            "sectionId": section_id,
+                        }
+                        tempo_changes.append(change)
+                        markings.append({**change, "text": f"♩={current_tempo}"})
+                if sound_dynamic:
+                    dynamic_label, dynamic_value = self._extract_dynamic_label(None, sound_dynamic)
+                    if dynamic_label and dynamic_label != current_dynamic:
+                        current_dynamic = dynamic_label
+                        change = {
+                            "type": "dynamic",
+                            "dynamic": dynamic_label,
+                            "dynamicValue": dynamic_value,
+                            "measureIndex": measure_index,
+                            "beatStart": beat_start,
+                            "pageNumber": page_number,
+                            "sectionId": section_id,
+                        }
+                        dynamic_changes.append(change)
+                        markings.append({**change, "text": dynamic_label})
+
+            for barline in self._xml_children(measure, "barline"):
+                repeat = self._xml_child(barline, "repeat")
+                if repeat is not None:
+                    repeat_structure.append(
+                        {
+                            "type": "repeat",
+                            "direction": repeat.attrib.get("direction", ""),
+                            "times": repeat.attrib.get("times", ""),
+                            "measureIndex": measure_index,
+                            "pageNumber": page_number,
+                            "sectionId": section_id,
+                        }
+                    )
+
+        stats = {
+            "markingCount": len(markings),
+            "tempoChangeCount": len(tempo_changes),
+            "dynamicChangeCount": len(dynamic_changes),
+            "repeatCount": len(repeat_structure),
+        }
+        return {
+            "markings": markings,
+            "tempoChanges": tempo_changes,
+            "dynamicChanges": dynamic_changes,
+            "repeatStructure": repeat_structure,
+            "markingStats": stats,
+        }
+
     def _parse_musicxml_source_to_section(
         self,
         source_path: Path,
@@ -1313,13 +1685,16 @@ class ErhuAnalyzer:
         section_id: str,
         section_title: str,
         sequence_index: int,
-    ) -> tuple[dict[str, Any] | None, list[str], str]:
+    ) -> tuple[dict[str, Any] | None, list[str], str, list[dict[str, Any]], dict[str, Any]]:
         xml_text = self._read_musicxml_source(source_path)
         if not xml_text.strip():
-            return None, [], selected_part_hint
+            return None, [], selected_part_hint, [], {}
 
         detected_parts = self._extract_musicxml_parts(xml_text)
-        resolved_part = self._resolve_selected_part(detected_parts, selected_part_hint)
+        part_candidates = self._extract_musicxml_part_candidates(xml_text, selected_part_hint)
+        resolved_part, selected_part_confidence = self._resolve_selected_part_from_candidates(part_candidates, selected_part_hint)
+        if not resolved_part:
+            resolved_part = self._resolve_selected_part(detected_parts, selected_part_hint)
         detected_tempo = self._extract_musicxml_tempo(xml_text)
         # If MusicXML has no tempo (Audiveris missed it), try image-based OCR on the page PDF.
         # Typical layout: pagewise/page-NNN/page-NNN.mxl → PDF at pagewise/page-NNN.pdf
@@ -1350,7 +1725,16 @@ class ErhuAnalyzer:
         )
         parsed_notes = self._parse_musicxml_score(xml_text, temp_request, resolved_part)
         if not parsed_notes:
-            return None, detected_parts, resolved_part
+            return None, detected_parts, resolved_part, part_candidates, {}
+        page_number_match = re.search(r"page[-\s]?0*(\d+)", section_id, flags=re.IGNORECASE)
+        page_number = int(page_number_match.group(1)) if page_number_match else 1
+        score_markings = self._extract_musicxml_markings(
+            xml_text,
+            resolved_part,
+            section_id,
+            page_number,
+            detected_tempo,
+        )
 
         section = {
             "sectionId": section_id,
@@ -1367,11 +1751,23 @@ class ErhuAnalyzer:
                     "beatDuration": note.beat_duration,
                     "midiPitch": note.midi_pitch,
                     "notePosition": dict(note.note_position or {}) if getattr(note, "note_position", None) else None,
+                    "articulations": list(note.articulations or []),
+                    "notations": list(note.notations or []),
+                    "techniques": list(note.techniques or []),
+                    "activeTempo": note.active_tempo or detected_tempo,
+                    "activeDynamic": note.active_dynamic or "",
+                    "dynamicValue": note.dynamic_value,
                 }
                 for note in parsed_notes
             ],
+            "markings": score_markings.get("markings", []),
+            "tempoChanges": score_markings.get("tempoChanges", []),
+            "dynamicChanges": score_markings.get("dynamicChanges", []),
+            "repeatStructure": score_markings.get("repeatStructure", []),
+            "partCandidates": part_candidates,
+            "selectedPartConfidence": round(float(selected_part_confidence or 0.0), 3),
         }
-        return section, detected_parts, resolved_part
+        return section, detected_parts, resolved_part, part_candidates, score_markings.get("markingStats", {})
 
     def _build_piece_pack_from_musicxml_sources(
         self,
@@ -1381,13 +1777,20 @@ class ErhuAnalyzer:
     ) -> tuple[dict[str, Any] | None, list[str], str]:
         sections: list[dict[str, Any]] = []
         detected_parts: list[str] = []
+        all_part_candidates: list[dict[str, Any]] = []
+        aggregate_marking_stats: dict[str, int] = {
+            "markingCount": 0,
+            "tempoChangeCount": 0,
+            "dynamicChangeCount": 0,
+            "repeatCount": 0,
+        }
         resolved_part = selected_part_hint or "erhu"
         multiple_sources = len(musicxml_sources) > 1
 
         for index, source_path in enumerate(musicxml_sources, start=1):
             section_id = "section-a" if not multiple_sources and index == 1 else f"page-{index:02d}"
             section_title = "自动识谱段落" if not multiple_sources and index == 1 else f"自动识谱第 {index} 页"
-            section, parts, next_resolved_part = self._parse_musicxml_source_to_section(
+            section, parts, next_resolved_part, part_candidates, marking_stats = self._parse_musicxml_source_to_section(
                 source_path,
                 request,
                 resolved_part,
@@ -1395,6 +1798,12 @@ class ErhuAnalyzer:
                 section_title,
                 index,
             )
+            for candidate in part_candidates:
+                label = str(candidate.get("label") or candidate.get("name") or "").strip()
+                if label and not any(str(existing.get("label") or existing.get("name") or "") == label for existing in all_part_candidates):
+                    all_part_candidates.append(candidate)
+            for key in aggregate_marking_stats:
+                aggregate_marking_stats[key] += int(safe_float(marking_stats.get(key), 0))
             for part_name in parts:
                 if part_name and part_name not in detected_parts:
                     detected_parts.append(part_name)
@@ -1418,6 +1827,21 @@ class ErhuAnalyzer:
             "composer": "Audiveris OMR",
             "selectedPart": resolved_part,
             "detectedParts": detected_parts or [resolved_part],
+            "selectedPartConfidence": round(
+                float(
+                    next(
+                        (
+                            item.get("selectedPartConfidence", item.get("score", 0.0))
+                            for item in all_part_candidates
+                            if str(item.get("label") or item.get("name") or "") == resolved_part
+                        ),
+                        0.0,
+                    )
+                ),
+                3,
+            ),
+            "partCandidates": all_part_candidates,
+            "markingStats": aggregate_marking_stats,
             "sections": sections,
         }
         return piece_pack, list(piece_pack["detectedParts"]), resolved_part
@@ -1599,7 +2023,7 @@ class ErhuAnalyzer:
                 if pagewise_sources:
                     musicxml_sources = [Path(item) for item in pagewise_sources]
                     musicxml_path = str(musicxml_sources[0])
-                    omr_confidence = 0.64
+                    omr_confidence = self._estimate_pagewise_omr_confidence(pagewise_stats, len(pagewise_sources))
                     omr_stats = {
                         **pagewise_stats,
                         "wholePdfAttempted": whole_pdf_attempted,
@@ -1649,6 +2073,13 @@ class ErhuAnalyzer:
             piece_pack["detectedParts"] = list(piece_pack.get("detectedParts") or detected_parts or [selected_part])
             selected_part = str(piece_pack.get("selectedPart") or selected_part)
             detected_parts = list(piece_pack.get("detectedParts") or [selected_part])
+        part_candidates = list(piece_pack.get("partCandidates") or []) if isinstance(piece_pack, dict) else []
+        selected_part_confidence = (
+            safe_float(piece_pack.get("selectedPartConfidence"), 0.0)
+            if isinstance(piece_pack, dict)
+            else 0.0
+        )
+        marking_stats = dict(piece_pack.get("markingStats") or {}) if isinstance(piece_pack, dict) else {}
 
         return ScoreImportJobResult(
             jobId=request.jobId,
@@ -1662,6 +2093,9 @@ class ErhuAnalyzer:
             detectedParts=detected_parts,
             selectedPart=selected_part,
             selectedPartCandidates=detected_parts,
+            selectedPartConfidence=round(float(selected_part_confidence or 0.0), 3),
+            partCandidates=part_candidates,
+            markingStats=marking_stats,
             piecePack=piece_pack,
             omrStats=omr_stats,
             warnings=warnings,
@@ -4317,7 +4751,15 @@ class ErhuAnalyzer:
             normalized_candidate = normalize_part_label(candidate)
             if any(term in candidate.lower() or normalize_part_label(term) in normalized_candidate for term in preferred_terms):
                 return candidate
-        return detected_parts[0]
+        non_piano = [
+            candidate
+            for candidate in detected_parts
+            if "piano" not in candidate.lower()
+            and "钢琴" not in candidate
+            and "鋼琴" not in candidate
+            and "閽㈢惔" not in candidate
+        ]
+        return non_piano[0] if non_piano else detected_parts[0]
 
     def _decode_symbolic_text(self, data: str, encoding: str | None) -> str:
         if not data:
@@ -4357,6 +4799,12 @@ class ErhuAnalyzer:
                     expected_onset=onset,
                     expected_offset=onset + duration_seconds,
                     note_position=dict(note.notePosition or {}) if getattr(note, "notePosition", None) else None,
+                    articulations=list(getattr(note, "articulations", []) or []),
+                    notations=list(getattr(note, "notations", []) or []),
+                    techniques=list(getattr(note, "techniques", []) or []),
+                    active_tempo=int(getattr(note, "activeTempo", 0) or 0) or None,
+                    active_dynamic=str(getattr(note, "activeDynamic", "") or "").strip() or None,
+                    dynamic_value=safe_float(getattr(note, "dynamicValue", None), 0.0) or None,
                 )
             )
         return hydrated
@@ -4369,13 +4817,17 @@ class ErhuAnalyzer:
         except ET.ParseError:
             return []
 
-        def child(node: ET.Element, tag: str) -> ET.Element | None:
+        def child(node: ET.Element | None, tag: str) -> ET.Element | None:
+            if node is None:
+                return None
             for element in list(node):
                 if element.tag.rsplit("}", 1)[-1] == tag:
                     return element
             return None
 
-        def children(node: ET.Element, tag: str) -> list[ET.Element]:
+        def children(node: ET.Element | None, tag: str) -> list[ET.Element]:
+            if node is None:
+                return []
             return [element for element in list(node) if element.tag.rsplit("}", 1)[-1] == tag]
 
         part_names: dict[str, str] = {}
@@ -4394,7 +4846,10 @@ class ErhuAnalyzer:
         part_candidates = [element for element in root.iter() if element.tag.rsplit("}", 1)[-1] == "part"]
         if not part_candidates:
             return []
-        preferred_part_label = self._resolve_selected_part(list(part_names.values()), selected_part_hint)
+        part_candidate_stats = self._extract_musicxml_part_candidates(xml_text, selected_part_hint)
+        preferred_part_label, _selected_part_confidence = self._resolve_selected_part_from_candidates(part_candidate_stats, selected_part_hint)
+        if not preferred_part_label:
+            preferred_part_label = self._resolve_selected_part(list(part_names.values()), selected_part_hint)
         preferred_part_id = next(
             (part_id for part_id, part_name in part_names.items() if part_name == preferred_part_label),
             "",
@@ -4432,6 +4887,9 @@ class ErhuAnalyzer:
         current_system_left = page_left_margin
         current_measure_offset = 0.0
         current_staff_distance = 70.0
+        current_tempo = int(getattr(request.piecePack, "tempo", 72) or 72)
+        current_dynamic = ""
+        current_dynamic_value: float | None = None
         last_system_top_line: float | None = None
         staff_height = 40.0
         page_number_match = re.search(r"page[-\s]?0*(\d+)", str(getattr(request, "sectionId", "") or getattr(request.piecePack, "sectionId", "") or ""), flags=re.IGNORECASE)
@@ -4489,6 +4947,30 @@ class ErhuAnalyzer:
                 current_clef_octave_change,
             )
             top_line_diatonic = clef_reference_diatonic + ((5 - clef_reference_line) * 2)
+            for direction in children(measure, "direction"):
+                sound_node = child(direction, "sound")
+                sound_tempo = sound_node.attrib.get("tempo") if sound_node is not None else None
+                sound_dynamic = sound_node.attrib.get("dynamics") if sound_node is not None else None
+                for direction_type in children(direction, "direction-type"):
+                    metronome = child(direction_type, "metronome")
+                    per_minute = child(metronome, "per-minute")
+                    tempo_value = safe_float(sound_tempo, 0.0) or safe_float(per_minute.text if per_minute is not None else None, 0.0)
+                    if tempo_value > 0:
+                        current_tempo = int(round(tempo_value))
+                    dynamics = child(direction_type, "dynamics")
+                    dynamic_label, dynamic_value = self._extract_dynamic_label(dynamics, sound_dynamic)
+                    if dynamic_label:
+                        current_dynamic = dynamic_label
+                        current_dynamic_value = dynamic_value
+                if sound_tempo:
+                    tempo_value = safe_float(sound_tempo, 0.0)
+                    if tempo_value > 0:
+                        current_tempo = int(round(tempo_value))
+                if sound_dynamic and not current_dynamic:
+                    dynamic_label, dynamic_value = self._extract_dynamic_label(None, sound_dynamic)
+                    if dynamic_label:
+                        current_dynamic = dynamic_label
+                        current_dynamic_value = dynamic_value
             for note_index, note in enumerate(children(measure, "note"), start=1):
                 is_rest = child(note, "rest") is not None
                 is_chord = child(note, "chord") is not None
@@ -4522,6 +5004,21 @@ class ErhuAnalyzer:
                             absolute_y = current_system_top_line + staff_offset + ((top_line_diatonic - note_diatonic) * 5.0)
                             normalized_x = max(0.0, min(1.0, absolute_x / page_width))
                             normalized_y = max(0.0, min(1.0, absolute_y / page_height))
+                            articulations: list[str] = []
+                            notations: list[str] = []
+                            techniques: list[str] = []
+                            notations_node = child(note, "notations")
+                            if notations_node is not None:
+                                for notation_node in list(notations_node):
+                                    local_notation = notation_node.tag.rsplit("}", 1)[-1]
+                                    if local_notation in {"articulations", "technical", "ornaments"}:
+                                        target = articulations if local_notation == "articulations" else techniques
+                                        for sub_node in list(notation_node):
+                                            tag = sub_node.tag.rsplit("}", 1)[-1]
+                                            if tag:
+                                                target.append(tag)
+                                    elif local_notation:
+                                        notations.append(local_notation)
                             note_events.append(
                                 NoteEvent(
                                     noteId=f"xml-m{measure_index}-n{note_index}",
@@ -4539,6 +5036,12 @@ class ErhuAnalyzer:
                                         "pageHeight": round(float(page_height), 3),
                                         "source": "musicxml-layout",
                                     },
+                                    articulations=sorted(set(articulations)),
+                                    notations=sorted(set(notations)),
+                                    techniques=sorted(set(techniques)),
+                                    activeTempo=current_tempo,
+                                    activeDynamic=current_dynamic,
+                                    dynamicValue=current_dynamic_value,
                                 )
                             )
                 if not is_chord:
@@ -4551,6 +5054,25 @@ class ErhuAnalyzer:
     def _collapse_erhu_melody_events(self, note_events: list[NoteEvent]) -> list[NoteEvent]:
         if len(note_events) <= 1:
             return note_events
+
+        staff_counts: dict[int, int] = {}
+        for note in note_events:
+            position = getattr(note, "notePosition", None) or {}
+            staff_index = int(safe_float(position.get("staffIndex"), 1))
+            if staff_index >= 1:
+                staff_counts[staff_index] = staff_counts.get(staff_index, 0) + 1
+        if len(staff_counts) > 1:
+            # Imported full scores can put erhu and piano into one generic Voice.
+            # For diagnosis and score highlighting, keep the solo erhu melody staff
+            # (normally the top staff) before collapsing chords/voices.
+            preferred_staff = min(staff_counts.keys())
+            staff_filtered = [
+                note
+                for note in note_events
+                if int(safe_float((getattr(note, "notePosition", None) or {}).get("staffIndex"), 1)) == preferred_staff
+            ]
+            if staff_filtered:
+                note_events = staff_filtered
 
         ordered = sorted(
             note_events,
@@ -4619,6 +5141,12 @@ class ErhuAnalyzer:
                     beatDuration=max(float(note.beatDuration), 0.25),
                     midiPitch=int(note.midiPitch),
                     notePosition=dict(note.notePosition or {}) if getattr(note, "notePosition", None) else None,
+                    articulations=list(getattr(note, "articulations", []) or []),
+                    notations=list(getattr(note, "notations", []) or []),
+                    techniques=list(getattr(note, "techniques", []) or []),
+                    activeTempo=int(getattr(note, "activeTempo", 0) or 0) or None,
+                    activeDynamic=str(getattr(note, "activeDynamic", "") or "").strip() or None,
+                    dynamicValue=safe_float(getattr(note, "dynamicValue", None), 0.0) or None,
                 )
             )
         return normalized
@@ -5731,7 +6259,7 @@ class ErhuAnalyzer:
         if rhythm_type == "rhythm-duration-long":
             return "保持拍点不变，提前准备换音，避免这一音占掉后面的拍子。"
         if rhythm_type == "rhythm-missing":
-            return "先单独确认这一拍是否真正演奏到位，再结合示范和教师复核。"
+            return "先单独确认这一拍是否真正演奏到位，再结合示范回放复核。"
         if bool(note.get("glideLike")):
             return "保持滑音表达，但把落点后的稳定段拉得更清楚。"
         return "先保留当前速度，针对该音做 3 到 5 次局部循环练习。"
@@ -5765,7 +6293,7 @@ class ErhuAnalyzer:
             if rhythm_magnitude >= abs(note.centsError):
                 return "rhythm-first", "该音节奏偏差更突出，先把起拍放准更有效。"
             return "pitch-first", "该音音高偏差更突出，先把落点稳定下来更有效。"
-        return "review-first", "该音接近阈值，建议先复核示范与教师判断。"
+        return "review-first", "该音接近阈值，建议先复核示范回放与当前录音。"
 
     def _practice_path_for_measure(self, measure: MeasureFinding) -> tuple[str, str]:
         if measure.issueType in {"rhythm-measure-rush", "rhythm-measure-drag", "rhythm-measure-short", "rhythm-measure-long", "rhythm-unstable"}:
@@ -5800,7 +6328,7 @@ class ErhuAnalyzer:
             f"系统共定位到 {len(note_findings)} 个问题音和 {len(measure_findings)} 个问题小节。",
         ]
         if uncertain_pitch_count:
-            summary_parts.append(f"其中有 {uncertain_pitch_count} 个音的证据偏弱，建议结合示范和教师判断复核。")
+            summary_parts.append(f"其中有 {uncertain_pitch_count} 个音的证据偏弱，建议结合示范回放复核。")
         summary_text = "".join(summary_parts)
 
         teacher_comment = (
@@ -6257,6 +6785,8 @@ class ErhuAnalyzer:
                 NoteFinding(
                     noteId=note["noteId"],
                     measureIndex=int(note["measureIndex"]),
+                    beatStart=round(float(note.get("beatStart", 0.0)), 4),
+                    beatDuration=round(float(note.get("beatDuration", 0.0)), 4),
                     expectedMidi=int(note["expectedMidi"]),
                     centsError=int(round(float(note["centsError"]))),
                     rawCentsError=int(round(float(note.get("rawCentsError", note["centsError"])))),

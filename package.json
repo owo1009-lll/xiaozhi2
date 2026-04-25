@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "server": "node server.js",
-    "analyzer:start": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 -m uvicorn app:app --app-dir python-service --host 127.0.0.1 --port 8000 --workers 4",
+    "analyzer:start": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 -m uvicorn app:app --app-dir python-service --host 127.0.0.1 --port 8000 --workers 2",
     "build": "vite build",
     "start": "node server.js",
     "start-prod": "powershell -ExecutionPolicy Bypass -File scripts\\start-prod.ps1",
@@ -23,6 +23,9 @@
     "evaluate:taohuawu-whole": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\run-piece-pass.py --piece-id taohuawu-test-fragment --audio data/test_audio_mix.mp3 --output-dir data/piece-pass/taohuawu-whole --max-candidates-per-section 2 --hint-radius 1 --hint-step 1 --window-padding 3",
     "score:export": "node scripts\\export-piece-score.mjs",
     "score:export:taohuawu": "node scripts\\export-piece-score.mjs --piece-id taohuawu-test-fragment --output-dir data/score-exports/taohuawu-test-fragment",
+    "test:real-corpus": "node scripts\\run-real-corpus-tests.mjs",
+    "test:real-corpus:run": "node scripts\\run-real-corpus-tests.mjs --run",
+    "test:score-markings": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-score-markings.py",
     "pilot:pack": "node scripts\\build-pilot-pack.mjs",
     "pilot:pack:taohuawu": "node scripts\\build-pilot-pack.mjs --piece-pass-json data/piece-pass/taohuawu-whole-v3/taohuawu-test-fragment-whole-piece-pass.json --output-dir data/pilot-pack/taohuawu-v1 --top-count 8",
     "research:export": "powershell -ExecutionPolicy Bypass -File scripts\\export-research-data.ps1",

@@ -5,7 +5,22 @@ import "./styles.css";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    // During local prototyping, stale service-worker caches can keep old labels,
+    // old score pages, and old issue sessions alive after a rebuild.
+    navigator.serviceWorker
+      .getRegistrations()
+      .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+      .catch(() => {});
+    if ("caches" in window) {
+      window.caches
+        .keys()
+        .then((keys) =>
+          Promise.all(
+            keys.filter((key) => key.startsWith("ai-erhu") || key.includes("vite")).map((key) => window.caches.delete(key)),
+          ),
+        )
+        .catch(() => {});
+    }
   });
 }
 

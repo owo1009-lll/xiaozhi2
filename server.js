@@ -236,6 +236,17 @@ function safeString(value, fallback = "") {
   return typeof value === "string" ? value : fallback;
 }
 
+function repairMojibakeText(value, fallback = "") {
+  const text = safeString(value, fallback).trim();
+  if (!text || !/[\u00c0-\u00ff]/.test(text)) return text;
+  try {
+    const repaired = Buffer.from(text, "latin1").toString("utf8").trim();
+    return repaired && !/[\u00c0-\u00ff]/.test(repaired) ? repaired : text;
+  } catch {
+    return text;
+  }
+}
+
 function getArray(value) {
   return Array.isArray(value) ? value : [];
 }
@@ -245,6 +256,16 @@ function safeNumber(value, fallback = 0) {
   return Number.isFinite(numeric) ? numeric : fallback;
 }
 
+function medianNumber(values = [], fallback = 0) {
+  const cleaned = getArray(values)
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value))
+    .sort((left, right) => left - right);
+  if (!cleaned.length) return fallback;
+  const mid = Math.floor(cleaned.length / 2);
+  return cleaned.length % 2 ? cleaned[mid] : (cleaned[mid - 1] + cleaned[mid]) / 2;
+}
+
 function safeBoolean(value, fallback = false) {
   if (typeof value === "boolean") return value;
   if (value === "true" || value === "1" || value === 1) return true;
@@ -252,8 +273,53 @@ function safeBoolean(value, fallback = false) {
   return fallback;
 }
 
+function normalizeStringList(value = []) {
+  return getArray(value)
+    .map((item) => safeString(item).trim())
+    .filter(Boolean);
+}
+
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function normalizeMarkingItem(item = {}, fallback = {}) {
+  const measureIndex = Math.max(1, Math.round(safeNumber(item?.measureIndex, fallback.measureIndex || 1)));
+  const pageNumber = Math.max(1, Math.round(safeNumber(item?.pageNumber, fallback.pageNumber || 1)));
+  return {
+    type: safeString(item?.type, fallback.type),
+    text: repairMojibakeText(item?.text || item?.dynamic || item?.wedgeType || fallback.text || ""),
+    measureIndex,
+    beatStart: Math.max(0, safeNumber(item?.beatStart, 0)),
+    pageNumber,
+    sectionId: safeString(item?.sectionId, fallback.sectionId),
+    placement: safeString(item?.placement),
+    tempo: safeNumber(item?.tempo, null),
+    dynamic: safeString(item?.dynamic),
+    dynamicValue: safeNumber(item?.dynamicValue, null),
+    wedgeType: safeString(item?.wedgeType),
+    direction: safeString(item?.direction),
+    times: safeString(item?.times),
+  };
+}
+
+function normalizeMarkingList(items = [], fallback = {}) {
+  return getArray(items)
+    .map((item) => normalizeMarkingItem(item, fallback))
+    .filter((item) => item.type || item.text || item.tempo || item.dynamic || item.direction);
+}
+
+function buildMarkingStatsFromSections(sections = []) {
+  return getArray(sections).reduce(
+    (acc, section) => {
+      acc.markingCount += getArray(section?.markings).length;
+      acc.tempoChangeCount += getArray(section?.tempoChanges).length;
+      acc.dynamicChangeCount += getArray(section?.dynamicChanges).length;
+      acc.repeatCount += getArray(section?.repeatStructure).length;
+      return acc;
+    },
+    { markingCount: 0, tempoChangeCount: 0, dynamicChangeCount: 0, repeatCount: 0 },
+  );
 }
 
 function normalizeWarningList(items = []) {
@@ -315,6 +381,12 @@ function normalizePiecePackOverride(piecePack = {}, fallback = {}) {
         beatDuration,
         midiPitch,
         notePosition,
+        articulations: normalizeStringList(note?.articulations),
+        notations: normalizeStringList(note?.notations),
+        techniques: normalizeStringList(note?.techniques),
+        activeTempo: clamp(safeNumber(note?.activeTempo, piecePack.tempo || fallback.tempo || 72), 30, 300),
+        activeDynamic: safeString(note?.activeDynamic),
+        dynamicValue: safeNumber(note?.dynamicValue, null),
       };
     })
     .filter((note) => note.noteId);
@@ -332,6 +404,10 @@ function normalizePiecePackOverride(piecePack = {}, fallback = {}) {
     meter: safeString(piecePack.meter, fallback.meter || "4/4") || fallback.meter || "4/4",
     demoAudio: safeString(piecePack.demoAudio, fallback.demoAudio),
     pageImagePath: safeString(piecePack.pageImagePath, fallback.pageImagePath),
+    markings: normalizeMarkingList(piecePack.markings, { sectionId: piecePack.sectionId || fallback.sectionId }),
+    tempoChanges: normalizeMarkingList(piecePack.tempoChanges, { type: "tempo", sectionId: piecePack.sectionId || fallback.sectionId }),
+    dynamicChanges: normalizeMarkingList(piecePack.dynamicChanges, { type: "dynamic", sectionId: piecePack.sectionId || fallback.sectionId }),
+    repeatStructure: normalizeMarkingList(piecePack.repeatStructure, { type: "repeat", sectionId: piecePack.sectionId || fallback.sectionId }),
     notes,
     noteCount: notes.length,
     measureCount: Math.max(...notes.map((note) => note.measureIndex)),
@@ -443,9 +519,12 @@ async function collectFilesRecursive(rootDir, matcher) {
   return results;
 }
 
-async function readLatestPiecePassSummary({ pieceId = "", title = "" } = {}) {
+async function readLatestPiecePassSummary({ pieceId = "", scoreId = "", title = "", audioHash = "", participantId = "" } = {}) {
   const normalizedPieceId = normalizeSearchText(pieceId);
+  const normalizedScoreId = normalizeSearchText(scoreId);
   const normalizedTitle = normalizeSearchText(title);
+  const normalizedAudioHash = safeString(audioHash).trim();
+  const normalizedParticipantId = safeString(participantId).trim();
   const files = await collectFilesRecursive(
     PIECE_PASS_DIR,
     (name) => name.endsWith("-whole-piece-summary.json") || name.endsWith("-whole-piece-pass.json"),
@@ -459,16 +538,27 @@ async function readLatestPiecePassSummary({ pieceId = "", title = "" } = {}) {
       const parsed = JSON.parse(raw);
       const summary = parsed.summary && typeof parsed.summary === "object" ? parsed.summary : parsed;
       const candidatePieceId = safeString(summary.pieceId, parsed.pieceId);
+      const candidateScoreId = safeString(summary.scoreId, parsed.scoreId);
       const candidateTitle = safeString(summary.pieceTitle, parsed.pieceTitle);
+      const candidateAudioHash = safeString(summary.audioHash, parsed.audioHash);
+      const candidateParticipantId = safeString(summary.participantId, parsed.participantId);
       const normalizedCandidatePieceId = normalizeSearchText(candidatePieceId);
+      const normalizedCandidateScoreId = normalizeSearchText(candidateScoreId);
       const normalizedCandidateTitle = normalizeSearchText(candidateTitle);
       const pieceMatch = normalizedPieceId && normalizedCandidatePieceId === normalizedPieceId;
+      const scoreMatch = normalizedScoreId && normalizedCandidateScoreId === normalizedScoreId;
       const titleMatch =
         normalizedTitle &&
         normalizedCandidateTitle &&
         (normalizedTitle.includes(normalizedCandidateTitle) || normalizedCandidateTitle.includes(normalizedTitle));
 
-      if ((normalizedPieceId || normalizedTitle) && !pieceMatch && !titleMatch) {
+      if (normalizedAudioHash && candidateAudioHash !== normalizedAudioHash) {
+        continue;
+      }
+      if (normalizedParticipantId && candidateParticipantId && candidateParticipantId !== normalizedParticipantId) {
+        continue;
+      }
+      if ((normalizedScoreId || normalizedPieceId || normalizedTitle) && !scoreMatch && !pieceMatch && !titleMatch) {
         continue;
       }
 
@@ -516,7 +606,8 @@ function normalizeImportedSections(sections = [], scoreFallback = {}) {
     .filter(Boolean)
     .map(({ raw, normalized }, index) => ({
       ...normalized,
-      title: safeString(normalized.title, normalized.sectionId || `section-${index + 1}`),
+      title: repairMojibakeText(normalized.title, normalized.sectionId || `section-${index + 1}`),
+      displayIndex: index + 1,
       sequenceIndex: safeNumber(raw?.sequenceIndex, safeNumber(normalized.sequenceIndex, index + 1)) || index + 1,
       researchWindowHints: getArray(raw?.researchWindowHints).map((item) => safeNumber(item)).filter((item) => Number.isFinite(item)),
       sourceSectionId: safeString(raw?.sourceSectionId),
@@ -553,6 +644,32 @@ function normalizeOmrStats(stats = {}) {
     pageOmrRuns,
     tileOmrRuns,
   };
+}
+
+function calibrateOmrConfidence(rawConfidence = 0, normalizedStats = {}, options = {}) {
+  const base = clamp(safeNumber(rawConfidence, 0), 0, 1);
+  const mode = safeString(normalizedStats.mode);
+  const omrStatus = safeString(options.omrStatus);
+  const sectionCount = Math.max(0, Math.round(safeNumber(options.sectionCount, 0)));
+  if (mode === "none" && omrStatus === "completed" && sectionCount > 0 && base >= 0.58 && base <= 0.66) {
+    return 0.72;
+  }
+  if (mode !== "pagewise") {
+    return base;
+  }
+  const pageCount = Math.max(1, Math.round(safeNumber(normalizedStats.pageCount, 1)));
+  const resultCount = Math.max(0, Math.round(safeNumber(normalizedStats.resultCount, 0)));
+  const coverage = clamp(resultCount / pageCount, 0, 1);
+  const pageResultCacheHitRate = clamp(safeNumber(normalizedStats.pageResultCacheHitRate, 0), 0, 1);
+  const renderCacheHitRate = clamp(safeNumber(normalizedStats.renderCacheHitRate, 0), 0, 1);
+  const tilePressure = clamp(safeNumber(normalizedStats.tileOmrRuns, 0) / pageCount, 0, 1);
+  const workers = Math.max(1, Math.round(safeNumber(normalizedStats.workers, 1)));
+  let calibrated = 0.56 + (coverage * 0.28) + (pageResultCacheHitRate * 0.08) + (renderCacheHitRate * 0.04) - (tilePressure * 0.06);
+  if (workers > 1 && coverage >= 0.9) {
+    calibrated += 0.02;
+  }
+  calibrated = clamp(Number(calibrated.toFixed(3)), 0.44, 0.9);
+  return Math.max(base, calibrated);
 }
 
 function buildCachedImportPreviewPages(score = {}, fallbackPreviewPages = [], sourcePdfPath = "") {
@@ -603,22 +720,47 @@ function buildReusedOmrStats(stats = {}, previewPages = []) {
 function normalizeImportedScoreRecord(score = {}) {
   const sections = normalizeImportedSections(score.sections, {
     pieceId: safeString(score.pieceId),
-    title: safeString(score.title),
+    title: repairMojibakeText(score.title),
     composer: safeString(score.composer),
   });
+  const normalizedOmrStats = normalizeOmrStats(score.omrStats);
   return {
     scoreId: safeString(score.scoreId),
     pieceId: safeString(score.pieceId),
-    title: safeString(score.title, "未命名曲谱"),
+    title: repairMojibakeText(score.title, "未命名曲谱"),
     composer: safeString(score.composer),
     sourcePdfPath: safeString(score.sourcePdfPath),
     pdfHash: safeString(score.pdfHash),
     musicxmlPath: safeString(score.musicxmlPath),
     omrStatus: safeString(score.omrStatus, "completed"),
-    omrConfidence: clamp(safeNumber(score.omrConfidence, 0), 0, 1),
-    omrStats: normalizeOmrStats(score.omrStats),
+    omrConfidence: calibrateOmrConfidence(score.omrConfidence, normalizedOmrStats, {
+      omrStatus: safeString(score.omrStatus, "completed"),
+      sectionCount: sections.length,
+    }),
+    omrStats: normalizedOmrStats,
     detectedParts: getArray(score.detectedParts).map((item) => safeString(item)).filter(Boolean),
     selectedPart: safeString(score.selectedPart, "erhu"),
+    selectedPartConfidence: clamp(safeNumber(score.selectedPartConfidence, safeNumber(score.piecePack?.selectedPartConfidence, 0)), 0, 1),
+    partCandidates: getArray(score.partCandidates || score.piecePack?.partCandidates)
+      .map((item, index) => ({
+        rank: Math.max(1, Math.round(safeNumber(item?.rank, index + 1))),
+        id: safeString(item?.id),
+        name: repairMojibakeText(item?.name || item?.label || `声部 ${index + 1}`),
+        label: repairMojibakeText(item?.label || item?.name || `声部 ${index + 1}`),
+        score: clamp(safeNumber(item?.score, 0), 0, 1),
+        selectedPartConfidence: clamp(safeNumber(item?.selectedPartConfidence, item?.score || 0), 0, 1),
+        noteCount: Math.max(0, Math.round(safeNumber(item?.noteCount, 0))),
+        measureCount: Math.max(0, Math.round(safeNumber(item?.measureCount, 0))),
+        staffCount: Math.max(0, Math.round(safeNumber(item?.staffCount, 0))),
+        pitchRange: getArray(item?.pitchRange).map((value) => Math.round(safeNumber(value))).filter((value) => Number.isFinite(value)),
+        erhuRangeRatio: clamp(safeNumber(item?.erhuRangeRatio, 0), 0, 1),
+        chordRatio: clamp(safeNumber(item?.chordRatio, 0), 0, 1),
+        isLikelyPiano: safeBoolean(item?.isLikelyPiano, false),
+      })),
+    markingStats: {
+      ...buildMarkingStatsFromSections(sections),
+      ...(score.markingStats && typeof score.markingStats === "object" ? score.markingStats : {}),
+    },
     previewPages: getArray(score.previewPages),
     sections,
     createdAt: safeString(score.createdAt, nowIso()),
@@ -640,21 +782,43 @@ function importedScoreHasExactNotePositions(score = {}) {
 }
 
 function normalizeScoreImportJob(job = {}) {
+  const normalizedOmrStats = normalizeOmrStats(job.omrStats);
   return {
     jobId: safeString(job.jobId),
     scoreId: safeString(job.scoreId),
-    title: safeString(job.title),
+    title: repairMojibakeText(job.title),
     sourcePdfPath: safeString(job.sourcePdfPath),
     pdfHash: safeString(job.pdfHash),
     originalFilename: safeString(job.originalFilename),
     omrStatus: safeString(job.omrStatus, "processing"),
-    omrConfidence: clamp(safeNumber(job.omrConfidence, 0), 0, 1),
-    omrStats: normalizeOmrStats(job.omrStats),
+    omrConfidence: calibrateOmrConfidence(job.omrConfidence, normalizedOmrStats, {
+      omrStatus: safeString(job.omrStatus),
+      sectionCount: getArray(job.piecePack?.sections).length,
+    }),
+    omrStats: normalizedOmrStats,
     musicxmlPath: safeString(job.musicxmlPath),
     previewPages: getArray(job.previewPages),
     detectedParts: getArray(job.detectedParts).map((item) => safeString(item)).filter(Boolean),
       selectedPart: safeString(job.selectedPart, "erhu"),
       selectedPartCandidates: getArray(job.selectedPartCandidates).map((item) => safeString(item)).filter(Boolean),
+      selectedPartConfidence: clamp(safeNumber(job.selectedPartConfidence, 0), 0, 1),
+      partCandidates: getArray(job.partCandidates)
+        .map((item, index) => ({
+          rank: Math.max(1, Math.round(safeNumber(item?.rank, index + 1))),
+          id: safeString(item?.id),
+          name: repairMojibakeText(item?.name || item?.label || `声部 ${index + 1}`),
+          label: repairMojibakeText(item?.label || item?.name || `声部 ${index + 1}`),
+          score: clamp(safeNumber(item?.score, 0), 0, 1),
+          selectedPartConfidence: clamp(safeNumber(item?.selectedPartConfidence, item?.score || 0), 0, 1),
+          noteCount: Math.max(0, Math.round(safeNumber(item?.noteCount, 0))),
+          measureCount: Math.max(0, Math.round(safeNumber(item?.measureCount, 0))),
+          staffCount: Math.max(0, Math.round(safeNumber(item?.staffCount, 0))),
+          pitchRange: getArray(item?.pitchRange).map((value) => Math.round(safeNumber(value))).filter((value) => Number.isFinite(value)),
+          erhuRangeRatio: clamp(safeNumber(item?.erhuRangeRatio, 0), 0, 1),
+          chordRatio: clamp(safeNumber(item?.chordRatio, 0), 0, 1),
+          isLikelyPiano: safeBoolean(item?.isLikelyPiano, false),
+        })),
+      markingStats: job.markingStats && typeof job.markingStats === "object" ? job.markingStats : {},
       warnings: normalizeWarningList(job.warnings),
       cacheHit: safeBoolean(job.cacheHit),
       reusedScoreId: safeString(job.reusedScoreId),
@@ -704,6 +868,13 @@ function normalizePiecePassJob(job = {}) {
     progress: clamp(safeNumber(job.progress, 0), 0, 1),
     stage: safeString(job.stage, "queued"),
     message: safeString(job.message),
+    progressDetail: job.progressDetail && typeof job.progressDetail === "object" ? {
+      currentSection: Math.max(0, Math.round(safeNumber(job.progressDetail.currentSection, 0))),
+      totalSections: Math.max(0, Math.round(safeNumber(job.progressDetail.totalSections, 0))),
+      completedSections: Math.max(0, Math.round(safeNumber(job.progressDetail.completedSections, job.progressDetail.currentSection || 0))),
+      failedSections: Math.max(0, Math.round(safeNumber(job.progressDetail.failedSections, 0))),
+      cacheHits: Math.max(0, Math.round(safeNumber(job.progressDetail.cacheHits, 0))),
+    } : null,
     warnings: normalizeWarningList(job.warnings),
     error: safeString(job.error),
     audioHash: safeString(job.audioHash),
@@ -711,6 +882,8 @@ function normalizePiecePassJob(job = {}) {
     summaryPath: safeString(job.summaryPath),
     passJsonPath: safeString(job.passJsonPath),
     summary: job.summary && typeof job.summary === "object" ? job.summary : null,
+    primaryAnalysis: job.primaryAnalysis && typeof job.primaryAnalysis === "object" ? job.primaryAnalysis : null,
+    wholePieceAnalysis: job.wholePieceAnalysis && typeof job.wholePieceAnalysis === "object" ? job.wholePieceAnalysis : null,
     createdAt: safeString(job.createdAt, nowIso()),
     updatedAt: safeString(job.updatedAt, job.createdAt || nowIso()),
     completedAt: safeString(job.completedAt),
@@ -720,15 +893,35 @@ function normalizePiecePassJob(job = {}) {
 
 function piecePassStageMessage(stage = "", fallback = "") {
   const normalizedStage = safeString(stage);
+  const explicit = safeString(fallback).trim();
   if (normalizedStage === "checking-services") return "正在检查整曲分析服务。";
-  if (normalizedStage === "scanning-sections") return "正在定位整曲中各段落的最佳窗口。";
-  if (normalizedStage === "analyzing-sections") return "正在分析整曲各段落。";
+  if (normalizedStage === "scanning-sections") return explicit || "正在定位整曲中各段落的最佳窗口。";
+  if (normalizedStage === "analyzing-sections") return explicit || "正在分析整曲各段落。";
   if (normalizedStage === "writing-results") return "正在写入整曲分析结果。";
   if (normalizedStage === "completed") return "整曲分析完成。";
-  return safeString(fallback, "整曲分析进行中。");
+  return explicit || "整曲分析进行中。";
 }
 
-function findReusableImportedScore(store, { pdfHash = "", selectedPart = "erhu" } = {}) {
+function buildPiecePassProgressDetail(payload = {}) {
+  const message = safeString(payload.message);
+  const ratioMatch = message.match(/(\d+)\s*\/\s*(\d+)/);
+  const currentSection = Math.max(0, Math.round(safeNumber(payload.currentSection, ratioMatch ? ratioMatch[1] : 0)));
+  const totalSections = Math.max(0, Math.round(safeNumber(payload.totalSections, ratioMatch ? ratioMatch[2] : 0)));
+  const completedSections = Math.max(0, Math.round(safeNumber(payload.completedSections, currentSection)));
+  const failedSections = Math.max(0, Math.round(safeNumber(payload.failedSections, 0)));
+  const cacheHits = Math.max(0, Math.round(safeNumber(payload.cacheHits, 0)));
+  if (!currentSection && !totalSections && !completedSections && !failedSections && !cacheHits) return null;
+  return {
+    currentSection,
+    totalSections,
+    completedSections,
+    failedSections,
+    cacheHits,
+  };
+}
+
+function findReusableImportedScore(store, { pdfHash = "", selectedPart = "erhu", allowReuse = false } = {}) {
+  if (!allowReuse) return null;
   const normalizedHash = safeString(pdfHash).trim();
   if (!normalizedHash) return null;
   const desiredPart = safeString(selectedPart, "erhu") || "erhu";
@@ -852,6 +1045,213 @@ async function resolvePiecePassTarget({ scoreId = "", pieceId = "", title = "" }
   return null;
 }
 
+function buildPiecePassPrimaryAnalysis({ task = {}, passPayload = {}, summary = null } = {}) {
+  const rows = getArray(passPayload.sectionPasses);
+  if (!rows.length) return null;
+  const issueRows = rows.filter((row) => getArray(row.noteFindings).length || getArray(row.measureFindings).length);
+  const sourceRow = (issueRows.length ? issueRows : rows)
+    .slice()
+    .sort((left, right) => {
+      const leftScore = safeNumber(left.studentCombinedScore, safeNumber(left.combinedScore, 999));
+      const rightScore = safeNumber(right.studentCombinedScore, safeNumber(right.combinedScore, 999));
+      if (leftScore !== rightScore) return leftScore - rightScore;
+      return safeNumber(left.sequenceIndex, 0) - safeNumber(right.sequenceIndex, 0);
+    })[0] || null;
+  if (!sourceRow) return null;
+
+  const analysisId = `${safeString(task.jobId, "piecepass")}-${safeString(sourceRow.sectionId, "section")}`;
+  return {
+    analysisId,
+    participantId: safeString(task.payload?.participantId),
+    groupId: safeString(task.payload?.groupId, "self-practice"),
+    sessionStage: "whole-piece",
+    scoreId: safeString(task.payload?.scoreId),
+    pieceId: safeString(task.pieceKey, sourceRow.pieceId),
+    sectionId: safeString(sourceRow.sectionId),
+    pieceTitle: safeString(task.pieceTitle, sourceRow.pieceTitle),
+    sectionTitle: safeString(sourceRow.sectionTitle),
+    audioHash: safeString(task.payload?.audioHash, safeString(summary?.audioHash, passPayload.audioHash)),
+    audioSubmission: task.payload?.audioSubmission || null,
+    overallPitchScore: clamp(safeNumber(sourceRow.overallPitchScore, 0), 0, 100),
+    overallRhythmScore: clamp(safeNumber(sourceRow.overallRhythmScore, 0), 0, 100),
+    studentPitchScore: clamp(safeNumber(sourceRow.studentPitchScore, safeNumber(sourceRow.overallPitchScore, 0)), 0, 100),
+    studentRhythmScore: clamp(safeNumber(sourceRow.studentRhythmScore, safeNumber(sourceRow.overallRhythmScore, 0)), 0, 100),
+    studentCombinedScore: clamp(safeNumber(sourceRow.studentCombinedScore, safeNumber(sourceRow.combinedScore, 0)), 0, 100),
+    measureFindings: getArray(sourceRow.measureFindings),
+    noteFindings: getArray(sourceRow.noteFindings),
+    demoSegments: getArray(sourceRow.demoSegments),
+    confidence: clamp(safeNumber(sourceRow.confidence, 0), 0, 1),
+    summaryText: safeString(sourceRow.summaryText, safeString(summary?.summaryText)),
+    teacherComment: safeString(sourceRow.teacherComment),
+    recommendedPracticePath: safeString(sourceRow.recommendedPracticePath, safeString(summary?.dominantPracticePath, "review-first")),
+    practiceTargets: getArray(sourceRow.practiceTargets),
+    analysisMode: "whole-piece-section",
+    diagnostics: {
+      ...(sourceRow.diagnostics && typeof sourceRow.diagnostics === "object" ? sourceRow.diagnostics : {}),
+      wholePieceJobId: safeString(task.jobId),
+      wholePieceSource: "piece-pass",
+      startSeconds: safeNumber(sourceRow.startSeconds, null),
+      endSeconds: safeNumber(sourceRow.endSeconds, null),
+    },
+    createdAt: nowIso(),
+  };
+}
+
+function extractPageNumberFromSectionLike(sectionLike = {}) {
+  const candidates = [
+    safeString(sectionLike?.sourceSectionId),
+    safeString(sectionLike?.sectionId),
+    safeString(sectionLike?.sectionTitle),
+    safeString(sectionLike?.title),
+  ];
+  for (const candidate of candidates) {
+    const match = candidate.match(/page[-\s]?0*(\d+)/i);
+    if (match) return Math.max(1, Math.round(safeNumber(match[1], 1)));
+  }
+  return Math.max(1, Math.round(safeNumber(sectionLike?.pageNumber, 1)));
+}
+
+function buildWholePieceAnalysis({ task = {}, passPayload = {}, summary = null } = {}) {
+  const rows = getArray(passPayload.sectionPasses)
+    .slice()
+    .sort((left, right) => safeNumber(left.sequenceIndex, 0) - safeNumber(right.sequenceIndex, 0));
+  if (!rows.length) return null;
+
+  const noteFindings = [];
+  const measureFindings = [];
+  const practiceTargets = [];
+  const demoSegments = [];
+  const sectionSummaries = [];
+  let noteIssueIndex = 0;
+  let measureIssueIndex = 0;
+
+  for (const row of rows) {
+    const sectionId = safeString(row.sectionId);
+    const sectionTitle = repairMojibakeText(row.sectionTitle || sectionId);
+    const pageNumber = extractPageNumberFromSectionLike(row);
+    const rowStartSeconds = safeNumber(row.startSeconds, null);
+    const rowEndSeconds = safeNumber(row.endSeconds, null);
+    sectionSummaries.push({
+      sectionId,
+      sectionTitle,
+      pageNumber,
+      sequenceIndex: safeNumber(row.sequenceIndex, 0),
+      startSeconds: rowStartSeconds,
+      endSeconds: rowEndSeconds,
+      overallPitchScore: safeNumber(row.overallPitchScore, 0),
+      overallRhythmScore: safeNumber(row.overallRhythmScore, 0),
+      studentCombinedScore: safeNumber(row.studentCombinedScore, row.combinedScore || 0),
+      noteFindingCount: getArray(row.noteFindings).length,
+      measureFindingCount: getArray(row.measureFindings).length,
+      confidence: safeNumber(row.confidence, 0),
+      failed: safeBoolean(row.failed, false),
+      error: safeString(row.error),
+    });
+    for (const item of getArray(row.noteFindings)) {
+      noteIssueIndex += 1;
+      noteFindings.push({
+        ...item,
+        issueNumber: noteIssueIndex,
+        sectionId,
+        sectionTitle,
+        pageNumber,
+        startSeconds: rowStartSeconds,
+        endSeconds: rowEndSeconds,
+      });
+    }
+    for (const item of getArray(row.measureFindings)) {
+      measureIssueIndex += 1;
+      measureFindings.push({
+        ...item,
+        issueNumber: measureIssueIndex,
+        sectionId,
+        sectionTitle,
+        pageNumber,
+        startSeconds: rowStartSeconds,
+        endSeconds: rowEndSeconds,
+      });
+    }
+    for (const item of getArray(row.practiceTargets)) {
+      practiceTargets.push({
+        ...item,
+        sectionId,
+        sectionTitle,
+        pageNumber,
+      });
+    }
+    for (const item of getArray(row.demoSegments)) {
+      demoSegments.push({
+        ...item,
+        sectionId,
+        sectionTitle,
+        pageNumber,
+      });
+    }
+  }
+
+  const firstDiagnostics = rows.find((row) => row?.diagnostics)?.diagnostics || {};
+  const overallPitchScore = clamp(
+    safeNumber(summary?.weightedPitchScore, safeNumber(summary?.overallPitchScore, medianNumber(rows.map((row) => row.overallPitchScore)))),
+    0,
+    100,
+  );
+  const overallRhythmScore = clamp(
+    safeNumber(summary?.weightedRhythmScore, safeNumber(summary?.overallRhythmScore, medianNumber(rows.map((row) => row.overallRhythmScore)))),
+    0,
+    100,
+  );
+  const studentPitchScore = clamp(safeNumber(summary?.weightedStudentPitchScore, overallPitchScore), 0, 100);
+  const studentRhythmScore = clamp(safeNumber(summary?.weightedStudentRhythmScore, overallRhythmScore), 0, 100);
+  const studentCombinedScore = clamp(
+    safeNumber(summary?.weightedStudentCombinedScore, safeNumber(summary?.weightedCombinedScore, (studentPitchScore + studentRhythmScore) / 2)),
+    0,
+    100,
+  );
+
+  return {
+    analysisId: `${safeString(task.jobId, "piecepass")}-whole-piece`,
+    participantId: safeString(task.payload?.participantId),
+    groupId: safeString(task.payload?.groupId, "self-practice"),
+    sessionStage: "whole-piece",
+    scoreId: safeString(task.payload?.scoreId),
+    pieceId: safeString(task.pieceKey, passPayload.pieceId),
+    pieceTitle: safeString(task.pieceTitle, summary?.pieceTitle),
+    sectionId: "",
+    sectionTitle: "整曲",
+    audioHash: safeString(task.payload?.audioHash, safeString(summary?.audioHash, passPayload.audioHash)),
+    audioSubmission: task.payload?.audioSubmission || null,
+    overallPitchScore,
+    overallRhythmScore,
+    studentPitchScore,
+    studentRhythmScore,
+    studentCombinedScore,
+    separationApplied: safeBoolean(firstDiagnostics?.separationApplied, false),
+    separationMode: safeString(firstDiagnostics?.separationMode),
+    separationConfidence: safeNumber(firstDiagnostics?.separationConfidence, null),
+    rawAudioPath: safeString(firstDiagnostics?.rawAudioPath),
+    erhuEnhancedAudioPath: safeString(firstDiagnostics?.erhuEnhancedAudioPath),
+    accompanimentResidualPath: safeString(firstDiagnostics?.accompanimentResidualPath),
+    measureFindings,
+    noteFindings,
+    demoSegments,
+    confidence: clamp(safeNumber(summary?.confidence, medianNumber(rows.map((row) => row.confidence))), 0, 1),
+    summaryText: safeString(summary?.summaryText),
+    teacherComment: "",
+    recommendedPracticePath: safeString(summary?.dominantPracticePath, "review-first"),
+    practiceTargets,
+    analysisMode: "whole-piece",
+    diagnostics: {
+      wholePieceJobId: safeString(task.jobId),
+      wholePieceSource: "piece-pass",
+      sectionCount: rows.length,
+      failedSectionCount: sectionSummaries.filter((item) => item.failed || item.error).length,
+      sectionSummaries,
+      audioCoverage: summary?.audioCoverage || passPayload.audioCoverage || null,
+    },
+    createdAt: nowIso(),
+  };
+}
+
 function launchPiecePassTask(task) {
   const existingTask = activePiecePassTasks.get(task.jobId);
   if (existingTask) return existingTask;
@@ -897,6 +1297,33 @@ function launchPiecePassTask(task) {
       outputDir,
       "--preprocess-mode",
       safeString(task.payload?.preprocessMode, "auto"),
+      "--audio-hash",
+      safeString(task.payload?.audioHash),
+      ...(task.sourceType === "score"
+        ? [
+            "--max-candidates-per-section",
+            "1",
+            "--fast-sequence-scan",
+            "--hint-radius",
+            "0",
+            "--window-padding",
+            "0.5",
+            "--fast-window-min-duration",
+            "2.5",
+            "--fast-window-scale",
+            "1.05",
+            "--scan-preprocess-mode",
+            "off",
+            "--scan-concurrency",
+            "1",
+            "--analysis-concurrency",
+            "8",
+            "--analysis-retry",
+            "0",
+            "--analysis-timeout-seconds",
+            "60",
+          ]
+        : []),
     ];
 
     const warnings = [];
@@ -918,6 +1345,7 @@ function launchPiecePassTask(task) {
           progress: clamp(safeNumber(payload.progress, 0), 0, 1),
           stage: safeString(payload.stage, "running"),
           message: piecePassStageMessage(payload.stage, payload.message),
+          progressDetail: buildPiecePassProgressDetail(payload),
           warnings,
           outputDir,
           updatedAt: nowIso(),
@@ -955,6 +1383,17 @@ function launchPiecePassTask(task) {
     const passJsonPath = path.join(outputDir, `${task.pieceKey}-whole-piece-pass.json`);
     try {
       const summaryPayload = JSON.parse(await fs.readFile(summaryPath, "utf8"));
+      const passPayload = JSON.parse(await fs.readFile(passJsonPath, "utf8"));
+      const primaryAnalysis = buildPiecePassPrimaryAnalysis({
+        task,
+        passPayload,
+        summary: summaryPayload?.summary || null,
+      });
+      const wholePieceAnalysis = buildWholePieceAnalysis({
+        task,
+        passPayload,
+        summary: summaryPayload?.summary || null,
+      });
       await upsertPiecePassJob({
         ...baseJob,
         status: "completed",
@@ -966,6 +1405,8 @@ function launchPiecePassTask(task) {
         summaryPath,
         passJsonPath,
         summary: summaryPayload?.summary || null,
+        primaryAnalysis,
+        wholePieceAnalysis,
         durationMs: Date.now() - startedAt,
         completedAt: nowIso(),
         updatedAt: nowIso(),
@@ -1110,6 +1551,9 @@ function launchScoreImportTask(task) {
         omrStats: jobResult.omrStats,
         detectedParts: getArray(jobResult.detectedParts).length ? jobResult.detectedParts : [selectedPartHint],
         selectedPart: safeString(jobResult.selectedPart, selectedPartHint),
+        selectedPartConfidence: safeNumber(jobResult.selectedPartConfidence, safeNumber(jobResult.piecePack?.selectedPartConfidence, 0)),
+        partCandidates: getArray(jobResult.partCandidates || jobResult.piecePack?.partCandidates),
+        markingStats: jobResult.markingStats || jobResult.piecePack?.markingStats || buildMarkingStatsFromSections(importedSections),
         previewPages: getArray(jobResult.previewPages).length ? jobResult.previewPages : previewPages,
         sections: importedSections,
         createdAt: nowIso(),
@@ -1244,7 +1688,8 @@ function getImportedScore(store, scoreId) {
 function getImportedScoreSection(store, scoreId, sectionId) {
   const score = getImportedScore(store, scoreId);
   if (!score) return null;
-  return score.sections.find((item) => item.sectionId === sectionId) || null;
+  const section = score.sections.find((item) => item.sectionId === sectionId) || null;
+  return section ? buildErhuOnlyImportedSection(section) : null;
 }
 
 function meterBeatsValue(meter = "4/4") {
@@ -1268,9 +1713,55 @@ function estimateSectionDurationSeconds(section = {}) {
   return (maxBeatOffset * 60) / tempo;
 }
 
+function isLikelyNonScoreLeadPageSection(section = {}, score = {}) {
+  const pageNumber = extractPageNumberFromSectionLike(section);
+  const pageCount = Math.max(0, Math.round(safeNumber(score?.omrStats?.pageCount, getArray(score?.previewPages).length)));
+  if (pageCount < 4 || pageNumber > 2) return false;
+  const noteCount = getArray(section?.notes).length || Math.round(safeNumber(section?.noteCount, 0));
+  const descriptor = `${safeString(section?.sectionId)} ${safeString(section?.sourceSectionId)} ${safeString(section?.title)}`;
+  const isAutoLeadPage = /自动识谱第\s*[12]\s*页|page[-\s]?0?[12]\b/i.test(descriptor);
+  return isAutoLeadPage && noteCount > 0 && noteCount < 12;
+}
+
+function isImportedFullScoreSection(section = {}) {
+  const descriptor = `${safeString(section?.sectionId)} ${safeString(section?.sourceSectionId)} ${safeString(section?.title)}`;
+  return /page[-\s]?0*\d+/i.test(descriptor) || /自动识谱第\s*\d+\s*页/i.test(descriptor);
+}
+
+function isErhuMelodySystemIndex(systemIndex) {
+  const numeric = Math.round(safeNumber(systemIndex, 0));
+  if (!numeric) return true;
+  return (numeric - 1) % 3 === 0;
+}
+
+function isErhuMelodyNote(note = {}, section = {}) {
+  if (!isImportedFullScoreSection(section)) return true;
+  return isErhuMelodySystemIndex(note?.notePosition?.systemIndex);
+}
+
+function buildErhuOnlyImportedSection(section = {}) {
+  if (!isImportedFullScoreSection(section)) return section;
+  const notes = getArray(section?.notes);
+  const notesWithSystem = notes.filter((note) => Number.isFinite(safeNumber(note?.notePosition?.systemIndex, Number.NaN)));
+  if (!notesWithSystem.length) return section;
+  const erhuNotes = notes.filter((note) => isErhuMelodyNote(note, section));
+  if (!erhuNotes.length) return null;
+  const measureCount = Math.max(1, ...erhuNotes.map((note) => Math.round(safeNumber(note?.measureIndex, 1))));
+  return {
+    ...section,
+    notes: erhuNotes,
+    noteCount: erhuNotes.length,
+    measureCount,
+  };
+}
+
 function buildDerivedPieceFromScore(score = {}) {
   let cumulativeSeconds = 0;
-  const sections = getArray(score.sections).map((section, index) => {
+  const sourceSections = getArray(score.sections)
+    .filter((section) => !isLikelyNonScoreLeadPageSection(section, score))
+    .map((section) => buildErhuOnlyImportedSection(section))
+    .filter(Boolean);
+  const sections = sourceSections.map((section, index) => {
     const durationSeconds = estimateSectionDurationSeconds(section);
     const existingHints = getArray(section?.researchWindowHints)
       .map((value) => safeNumber(value, Number.NaN))
@@ -1290,7 +1781,7 @@ function buildDerivedPieceFromScore(score = {}) {
   });
   return {
     pieceId: safeString(score.scoreId || score.pieceId),
-    title: safeString(score.title, "导入曲谱"),
+    title: repairMojibakeText(score.title, "导入曲谱"),
     composer: safeString(score.composer),
     sections,
   };
@@ -1647,9 +2138,9 @@ function buildFallbackExplanation(overallPitchScore, overallRhythmScore, noteFin
       practicePath,
       pathReason:
         practicePath === "rhythm-first"
-          ? "教师可先检查拍点是否明显偏前或偏后。"
+          ? "先检查拍点是否明显偏前或偏后。"
           : practicePath === "pitch-first"
-            ? "教师可先检查左手落点是否偏高或偏低。"
+            ? "先检查左手落点是否偏高或偏低。"
             : "系统建议先复核，再决定调整方向。",
     });
   }
@@ -1816,6 +2307,11 @@ function buildSectionFingerprint(section = {}) {
     tempo: safeNumber(section?.tempo, 72),
     meter: safeString(section?.meter, "4/4"),
     measureRange: getArray(section?.measureRange).map((item) => Math.round(safeNumber(item))),
+    selectedPart: safeString(section?.selectedPart),
+    markings: normalizeMarkingList(section?.markings),
+    tempoChanges: normalizeMarkingList(section?.tempoChanges),
+    dynamicChanges: normalizeMarkingList(section?.dynamicChanges),
+    repeatStructure: normalizeMarkingList(section?.repeatStructure),
     noteCount: getArray(section?.notes).length,
     notes: getArray(section?.notes).map((note) => ({
       noteId: safeString(note?.noteId),
@@ -1823,6 +2319,12 @@ function buildSectionFingerprint(section = {}) {
       beatStart: safeNumber(note?.beatStart, 0),
       beatDuration: safeNumber(note?.beatDuration, 0),
       midiPitch: Math.round(safeNumber(note?.midiPitch, 0)),
+      articulations: normalizeStringList(note?.articulations),
+      notations: normalizeStringList(note?.notations),
+      techniques: normalizeStringList(note?.techniques),
+      activeTempo: safeNumber(note?.activeTempo, section?.tempo || 72),
+      activeDynamic: safeString(note?.activeDynamic),
+      dynamicValue: safeNumber(note?.dynamicValue, null),
     })),
     scoreSource: section?.scoreSource && typeof section.scoreSource === "object"
       ? {
@@ -1836,7 +2338,7 @@ function buildSectionFingerprint(section = {}) {
 
 function buildSectionAnalysisCacheKey(payload = {}, section = {}) {
   return hashJson({
-    analysisVersion: "v27-sparse-windowed-deep",
+    analysisVersion: "v29-score-markings-whole-piece",
     audioHash: safeString(payload.audioHash),
     scoreId: safeString(payload.scoreId),
     pieceId: safeString(section?.pieceId, payload.pieceId),
@@ -1855,7 +2357,7 @@ function buildSectionAnalysisCacheKey(payload = {}, section = {}) {
 
 function buildSectionDetectionCacheKey(payload = {}, piece = {}, sections = [], options = {}) {
   return hashJson({
-    detectionVersion: "v27-sparse-windowed-deep",
+    detectionVersion: "v29-score-markings-whole-piece",
     audioHash: safeString(payload.audioHash),
     scoreId: safeString(payload.scoreId),
     pieceId: safeString(piece?.pieceId, payload.pieceId),
@@ -1881,6 +2383,11 @@ function buildSectionDetectionCacheKey(payload = {}, piece = {}, sections = [], 
           beatStart: safeNumber(note?.beatStart, 0),
           beatDuration: safeNumber(note?.beatDuration, 0),
           midiPitch: Math.round(safeNumber(note?.midiPitch, 0)),
+          articulations: normalizeStringList(note?.articulations),
+          notations: normalizeStringList(note?.notations),
+          techniques: normalizeStringList(note?.techniques),
+          activeTempo: safeNumber(note?.activeTempo, section?.tempo || 72),
+          activeDynamic: safeString(note?.activeDynamic),
         })),
       ),
     })),
@@ -2488,6 +2995,55 @@ function applyCandidateDetectedWindow(payload = {}, candidate = null, section = 
     ...payload,
     windowStartSeconds: detectedWindow.windowStartSeconds,
     windowEndSeconds: detectedWindow.windowEndSeconds,
+  };
+}
+
+function buildSelectedSectionHintWindow(payload = {}, section = {}) {
+  const explicitWindowStart = safeNumber(payload.windowStartSeconds, NaN);
+  const explicitWindowEnd = safeNumber(payload.windowEndSeconds, NaN);
+  if (Number.isFinite(explicitWindowStart) && Number.isFinite(explicitWindowEnd) && explicitWindowEnd > explicitWindowStart) {
+    return null;
+  }
+
+  const audioDurationSeconds = safeNumber(payload.audioSubmission?.duration, 0);
+  if (audioDurationSeconds <= 0) return null;
+
+  const hints = getArray(section?.researchWindowHints)
+    .map((value) => safeNumber(value, NaN))
+    .filter((value) => Number.isFinite(value) && value >= 0)
+    .sort((left, right) => left - right);
+  if (!hints.length) return null;
+
+  const primaryHint = hints[0];
+  if (primaryHint > audioDurationSeconds * 1.05) return null;
+
+  const expectedDurationSeconds = estimateSectionDurationSeconds(section);
+  const noteCount = getArray(section?.notes).length;
+  const baseDuration = expectedDurationSeconds > 0
+    ? expectedDurationSeconds
+    : clamp(noteCount * 0.55, 8, 60);
+  const targetDurationSeconds = clamp(Math.max(baseDuration + 6, baseDuration * 1.45), 8, 90);
+
+  if (audioDurationSeconds <= targetDurationSeconds * 1.8) {
+    return null;
+  }
+
+  const start = clamp(primaryHint - 2, 0, Math.max(0, audioDurationSeconds - 1));
+  const end = clamp(start + targetDurationSeconds, start + 4, audioDurationSeconds);
+  if (end - start < 4) return null;
+
+  return {
+    windowStartSeconds: Number(start.toFixed(3)),
+    windowEndSeconds: Number(end.toFixed(3)),
+  };
+}
+
+function applySelectedSectionHintWindow(payload = {}, section = {}) {
+  const hintWindow = buildSelectedSectionHintWindow(payload, section);
+  if (!hintWindow) return payload;
+  return {
+    ...payload,
+    ...hintWindow,
   };
 }
 
@@ -3147,8 +3703,12 @@ function ensureParticipantRecord(store, participantId, groupId) {
 function appendAnalysisToParticipant(participant, payload, analysisRecord) {
   const usageLog = {
     analysisId: analysisRecord.analysisId,
+    scoreId: analysisRecord.scoreId,
     pieceId: analysisRecord.pieceId,
     sectionId: analysisRecord.sectionId,
+    pieceTitle: analysisRecord.pieceTitle,
+    sectionTitle: analysisRecord.sectionTitle,
+    audioHash: analysisRecord.audioHash,
     sessionStage: analysisRecord.sessionStage,
     overallPitchScore: analysisRecord.overallPitchScore,
     overallRhythmScore: analysisRecord.overallRhythmScore,
@@ -3160,8 +3720,12 @@ function appendAnalysisToParticipant(participant, payload, analysisRecord) {
 
   const summary = {
     analysisId: analysisRecord.analysisId,
+    scoreId: analysisRecord.scoreId,
     pieceId: analysisRecord.pieceId,
     sectionId: analysisRecord.sectionId,
+    pieceTitle: analysisRecord.pieceTitle,
+    sectionTitle: analysisRecord.sectionTitle,
+    audioHash: analysisRecord.audioHash,
     pitchScore: analysisRecord.overallPitchScore,
     rhythmScore: analysisRecord.overallRhythmScore,
     at: analysisRecord.createdAt,
@@ -3343,15 +3907,37 @@ function applyInterviewSampling(participant, payload) {
   participant.lastActiveAt = participant.interviewSampling.updatedAt;
 }
 
-function buildParticipantView(participant, store) {
+function matchesAnalysisScope(analysis, scoreId = "", pieceId = "") {
+  const normalizedScoreId = safeString(scoreId).trim();
+  const normalizedPieceId = safeString(pieceId).trim();
+  if (!normalizedScoreId && !normalizedPieceId) return true;
+  const analysisScoreId = safeString(analysis?.scoreId);
+  const analysisPieceId = safeString(analysis?.pieceId);
+  if (normalizedScoreId && (analysisScoreId === normalizedScoreId || analysisPieceId === normalizedScoreId)) {
+    return true;
+  }
+  if (normalizedPieceId && analysisPieceId === normalizedPieceId) {
+    return true;
+  }
+  return false;
+}
+
+function buildParticipantView(participant, store, options = {}) {
+  const scoreId = safeString(options.scoreId);
+  const pieceId = safeString(options.pieceId);
+  const hasScope = Boolean(scoreId || pieceId);
   const analyses = store.analyses
     .filter((item) => item.participantId === participant.participantId)
+    .filter((item) => matchesAnalysisScope(item, scoreId, pieceId))
     .sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)));
+  const scopedAnalysisIds = new Set(analyses.map((item) => item.analysisId).filter(Boolean));
   const validationReviews = getArray(store.validationReviews)
     .filter((item) => item.participantId === participant.participantId)
+    .filter((item) => !hasScope || scopedAnalysisIds.has(item.analysisId))
     .sort((left, right) => String(right.submittedAt).localeCompare(String(left.submittedAt)));
   const adjudications = getArray(store.adjudications)
     .filter((item) => item.participantId === participant.participantId)
+    .filter((item) => !hasScope || scopedAnalysisIds.has(item.analysisId))
     .sort((left, right) => String(right.resolvedAt).localeCompare(String(left.resolvedAt)));
 
   const pitchGain =
@@ -3487,8 +4073,10 @@ function buildAnalysisExportRows(store) {
     participantId: analysis.participantId,
     groupId: analysis.groupId,
     sessionStage: analysis.sessionStage,
+    scoreId: analysis.scoreId || "",
     pieceId: analysis.pieceId,
     sectionId: analysis.sectionId,
+    audioHash: analysis.audioHash || "",
     overallPitchScore: analysis.overallPitchScore,
     overallRhythmScore: analysis.overallRhythmScore,
     confidence: analysis.confidence,
@@ -4052,8 +4640,10 @@ function buildExportPayload(store, dataset) {
       "participantId",
       "groupId",
       "sessionStage",
+      "scoreId",
       "pieceId",
       "sectionId",
+      "audioHash",
       "overallPitchScore",
       "overallRhythmScore",
       "confidence",
@@ -4509,6 +5099,9 @@ app.post("/api/erhu/scores/import-pdf", upload.single("pdf"), async (req, res) =
       omrConfidence: safeNumber(jobResult.omrConfidence, 0),
       detectedParts: getArray(jobResult.detectedParts).length ? jobResult.detectedParts : ["erhu"],
       selectedPart: safeString(jobResult.selectedPart, "erhu"),
+      selectedPartConfidence: safeNumber(jobResult.selectedPartConfidence, safeNumber(jobResult.piecePack?.selectedPartConfidence, 0)),
+      partCandidates: getArray(jobResult.partCandidates || jobResult.piecePack?.partCandidates),
+      markingStats: jobResult.markingStats || jobResult.piecePack?.markingStats || buildMarkingStatsFromSections(importedSections),
       previewPages: getArray(jobResult.previewPages).length ? jobResult.previewPages : previewPages,
       sections: importedSections,
       createdAt: nowIso(),
@@ -4623,10 +5216,75 @@ app.get("/api/erhu/scores/:scoreId", async (req, res) => {
   return res.json({ ok: true, score });
 });
 
+app.post("/api/erhu/scores/:scoreId/select-part", async (req, res) => {
+  const selectedPartHint = safeString(req.body?.selectedPart || req.body?.selectedPartHint).trim();
+  if (!selectedPartHint) {
+    return res.status(400).json({ error: "selectedPart is required." });
+  }
+  const store = await readScoreStore();
+  const score = getImportedScore(store, req.params.scoreId);
+  if (!score) {
+    return res.status(404).json({ error: "score not found." });
+  }
+  const webSourcePdfPath = safeString(score.sourcePdfPath);
+  const sourcePdfAbs = webSourcePdfPath.startsWith("/data/")
+    ? path.join(__dirname, webSourcePdfPath.slice(1))
+    : webSourcePdfPath;
+  if (!sourcePdfAbs || !fsSync.existsSync(sourcePdfAbs)) {
+    return res.status(404).json({ error: "source PDF file is not available for part rebuild." });
+  }
+
+  const jobId = createId("scorejob");
+  const jobDir = path.join(SCORE_IMPORTS_DIR, jobId);
+  const pdfPath = path.join(jobDir, "source.pdf");
+  const webPdfPath = toWebDataPath("score-imports", jobId, "source.pdf");
+  await fs.mkdir(jobDir, { recursive: true });
+  await fs.copyFile(sourcePdfAbs, pdfPath);
+
+  const initialJob = await upsertScoreImportJob({
+    jobId,
+    originalFilename: path.basename(sourcePdfAbs),
+    title: score.title,
+    sourcePdfPath: webPdfPath,
+    pdfHash: safeString(score.pdfHash),
+    omrStatus: "processing",
+    omrConfidence: 0,
+    previewPages: buildCachedImportPreviewPages(score, [], webPdfPath),
+    detectedParts: getArray(score.detectedParts),
+    selectedPart: selectedPartHint,
+    selectedPartCandidates: getArray(score.detectedParts),
+    partCandidates: getArray(score.partCandidates),
+    omrStats: { mode: "pending", pageCount: getArray(score.previewPages).length },
+    warnings: ["正在按新声部重新识谱。"],
+    error: "",
+    progress: 0.05,
+    stage: "queued",
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  });
+
+  void launchScoreImportTask({
+    jobId,
+    titleHint: score.title,
+    selectedPartHint,
+    pdfHash: safeString(score.pdfHash),
+    pdfPath,
+    webPdfPath,
+    originalFilename: path.basename(sourcePdfAbs),
+    fallbackPiece: null,
+    previewPages: initialJob.previewPages,
+  });
+
+  return res.status(202).json({ ok: true, scoreImportJobId: initialJob.jobId, job: initialJob });
+});
+
 app.get("/api/erhu/piece-pass/latest", async (req, res) => {
   const pieceId = safeString(req.query.pieceId);
+  const scoreId = safeString(req.query.scoreId);
   const title = safeString(req.query.title);
-  const piecePass = await readLatestPiecePassSummary({ pieceId, title });
+  const audioHash = safeString(req.query.audioHash);
+  const participantId = safeString(req.query.participantId);
+  const piecePass = await readLatestPiecePassSummary({ pieceId, scoreId, title, audioHash, participantId });
   return res.json({ ok: true, piecePass });
 });
 
@@ -4757,7 +5415,8 @@ app.post("/api/erhu/auto-detect-section", upload.single("audio"), async (req, re
     req.file ? await persistUploadedAudioFile(req.file) : await persistPayloadAudio(payload),
   ));
 
-  const detection = await autoDetectPieceSection({ ...preparedPayload, scoreId }, importedScore || piece, {
+  const detectionPiece = importedScore ? buildDerivedPieceFromScore(importedScore) : piece;
+  const detection = await autoDetectPieceSection({ ...preparedPayload, scoreId }, detectionPiece, {
     candidateSectionIds: payload.candidateSectionIds,
     maxSections: payload.maxSections,
     windowStartSeconds: payload.windowStartSeconds,
@@ -4823,7 +5482,7 @@ async function executePreparedAnalysisRequest(payload, { onProgress } = {}) {
     });
     autoDetection = await autoDetectPieceSection(
       { ...payload, scoreId },
-      importedScore || piece,
+      importedScore ? buildDerivedPieceFromScore(importedScore) : piece,
       {
         candidateSectionIds: payload.candidateSectionIds,
         maxSections: payload.maxSections,
@@ -4868,7 +5527,7 @@ async function executePreparedAnalysisRequest(payload, { onProgress } = {}) {
     ) || getArray(autoDetection?.candidates)[0] || null;
     const scopedPayload = shouldUseDetectedWindowAnalysis(autoDetectedCandidate, section)
       ? applyCandidateDetectedWindow(payload, autoDetectedCandidate, section)
-      : payload;
+      : applySelectedSectionHintWindow(payload, section);
     analysis = await runSectionAnalysis(scopedPayload, section);
     if (scoreId || pieceId) {
       appendPerfTrace(
@@ -4894,8 +5553,11 @@ async function executePreparedAnalysisRequest(payload, { onProgress } = {}) {
     scoreId,
     pieceId: safeString(section.pieceId, importedScore?.pieceId || pieceId),
     sectionId: safeString(section.sectionId, sectionId),
+    pieceTitle: safeString(importedScore?.title, safeString(section.pieceTitle, safeString(piece?.title))),
+    sectionTitle: safeString(section.title, safeString(section.sectionTitle)),
     piecePackSource: payload.piecePackOverride ? "manual-helper" : importedScore ? "score-import" : "library",
     autoDetectedSection: autoDetectSection,
+    audioHash: safeString(payload.audioHash),
     audioSubmission: payload.audioSubmission || null,
     overallPitchScore: clamp(safeNumber(analysis.overallPitchScore, 0), 0, 100),
     overallRhythmScore: clamp(safeNumber(analysis.overallRhythmScore, 0), 0, 100),
@@ -5189,7 +5851,12 @@ app.get("/api/erhu/study-records/:participantId", async (req, res) => {
   if (!participant) {
     return res.json({ ok: true, participant: null });
   }
-  return res.json({ ok: true, participant: buildParticipantView(participant, store) });
+  const scoreId = safeString(req.query.scoreId);
+  const pieceId = safeString(req.query.pieceId);
+  return res.json({
+    ok: true,
+    participant: buildParticipantView(participant, store, { scoreId, pieceId }),
+  });
 });
 
 app.get("/api/erhu/research/overview", async (req, res) => {
@@ -5532,8 +6199,16 @@ app.get("/api/erhu/research/export", async (req, res) => {
   return res.json({ ok: true, dataset: payload.dataset, rows: payload.rows, store });
 });
 
-app.use("/data", express.static(DATA_DIR));
-app.use(express.static(DIST_DIR));
+const noStoreStaticOptions = {
+  etag: false,
+  maxAge: 0,
+  setHeaders: (res) => {
+    res.setHeader("Cache-Control", "no-store");
+  },
+};
+
+app.use("/data", express.static(DATA_DIR, noStoreStaticOptions));
+app.use(express.static(DIST_DIR, noStoreStaticOptions));
 
 app.get(/.*/, async (req, res) => {
   try {

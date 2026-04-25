@@ -12,6 +12,12 @@ class NoteEvent(BaseModel):
     beatDuration: float = 1.0
     midiPitch: int = 60
     notePosition: dict[str, Any] | None = None
+    articulations: list[str] = Field(default_factory=list)
+    notations: list[str] = Field(default_factory=list)
+    techniques: list[str] = Field(default_factory=list)
+    activeTempo: int | None = None
+    activeDynamic: str | None = None
+    dynamicValue: float | None = None
 
 
 class SymbolicScoreSource(BaseModel):
@@ -33,6 +39,10 @@ class PiecePack(BaseModel):
     researchWindowHints: list[float] = Field(default_factory=list)
     measureRange: list[int] = Field(default_factory=list)
     calibrationProfile: dict[str, Any] | None = None
+    markings: list[dict[str, Any]] = Field(default_factory=list)
+    tempoChanges: list[dict[str, Any]] = Field(default_factory=list)
+    dynamicChanges: list[dict[str, Any]] = Field(default_factory=list)
+    repeatStructure: list[dict[str, Any]] = Field(default_factory=list)
     notes: list[NoteEvent] = Field(default_factory=list)
     scoreSource: SymbolicScoreSource | None = None
 
@@ -74,6 +84,8 @@ class MeasureFinding(BaseModel):
 class NoteFinding(BaseModel):
     noteId: str
     measureIndex: int
+    beatStart: float | None = None
+    beatDuration: float | None = None
     expectedMidi: int
     centsError: int
     rawCentsError: int | None = None
@@ -163,6 +175,9 @@ class ScoreImportJobResult(BaseModel):
     detectedParts: list[str] = Field(default_factory=list)
     selectedPart: str | None = None
     selectedPartCandidates: list[str] = Field(default_factory=list)
+    selectedPartConfidence: float | None = None
+    partCandidates: list[dict[str, Any]] = Field(default_factory=list)
+    markingStats: dict[str, Any] = Field(default_factory=dict)
     piecePack: dict[str, Any] | None = None
     omrStats: dict[str, Any] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)

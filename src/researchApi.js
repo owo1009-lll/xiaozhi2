@@ -10,8 +10,12 @@ export async function fetchPieces() {
   return readJson(await fetch("/api/erhu/pieces"));
 }
 
-export async function fetchParticipant(participantId) {
-  return readJson(await fetch(`/api/erhu/study-records/${encodeURIComponent(participantId)}`));
+export async function fetchParticipant(participantId, { scoreId = "", pieceId = "" } = {}) {
+  const searchParams = new URLSearchParams();
+  if (scoreId) searchParams.set("scoreId", scoreId);
+  if (pieceId) searchParams.set("pieceId", pieceId);
+  const suffix = searchParams.toString() ? `?${searchParams.toString()}` : "";
+  return readJson(await fetch(`/api/erhu/study-records/${encodeURIComponent(participantId)}${suffix}`));
 }
 
 export async function createAnalysis(payload) {
@@ -84,10 +88,13 @@ export async function fetchScore(scoreId) {
   return readJson(await fetch(`/api/erhu/scores/${encodeURIComponent(scoreId)}`));
 }
 
-export async function fetchLatestPiecePassSummary({ pieceId = "", title = "" } = {}) {
+export async function fetchLatestPiecePassSummary({ pieceId = "", scoreId = "", title = "", audioHash = "", participantId = "" } = {}) {
   const searchParams = new URLSearchParams();
   if (pieceId) searchParams.set("pieceId", pieceId);
+  if (scoreId) searchParams.set("scoreId", scoreId);
   if (title) searchParams.set("title", title);
+  if (audioHash) searchParams.set("audioHash", audioHash);
+  if (participantId) searchParams.set("participantId", participantId);
   const suffix = searchParams.toString() ? `?${searchParams.toString()}` : "";
   return readJson(await fetch(`/api/erhu/piece-pass/latest${suffix}`));
 }

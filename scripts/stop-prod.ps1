@@ -36,7 +36,16 @@ $prodListeners = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyConti
 foreach ($listener in $prodListeners) {
   try {
     $process = Get-CimInstance Win32_Process -Filter "ProcessId = $($listener.OwningProcess)" -ErrorAction SilentlyContinue
-    if ($process -and $process.CommandLine -and $process.CommandLine -like "*$repoRoot*") {
+    $commandLine = if ($process) { $process.CommandLine } else { $null }
+    $isManaged =
+      $commandLine -and (
+        $commandLine -like "*$repoRoot*" -or
+        $commandLine -like "*server.js*" -or
+        $commandLine -like "*uvicorn*" -or
+        $commandLine -like "*python-service*" -or
+        $commandLine -like "*ai二胡*"
+      )
+    if ($isManaged) {
       Stop-Pid -TargetPid $listener.OwningProcess
     }
   } catch {

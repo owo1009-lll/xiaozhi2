@@ -3,6 +3,11 @@ import { playReferenceNotes, unlockAudio } from "./audioSynth";
 import {
   buildIssueSessionPayload,
   clampScore,
+  extractSectionPageNumber,
+  ISSUE_SESSION_SCHEMA_VERSION,
+  ISSUE_SESSION_STORAGE_PREFIX,
+  LEGACY_ISSUE_SESSION_STORAGE_PREFIX,
+  formatScoreTitle,
   formatPracticePathLabel,
   formatSectionDisplayName,
   getDisplayCombinedScore,
@@ -22,7 +27,8 @@ import {
   importScorePdf,
 } from "./researchApi";
 
-const STUDENT_APP_STATE_KEY = "ai-erhu.student-app-state-v2";
+const STUDENT_APP_STATE_KEY = "ai-erhu.student-app-state-v4";
+const LEGACY_STUDENT_APP_STATE_KEYS = ["ai-erhu.student-app-state-v2", "ai-erhu.student-app-state-v3"];
 
 function percentText(value) {
   const numeric = Number(value);
@@ -171,7 +177,7 @@ function buildOverallFeedback(analysis) {
     `系统共定位到 ${noteCount} 个问题音和 ${measureCount} 个问题小节。`,
   ];
   if (uncertainCount > 0) {
-    parts.push(`其中有 ${uncertainCount} 个音的证据偏弱，建议结合示范和教师判断复核。`);
+    parts.push(`其中有 ${uncertainCount} 个音的证据偏弱，建议结合示范回放复核。`);
   }
   return parts.join("");
 }
@@ -182,15 +188,43 @@ function loadPersistedStudentState() {
     const raw = window.localStorage.getItem(STUDENT_APP_STATE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : null;
+    if (!parsed || typeof parsed !== "object") return null;
+    const restoredPiecePassJob = parsed.piecePassJob?.status === "processing" ? parsed.piecePassJob : null;
+    return {
+      ...parsed,
+      piecePassJob: restoredPiecePassJob,
+      piecePassSummary: null,
+    };
   } catch {
     return null;
   }
 }
 
+function clearIssueSessionCache(keepKey = "") {
+  if (typeof window === "undefined") return;
+  const cleanupStorage = (storage) => {
+    const keys = [];
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index);
+      if (
+        !key ||
+        (!key.startsWith(ISSUE_SESSION_STORAGE_PREFIX) && !key.startsWith(LEGACY_ISSUE_SESSION_STORAGE_PREFIX))
+      ) {
+        continue;
+      }
+      if (keepKey && key === keepKey) continue;
+      keys.push(key);
+    }
+    keys.forEach((key) => storage.removeItem(key));
+  };
+  cleanupStorage(window.localStorage);
+  cleanupStorage(window.sessionStorage);
+}
+
 function persistStudentState(snapshot) {
   if (typeof window === "undefined") return;
   try {
+    LEGACY_STUDENT_APP_STATE_KEYS.forEach((key) => window.localStorage.removeItem(key));
     window.localStorage.setItem(STUDENT_APP_STATE_KEY, JSON.stringify(snapshot));
   } catch {
     // ignore quota errors
@@ -204,6 +238,73 @@ function pickSectionId(score, requestedSectionId) {
     return requestedSectionId;
   }
   return sections[0].sectionId || "";
+}
+
+function getSectionNoteCount(section) {
+  return Array.isArray(section?.notes) ? section.notes.length : Number(section?.noteCount) || 0;
+}
+
+function isLikelyImportedLeadPageSection(section, score) {
+  const pageNumber = extractSectionPageNumber(section || {});
+  const totalPages =
+    Number(score?.omrStats?.pageCount)
+    || (Array.isArray(score?.previewPages) ? score.previewPages.length : 0)
+    || 0;
+  if (totalPages < 4 || pageNumber > 2) return false;
+  const noteCount = getSectionNoteCount(section);
+  const title = String(section?.title || section?.displayTitle || "");
+  const descriptor = `${section?.sectionId || ""} ${section?.sourceSectionId || ""} ${title}`;
+  const isAutoPage = /自动识谱第\s*[12]\s*页|page[-\s]?0?[12]\b/i.test(descriptor);
+  return isAutoPage && noteCount > 0 && noteCount < 12;
+}
+
+function isImportedFullScoreSection(section) {
+  const descriptor = `${section?.sectionId || ""} ${section?.sourceSectionId || ""} ${section?.title || ""}`;
+  return /page[-\s]?0*\d+/i.test(descriptor) || /自动识谱第\s*\d+\s*页/i.test(descriptor);
+}
+
+function isErhuMelodySystemIndex(systemIndex) {
+  const numeric = Math.round(Number(systemIndex) || 0);
+  if (!numeric) return true;
+  return (numeric - 1) % 3 === 0;
+}
+
+function isLikelyAccompanimentOnlySection(section) {
+  if (!isImportedFullScoreSection(section)) return false;
+  const notes = Array.isArray(section?.notes) ? section.notes : [];
+  if (!notes.length) return false;
+  const notesWithSystem = notes.filter((note) => Number.isFinite(Number(note?.notePosition?.systemIndex)));
+  if (!notesWithSystem.length) return false;
+  return !notesWithSystem.some((note) => isErhuMelodySystemIndex(note?.notePosition?.systemIndex));
+}
+
+function getStudentVisibleSections(score) {
+  const sections = Array.isArray(score?.sections) ? score.sections : [];
+  const filtered = sections.filter(
+    (section) => !isLikelyImportedLeadPageSection(section, score) && !isLikelyAccompanimentOnlySection(section),
+  );
+  return filtered.length ? filtered : sections;
+}
+
+function pickVisibleSectionId(score, requestedSectionId) {
+  const sections = getStudentVisibleSections(score);
+  if (!sections.length) return "";
+  if (requestedSectionId && sections.some((item) => item.sectionId === requestedSectionId)) {
+    return requestedSectionId;
+  }
+  return sections[0]?.sectionId || "";
+}
+
+function analysisMatchesScore(analysis, score) {
+  if (!analysis || !score) return false;
+  const scoreId = String(score.scoreId || "").trim();
+  const pieceId = String(score.pieceId || "").trim();
+  const analysisScoreId = String(analysis.scoreId || "").trim();
+  const analysisPieceId = String(analysis.pieceId || "").trim();
+  if (scoreId && analysisScoreId && analysisScoreId === scoreId) return true;
+  if (scoreId && analysisPieceId && analysisPieceId === scoreId) return true;
+  if (pieceId && analysisPieceId && analysisPieceId === pieceId) return true;
+  return false;
 }
 
 export default function StudentApp({ onOpenResearch }) {
@@ -227,6 +328,7 @@ export default function StudentApp({ onOpenResearch }) {
   const [analysis, setAnalysis] = useState(restoredStateRef.current?.analysis || null);
   const [participantSnapshot, setParticipantSnapshot] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [excludedAnalysisIds, setExcludedAnalysisIds] = useState(() => new Set());
   const [piecePassSummary, setPiecePassSummary] = useState(restoredStateRef.current?.piecePassSummary || null);
   const [piecePassLoading, setPiecePassLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState(restoredStateRef.current?.statusMessage || "先导入 PDF 曲谱，再选择段落并上传音频。");
@@ -261,8 +363,8 @@ export default function StudentApp({ onOpenResearch }) {
       selectedSectionId,
       analysisJob,
       analysis,
-      piecePassJob,
-      piecePassSummary,
+      piecePassJob: piecePassJob?.status === "processing" ? piecePassJob : null,
+      piecePassSummary: null,
       separationMode,
       statusMessage,
     });
@@ -284,7 +386,7 @@ export default function StudentApp({ onOpenResearch }) {
         if (cancelled) return;
         const nextScore = json?.score || null;
         setScore(nextScore);
-        setSelectedSectionId((current) => pickSectionId(nextScore, current || restored?.selectedSectionId));
+        setSelectedSectionId((current) => pickVisibleSectionId(nextScore, current || restored?.selectedSectionId));
       })
       .catch(() => {});
     return () => {
@@ -315,6 +417,11 @@ export default function StudentApp({ onOpenResearch }) {
           if (message.includes("score import job not found")) {
             retryCount += 1;
             if (retryCount <= 5) continue;
+            setScoreJob(null);
+            setImportingScore(false);
+            setStatusMessage("当前识谱任务已失效，请重新导入 PDF。");
+            setErrorMessage("识谱任务已失效，请重新导入 PDF。");
+            return;
           }
           if (!cancelled) {
             setImportingScore(false);
@@ -350,7 +457,7 @@ export default function StudentApp({ onOpenResearch }) {
             if (nextJob.analysis) {
               setAnalysis(nextJob.analysis);
               if (nextJob.analysis?.sectionId) {
-                setSelectedSectionId((current) => current || nextJob.analysis.sectionId);
+                setSelectedSectionId(pickVisibleSectionId(score, nextJob.analysis.sectionId));
               }
             }
             if (nextJob.participantId) {
@@ -366,7 +473,14 @@ export default function StudentApp({ onOpenResearch }) {
           }
         } catch (error) {
           if (cancelled) return;
-          setErrorMessage(error.message || "读取分析进度失败。");
+          const message = String(error?.message || "");
+          if (message.includes("analysis job not found")) {
+            setAnalysisJob(null);
+            setStatusMessage("当前分析任务已失效，请重新上传音频并开始诊断。");
+            setErrorMessage("分析任务已失效，请重新开始诊断。");
+          } else {
+            setErrorMessage(error.message || "读取分析进度失败。");
+          }
           setAnalyzing(false);
           return;
         }
@@ -377,7 +491,7 @@ export default function StudentApp({ onOpenResearch }) {
     return () => {
       cancelled = true;
     };
-  }, [analysisJob?.jobId, analysisJob?.status]);
+  }, [analysisJob?.jobId, analysisJob?.status, score]);
 
   useEffect(() => {
     if (!piecePassJob?.jobId || piecePassJob?.status !== "processing") return undefined;
@@ -400,6 +514,13 @@ export default function StudentApp({ onOpenResearch }) {
               summary: nextJob.summary || current?.summary || null,
               updatedAt: nextJob.updatedAt,
             }));
+            const completedAnalysis = nextJob.wholePieceAnalysis || nextJob.primaryAnalysis || null;
+            if (completedAnalysis) {
+              setAnalysis(completedAnalysis);
+              if (completedAnalysis.sectionId) {
+                setSelectedSectionId(pickVisibleSectionId(score, completedAnalysis.sectionId));
+              }
+            }
             setPiecePassRunning(false);
             return;
           }
@@ -410,7 +531,14 @@ export default function StudentApp({ onOpenResearch }) {
           }
         } catch (error) {
           if (cancelled) return;
-          setErrorMessage(error.message || "读取整曲分析进度失败。");
+          const message = String(error?.message || "");
+          if (message.includes("piece-pass job not found")) {
+            setPiecePassJob(null);
+            setStatusMessage("当前整曲分析任务已失效，请重新运行整曲分析。");
+            setErrorMessage("整曲分析任务已失效，请重新运行整曲分析。");
+          } else {
+            setErrorMessage(error.message || "读取整曲分析进度失败。");
+          }
           setPiecePassRunning(false);
           return;
         }
@@ -421,7 +549,7 @@ export default function StudentApp({ onOpenResearch }) {
     return () => {
       cancelled = true;
     };
-  }, [piecePassJob?.jobId, piecePassJob?.status]);
+  }, [piecePassJob?.jobId, piecePassJob?.status, score]);
 
   useEffect(() => {
     if (!scoreJob?.scoreId || scoreJob?.omrStatus !== "completed") return undefined;
@@ -432,7 +560,7 @@ export default function StudentApp({ onOpenResearch }) {
         if (cancelled) return;
         const nextScore = scoreJson?.score || null;
         setScore(nextScore);
-        setSelectedSectionId((current) => pickSectionId(nextScore, current));
+        setSelectedSectionId((current) => pickVisibleSectionId(nextScore, current));
         setStatusMessage(buildImportStatusMessage(scoreJob));
       } catch {
         if (!cancelled) {
@@ -459,9 +587,14 @@ export default function StudentApp({ onOpenResearch }) {
   }, [scoreJob?.error, scoreJob?.omrStatus]);
 
   useEffect(() => {
+    LEGACY_STUDENT_APP_STATE_KEYS.forEach((key) => window.localStorage.removeItem(key));
+    clearIssueSessionCache();
+  }, []);
+
+  useEffect(() => {
     if (!studentId.trim()) return;
     void refreshParticipantSnapshot(studentId.trim());
-  }, [studentId]);
+  }, [studentId, score?.scoreId, score?.pieceId]);
 
   useEffect(() => {
     if (!audioFile) return undefined;
@@ -482,23 +615,28 @@ export default function StudentApp({ onOpenResearch }) {
   );
 
   useEffect(() => {
-    const nextPieceId = score?.scoreId || score?.pieceId;
-    const nextTitle = score?.title;
-    if (!nextPieceId && !nextTitle) {
+    const currentAudioHash = piecePassJob?.audioHash || piecePassSummary?.summary?.audioHash || "";
+    if (!score || !currentAudioHash) {
       setPiecePassSummary(null);
       return undefined;
     }
 
     let disposed = false;
     setPiecePassLoading(true);
-    fetchLatestPiecePassSummary({ pieceId: nextPieceId, title: nextTitle })
+    fetchLatestPiecePassSummary({
+      scoreId: score.scoreId,
+      pieceId: score.scoreId || score.pieceId,
+      title: formatScoreTitle(score),
+      audioHash: currentAudioHash,
+      participantId: studentId.trim(),
+    })
       .then((json) => {
         if (!disposed) {
-          setPiecePassSummary((current) => current || json?.piecePass || null);
+          setPiecePassSummary(json?.piecePass || null);
         }
       })
       .catch(() => {
-        if (!disposed) setPiecePassSummary((current) => current || null);
+        if (!disposed) setPiecePassSummary(null);
       })
       .finally(() => {
         if (!disposed) setPiecePassLoading(false);
@@ -507,70 +645,104 @@ export default function StudentApp({ onOpenResearch }) {
     return () => {
       disposed = true;
     };
-  }, [score?.scoreId, score?.pieceId, score?.title]);
+  }, [piecePassJob?.audioHash, piecePassSummary?.summary?.audioHash, score?.scoreId, score?.pieceId, score?.title, studentId]);
+
+  const visibleSections = useMemo(() => getStudentVisibleSections(score), [score]);
 
   const selectedSection = useMemo(
-    () => score?.sections?.find((section) => section.sectionId === selectedSectionId) || null,
-    [score, selectedSectionId],
+    () => visibleSections.find((section) => section.sectionId === selectedSectionId) || null,
+    [visibleSections, selectedSectionId],
   );
 
+  useEffect(() => {
+    if (!score) return;
+    setSelectedSectionId((current) => pickVisibleSectionId(score, current));
+  }, [score, visibleSections]);
+
+  useEffect(() => {
+    if (!analysis || !score) return;
+    if (!analysisMatchesScore(analysis, score)) {
+      setAnalysis(null);
+    }
+  }, [analysis, score]);
+
   const sectionMap = useMemo(
-    () => new Map((score?.sections || []).map((section) => [section.sectionId, section])),
-    [score?.sections],
+    () => new Map(visibleSections.map((section) => [section.sectionId, section])),
+    [visibleSections],
   );
 
   const recentAnalyses = useMemo(
     () =>
-      [...(participantSnapshot?.analyses || [])].sort(
-        (left, right) => new Date(right?.createdAt || 0).getTime() - new Date(left?.createdAt || 0).getTime(),
-      ),
-    [participantSnapshot],
+      [...(participantSnapshot?.analyses || [])]
+        .filter((item) => !excludedAnalysisIds.has(item.analysisId))
+        .filter((item) => analysisMatchesScore(item, score))
+        .sort(
+          (left, right) => new Date(right?.createdAt || 0).getTime() - new Date(left?.createdAt || 0).getTime(),
+        ),
+    [participantSnapshot, excludedAnalysisIds, score],
   );
 
-  const currentSectionHistory = useMemo(() => {
-    if (!selectedSectionId) return recentAnalyses;
-    return recentAnalyses.filter((item) => item.sectionId === selectedSectionId);
-  }, [recentAnalyses, selectedSectionId]);
+  const currentSectionHistory = useMemo(
+    () => (selectedSectionId ? recentAnalyses.filter((item) => item.sectionId === selectedSectionId) : recentAnalyses),
+    [recentAnalyses, selectedSectionId],
+  );
 
-  const recentHistory = useMemo(() => currentSectionHistory.slice(0, 8), [currentSectionHistory]);
+  const recentHistory = useMemo(() => recentAnalyses.slice(0, 8), [recentAnalyses]);
 
   const historySummary = useMemo(() => {
-    const latest = currentSectionHistory[0] || null;
-    const best = currentSectionHistory.reduce(
+    const latest = recentAnalyses[0] || null;
+    const best = recentAnalyses.reduce(
       (winner, item) => (winner == null || getDisplayCombinedScore(item) > getDisplayCombinedScore(winner) ? item : winner),
-      currentSectionHistory[0] || null,
+      recentAnalyses[0] || null,
     );
-    const averagePitch = currentSectionHistory.length
-      ? Math.round(currentSectionHistory.reduce((sum, item) => sum + getDisplayPitchScore(item), 0) / currentSectionHistory.length)
+    const averagePitch = recentAnalyses.length
+      ? Math.round(recentAnalyses.reduce((sum, item) => sum + getDisplayPitchScore(item), 0) / recentAnalyses.length)
       : 0;
-    const averageRhythm = currentSectionHistory.length
-      ? Math.round(currentSectionHistory.reduce((sum, item) => sum + getDisplayRhythmScore(item), 0) / currentSectionHistory.length)
+    const averageRhythm = recentAnalyses.length
+      ? Math.round(recentAnalyses.reduce((sum, item) => sum + getDisplayRhythmScore(item), 0) / recentAnalyses.length)
       : 0;
     return {
-      scopedCount: currentSectionHistory.length,
+      scopedCount: recentAnalyses.length,
       latest,
       best,
       averagePitch,
       averageRhythm,
     };
-  }, [currentSectionHistory]);
+  }, [recentAnalyses]);
 
   const overallFeedback = buildOverallFeedback(analysis);
   const analysisBusy = analyzing || analysisJob?.status === "processing";
   const wholePieceBusy = piecePassRunning || piecePassJob?.status === "processing";
 
   function describeHistorySection(item) {
-    const knownSection = sectionMap.get(item.sectionId);
-    if (knownSection) return formatSectionDisplayName(knownSection);
-    return formatSectionDisplayName({ sectionId: item.sectionId, title: item.sectionTitle });
+    const knownSection = item.scoreId === score?.scoreId ? sectionMap.get(item.sectionId) : null;
+    const sectionLabel = knownSection
+      ? formatSectionDisplayName(knownSection)
+      : formatSectionDisplayName({ sectionId: item.sectionId, title: item.sectionTitle });
+    const rawPieceLabel = item.pieceTitle || item.scoreTitle || "";
+    const pieceLabel = rawPieceLabel ? formatScoreTitle(rawPieceLabel) : item.pieceId || item.scoreId || "";
+    if (pieceLabel && item.scoreId !== score?.scoreId) {
+      return `${pieceLabel} · ${sectionLabel}`;
+    }
+    return sectionLabel;
   }
 
   async function refreshParticipantSnapshot(nextParticipantId = studentId) {
     const resolvedParticipantId = String(nextParticipantId || "").trim();
     if (!resolvedParticipantId) return;
+    const resolvedScoreId = String(score?.scoreId || "").trim();
+    const resolvedPieceId = String(score?.pieceId || score?.scoreId || "").trim();
+    if (!resolvedScoreId && !resolvedPieceId) {
+      setParticipantSnapshot(null);
+      setHistoryLoading(false);
+      return;
+    }
     setHistoryLoading(true);
     try {
-      const json = await fetchParticipant(resolvedParticipantId);
+      const json = await fetchParticipant(resolvedParticipantId, {
+        scoreId: resolvedScoreId,
+        pieceId: resolvedPieceId,
+      });
       setParticipantSnapshot(json?.participant || null);
     } catch {
       setParticipantSnapshot(null);
@@ -592,6 +764,9 @@ export default function StudentApp({ onOpenResearch }) {
     setAnalysisJob(null);
     setPiecePassJob(null);
     setPiecePassSummary(null);
+    setParticipantSnapshot(null);
+    setExcludedAnalysisIds(new Set());
+    clearIssueSessionCache();
     setSelectedSectionId("");
     setStatusMessage("正在导入 PDF 并启动自动识谱，请稍候。");
     try {
@@ -602,7 +777,7 @@ export default function StudentApp({ onOpenResearch }) {
         const scoreJson = await fetchScore(job.scoreId);
         const nextScore = scoreJson?.score || null;
         setScore(nextScore);
-        setSelectedSectionId(pickSectionId(nextScore, ""));
+        setSelectedSectionId(pickVisibleSectionId(nextScore, ""));
         setStatusMessage(buildImportStatusMessage(job));
         setImportingScore(false);
       } else {
@@ -620,6 +795,7 @@ export default function StudentApp({ onOpenResearch }) {
     setAnalysis(null);
     setAnalysisJob(null);
     setPiecePassJob(null);
+    setPiecePassSummary(null);
     setErrorMessage("");
     setStatusMessage(`已载入音频：${file.name}`);
     const duration = await getAudioDuration(file);
@@ -729,7 +905,15 @@ export default function StudentApp({ onOpenResearch }) {
       return;
     }
     setPiecePassRunning(true);
-    setPiecePassJob(null);
+    const queuedPiecePassJob = {
+      jobId: "",
+      status: "processing",
+      stage: "checking-services",
+      progress: 0.03,
+      message: "整曲分析任务已提交，正在准备整曲扫描。",
+    };
+    setPiecePassJob(queuedPiecePassJob);
+    setPiecePassSummary(null);
     setErrorMessage("");
     setStatusMessage("整曲分析任务已提交，正在准备整曲扫描。");
     try {
@@ -737,7 +921,7 @@ export default function StudentApp({ onOpenResearch }) {
         participantId: studentId.trim() || `student-${Date.now().toString(36)}`,
         scoreId: score.scoreId,
         pieceId: score.pieceId || score.scoreId,
-        title: score.title,
+        title: formatScoreTitle(score),
         preprocessMode: separationMode === "off" ? "off" : "auto",
         audioSubmission: {
           name: audioFile.name,
@@ -747,7 +931,10 @@ export default function StudentApp({ onOpenResearch }) {
         },
         audioFile,
       });
-      const nextJob = json?.job || null;
+      const nextJob = json?.job || {
+        ...queuedPiecePassJob,
+        jobId: json?.jobId || json?.piecePassJobId || "",
+      };
       setPiecePassJob(nextJob);
       setStatusMessage(buildPiecePassStatusMessage(nextJob));
     } catch (error) {
@@ -756,10 +943,19 @@ export default function StudentApp({ onOpenResearch }) {
     }
   }
 
+  function handleDeleteHistoryItem(analysisId) {
+    setExcludedAnalysisIds((prev) => new Set([...prev, analysisId]));
+  }
+
+  function handleClearSectionStats() {
+    const idsToRemove = currentSectionHistory.map((item) => item.analysisId).filter(Boolean);
+    setExcludedAnalysisIds((prev) => new Set([...prev, ...idsToRemove]));
+  }
+
   function handleLoadHistoryItem(item) {
     if (!item) return;
     setAnalysis(item);
-    if (item.sectionId) setSelectedSectionId(item.sectionId);
+    if (item.sectionId) setSelectedSectionId(pickVisibleSectionId(score, item.sectionId));
     setStatusMessage("已载入这次练习结果，可以继续查看问题谱面或重新录音。");
   }
 
@@ -775,11 +971,34 @@ export default function StudentApp({ onOpenResearch }) {
   }
 
   function handleOpenIssueScorePage() {
-    if (!analysis || !score || !selectedSection) return;
-    const issueSessionId = `issue-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-    const payload = JSON.stringify(buildIssueSessionPayload({ analysis, score, section: selectedSection }));
-    window.sessionStorage.setItem(`ai-erhu.issue-session.${issueSessionId}`, payload);
-    window.localStorage.setItem(`ai-erhu.issue-session.${issueSessionId}`, payload);
+    if (!analysis || !score) return;
+    const isWholePiece = analysis.analysisMode === "whole-piece";
+    const issueSection = isWholePiece
+      ? null
+      : visibleSections.find((item) => item.sectionId === analysis.sectionId)
+        || selectedSection
+        || null;
+    if (!isWholePiece && !issueSection) return;
+    const uniqueSource = analysis.analysisId || analysis.audioHash || analysis.createdAt || Date.now().toString(36);
+    const sectionKey = isWholePiece ? "whole-piece" : issueSection.sectionId;
+    const audioKey = analysis.audioHash || piecePassJob?.audioHash || piecePassSummary?.summary?.audioHash || "no-audio-hash";
+    const issueSessionId = `issue-v${ISSUE_SESSION_SCHEMA_VERSION}-${score.scoreId}-${audioKey}-${sectionKey}-${uniqueSource}`;
+    const payload = JSON.stringify(buildIssueSessionPayload({
+      analysis,
+      score,
+      section: issueSection,
+      mode: isWholePiece ? "whole-piece" : "section",
+      originalAudio: audioPreviewUrl ? {
+        url: audioPreviewUrl,
+        durationSeconds: audioDuration,
+        filename: audioFile?.name || analysis.audioFilename || "",
+        audioHash: audioKey,
+      } : null,
+    }));
+    clearIssueSessionCache();
+    const storageKey = `${ISSUE_SESSION_STORAGE_PREFIX}${issueSessionId}`;
+    window.sessionStorage.setItem(storageKey, payload);
+    window.localStorage.setItem(storageKey, payload);
     const url = new URL(window.location.href);
     url.searchParams.set("mode", "score-issues");
     url.searchParams.set("issueSession", issueSessionId);
@@ -787,6 +1006,12 @@ export default function StudentApp({ onOpenResearch }) {
   }
 
   const wholePieceSummary = piecePassJob?.summary || piecePassSummary?.summary || null;
+  const visiblePiecePassJob = piecePassJob || (piecePassRunning ? {
+    status: "processing",
+    stage: "checking-services",
+    progress: 0.03,
+    message: "整曲分析任务已提交，正在准备整曲扫描。",
+  } : null);
 
   return (
     <div className="app-shell">
@@ -803,9 +1028,12 @@ export default function StudentApp({ onOpenResearch }) {
           </div>
         </div>
         <div className="hero-side">
-          <MetricCard label="分析服务" value={analyzerStatus?.reachable ? 100 : 0} suffix="%" />
-          <MetricCard label="音准" value={getDisplayPitchScore(analysis)} />
-          <MetricCard label="节奏" value={getDisplayRhythmScore(analysis)} />
+          <div className="score-badge">
+            <span>分析服务</span>
+            <strong style={{ color: analyzerStatus?.reachable ? "var(--accent)" : "#b42318" }}>
+              {analyzerStatus == null ? "检测中" : analyzerStatus.reachable ? "正常" : "离线"}
+            </strong>
+          </div>
           <button type="button" className="secondary-button" onClick={onOpenResearch}>
             打开研究后台
           </button>
@@ -879,9 +1107,6 @@ export default function StudentApp({ onOpenResearch }) {
             </button>
             <button type="button" className="secondary-button" onClick={handleAnalyze} disabled={analysisBusy}>
               {analysisBusy ? "分析中..." : "分段诊断"}
-            </button>
-            <button type="button" className="secondary-button" onClick={handleRunWholePiece} disabled={wholePieceBusy}>
-              {wholePieceBusy ? "整曲分析中..." : "整曲分析"}
             </button>
           </div>
           <input
@@ -959,7 +1184,62 @@ export default function StudentApp({ onOpenResearch }) {
         </section>
 
         <section className="panel-card">
-          <StepTitle step="04" title="练习记录与整曲概览" description="这里保留最近几次练习记录，并支持把整曲分析放到后台运行。" />
+          <StepTitle step="04" title="整曲分析" description="对当前录音逐段匹配曲谱，生成整曲或长片段概览。" />
+          <div className="action-row">
+            <button type="button" className="primary-button" onClick={handleRunWholePiece} disabled={wholePieceBusy}>
+              {wholePieceBusy ? "整曲分析中..." : "运行整曲分析"}
+            </button>
+          </div>
+          {visiblePiecePassJob ? (
+            <div className="omr-progress-card piece-pass-progress-card" style={{ marginTop: 14 }}>
+              <div className="omr-progress-head">
+                <span>{piecePassProgressHeadline(visiblePiecePassJob)}</span>
+                <strong>{percentText(visiblePiecePassJob.progress)}</strong>
+              </div>
+              <div className="omr-progress-track" aria-hidden="true">
+                <span
+                  className={`omr-progress-fill${visiblePiecePassJob.status === "processing" ? " is-analyzing" : ""}`}
+                  style={{ width: percentText(visiblePiecePassJob.progress) }}
+                />
+              </div>
+              {visiblePiecePassJob.progressDetail?.totalSections ? (
+                <p className="sidebar-meta">
+                  已完成 {visiblePiecePassJob.progressDetail.completedSections || visiblePiecePassJob.progressDetail.currentSection} / {visiblePiecePassJob.progressDetail.totalSections} 个段落
+                </p>
+              ) : null}
+              <p>{buildPiecePassStatusMessage(visiblePiecePassJob)}</p>
+            </div>
+          ) : null}
+          {piecePassJob?.status === "failed" ? (
+            <div className="error-banner" style={{ marginTop: 14 }}>
+              整曲分析失败：{piecePassJob.error || "请检查音频文件后重试。"}
+            </div>
+          ) : null}
+          {piecePassLoading ? (
+            <p style={{ marginTop: 10 }}>正在读取当前曲目的整曲概览...</p>
+          ) : wholePieceSummary ? (
+            <div className="history-card" style={{ marginTop: 14 }}>
+              <h3>整曲概览</h3>
+              <p>
+                已分析段落：{wholePieceSummary.matchedSectionCount} / {wholePieceSummary.structuredSectionCount}
+                {" · "}
+                综合评分：{getDisplayCombinedScore(wholePieceSummary)}
+              </p>
+              <p>建议路径：{formatPracticePathLabel(wholePieceSummary.dominantPracticePath)}</p>
+              {wholePieceSummary.audioCoverage?.isPartial ? (
+                <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
+                  本次录音时长约 {Math.round(Number(wholePieceSummary.audioCoverage.audioDurationSeconds || 0))} 秒。
+                  系统已跳过 {wholePieceSummary.audioCoverage.skippedSectionCount || 0} 个未匹配到的段落；这不代表录音不是完整曲目。
+                </p>
+              ) : null}
+            </div>
+          ) : !piecePassJob || piecePassJob.status === "failed" ? (
+            <div className="empty-card" style={{ marginTop: 14 }}>上传完整音频后点击【运行整曲分析】，系统会逐段对比曲谱并生成整曲概览。</div>
+          ) : null}
+        </section>
+
+        <section className="panel-card">
+          <StepTitle step="05" title="练习记录" description="最近几次练习记录，按时间显示，不再限定为当前下拉段落。" />
           <div className="upload-meta">
             <span>学生编号：{studentId || "未设置"}</span>
             <span>当前段落：{selectedSection ? formatSectionDisplayName(selectedSection) : "未选择"}</span>
@@ -967,10 +1247,15 @@ export default function StudentApp({ onOpenResearch }) {
           </div>
           <div className="summary-grid">
             <div className="history-card">
-              <h3>本段练习统计</h3>
-              <p>本段练习次数：{historySummary.scopedCount}</p>
+              <h3>练习统计</h3>
+              <p>练习次数：{historySummary.scopedCount}</p>
               <p>平均音准：{historySummary.averagePitch}</p>
               <p>平均节奏：{historySummary.averageRhythm}</p>
+              {currentSectionHistory.length > 0 ? (
+                <button type="button" className="secondary-button" onClick={handleClearSectionStats} style={{ marginTop: 8 }}>
+                  清零当前段统计
+                </button>
+              ) : null}
             </div>
             <div className="history-card">
               <h3>最近一次</h3>
@@ -980,56 +1265,26 @@ export default function StudentApp({ onOpenResearch }) {
                   <p>综合：{getDisplayCombinedScore(historySummary.latest)}</p>
                   <p>练习路径：{formatPracticePathLabel(historySummary.latest.recommendedPracticePath)}</p>
                   <button type="button" className="secondary-button" onClick={() => handleLoadHistoryItem(historySummary.latest)}>
-                    查看这次结果
+                    查看结果
                   </button>
                 </>
               ) : (
-                <p>当前没有最近一次记录。</p>
+                <p>暂无记录。</p>
               )}
             </div>
             <div className="history-card">
-              <h3>最佳一次</h3>
+              <h3>历史最佳</h3>
               {historySummary.best ? (
                 <>
                   <p>{formatAnalysisTime(historySummary.best.createdAt)}</p>
                   <p>综合：{getDisplayCombinedScore(historySummary.best)}</p>
                   <p>练习路径：{formatPracticePathLabel(historySummary.best.recommendedPracticePath)}</p>
                   <button type="button" className="secondary-button" onClick={() => handleLoadHistoryItem(historySummary.best)}>
-                    查看最佳结果
+                    查看结果
                   </button>
                 </>
               ) : (
-                <p>当前没有可用的最佳记录。</p>
-              )}
-            </div>
-            <div className="history-card">
-              <h3>整曲概览</h3>
-              <div className="action-row">
-                <button type="button" className="primary-button" onClick={handleRunWholePiece} disabled={wholePieceBusy}>
-                  {wholePieceBusy ? "整曲分析中..." : "运行整曲分析"}
-                </button>
-              </div>
-              {piecePassJob ? (
-                <div className="omr-progress-card">
-                  <div className="omr-progress-head">
-                    <span>{piecePassProgressHeadline(piecePassJob)}</span>
-                    <strong>{percentText(piecePassJob.progress)}</strong>
-                  </div>
-                  <div className="omr-progress-track" aria-hidden="true">
-                    <span className="omr-progress-fill" style={{ width: percentText(piecePassJob.progress) }} />
-                  </div>
-                  <p>{buildPiecePassStatusMessage(piecePassJob)}</p>
-                </div>
-              ) : null}
-              {piecePassLoading ? (
-                <p>正在读取当前曲目的整曲概览...</p>
-              ) : wholePieceSummary ? (
-                <>
-                  <p>覆盖：{wholePieceSummary.matchedSectionCount}/{wholePieceSummary.structuredSectionCount}</p>
-                  <p>整曲：{getDisplayCombinedScore(wholePieceSummary)} · 路径 {formatPracticePathLabel(wholePieceSummary.dominantPracticePath)}</p>
-                </>
-              ) : (
-                <p>当前曲目还没有整曲概览。</p>
+                <p>暂无记录。</p>
               )}
             </div>
           </div>
@@ -1045,9 +1300,14 @@ export default function StudentApp({ onOpenResearch }) {
                     </p>
                     <p>练习路径 {formatPracticePathLabel(item.recommendedPracticePath)}</p>
                   </div>
-                  <button type="button" className="secondary-button" onClick={() => handleLoadHistoryItem(item)}>
-                    查看结果
-                  </button>
+                  <div className="action-col">
+                    <button type="button" className="secondary-button" onClick={() => handleLoadHistoryItem(item)}>
+                      查看结果
+                    </button>
+                    <button type="button" className="secondary-button" onClick={() => handleDeleteHistoryItem(item.analysisId)}>
+                      删除
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

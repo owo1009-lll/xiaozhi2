@@ -653,6 +653,13 @@ button {
   line-height: 1.6;
 }
 
+.action-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .queue-item {
   display: flex;
   justify-content: space-between;
@@ -753,7 +760,11 @@ button {
 
 .score-issue-shell {
   display: grid;
-  gap: 18px;
+  gap: 14px;
+  width: 100%;
+  max-width: none;
+  min-height: 100vh;
+  padding: 14px 18px 18px;
 }
 
 .score-issue-header {
@@ -771,14 +782,17 @@ button {
 
 .score-issue-layout {
   display: grid;
-  gap: 18px;
-  grid-template-columns: 256px minmax(0, 1fr);
+  gap: 14px;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
   align-items: start;
+  min-height: calc(100vh - 132px);
 }
 
 .score-page-panel {
   display: grid;
   gap: 14px;
+  min-height: calc(100vh - 132px);
+  padding: 14px;
 }
 
 .score-page-toolbar {
@@ -845,9 +859,10 @@ button {
   border-radius: 18px;
   border: 1px solid rgba(15, 23, 42, 0.08);
   background: rgba(255, 255, 255, 0.88);
-  height: calc(100vh - 260px);
-  min-height: 480px;
-  padding: 12px;
+  width: 100%;
+  height: calc(100vh - 236px);
+  min-height: 620px;
+  padding: 4px;
 }
 
 .score-page-stage {
@@ -1024,8 +1039,8 @@ button {
   padding: 0;
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 220px);
-  min-height: 320px;
+  max-height: calc(100vh - 132px);
+  min-height: calc(100vh - 132px);
   overflow: hidden;
 }
 
@@ -1143,8 +1158,22 @@ button {
     flex-direction: column;
   }
 
+  .score-issue-shell {
+    padding: 12px;
+  }
+
+  .score-page-panel {
+    min-height: auto;
+  }
+
+  .score-page-viewport {
+    height: calc(100vh - 310px);
+    min-height: 420px;
+  }
+
   .score-sidebar {
     max-height: 60vh;
+    min-height: 280px;
   }
 
   .score-zoom-group {

@@ -46,8 +46,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cache-dir", default="", help="Optional directory for per-section cached pass rows. Defaults to <output-dir>/section-cache.")
     parser.add_argument("--refresh-cache", action="store_true", help="Ignore existing per-section cache and recompute all section passes.")
     parser.add_argument("--scan-preprocess-mode", default="off", help="preprocessMode used during scan windows. 'off' skips source separation for speed.")
-    parser.add_argument("--analysis-concurrency", type=int, default=2, help="Number of sections to analyze in parallel during the analysis pass.")
+    parser.add_argument("--scan-concurrency", type=int, default=2, help="Number of sections to scan in parallel.")
+    parser.add_argument("--analysis-concurrency", type=int, default=3, help="Number of sections to analyze in parallel during the analysis pass.")
     parser.add_argument("--analysis-retry", type=int, default=2, help="Max retries per section on transient connection errors.")
+    parser.add_argument("--analysis-timeout-seconds", type=float, default=90.0, help="HTTP timeout for each focused section analysis.")
+    parser.add_argument("--audio-hash", default="", help="Content hash for the input audio. Used to isolate per-section caches.")
+    parser.add_argument("--reuse-scan-analyses", action="store_true", help="Use scan-window analyses as final section rows instead of re-analyzing every section.")
+    parser.add_argument("--fast-window-min-duration", type=float, default=0.0, help="Minimum seconds per section window in fast sequence scan.")
+    parser.add_argument("--fast-window-scale", type=float, default=1.6, help="Duration scale applied to score-estimated section length in fast sequence scan.")
+    parser.add_argument(
+        "--fast-sequence-scan",
+        action="store_true",
+        help="Skip expensive analyzer-based section detection and build ordered section windows from score timing hints.",
+    )
     return parser.parse_args()
 
 
@@ -70,10 +81,10 @@ def read_json(url: str) -> dict:
         return json.loads(response.read().decode("utf-8"))
 
 
-def post_json(url: str, payload: dict) -> dict:
+def post_json(url: str, payload: dict, timeout_seconds: float = 240.0) -> dict:
     body = json.dumps(payload).encode("utf-8")
     req = request.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
-    with request.urlopen(req, timeout=240) as response:
+    with request.urlopen(req, timeout=max(5.0, float(timeout_seconds))) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
@@ -83,6 +94,104 @@ def safe_number(value, fallback=0.0) -> float:
     except (TypeError, ValueError):
         return float(fallback)
     return numeric if numeric == numeric else float(fallback)
+
+
+def meter_beats(meter: str | None) -> float:
+    if not meter:
+        return 4.0
+    beats = str(meter).split("/")[0]
+    try:
+        return max(1.0, float(beats))
+    except ValueError:
+        return 4.0
+
+
+def section_length_beats(section: dict) -> float:
+    beats_per_measure = meter_beats(section.get("meter"))
+    notes = section.get("notes") or []
+    max_offset = 0.0
+    for note in notes:
+        end_beat = (
+            (safe_number(note.get("measureIndex"), 1) - 1.0) * beats_per_measure
+            + safe_number(note.get("beatStart"), 0.0)
+            + safe_number(note.get("beatDuration"), 1.0)
+        )
+        max_offset = max(max_offset, end_beat)
+    return max(max_offset, beats_per_measure)
+
+
+def estimate_section_duration_seconds(
+    section: dict,
+    window_padding: float,
+    min_duration_seconds: float = 8.0,
+    duration_scale: float = 1.6,
+) -> float:
+    tempo = max(30.0, safe_number(section.get("tempo"), 72.0))
+    expected_duration = section_length_beats(section) * (60.0 / tempo)
+    return max(
+        expected_duration + window_padding,
+        expected_duration * max(1.0, duration_scale),
+        max(1.0, min_duration_seconds),
+    )
+
+
+def hash_json(value: object) -> str:
+    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
+
+def resolve_audio_hash(audio_path: Path, explicit_hash: str = "") -> str:
+    if explicit_hash:
+        return explicit_hash
+    name_hash = audio_path.name.split(".")[0]
+    if len(name_hash) >= 16 and all(char in "0123456789abcdefABCDEF" for char in name_hash[:16]):
+        return name_hash
+    stat = audio_path.stat()
+    return hashlib.sha1(f"{audio_path.resolve()}|{stat.st_size}|{stat.st_mtime_ns}".encode("utf-8")).hexdigest()
+
+
+def section_fingerprint(section: dict) -> str:
+    return hash_json(
+        {
+            "sectionId": section.get("sectionId"),
+            "sourceSectionId": section.get("sourceSectionId"),
+            "title": section.get("title"),
+            "sequenceIndex": section.get("sequenceIndex"),
+            "tempo": section.get("tempo"),
+            "meter": section.get("meter"),
+            "measureRange": section.get("measureRange"),
+            "notes": [
+                {
+                    "noteId": note.get("noteId"),
+                    "measureIndex": note.get("measureIndex"),
+                    "beatStart": note.get("beatStart"),
+                    "beatDuration": note.get("beatDuration"),
+                    "midiPitch": note.get("midiPitch"),
+                }
+                for note in (section.get("notes") or [])
+            ],
+        }
+    )
+
+
+def piece_fingerprint(piece: dict) -> str:
+    return hash_json(
+        {
+            "pieceId": piece.get("pieceId"),
+            "scoreId": piece.get("scoreId"),
+            "title": piece.get("title"),
+            "sections": [
+                {
+                    "sectionId": section.get("sectionId"),
+                    "sourceSectionId": section.get("sourceSectionId"),
+                    "sequenceIndex": section.get("sequenceIndex"),
+                    "noteCount": len(section.get("notes") or []),
+                    "fingerprint": section_fingerprint(section),
+                }
+                for section in (piece.get("sections") or [])
+            ],
+        }
+    )
 
 
 def slice_audio(audio_path: Path, start_seconds: float, duration_seconds: float) -> tuple[bytes, float]:
@@ -103,6 +212,7 @@ def analyze_window(
     duration_seconds: float,
     preprocess_mode: str,
     label: str,
+    timeout_seconds: float = 90.0,
 ) -> dict:
     piece_pack = {
         "pieceId": piece.get("pieceId"),
@@ -130,7 +240,7 @@ def analyze_window(
         },
         "audioDataUrl": "data:audio/wav;base64," + base64.b64encode(wav_bytes).decode("ascii"),
     }
-    return post_json(f"{analyzer_url}/analyze", payload).get("analysis") or {}
+    return post_json(f"{analyzer_url}/analyze", payload, timeout_seconds=timeout_seconds).get("analysis") or {}
 
 
 def mean_weighted(rows: list[dict], key: str, weight_key: str) -> float:
@@ -152,6 +262,8 @@ def run_scan(args: argparse.Namespace, scan_output_dir: Path) -> Path:
     scan_json = scan_output_dir / f"{output_key}-segment-scan.json"
     if args.skip_scan and scan_json.exists():
         return scan_json
+    if args.fast_sequence_scan:
+        raise RuntimeError("fast sequence scan requires piece context; call build_fast_sequence_scan instead")
 
     command = [
         sys.executable,
@@ -174,6 +286,8 @@ def run_scan(args: argparse.Namespace, scan_output_dir: Path) -> Path:
         str(args.max_candidates_per_section),
         "--scan-preprocess-mode",
         args.scan_preprocess_mode,
+        "--concurrency",
+        str(args.scan_concurrency),
     ]
     if args.score_id:
         command.extend(["--score-id", args.score_id])
@@ -188,24 +302,224 @@ def run_scan(args: argparse.Namespace, scan_output_dir: Path) -> Path:
     if merged_section_ids:
         command.extend(["--section-ids", ",".join(dict.fromkeys(merged_section_ids))])
 
-    completed = subprocess.run(
+    process = subprocess.Popen(
         command,
         cwd=str(REPO_ROOT),
-        check=False,
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
+
+    # Emit timed progress ticks while scan runs (0.18 → 0.34, every 8 s).
+    _scan_done = threading.Event()
+
+    def _tick_scan_progress() -> None:
+        tick = 0
+        while not _scan_done.wait(timeout=8.0):
+            tick += 1
+            p = min(0.18 + tick * 0.02, 0.34)
+            emit_progress(p, "scanning-sections", "正在定位整曲各段落的最佳窗口。")
+
+    ticker = threading.Thread(target=_tick_scan_progress, daemon=True)
+    ticker.start()
+
+    stdout_bytes, stderr_bytes = process.communicate()
+    _scan_done.set()
+    ticker.join(timeout=1.0)
+
     # Always forward scan stderr so warnings appear in job logs regardless of exit code.
-    if completed.stderr:
-        for line in completed.stderr.decode("utf-8", errors="replace").splitlines():
+    if stderr_bytes:
+        for line in stderr_bytes.decode("utf-8", errors="replace").splitlines():
             if line.strip():
                 sys.stderr.write(line + "\n")
 
-    if completed.returncode != 0:
-        stdout = completed.stdout.decode("utf-8", errors="replace") if completed.stdout else ""
-        raise SystemExit(f"whole-piece scan failed (exit {completed.returncode}):\n{stdout}")
+    if process.returncode != 0:
+        stdout = stdout_bytes.decode("utf-8", errors="replace") if stdout_bytes else ""
+        raise SystemExit(f"whole-piece scan failed (exit {process.returncode}):\n{stdout}")
 
     if not scan_json.exists():
         raise SystemExit(f"scan finished without producing {scan_json}")
+    return scan_json
+
+
+def _selected_sections_for_pass(args: argparse.Namespace, piece: dict) -> list[dict]:
+    selected_section_ids = {value.strip() for value in args.section_id if value and value.strip()}
+    if args.section_ids:
+        selected_section_ids.update(value.strip() for value in str(args.section_ids).split(",") if value.strip())
+    sections = [section for section in (piece.get("sections") or []) if section.get("notes")]
+    if selected_section_ids:
+        sections = [section for section in sections if section.get("sectionId") in selected_section_ids]
+    sections.sort(key=lambda item: int(safe_number(item.get("sequenceIndex"), 0)))
+    if args.max_sections and args.max_sections > 0:
+        sections = sections[: args.max_sections]
+    return sections
+
+
+def _patch_missing_or_oversized_hints(sections: list[dict], audio_duration: float) -> tuple[list[dict], float]:
+    if not sections:
+        return sections, 0.0
+
+    ordered = sorted(sections, key=lambda item: int(safe_number(item.get("sequenceIndex"), 0)))
+    cumulative = 0.0
+    generated: dict[str, float] = {}
+    for section in ordered:
+        section_id = str(section.get("sectionId") or "")
+        generated[section_id] = round(cumulative, 2)
+        cumulative += max(2.0, estimate_section_duration_seconds(section, 0.0))
+
+    all_hints = [safe_number(h, float("nan")) for section in ordered for h in (section.get("researchWindowHints") or [])]
+    all_hints = [value for value in all_hints if value == value and value >= 0]
+    estimated_piece_duration = max(all_hints) if all_hints else cumulative
+
+    patched = []
+    for section in sections:
+        section_id = str(section.get("sectionId") or "")
+        hints = [safe_number(h, float("nan")) for h in (section.get("researchWindowHints") or [])]
+        hints = [value for value in hints if value == value and value >= 0]
+        if not hints:
+            hints = [generated.get(section_id, 0.0)]
+        patched.append({**section, "researchWindowHints": hints})
+
+    if audio_duration > 0:
+        patched_hints = [h for section in patched for h in (section.get("researchWindowHints") or [])]
+        max_hint = max(patched_hints) if patched_hints else 0.0
+        if max_hint > audio_duration * 0.95:
+            scale = (audio_duration * 0.88) / max_hint
+            sys.stderr.write(
+                f"INFO: fast sequence hints rescaled by {scale:.3f} "
+                f"(max_hint={max_hint:.1f}s > audio={audio_duration:.1f}s)\n"
+            )
+            patched = [
+                {
+                    **section,
+                    "researchWindowHints": [
+                        round(max(0.0, safe_number(h, 0.0) * scale), 2)
+                        for h in (section.get("researchWindowHints") or [])
+                    ],
+                }
+                for section in patched
+            ]
+
+    return patched, estimated_piece_duration
+
+
+def build_fast_sequence_scan(args: argparse.Namespace, scan_output_dir: Path, piece: dict, audio_path: Path) -> Path:
+    scan_output_dir.mkdir(parents=True, exist_ok=True)
+    output_key = args.score_id or args.piece_id
+    scan_json = scan_output_dir / f"{output_key}-segment-scan.json"
+    if args.skip_scan and scan_json.exists():
+        return scan_json
+
+    try:
+        audio_duration = float(sf.info(str(audio_path)).duration)
+    except Exception:
+        audio_duration = 0.0
+
+    sections, estimated_piece_duration = _patch_missing_or_oversized_hints(
+        _selected_sections_for_pass(args, piece),
+        audio_duration,
+    )
+    sequence_path: list[dict] = []
+    scan_results: list[dict] = []
+    previous_start = 0.0
+    planned_starts: list[tuple[dict, float]] = []
+
+    for section in sections:
+        hints = [safe_number(h, 0.0) for h in (section.get("researchWindowHints") or [previous_start])]
+        start_seconds = max(0.0, min(hints) if hints else previous_start)
+        start_seconds = max(previous_start, start_seconds)
+        if audio_duration > 0:
+            start_seconds = min(start_seconds, max(0.0, audio_duration - 1.0))
+        planned_starts.append((section, start_seconds))
+        previous_start = start_seconds
+
+    min_duration = safe_number(args.fast_window_min_duration, 0.0) or (3.5 if args.fast_sequence_scan else 8.0)
+    for index, (section, start_seconds) in enumerate(planned_starts):
+        window_duration = estimate_section_duration_seconds(
+            section,
+            args.window_padding,
+            min_duration_seconds=min_duration,
+            duration_scale=safe_number(args.fast_window_scale, 1.6),
+        )
+        next_start = planned_starts[index + 1][1] if index + 1 < len(planned_starts) else None
+        if next_start is not None and next_start > start_seconds + 0.25:
+            # In fast ordered scans, the next section start is a stronger bound
+            # than a per-section duration expansion. This avoids overlapping
+            # every short OMR chunk and cuts first-run whole-piece latency.
+            bounded_duration = max(min_duration, (next_start - start_seconds) + args.window_padding)
+            window_duration = min(window_duration, bounded_duration)
+        if audio_duration > 0:
+            window_duration = min(window_duration, max(1.0, audio_duration - start_seconds))
+
+        item = {
+            "sectionId": section.get("sectionId"),
+            "sectionTitle": section.get("title"),
+            "sequenceIndex": int(safe_number(section.get("sequenceIndex"), 0)),
+            "startSeconds": round(start_seconds, 2),
+            "durationSeconds": round(window_duration, 2),
+            "score": None,
+            "nearestHintDistance": 0,
+            "priorAdjustedScore": 0,
+            "overallPitchScore": None,
+            "overallRhythmScore": None,
+            "confidence": None,
+            "recommendedPracticePath": "review-first",
+            "measureFindingCount": 0,
+            "noteFindingCount": 0,
+            "measureFindings": [],
+            "noteFindings": [],
+            "demoSegments": [],
+            "studentPitchScore": None,
+            "studentRhythmScore": None,
+            "studentCombinedScore": None,
+            "summaryText": "",
+            "diagnostics": {"analysisSource": "fast-sequence-window"},
+        }
+        sequence_path.append(item)
+        scan_results.append(
+            {
+                "sectionId": section.get("sectionId"),
+                "sectionTitle": section.get("title"),
+                "sequenceIndex": int(safe_number(section.get("sequenceIndex"), 0)),
+                "expectedDurationSeconds": round(max(1.0, window_duration - args.window_padding), 2),
+                "windowDurationSeconds": round(window_duration, 2),
+                "candidateCount": 1,
+                "bestMatch": item,
+                "topMatches": [item],
+            }
+        )
+
+    audio_coverage = {
+        "audioDurationSeconds": round(audio_duration, 2),
+        "estimatedPieceDurationSeconds": round(estimated_piece_duration, 2),
+        "isPartial": False,
+        "scannedSectionCount": len(sequence_path),
+        "skippedSectionCount": 0,
+        "lastScannedSectionId": sequence_path[-1]["sectionId"] if sequence_path else None,
+        "skippedSectionIds": [],
+        "scanMode": "fast-sequence-window",
+    }
+    payload = {
+        "pieceId": output_key,
+        "audio": str(audio_path),
+        "audioCoverage": audio_coverage,
+        "scanResults": scan_results,
+        "rankedMatches": sequence_path,
+        "sequenceAwarePath": sequence_path,
+    }
+    scan_json.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    (scan_output_dir / f"{output_key}-segment-scan.md").write_text(
+        "\n".join(
+            [
+                "# Fast Sequence Scan Report",
+                "",
+                f"- Piece: {piece.get('title')} ({output_key})",
+                f"- Audio: {audio_path}",
+                f"- Sections: {len(sequence_path)}",
+                "- Mode: score-order timing hints, no analyzer scan",
+            ]
+        ),
+        encoding="utf-8",
+    )
     return scan_json
 
 
@@ -267,23 +581,11 @@ def build_summary_text(summary: dict) -> str:
     weakest_labels = ", ".join(
         f"{item.get('sequenceIndex')}.{item.get('sectionTitle')}({item.get('combinedScore')})" for item in weakest[:3]
     )
-    coverage = summary.get("audioCoverage") or {}
-    coverage_note = ""
-    if coverage.get("isPartial"):
-        audio_dur = safe_number(coverage.get("audioDurationSeconds"), 0)
-        piece_dur = safe_number(coverage.get("estimatedPieceDurationSeconds"), 0)
-        last_sec = coverage.get("lastScannedSectionId") or ""
-        pct = int(100 * audio_dur / piece_dur) if piece_dur > 0 else 0
-        coverage_note = (
-            f" 当前为部分录音（{audio_dur:.0f}秒，约全曲 {pct}%），"
-            f"覆盖至段落 {last_sec}，后续 {coverage.get('skippedSectionCount', 0)} 个段落超出音频范围已跳过。"
-        )
     return (
         f"当前整曲 pass 已覆盖 {summary.get('matchedSectionCount')}/{summary.get('structuredSectionCount')} 个结构化段落，"
         f"加权音准 {summary.get('weightedPitchScore')}，加权节奏 {summary.get('weightedRhythmScore')}，"
         f"整曲优先练习路径为 {summary.get('dominantPracticePath')}。"
         + (f" 当前最弱的段落是 {weakest_labels}。" if weakest_labels else "")
-        + coverage_note
     )
 
 
@@ -293,13 +595,52 @@ def resolve_cache_dir(output_dir: Path, cache_dir_arg: str) -> Path:
     return output_dir / "section-cache"
 
 
-def build_section_cache_key(piece_id: str, section_id: str, start_seconds: float, duration_seconds: float, preprocess_mode: str) -> str:
-    raw = f"{piece_id}|{section_id}|{start_seconds:.2f}|{duration_seconds:.2f}|{preprocess_mode}"
-    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
+def build_section_cache_key(
+    piece_id: str,
+    section_id: str,
+    start_seconds: float,
+    duration_seconds: float,
+    preprocess_mode: str,
+    audio_hash: str,
+    piece_hash: str,
+    section_hash: str,
+) -> str:
+    return hash_json(
+        {
+            "version": "piece-pass-section-v3",
+            "audioHash": audio_hash,
+            "pieceId": piece_id,
+            "pieceFingerprint": piece_hash,
+            "sectionId": section_id,
+            "sectionFingerprint": section_hash,
+            "startSeconds": round(start_seconds, 2),
+            "durationSeconds": round(duration_seconds, 2),
+            "preprocessMode": preprocess_mode,
+        }
+    )[:20]
 
 
-def cache_path_for_section(cache_dir: Path, piece_id: str, section_id: str, start_seconds: float, duration_seconds: float, preprocess_mode: str) -> Path:
-    cache_key = build_section_cache_key(piece_id, section_id, start_seconds, duration_seconds, preprocess_mode)
+def cache_path_for_section(
+    cache_dir: Path,
+    piece_id: str,
+    section_id: str,
+    start_seconds: float,
+    duration_seconds: float,
+    preprocess_mode: str,
+    audio_hash: str,
+    piece_hash: str,
+    section_hash: str,
+) -> Path:
+    cache_key = build_section_cache_key(
+        piece_id,
+        section_id,
+        start_seconds,
+        duration_seconds,
+        preprocess_mode,
+        audio_hash,
+        piece_hash,
+        section_hash,
+    )
     safe_section_id = "".join(char if char.isalnum() or char in {"-", "_"} else "-" for char in section_id) or "section"
     return cache_dir / f"{safe_section_id}-{cache_key}.json"
 
@@ -311,8 +652,21 @@ def load_cached_section_row(
     start_seconds: float,
     duration_seconds: float,
     preprocess_mode: str,
+    audio_hash: str,
+    piece_hash: str,
+    section_hash: str,
 ) -> dict | None:
-    cache_path = cache_path_for_section(cache_dir, piece_id, section_id, start_seconds, duration_seconds, preprocess_mode)
+    cache_path = cache_path_for_section(
+        cache_dir,
+        piece_id,
+        section_id,
+        start_seconds,
+        duration_seconds,
+        preprocess_mode,
+        audio_hash,
+        piece_hash,
+        section_hash,
+    )
     if not cache_path.exists():
         return None
     try:
@@ -330,13 +684,30 @@ def write_cached_section_row(
     start_seconds: float,
     duration_seconds: float,
     preprocess_mode: str,
+    audio_hash: str,
+    piece_hash: str,
+    section_hash: str,
     row: dict,
 ) -> None:
     cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_path = cache_path_for_section(cache_dir, piece_id, section_id, start_seconds, duration_seconds, preprocess_mode)
+    cache_path = cache_path_for_section(
+        cache_dir,
+        piece_id,
+        section_id,
+        start_seconds,
+        duration_seconds,
+        preprocess_mode,
+        audio_hash,
+        piece_hash,
+        section_hash,
+    )
     cache_path.write_text(
         json.dumps(
             {
+                "cacheVersion": "piece-pass-section-v3",
+                "audioHash": audio_hash,
+                "pieceFingerprint": piece_hash,
+                "sectionFingerprint": section_hash,
                 "pieceId": piece_id,
                 "sectionId": section_id,
                 "startSeconds": round(start_seconds, 2),
@@ -432,43 +803,18 @@ def write_markdown(path: Path, summary: dict, rows: list[dict], scan_json_path: 
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def write_cached_section_row(
-    cache_dir: Path,
-    piece_id: str,
-    section_id: str,
-    start_seconds: float,
-    duration_seconds: float,
-    preprocess_mode: str,
-    row: dict,
-) -> None:
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_path = cache_path_for_section(cache_dir, piece_id, section_id, start_seconds, duration_seconds, preprocess_mode)
-    cache_path.write_text(
-        json.dumps(
-            {
-                "pieceId": piece_id,
-                "sectionId": section_id,
-                "startSeconds": round(start_seconds, 2),
-                "durationSeconds": round(duration_seconds, 2),
-                "preprocessMode": preprocess_mode,
-                "sectionRow": row,
-            },
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
-
-
 def _analyze_section_item(
     item: dict,
     section: dict,
     audio_path: Path,
     cache_dir: Path,
     piece: dict,
+    audio_hash: str,
+    piece_hash: str,
     analyzer_url: str,
     preprocess_mode: str,
     refresh_cache: bool,
+    analysis_timeout_seconds: float,
 ) -> tuple[dict, bool]:
     section_id = item.get("sectionId")
     start_seconds = safe_number(item.get("startSeconds"), 0.0)
@@ -476,9 +822,18 @@ def _analyze_section_item(
     note_count = len(section.get("notes") or [])
     measure_count = len({note.get("measureIndex") for note in section.get("notes") or []})
     piece_id = str(piece.get("pieceId"))
+    current_section_fingerprint = section_fingerprint(section)
 
     row = None if refresh_cache else load_cached_section_row(
-        cache_dir, piece_id, str(section_id), start_seconds, duration_seconds, preprocess_mode,
+        cache_dir,
+        piece_id,
+        str(section_id),
+        start_seconds,
+        duration_seconds,
+        preprocess_mode,
+        audio_hash,
+        piece_hash,
+        current_section_fingerprint,
     )
     if row:
         row = dict(row)
@@ -491,6 +846,7 @@ def _analyze_section_item(
     analysis = analyze_window(
         analyzer_url, piece, section, wav_bytes, actual_duration, preprocess_mode,
         f"{section_id}-{start_seconds}",
+        timeout_seconds=analysis_timeout_seconds,
     )
     combined_score = round(
         safe_number(analysis.get("overallPitchScore"), 0) * 0.45
@@ -531,13 +887,123 @@ def _analyze_section_item(
         "recommendedPracticePath": analysis.get("recommendedPracticePath"),
         "measureFindingCount": len(analysis.get("measureFindings") or []),
         "noteFindingCount": len(analysis.get("noteFindings") or []),
+        "measureFindings": analysis.get("measureFindings") or [],
+        "noteFindings": analysis.get("noteFindings") or [],
+        "demoSegments": analysis.get("demoSegments") or [],
         "summaryText": analysis.get("summaryText") or "",
         "teacherComment": analysis.get("teacherComment") or "",
         "practiceTargets": analysis.get("practiceTargets") or [],
         "diagnostics": analysis.get("diagnostics") or {},
     }
-    write_cached_section_row(cache_dir, piece_id, str(section_id), start_seconds, duration_seconds, preprocess_mode, row)
+    write_cached_section_row(
+        cache_dir,
+        piece_id,
+        str(section_id),
+        start_seconds,
+        duration_seconds,
+        preprocess_mode,
+        audio_hash,
+        piece_hash,
+        current_section_fingerprint,
+        row,
+    )
     return row, False
+
+
+def build_section_row_from_scan_item(item: dict, section: dict, piece: dict) -> dict:
+    start_seconds = safe_number(item.get("startSeconds"), 0.0)
+    duration_seconds = max(1.0, safe_number(item.get("durationSeconds"), 8.0))
+    note_count = len(section.get("notes") or [])
+    measure_count = len({note.get("measureIndex") for note in section.get("notes") or []})
+    overall_pitch = item.get("overallPitchScore")
+    overall_rhythm = item.get("overallRhythmScore")
+    combined_score = round(
+        safe_number(overall_pitch, 0) * 0.45
+        + safe_number(overall_rhythm, 0) * 0.45
+        + safe_number(item.get("confidence"), 0) * 10,
+        2,
+    )
+    return {
+        "pieceId": piece.get("pieceId"),
+        "pieceTitle": piece.get("title"),
+        "sequenceIndex": int(section.get("sequenceIndex") or 0),
+        "sectionId": item.get("sectionId") or section.get("sectionId"),
+        "sectionTitle": item.get("sectionTitle") or section.get("title"),
+        "startSeconds": round(start_seconds, 2),
+        "endSeconds": round(start_seconds + duration_seconds, 2),
+        "durationSeconds": round(duration_seconds, 2),
+        "noteCount": note_count,
+        "measureCount": measure_count,
+        "rawScanScore": item.get("score"),
+        "priorAdjustedScore": item.get("priorAdjustedScore"),
+        "nearestHintDistance": item.get("nearestHintDistance"),
+        "overallPitchScore": overall_pitch,
+        "overallRhythmScore": overall_rhythm,
+        "studentPitchScore": item.get("studentPitchScore", overall_pitch),
+        "studentRhythmScore": item.get("studentRhythmScore", overall_rhythm),
+        "confidence": item.get("confidence"),
+        "combinedScore": combined_score,
+        "studentCombinedScore": item.get(
+            "studentCombinedScore",
+            round((safe_number(overall_pitch, 0) + safe_number(overall_rhythm, 0)) / 2.0),
+        ),
+        "recommendedPracticePath": item.get("recommendedPracticePath"),
+        "measureFindingCount": item.get("measureFindingCount", 0),
+        "noteFindingCount": item.get("noteFindingCount", 0),
+        "measureFindings": item.get("measureFindings") or [],
+        "noteFindings": item.get("noteFindings") or [],
+        "demoSegments": item.get("demoSegments") or [],
+        "summaryText": item.get("summaryText") or "",
+        "teacherComment": "",
+        "practiceTargets": [],
+        "diagnostics": {
+            **(item.get("diagnostics") or {}),
+            "analysisSource": "scan-window",
+        },
+    }
+
+
+def build_failed_section_row(item: dict, section: dict, piece: dict, exc: Exception) -> dict:
+    note_count = len(section.get("notes") or [])
+    measure_count = len({note.get("measureIndex") for note in section.get("notes") or []})
+    error_text = str(exc) or exc.__class__.__name__
+    return {
+        "pieceId": piece.get("pieceId"),
+        "pieceTitle": piece.get("title"),
+        "sequenceIndex": int(section.get("sequenceIndex") or 0),
+        "sectionId": item.get("sectionId") or section.get("sectionId"),
+        "sectionTitle": item.get("sectionTitle") or section.get("title"),
+        "startSeconds": round(safe_number(item.get("startSeconds"), 0.0), 2),
+        "endSeconds": round(safe_number(item.get("endSeconds"), 0.0), 2),
+        "durationSeconds": round(safe_number(item.get("durationSeconds"), 0.0), 2),
+        "noteCount": note_count,
+        "measureCount": measure_count,
+        "rawScanScore": item.get("score"),
+        "priorAdjustedScore": item.get("priorAdjustedScore"),
+        "nearestHintDistance": item.get("nearestHintDistance"),
+        "overallPitchScore": 0,
+        "overallRhythmScore": 0,
+        "studentPitchScore": 0,
+        "studentRhythmScore": 0,
+        "confidence": 0,
+        "combinedScore": 0,
+        "studentCombinedScore": 0,
+        "recommendedPracticePath": "review-first",
+        "measureFindingCount": 0,
+        "noteFindingCount": 0,
+        "measureFindings": [],
+        "noteFindings": [],
+        "demoSegments": [],
+        "summaryText": f"该段落分析超时或失败，已跳过深度诊断：{error_text}",
+        "teacherComment": "",
+        "practiceTargets": [],
+        "analysisFailed": True,
+        "failureReason": error_text,
+        "diagnostics": {
+            "analysisSource": "focused-analysis-failed",
+            "failureReason": error_text,
+        },
+    }
 
 
 def main() -> int:
@@ -547,6 +1013,8 @@ def main() -> int:
     cache_dir = resolve_cache_dir(output_dir, args.cache_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     output_key = args.score_id or args.piece_id
+    audio_path = (REPO_ROOT / args.audio).resolve()
+    audio_hash = resolve_audio_hash(audio_path, args.audio_hash)
 
     try:
         emit_progress(0.04, "checking-services", "正在检查整曲分析服务。")
@@ -562,14 +1030,18 @@ def main() -> int:
     piece = piece_json.get("piece") or {}
     if not piece:
         raise SystemExit(f"piece not found: {args.score_id or args.piece_id}")
+    current_piece_fingerprint = piece_fingerprint(piece)
 
-    emit_progress(0.18, "scanning-sections", "正在定位整曲中各段落的最佳窗口。")
-    scan_json_path = run_scan(args, scan_output_dir)
+    if args.fast_sequence_scan:
+        emit_progress(0.34, "scanning-sections", "已按曲谱顺序生成整曲段落窗口，正在进入深度分析。")
+        scan_json_path = build_fast_sequence_scan(args, scan_output_dir, piece, audio_path)
+    else:
+        emit_progress(0.18, "scanning-sections", "正在定位整曲中各段落的最佳窗口。")
+        scan_json_path = run_scan(args, scan_output_dir)
     scan_payload = json.loads(scan_json_path.read_text(encoding="utf-8"))
     sequence_path = scan_payload.get("sequenceAwarePath") or []
     audio_coverage = scan_payload.get("audioCoverage")
     section_lookup = {section.get("sectionId"): section for section in piece.get("sections") or []}
-    audio_path = (REPO_ROOT / args.audio).resolve()
 
     valid_items = [(item, section_lookup.get(item.get("sectionId"))) for item in sequence_path]
     valid_items = [(item, sec) for item, sec in valid_items if sec]
@@ -581,12 +1053,14 @@ def main() -> int:
 
     def _run_item(pair: tuple) -> tuple[dict, bool]:
         item, sec = pair
+        if args.reuse_scan_analyses:
+            return build_section_row_from_scan_item(item, sec, piece), True
         last_exc: Exception | None = None
         for attempt in range(max(1, args.analysis_retry + 1)):
             try:
                 return _analyze_section_item(
-                    item, sec, audio_path, cache_dir, piece,
-                    args.analyzer_url, args.preprocess_mode, args.refresh_cache,
+                    item, sec, audio_path, cache_dir, piece, audio_hash, current_piece_fingerprint,
+                    args.analyzer_url, args.preprocess_mode, args.refresh_cache, args.analysis_timeout_seconds,
                 )
             except Exception as exc:
                 last_exc = exc
@@ -597,7 +1071,12 @@ def main() -> int:
     concurrency = max(1, args.analysis_concurrency)
     if concurrency <= 1 or len(valid_items) <= 1:
         for pair in valid_items:
-            row, hit = _run_item(pair)
+            try:
+                row, hit = _run_item(pair)
+            except Exception as exc:
+                item, sec = pair
+                sys.stderr.write(f"WARNING: analysis skipped {sec.get('sectionId')} after retries: {exc}\n")
+                row, hit = build_failed_section_row(item, sec, piece, exc), False
             section_rows.append(row)
             cache_hits += hit
             completed_count += 1
@@ -619,7 +1098,7 @@ def main() -> int:
                     sys.stderr.write(
                         f"WARNING: analysis skipped {sec.get('sectionId')} after retries: {exc}\n"
                     )
-                    continue
+                    row, hit = build_failed_section_row(item, sec, piece, exc), False
                 with progress_lock:
                     section_rows.append(row)
                     cache_hits += hit
@@ -634,9 +1113,14 @@ def main() -> int:
     section_rows.sort(key=lambda row: (row.get("sequenceIndex") or 0, row.get("startSeconds") or 0))
     summary = summarize_piece_pass(piece, section_rows, audio_coverage=audio_coverage)
     summary["summaryText"] = build_summary_text(summary)
+    summary["scoreId"] = args.score_id
+    summary["audioHash"] = audio_hash
+    summary["analysisReuseMode"] = "scan-window" if args.reuse_scan_analyses else "focused-analysis"
 
     json_payload = {
-        "pieceId": args.piece_id,
+        "pieceId": output_key,
+        "scoreId": args.score_id,
+        "audioHash": audio_hash,
         "audio": str(audio_path),
         "scanJsonPath": str(scan_json_path),
         "summary": summary,
@@ -653,8 +1137,9 @@ def main() -> int:
     summary_path.write_text(
         json.dumps(
             {
-                "pieceId": args.piece_id,
+                "pieceId": output_key,
                 "scoreId": args.score_id,
+                "audioHash": audio_hash,
                 "audio": str(audio_path),
                 "scanJsonPath": str(scan_json_path),
                 "summary": summary,
@@ -672,8 +1157,9 @@ def main() -> int:
     print(
         json.dumps(
             {
-                "pieceId": args.piece_id,
+                "pieceId": output_key,
                 "scoreId": args.score_id,
+                "audioHash": audio_hash,
                 "matchedSectionCount": summary.get("matchedSectionCount"),
                 "structuredSectionCount": summary.get("structuredSectionCount"),
                 "weightedPitchScore": summary.get("weightedPitchScore"),

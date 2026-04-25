@@ -165,6 +165,33 @@ def build_candidates(hints: list[float], hint_radius: float, hint_step: float, m
     return ranked[: max(1, max_candidates)]
 
 
+def add_fallback_timing_hints(sections: list[dict], audio_duration: float) -> list[dict]:
+    if audio_duration <= 0 or not sections:
+        return sections
+    hinted = [section for section in sections if section.get("researchWindowHints")]
+    if len(hinted) >= max(2, int(len(sections) * 0.4)):
+        return sections
+
+    ordered = sorted(sections, key=lambda item: int(item.get("sequenceIndex") or 0))
+    count = max(1, len(ordered))
+    # Keep the last generated hint before the end of the file so the scan window
+    # still has room for the final phrase.
+    usable_span = max(8.0, audio_duration * 0.9)
+    generated: dict[str, float] = {}
+    for index, section in enumerate(ordered):
+        section_id = str(section.get("sectionId") or "")
+        generated[section_id] = round((index / max(1, count - 1)) * usable_span, 2)
+
+    patched: list[dict] = []
+    for section in sections:
+        if section.get("researchWindowHints"):
+            patched.append(section)
+            continue
+        section_id = str(section.get("sectionId") or "")
+        patched.append({**section, "researchWindowHints": [generated.get(section_id, 0.0)]})
+    return patched
+
+
 def scan_section(
     analyzer_url: str,
     audio_path: Path,
@@ -204,6 +231,12 @@ def scan_section(
             "recommendedPracticePath": analysis.get("recommendedPracticePath"),
             "measureFindingCount": len(analysis.get("measureFindings") or []),
             "noteFindingCount": len(analysis.get("noteFindings") or []),
+            "measureFindings": analysis.get("measureFindings") or [],
+            "noteFindings": analysis.get("noteFindings") or [],
+            "demoSegments": analysis.get("demoSegments") or [],
+            "studentPitchScore": analysis.get("studentPitchScore", analysis.get("overallPitchScore")),
+            "studentRhythmScore": analysis.get("studentRhythmScore", analysis.get("overallRhythmScore")),
+            "studentCombinedScore": analysis.get("studentCombinedScore"),
             "summaryText": analysis.get("summaryText") or "",
             "diagnostics": analysis.get("diagnostics") or {},
         }
@@ -291,14 +324,17 @@ def main() -> int:
     try:
         audio_info = sf.info(str(audio_path))
         audio_duration = audio_info.duration
+        sections_to_scan = add_fallback_timing_hints(sections_to_scan, audio_duration)
 
         all_hints = [float(h) for s in sections_to_scan for h in (s.get("researchWindowHints") or [])]
         if all_hints:
             max_hint = max(all_hints)
             estimated_piece_duration = max_hint
 
-            # Partial audio: hints exceed audio by more than 80% — clearly a short clip.
-            if max_hint > audio_duration * 1.8:
+            # For imported OMR scores, section timing hints are estimated from generated
+            # score chunks and can be much longer than the real recording. Do not use
+            # those hints to declare a full recording "partial".
+            if not args.score_id and max_hint > audio_duration * 1.8:
                 is_partial = True
                 coverage_limit = audio_duration * 1.35  # generous buffer for tempo variation
                 within: list[dict] = []

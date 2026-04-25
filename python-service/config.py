@@ -7,7 +7,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
-load_dotenv(Path(__file__).resolve().parent / ".env")
+load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 
 
 def env_bool(name: str, default: bool = False) -> bool:
@@ -106,7 +106,7 @@ class Settings:
     analysis_stability_min_rhythm_score: float = float(os.getenv("ERHU_ANALYSIS_STABILITY_MIN_RHYTHM_SCORE", "85"))
     analysis_stability_max_pitch_issues: int = int(os.getenv("ERHU_ANALYSIS_STABILITY_MAX_PITCH_ISSUES", "1"))
     analysis_stability_min_uncertain_pitch: int = int(os.getenv("ERHU_ANALYSIS_STABILITY_MIN_UNCERTAIN_PITCH", "5"))
-    enable_torchcrepe: bool = env_bool("ERHU_ENABLE_TORCHCREPE", False)
+    enable_torchcrepe: bool = env_bool("ERHU_ENABLE_TORCHCREPE", True)
     enable_madmom: bool = env_bool("ERHU_ENABLE_MADMOM", True)
     enable_librosa_decode: bool = env_bool("ERHU_ENABLE_LIBROSA_DECODE", False)
     madmom_fps: int = int(os.getenv("ERHU_MADMOM_FPS", "100"))
