@@ -3,6 +3,7 @@ import path from "node:path";
 
 const repoRoot = process.cwd();
 const outputRoot = path.join(repoRoot, "data", "real-tests", "alignment-quality");
+const MAINLINE_ANALYSIS_MODES = new Set(["whole-piece"]);
 
 function readJson(relativePath, fallback) {
   const absolutePath = path.join(repoRoot, relativePath);
@@ -239,6 +240,24 @@ function finalizeRates(target) {
   return target;
 }
 
+function addAnalysisSummary(target, result) {
+  target.checkedAnalyses += 1;
+  for (const key of [
+    "noteIssueCount",
+    "noteExactCount",
+    "noteMeasureOnlyCount",
+    "noteReviewCount",
+    "noteAccompanimentFailureCount",
+    "measureIssueCount",
+    "measureExactCount",
+    "measureReviewCount",
+    "measureAccompanimentFailureCount",
+  ]) {
+    target[key] += result[key];
+  }
+  return target;
+}
+
 function auditAnalysis(score, analysis) {
   const result = emptyAnalysisSummary(analysis, score);
   const failures = [];
@@ -305,6 +324,14 @@ function writeMarkdown(report, filePath) {
     `- Whole-piece accompaniment failure rate: ${((report.modeBreakdown?.["whole-piece"]?.accompanimentFailureRate || 0) * 100).toFixed(2)}%`,
     `- Whole-piece-section review rate: ${((report.modeBreakdown?.["whole-piece-section"]?.reviewRate || 0) * 100).toFixed(1)}%`,
     "",
+    "## Mainline Only",
+    "",
+    `- Mainline checked analyses: ${report.mainline?.checkedAnalyses || 0}`,
+    `- Mainline note exact rate: ${((report.mainline?.exactNoteRate || 0) * 100).toFixed(1)}%`,
+    `- Mainline measure-located rate: ${((report.mainline?.measureLocatedRate || 0) * 100).toFixed(1)}%`,
+    `- Mainline review-needed rate: ${((report.mainline?.reviewRate || 0) * 100).toFixed(1)}%`,
+    `- Mainline accompaniment failure rate: ${((report.mainline?.accompanimentFailureRate || 0) * 100).toFixed(2)}%`,
+    "",
     "## Per Analysis",
     "",
     "| Piece | Analysis | Notes exact/measure/review/fail | Measures exact/review/fail |",
@@ -346,6 +373,7 @@ const report = {
   reviewRate: 0,
   accompanimentFailureRate: 0,
   modeBreakdown: {},
+  mainline: emptyTotals(),
   perAnalysis: [],
   failures: [],
 };
@@ -356,26 +384,15 @@ for (const analysis of analyses) {
     report.skippedMissingScore += 1;
     continue;
   }
-  report.checkedAnalyses += 1;
   const { result, failures } = auditAnalysis(score, analysis);
   report.perAnalysis.push(result);
   report.failures.push(...failures);
   const mode = String(result.analysisMode || "unknown");
   if (!report.modeBreakdown[mode]) report.modeBreakdown[mode] = emptyTotals();
-  report.modeBreakdown[mode].checkedAnalyses += 1;
-  for (const key of [
-    "noteIssueCount",
-    "noteExactCount",
-    "noteMeasureOnlyCount",
-    "noteReviewCount",
-    "noteAccompanimentFailureCount",
-    "measureIssueCount",
-    "measureExactCount",
-    "measureReviewCount",
-    "measureAccompanimentFailureCount",
-  ]) {
-    report[key] += result[key];
-    report.modeBreakdown[mode][key] += result[key];
+  addAnalysisSummary(report, result);
+  addAnalysisSummary(report.modeBreakdown[mode], result);
+  if (MAINLINE_ANALYSIS_MODES.has(mode)) {
+    addAnalysisSummary(report.mainline, result);
   }
 }
 
@@ -385,6 +402,7 @@ finalizeRates(report);
 for (const totals of Object.values(report.modeBreakdown)) {
   finalizeRates(totals);
 }
+finalizeRates(report.mainline);
 report.perAnalysis.sort((left, right) => (
   (right.noteAccompanimentFailureCount + right.measureAccompanimentFailureCount)
   - (left.noteAccompanimentFailureCount + left.measureAccompanimentFailureCount)
@@ -414,6 +432,11 @@ console.log(JSON.stringify({
   exactNoteRate: report.exactNoteRate,
   measureLocatedRate: report.measureLocatedRate,
   reviewRate: report.reviewRate,
+  mainlineCheckedAnalyses: report.mainline.checkedAnalyses,
+  mainlineExactNoteRate: report.mainline.exactNoteRate,
+  mainlineMeasureLocatedRate: report.mainline.measureLocatedRate,
+  mainlineReviewRate: report.mainline.reviewRate,
+  mainlineAccompanimentFailureRate: report.mainline.accompanimentFailureRate,
   output: path.relative(repoRoot, latestJsonPath),
 }, null, 2));
 
