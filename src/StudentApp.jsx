@@ -29,11 +29,12 @@ import {
   selectScorePart,
 } from "./researchApi";
 
-const STUDENT_APP_STATE_KEY = "ai-erhu.student-app-state-v5";
+const STUDENT_APP_STATE_KEY = "ai-erhu.student-app-state-v6";
 const LEGACY_STUDENT_APP_STATE_KEYS = [
   "ai-erhu.student-app-state-v2",
   "ai-erhu.student-app-state-v3",
   "ai-erhu.student-app-state-v4",
+  "ai-erhu.student-app-state-v5",
 ];
 
 function percentText(value) {
@@ -373,8 +374,12 @@ function analysisMatchesScore(analysis, score) {
   const pieceId = String(score.pieceId || "").trim();
   const analysisScoreId = String(analysis.scoreId || "").trim();
   const analysisPieceId = String(analysis.pieceId || "").trim();
-  if (scoreId && analysisScoreId && analysisScoreId === scoreId) return true;
-  if (scoreId && analysisPieceId && analysisPieceId === scoreId) return true;
+  if (scoreId) {
+    if (analysisScoreId || analysisPieceId) {
+      return analysisScoreId === scoreId || analysisPieceId === scoreId;
+    }
+    return false;
+  }
   if (pieceId && analysisPieceId && analysisPieceId === pieceId) return true;
   return false;
 }
@@ -383,7 +388,11 @@ function jobMatchesScore(job, score) {
   if (!job || !score) return false;
   const scoreId = String(score.scoreId || "").trim();
   const jobScoreId = String(job.scoreId || job.payload?.scoreId || job.wholePieceAnalysis?.scoreId || job.primaryAnalysis?.scoreId || "").trim();
-  if (scoreId && jobScoreId) return jobScoreId === scoreId;
+  const jobPieceId = String(job.pieceId || job.payload?.pieceId || job.wholePieceAnalysis?.pieceId || job.primaryAnalysis?.pieceId || "").trim();
+  if (scoreId) {
+    if (jobScoreId || jobPieceId) return jobScoreId === scoreId || jobPieceId === scoreId;
+    return false;
+  }
   const pieceTitle = formatScoreTitle(score);
   const jobTitle = String(job.pieceTitle || job.title || job.wholePieceAnalysis?.pieceTitle || "").trim();
   return Boolean(pieceTitle && jobTitle && pieceTitle === jobTitle);
@@ -713,7 +722,10 @@ export default function StudentApp({ onOpenResearch }) {
   }, [studentId, score?.scoreId, score?.pieceId]);
 
   useEffect(() => {
-    if (!audioFile) return undefined;
+    if (!audioFile) {
+      setAudioPreviewUrl("");
+      return undefined;
+    }
     const objectUrl = URL.createObjectURL(audioFile);
     setAudioPreviewUrl(objectUrl);
     return () => URL.revokeObjectURL(objectUrl);
@@ -741,8 +753,8 @@ export default function StudentApp({ onOpenResearch }) {
     setPiecePassLoading(true);
     fetchLatestPiecePassSummary({
       scoreId: score.scoreId,
-      pieceId: score.scoreId || score.pieceId,
-      title: formatScoreTitle(score),
+      pieceId: score.pieceId,
+      title: score.scoreId ? "" : formatScoreTitle(score),
       audioHash: currentAudioHash,
       participantId: studentId.trim(),
     })
@@ -892,6 +904,8 @@ export default function StudentApp({ onOpenResearch }) {
     setPiecePassSummary(null);
     setParticipantSnapshot(null);
     setExcludedAnalysisIds(new Set());
+    setAudioFile(null);
+    setAudioDuration(null);
     clearIssueSessionCache();
     setSelectedSectionId("");
     setStatusMessage("正在导入 PDF 并启动自动识谱，请稍候。");
@@ -930,6 +944,8 @@ export default function StudentApp({ onOpenResearch }) {
     setPiecePassSummary(null);
     setParticipantSnapshot(null);
     setExcludedAnalysisIds(new Set());
+    setAudioFile(null);
+    setAudioDuration(null);
     clearIssueSessionCache();
     setSelectedSectionId("");
     setStatusMessage("正在导入 MusicXML，并生成可分析的结构化乐谱。");
@@ -1004,6 +1020,8 @@ export default function StudentApp({ onOpenResearch }) {
     setAnalysisJob(null);
     setPiecePassJob(null);
     setPiecePassSummary(null);
+    setAudioFile(null);
+    setAudioDuration(null);
     setSelectedSectionId("");
     setErrorMessage("");
     clearIssueSessionCache();
@@ -1022,6 +1040,8 @@ export default function StudentApp({ onOpenResearch }) {
     setAnalysisJob(null);
     setPiecePassJob(null);
     setPiecePassSummary(null);
+    setAudioFile(null);
+    setAudioDuration(null);
     setSelectedSectionId("");
     setErrorMessage("");
     clearIssueSessionCache();

@@ -712,7 +712,10 @@ async function readLatestPiecePassSummary({ pieceId = "", scoreId = "", title = 
       const normalizedCandidateScoreId = normalizeSearchText(candidateScoreId);
       const normalizedCandidateTitle = normalizeSearchText(candidateTitle);
       const pieceMatch = normalizedPieceId && normalizedCandidatePieceId === normalizedPieceId;
-      const scoreMatch = normalizedScoreId && normalizedCandidateScoreId === normalizedScoreId;
+      const scoreMatch = normalizedScoreId && (
+        normalizedCandidateScoreId === normalizedScoreId
+        || normalizedCandidatePieceId === normalizedScoreId
+      );
       const titleMatch =
         normalizedTitle &&
         normalizedCandidateTitle &&
@@ -724,7 +727,13 @@ async function readLatestPiecePassSummary({ pieceId = "", scoreId = "", title = 
       if (normalizedParticipantId && candidateParticipantId && candidateParticipantId !== normalizedParticipantId) {
         continue;
       }
-      if ((normalizedScoreId || normalizedPieceId || normalizedTitle) && !scoreMatch && !pieceMatch && !titleMatch) {
+      if (normalizedScoreId && !scoreMatch) {
+        continue;
+      }
+      if (!normalizedScoreId && normalizedPieceId && !pieceMatch) {
+        continue;
+      }
+      if (!normalizedScoreId && !normalizedPieceId && normalizedTitle && !titleMatch) {
         continue;
       }
 
