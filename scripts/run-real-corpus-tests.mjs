@@ -21,6 +21,7 @@ function parseArgs() {
     maxPairs: 0,
     pairOffset: 0,
     minConfidence: 0.72,
+    strict: false,
   };
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
@@ -31,6 +32,7 @@ function parseArgs() {
     else if (arg === "--max-pairs") parsed.maxPairs = Number(args[++i]) || 0;
     else if (arg === "--pair-offset") parsed.pairOffset = Math.max(0, Number(args[++i]) || 0);
     else if (arg === "--min-confidence") parsed.minConfidence = Number(args[++i]) || parsed.minConfidence;
+    else if (arg === "--strict") parsed.strict = true;
   }
   parsed.roots = [...new Set(parsed.roots.filter(Boolean))];
   return parsed;
@@ -165,6 +167,80 @@ async function pollPiecePass(baseUrl, jobId) {
   throw new Error("whole-piece analysis timed out");
 }
 
+function summarizeStatusCounts(results = []) {
+  return results.reduce((counts, item) => {
+    const key = item.status || "unknown";
+    counts[key] = (counts[key] || 0) + 1;
+    return counts;
+  }, {});
+}
+
+function buildResultChecks(result, minConfidence) {
+  const importJob = result.importJob || {};
+  const pieceJob = result.piecePassJob || {};
+  const summary = pieceJob.summary || {};
+  const structured = Number(summary.structuredSectionCount || 0);
+  const attempted = Number(summary.attemptedSectionCount || 0);
+  const matched = Number(summary.matchedSectionCount || 0);
+  const failed = Number(summary.failedSectionCount || 0);
+  const timedOut = Number(summary.timedOutSectionCount || 0);
+  const completeness = Number(summary.analysisCompletenessRatio ?? summary.sectionCoverageRatio ?? 0);
+  const omrConfidence = Number(importJob.omrConfidence || 0);
+  const p0Failures = [];
+
+  if (result.status !== "completed") p0Failures.push(`status=${result.status || "unknown"}`);
+  if (importJob.omrStatus && importJob.omrStatus !== "completed") p0Failures.push(`omr=${importJob.omrStatus}`);
+  if (Number.isFinite(omrConfidence) && omrConfidence < minConfidence) p0Failures.push(`omr-confidence=${omrConfidence.toFixed(2)}`);
+  if (!pieceJob.wholePieceAnalysis) p0Failures.push("missing-whole-piece-analysis");
+  if (structured <= 0) p0Failures.push("no-structured-sections");
+  if (attempted <= 0) p0Failures.push("no-attempted-sections");
+  if (matched <= 0) p0Failures.push("no-matched-sections");
+  if (failed > 0) p0Failures.push(`failed-sections=${failed}`);
+  if (timedOut > 0) p0Failures.push(`timed-out-sections=${timedOut}`);
+  if (Number.isFinite(completeness) && completeness > 0 && completeness < 0.98) {
+    p0Failures.push(`completeness=${completeness.toFixed(2)}`);
+  }
+  if (summary.analysisReliable === false) p0Failures.push("analysis-unreliable");
+
+  return {
+    ok: p0Failures.length === 0,
+    p0Failures,
+    omrConfidence,
+    structuredSectionCount: structured,
+    attemptedSectionCount: attempted,
+    matchedSectionCount: matched,
+    failedSectionCount: failed,
+    timedOutSectionCount: timedOut,
+    completeness,
+    totalNoteFindings: Number(summary.totalNoteFindings || 0),
+    totalMeasureFindings: Number(summary.totalMeasureFindings || 0),
+    importMs: Number(result.importMs || 0),
+    analysisMs: Number(result.analysisMs || 0),
+  };
+}
+
+function refreshReportSummary(report, minConfidence) {
+  report.statusCounts = summarizeStatusCounts(report.results);
+  report.p0Failures = [];
+  for (const result of report.results || []) {
+    result.checks = buildResultChecks(result, minConfidence);
+    if (!result.checks.ok) {
+      report.p0Failures.push({
+        title: result.title,
+        status: result.status,
+        failures: result.checks.p0Failures,
+      });
+    }
+  }
+  report.p0FailureCount = report.p0Failures.length;
+  report.completedCount = report.statusCounts.completed || 0;
+  report.skippedCount = Object.entries(report.statusCounts)
+    .filter(([key]) => key.startsWith("skipped"))
+    .reduce((sum, [, value]) => sum + value, 0);
+  report.failedCount = (report.statusCounts.failed || 0) + report.p0FailureCount;
+  return report;
+}
+
 async function main() {
   const args = parseArgs();
   await fs.mkdir(args.outputDir, { recursive: true });
@@ -201,7 +277,7 @@ async function main() {
   }
   const offsetPairs = args.pairOffset > 0 ? dedupedPairs.slice(args.pairOffset) : dedupedPairs;
   const selectedPairs = args.maxPairs > 0 ? offsetPairs.slice(0, args.maxPairs) : offsetPairs;
-  const report = { createdAt: new Date().toISOString(), run: args.run, pairs: selectedPairs, results: [] };
+  const report = { createdAt: new Date().toISOString(), run: args.run, strict: args.strict, pairs: selectedPairs, results: [] };
   const summaryPath = path.join(args.outputDir, "run-summary.json");
   const writeReport = async () => {
     await fs.writeFile(summaryPath, JSON.stringify(report, null, 2), "utf8");
@@ -262,7 +338,19 @@ async function main() {
     }
   }
   await writeReport();
-  console.log(JSON.stringify({ outputDir: args.outputDir, pairCount: selectedPairs.length, ran: args.run }, null, 2));
+  refreshReportSummary(report, args.minConfidence);
+  await writeReport();
+  console.log(JSON.stringify({
+    outputDir: args.outputDir,
+    pairCount: selectedPairs.length,
+    ran: args.run,
+    statusCounts: report.statusCounts,
+    p0FailureCount: report.p0FailureCount,
+    p0Failures: report.p0Failures,
+  }, null, 2));
+  if (args.strict && report.p0FailureCount > 0) {
+    process.exit(1);
+  }
 }
 
 main().catch((error) => {
