@@ -1077,7 +1077,9 @@ export default function ScoreIssuePage() {
           ...item,
           sectionId: issueSectionId,
           sectionTitle: item.sectionTitle || formatSectionDisplayName(issueSection),
-          pageNumber: measurePageMap.get(sectionKey(issueSectionId, item.measureIndex)) || extractSectionPageNumber(issueSection),
+          pageNumber: locationReliable
+            ? (measurePageMap.get(sectionKey(issueSectionId, item.measureIndex)) || extractSectionPageNumber(issueSection))
+            : (Number(item.sourcePageNumber || item.pageNumber) || extractSectionPageNumber(issueSection)),
           displayMeasureIndex: displayMeasureLookup.get(measureKey) || item.measureIndex,
           measureKey,
           issueKey: `measure-${measureKey}`,
@@ -1085,7 +1087,7 @@ export default function ScoreIssuePage() {
           issueTone: item.issueTone || getIssueTone([item.label]),
           locationReliable,
           needsReview: !locationReliable,
-          reviewReason: locationReliable ? "" : "未定位到可靠二胡小节坐标",
+          reviewReason: locationReliable ? "" : "未定位到可靠二胡小节坐标，已保留为复核项",
         };
       }),
     [displayMeasureLookup, isWholePieceMode, measureIssues, measurePageMap, projectionScore, score, section],
@@ -1108,7 +1110,9 @@ export default function ScoreIssuePage() {
           tags,
           sectionId: issueSectionId,
           sectionTitle: item.sectionTitle || formatSectionDisplayName(issueSection),
-          pageNumber: overlayItem?.pageNumber || extractSectionPageNumber(issueSection),
+          pageNumber: locationReliable
+            ? (overlayItem?.pageNumber || extractSectionPageNumber(issueSection))
+            : (Number(item.sourcePageNumber || item.pageNumber) || extractSectionPageNumber(issueSection)),
           displayMeasureIndex: displayMeasureLookup.get(sectionKey(issueSectionId, item.measureIndex)) || item.measureIndex,
           noteOrdinal: getIssueNoteOrdinal(item.noteId, index + 1),
           overlayItem,
@@ -1118,7 +1122,7 @@ export default function ScoreIssuePage() {
           issueTone: item.issueTone || overlayItem?.issueTone || getIssueTone(tags || []),
           locationReliable,
           needsReview: !locationReliable,
-          reviewReason: locationReliable ? "" : "未定位到可靠二胡音符坐标",
+          reviewReason: locationReliable ? "" : "未定位到可靠二胡音符坐标，已保留为复核项",
         };
       }),
     [displayMeasureLookup, measureIssueEntries.length, noteIssues, noteOverlayItems, score, section],
