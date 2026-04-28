@@ -15,6 +15,7 @@ $pidFile = Join-Path $dataDir "prod-pids.json"
 $pythonRunner = Join-Path $repoRoot "scripts\run-python.ps1"
 $serverUrl = "http://127.0.0.1:3000"
 $analyzerUrl = "http://127.0.0.1:8000/docs"
+$analyzerWorkers = if ($IsWindows) { 1 } else { 2 }
 
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 
@@ -114,7 +115,7 @@ $analyzerProcess = $null
 if (Test-Path $pythonRunner) {
   $analyzerListenerBeforeStart = @(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue)
   if ($analyzerListenerBeforeStart.Count -eq 0) {
-    $analyzerCommand = "& { `$env:ERHU_ENABLE_TORCHCREPE='true'; `$env:ERHU_ENABLE_MADMOM='true'; & '$pythonRunner' -m uvicorn app:app --app-dir python-service --host 127.0.0.1 --port 8000 --workers 2 --log-level warning }"
+    $analyzerCommand = "& { `$env:ERHU_ENABLE_TORCHCREPE='true'; `$env:ERHU_ENABLE_MADMOM='true'; & '$pythonRunner' -m uvicorn app:app --app-dir python-service --host 127.0.0.1 --port 8000 --workers $analyzerWorkers --log-level warning }"
     $startedAnalyzer = Start-Process -FilePath "powershell" `
       -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $analyzerCommand `
       -WorkingDirectory $repoRoot `

@@ -4,8 +4,8 @@ export function clampScore(value) {
   return Math.max(0, Math.min(100, Math.round(numeric)));
 }
 
-export const ISSUE_SESSION_SCHEMA_VERSION = 9;
-export const ISSUE_SESSION_STORAGE_PREFIX = "ai-erhu.issue-session.v9.";
+export const ISSUE_SESSION_SCHEMA_VERSION = 20;
+export const ISSUE_SESSION_STORAGE_PREFIX = "ai-erhu.issue-session.v20.";
 export const LEGACY_ISSUE_SESSION_STORAGE_PREFIX = "ai-erhu.issue-session.";
 
 export function repairMojibakeText(value) {
@@ -52,7 +52,7 @@ export function formatNoteLabel(noteId, fallbackMeasureIndex) {
   const parsed = parseXmlNoteId(noteId);
   if (parsed) return `第 ${parsed.measureIndex} 小节第 ${parsed.noteIndex} 音`;
   const numericMeasure = Number(fallbackMeasureIndex);
-  if (Number.isFinite(numericMeasure)) return `第 ${Math.round(numericMeasure)} 小节`;
+  if (Number.isFinite(numericMeasure) && numericMeasure > 0) return `第 ${Math.round(numericMeasure)} 小节`;
   return String(noteId || "未定位音位");
 }
 
@@ -90,7 +90,7 @@ export function formatPitchLabelText(value) {
 
 export function formatRhythmLabelText(item) {
   const value = item?.rhythmType || item?.rhythmLabel;
-  if (item?.rhythmTypeLabel) return item.rhythmTypeLabel;
+  if (item?.rhythmTypeLabel) return repairMojibakeText(item.rhythmTypeLabel);
   if (value === "rhythm-rush") return "节奏抢拍";
   if (value === "rhythm-drag") return "节奏拖拍";
   if (value === "rhythm-duration-short") return "时值偏短";
@@ -110,7 +110,7 @@ export function formatMeasureIssueLabelText(item) {
   if (value === "rhythm-measure-long") return "本小节时值普遍偏长";
   if (value === "rhythm-unstable") return "本小节节奏不稳";
   if (value === "pitch-unstable") return "本小节音准不稳";
-  return item?.issueLabel || "问题小节";
+  return repairMojibakeText(item?.issueLabel) || "问题小节";
 }
 
 export function formatSectionDisplayName(section) {
@@ -120,6 +120,7 @@ export function formatSectionDisplayName(section) {
     /^xml-/i.test(title) ||
     /^自动识谱第\s*\d+\s*页/i.test(title);
   if (title && !isInternalTitle) return title;
+
   const sectionId = String(section?.sectionId || section?.sourceSectionId || "");
   const explicitOrder = Number(section?.displayIndex);
   const sequenceIndex = Number(section?.sequenceIndex);
@@ -130,10 +131,11 @@ export function formatSectionDisplayName(section) {
     (Number.isFinite(sequenceIndex) && sequenceIndex > 0 && sequenceIndex < 100 && sequenceIndex) ||
     null;
   if (readableOrder) return `第 ${Math.round(readableOrder)} 段`;
+
   const pageChunkMatch = sectionId.match(/^page-(\d+)-s(\d+)$/i);
-  if (pageChunkMatch) return `第 ${Number(pageChunkMatch[1])}-${Number(pageChunkMatch[2])} 段`;
+  if (pageChunkMatch) return `第 ${Number(pageChunkMatch[1])} 页片段 ${Number(pageChunkMatch[2])}`;
   const pageMatch = sectionId.match(/^page-(\d+)$/i);
-  if (pageMatch) return `第 ${Number(pageMatch[1])} 段`;
+  if (pageMatch) return `第 ${Number(pageMatch[1])} 页`;
   return title && !isInternalTitle ? title : "未命名段落";
 }
 

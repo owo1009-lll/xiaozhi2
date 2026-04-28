@@ -88,6 +88,16 @@ export async function fetchScore(scoreId) {
   return readJson(await fetch(`/api/erhu/scores/${encodeURIComponent(scoreId)}`));
 }
 
+export async function selectScorePart(scoreId, selectedPart) {
+  return readJson(
+    await fetch(`/api/erhu/scores/${encodeURIComponent(scoreId)}/select-part`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ selectedPart }),
+    }),
+  );
+}
+
 export async function fetchLatestPiecePassSummary({ pieceId = "", scoreId = "", title = "", audioHash = "", participantId = "" } = {}) {
   const searchParams = new URLSearchParams();
   if (pieceId) searchParams.set("pieceId", pieceId);

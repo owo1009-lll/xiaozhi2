@@ -372,6 +372,10 @@ function normalizePiecePackOverride(piecePack = {}, fallback = {}) {
               normalizedX: clamp(normalizedX, 0, 1),
               normalizedY: clamp(normalizedY, 0, 1),
               source: safeString(note?.notePosition?.source, "musicxml-layout"),
+              scoreLineRole: safeString(note?.notePosition?.scoreLineRole),
+              scoreLineConfidence: clamp(safeNumber(note?.notePosition?.scoreLineConfidence, 0), 0, 1),
+              scoreLineSource: safeString(note?.notePosition?.scoreLineSource),
+              scoreLineId: safeString(note?.notePosition?.scoreLineId),
             }
           : null;
       return {
@@ -413,6 +417,151 @@ function normalizePiecePackOverride(piecePack = {}, fallback = {}) {
     measureCount: Math.max(...notes.map((note) => note.measureIndex)),
     scoreSource: piecePack.scoreSource && typeof piecePack.scoreSource === "object" ? piecePack.scoreSource : null,
   };
+}
+
+function buildScoreLineStatsFromNotes(notes = []) {
+  const roleCounts = {};
+  const noteList = getArray(notes);
+  for (const note of noteList) {
+    const role = safeString(note?.notePosition?.scoreLineRole, "missing") || "missing";
+    roleCounts[role] = (roleCounts[role] || 0) + 1;
+  }
+  const noteCount = noteList.length;
+  const erhuNoteCount = Math.max(0, Math.round(safeNumber(roleCounts.erhu, 0)));
+  const accompanimentNoteCount = Math.max(0, Math.round(safeNumber(roleCounts.accompaniment, 0)));
+  const unknownNoteCount = Math.max(0, Math.round(safeNumber(roleCounts.unknown, 0) + safeNumber(roleCounts.missing, 0)));
+  return {
+    noteCount,
+    erhuNoteCount,
+    accompanimentNoteCount,
+    unknownNoteCount,
+    erhuRatio: noteCount ? Number((erhuNoteCount / noteCount).toFixed(3)) : 0,
+    splitApplied: erhuNoteCount > 0 && accompanimentNoteCount > 0,
+    roleCounts,
+  };
+}
+
+function annotateImportedSectionsScoreLineRoles(sections = [], score = {}) {
+  const normalizedSections = getArray(sections);
+  if (!normalizedSections.length) return normalizedSections;
+  const hasExistingRoles = normalizedSections.some((section) =>
+    getArray(section?.notes).some((note) => safeString(note?.notePosition?.scoreLineRole)),
+  );
+  if (hasExistingRoles) {
+    return normalizedSections.map((section) => ({
+      ...section,
+      scoreLineStats:
+        section?.scoreLineStats && typeof section.scoreLineStats === "object"
+          ? section.scoreLineStats
+          : buildScoreLineStatsFromNotes(section?.notes),
+    }));
+  }
+
+  const cleanSolo = isCleanSoloSelectedPart(score);
+  const candidate = getSelectedPartCandidate(score);
+  const ambiguous =
+    !cleanSolo &&
+    (hasAccompanimentPartCandidate(score) ||
+      safeBoolean(candidate?.isLikelyPiano, false) ||
+      safeNumber(candidate?.chordRatio, 0) >= 0.18 ||
+      Math.max(1, safeNumber(candidate?.staffCount, 1)) >= 2);
+  if (!cleanSolo && !ambiguous) return normalizedSections;
+
+  const lineGroups = new Map();
+  for (const section of normalizedSections) {
+    for (const note of getArray(section?.notes)) {
+      const position = note?.notePosition || {};
+      if (!Number.isFinite(safeNumber(position.normalizedY, NaN))) continue;
+      const pageNumber = Math.max(1, Math.round(safeNumber(position.pageNumber, 1)));
+      const systemIndex = Math.max(1, Math.round(safeNumber(position.systemIndex, 1)));
+      const staffIndex = Math.max(1, Math.round(safeNumber(position.staffIndex, 1)));
+      const key = `${pageNumber}:${systemIndex}:${staffIndex}`;
+      if (!lineGroups.has(key)) {
+        lineGroups.set(key, { key, pageNumber, systemIndex, staffIndex, notes: [] });
+      }
+      lineGroups.get(key).notes.push(note);
+    }
+  }
+  if (!lineGroups.size) return normalizedSections;
+
+  const pageGroups = new Map();
+  for (const group of lineGroups.values()) {
+    if (!pageGroups.has(group.pageNumber)) pageGroups.set(group.pageNumber, []);
+    pageGroups.get(group.pageNumber).push(group);
+  }
+
+  const roleByLineKey = new Map();
+  for (const groups of pageGroups.values()) {
+    const ordered = groups
+      .map((group) => ({
+        ...group,
+        medianY: medianNumber(group.notes.map((note) => note?.notePosition?.normalizedY)),
+      }))
+      .sort((left, right) => left.medianY - right.medianY);
+    const lineCount = Math.max(1, ordered.length);
+    for (let lineRank = 0; lineRank < ordered.length; lineRank += 1) {
+      const group = ordered[lineRank];
+      if (cleanSolo) {
+        roleByLineKey.set(group.key, { role: "erhu", confidence: 0.92, source: "clean-solo-part-js" });
+        continue;
+      }
+      const onsetCounts = new Map();
+      const pitches = [];
+      for (const note of group.notes) {
+        const onsetKey = `${Math.max(1, Math.round(safeNumber(note?.measureIndex, 1)))}:${safeNumber(note?.beatStart, 0).toFixed(4)}`;
+        onsetCounts.set(onsetKey, (onsetCounts.get(onsetKey) || 0) + 1);
+        pitches.push(Math.round(safeNumber(note?.midiPitch, 69)));
+      }
+      const chordExcess = [...onsetCounts.values()].reduce((sum, count) => sum + Math.max(0, count - 1), 0);
+      const chordRatio = chordExcess / Math.max(1, group.notes.length);
+      const rangeHits = pitches.filter((pitch) => pitch >= 52 && pitch <= 96).length;
+      const rangeRatio = rangeHits / Math.max(1, pitches.length);
+      const pitchSpan = pitches.length ? Math.max(...pitches) - Math.min(...pitches) : 0;
+      let erhuPatternScore = 0.42;
+      if (lineCount === 2) {
+        erhuPatternScore = lineRank === 0 ? 0.74 : 0.18;
+      } else if (lineCount >= 3) {
+        erhuPatternScore = lineRank % 3 === 0 ? 0.74 : 0.14;
+      }
+      let confidence = erhuPatternScore;
+      confidence += Math.min(0.12, rangeRatio * 0.12);
+      confidence += pitchSpan <= 36 ? 0.06 : -0.05;
+      confidence -= Math.min(0.18, chordRatio * 0.75);
+      confidence = clamp(Number(confidence.toFixed(3)), 0.05, 0.9);
+      roleByLineKey.set(group.key, {
+        role: confidence >= 0.66 ? "erhu" : "accompaniment",
+        confidence,
+        source: "omr-line-split-js",
+      });
+    }
+  }
+
+  return normalizedSections.map((section) => {
+    const notes = getArray(section?.notes).map((note) => {
+      const position = note?.notePosition || {};
+      const pageNumber = Math.max(1, Math.round(safeNumber(position.pageNumber, 1)));
+      const systemIndex = Math.max(1, Math.round(safeNumber(position.systemIndex, 1)));
+      const staffIndex = Math.max(1, Math.round(safeNumber(position.staffIndex, 1)));
+      const key = `${pageNumber}:${systemIndex}:${staffIndex}`;
+      const line = roleByLineKey.get(key);
+      if (!line || !note?.notePosition) return note;
+      return {
+        ...note,
+        notePosition: {
+          ...note.notePosition,
+          scoreLineRole: line.role,
+          scoreLineConfidence: line.confidence,
+          scoreLineSource: line.source,
+          scoreLineId: `p${pageNumber}-sys${systemIndex}-staff${staffIndex}`,
+        },
+      };
+    });
+    return {
+      ...section,
+      notes,
+      scoreLineStats: buildScoreLineStatsFromNotes(notes),
+    };
+  });
 }
 
 async function readStudyStore() {
@@ -519,6 +668,23 @@ async function collectFilesRecursive(rootDir, matcher) {
   return results;
 }
 
+function getPiecePassSummaryReliability(summary = {}) {
+  const attempted = Math.max(0, Math.round(safeNumber(summary?.attemptedSectionCount, 0)));
+  const matched = Math.max(0, Math.round(safeNumber(summary?.matchedSectionCount, 0)));
+  const failed = Math.max(0, Math.round(safeNumber(summary?.failedSectionCount, 0)));
+  const timedOut = Math.max(0, Math.round(safeNumber(summary?.timedOutSectionCount, 0)));
+  const completeness = attempted > 0 ? matched / attempted : safeNumber(summary?.analysisCompletenessRatio, 0);
+  const complete = matched > 0 && failed === 0 && timedOut === 0 && (!attempted || matched >= attempted);
+  const reliable = complete || (
+    safeBoolean(summary?.analysisReliable, false)
+    && matched > 0
+    && failed === 0
+    && timedOut === 0
+    && completeness >= 0.98
+  );
+  return { complete, reliable, attempted, matched, failed, timedOut, completeness };
+}
+
 async function readLatestPiecePassSummary({ pieceId = "", scoreId = "", title = "", audioHash = "", participantId = "" } = {}) {
   const normalizedPieceId = normalizeSearchText(pieceId);
   const normalizedScoreId = normalizeSearchText(scoreId);
@@ -563,10 +729,12 @@ async function readLatestPiecePassSummary({ pieceId = "", scoreId = "", title = 
       }
 
       const stat = await fs.stat(filePath);
+      const reliability = getPiecePassSummaryReliability(summary);
       candidates.push({
         filePath,
         stat,
         summary,
+        reliability,
       });
     } catch {
       // ignore malformed piece-pass exports
@@ -574,12 +742,35 @@ async function readLatestPiecePassSummary({ pieceId = "", scoreId = "", title = 
   }
 
   if (!candidates.length) return null;
-  candidates.sort((left, right) => right.stat.mtimeMs - left.stat.mtimeMs);
+  const newestMtime = Math.max(...candidates.map((item) => item.stat.mtimeMs));
+  candidates.sort((left, right) => {
+    if (left.reliability.complete !== right.reliability.complete) {
+      return left.reliability.complete ? -1 : 1;
+    }
+    if (left.reliability.reliable !== right.reliability.reliable) {
+      return left.reliability.reliable ? -1 : 1;
+    }
+    return right.stat.mtimeMs - left.stat.mtimeMs;
+  });
   const latest = candidates[0];
+  const skippedNewerIncompleteCount = candidates.filter((item) => (
+    item.stat.mtimeMs > latest.stat.mtimeMs
+    && !item.reliability.complete
+  )).length;
   return {
     sourcePath: latest.filePath,
     updatedAt: new Date(latest.stat.mtimeMs).toISOString(),
-    summary: latest.summary,
+    selectedComplete: latest.reliability.complete,
+    selectedReliable: latest.reliability.reliable,
+    ignoredNewerIncompleteCount: skippedNewerIncompleteCount,
+    summary: {
+      ...latest.summary,
+      selectedComplete: latest.reliability.complete,
+      selectedReliable: latest.reliability.reliable,
+      ignoredNewerIncompleteCount: skippedNewerIncompleteCount,
+      hasNewerIncompleteResult: skippedNewerIncompleteCount > 0,
+      newestResultAt: new Date(newestMtime).toISOString(),
+    },
   };
 }
 
@@ -590,7 +781,7 @@ function normalizeSearchText(value) {
 }
 
 function normalizeImportedSections(sections = [], scoreFallback = {}) {
-  return getArray(sections)
+  const normalizedSections = getArray(sections)
     .map((section, index) => ({
       raw: section,
       normalized: normalizePiecePackOverride(section, {
@@ -613,7 +804,36 @@ function normalizeImportedSections(sections = [], scoreFallback = {}) {
       sourceSectionId: safeString(raw?.sourceSectionId),
       measureRange: getArray(raw?.measureRange).map((item) => Math.round(safeNumber(item))).filter((item) => Number.isFinite(item)),
       pageImagePath: safeString(raw?.pageImagePath, normalized.pageImagePath),
+      selectedPart: safeString(raw?.selectedPart, scoreFallback?.selectedPart),
+      selectedPartId: safeString(raw?.selectedPartId),
+      selectedPartConfidence: clamp(safeNumber(raw?.selectedPartConfidence, 0), 0, 1),
+      erhuProjectionMode: safeString(raw?.erhuProjectionMode),
+      erhuProjectionReason: safeString(raw?.erhuProjectionReason),
+      partCandidates: getArray(raw?.partCandidates)
+        .map((item, candidateIndex) => ({
+          rank: Math.max(1, Math.round(safeNumber(item?.rank, candidateIndex + 1))),
+          id: safeString(item?.id),
+          name: repairMojibakeText(item?.name || item?.label || `声部 ${candidateIndex + 1}`),
+          label: repairMojibakeText(item?.label || item?.name || `声部 ${candidateIndex + 1}`),
+          selectionKey: safeString(item?.selectionKey),
+          qualifiedLabel: repairMojibakeText(item?.qualifiedLabel || item?.label || item?.name || `声部 ${candidateIndex + 1}`),
+          score: clamp(safeNumber(item?.score, 0), 0, 1),
+          selectedPartConfidence: clamp(safeNumber(item?.selectedPartConfidence, item?.score || 0), 0, 1),
+          noteCount: Math.max(0, Math.round(safeNumber(item?.noteCount, 0))),
+          measureCount: Math.max(0, Math.round(safeNumber(item?.measureCount, 0))),
+          staffCount: Math.max(0, Math.round(safeNumber(item?.staffCount, 0))),
+          pitchRange: getArray(item?.pitchRange).map((value) => Math.round(safeNumber(value))).filter((value) => Number.isFinite(value)),
+          erhuRangeRatio: clamp(safeNumber(item?.erhuRangeRatio, 0), 0, 1),
+          chordRatio: clamp(safeNumber(item?.chordRatio, 0), 0, 1),
+          isLikelyPiano: safeBoolean(item?.isLikelyPiano, false),
+          isGenericVoice: safeBoolean(item?.isGenericVoice, false),
+          isAfterExplicitPiano: safeBoolean(item?.isAfterExplicitPiano, false),
+          isLikelyAccompanimentSplit: safeBoolean(item?.isLikelyAccompanimentSplit, false),
+          safeForErhuProjection: safeBoolean(item?.safeForErhuProjection, false),
+        })),
+      scoreLineStats: raw?.scoreLineStats && typeof raw.scoreLineStats === "object" ? raw.scoreLineStats : undefined,
     }));
+  return annotateImportedSectionsScoreLineRoles(normalizedSections, scoreFallback);
 }
 
 function normalizeOmrStats(stats = {}) {
@@ -722,6 +942,9 @@ function normalizeImportedScoreRecord(score = {}) {
     pieceId: safeString(score.pieceId),
     title: repairMojibakeText(score.title),
     composer: safeString(score.composer),
+    selectedPart: safeString(score.selectedPart, score.piecePack?.selectedPart || "erhu"),
+    selectedPartId: safeString(score.selectedPartId),
+    partCandidates: getArray(score.partCandidates || score.piecePack?.partCandidates),
   });
   const normalizedOmrStats = normalizeOmrStats(score.omrStats);
   return {
@@ -740,6 +963,7 @@ function normalizeImportedScoreRecord(score = {}) {
     omrStats: normalizedOmrStats,
     detectedParts: getArray(score.detectedParts).map((item) => safeString(item)).filter(Boolean),
     selectedPart: safeString(score.selectedPart, "erhu"),
+    selectedPartId: safeString(score.selectedPartId),
     selectedPartConfidence: clamp(safeNumber(score.selectedPartConfidence, safeNumber(score.piecePack?.selectedPartConfidence, 0)), 0, 1),
     partCandidates: getArray(score.partCandidates || score.piecePack?.partCandidates)
       .map((item, index) => ({
@@ -747,6 +971,8 @@ function normalizeImportedScoreRecord(score = {}) {
         id: safeString(item?.id),
         name: repairMojibakeText(item?.name || item?.label || `声部 ${index + 1}`),
         label: repairMojibakeText(item?.label || item?.name || `声部 ${index + 1}`),
+        selectionKey: safeString(item?.selectionKey),
+        qualifiedLabel: repairMojibakeText(item?.qualifiedLabel || item?.label || item?.name || `candidate-${index + 1}`),
         score: clamp(safeNumber(item?.score, 0), 0, 1),
         selectedPartConfidence: clamp(safeNumber(item?.selectedPartConfidence, item?.score || 0), 0, 1),
         noteCount: Math.max(0, Math.round(safeNumber(item?.noteCount, 0))),
@@ -756,11 +982,16 @@ function normalizeImportedScoreRecord(score = {}) {
         erhuRangeRatio: clamp(safeNumber(item?.erhuRangeRatio, 0), 0, 1),
         chordRatio: clamp(safeNumber(item?.chordRatio, 0), 0, 1),
         isLikelyPiano: safeBoolean(item?.isLikelyPiano, false),
+        isGenericVoice: safeBoolean(item?.isGenericVoice, false),
+        isAfterExplicitPiano: safeBoolean(item?.isAfterExplicitPiano, false),
+        isLikelyAccompanimentSplit: safeBoolean(item?.isLikelyAccompanimentSplit, false),
+        safeForErhuProjection: safeBoolean(item?.safeForErhuProjection, false),
       })),
     markingStats: {
       ...buildMarkingStatsFromSections(sections),
       ...(score.markingStats && typeof score.markingStats === "object" ? score.markingStats : {}),
     },
+    scoreLineStats: score.scoreLineStats && typeof score.scoreLineStats === "object" ? score.scoreLineStats : undefined,
     previewPages: getArray(score.previewPages),
     sections,
     createdAt: safeString(score.createdAt, nowIso()),
@@ -781,6 +1012,16 @@ function importedScoreHasExactNotePositions(score = {}) {
   return hasExactNotePositions && hasPageImages;
 }
 
+function importedScoreHasProjectionMetadata(score = {}) {
+  return getArray(score.sections).some((section) => {
+    const stats = section?.scoreLineStats && typeof section.scoreLineStats === "object" ? section.scoreLineStats : null;
+    if (stats && (safeNumber(stats.erhuNoteCount, 0) > 0 || safeNumber(stats.accompanimentNoteCount, 0) > 0)) {
+      return true;
+    }
+    return getArray(section?.notes).some((note) => safeString(note?.notePosition?.scoreLineRole).length > 0);
+  });
+}
+
 function normalizeScoreImportJob(job = {}) {
   const normalizedOmrStats = normalizeOmrStats(job.omrStats);
   return {
@@ -789,7 +1030,7 @@ function normalizeScoreImportJob(job = {}) {
     title: repairMojibakeText(job.title),
     sourcePdfPath: safeString(job.sourcePdfPath),
     pdfHash: safeString(job.pdfHash),
-    originalFilename: safeString(job.originalFilename),
+    originalFilename: repairMojibakeText(job.originalFilename),
     omrStatus: safeString(job.omrStatus, "processing"),
     omrConfidence: calibrateOmrConfidence(job.omrConfidence, normalizedOmrStats, {
       omrStatus: safeString(job.omrStatus),
@@ -808,6 +1049,8 @@ function normalizeScoreImportJob(job = {}) {
           id: safeString(item?.id),
           name: repairMojibakeText(item?.name || item?.label || `声部 ${index + 1}`),
           label: repairMojibakeText(item?.label || item?.name || `声部 ${index + 1}`),
+          selectionKey: safeString(item?.selectionKey),
+          qualifiedLabel: repairMojibakeText(item?.qualifiedLabel || item?.label || item?.name || `candidate-${index + 1}`),
           score: clamp(safeNumber(item?.score, 0), 0, 1),
           selectedPartConfidence: clamp(safeNumber(item?.selectedPartConfidence, item?.score || 0), 0, 1),
           noteCount: Math.max(0, Math.round(safeNumber(item?.noteCount, 0))),
@@ -817,6 +1060,10 @@ function normalizeScoreImportJob(job = {}) {
           erhuRangeRatio: clamp(safeNumber(item?.erhuRangeRatio, 0), 0, 1),
           chordRatio: clamp(safeNumber(item?.chordRatio, 0), 0, 1),
           isLikelyPiano: safeBoolean(item?.isLikelyPiano, false),
+          isGenericVoice: safeBoolean(item?.isGenericVoice, false),
+          isAfterExplicitPiano: safeBoolean(item?.isAfterExplicitPiano, false),
+          isLikelyAccompanimentSplit: safeBoolean(item?.isLikelyAccompanimentSplit, false),
+          safeForErhuProjection: safeBoolean(item?.safeForErhuProjection, false),
         })),
       markingStats: job.markingStats && typeof job.markingStats === "object" ? job.markingStats : {},
       warnings: normalizeWarningList(job.warnings),
@@ -936,6 +1183,7 @@ function findReusableImportedScore(store, { pdfHash = "", selectedPart = "erhu",
           desiredPart.toLowerCase() === "erhu"
         ) &&
         importedScoreHasExactNotePositions(score) &&
+        importedScoreHasProjectionMetadata(score) &&
         getArray(score.sections).length > 0,
     ) || null
   );
@@ -1064,6 +1312,14 @@ function buildPiecePassPrimaryAnalysis({ task = {}, passPayload = {}, summary = 
   if (!sourceRow) return null;
 
   const analysisId = `${safeString(task.jobId, "piecepass")}-${safeString(sourceRow.sectionId, "section")}`;
+  const originalAudioUrl = toWebPathFromAbsolute(task.payload?.audioPath);
+  const originalAudioDuration = Number(task.payload?.audioSubmission?.duration);
+  const originalAudio = originalAudioUrl ? {
+    url: originalAudioUrl,
+    durationSeconds: Number.isFinite(originalAudioDuration) && originalAudioDuration > 0 ? originalAudioDuration : null,
+    filename: repairMojibakeText(task.payload?.audioSubmission?.name),
+    audioHash: safeString(task.payload?.audioHash, safeString(summary?.audioHash, passPayload.audioHash)),
+  } : null;
   return {
     analysisId,
     participantId: safeString(task.payload?.participantId),
@@ -1076,6 +1332,10 @@ function buildPiecePassPrimaryAnalysis({ task = {}, passPayload = {}, summary = 
     sectionTitle: safeString(sourceRow.sectionTitle),
     audioHash: safeString(task.payload?.audioHash, safeString(summary?.audioHash, passPayload.audioHash)),
     audioSubmission: task.payload?.audioSubmission || null,
+    originalAudio,
+    audioUrl: safeString(originalAudio?.url),
+    originalAudioUrl: safeString(originalAudio?.url),
+    audioDurationSeconds: originalAudio?.durationSeconds ?? null,
     overallPitchScore: clamp(safeNumber(sourceRow.overallPitchScore, 0), 0, 100),
     overallRhythmScore: clamp(safeNumber(sourceRow.overallRhythmScore, 0), 0, 100),
     studentPitchScore: clamp(safeNumber(sourceRow.studentPitchScore, safeNumber(sourceRow.overallPitchScore, 0)), 0, 100),
@@ -1218,6 +1478,14 @@ function buildWholePieceAnalysis({ task = {}, passPayload = {}, summary = null }
     0,
     100,
   );
+  const originalAudioUrl = toWebPathFromAbsolute(task.payload?.audioPath);
+  const originalAudioDuration = Number(task.payload?.audioSubmission?.duration);
+  const originalAudio = originalAudioUrl ? {
+    url: originalAudioUrl,
+    durationSeconds: Number.isFinite(originalAudioDuration) && originalAudioDuration > 0 ? originalAudioDuration : null,
+    filename: repairMojibakeText(task.payload?.audioSubmission?.name),
+    audioHash: safeString(task.payload?.audioHash, safeString(summary?.audioHash, passPayload.audioHash)),
+  } : null;
 
   return {
     analysisId: `${safeString(task.jobId, "piecepass")}-whole-piece`,
@@ -1231,6 +1499,10 @@ function buildWholePieceAnalysis({ task = {}, passPayload = {}, summary = null }
     sectionTitle: "整曲",
     audioHash: safeString(task.payload?.audioHash, safeString(summary?.audioHash, passPayload.audioHash)),
     audioSubmission: task.payload?.audioSubmission || null,
+    originalAudio,
+    audioUrl: safeString(originalAudio?.url),
+    originalAudioUrl: safeString(originalAudio?.url),
+    audioDurationSeconds: originalAudio?.durationSeconds ?? null,
     overallPitchScore,
     overallRhythmScore,
     studentPitchScore,
@@ -1333,14 +1605,16 @@ function launchPiecePassTask(task) {
             "1.05",
             "--scan-preprocess-mode",
             "off",
+            "--cache-dir",
+            "data/piece-pass/section-cache",
             "--scan-concurrency",
             "1",
             "--analysis-concurrency",
-            "3",
-            "--analysis-retry",
             "1",
+            "--analysis-retry",
+            "2",
             "--analysis-timeout-seconds",
-            "90",
+            "240",
           ]
         : []),
     ];
@@ -1415,6 +1689,33 @@ function launchPiecePassTask(task) {
         passPayload,
         summary: passSummary,
       });
+      const structuredSectionCount = Math.max(0, Math.round(safeNumber(passSummary?.structuredSectionCount, 0)));
+      const attemptedSectionCount = Math.max(0, Math.round(safeNumber(passSummary?.attemptedSectionCount, 0)));
+      const matchedSectionCount = Math.max(0, Math.round(safeNumber(passSummary?.matchedSectionCount, 0)));
+      if (!wholePieceAnalysis || structuredSectionCount <= 0 || attemptedSectionCount <= 0 || matchedSectionCount <= 0) {
+        await upsertPiecePassJob({
+          ...baseJob,
+          status: "failed",
+          progress: 1,
+          stage: "failed",
+          message: "整曲分析失败：没有得到可用的二胡旋律段落，请重新确认 PDF 声部识别结果。",
+          warnings: [
+            ...warnings,
+            `no analyzable erhu sections: structured=${structuredSectionCount}, attempted=${attemptedSectionCount}, matched=${matchedSectionCount}`,
+          ],
+          error: "no analyzable erhu sections",
+          outputDir,
+          summaryPath,
+          passJsonPath,
+          summary: passSummary,
+          primaryAnalysis: null,
+          wholePieceAnalysis: null,
+          durationMs: Date.now() - startedAt,
+          completedAt: nowIso(),
+          updatedAt: nowIso(),
+        });
+        return;
+      }
       const nextWarnings = analysisReliable
         ? warnings
         : [
@@ -1465,6 +1766,16 @@ async function finalizeScoreImportArtifacts({ job, scoreRecord }) {
   const store = await readScoreStore();
   if (scoreRecord) {
     const normalizedScore = normalizeImportedScoreRecord(scoreRecord);
+    const normalizedPdfHash = safeString(normalizedScore.pdfHash);
+    const normalizedSelectedPart = safeString(normalizedScore.selectedPart).toLowerCase();
+    if (normalizedPdfHash) {
+      store.scores = getArray(store.scores).filter((item) => {
+        if (safeString(item.scoreId) === normalizedScore.scoreId) return true;
+        if (safeString(item.pdfHash) !== normalizedPdfHash) return true;
+        const sameSelectedPart = safeString(item.selectedPart).toLowerCase() === normalizedSelectedPart;
+        return !sameSelectedPart;
+      });
+    }
     const existingScoreIndex = store.scores.findIndex((item) => item.scoreId === normalizedScore.scoreId);
     if (existingScoreIndex >= 0) {
       store.scores[existingScoreIndex] = normalizedScore;
@@ -1578,6 +1889,7 @@ function launchScoreImportTask(task) {
         omrStats: jobResult.omrStats,
         detectedParts: getArray(jobResult.detectedParts).length ? jobResult.detectedParts : [selectedPartHint],
         selectedPart: safeString(jobResult.selectedPart, selectedPartHint),
+        selectedPartId: safeString(jobResult.piecePack?.selectedPartId),
         selectedPartConfidence: safeNumber(jobResult.selectedPartConfidence, safeNumber(jobResult.piecePack?.selectedPartConfidence, 0)),
         partCandidates: getArray(jobResult.partCandidates || jobResult.piecePack?.partCandidates),
         markingStats: jobResult.markingStats || jobResult.piecePack?.markingStats || buildMarkingStatsFromSections(importedSections),
@@ -1716,7 +2028,7 @@ function getImportedScoreSection(store, scoreId, sectionId) {
   const score = getImportedScore(store, scoreId);
   if (!score) return null;
   const section = score.sections.find((item) => item.sectionId === sectionId) || null;
-  return section ? buildErhuOnlyImportedSection(section) : null;
+  return section ? buildErhuOnlyImportedSection(section, score) : null;
 }
 
 function meterBeatsValue(meter = "4/4") {
@@ -1758,9 +2070,9 @@ function isImportedFullScoreSection(section = {}) {
 function getSelectedPartCandidate(score = {}) {
   const candidates = getArray(score?.partCandidates);
   if (!candidates.length) return null;
-  const selected = safeString(score?.selectedPart || score?.selectedPartId).trim().toLowerCase();
+  const selected = safeString(score?.selectedPartId || score?.selectedPart).trim().toLowerCase();
   return candidates.find((candidate) => (
-    [candidate?.id, candidate?.name, candidate?.label]
+    [candidate?.id, candidate?.selectionKey, candidate?.qualifiedLabel, candidate?.name, candidate?.label]
       .map((item) => safeString(item).trim().toLowerCase())
       .includes(selected)
   )) || candidates[0] || null;
@@ -1771,13 +2083,49 @@ function isExplicitErhuPartCandidate(candidate = {}) {
   return /\berhu\b|二胡/i.test(label);
 }
 
+function hasAccompanimentPartCandidate(score = {}) {
+  return getArray(score?.partCandidates).some((candidate) => {
+    const label = `${safeString(candidate?.id)} ${safeString(candidate?.name)} ${safeString(candidate?.label)}`;
+    return /\b(piano|pno|accompaniment)\b|钢琴|伴奏|閽㈢惔|閶肩惔/i.test(label)
+      || safeBoolean(candidate?.isLikelyPiano, false)
+      || Math.max(1, safeNumber(candidate?.staffCount, 1)) >= 2;
+  });
+}
+
 function isCleanSoloSelectedPart(score = {}) {
   const candidate = getSelectedPartCandidate(score);
   if (!candidate) return false;
   if (isExplicitErhuPartCandidate(candidate)) return true;
+  if (hasAccompanimentPartCandidate(score)) return false;
   return !safeBoolean(candidate?.isLikelyPiano, false)
     && safeNumber(candidate?.chordRatio, 0) < 0.18
     && Math.max(1, safeNumber(candidate?.staffCount, 1)) <= 1;
+}
+
+function getImportedProjectionSource(section = {}, score = {}) {
+  return getArray(section?.partCandidates).length ? section : score;
+}
+
+function isBlockedImportedProjection(section = {}, score = {}) {
+  const mode = safeString(section?.erhuProjectionMode).trim().toLowerCase();
+  if (mode === "blocked") return true;
+  const source = getImportedProjectionSource(section, score);
+  const candidate = getSelectedPartCandidate(source);
+  if (!candidate) return false;
+  if (isExplicitErhuPartCandidate(candidate)) return false;
+  if (!hasAccompanimentPartCandidate(source)) return false;
+  const sectionConfidence = safeNumber(section?.selectedPartConfidence, Number.NaN);
+  const sourceConfidence = safeNumber(source?.selectedPartConfidence, 0);
+  const confidence = Number.isFinite(sectionConfidence) && sectionConfidence > 0
+    ? sectionConfidence
+    : sourceConfidence;
+  return confidence < 0.62
+    && (
+      safeBoolean(candidate?.isLikelyAccompanimentSplit, false)
+      || safeBoolean(candidate?.isAfterExplicitPiano, false)
+      || safeBoolean(candidate?.isLikelyPiano, false)
+      || !safeBoolean(candidate?.safeForErhuProjection, false)
+    );
 }
 
 function isErhuMelodySystemIndex(systemIndex, score = {}) {
@@ -1789,11 +2137,20 @@ function isErhuMelodySystemIndex(systemIndex, score = {}) {
 
 function isErhuMelodyNote(note = {}, section = {}, score = {}) {
   if (!isImportedFullScoreSection(section)) return true;
+  if (isBlockedImportedProjection(section, score)) return false;
+  const source = getImportedProjectionSource(section, score);
+  const accompanimentPresent = hasAccompanimentPartCandidate(source) || hasAccompanimentPartCandidate(score);
+  const lineRole = safeString(note?.notePosition?.scoreLineRole).toLowerCase();
+  const lineConfidence = safeNumber(note?.notePosition?.scoreLineConfidence, 0);
+  if (lineRole === "erhu" && lineConfidence >= 0.66) return true;
+  if (lineRole) return false;
+  if (accompanimentPresent) return false;
   return isErhuMelodySystemIndex(note?.notePosition?.systemIndex, score);
 }
 
 function buildErhuOnlyImportedSection(section = {}, score = {}) {
   if (!isImportedFullScoreSection(section)) return section;
+  if (isBlockedImportedProjection(section, score)) return null;
   const notes = getArray(section?.notes);
   const notesWithSystem = notes.filter((note) => Number.isFinite(safeNumber(note?.notePosition?.systemIndex, Number.NaN)));
   if (!notesWithSystem.length) return section;
@@ -1904,6 +2261,11 @@ function toWebPathFromAbsolute(filePath) {
   const relative = path.relative(DATA_DIR, absolute);
   if (relative && !relative.startsWith("..")) {
     return toWebDataPath(relative);
+  }
+  const aliasDataDir = path.join(ASCII_RUNTIME_ROOT, "data");
+  const aliasRelative = path.relative(aliasDataDir, absolute);
+  if (aliasRelative && !aliasRelative.startsWith("..") && !path.isAbsolute(aliasRelative)) {
+    return toWebDataPath(aliasRelative);
   }
   return absolute;
 }
@@ -4965,7 +5327,7 @@ app.post("/api/erhu/scores/import-pdf", upload.single("pdf"), async (req, res) =
   const knownPiece = findKnownPieceForPdf(titleHint, req.file.originalname || "");
   const fallbackPiece = knownPiece ? cloneLibraryPieceForImport(knownPiece) : null;
   const store = await readScoreStore();
-  const reusableScore = findReusableImportedScore(store, { pdfHash, selectedPart: selectedPartHint });
+  const reusableScore = findReusableImportedScore(store, { pdfHash, selectedPart: selectedPartHint, allowReuse: true });
 
   await fs.mkdir(jobDir, { recursive: true });
   await fs.writeFile(pdfPath, req.file.buffer);
@@ -5004,6 +5366,8 @@ app.post("/api/erhu/scores/import-pdf", upload.single("pdf"), async (req, res) =
       detectedParts: reusableScoreRecord.detectedParts,
       selectedPart: reusableScoreRecord.selectedPart,
       selectedPartCandidates: reusableScoreRecord.detectedParts,
+      selectedPartConfidence: reusableScoreRecord.selectedPartConfidence,
+      partCandidates: reusableScoreRecord.partCandidates,
       omrStats: buildReusedOmrStats(reusableScoreRecord.omrStats, previewPages),
       warnings: ["已复用相同 PDF 的识谱结果，已跳过重复读谱。"],
       cacheHit: true,
@@ -5169,6 +5533,7 @@ app.post("/api/erhu/scores/import-pdf", upload.single("pdf"), async (req, res) =
       omrConfidence: safeNumber(jobResult.omrConfidence, 0),
       detectedParts: getArray(jobResult.detectedParts).length ? jobResult.detectedParts : ["erhu"],
       selectedPart: safeString(jobResult.selectedPart, "erhu"),
+      selectedPartId: safeString(jobResult.piecePack?.selectedPartId),
       selectedPartConfidence: safeNumber(jobResult.selectedPartConfidence, safeNumber(jobResult.piecePack?.selectedPartConfidence, 0)),
       partCandidates: getArray(jobResult.partCandidates || jobResult.piecePack?.partCandidates),
       markingStats: jobResult.markingStats || jobResult.piecePack?.markingStats || buildMarkingStatsFromSections(importedSections),

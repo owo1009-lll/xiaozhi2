@@ -240,7 +240,20 @@ async function main() {
         const pieceJob = await pollPiecePass(args.baseUrl, result.piecePassJobId);
         result.analysisMs = Date.now() - analysisStart;
         result.piecePassJob = pieceJob;
-        result.status = pieceJob.status === "completed" ? "completed" : "failed";
+        const summary = pieceJob.summary || {};
+        const structured = Number(summary.structuredSectionCount || 0);
+        const attempted = Number(summary.attemptedSectionCount || 0);
+        const matched = Number(summary.matchedSectionCount || 0);
+        const usableWholePiece =
+          pieceJob.status === "completed"
+          && pieceJob.wholePieceAnalysis
+          && structured > 0
+          && attempted > 0
+          && matched > 0;
+        result.status = usableWholePiece ? "completed" : "failed";
+        if (!usableWholePiece) {
+          result.error = pieceJob.error || `unusable whole-piece result: structured=${structured}, attempted=${attempted}, matched=${matched}`;
+        }
       } catch (error) {
         result.status = "failed";
         result.error = String(error?.message || error);

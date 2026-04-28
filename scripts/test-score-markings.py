@@ -161,6 +161,51 @@ MERGED_VOICE_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
 </score-partwise>
 """
 
+SYSTEM_MERGED_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <defaults>
+    <page-layout>
+      <page-height>1600</page-height>
+      <page-width>1200</page-width>
+    </page-layout>
+  </defaults>
+  <part-list>
+    <score-part id="P1"><part-name>Voice</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1" width="420">
+      <print new-system="yes"><system-layout><top-system-distance>120</top-system-distance></system-layout></print>
+      <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+      <note default-x="60"><pitch><step>D</step><octave>5</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2" width="420">
+      <print new-system="yes"><system-layout><top-system-distance>260</top-system-distance></system-layout></print>
+      <note default-x="60"><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+      <note default-x="60"><chord/><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3" width="420">
+      <print new-system="yes"><system-layout><top-system-distance>400</top-system-distance></system-layout></print>
+      <note default-x="60"><pitch><step>C</step><octave>3</octave></pitch><duration>4</duration></note>
+      <note default-x="60"><chord/><pitch><step>G</step><octave>3</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4" width="420">
+      <print new-system="yes"><system-layout><top-system-distance>540</top-system-distance></system-layout></print>
+      <note default-x="60"><pitch><step>E</step><octave>5</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="5" width="420">
+      <print new-system="yes"><system-layout><top-system-distance>680</top-system-distance></system-layout></print>
+      <note default-x="60"><pitch><step>G</step><octave>3</octave></pitch><duration>4</duration></note>
+      <note default-x="60"><chord/><pitch><step>B</step><octave>3</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="6" width="420">
+      <print new-system="yes"><system-layout><top-system-distance>820</top-system-distance></system-layout></print>
+      <note default-x="60"><pitch><step>A</step><octave>2</octave></pitch><duration>4</duration></note>
+      <note default-x="60"><chord/><pitch><step>E</step><octave>3</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 
 def require(condition: bool, message: str) -> None:
     if not condition:
@@ -204,13 +249,39 @@ def main() -> int:
             "Merged Voice",
             1,
         )
+        system_source = Path(tmp) / "system-merged-voice.musicxml"
+        system_source.write_text(SYSTEM_MERGED_MUSICXML, encoding="utf-8")
+        system_request = ScoreImportRequest(
+            jobId="system-merged-voice-test",
+            pdfPath=str(system_source),
+            originalFilename="system-merged-voice.musicxml",
+            titleHint="System Merged Voice Test",
+            selectedPartHint="Voice",
+        )
+        system_section, *_ = analyzer._parse_musicxml_source_to_section(
+            system_source,
+            system_request,
+            "Voice",
+            "page-001-s01",
+            "System Merged Voice",
+            1,
+        )
 
     require(section is not None, "MusicXML did not produce a section.")
     require(merged_section is not None, "Merged voice MusicXML did not produce a section.")
+    require(system_section is not None, "System-merged voice MusicXML did not produce a section.")
     merged_notes = merged_section["notes"]
     merged_staffs = {int(note["notePosition"]["staffIndex"]) for note in merged_notes if note.get("notePosition")}
     require(merged_staffs == {1}, f"Merged voice should keep only erhu/top staff, got {merged_staffs}.")
     require([note["midiPitch"] for note in merged_notes] == [74, 76], "Merged voice should keep the top erhu melody pitches.")
+    require(
+        merged_section.get("scoreLineStats", {}).get("erhuNoteCount") == 2,
+        "Merged voice should mark retained notes as erhu line notes.",
+    )
+    system_notes = system_section["notes"]
+    system_systems = {int(note["notePosition"]["systemIndex"]) for note in system_notes if note.get("notePosition")}
+    require(system_systems == {1, 4}, f"Three-line system split should keep only erhu systems 1 and 4, got {system_systems}.")
+    require([note["midiPitch"] for note in system_notes] == [74, 76], "Three-line system split should exclude piano accompaniment lines.")
     notes = section["notes"]
     first_note = notes[0]
     require(selected_part == "Erhu", f"Expected Erhu selected part, got {selected_part!r}.")

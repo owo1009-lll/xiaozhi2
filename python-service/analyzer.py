@@ -1368,11 +1368,23 @@ class ErhuAnalyzer:
             if part_id:
                 part_names[part_id] = part_name or part_id
 
-        candidates: list[dict[str, Any]] = []
-        normalized_hint = normalize_part_label(selected_hint)
-        for part in [element for element in root.iter() if self._xml_local_tag(element) == "part"]:
+        part_elements = [element for element in root.iter() if self._xml_local_tag(element) == "part"]
+        normalized_label_counts: dict[str, int] = {}
+        part_order: list[tuple[int, ET.Element, str, str]] = []
+        explicit_piano_part_index: int | None = None
+        for part_index, part in enumerate(part_elements, start=1):
             part_id = part.attrib.get("id", "").strip()
             part_name = part_names.get(part_id, part_id or "Voice")
+            normalized_label = normalize_part_label(part_name)
+            normalized_label_counts[normalized_label] = normalized_label_counts.get(normalized_label, 0) + 1
+            part_order.append((part_index, part, part_id, part_name))
+            part_name_lower = part_name.lower()
+            if explicit_piano_part_index is None and ("piano" in part_name_lower or "閽㈢惔" in part_name or "閶肩惔" in part_name or "闁姐垻鎯?" in part_name):
+                explicit_piano_part_index = part_index
+
+        candidates: list[dict[str, Any]] = []
+        normalized_hint = normalize_part_label(selected_hint)
+        for part_index, part, part_id, part_name in part_order:
             pitches: list[int] = []
             staff_indices: set[int] = set()
             note_count = 0
@@ -1426,27 +1438,69 @@ class ErhuAnalyzer:
             erhu_name = ("erhu" in name_lower) or ("二胡" in part_name) or ("浜岃儭" in part_name)
             piano_name = "piano" in name_lower or "钢琴" in part_name or "鋼琴" in part_name or "閽㈢惔" in part_name
             voice_name = "voice" in name_lower or normalized_name == "voice"
+            duplicate_label_count = normalized_label_counts.get(normalized_name, 0)
+            is_generic_voice = voice_name and not erhu_name and not piano_name
+            is_after_explicit_piano = explicit_piano_part_index is not None and part_index > explicit_piano_part_index
             range_hits = sum(1 for value in pitches if 52 <= value <= 96)
             range_ratio = (range_hits / len(pitches)) if pitches else 0.0
             chord_ratio = (chord_count / max(1, note_count)) if note_count else 0.0
+            low_range_penalty = 0.0
+            if min_pitch and min_pitch < 48:
+                low_range_penalty = min(0.22, ((48 - min_pitch) / 24.0) * 0.12)
+            dense_voice_penalty = 0.12 if note_count >= 60 and chord_ratio >= 0.1 else 0.0
+            after_piano_penalty = 0.36 if is_generic_voice and is_after_explicit_piano else 0.0
+            chord_penalty = min(0.28, chord_ratio * 0.9) if chord_ratio >= 0.12 else min(0.14, chord_ratio * 0.55)
+            likely_accompaniment_split = bool(
+                is_generic_voice
+                and (
+                    is_after_explicit_piano
+                    or chord_ratio >= 0.18
+                    or min_pitch < 48
+                    or (note_count >= 60 and chord_ratio >= 0.1)
+                )
+            )
+            safe_for_erhu_projection = bool(
+                erhu_name
+                or (
+                    note_count >= 4
+                    and staff_count == 1
+                    and range_ratio >= 0.72
+                    and chord_ratio <= 0.12
+                    and min_pitch >= 52
+                    and not likely_accompaniment_split
+                    and (not is_after_explicit_piano or explicit_piano_part_index is None)
+                )
+            )
             score = (
                 0.18
                 + min(0.22, note_count / 480.0)
                 + (range_ratio * 0.28)
                 + (0.16 if staff_count == 1 else -0.16)
                 + (0.14 if pitch_span <= 36 else -0.04)
-                - min(0.18, chord_ratio * 0.7)
+                - chord_penalty
                 + (0.25 if erhu_name else 0.0)
                 + (0.08 if voice_name else 0.0)
                 - (0.35 if piano_name else 0.0)
+                - low_range_penalty
+                - dense_voice_penalty
+                - after_piano_penalty
+                + (0.18 if safe_for_erhu_projection else 0.0)
             )
             if normalized_hint and normalized_hint in normalize_part_label(part_name):
                 score += 0.12
+            if note_count <= 0:
+                score = 0.0
+            elif note_count < 4:
+                score -= 0.14
+            selection_key = part_id or part_name
             candidates.append(
                 {
+                    "partIndex": part_index,
                     "id": part_id,
                     "name": part_name,
                     "label": part_name,
+                    "selectionKey": selection_key,
+                    "qualifiedLabel": f"{part_name} [{part_id}]" if duplicate_label_count > 1 and part_id else part_name,
                     "score": round(max(0.0, min(1.0, score)), 3),
                     "noteCount": note_count,
                     "measureCount": measure_count,
@@ -1455,6 +1509,10 @@ class ErhuAnalyzer:
                     "erhuRangeRatio": round(range_ratio, 3),
                     "chordRatio": round(chord_ratio, 3),
                     "isLikelyPiano": bool(piano_name or staff_count >= 2 or chord_ratio > 0.18),
+                    "isGenericVoice": bool(is_generic_voice),
+                    "isAfterExplicitPiano": bool(is_after_explicit_piano),
+                    "isLikelyAccompanimentSplit": likely_accompaniment_split,
+                    "safeForErhuProjection": safe_for_erhu_projection,
                 }
             )
         candidates.sort(key=lambda item: (float(item.get("score", 0.0)), int(item.get("noteCount", 0))), reverse=True)
@@ -1466,26 +1524,167 @@ class ErhuAnalyzer:
         else:
             confidence = 0.0
         for index, candidate in enumerate(candidates):
+            candidate_confidence = confidence if index == 0 else max(0.25, confidence - 0.18)
+            if not bool(candidate.get("safeForErhuProjection")):
+                candidate_confidence = min(candidate_confidence, 0.58 if index == 0 else 0.42)
             candidate["rank"] = index + 1
-            candidate["selectedPartConfidence"] = round(confidence if index == 0 else max(0.25, confidence - 0.18), 3)
+            candidate["selectedPartConfidence"] = round(candidate_confidence, 3)
         return candidates
+
+    def _candidate_matches_selected_hint(self, candidate: dict[str, Any], selected_hint: str | None) -> bool:
+        raw_hint = str(selected_hint or "").strip()
+        if not raw_hint:
+            return False
+        raw_hint_lower = raw_hint.lower()
+        candidate_id = str(candidate.get("id") or "").strip().lower()
+        candidate_key = str(candidate.get("selectionKey") or "").strip().lower()
+        candidate_qualified = str(candidate.get("qualifiedLabel") or "").strip().lower()
+        if raw_hint_lower and raw_hint_lower in {candidate_id, candidate_key, candidate_qualified}:
+            return True
+        normalized_hint = normalize_part_label(selected_hint)
+        if not normalized_hint:
+            return False
+        for field in ("label", "name", "qualifiedLabel"):
+            normalized_value = normalize_part_label(str(candidate.get(field) or ""))
+            if normalized_value and (normalized_hint in normalized_value or normalized_value in normalized_hint):
+                return True
+        return False
 
     def _resolve_selected_part_from_candidates(
         self,
         candidates: list[dict[str, Any]],
         selected_hint: str | None,
-    ) -> tuple[str, float]:
+    ) -> tuple[dict[str, Any] | None, float]:
         if not candidates:
-            return self._resolve_selected_part([], selected_hint), 0.0
-        normalized_hint = normalize_part_label(selected_hint)
-        if normalized_hint:
-            for candidate in candidates:
-                label = str(candidate.get("label") or candidate.get("name") or "").strip()
-                normalized_label = normalize_part_label(label)
-                if normalized_label and (normalized_hint in normalized_label or normalized_label in normalized_hint):
-                    return label, float(candidate.get("selectedPartConfidence", candidate.get("score", 0.65)))
-        best = candidates[0]
-        return str(best.get("label") or best.get("name") or "erhu"), float(best.get("selectedPartConfidence", best.get("score", 0.5)))
+            return None, 0.0
+        for candidate in candidates:
+            if self._candidate_matches_selected_hint(candidate, selected_hint):
+                return candidate, float(candidate.get("selectedPartConfidence", candidate.get("score", 0.65)))
+        safe_candidates = [
+            candidate
+            for candidate in candidates
+            if bool(candidate.get("safeForErhuProjection")) and int(safe_float(candidate.get("noteCount"), 0)) > 0
+        ]
+        best = safe_candidates[0] if safe_candidates else candidates[0]
+        return best, float(best.get("selectedPartConfidence", best.get("score", 0.5)))
+
+    def _extract_candidate_layout_profile(self, parsed_notes: list[SymbolicNote]) -> dict[str, float | bool]:
+        y_values: list[float] = []
+        pitch_values: list[float] = []
+        system_values: list[int] = []
+        for note in parsed_notes or []:
+            position = getattr(note, "notePosition", None) or getattr(note, "note_position", None) or {}
+            normalized_y = safe_float(position.get("normalizedY"), None)
+            if normalized_y is not None:
+                y_values.append(float(normalized_y))
+            system_index = int(safe_float(position.get("systemIndex"), 0))
+            if system_index > 0:
+                system_values.append(system_index)
+            pitch_values.append(float(getattr(note, "midiPitch", getattr(note, "midi_pitch", 0)) or 0))
+        if not y_values:
+            return {
+                "hasLayout": False,
+                "medianY": 1.0,
+                "minY": 1.0,
+                "maxY": 1.0,
+                "ySpread": 1.0,
+                "medianPitch": 0.0,
+                "systemCount": 0.0,
+            }
+        median_y = trimmed_median(y_values, 0.12)
+        min_y = min(y_values)
+        max_y = max(y_values)
+        median_pitch = trimmed_median(pitch_values, 0.12) if pitch_values else 0.0
+        return {
+            "hasLayout": True,
+            "medianY": float(median_y),
+            "minY": float(min_y),
+            "maxY": float(max_y),
+            "ySpread": float(max_y - min_y),
+            "medianPitch": float(median_pitch),
+            "systemCount": float(len(set(system_values))),
+        }
+
+    def _score_layout_candidate(
+        self,
+        candidate: dict[str, Any],
+        profile: dict[str, float | bool],
+    ) -> float:
+        base_score = max(0.0, min(1.0, safe_float(candidate.get("score"), 0.0)))
+        if not bool(profile.get("hasLayout")):
+            return base_score
+        median_y = max(0.0, min(1.0, safe_float(profile.get("medianY"), 1.0)))
+        y_spread = max(0.0, min(1.0, safe_float(profile.get("ySpread"), 1.0)))
+        median_pitch = safe_float(profile.get("medianPitch"), 0.0)
+        top_bias = 1.0 - median_y
+        compactness = 1.0 - min(1.0, y_spread / 0.42)
+        pitch_bias = max(0.0, min(1.0, (median_pitch - 52.0) / 28.0))
+        layout_score = (base_score * 0.56) + (top_bias * 0.28) + (compactness * 0.08) + (pitch_bias * 0.08)
+        if bool(candidate.get("isLikelyAccompanimentSplit")):
+            layout_score -= 0.18
+        if bool(candidate.get("isAfterExplicitPiano")):
+            layout_score -= 0.12
+        if bool(candidate.get("isLikelyPiano")):
+            layout_score -= 0.18
+        return max(0.0, min(1.0, layout_score))
+
+    def _refine_selected_part_candidate_with_layout(
+        self,
+        xml_text: str,
+        request: AnalyzeRequest,
+        candidates: list[dict[str, Any]],
+        selected_candidate: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        if not candidates:
+            return selected_candidate
+        if self._is_explicit_erhu_part_candidate(selected_candidate):
+            return selected_candidate
+        safe_candidates = [
+            candidate
+            for candidate in candidates
+            if bool(candidate.get("safeForErhuProjection")) and int(safe_float(candidate.get("noteCount"), 0)) > 0
+        ]
+        if len(safe_candidates) < 2:
+            return selected_candidate
+
+        preview_candidates = safe_candidates[: min(3, len(safe_candidates))]
+        scored_previews: list[tuple[float, dict[str, Any], dict[str, float | bool]]] = []
+        for candidate in preview_candidates:
+            candidate_hint = str(candidate.get("selectionKey") or candidate.get("id") or candidate.get("label") or "").strip()
+            if not candidate_hint:
+                continue
+            preview_notes = self._parse_musicxml_score(xml_text, request, candidate_hint)
+            profile = self._extract_candidate_layout_profile(preview_notes)
+            if not bool(profile.get("hasLayout")):
+                continue
+            scored_previews.append((self._score_layout_candidate(candidate, profile), candidate, profile))
+        if not scored_previews:
+            return selected_candidate
+
+        scored_previews.sort(key=lambda item: item[0], reverse=True)
+        best_score, best_candidate, _best_profile = scored_previews[0]
+        current_candidate = selected_candidate or preview_candidates[0]
+        current_entry = next(
+            (item for item in scored_previews if str(item[1].get("selectionKey") or item[1].get("id") or "") == str(current_candidate.get("selectionKey") or current_candidate.get("id") or "")),
+            None,
+        )
+        current_score = current_entry[0] if current_entry else self._score_layout_candidate(
+            current_candidate,
+            self._extract_candidate_layout_profile(
+                self._parse_musicxml_score(
+                    xml_text,
+                    request,
+                    str(current_candidate.get("selectionKey") or current_candidate.get("id") or current_candidate.get("label") or "").strip(),
+                )
+            ),
+        )
+        if best_candidate is current_candidate:
+            return current_candidate
+        if best_score >= (current_score + 0.08):
+            return best_candidate
+        if not bool(current_candidate.get("safeForErhuProjection")) and bool(best_candidate.get("safeForErhuProjection")):
+            return best_candidate
+        return current_candidate
 
     def _extract_dynamic_label(self, dynamics_node: ET.Element | None, sound_value: str | None = None) -> tuple[str, float | None]:
         if dynamics_node is not None:
@@ -1530,8 +1729,8 @@ class ErhuAnalyzer:
             if part_id:
                 part_names[part_id] = (name_node.text or part_id).strip() if name_node is not None else part_id
         candidates = self._extract_musicxml_part_candidates(xml_text, selected_part_hint)
-        selected_label, _ = self._resolve_selected_part_from_candidates(candidates, selected_part_hint)
-        selected_part_id = next((part_id for part_id, name in part_names.items() if name == selected_label), "")
+        selected_candidate, _ = self._resolve_selected_part_from_candidates(candidates, selected_part_hint)
+        selected_part_id = str((selected_candidate or {}).get("id") or "").strip()
         parts = [element for element in root.iter() if self._xml_local_tag(element) == "part"]
         part = next((element for element in parts if element.attrib.get("id", "").strip() == selected_part_id), parts[0] if parts else None)
         if part is None:
@@ -1692,9 +1891,14 @@ class ErhuAnalyzer:
 
         detected_parts = self._extract_musicxml_parts(xml_text)
         part_candidates = self._extract_musicxml_part_candidates(xml_text, selected_part_hint)
-        resolved_part, selected_part_confidence = self._resolve_selected_part_from_candidates(part_candidates, selected_part_hint)
+        resolved_candidate, selected_part_confidence = self._resolve_selected_part_from_candidates(part_candidates, selected_part_hint)
+        resolved_part = str((resolved_candidate or {}).get("selectionKey") or (resolved_candidate or {}).get("id") or "").strip()
+        resolved_part_label = str((resolved_candidate or {}).get("label") or (resolved_candidate or {}).get("name") or "").strip()
+        resolved_part_id = str((resolved_candidate or {}).get("id") or "").strip()
         if not resolved_part:
             resolved_part = self._resolve_selected_part(detected_parts, selected_part_hint)
+        if not resolved_part_label:
+            resolved_part_label = self._resolve_selected_part(detected_parts, selected_part_hint)
         detected_tempo = self._extract_musicxml_tempo(xml_text)
         # If MusicXML has no tempo (Audiveris missed it), try image-based OCR on the page PDF.
         # Typical layout: pagewise/page-NNN/page-NNN.mxl → PDF at pagewise/page-NNN.pdf
@@ -1723,6 +1927,18 @@ class ErhuAnalyzer:
                 "scoreSource": {"format": "musicxml", "encoding": "utf-8", "data": xml_text},
             },
         )
+        refined_candidate = self._refine_selected_part_candidate_with_layout(
+            xml_text,
+            temp_request,
+            part_candidates,
+            resolved_candidate,
+        )
+        if refined_candidate is not None:
+            resolved_candidate = refined_candidate
+            resolved_part = str((resolved_candidate or {}).get("selectionKey") or (resolved_candidate or {}).get("id") or resolved_part).strip() or resolved_part
+            resolved_part_label = str((resolved_candidate or {}).get("label") or (resolved_candidate or {}).get("name") or resolved_part_label).strip() or resolved_part_label
+            resolved_part_id = str((resolved_candidate or {}).get("id") or resolved_part_id).strip() or resolved_part_id
+            selected_part_confidence = float((resolved_candidate or {}).get("selectedPartConfidence", selected_part_confidence or 0.0))
         parsed_notes = self._parse_musicxml_score(xml_text, temp_request, resolved_part)
         if not parsed_notes:
             return None, detected_parts, resolved_part, part_candidates, {}
@@ -1735,6 +1951,25 @@ class ErhuAnalyzer:
             page_number,
             detected_tempo,
         )
+        score_line_counts: dict[str, int] = {}
+        score_line_sources: dict[str, int] = {}
+        for note in parsed_notes:
+            note_position = getattr(note, "note_position", None) or {}
+            role = str(note_position.get("scoreLineRole") or "missing")
+            source = str(note_position.get("scoreLineSource") or "missing")
+            score_line_counts[role] = score_line_counts.get(role, 0) + 1
+            score_line_sources[source] = score_line_sources.get(source, 0) + 1
+        score_line_note_count = max(1, len(parsed_notes))
+        score_line_stats = {
+            "noteCount": len(parsed_notes),
+            "erhuNoteCount": int(score_line_counts.get("erhu", 0)),
+            "accompanimentNoteCount": int(score_line_counts.get("accompaniment", 0)),
+            "unknownNoteCount": int(score_line_counts.get("unknown", 0) + score_line_counts.get("missing", 0)),
+            "erhuRatio": round(float(score_line_counts.get("erhu", 0)) / score_line_note_count, 3),
+            "splitApplied": bool(score_line_counts.get("erhu", 0) and score_line_counts.get("accompaniment", 0)),
+            "roleCounts": score_line_counts,
+            "sourceCounts": score_line_sources,
+        }
 
         section = {
             "sectionId": section_id,
@@ -1765,9 +2000,14 @@ class ErhuAnalyzer:
             "dynamicChanges": score_markings.get("dynamicChanges", []),
             "repeatStructure": score_markings.get("repeatStructure", []),
             "partCandidates": part_candidates,
+            "selectedPart": resolved_part_label or resolved_part,
+            "selectedPartId": resolved_part_id,
             "selectedPartConfidence": round(float(selected_part_confidence or 0.0), 3),
+            "erhuProjectionMode": "exact" if bool((resolved_candidate or {}).get("safeForErhuProjection")) else "blocked",
+            "erhuProjectionReason": "" if bool((resolved_candidate or {}).get("safeForErhuProjection")) else "no-safe-erhu-part-candidate",
+            "scoreLineStats": score_line_stats,
         }
-        return section, detected_parts, resolved_part, part_candidates, score_markings.get("markingStats", {})
+        return section, detected_parts, resolved_part_label or resolved_part, part_candidates, score_markings.get("markingStats", {})
 
     def _build_piece_pack_from_musicxml_sources(
         self,
@@ -1784,7 +2024,15 @@ class ErhuAnalyzer:
             "dynamicChangeCount": 0,
             "repeatCount": 0,
         }
+        aggregate_score_line_stats: dict[str, int] = {
+            "noteCount": 0,
+            "erhuNoteCount": 0,
+            "accompanimentNoteCount": 0,
+            "unknownNoteCount": 0,
+        }
         resolved_part = selected_part_hint or "erhu"
+        resolved_part_label = selected_part_hint or "erhu"
+        resolved_part_id = ""
         multiple_sources = len(musicxml_sources) > 1
 
         for index, source_path in enumerate(musicxml_sources, start=1):
@@ -1799,8 +2047,11 @@ class ErhuAnalyzer:
                 index,
             )
             for candidate in part_candidates:
-                label = str(candidate.get("label") or candidate.get("name") or "").strip()
-                if label and not any(str(existing.get("label") or existing.get("name") or "") == label for existing in all_part_candidates):
+                candidate_key = str(candidate.get("selectionKey") or candidate.get("id") or candidate.get("label") or candidate.get("name") or "").strip()
+                if candidate_key and not any(
+                    str(existing.get("selectionKey") or existing.get("id") or existing.get("label") or existing.get("name") or "").strip() == candidate_key
+                    for existing in all_part_candidates
+                ):
                     all_part_candidates.append(candidate)
             for key in aggregate_marking_stats:
                 aggregate_marking_stats[key] += int(safe_float(marking_stats.get(key), 0))
@@ -1809,6 +2060,11 @@ class ErhuAnalyzer:
                     detected_parts.append(part_name)
             resolved_part = next_resolved_part or resolved_part
             if section:
+                resolved_part_label = str(section.get("selectedPart") or resolved_part_label or resolved_part).strip() or resolved_part_label
+                resolved_part_id = str(section.get("selectedPartId") or resolved_part_id).strip()
+                section_line_stats = section.get("scoreLineStats") or {}
+                for key in aggregate_score_line_stats:
+                    aggregate_score_line_stats[key] += int(safe_float(section_line_stats.get(key), 0))
                 page_image_path = ""
                 if request.outputDir:
                     candidate_image = Path(request.outputDir) / "pagewise" / f"page-{index:03d}.png"
@@ -1819,21 +2075,26 @@ class ErhuAnalyzer:
                 sections.extend(self._chunk_imported_section(section))
 
         if not sections:
-            return None, detected_parts or [selected_part_hint], resolved_part
+            return None, detected_parts or [selected_part_hint], resolved_part_label or resolved_part
 
         piece_pack = {
             "pieceId": request.jobId,
             "title": request.titleHint or request.originalFilename or request.jobId,
             "composer": "Audiveris OMR",
-            "selectedPart": resolved_part,
-            "detectedParts": detected_parts or [resolved_part],
+            "selectedPart": resolved_part_label or resolved_part,
+            "selectedPartId": resolved_part_id,
+            "detectedParts": detected_parts or [resolved_part_label or resolved_part],
             "selectedPartConfidence": round(
                 float(
                     next(
                         (
                             item.get("selectedPartConfidence", item.get("score", 0.0))
                             for item in all_part_candidates
-                            if str(item.get("label") or item.get("name") or "") == resolved_part
+                            if (
+                                str(item.get("selectionKey") or item.get("id") or "").strip() == resolved_part
+                                or str(item.get("id") or "").strip() == resolved_part_id
+                                or str(item.get("label") or item.get("name") or "").strip() == resolved_part_label
+                            )
                         ),
                         0.0,
                     )
@@ -1842,9 +2103,21 @@ class ErhuAnalyzer:
             ),
             "partCandidates": all_part_candidates,
             "markingStats": aggregate_marking_stats,
+            "scoreLineStats": {
+                **aggregate_score_line_stats,
+                "erhuRatio": round(
+                    float(aggregate_score_line_stats.get("erhuNoteCount", 0))
+                    / max(1, int(aggregate_score_line_stats.get("noteCount", 0))),
+                    3,
+                ),
+                "splitApplied": bool(
+                    aggregate_score_line_stats.get("erhuNoteCount", 0)
+                    and aggregate_score_line_stats.get("accompanimentNoteCount", 0)
+                ),
+            },
             "sections": sections,
         }
-        return piece_pack, list(piece_pack["detectedParts"]), resolved_part
+        return piece_pack, list(piece_pack["detectedParts"]), resolved_part_label or resolved_part
 
     def _chunk_imported_section(self, section: dict[str, Any]) -> list[dict[str, Any]]:
         notes = list(section.get("notes") or [])
@@ -1919,6 +2192,11 @@ class ErhuAnalyzer:
                 }
                 for note in current_notes
             ]
+            chunk_role_counts: dict[str, int] = {}
+            for note in sanitized_notes:
+                role = str((note.get("notePosition") or {}).get("scoreLineRole") or "missing")
+                chunk_role_counts[role] = chunk_role_counts.get(role, 0) + 1
+            chunk_note_count = max(1, len(sanitized_notes))
             chunk = {
                 **section,
                 "sectionId": f"{section.get('sectionId', 'section')}-s{chunk_index:02d}",
@@ -1929,6 +2207,15 @@ class ErhuAnalyzer:
                 "measureRange": [min(current_measures), max(current_measures)] if current_measures else [],
                 "chunkBeatRange": [round(current_beat_start, 3), round(current_beat_end, 3)] if current_notes else [],
                 "chunkedImported": True,
+                "scoreLineStats": {
+                    "noteCount": len(sanitized_notes),
+                    "erhuNoteCount": int(chunk_role_counts.get("erhu", 0)),
+                    "accompanimentNoteCount": int(chunk_role_counts.get("accompaniment", 0)),
+                    "unknownNoteCount": int(chunk_role_counts.get("unknown", 0) + chunk_role_counts.get("missing", 0)),
+                    "erhuRatio": round(float(chunk_role_counts.get("erhu", 0)) / chunk_note_count, 3),
+                    "splitApplied": bool(chunk_role_counts.get("erhu", 0) and chunk_role_counts.get("accompaniment", 0)),
+                    "roleCounts": chunk_role_counts,
+                },
             }
             chunks.append(chunk)
             current_notes = []
@@ -1966,6 +2253,20 @@ class ErhuAnalyzer:
         if len(chunks) >= 2 and len(chunks[-1]["notes"]) < 12:
             tail = chunks.pop()
             chunks[-1]["notes"].extend(tail["notes"])
+            merged_role_counts: dict[str, int] = {}
+            for note in chunks[-1]["notes"]:
+                role = str((note.get("notePosition") or {}).get("scoreLineRole") or "missing")
+                merged_role_counts[role] = merged_role_counts.get(role, 0) + 1
+            merged_note_count = max(1, len(chunks[-1]["notes"]))
+            chunks[-1]["scoreLineStats"] = {
+                "noteCount": len(chunks[-1]["notes"]),
+                "erhuNoteCount": int(merged_role_counts.get("erhu", 0)),
+                "accompanimentNoteCount": int(merged_role_counts.get("accompaniment", 0)),
+                "unknownNoteCount": int(merged_role_counts.get("unknown", 0) + merged_role_counts.get("missing", 0)),
+                "erhuRatio": round(float(merged_role_counts.get("erhu", 0)) / merged_note_count, 3),
+                "splitApplied": bool(merged_role_counts.get("erhu", 0) and merged_role_counts.get("accompaniment", 0)),
+                "roleCounts": merged_role_counts,
+            }
             measure_range = list(chunks[-1].get("measureRange") or [])
             tail_range = list(tail.get("measureRange") or [])
             if measure_range and tail_range:
@@ -4853,13 +5154,16 @@ class ErhuAnalyzer:
         if not part_candidates:
             return []
         part_candidate_stats = self._extract_musicxml_part_candidates(xml_text, selected_part_hint)
-        preferred_part_label, _selected_part_confidence = self._resolve_selected_part_from_candidates(part_candidate_stats, selected_part_hint)
+        selected_part_candidate, _selected_part_confidence = self._resolve_selected_part_from_candidates(part_candidate_stats, selected_part_hint)
+        preferred_part_label = str((selected_part_candidate or {}).get("label") or (selected_part_candidate or {}).get("name") or "").strip()
         if not preferred_part_label:
             preferred_part_label = self._resolve_selected_part(list(part_names.values()), selected_part_hint)
-        preferred_part_id = next(
-            (part_id for part_id, part_name in part_names.items() if part_name == preferred_part_label),
-            "",
-        )
+        preferred_part_id = str((selected_part_candidate or {}).get("id") or "").strip()
+        if not preferred_part_id:
+            preferred_part_id = next(
+                (part_id for part_id, part_name in part_names.items() if part_name == preferred_part_label),
+                "",
+            )
         part = next(
             (
                 element
@@ -5054,12 +5358,195 @@ class ErhuAnalyzer:
                     current_beat += max(duration_beats, 0.0)
             current_measure_offset += max(0.0, safe_float(measure.attrib.get("width"), 0.0))
 
+        note_events = self._annotate_score_line_roles(note_events, selected_part_candidate, part_candidate_stats)
         note_events = self._collapse_erhu_melody_events(note_events)
         return self._hydrate_piece_notes(note_events, request)
+
+    def _find_musicxml_part_candidate(self, candidates: list[dict[str, Any]], selected_label: str | None) -> dict[str, Any] | None:
+        if not candidates:
+            return None
+        normalized_selected = normalize_part_label(selected_label)
+        if normalized_selected:
+            for candidate in candidates:
+                labels = [
+                    normalize_part_label(str(candidate.get("id") or "")),
+                    normalize_part_label(str(candidate.get("name") or "")),
+                    normalize_part_label(str(candidate.get("label") or "")),
+                ]
+                if normalized_selected in labels:
+                    return candidate
+        return candidates[0]
+
+    def _is_explicit_erhu_part_candidate(self, candidate: dict[str, Any] | None) -> bool:
+        if not candidate:
+            return False
+        label = " ".join(str(candidate.get(key) or "") for key in ("id", "name", "label")).lower()
+        return "erhu" in label or "二胡" in label
+
+    def _has_accompaniment_part_candidate(self, candidates: list[dict[str, Any]] | None) -> bool:
+        for candidate in candidates or []:
+            label = " ".join(str(candidate.get(key) or "") for key in ("id", "name", "label")).lower()
+            if "piano" in label or "pno" in label or "accompaniment" in label or "钢琴" in label or "伴奏" in label:
+                return True
+            if bool(candidate.get("isLikelyPiano")):
+                return True
+            if int(safe_float(candidate.get("staffCount"), 1)) >= 2:
+                return True
+        return False
+
+    def _is_clean_solo_part_candidate(
+        self,
+        candidate: dict[str, Any] | None,
+        candidates: list[dict[str, Any]] | None = None,
+    ) -> bool:
+        if not candidate:
+            return False
+        if self._is_explicit_erhu_part_candidate(candidate):
+            return True
+        if self._has_accompaniment_part_candidate(candidates):
+            return False
+        return (
+            not bool(candidate.get("isLikelyPiano"))
+            and safe_float(candidate.get("chordRatio"), 0.0) < 0.18
+            and int(safe_float(candidate.get("staffCount"), 1)) <= 1
+        )
+
+    def _is_ambiguous_part_candidate(
+        self,
+        candidate: dict[str, Any] | None,
+        candidates: list[dict[str, Any]] | None = None,
+    ) -> bool:
+        if not candidate or self._is_explicit_erhu_part_candidate(candidate):
+            return False
+        return (
+            self._has_accompaniment_part_candidate(candidates)
+            or bool(candidate.get("isLikelyPiano"))
+            or safe_float(candidate.get("chordRatio"), 0.0) >= 0.18
+        )
+
+    def _annotate_score_line_roles(
+        self,
+        note_events: list[NoteEvent],
+        selected_part_candidate: dict[str, Any] | None,
+        part_candidates: list[dict[str, Any]] | None = None,
+    ) -> list[NoteEvent]:
+        if not note_events:
+            return note_events
+
+        clean_solo = self._is_clean_solo_part_candidate(selected_part_candidate, part_candidates)
+        ambiguous = self._is_ambiguous_part_candidate(selected_part_candidate, part_candidates)
+        if not clean_solo and not ambiguous:
+            return note_events
+
+        line_groups: dict[tuple[int, int, int], list[NoteEvent]] = {}
+        for note in note_events:
+            position = getattr(note, "notePosition", None) or {}
+            page_number = int(safe_float(position.get("pageNumber"), 1))
+            system_index = int(safe_float(position.get("systemIndex"), 1))
+            staff_index = int(safe_float(position.get("staffIndex"), 1))
+            line_groups.setdefault((page_number, system_index, staff_index), []).append(note)
+
+        page_order: dict[int, list[tuple[int, int, int]]] = {}
+        for key, notes in line_groups.items():
+            page_number = key[0]
+            page_order.setdefault(page_number, []).append(key)
+        for page_number, keys in list(page_order.items()):
+            page_order[page_number] = sorted(
+                keys,
+                key=lambda key: median([
+                    safe_float((getattr(note, "notePosition", None) or {}).get("normalizedY"), 0.0)
+                    for note in line_groups.get(key, [])
+                ]),
+            )
+
+        line_roles: dict[tuple[int, int, int], tuple[str, float, str]] = {}
+        for key, notes in line_groups.items():
+            page_number = key[0]
+            ordered_keys = page_order.get(page_number, [])
+            line_rank = ordered_keys.index(key) if key in ordered_keys else 0
+            line_count = max(1, len(ordered_keys))
+
+            if clean_solo:
+                line_roles[key] = ("erhu", 0.92, "clean-solo-part")
+                continue
+
+            onset_counts: dict[tuple[int, float], int] = {}
+            pitches: list[int] = []
+            for note in notes:
+                onset_key = (int(note.measureIndex), round(float(note.beatStart), 4))
+                onset_counts[onset_key] = onset_counts.get(onset_key, 0) + 1
+                pitches.append(int(note.midiPitch))
+            chord_excess = sum(max(0, count - 1) for count in onset_counts.values())
+            chord_ratio = chord_excess / max(1, len(notes))
+            range_hits = sum(1 for value in pitches if 52 <= value <= 96)
+            range_ratio = range_hits / max(1, len(pitches))
+            pitch_span = (max(pitches) - min(pitches)) if pitches else 0
+
+            erhu_pattern_score = 0.0
+            if line_count == 1:
+                erhu_pattern_score = 0.42
+            elif line_count == 2:
+                erhu_pattern_score = 0.74 if line_rank == 0 else 0.18
+            else:
+                erhu_pattern_score = 0.74 if line_rank % 3 == 0 else 0.14
+
+            confidence = erhu_pattern_score
+            confidence += min(0.12, range_ratio * 0.12)
+            confidence += 0.06 if pitch_span <= 36 else -0.05
+            confidence -= min(0.18, chord_ratio * 0.75)
+            confidence = max(0.05, min(0.9, confidence))
+            role = "erhu" if confidence >= 0.66 else "accompaniment"
+            line_roles[key] = (role, round(confidence, 3), "omr-line-split")
+
+        annotated: list[NoteEvent] = []
+        for note in note_events:
+            position = dict(getattr(note, "notePosition", None) or {})
+            key = (
+                int(safe_float(position.get("pageNumber"), 1)),
+                int(safe_float(position.get("systemIndex"), 1)),
+                int(safe_float(position.get("staffIndex"), 1)),
+            )
+            role, confidence, source = line_roles.get(key, ("unknown", 0.0, "none"))
+            position.update(
+                {
+                    "scoreLineRole": role,
+                    "scoreLineConfidence": confidence,
+                    "scoreLineSource": source,
+                    "scoreLineId": f"p{key[0]}-sys{key[1]}-staff{key[2]}",
+                }
+            )
+            annotated.append(
+                NoteEvent(
+                    noteId=note.noteId,
+                    measureIndex=int(note.measureIndex),
+                    beatStart=float(note.beatStart),
+                    beatDuration=float(note.beatDuration),
+                    midiPitch=int(note.midiPitch),
+                    notePosition=position,
+                    articulations=list(getattr(note, "articulations", []) or []),
+                    notations=list(getattr(note, "notations", []) or []),
+                    techniques=list(getattr(note, "techniques", []) or []),
+                    activeTempo=int(getattr(note, "activeTempo", 0) or 0) or None,
+                    activeDynamic=str(getattr(note, "activeDynamic", "") or "").strip() or None,
+                    dynamicValue=safe_float(getattr(note, "dynamicValue", None), 0.0) or None,
+                )
+            )
+        return annotated
 
     def _collapse_erhu_melody_events(self, note_events: list[NoteEvent]) -> list[NoteEvent]:
         if len(note_events) <= 1:
             return note_events
+
+        role_filtered = [
+            note
+            for note in note_events
+            if str((getattr(note, "notePosition", None) or {}).get("scoreLineRole") or "").lower() == "erhu"
+            and safe_float((getattr(note, "notePosition", None) or {}).get("scoreLineConfidence"), 0.0) >= 0.66
+        ]
+        if role_filtered:
+            # Strong mode: once OMR has separated melody/accompaniment lines, only
+            # the erhu melody line is allowed into pitch/rhythm diagnosis.
+            note_events = role_filtered
 
         staff_counts: dict[int, int] = {}
         for note in note_events:

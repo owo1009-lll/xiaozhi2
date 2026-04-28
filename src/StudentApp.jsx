@@ -25,10 +25,15 @@ import {
   fetchScore,
   fetchScoreImportJob,
   importScorePdf,
+  selectScorePart,
 } from "./researchApi";
 
-const STUDENT_APP_STATE_KEY = "ai-erhu.student-app-state-v4";
-const LEGACY_STUDENT_APP_STATE_KEYS = ["ai-erhu.student-app-state-v2", "ai-erhu.student-app-state-v3"];
+const STUDENT_APP_STATE_KEY = "ai-erhu.student-app-state-v5";
+const LEGACY_STUDENT_APP_STATE_KEYS = [
+  "ai-erhu.student-app-state-v2",
+  "ai-erhu.student-app-state-v3",
+  "ai-erhu.student-app-state-v4",
+];
 
 function percentText(value) {
   const numeric = Number(value);
@@ -38,6 +43,43 @@ function percentText(value) {
 function confidenceText(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? `${Math.round(numeric * 100)}%` : "未提供";
+}
+
+function getPartCandidates(job, score) {
+  return (Array.isArray(job?.partCandidates) && job.partCandidates.length ? job.partCandidates : score?.partCandidates || [])
+    .filter(Boolean);
+}
+
+function getPartCandidateKey(candidate, index = 0) {
+  return String(candidate?.selectionKey || candidate?.id || candidate?.qualifiedLabel || candidate?.label || candidate?.name || `part-${index + 1}`);
+}
+
+function getSelectedPartKey(job, score) {
+  return String(job?.selectedPartId || job?.selectedPart || score?.selectedPartId || score?.selectedPart || "");
+}
+
+function getSelectedPartConfidence(job, score) {
+  const numeric = Number(job?.selectedPartConfidence ?? score?.selectedPartConfidence);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function needsPartReview(job, score) {
+  if ((job?.omrStatus || score?.omrStatus) !== "completed") return false;
+  const candidates = getPartCandidates(job, score);
+  if (candidates.length <= 1) return false;
+  return getSelectedPartConfidence(job, score) > 0 && getSelectedPartConfidence(job, score) < 0.7;
+}
+
+function formatPartCandidateLabel(candidate, index = 0) {
+  const label = String(candidate?.label || candidate?.name || `候选声部 ${index + 1}`).trim();
+  const noteCount = Number(candidate?.noteCount);
+  const measureCount = Number(candidate?.measureCount);
+  const confidence = Number(candidate?.selectedPartConfidence ?? candidate?.score);
+  const details = [];
+  if (Number.isFinite(confidence)) details.push(`置信度 ${confidenceText(confidence)}`);
+  if (Number.isFinite(noteCount)) details.push(`${noteCount} 个音`);
+  if (Number.isFinite(measureCount)) details.push(`${measureCount} 小节`);
+  return `候选声部 ${index + 1}：${label}${details.length ? `（${details.join("，")}）` : ""}`;
 }
 
 function importProgressHeadline(job) {
@@ -84,10 +126,32 @@ function piecePassProgressHeadline(job) {
   return "整曲分析排队中";
 }
 
+function getPiecePassCompletionState(summary = {}) {
+  const attempted = Math.max(0, Math.round(Number(summary?.attemptedSectionCount) || 0));
+  const matched = Math.max(0, Math.round(Number(summary?.matchedSectionCount) || 0));
+  const failed = Math.max(0, Math.round(Number(summary?.failedSectionCount) || 0));
+  const timedOut = Math.max(0, Math.round(Number(summary?.timedOutSectionCount) || 0));
+  const complete = matched > 0 && failed === 0 && timedOut === 0 && (!attempted || matched >= attempted);
+  return { attempted, matched, failed, timedOut, complete };
+}
+
+function buildIncompletePiecePassMessage(summary = {}) {
+  const state = getPiecePassCompletionState(summary);
+  const total = state.attempted || Number(summary?.structuredSectionCount) || 0;
+  const failed = Math.max(state.failed, state.timedOut);
+  return `整曲分析未完成：已完成 ${state.matched}/${total || "?"} 段，失败或超时 ${failed} 段。当前问题谱会漏报，已阻止作为正式结果打开。`;
+}
+
 function buildPiecePassStatusMessage(job) {
   if (!job) return "";
   if (job?.status === "failed") return job.error || "整曲分析失败，请稍后重试。";
-  if (job?.status === "completed") return "整曲分析完成，已更新整曲概览。";
+  if (job?.status === "completed") {
+    const summary = job?.summary || {};
+    if (summary?.analysisReliable === false || !getPiecePassCompletionState(summary).complete) {
+      return buildIncompletePiecePassMessage(summary);
+    }
+    return "整曲分析完成，已更新整曲概览。";
+  }
   if (job?.stage === "checking-services") return "正在检查整曲分析服务。";
   if (job?.stage === "scanning-sections") return "正在扫描整曲段落。";
   if (job?.stage === "analyzing-sections") return "正在分析整曲段落。";
@@ -189,9 +253,16 @@ function loadPersistedStudentState() {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") return null;
+    const restoredScoreId = String(parsed.scoreId || parsed.scoreJob?.scoreId || "").trim();
+    const restoredAnalysisScoreId = String(parsed.analysis?.scoreId || parsed.analysis?.pieceId || "").trim();
+    const restoredAnalysis =
+      restoredScoreId && restoredAnalysisScoreId && restoredAnalysisScoreId !== restoredScoreId
+        ? null
+        : parsed.analysis || null;
     const restoredPiecePassJob = parsed.piecePassJob?.status === "processing" ? parsed.piecePassJob : null;
     return {
       ...parsed,
+      analysis: restoredAnalysis,
       piecePassJob: restoredPiecePassJob,
       piecePassSummary: null,
     };
@@ -307,6 +378,16 @@ function analysisMatchesScore(analysis, score) {
   return false;
 }
 
+function jobMatchesScore(job, score) {
+  if (!job || !score) return false;
+  const scoreId = String(score.scoreId || "").trim();
+  const jobScoreId = String(job.scoreId || job.payload?.scoreId || job.wholePieceAnalysis?.scoreId || job.primaryAnalysis?.scoreId || "").trim();
+  if (scoreId && jobScoreId) return jobScoreId === scoreId;
+  const pieceTitle = formatScoreTitle(score);
+  const jobTitle = String(job.pieceTitle || job.title || job.wholePieceAnalysis?.pieceTitle || "").trim();
+  return Boolean(pieceTitle && jobTitle && pieceTitle === jobTitle);
+}
+
 export default function StudentApp({ onOpenResearch }) {
   const restoredStateRef = useRef(loadPersistedStudentState());
   const stopDemoRef = useRef(() => {});
@@ -334,6 +415,7 @@ export default function StudentApp({ onOpenResearch }) {
   const [statusMessage, setStatusMessage] = useState(restoredStateRef.current?.statusMessage || "先导入 PDF 曲谱，再选择段落并上传音频。");
   const [errorMessage, setErrorMessage] = useState("");
   const [importingScore, setImportingScore] = useState(false);
+  const [selectingPart, setSelectingPart] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [piecePassRunning, setPiecePassRunning] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -455,9 +537,16 @@ export default function StudentApp({ onOpenResearch }) {
           setStatusMessage(buildAnalysisStatusMessage(nextJob));
           if (nextJob?.status === "completed") {
             if (nextJob.analysis) {
-              setAnalysis(nextJob.analysis);
-              if (nextJob.analysis?.sectionId) {
-                setSelectedSectionId(pickVisibleSectionId(score, nextJob.analysis.sectionId));
+              if (analysisMatchesScore(nextJob.analysis, score)) {
+                setAnalysis(nextJob.analysis);
+                if (nextJob.analysis?.sectionId) {
+                  setSelectedSectionId(pickVisibleSectionId(score, nextJob.analysis.sectionId));
+                }
+              } else {
+                setAnalysis(null);
+                setAnalysisJob(null);
+                clearIssueSessionCache();
+                setErrorMessage("分析结果与当前曲谱不一致，已阻止打开旧结果。请重新分析当前曲目。");
               }
             }
             if (nextJob.participantId) {
@@ -509,14 +598,33 @@ export default function StudentApp({ onOpenResearch }) {
           setPiecePassJob(nextJob);
           setStatusMessage(buildPiecePassStatusMessage(nextJob));
           if (nextJob?.status === "completed") {
+            if (!jobMatchesScore(nextJob, score)) {
+              setPiecePassJob(null);
+              setPiecePassSummary(null);
+              setPiecePassRunning(false);
+              setErrorMessage("整曲分析结果与当前曲谱不一致，已阻止打开旧结果。请重新运行当前曲目的整曲分析。");
+              return;
+            }
             setPiecePassSummary((current) => ({
               ...(current || {}),
               summary: nextJob.summary || current?.summary || null,
               updatedAt: nextJob.updatedAt,
             }));
+            const completionState = getPiecePassCompletionState(nextJob.summary || {});
+            if (nextJob.summary?.analysisReliable === false || !completionState.complete) {
+              setAnalysis(null);
+              setErrorMessage(buildIncompletePiecePassMessage(nextJob.summary || {}));
+              setPiecePassRunning(false);
+              return;
+            }
             const completedAnalysis = nextJob.wholePieceAnalysis || nextJob.primaryAnalysis || null;
             if (completedAnalysis) {
-              setAnalysis(completedAnalysis);
+              if (analysisMatchesScore(completedAnalysis, score)) {
+                setAnalysis(completedAnalysis);
+              } else {
+                setAnalysis(null);
+                setErrorMessage("整曲分析结果与当前曲谱不一致，已阻止打开旧结果。请重新运行当前曲目的整曲分析。");
+              }
               if (completedAnalysis.sectionId) {
                 setSelectedSectionId(pickVisibleSectionId(score, completedAnalysis.sectionId));
               }
@@ -560,7 +668,12 @@ export default function StudentApp({ onOpenResearch }) {
         if (cancelled) return;
         const nextScore = scoreJson?.score || null;
         setScore(nextScore);
-        setSelectedSectionId((current) => pickVisibleSectionId(nextScore, current));
+        setSelectedSectionId(pickVisibleSectionId(nextScore, ""));
+        setAnalysis(null);
+        setAnalysisJob(null);
+        setPiecePassJob(null);
+        setPiecePassSummary(null);
+        clearIssueSessionCache();
         setStatusMessage(buildImportStatusMessage(scoreJob));
       } catch {
         if (!cancelled) {
@@ -648,6 +761,13 @@ export default function StudentApp({ onOpenResearch }) {
   }, [piecePassJob?.audioHash, piecePassSummary?.summary?.audioHash, score?.scoreId, score?.pieceId, score?.title, studentId]);
 
   const visibleSections = useMemo(() => getStudentVisibleSections(score), [score]);
+  const partCandidates = useMemo(() => getPartCandidates(scoreJob, score), [score, scoreJob]);
+  const selectedPartKey = getSelectedPartKey(scoreJob, score);
+  const selectedPartOptionValue = partCandidates.some((candidate, index) => getPartCandidateKey(candidate, index) === selectedPartKey)
+    ? selectedPartKey
+    : getPartCandidateKey(partCandidates[0], 0);
+  const selectedPartConfidence = getSelectedPartConfidence(scoreJob, score);
+  const shouldReviewPart = needsPartReview(scoreJob, score);
 
   const selectedSection = useMemo(
     () => visibleSections.find((section) => section.sectionId === selectedSectionId) || null,
@@ -663,6 +783,9 @@ export default function StudentApp({ onOpenResearch }) {
     if (!analysis || !score) return;
     if (!analysisMatchesScore(analysis, score)) {
       setAnalysis(null);
+      setPiecePassSummary(null);
+      setPiecePassJob(null);
+      clearIssueSessionCache();
     }
   }, [analysis, score]);
 
@@ -789,6 +912,37 @@ export default function StudentApp({ onOpenResearch }) {
     }
   }
 
+  async function handleSelectPart(nextSelectedPart) {
+    const scoreId = score?.scoreId || scoreJob?.scoreId;
+    if (!scoreId || !nextSelectedPart || selectingPart) return;
+    setSelectingPart(true);
+    setImportingScore(true);
+    setErrorMessage("");
+    setAnalysis(null);
+    setAnalysisJob(null);
+    setPiecePassJob(null);
+    setPiecePassSummary(null);
+    clearIssueSessionCache();
+    setStatusMessage("正在按你选择的二胡声部重新识谱，请稍候。");
+    try {
+      const json = await selectScorePart(scoreId, nextSelectedPart);
+      const job = json?.job || null;
+      setScoreJob(job);
+      if (job?.scoreId && job?.omrStatus === "completed") {
+        const scoreJson = await fetchScore(job.scoreId);
+        const nextScore = scoreJson?.score || null;
+        setScore(nextScore);
+        setSelectedSectionId(pickVisibleSectionId(nextScore, ""));
+      }
+      setStatusMessage(buildImportStatusMessage(job));
+    } catch (error) {
+      setErrorMessage(error.message || "声部重选失败，请稍后重试。");
+      setImportingScore(false);
+    } finally {
+      setSelectingPart(false);
+    }
+  }
+
   async function handleAudioFile(file) {
     if (!file) return;
     setAudioFile(file);
@@ -801,6 +955,23 @@ export default function StudentApp({ onOpenResearch }) {
     const duration = await getAudioDuration(file);
     setAudioDuration(duration);
   }
+
+  function handleScorePdfSelected(file) {
+    setScorePdfFile(file || null);
+    setScore(null);
+    setScoreJob(null);
+    setAnalysis(null);
+    setAnalysisJob(null);
+    setPiecePassJob(null);
+    setPiecePassSummary(null);
+    setSelectedSectionId("");
+    setErrorMessage("");
+    clearIssueSessionCache();
+    if (file) {
+      setStatusMessage(`已选择 PDF：${file.name}。请点击“开始导入与识谱”，完成后再上传对应音频。`);
+    }
+  }
+
 
   async function startRecording() {
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
@@ -905,8 +1076,13 @@ export default function StudentApp({ onOpenResearch }) {
       return;
     }
     setPiecePassRunning(true);
+    setAnalysis(null);
+    setAnalysisJob(null);
+    clearIssueSessionCache();
     const queuedPiecePassJob = {
       jobId: "",
+      scoreId: score.scoreId,
+      pieceTitle: formatScoreTitle(score),
       status: "processing",
       stage: "checking-services",
       progress: 0.03,
@@ -935,6 +1111,12 @@ export default function StudentApp({ onOpenResearch }) {
         ...queuedPiecePassJob,
         jobId: json?.jobId || json?.piecePassJobId || "",
       };
+      if (nextJob?.scoreId && String(nextJob.scoreId) !== String(score.scoreId)) {
+        setPiecePassJob(null);
+        setPiecePassRunning(false);
+        setErrorMessage("整曲分析任务与当前曲谱不一致，已阻止旧任务继续显示。请重新运行当前曲目的整曲分析。");
+        return;
+      }
       setPiecePassJob(nextJob);
       setStatusMessage(buildPiecePassStatusMessage(nextJob));
     } catch (error) {
@@ -972,6 +1154,14 @@ export default function StudentApp({ onOpenResearch }) {
 
   function handleOpenIssueScorePage() {
     if (!analysis || !score) return;
+    if (!analysisMatchesScore(analysis, score)) {
+      setAnalysis(null);
+      setPiecePassJob(null);
+      setPiecePassSummary(null);
+      clearIssueSessionCache();
+      setErrorMessage("当前分析结果不属于当前 PDF 曲谱，已阻止打开旧问题谱。请重新运行当前曲目的分析。");
+      return;
+    }
     const isWholePiece = analysis.analysisMode === "whole-piece";
     const issueSection = isWholePiece
       ? null
@@ -983,17 +1173,28 @@ export default function StudentApp({ onOpenResearch }) {
     const sectionKey = isWholePiece ? "whole-piece" : issueSection.sectionId;
     const audioKey = analysis.audioHash || piecePassJob?.audioHash || piecePassSummary?.summary?.audioHash || "no-audio-hash";
     const issueSessionId = `issue-v${ISSUE_SESSION_SCHEMA_VERSION}-${score.scoreId}-${audioKey}-${sectionKey}-${uniqueSource}`;
+    const analysisOriginalAudioUrl =
+      analysis.originalAudio?.url
+      || analysis.originalAudioUrl
+      || analysis.audioUrl
+      || "";
+    const originalAudioForIssuePage = audioPreviewUrl ? {
+      url: audioPreviewUrl,
+      durationSeconds: audioDuration,
+      filename: audioFile?.name || analysis.audioFilename || "",
+      audioHash: audioKey,
+    } : (analysisOriginalAudioUrl ? {
+      url: analysisOriginalAudioUrl,
+      durationSeconds: analysis.originalAudio?.durationSeconds ?? analysis.audioDurationSeconds ?? null,
+      filename: analysis.originalAudio?.filename || analysis.audioSubmission?.name || analysis.audioFilename || "",
+      audioHash: audioKey,
+    } : null);
     const payload = JSON.stringify(buildIssueSessionPayload({
       analysis,
       score,
       section: issueSection,
       mode: isWholePiece ? "whole-piece" : "section",
-      originalAudio: audioPreviewUrl ? {
-        url: audioPreviewUrl,
-        durationSeconds: audioDuration,
-        filename: audioFile?.name || analysis.audioFilename || "",
-        audioHash: audioKey,
-      } : null,
+      originalAudio: originalAudioForIssuePage,
     }));
     clearIssueSessionCache();
     const storageKey = `${ISSUE_SESSION_STORAGE_PREFIX}${issueSessionId}`;
@@ -1068,7 +1269,7 @@ export default function StudentApp({ onOpenResearch }) {
             className="hidden-input"
             type="file"
             accept="application/pdf"
-            onChange={(event) => setScorePdfFile(event.target.files?.[0] || null)}
+            onChange={(event) => handleScorePdfSelected(event.target.files?.[0] || null)}
           />
           <div className="upload-meta">
             <span>PDF：{scorePdfFile?.name || "尚未选择 PDF"}</span>
@@ -1092,6 +1293,31 @@ export default function StudentApp({ onOpenResearch }) {
                   </a>
                 </div>
               ) : null}
+            </div>
+          ) : null}
+          {shouldReviewPart ? (
+            <div className="history-card warning-card">
+              <h3>需要确认二胡声部</h3>
+              <p>
+                当前自动声部识别置信度为 {confidenceText(selectedPartConfidence)}。如果谱面含钢琴伴奏，建议先确认二胡旋律声部，再上传音频分析。
+              </p>
+              <label>
+                <span>二胡声部</span>
+                <select
+                  value={selectedPartOptionValue}
+                  onChange={(event) => handleSelectPart(event.target.value)}
+                  disabled={selectingPart || importingScore}
+                >
+                  {partCandidates.map((candidate, index) => {
+                    const value = getPartCandidateKey(candidate, index);
+                    return (
+                      <option key={value} value={value}>
+                        {formatPartCandidateLabel(candidate, index)}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
             </div>
           ) : null}
         </section>
@@ -1229,6 +1455,11 @@ export default function StudentApp({ onOpenResearch }) {
                 <p className="error-text">
                   本次整曲分析不完整：有效段落 {wholePieceSummary.matchedSectionCount || 0} / {wholePieceSummary.attemptedSectionCount || wholePieceSummary.structuredSectionCount || 0}，
                   失败或超时 {wholePieceSummary.failedSectionCount || 0} 段。请重新分析或改用分段诊断，不要直接采用该整曲评分。
+                </p>
+              ) : null}
+              {wholePieceSummary.hasNewerIncompleteResult ? (
+                <p className="error-text">
+                  最近一次整曲任务存在超时漏报，当前概览已自动回退到较早的完整结果；建议重新运行整曲分析生成新的完整问题谱。
                 </p>
               ) : null}
               <p>建议路径：{formatPracticePathLabel(wholePieceSummary.dominantPracticePath)}</p>

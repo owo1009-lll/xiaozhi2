@@ -400,6 +400,18 @@ button {
   gap: 12px;
 }
 
+.warning-card {
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  background: #fff7e6;
+  display: grid;
+  gap: 12px;
+}
+
+.warning-card label {
+  display: grid;
+  gap: 8px;
+}
+
 .omr-progress-head {
   display: flex;
   align-items: center;
@@ -932,10 +944,22 @@ button {
   position: relative;
 }
 
+.score-page-stage.is-melody-band {
+  overflow: hidden;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
 .score-page-image {
   display: block;
   max-width: none;
   height: auto;
+}
+
+.score-page-source-cropped {
+  position: absolute;
+  left: 0;
+  max-width: none;
 }
 
 .score-measure-overlay {
