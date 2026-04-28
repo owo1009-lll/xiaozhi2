@@ -22,11 +22,22 @@ function isImportedSection(section) {
   return /page[-\s]?0*\d+/i.test(`${section?.sectionId || ""} ${section?.sourceSectionId || ""} ${section?.title || ""}`);
 }
 
+function isErhuMelodySystemIndex(systemIndex) {
+  const numeric = Math.round(Number(systemIndex) || 0);
+  if (!numeric) return false;
+  return (numeric - 1) % 3 === 0;
+}
+
 function isErhuNote(note, section) {
   if (!isImportedSection(section)) return true;
   const role = String(note?.notePosition?.scoreLineRole || "").toLowerCase();
   const confidence = Number(note?.notePosition?.scoreLineConfidence) || 0;
-  if (role === "erhu" && confidence >= 0.66) return true;
+  if (role === "erhu" && confidence >= 0.66) {
+    const stats = section?.scoreLineStats || {};
+    const accompanimentCount = Number(stats.accompanimentNoteCount) || 0;
+    if (accompanimentCount <= 0) return true;
+    return isErhuMelodySystemIndex(note?.notePosition?.systemIndex);
+  }
   if (role) return false;
   return false;
 }

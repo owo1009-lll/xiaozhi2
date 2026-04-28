@@ -1601,6 +1601,8 @@ function launchPiecePassTask(task) {
             "0.5",
             "--fast-window-min-duration",
             "2.5",
+            "--fast-window-max-duration",
+            "8",
             "--fast-window-scale",
             "1.05",
             "--scan-preprocess-mode",
@@ -1608,13 +1610,13 @@ function launchPiecePassTask(task) {
             "--cache-dir",
             "data/piece-pass/section-cache",
             "--scan-concurrency",
-            "1",
-            "--analysis-concurrency",
-            "1",
-            "--analysis-retry",
             "2",
+            "--analysis-concurrency",
+            "2",
+            "--analysis-retry",
+            "1",
             "--analysis-timeout-seconds",
-            "240",
+            "180",
           ]
         : []),
     ];
@@ -2106,7 +2108,18 @@ function getImportedProjectionSource(section = {}, score = {}) {
   return getArray(section?.partCandidates).length ? section : score;
 }
 
+function sectionHasConfidentErhuLine(section = {}) {
+  const stats = section?.scoreLineStats && typeof section.scoreLineStats === "object" ? section.scoreLineStats : null;
+  if (safeNumber(stats?.erhuNoteCount, 0) > 0) return true;
+  return getArray(section?.notes).some((note) => {
+    const role = safeString(note?.notePosition?.scoreLineRole).toLowerCase();
+    const confidence = safeNumber(note?.notePosition?.scoreLineConfidence, 0);
+    return role === "erhu" && confidence >= 0.66;
+  });
+}
+
 function isBlockedImportedProjection(section = {}, score = {}) {
+  if (sectionHasConfidentErhuLine(section)) return false;
   const mode = safeString(section?.erhuProjectionMode).trim().toLowerCase();
   if (mode === "blocked") return true;
   const source = getImportedProjectionSource(section, score);
@@ -2142,7 +2155,13 @@ function isErhuMelodyNote(note = {}, section = {}, score = {}) {
   const accompanimentPresent = hasAccompanimentPartCandidate(source) || hasAccompanimentPartCandidate(score);
   const lineRole = safeString(note?.notePosition?.scoreLineRole).toLowerCase();
   const lineConfidence = safeNumber(note?.notePosition?.scoreLineConfidence, 0);
-  if (lineRole === "erhu" && lineConfidence >= 0.66) return true;
+  if (lineRole === "erhu" && lineConfidence >= 0.66) {
+    if (!accompanimentPresent) return true;
+    // Do not trust stale cached scoreLineRole values by themselves when the
+    // imported score still contains accompaniment.  The marker must also sit on
+    // the expected top melody system, otherwise it becomes manual-review only.
+    return isErhuMelodySystemIndex(note?.notePosition?.systemIndex, source || score);
+  }
   if (lineRole) return false;
   if (accompanimentPresent) return false;
   return isErhuMelodySystemIndex(note?.notePosition?.systemIndex, score);
@@ -2964,6 +2983,55 @@ async function callExternalScoreImportLongTimeout(payload) {
 
     request.on("timeout", () => {
       request.destroy(new Error("score import timed out"));
+    });
+    request.on("error", reject);
+    request.write(body);
+    request.end();
+  });
+
+  return json?.job || null;
+}
+
+async function callExternalMusicXmlImportLongTimeout(payload) {
+  const analyzerUrl = safeString(process.env.ERHU_ANALYZER_URL).replace(/\/+$/, "");
+  if (!analyzerUrl) return null;
+  const target = new URL(`${analyzerUrl}/score/import-musicxml`);
+  const transport = target.protocol === "https:" ? https : http;
+  const body = JSON.stringify(payload);
+
+  const json = await new Promise((resolve, reject) => {
+    const request = transport.request(
+      target,
+      {
+        method: "POST",
+        agent: false,
+        headers: {
+          "Connection": "close",
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(body),
+        },
+        timeout: 5 * 60 * 1000,
+      },
+      (response) => {
+        const chunks = [];
+        response.on("data", (chunk) => chunks.push(chunk));
+        response.on("end", () => {
+          const text = Buffer.concat(chunks).toString("utf8");
+          if ((response.statusCode || 500) >= 400) {
+            reject(new Error(`musicxml import upstream failed: ${response.statusCode || 500}`));
+            return;
+          }
+          try {
+            resolve(JSON.parse(text));
+          } catch (error) {
+            reject(error);
+          }
+        });
+      },
+    );
+
+    request.on("timeout", () => {
+      request.destroy(new Error("musicxml import timed out"));
     });
     request.on("error", reject);
     request.write(body);
@@ -5617,6 +5685,131 @@ app.post("/api/erhu/scores/import-pdf", upload.single("pdf"), async (req, res) =
   await writeScoreStore(store);
 
   return res.json({ ok: true, scoreImportJobId: normalizedJob.jobId, job: normalizedJob });
+});
+
+app.post("/api/erhu/scores/import-musicxml", upload.single("musicxml"), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "musicxml file is required." });
+  }
+
+  const originalName = req.file.originalname || "score.musicxml";
+  const originalExt = path.extname(originalName).toLowerCase();
+  const fileExt = [".musicxml", ".xml", ".mxl"].includes(originalExt) ? originalExt : ".musicxml";
+  const titleHint = safeString(req.body?.titleHint, path.parse(originalName).name);
+  const selectedPartHint = safeString(req.body?.selectedPartHint, "erhu") || "erhu";
+  const musicxmlHash = sha1(req.file.buffer);
+  const jobId = createId("scorejob");
+  const jobDir = path.join(SCORE_IMPORTS_DIR, jobId);
+  const musicxmlPath = path.join(jobDir, `source${fileExt}`);
+  const webMusicXmlPath = toWebDataPath("score-imports", jobId, `source${fileExt}`);
+  await fs.mkdir(jobDir, { recursive: true });
+  await fs.writeFile(musicxmlPath, req.file.buffer);
+
+  let jobResult = null;
+  let serviceWarning = "";
+  try {
+    jobResult = await callExternalMusicXmlImportLongTimeout({
+      jobId,
+      musicxmlPath,
+      originalFilename: originalName,
+      titleHint,
+      selectedPartHint,
+      outputDir: jobDir,
+    });
+  } catch (error) {
+    serviceWarning = safeString(error?.message, "external MusicXML import unavailable");
+  }
+
+  const store = await readScoreStore();
+  let normalizedJob = normalizeScoreImportJob({
+    jobId,
+    originalFilename: originalName,
+    title: titleHint,
+    sourcePdfPath: "",
+    pdfHash: `musicxml:${musicxmlHash}`,
+    omrStatus: "failed",
+    omrConfidence: 0,
+    musicxmlPath: webMusicXmlPath,
+    previewPages: [],
+    detectedParts: [selectedPartHint],
+    selectedPart: selectedPartHint,
+    selectedPartCandidates: [selectedPartHint],
+    warnings: serviceWarning ? [serviceWarning] : [],
+    error: "MusicXML 导入失败。",
+    progress: 1,
+    stage: "failed",
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  });
+
+  if (jobResult?.omrStatus === "completed" && jobResult.piecePack) {
+    const upstreamScoreId = safeString(jobResult.scoreId);
+    const scoreId = upstreamScoreId.startsWith("score-") ? upstreamScoreId : createId("score");
+    const importedSections = getArray(jobResult.piecePack?.sections).length ? jobResult.piecePack.sections : [jobResult.piecePack];
+    const scoreRecord = normalizeImportedScoreRecord({
+      scoreId,
+      pieceId: safeString(jobResult.piecePack?.pieceId),
+      title: safeString(jobResult.title, titleHint),
+      composer: safeString(jobResult.piecePack?.composer, "MusicXML import"),
+      sourcePdfPath: "",
+      pdfHash: `musicxml:${musicxmlHash}`,
+      musicxmlPath: webMusicXmlPath,
+      omrStatus: "completed",
+      omrConfidence: safeNumber(jobResult.omrConfidence, 0.88),
+      omrStats: jobResult.omrStats,
+      detectedParts: getArray(jobResult.detectedParts).length ? jobResult.detectedParts : [selectedPartHint],
+      selectedPart: safeString(jobResult.selectedPart, selectedPartHint),
+      selectedPartId: safeString(jobResult.piecePack?.selectedPartId),
+      selectedPartConfidence: safeNumber(jobResult.selectedPartConfidence, safeNumber(jobResult.piecePack?.selectedPartConfidence, 0)),
+      partCandidates: getArray(jobResult.partCandidates || jobResult.piecePack?.partCandidates),
+      markingStats: jobResult.markingStats || jobResult.piecePack?.markingStats || buildMarkingStatsFromSections(importedSections),
+      previewPages: [],
+      sections: importedSections,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    });
+    const existingScoreIndex = store.scores.findIndex((item) => item.scoreId === scoreId);
+    if (existingScoreIndex >= 0) {
+      store.scores[existingScoreIndex] = scoreRecord;
+    } else {
+      store.scores.push(scoreRecord);
+    }
+    normalizedJob = normalizeScoreImportJob({
+      ...jobResult,
+      jobId,
+      scoreId,
+      title: scoreRecord.title,
+      sourcePdfPath: "",
+      pdfHash: `musicxml:${musicxmlHash}`,
+      musicxmlPath: webMusicXmlPath,
+      originalFilename: originalName,
+      previewPages: [],
+      warnings: [...getArray(jobResult.warnings), ...(serviceWarning ? [serviceWarning] : [])],
+      error: jobResult.error,
+      progress: 1,
+      stage: "completed",
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    });
+  } else if (serviceWarning) {
+    normalizedJob.warnings = [serviceWarning];
+    normalizedJob.error = "MusicXML 导入失败，Python 识谱服务不可用或解析失败。";
+  }
+
+  const existingJobIndex = store.jobs.findIndex((item) => item.jobId === normalizedJob.jobId);
+  if (existingJobIndex >= 0) {
+    store.jobs[existingJobIndex] = normalizedJob;
+  } else {
+    store.jobs.push(normalizedJob);
+  }
+  await writeScoreStore(store);
+
+  return res.status(normalizedJob.omrStatus === "completed" ? 200 : 502).json({
+    ok: normalizedJob.omrStatus === "completed",
+    error: normalizedJob.omrStatus === "completed" ? "" : normalizedJob.error,
+    scoreImportJobId: normalizedJob.jobId,
+    job: normalizedJob,
+  });
 });
 
 app.get("/api/erhu/scores/import-pdf/:jobId", async (req, res) => {

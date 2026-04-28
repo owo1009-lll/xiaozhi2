@@ -39,6 +39,7 @@ from schemas import (
     PracticeTarget,
     RankedSectionCandidate,
     RankSectionsRequest,
+    MusicXmlImportRequest,
     ScoreImportJobResult,
     ScoreImportRequest,
     SeparateErhuRequest,
@@ -303,7 +304,7 @@ class ErhuAnalyzer:
         self.settings = settings
 
     def dependency_report(self) -> dict[str, bool]:
-        return {
+        report = {
             "numpy": np is not None,
             "librosa": librosa is not None,
             "soundfile": sf is not None,
@@ -315,6 +316,32 @@ class ErhuAnalyzer:
             "pypdf": bool(PdfReader and PdfWriter),
             "ffmpeg": bool(self._resolve_ffmpeg_path()),
             "audiveris": bool(self.settings.audiveris_cli and os.path.exists(self.settings.audiveris_cli)),
+        }
+        if torch is not None:
+            report["torchCuda"] = bool(torch.cuda.is_available())
+        return report
+
+    def runtime_report(self) -> dict[str, Any]:
+        torch_version = ""
+        cuda_version = ""
+        torch_device = "none"
+        cuda_device_name = ""
+        if torch is not None:
+            torch_version = str(getattr(torch, "__version__", ""))
+            cuda_version = str(getattr(torch.version, "cuda", "") or "")
+            if torch.cuda.is_available():
+                torch_device = "cuda"
+                try:
+                    cuda_device_name = str(torch.cuda.get_device_name(0))
+                except Exception:
+                    cuda_device_name = "cuda"
+            else:
+                torch_device = "cpu"
+        return {
+            "torchVersion": torch_version,
+            "torchCudaVersion": cuda_version,
+            "torchDevice": torch_device,
+            "cudaDeviceName": cuda_device_name,
         }
 
     def _clip_feature_cache_dir(self) -> Path:
@@ -2403,6 +2430,112 @@ class ErhuAnalyzer:
             error=None,
         )
 
+    def import_musicxml_score(self, request: MusicXmlImportRequest) -> ScoreImportJobResult:
+        output_dir = Path(request.outputDir or (Path(self.settings.data_root) / "score-imports" / request.jobId))
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        musicxml_path = Path(request.musicxmlPath)
+        selected_part = (request.selectedPartHint or "erhu").strip() or "erhu"
+        warnings: list[str] = []
+        detected_parts: list[str] = [selected_part]
+
+        if not musicxml_path.exists():
+            return ScoreImportJobResult(
+                jobId=request.jobId,
+                omrStatus="failed",
+                omrConfidence=0.0,
+                scoreId=None,
+                title=request.titleHint or request.originalFilename or request.jobId,
+                sourcePdfPath=None,
+                musicxmlPath=str(musicxml_path),
+                detectedParts=detected_parts,
+                selectedPart=selected_part,
+                selectedPartCandidates=detected_parts,
+                warnings=["MusicXML 文件不存在。"],
+                error="MusicXML 文件不存在，无法生成结构化乐谱。",
+            )
+
+        try:
+            piece_pack, detected_parts, resolved_part = self._build_piece_pack_from_musicxml_sources(
+                [musicxml_path],
+                request,
+                selected_part,
+            )
+        except Exception as error:
+            return ScoreImportJobResult(
+                jobId=request.jobId,
+                omrStatus="failed",
+                omrConfidence=0.0,
+                scoreId=None,
+                title=request.titleHint or request.originalFilename or request.jobId,
+                sourcePdfPath=None,
+                musicxmlPath=str(musicxml_path),
+                detectedParts=detected_parts,
+                selectedPart=selected_part,
+                selectedPartCandidates=detected_parts,
+                warnings=[str(error)],
+                error="MusicXML 解析失败，无法生成结构化乐谱。",
+            )
+
+        if not piece_pack:
+            return ScoreImportJobResult(
+                jobId=request.jobId,
+                omrStatus="failed",
+                omrConfidence=0.0,
+                scoreId=None,
+                title=request.titleHint or request.originalFilename or request.jobId,
+                sourcePdfPath=None,
+                musicxmlPath=str(musicxml_path),
+                detectedParts=detected_parts,
+                selectedPart=selected_part,
+                selectedPartCandidates=detected_parts,
+                warnings=["MusicXML 中没有解析出可分析的二胡旋律音符。"],
+                error="MusicXML 未生成可分析曲库，请检查声部选择或文件内容。",
+            )
+
+        if isinstance(piece_pack, dict):
+            piece_pack["composer"] = piece_pack.get("composer") or "MusicXML import"
+            piece_pack["selectedPart"] = piece_pack.get("selectedPart") or resolved_part
+            piece_pack["detectedParts"] = list(piece_pack.get("detectedParts") or detected_parts or [resolved_part])
+            selected_part = str(piece_pack.get("selectedPart") or resolved_part)
+            detected_parts = list(piece_pack.get("detectedParts") or [selected_part])
+
+        part_candidates = list(piece_pack.get("partCandidates") or []) if isinstance(piece_pack, dict) else []
+        selected_part_confidence = (
+            safe_float(piece_pack.get("selectedPartConfidence"), 0.0)
+            if isinstance(piece_pack, dict)
+            else 0.0
+        )
+        marking_stats = dict(piece_pack.get("markingStats") or {}) if isinstance(piece_pack, dict) else {}
+        section_count = len(piece_pack.get("sections") or []) if isinstance(piece_pack, dict) else 0
+        omr_confidence = max(0.65, min(0.96, float(selected_part_confidence or 0.0) or 0.88))
+
+        return ScoreImportJobResult(
+            jobId=request.jobId,
+            omrStatus="completed",
+            omrConfidence=omr_confidence,
+            scoreId=request.jobId,
+            title=request.titleHint or request.originalFilename or request.jobId,
+            sourcePdfPath=None,
+            musicxmlPath=str(musicxml_path),
+            previewPages=[],
+            detectedParts=detected_parts,
+            selectedPart=selected_part,
+            selectedPartCandidates=detected_parts,
+            selectedPartConfidence=round(float(selected_part_confidence or 0.0), 3),
+            partCandidates=part_candidates,
+            markingStats=marking_stats,
+            piecePack=piece_pack,
+            omrStats={
+                "mode": "musicxml-upload",
+                "pageCount": 0,
+                "resultCount": section_count,
+                "wholePdfAttempted": False,
+            },
+            warnings=warnings,
+            error=None,
+        )
+
     def separate_erhu(self, request: SeparateErhuRequest) -> SeparateErhuResult:
         audio = self._decode_audio(request)
         score_notes, _ = self._resolve_score_notes(request)
@@ -2972,7 +3105,7 @@ class ErhuAnalyzer:
                     fmin=120.0,
                     fmax=1400.0,
                     batch_size=512,
-                    device="cpu",
+                    device="cuda" if torch.cuda.is_available() else "cpu",
                     return_periodicity=True,
                 )
                 pitch_values = pitch.squeeze(0).detach().cpu().numpy()
@@ -5494,6 +5627,11 @@ class ErhuAnalyzer:
             confidence += min(0.12, range_ratio * 0.12)
             confidence += 0.06 if pitch_span <= 36 else -0.05
             confidence -= min(0.18, chord_ratio * 0.75)
+            if chord_ratio >= 0.18:
+                # Piano/accompaniment lines are commonly polyphonic.  When the
+                # imported part is ambiguous, do not allow a chord-dense line to
+                # be projected as the erhu melody even if it is visually high.
+                confidence = min(confidence - 0.18, 0.58)
             confidence = max(0.05, min(0.9, confidence))
             role = "erhu" if confidence >= 0.66 else "accompaniment"
             line_roles[key] = (role, round(confidence, 3), "omr-line-split")
@@ -5547,6 +5685,10 @@ class ErhuAnalyzer:
             # Strong mode: once OMR has separated melody/accompaniment lines, only
             # the erhu melody line is allowed into pitch/rhythm diagnosis.
             note_events = role_filtered
+        elif any(str((getattr(note, "notePosition", None) or {}).get("scoreLineRole") or "").strip() for note in note_events):
+            # If line-role analysis ran and found no reliable erhu line, keep the
+            # section out of automatic diagnosis instead of falling back to piano.
+            return []
 
         staff_counts: dict[int, int] = {}
         for note in note_events:
@@ -5718,7 +5860,7 @@ class ErhuAnalyzer:
                     fmin=120.0,
                     fmax=1400.0,
                     batch_size=256,
-                    device="cpu",
+                    device="cuda" if torch.cuda.is_available() else "cpu",
                     return_periodicity=True,
                 )
                 pitch_values = pitch.squeeze(0).detach().cpu().numpy()

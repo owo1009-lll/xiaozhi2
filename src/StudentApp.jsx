@@ -24,6 +24,7 @@ import {
   fetchPiecePassJob,
   fetchScore,
   fetchScoreImportJob,
+  importScoreMusicXml,
   importScorePdf,
   selectScorePart,
 } from "./researchApi";
@@ -392,12 +393,14 @@ export default function StudentApp({ onOpenResearch }) {
   const restoredStateRef = useRef(loadPersistedStudentState());
   const stopDemoRef = useRef(() => {});
   const scoreFileInputRef = useRef(null);
+  const scoreMusicXmlInputRef = useRef(null);
   const audioFileInputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
   const [studentId, setStudentId] = useState(restoredStateRef.current?.studentId || "");
   const [scorePdfFile, setScorePdfFile] = useState(null);
+  const [scoreMusicXmlFile, setScoreMusicXmlFile] = useState(null);
   const [scoreJob, setScoreJob] = useState(restoredStateRef.current?.scoreJob || null);
   const [analysisJob, setAnalysisJob] = useState(restoredStateRef.current?.analysisJob || null);
   const [piecePassJob, setPiecePassJob] = useState(restoredStateRef.current?.piecePassJob || null);
@@ -912,6 +915,42 @@ export default function StudentApp({ onOpenResearch }) {
     }
   }
 
+  async function handleImportMusicXml() {
+    if (!scoreMusicXmlFile) {
+      setErrorMessage("请先选择 MusicXML 文件。");
+      return;
+    }
+    setImportingScore(true);
+    setErrorMessage("");
+    setScore(null);
+    setScoreJob(null);
+    setAnalysis(null);
+    setAnalysisJob(null);
+    setPiecePassJob(null);
+    setPiecePassSummary(null);
+    setParticipantSnapshot(null);
+    setExcludedAnalysisIds(new Set());
+    clearIssueSessionCache();
+    setSelectedSectionId("");
+    setStatusMessage("正在导入 MusicXML，并生成可分析的结构化乐谱。");
+    try {
+      const json = await importScoreMusicXml(scoreMusicXmlFile);
+      const job = json?.job || null;
+      setScoreJob(job);
+      if (job?.scoreId) {
+        const scoreJson = await fetchScore(job.scoreId);
+        const nextScore = scoreJson?.score || null;
+        setScore(nextScore);
+        setSelectedSectionId(pickVisibleSectionId(nextScore, ""));
+      }
+      setStatusMessage(buildImportStatusMessage(job));
+    } catch (error) {
+      setErrorMessage(error.message || "MusicXML 导入失败。");
+    } finally {
+      setImportingScore(false);
+    }
+  }
+
   async function handleSelectPart(nextSelectedPart) {
     const scoreId = score?.scoreId || scoreJob?.scoreId;
     if (!scoreId || !nextSelectedPart || selectingPart) return;
@@ -958,6 +997,7 @@ export default function StudentApp({ onOpenResearch }) {
 
   function handleScorePdfSelected(file) {
     setScorePdfFile(file || null);
+    if (file) setScoreMusicXmlFile(null);
     setScore(null);
     setScoreJob(null);
     setAnalysis(null);
@@ -972,6 +1012,23 @@ export default function StudentApp({ onOpenResearch }) {
     }
   }
 
+
+  function handleScoreMusicXmlSelected(file) {
+    setScoreMusicXmlFile(file || null);
+    if (file) setScorePdfFile(null);
+    setScore(null);
+    setScoreJob(null);
+    setAnalysis(null);
+    setAnalysisJob(null);
+    setPiecePassJob(null);
+    setPiecePassSummary(null);
+    setSelectedSectionId("");
+    setErrorMessage("");
+    clearIssueSessionCache();
+    if (file) {
+      setStatusMessage(`已选择 MusicXML：${file.name}。这是 PDF 自动识谱失败时的备用导入路径。`);
+    }
+  }
 
   async function startRecording() {
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
@@ -1270,6 +1327,21 @@ export default function StudentApp({ onOpenResearch }) {
             type="file"
             accept="application/pdf"
             onChange={(event) => handleScorePdfSelected(event.target.files?.[0] || null)}
+          />
+          <div className="action-row">
+            <button type="button" className="secondary-button" onClick={() => scoreMusicXmlInputRef.current?.click()}>
+              选择 MusicXML
+            </button>
+            <button type="button" className="secondary-button" onClick={handleImportMusicXml} disabled={importingScore}>
+              {importingScore ? "导入中..." : "导入 MusicXML 备用"}
+            </button>
+          </div>
+          <input
+            ref={scoreMusicXmlInputRef}
+            className="hidden-input"
+            type="file"
+            accept=".musicxml,.xml,.mxl,application/vnd.recordare.musicxml+xml,application/vnd.recordare.musicxml"
+            onChange={(event) => handleScoreMusicXmlSelected(event.target.files?.[0] || null)}
           />
           <div className="upload-meta">
             <span>PDF：{scorePdfFile?.name || "尚未选择 PDF"}</span>

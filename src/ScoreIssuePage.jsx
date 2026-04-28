@@ -204,6 +204,16 @@ function getImportedProjectionSource(section, score = null) {
   return Array.isArray(section?.partCandidates) && section.partCandidates.length ? section : score;
 }
 
+function sectionHasConfidentErhuLine(section) {
+  const stats = section?.scoreLineStats && typeof section.scoreLineStats === "object" ? section.scoreLineStats : null;
+  if (Number(stats?.erhuNoteCount) > 0) return true;
+  return (Array.isArray(section?.notes) ? section.notes : []).some((note) => {
+    const role = String(note?.notePosition?.scoreLineRole || "").toLowerCase();
+    const confidence = Number(note?.notePosition?.scoreLineConfidence) || 0;
+    return role === "erhu" && confidence >= 0.66;
+  });
+}
+
 function isAmbiguousImportedPart(score) {
   const candidate = getSelectedPartCandidate(score);
   if (!candidate) return false;
@@ -212,6 +222,7 @@ function isAmbiguousImportedPart(score) {
 }
 
 function isBlockedImportedProjection(section, score = null) {
+  if (sectionHasConfidentErhuLine(section)) return false;
   const mode = String(section?.erhuProjectionMode || "").trim().toLowerCase();
   if (mode === "blocked") return true;
   const source = getImportedProjectionSource(section, score);
@@ -250,7 +261,13 @@ function isErhuMelodyNote(note, section, score = null) {
   const accompanimentPresent = hasAccompanimentPartCandidate(source) || hasAccompanimentPartCandidate(score);
   const lineRole = String(note?.notePosition?.scoreLineRole || "").toLowerCase();
   const lineConfidence = Number(note?.notePosition?.scoreLineConfidence) || 0;
-  if (lineRole === "erhu" && lineConfidence >= 0.66) return true;
+  if (lineRole === "erhu" && lineConfidence >= 0.66) {
+    if (!accompanimentPresent && !isAmbiguousImportedPart(score) && !isAmbiguousImportedPart(source)) return true;
+    // Cached OMR can contain stale/wrong scoreLineRole values.  In full-score
+    // pages with accompaniment, require the visual line to also match the
+    // expected top melody staff pattern before showing a student-facing marker.
+    return isErhuMelodySystemIndex(note?.notePosition?.systemIndex, source || score);
+  }
   if (lineRole) return false;
   if (accompanimentPresent || isAmbiguousImportedPart(score) || isAmbiguousImportedPart(source)) return false;
   return isErhuMelodySystemIndex(note?.notePosition?.systemIndex, score);
@@ -906,29 +923,12 @@ export default function ScoreIssuePage() {
     ? Math.max(1, ...effectiveSections.map((item) => getSectionMeasureCount(item)))
     : getSectionMeasureCount(section || {});
   const measureIssues = useMemo(
-    () => buildMeasureIssues(analysis).filter((item) => {
-      const issueSection = resolveIssueSection(score, section, item);
-      return !isWholePieceMode || (
-        !isLikelyNonScoreLeadPage(issueSection, score)
-        && !isLikelyAccompanimentOnlySection(issueSection, projectionScore)
-        && hasErhuMelodyMeasure(issueSection, item.measureIndex, projectionScore)
-      );
-    }),
-    [analysis, isWholePieceMode, projectionScore, score, section],
+    () => buildMeasureIssues(analysis),
+    [analysis],
   );
   const noteIssues = useMemo(
-    () => buildNoteIssues(analysis).filter((item) => {
-      const issueSection = resolveIssueSection(score, section, item);
-      const sectionStaffIndex = getErhuStaffIndex(issueSection, dominantStaffIndex);
-      if (!issueSection) return false;
-      if (!hasExactErhuIssueNote(issueSection, item, sectionStaffIndex, projectionScore)) return false;
-      return !isWholePieceMode || (
-        !isLikelyNonScoreLeadPage(issueSection, score)
-        && !isLikelyAccompanimentOnlySection(issueSection, projectionScore)
-        && hasErhuMelodyMeasure(issueSection, item.measureIndex, projectionScore)
-      );
-    }),
-    [analysis, dominantStaffIndex, isWholePieceMode, projectionScore, score, section],
+    () => buildNoteIssues(analysis),
+    [analysis],
   );
   const visibleAnalysisForSummary = useMemo(
     () => ({
@@ -1050,6 +1050,10 @@ export default function ScoreIssuePage() {
         const issueSection = resolveIssueSection(score, section, item);
         const issueSectionId = String(issueSection?.sectionId || item.sectionId || "");
         const measureKey = sectionKey(issueSectionId, item.measureIndex);
+        const leadPage = isWholePieceMode && isLikelyNonScoreLeadPage(issueSection, score);
+        const accompanimentOnly = isWholePieceMode && isLikelyAccompanimentOnlySection(issueSection, projectionScore);
+        const hasMelodyMeasure = Boolean(issueSection && hasErhuMelodyMeasure(issueSection, item.measureIndex, projectionScore));
+        const locationReliable = Boolean(issueSection && !leadPage && !accompanimentOnly && hasMelodyMeasure);
         return {
           ...item,
           sectionId: issueSectionId,
@@ -1060,9 +1064,12 @@ export default function ScoreIssuePage() {
           issueKey: `measure-${measureKey}`,
           issueNumber: index + 1,
           issueTone: item.issueTone || getIssueTone([item.label]),
+          locationReliable,
+          needsReview: !locationReliable,
+          reviewReason: locationReliable ? "" : "未定位到可靠二胡小节坐标",
         };
       }),
-    [displayMeasureLookup, measureIssues, measurePageMap, score, section],
+    [displayMeasureLookup, isWholePieceMode, measureIssues, measurePageMap, projectionScore, score, section],
   );
 
   const noteIssueEntries = useMemo(
@@ -1074,8 +1081,12 @@ export default function ScoreIssuePage() {
           noteOverlayItems.find((overlay) => String(overlay.noteId || "") === String(item.noteId || "") && overlay.measureIndex === item.measureIndex && overlay.sectionId === issueSectionId)
           || null;
         const overlayKey = overlayItem?.key || `note-${item.noteId || index}-${item.measureIndex}`;
+        const importedSection = shouldProjectImportedFullScoreSection(issueSection);
+        const locationReliable = Boolean(overlayItem && (!importedSection || overlayItem.exact));
+        const tags = locationReliable ? item.tags : [...new Set([...(item.tags || []), "需复核"])];
         return {
           ...item,
+          tags,
           sectionId: issueSectionId,
           sectionTitle: item.sectionTitle || formatSectionDisplayName(issueSection),
           pageNumber: overlayItem?.pageNumber || extractSectionPageNumber(issueSection),
@@ -1085,7 +1096,10 @@ export default function ScoreIssuePage() {
           overlayKey,
           issueKey: `note-${overlayKey}`,
           issueNumber: measureIssueEntries.length + index + 1,
-          issueTone: item.issueTone || overlayItem?.issueTone || getIssueTone(item.tags || []),
+          issueTone: item.issueTone || overlayItem?.issueTone || getIssueTone(tags || []),
+          locationReliable,
+          needsReview: !locationReliable,
+          reviewReason: locationReliable ? "" : "未定位到可靠二胡音符坐标",
         };
       }),
     [displayMeasureLookup, measureIssueEntries.length, noteIssues, noteOverlayItems, score, section],
@@ -1110,7 +1124,7 @@ export default function ScoreIssuePage() {
   }, [measureIssueEntries, noteIssueEntries]);
 
   const measureOverlayKeys = useMemo(
-    () => [...new Set(measureIssueEntries.map((item) => item.measureKey))],
+    () => [...new Set(measureIssueEntries.filter((item) => item.locationReliable).map((item) => item.measureKey))],
     [measureIssueEntries],
   );
 
@@ -1419,7 +1433,10 @@ export default function ScoreIssuePage() {
                         <span className="issue-number-chip">{item.issueNumber}</span>
                         {formatDisplayMeasureLabel(item.measureIndex, item.displayMeasureIndex)}
                       </strong>
-                      <span>{item.label}</span>
+                      <span>
+                        {item.label}
+                        {item.needsReview ? `，${item.reviewReason || "需复核"}` : ""}
+                      </span>
                     </button>
                   );
                 }
@@ -1439,7 +1456,7 @@ export default function ScoreIssuePage() {
                     </strong>
                     <span>
                       {item.tags.join("、")}
-                      {!overlayItem ? "，未定位到可靠二胡音符坐标" : ""}
+                      {item.needsReview ? `，${item.reviewReason || "需复核"}` : ""}
                     </span>
                   </button>
                 );

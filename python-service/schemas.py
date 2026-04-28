@@ -163,6 +163,15 @@ class ScoreImportRequest(BaseModel):
     outputDir: str | None = None
 
 
+class MusicXmlImportRequest(BaseModel):
+    jobId: str
+    musicxmlPath: str
+    originalFilename: str | None = None
+    titleHint: str | None = None
+    selectedPartHint: str | None = None
+    outputDir: str | None = None
+
+
 class ScoreImportJobResult(BaseModel):
     jobId: str
     omrStatus: str

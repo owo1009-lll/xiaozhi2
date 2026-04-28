@@ -14,27 +14,13 @@ $analyzerErrLog = Join-Path $dataDir "prod-analyzer-error.log"
 $pidFile = Join-Path $dataDir "prod-pids.json"
 $pythonRunner = Join-Path $repoRoot "scripts\run-python.ps1"
 $serverUrl = "http://127.0.0.1:3000"
-$analyzerUrl = "http://127.0.0.1:8000/docs"
-$analyzerWorkers = if ($IsWindows) { 1 } else { 2 }
+$analyzerPort = 8000
+$serverAnalyzerUrl = "http://127.0.0.1:$analyzerPort"
+$analyzerUrl = "$serverAnalyzerUrl/docs"
+$isWindowsHost = ($env:OS -eq "Windows_NT") -or ($PSVersionTable.Platform -eq "Win32NT") -or ($IsWindows -eq $true)
+$analyzerWorkers = if ($isWindowsHost) { 1 } else { 2 }
 
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
-
-function Find-ProcessByCommandLine {
-  param(
-    [string[]]$Patterns
-  )
-
-  Get-CimInstance Win32_Process | Where-Object {
-    $commandLine = $_.CommandLine
-    if (-not $commandLine) { return $false }
-    foreach ($pattern in $Patterns) {
-      if ($commandLine -notlike "*$pattern*") {
-        return $false
-      }
-    }
-    return $true
-  } | Select-Object -First 1
-}
 
 function Stop-ManagedListener {
   param(
@@ -86,10 +72,31 @@ function Wait-HttpReady {
   return $false
 }
 
+function Test-AnalyzerRouteReady {
+  param(
+    [int]$Port
+  )
+
+  try {
+    $openApi = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/openapi.json" -TimeoutSec 2
+    $paths = @($openApi.paths.PSObject.Properties.Name)
+    return $paths -contains "/score/import-musicxml"
+  } catch {
+    return $false
+  }
+}
+
 Stop-ManagedListener -Port 3000 -CommandPatterns @("server.js")
-Stop-ManagedListener -Port 8000 -CommandPatterns @("uvicorn")
-Stop-ManagedListener -Port 8000 -CommandPatterns @("python-service")
-Stop-ManagedListener -Port 8000 -CommandPatterns @("ai二胡")
+Stop-ManagedListener -Port 8000 -CommandPatterns @("uvicorn", "python-service")
+Stop-ManagedListener -Port 8100 -CommandPatterns @("uvicorn", "python-service")
+
+$staleAnalyzerListeners = @(Get-NetTCPConnection -LocalPort $analyzerPort -State Listen -ErrorAction SilentlyContinue)
+if ($staleAnalyzerListeners.Count -gt 0 -and -not (Test-AnalyzerRouteReady -Port $analyzerPort)) {
+  $analyzerPort = 8100
+  $serverAnalyzerUrl = "http://127.0.0.1:$analyzerPort"
+  $analyzerUrl = "$serverAnalyzerUrl/docs"
+  Stop-ManagedListener -Port $analyzerPort -CommandPatterns @("uvicorn", "python-service")
+}
 
 if (-not $SkipBuild) {
   Push-Location $repoRoot
@@ -102,8 +109,9 @@ if (-not $SkipBuild) {
 
 $serverListenerBeforeStart = @(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue)
 if ($serverListenerBeforeStart.Count -eq 0) {
+  $serverCommand = "& { `$env:NODE_ENV='production'; `$env:PORT='3000'; `$env:ERHU_ANALYZER_URL='$serverAnalyzerUrl'; node server.js }"
   $startedServer = Start-Process -FilePath "powershell" `
-    -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "& { `$env:NODE_ENV='production'; `$env:PORT='3000'; node server.js }" `
+    -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $serverCommand `
     -WorkingDirectory $repoRoot `
     -RedirectStandardOutput $serverLog `
     -RedirectStandardError $serverErrLog `
@@ -113,9 +121,9 @@ if ($serverListenerBeforeStart.Count -eq 0) {
 
 $analyzerProcess = $null
 if (Test-Path $pythonRunner) {
-  $analyzerListenerBeforeStart = @(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue)
+  $analyzerListenerBeforeStart = @(Get-NetTCPConnection -LocalPort $analyzerPort -State Listen -ErrorAction SilentlyContinue)
   if ($analyzerListenerBeforeStart.Count -eq 0) {
-    $analyzerCommand = "& { `$env:ERHU_ENABLE_TORCHCREPE='true'; `$env:ERHU_ENABLE_MADMOM='true'; & '$pythonRunner' -m uvicorn app:app --app-dir python-service --host 127.0.0.1 --port 8000 --workers $analyzerWorkers --log-level warning }"
+    $analyzerCommand = "& { `$env:ERHU_ENABLE_TORCHCREPE='true'; `$env:ERHU_ENABLE_MADMOM='true'; `$env:ERHU_PREFER_CUDA_PYTHON='true'; `$env:ERHU_TORCH_DEVICE='cuda'; `$env:ERHU_PORT='$analyzerPort'; & '$pythonRunner' -m uvicorn app:app --app-dir python-service --host 127.0.0.1 --port $analyzerPort --workers $analyzerWorkers --log-level warning }"
     $startedAnalyzer = Start-Process -FilePath "powershell" `
       -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $analyzerCommand `
       -WorkingDirectory $repoRoot `
@@ -133,7 +141,7 @@ if (Test-Path $pythonRunner) {
 }
 
 $serverListener = @(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1)
-$analyzerListener = @(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1)
+$analyzerListener = @(Get-NetTCPConnection -LocalPort $analyzerPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1)
 $serverPid = if ($serverListener.Count -gt 0) { $serverListener[0].OwningProcess } elseif ($startedServer) { $startedServer.Id } else { $null }
 $analyzerPid = if ($analyzerListener.Count -gt 0) { $analyzerListener[0].OwningProcess } elseif ($startedAnalyzer) { $startedAnalyzer.Id } else { $null }
 
@@ -141,6 +149,8 @@ $analyzerPid = if ($analyzerListener.Count -gt 0) { $analyzerListener[0].OwningP
   repoRoot = $repoRoot
   serverPid = $serverPid
   analyzerPid = $analyzerPid
+  analyzerPort = $analyzerPort
+  analyzerUrl = $serverAnalyzerUrl
   updatedAt = (Get-Date).ToString("o")
   mode = "production"
 } | ConvertTo-Json | Set-Content -Path $pidFile -Encoding UTF8

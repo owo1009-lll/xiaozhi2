@@ -32,7 +32,7 @@ if (Test-Path $pidFile) {
   Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
 }
 
-$prodListeners = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.LocalPort -in 3000, 8000 })
+$prodListeners = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.LocalPort -in 3000, 8000, 8100 })
 foreach ($listener in $prodListeners) {
   try {
     $process = Get-CimInstance Win32_Process -Filter "ProcessId = $($listener.OwningProcess)" -ErrorAction SilentlyContinue

@@ -53,6 +53,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--audio-hash", default="", help="Content hash for the input audio. Used to isolate per-section caches.")
     parser.add_argument("--reuse-scan-analyses", action="store_true", help="Use scan-window analyses as final section rows instead of re-analyzing every section.")
     parser.add_argument("--fast-window-min-duration", type=float, default=0.0, help="Minimum seconds per section window in fast sequence scan.")
+    parser.add_argument("--fast-window-max-duration", type=float, default=0.0, help="Optional maximum seconds per section window for highly fragmented fast sequence scans.")
     parser.add_argument("--fast-window-scale", type=float, default=1.6, help="Duration scale applied to score-estimated section length in fast sequence scan.")
     parser.add_argument(
         "--fast-sequence-scan",
@@ -208,7 +209,8 @@ def analyze_window(
     analyzer_url: str,
     piece: dict,
     section: dict,
-    wav_bytes: bytes,
+    audio_path: Path,
+    start_seconds: float,
     duration_seconds: float,
     preprocess_mode: str,
     label: str,
@@ -233,12 +235,14 @@ def analyze_window(
         "preprocessMode": preprocess_mode,
         "piecePack": piece_pack,
         "audioSubmission": {
-            "name": f"{label}.wav",
-            "mimeType": "audio/wav",
-            "size": len(wav_bytes),
+            "name": f"{label}{audio_path.suffix or '.audio'}",
+            "mimeType": "audio/mpeg" if audio_path.suffix.lower() == ".mp3" else "audio/wav",
+            "size": 0,
             "duration": duration_seconds,
         },
-        "audioDataUrl": "data:audio/wav;base64," + base64.b64encode(wav_bytes).decode("ascii"),
+        "audioPath": str(audio_path),
+        "windowStartSeconds": round(start_seconds, 3),
+        "windowEndSeconds": round(start_seconds + duration_seconds, 3),
     }
     return post_json(f"{analyzer_url}/analyze", payload, timeout_seconds=timeout_seconds).get("analysis") or {}
 
@@ -444,6 +448,8 @@ def build_fast_sequence_scan(args: argparse.Namespace, scan_output_dir: Path, pi
         previous_start = start_seconds
 
     min_duration = safe_number(args.fast_window_min_duration, 0.0) or (3.5 if args.fast_sequence_scan else 8.0)
+    max_duration = max(0.0, safe_number(getattr(args, "fast_window_max_duration", 0.0), 0.0))
+    should_cap_fragmented_windows = bool(max_duration > 0 and len(sections) >= 40)
     for index, (section, start_seconds) in enumerate(planned_starts):
         window_duration = estimate_section_duration_seconds(
             section,
@@ -458,6 +464,8 @@ def build_fast_sequence_scan(args: argparse.Namespace, scan_output_dir: Path, pi
             # every short OMR chunk and cuts first-run whole-piece latency.
             bounded_duration = max(min_duration, (next_start - start_seconds) + args.window_padding)
             window_duration = min(window_duration, bounded_duration)
+        if should_cap_fragmented_windows:
+            window_duration = max(min_duration, min(window_duration, max_duration))
         if audio_duration > 0:
             window_duration = min(window_duration, max(1.0, audio_duration - start_seconds))
 
@@ -877,9 +885,8 @@ def _analyze_section_item(
         row["nearestHintDistance"] = item.get("nearestHintDistance")
         return row, True
 
-    wav_bytes, actual_duration = slice_audio(audio_path, start_seconds, duration_seconds)
     analysis = analyze_window(
-        analyzer_url, piece, section, wav_bytes, actual_duration, preprocess_mode,
+        analyzer_url, piece, section, audio_path, start_seconds, duration_seconds, preprocess_mode,
         f"{section_id}-{start_seconds}",
         timeout_seconds=analysis_timeout_seconds,
     )
@@ -896,8 +903,8 @@ def _analyze_section_item(
         "sectionId": section_id,
         "sectionTitle": section.get("title"),
         "startSeconds": round(start_seconds, 2),
-        "endSeconds": round(start_seconds + actual_duration, 2),
-        "durationSeconds": round(actual_duration, 2),
+        "endSeconds": round(start_seconds + duration_seconds, 2),
+        "durationSeconds": round(duration_seconds, 2),
         "noteCount": note_count,
         "measureCount": measure_count,
         "rawScanScore": item.get("score"),

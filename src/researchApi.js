@@ -80,6 +80,20 @@ export async function importScorePdf(file, titleHint = "") {
   );
 }
 
+export async function importScoreMusicXml(file, titleHint = "") {
+  const formData = new FormData();
+  formData.append("musicxml", file);
+  if (titleHint) {
+    formData.append("titleHint", titleHint);
+  }
+  return readJson(
+    await fetch("/api/erhu/scores/import-musicxml", {
+      method: "POST",
+      body: formData,
+    }),
+  );
+}
+
 export async function fetchScoreImportJob(jobId) {
   return readJson(await fetch(`/api/erhu/scores/import-pdf/${encodeURIComponent(jobId)}`));
 }
