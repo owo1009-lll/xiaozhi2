@@ -22,6 +22,7 @@ function parseArgs() {
     pairOffset: 0,
     minConfidence: 0.72,
     strict: false,
+    requestTimeoutMs: 30000,
   };
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
@@ -33,9 +34,68 @@ function parseArgs() {
     else if (arg === "--pair-offset") parsed.pairOffset = Math.max(0, Number(args[++i]) || 0);
     else if (arg === "--min-confidence") parsed.minConfidence = Number(args[++i]) || parsed.minConfidence;
     else if (arg === "--strict") parsed.strict = true;
+    else if (arg === "--request-timeout-ms") parsed.requestTimeoutMs = Math.max(1000, Number(args[++i]) || parsed.requestTimeoutMs);
   }
   parsed.roots = [...new Set(parsed.roots.filter(Boolean))];
   return parsed;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 30000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    const text = await response.text();
+    let json = {};
+    if (text) {
+      try {
+        json = JSON.parse(text);
+      } catch {
+        json = { raw: text };
+      }
+    }
+    if (!response.ok) {
+      const message = json?.error || json?.message || response.statusText || "request failed";
+      throw new Error(`${message} (${response.status})`);
+    }
+    return json;
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(`request timed out after ${timeoutMs}ms: ${url}`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function runPreflight(baseUrl, timeoutMs) {
+  const preflight = {
+    ok: false,
+    baseUrl,
+    checkedAt: new Date().toISOString(),
+    failures: [],
+  };
+  try {
+    preflight.health = await fetchJsonWithTimeout(`${baseUrl}/api/health`, {}, timeoutMs);
+  } catch (error) {
+    preflight.failures.push(`node-gateway-unreachable: ${String(error?.message || error)}`);
+  }
+  try {
+    const analyzerStatus = await fetchJsonWithTimeout(`${baseUrl}/api/erhu/analyzer-status`, {}, timeoutMs);
+    preflight.analyzer = analyzerStatus?.analyzer || analyzerStatus;
+    if (!preflight.analyzer?.reachable) {
+      preflight.failures.push(`python-analyzer-unreachable: ${preflight.analyzer?.mode || "unknown"}`);
+    }
+  } catch (error) {
+    preflight.failures.push(`python-analyzer-status-error: ${String(error?.message || error)}`);
+  }
+  preflight.ok = preflight.failures.length === 0;
+  return preflight;
 }
 
 function stripExtension(value) {
@@ -114,28 +174,25 @@ function shouldExcludePdf(pdfPath) {
   return "";
 }
 
-async function postPdfImport(baseUrl, pair) {
+async function postPdfImport(baseUrl, pair, timeoutMs) {
   const form = new FormData();
   const bytes = await fs.readFile(pair.pdfPath);
   form.append("pdf", new Blob([bytes], { type: "application/pdf" }), path.basename(pair.pdfPath));
   form.append("titleHint", pair.title);
-  const response = await fetch(`${baseUrl}/api/erhu/scores/import-pdf`, { method: "POST", body: form });
-  if (!response.ok) throw new Error(`PDF import failed: ${response.status}`);
-  return response.json();
+  return fetchJsonWithTimeout(`${baseUrl}/api/erhu/scores/import-pdf`, { method: "POST", body: form }, timeoutMs);
 }
 
-async function pollImport(baseUrl, jobId) {
+async function pollImport(baseUrl, jobId, timeoutMs) {
   for (let i = 0; i < 240; i += 1) {
-    const response = await fetch(`${baseUrl}/api/erhu/scores/import-pdf/${jobId}`);
-    const json = await response.json();
+    const json = await fetchJsonWithTimeout(`${baseUrl}/api/erhu/scores/import-pdf/${jobId}`, {}, timeoutMs);
     const job = json.job || {};
     if (job.omrStatus === "completed" || job.omrStatus === "failed") return job;
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await sleep(2000);
   }
   throw new Error("PDF import timed out");
 }
 
-async function postWholePiece(baseUrl, pair, job) {
+async function postWholePiece(baseUrl, pair, job, timeoutMs) {
   const form = new FormData();
   const bytes = await fs.readFile(pair.audioPath);
   form.append("audio", new Blob([bytes], { type: "audio/mpeg" }), path.basename(pair.audioPath));
@@ -151,18 +208,15 @@ async function postWholePiece(baseUrl, pair, job) {
       preprocessMode: "auto",
     }),
   );
-  const response = await fetch(`${baseUrl}/api/erhu/piece-pass-jobs`, { method: "POST", body: form });
-  if (!response.ok) throw new Error(`whole-piece job failed: ${response.status}`);
-  return response.json();
+  return fetchJsonWithTimeout(`${baseUrl}/api/erhu/piece-pass-jobs`, { method: "POST", body: form }, timeoutMs);
 }
 
-async function pollPiecePass(baseUrl, jobId) {
+async function pollPiecePass(baseUrl, jobId, timeoutMs) {
   for (let i = 0; i < 720; i += 1) {
-    const response = await fetch(`${baseUrl}/api/erhu/piece-pass-jobs/${jobId}`);
-    const json = await response.json();
+    const json = await fetchJsonWithTimeout(`${baseUrl}/api/erhu/piece-pass-jobs/${jobId}`, {}, timeoutMs);
     const job = json.job || {};
     if (job.status === "completed" || job.status === "failed") return job;
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    await sleep(3000);
   }
   throw new Error("whole-piece analysis timed out");
 }
@@ -222,6 +276,13 @@ function buildResultChecks(result, minConfidence) {
 function refreshReportSummary(report, minConfidence) {
   report.statusCounts = summarizeStatusCounts(report.results);
   report.p0Failures = [];
+  if (report.preflight && !report.preflight.ok) {
+    report.p0Failures.push({
+      title: "preflight",
+      status: "failed",
+      failures: report.preflight.failures || ["preflight-failed"],
+    });
+  }
   for (const result of report.results || []) {
     result.checks = buildResultChecks(result, minConfidence);
     if (!result.checks.ok) {
@@ -277,7 +338,15 @@ async function main() {
   }
   const offsetPairs = args.pairOffset > 0 ? dedupedPairs.slice(args.pairOffset) : dedupedPairs;
   const selectedPairs = args.maxPairs > 0 ? offsetPairs.slice(0, args.maxPairs) : offsetPairs;
-  const report = { createdAt: new Date().toISOString(), run: args.run, strict: args.strict, pairs: selectedPairs, results: [] };
+  const report = {
+    createdAt: new Date().toISOString(),
+    run: args.run,
+    strict: args.strict,
+    baseUrl: args.baseUrl,
+    requestTimeoutMs: args.requestTimeoutMs,
+    pairs: selectedPairs,
+    results: [],
+  };
   const summaryPath = path.join(args.outputDir, "run-summary.json");
   const writeReport = async () => {
     await fs.writeFile(summaryPath, JSON.stringify(report, null, 2), "utf8");
@@ -286,6 +355,21 @@ async function main() {
   await writeReport();
 
   if (args.run) {
+    report.preflight = await runPreflight(args.baseUrl, args.requestTimeoutMs);
+    refreshReportSummary(report, args.minConfidence);
+    await writeReport();
+    if (!report.preflight.ok) {
+      console.log(JSON.stringify({
+        outputDir: args.outputDir,
+        pairCount: selectedPairs.length,
+        ran: args.run,
+        statusCounts: report.statusCounts,
+        p0FailureCount: report.p0FailureCount,
+        p0Failures: report.p0Failures,
+      }, null, 2));
+      if (args.strict) process.exit(1);
+      return;
+    }
     for (const pair of selectedPairs) {
       const result = { title: pair.title, pdfPath: pair.pdfPath, audioPath: pair.audioPath, status: "pending" };
       report.results.push(result);
@@ -294,10 +378,10 @@ async function main() {
         const importStart = Date.now();
         result.status = "importing";
         await writeReport();
-        const started = await postPdfImport(args.baseUrl, pair);
+        const started = await postPdfImport(args.baseUrl, pair, args.requestTimeoutMs);
         result.scoreImportJobId = started.scoreImportJobId || started.job?.jobId || "";
         await writeReport();
-        const importJob = await pollImport(args.baseUrl, result.scoreImportJobId);
+        const importJob = await pollImport(args.baseUrl, result.scoreImportJobId, args.requestTimeoutMs);
         result.importMs = Date.now() - importStart;
         result.importJob = importJob;
         result.status = "imported";
@@ -310,10 +394,10 @@ async function main() {
         const analysisStart = Date.now();
         result.status = "analyzing";
         await writeReport();
-        const pieceStarted = await postWholePiece(args.baseUrl, pair, importJob);
+        const pieceStarted = await postWholePiece(args.baseUrl, pair, importJob, args.requestTimeoutMs);
         result.piecePassJobId = pieceStarted.piecePassJobId || pieceStarted.job?.jobId || "";
         await writeReport();
-        const pieceJob = await pollPiecePass(args.baseUrl, result.piecePassJobId);
+        const pieceJob = await pollPiecePass(args.baseUrl, result.piecePassJobId, args.requestTimeoutMs);
         result.analysisMs = Date.now() - analysisStart;
         result.piecePassJob = pieceJob;
         const summary = pieceJob.summary || {};
