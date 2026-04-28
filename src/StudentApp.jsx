@@ -75,6 +75,7 @@ function isAccompanimentCandidate(candidate) {
 
 function needsPartReview(job, score) {
   if ((job?.omrStatus || score?.omrStatus) !== "completed") return false;
+  if (job?.selectedPartConfirmed || score?.selectedPartConfirmed) return false;
   const candidates = getPartCandidates(job, score);
   if (candidates.length <= 1) return false;
   return getSelectedPartConfidence(job, score) > 0 && getSelectedPartConfidence(job, score) < 0.7;
@@ -1113,6 +1114,10 @@ export default function StudentApp({ onOpenResearch }) {
       setErrorMessage("请先选择一个分析段落。");
       return;
     }
+    if (shouldReviewPart) {
+      setErrorMessage("请先确认二胡旋律行，再上传音频分析。这样可以避免把音准和节奏问题标到钢琴伴奏谱上。");
+      return;
+    }
     if (!audioFile) {
       setErrorMessage("请先上传或录制音频。");
       return;
@@ -1152,6 +1157,10 @@ export default function StudentApp({ onOpenResearch }) {
   async function handleRunWholePiece() {
     if (!score?.scoreId) {
       setErrorMessage("请先导入 PDF 曲谱。");
+      return;
+    }
+    if (shouldReviewPart) {
+      setErrorMessage("请先确认二胡旋律行，再运行整曲分析。这样可以避免把音准和节奏问题标到钢琴伴奏谱上。");
       return;
     }
     if (!audioFile) {
@@ -1416,6 +1425,16 @@ export default function StudentApp({ onOpenResearch }) {
                   })}
                 </select>
               </label>
+              <div className="action-row" style={{ marginTop: 10 }}>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => handleSelectPart(selectedPartOptionValue)}
+                  disabled={selectingPart || importingScore || !selectedPartOptionValue}
+                >
+                  {selectingPart || importingScore ? "正在确认..." : "确认使用此旋律行"}
+                </button>
+              </div>
               <p className="form-help">选择后系统会重新整理可分析段落。看不准时，优先选择标有 Eh. / Erhu / 二胡 的单旋律行，不要选择 Pno. / Piano / 钢琴伴奏行。</p>
             </div>
           ) : null}
@@ -1430,7 +1449,7 @@ export default function StudentApp({ onOpenResearch }) {
             <button type="button" className="secondary-button" onClick={() => audioFileInputRef.current?.click()}>
               上传音频
             </button>
-            <button type="button" className="secondary-button" onClick={handleAnalyze} disabled={analysisBusy}>
+            <button type="button" className="secondary-button" onClick={handleAnalyze} disabled={analysisBusy || shouldReviewPart}>
               {analysisBusy ? "分析中..." : "分段诊断"}
             </button>
           </div>
@@ -1511,7 +1530,7 @@ export default function StudentApp({ onOpenResearch }) {
         <section className="panel-card">
           <StepTitle step="04" title="整曲分析" description="对当前录音逐段匹配曲谱，生成整曲或长片段概览。" />
           <div className="action-row">
-            <button type="button" className="primary-button" onClick={handleRunWholePiece} disabled={wholePieceBusy}>
+            <button type="button" className="primary-button" onClick={handleRunWholePiece} disabled={wholePieceBusy || shouldReviewPart}>
               {wholePieceBusy ? "整曲分析中..." : "运行整曲分析"}
             </button>
           </div>
