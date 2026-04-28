@@ -28,6 +28,7 @@
     "test:score-markings": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-score-markings.py",
     "test:score-issues": "node scripts\\test-score-issue-projection.mjs",
     "test:dtw-quality": "node scripts\\audit-dtw-alignment-quality.mjs",
+    "test:mainline-p0": "powershell -ExecutionPolicy Bypass -File scripts\\run-mainline-p0-checks.ps1",
     "pilot:pack": "node scripts\\build-pilot-pack.mjs",
     "pilot:pack:taohuawu": "node scripts\\build-pilot-pack.mjs --piece-pass-json data/piece-pass/taohuawu-whole-v3/taohuawu-test-fragment-whole-piece-pass.json --output-dir data/pilot-pack/taohuawu-v1 --top-count 8",
     "research:export": "powershell -ExecutionPolicy Bypass -File scripts\\export-research-data.ps1",
