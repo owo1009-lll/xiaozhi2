@@ -206,6 +206,53 @@ SYSTEM_MERGED_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
 </score-partwise>
 """
 
+SPARSE_FALSE_LEAD_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <defaults>
+    <page-layout>
+      <page-height>1600</page-height>
+      <page-width>1200</page-width>
+    </page-layout>
+  </defaults>
+  <part-list>
+    <score-part id="P1"><part-name>Voice</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1" width="420">
+      <print new-system="yes"><system-layout><top-system-distance>100</top-system-distance></system-layout></print>
+      <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+      <note default-x="60"><pitch><step>D</step><octave>6</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2" width="420">
+      <print new-system="yes"><system-layout><top-system-distance>240</top-system-distance></system-layout></print>
+      <note default-x="60"><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+      <note default-x="60"><chord/><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3" width="420">
+      <print new-system="yes"><system-layout><top-system-distance>380</top-system-distance></system-layout></print>
+      <note default-x="60"><pitch><step>C</step><octave>3</octave></pitch><duration>4</duration></note>
+      <note default-x="60"><chord/><pitch><step>G</step><octave>3</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4" width="420">
+      <print new-system="yes"><system-layout><top-system-distance>520</top-system-distance></system-layout></print>
+      <note default-x="60"><pitch><step>D</step><octave>5</octave></pitch><duration>4</duration></note>
+      <note default-x="160"><pitch><step>E</step><octave>5</octave></pitch><duration>4</duration></note>
+      <note default-x="260"><pitch><step>F</step><octave>5</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="5" width="420">
+      <print new-system="yes"><system-layout><top-system-distance>660</top-system-distance></system-layout></print>
+      <note default-x="60"><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+      <note default-x="60"><chord/><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="6" width="420">
+      <print new-system="yes"><system-layout><top-system-distance>800</top-system-distance></system-layout></print>
+      <note default-x="60"><pitch><step>C</step><octave>3</octave></pitch><duration>4</duration></note>
+      <note default-x="60"><chord/><pitch><step>E</step><octave>3</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 
 def require(condition: bool, message: str) -> None:
     if not condition:
@@ -266,10 +313,28 @@ def main() -> int:
             "System Merged Voice",
             1,
         )
+        sparse_source = Path(tmp) / "sparse-false-lead.musicxml"
+        sparse_source.write_text(SPARSE_FALSE_LEAD_MUSICXML, encoding="utf-8")
+        sparse_request = ScoreImportRequest(
+            jobId="sparse-false-lead-test",
+            pdfPath=str(sparse_source),
+            originalFilename="sparse-false-lead.musicxml",
+            titleHint="Sparse False Lead Test",
+            selectedPartHint="Voice",
+        )
+        sparse_section, *_ = analyzer._parse_musicxml_source_to_section(
+            sparse_source,
+            sparse_request,
+            "Voice",
+            "page-001-s01",
+            "Sparse False Lead",
+            1,
+        )
 
     require(section is not None, "MusicXML did not produce a section.")
     require(merged_section is not None, "Merged voice MusicXML did not produce a section.")
     require(system_section is not None, "System-merged voice MusicXML did not produce a section.")
+    require(sparse_section is not None, "Sparse false lead MusicXML did not produce a section.")
     merged_notes = merged_section["notes"]
     merged_staffs = {int(note["notePosition"]["staffIndex"]) for note in merged_notes if note.get("notePosition")}
     require(merged_staffs == {1}, f"Merged voice should keep only erhu/top staff, got {merged_staffs}.")
@@ -282,6 +347,10 @@ def main() -> int:
     system_systems = {int(note["notePosition"]["systemIndex"]) for note in system_notes if note.get("notePosition")}
     require(system_systems == {1, 4}, f"Three-line system split should keep only erhu systems 1 and 4, got {system_systems}.")
     require([note["midiPitch"] for note in system_notes] == [74, 76], "Three-line system split should exclude piano accompaniment lines.")
+    sparse_notes = sparse_section["notes"]
+    sparse_systems = {int(note["notePosition"]["systemIndex"]) for note in sparse_notes if note.get("notePosition")}
+    require(sparse_systems == {4}, f"Sparse false lead should be suppressed; kept systems {sparse_systems}.")
+    require([note["midiPitch"] for note in sparse_notes] == [74, 76, 77], "Sparse false lead should keep only the real erhu melody system.")
     notes = section["notes"]
     first_note = notes[0]
     require(selected_part == "Erhu", f"Expected Erhu selected part, got {selected_part!r}.")

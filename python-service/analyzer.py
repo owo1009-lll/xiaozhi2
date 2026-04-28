@@ -5592,6 +5592,22 @@ class ErhuAnalyzer:
                 ]),
             )
 
+        page_has_dense_erhu_pattern_line: dict[int, bool] = {}
+        for page_number, ordered_keys in page_order.items():
+            line_count = max(1, len(ordered_keys))
+            dense_pattern_found = False
+            for line_rank, candidate_key in enumerate(ordered_keys):
+                if line_count == 1:
+                    pattern_candidate = True
+                elif line_count == 2:
+                    pattern_candidate = line_rank == 0
+                else:
+                    pattern_candidate = line_rank % 3 == 0
+                if pattern_candidate and len(line_groups.get(candidate_key, [])) >= 3:
+                    dense_pattern_found = True
+                    break
+            page_has_dense_erhu_pattern_line[page_number] = dense_pattern_found
+
         line_roles: dict[tuple[int, int, int], tuple[str, float, str]] = {}
         for key, notes in line_groups.items():
             page_number = key[0]
@@ -5632,6 +5648,13 @@ class ErhuAnalyzer:
                 # imported part is ambiguous, do not allow a chord-dense line to
                 # be projected as the erhu melody even if it is visually high.
                 confidence = min(confidence - 0.18, 0.58)
+            if ambiguous and line_count >= 4 and len(notes) <= 2 and page_has_dense_erhu_pattern_line.get(page_number, False):
+                # Full-score OMR often turns title/text fragments or isolated
+                # accompaniment artifacts into one or two pitched events above
+                # the real system.  In student-facing diagnosis it is safer to
+                # suppress those sparse pseudo-lines than to highlight them as
+                # erhu issues.
+                confidence = min(confidence - 0.22, 0.58)
             confidence = max(0.05, min(0.9, confidence))
             role = "erhu" if confidence >= 0.66 else "accompaniment"
             line_roles[key] = (role, round(confidence, 3), "omr-line-split")
