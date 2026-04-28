@@ -20,6 +20,7 @@ function parseArgs() {
     run: false,
     maxPairs: 0,
     pairOffset: 0,
+    excludeTitles: [],
     minConfidence: 0.72,
     strict: false,
     requestTimeoutMs: 30000,
@@ -32,11 +33,13 @@ function parseArgs() {
     else if (arg === "--output-dir") parsed.outputDir = path.resolve(REPO_ROOT, args[++i]);
     else if (arg === "--max-pairs") parsed.maxPairs = Number(args[++i]) || 0;
     else if (arg === "--pair-offset") parsed.pairOffset = Math.max(0, Number(args[++i]) || 0);
+    else if (arg === "--exclude-title") parsed.excludeTitles.push(args[++i] || "");
     else if (arg === "--min-confidence") parsed.minConfidence = Number(args[++i]) || parsed.minConfidence;
     else if (arg === "--strict") parsed.strict = true;
     else if (arg === "--request-timeout-ms") parsed.requestTimeoutMs = Math.max(1000, Number(args[++i]) || parsed.requestTimeoutMs);
   }
   parsed.roots = [...new Set(parsed.roots.filter(Boolean))];
+  parsed.excludeTitles = [...new Set(parsed.excludeTitles.map((item) => normalizeTitle(item)).filter(Boolean))];
   return parsed;
 }
 
@@ -172,6 +175,12 @@ function shouldExcludePdf(pdfPath) {
   if (EXCLUDED_TITLES.has(title) || EXCLUDED_TITLES.has(normalized)) return "unsupported-jianpu-or-explicit-exclusion";
   if (/\u7b80\u8c31/.test(title)) return "unsupported-jianpu-or-explicit-exclusion";
   return "";
+}
+
+function titleExcludedByArgs(title, excludeTitles) {
+  const normalized = normalizeTitle(title);
+  if (!normalized) return false;
+  return (excludeTitles || []).some((excluded) => normalized === excluded || normalized.includes(excluded) || excluded.includes(normalized));
 }
 
 async function postPdfImport(baseUrl, pair, timeoutMs) {
@@ -327,6 +336,7 @@ async function main() {
     })
     .filter((pair) => pair.audioPath)
     .filter((pair) => !pair.excluded)
+    .filter((pair) => !titleExcludedByArgs(pair.title, args.excludeTitles))
     .sort((left, right) => right.matchScore - left.matchScore || left.title.localeCompare(right.title, "zh-Hans-CN"));
   const dedupedPairs = [];
   const seenPairKeys = new Set();
@@ -344,6 +354,7 @@ async function main() {
     strict: args.strict,
     baseUrl: args.baseUrl,
     requestTimeoutMs: args.requestTimeoutMs,
+    excludeTitles: args.excludeTitles,
     pairs: selectedPairs,
     results: [],
   };
