@@ -42,9 +42,12 @@ function percentText(value) {
   return Number.isFinite(numeric) ? `${Math.round(numeric * 100)}%` : "0%";
 }
 
-function confidenceText(value) {
+function scoreImportQualityText(value) {
   const numeric = Number(value);
-  return Number.isFinite(numeric) ? `${Math.round(numeric * 100)}%` : "未提供";
+  if (!Number.isFinite(numeric)) return "未开始";
+  if (numeric >= 0.85) return "较好";
+  if (numeric >= 0.65) return "可用，建议复核";
+  return "需复核";
 }
 
 function getPartCandidates(job, score) {
@@ -65,6 +68,11 @@ function getSelectedPartConfidence(job, score) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+function isAccompanimentCandidate(candidate) {
+  const label = String(candidate?.label || candidate?.name || candidate?.role || "").toLowerCase();
+  return /piano|pno|pn\.|伴奏|钢琴|accompaniment/.test(label);
+}
+
 function needsPartReview(job, score) {
   if ((job?.omrStatus || score?.omrStatus) !== "completed") return false;
   const candidates = getPartCandidates(job, score);
@@ -73,15 +81,14 @@ function needsPartReview(job, score) {
 }
 
 function formatPartCandidateLabel(candidate, index = 0) {
-  const label = String(candidate?.label || candidate?.name || `候选声部 ${index + 1}`).trim();
   const noteCount = Number(candidate?.noteCount);
   const measureCount = Number(candidate?.measureCount);
-  const confidence = Number(candidate?.selectedPartConfidence ?? candidate?.score);
+  const isAccompaniment = isAccompanimentCandidate(candidate);
   const details = [];
-  if (Number.isFinite(confidence)) details.push(`置信度 ${confidenceText(confidence)}`);
   if (Number.isFinite(noteCount)) details.push(`${noteCount} 个音`);
   if (Number.isFinite(measureCount)) details.push(`${measureCount} 小节`);
-  return `候选声部 ${index + 1}：${label}${details.length ? `（${details.join("，")}）` : ""}`;
+  const prefix = isAccompaniment ? `伴奏行 ${index + 1}（通常不要选）` : `旋律行 ${index + 1}`;
+  return `${prefix}${details.length ? `：${details.join("，")}` : ""}`;
 }
 
 function importProgressHeadline(job) {
@@ -781,7 +788,6 @@ export default function StudentApp({ onOpenResearch }) {
   const selectedPartOptionValue = partCandidates.some((candidate, index) => getPartCandidateKey(candidate, index) === selectedPartKey)
     ? selectedPartKey
     : getPartCandidateKey(partCandidates[0], 0);
-  const selectedPartConfidence = getSelectedPartConfidence(scoreJob, score);
   const shouldReviewPart = needsPartReview(scoreJob, score);
 
   const selectedSection = useMemo(
@@ -1366,7 +1372,7 @@ export default function StudentApp({ onOpenResearch }) {
           <div className="upload-meta">
             <span>PDF：{scorePdfFile?.name || "尚未选择 PDF"}</span>
             <span>状态：{scoreJob?.omrStatus || "未开始"}</span>
-            <span>识谱置信度：{scoreJob ? confidenceText(scoreJob.omrConfidence) : "未提供"}</span>
+            <span>识谱质量：{scoreJob ? scoreImportQualityText(scoreJob.omrConfidence) : "未开始"}</span>
           </div>
           {scoreJob ? (
             <div className="history-card omr-progress-card">
@@ -1389,12 +1395,12 @@ export default function StudentApp({ onOpenResearch }) {
           ) : null}
           {shouldReviewPart ? (
             <div className="history-card warning-card">
-              <h3>需要确认二胡声部</h3>
+              <h3>请选择二胡旋律行</h3>
               <p>
-                当前自动声部识别置信度为 {confidenceText(selectedPartConfidence)}。如果谱面含钢琴伴奏，建议先确认二胡旋律声部，再上传音频分析。
+                这份谱面可能同时包含二胡和钢琴。请选实际演奏二胡旋律的那一行；如果选成伴奏行，后面的音准和节奏问题会标到钢琴谱上。
               </p>
               <label>
-                <span>二胡声部</span>
+                <span>二胡旋律行</span>
                 <select
                   value={selectedPartOptionValue}
                   onChange={(event) => handleSelectPart(event.target.value)}
@@ -1410,6 +1416,7 @@ export default function StudentApp({ onOpenResearch }) {
                   })}
                 </select>
               </label>
+              <p className="form-help">选择后系统会重新整理可分析段落。看不准时，优先选择标有 Eh. / Erhu / 二胡 的单旋律行，不要选择 Pno. / Piano / 钢琴伴奏行。</p>
             </div>
           ) : null}
         </section>
