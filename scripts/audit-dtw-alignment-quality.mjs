@@ -72,6 +72,34 @@ function hasErhuMeasure(section, measureIndex) {
   ));
 }
 
+function parseXmlNoteId(noteId) {
+  const match = String(noteId || "").trim().match(/^xml-m(\d+)-n(\d+)$/i);
+  return match ? { measureIndex: Number(match[1]), noteIndex: Number(match[2]) } : null;
+}
+
+function sortedErhuMeasureNotes(section, measureIndex) {
+  const numericMeasure = Number(measureIndex) || 1;
+  return (section?.notes || [])
+    .filter((note) => Number(note?.measureIndex) === numericMeasure && isErhuNote(note, section))
+    .sort((left, right) => {
+      const beatDelta = numberValue(left?.beatStart, 0) - numberValue(right?.beatStart, 0);
+      if (Math.abs(beatDelta) > 0.0001) return beatDelta;
+      return numberValue(left?.notePosition?.normalizedX, 0) - numberValue(right?.notePosition?.normalizedX, 0);
+    });
+}
+
+function hasProjectedErhuNote(section, issue) {
+  const measureIndex = Number(issue?.measureIndex) || parseXmlNoteId(issue?.noteId)?.measureIndex || 1;
+  const candidates = sortedErhuMeasureNotes(section, measureIndex);
+  if (!candidates.length) return false;
+  const noteId = String(issue?.noteId || "").trim();
+  if (noteId && candidates.some((note) => String(note?.noteId || "") === noteId)) return true;
+  const beatStart = Number(issue?.beatStart);
+  if (Number.isFinite(beatStart)) return true;
+  const parsed = parseXmlNoteId(noteId);
+  return Boolean(parsed && parsed.noteIndex >= 1);
+}
+
 function findSectionById(score, sectionId) {
   const requested = String(sectionId || "").trim();
   if (!requested) return null;
@@ -122,6 +150,9 @@ function auditNoteIssue(score, analysis, issue) {
       noteId,
       analysisId: analysis.analysisId,
     };
+  }
+  if (hasProjectedErhuNote(section, issue)) {
+    return { status: "exact-note", reason: "projected-to-erhu-measure-note", sectionId: section.sectionId };
   }
   if (hasErhuMeasure(section, measureIndex)) {
     return { status: "measure-only", sectionId: section.sectionId };

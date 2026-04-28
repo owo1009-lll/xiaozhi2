@@ -344,18 +344,37 @@ function findErhuNotePosition(section, issue, preferredStaffIndex, score = null)
   const issueNoteId = String(issue?.noteId || "");
 
   if (importedFullScore) {
-    const exactImportedNotes = issueNoteId
-      ? notes.filter((item) => (
-        String(item?.noteId || "") === issueNoteId
-        && Number(item?.measureIndex) === measureIndex
-        && readNotePosition(item, section, absolutePage)
-      ))
-      : [];
-    const erhuImportedNote = exactImportedNotes.find((item) => (
-      getNoteStaffIndex(item) === targetStaff
-      && isErhuMelodyNote(item, section, score)
-    ));
-    return erhuImportedNote ? readNotePosition(erhuImportedNote, section, absolutePage) : null;
+    const sameMeasureImported = melodyNotes
+      .filter((item) => Number(item?.measureIndex) === measureIndex && readNotePosition(item, section, absolutePage))
+      .sort((left, right) => {
+        const beatDelta = Number(left?.beatStart || 0) - Number(right?.beatStart || 0);
+        if (Math.abs(beatDelta) > 0.0001) return beatDelta;
+        return Number(left?.notePosition?.normalizedX || 0) - Number(right?.notePosition?.normalizedX || 0);
+      });
+
+    const exactImportedNote = issueNoteId
+      ? sameMeasureImported.find((item) => String(item?.noteId || "") === issueNoteId)
+      : null;
+    if (exactImportedNote) return readNotePosition(exactImportedNote, section, absolutePage);
+
+    const issueBeat = Number(issue?.beatStart);
+    if (Number.isFinite(issueBeat) && sameMeasureImported.length) {
+      const closest = sameMeasureImported.reduce((winner, item) => {
+        if (!winner) return item;
+        return Math.abs(Number(item?.beatStart || 0) - issueBeat) < Math.abs(Number(winner?.beatStart || 0) - issueBeat)
+          ? item
+          : winner;
+      }, null);
+      return readNotePosition(closest, section, absolutePage);
+    }
+
+    const parsed = parseXmlNoteId(issue?.noteId);
+    if (parsed && sameMeasureImported.length) {
+      const targetIndex = Math.max(0, Math.min(sameMeasureImported.length - 1, parsed.noteIndex - 1));
+      return readNotePosition(sameMeasureImported[targetIndex], section, absolutePage);
+    }
+
+    return sameMeasureImported.length === 1 ? readNotePosition(sameMeasureImported[0], section, absolutePage) : null;
   }
 
   const sameMeasure = melodyNotes
