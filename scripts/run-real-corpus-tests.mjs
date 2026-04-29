@@ -255,6 +255,9 @@ function buildResultChecks(result, minConfidence, thresholds = {}) {
   const omrConfidence = Number(importJob.omrConfidence || 0);
   const importMs = Number(result.importMs || 0);
   const analysisMs = Number(result.analysisMs || 0);
+  const cacheHitCount = Number(summary.sectionCacheHitCount || 0);
+  const cacheMissCount = Number(summary.sectionCacheMissCount || Math.max(0, attempted - cacheHitCount));
+  const cacheHitRate = Number(summary.sectionCacheHitRate || (attempted > 0 ? cacheHitCount / attempted : 0));
   const p0Failures = [];
   const warnings = [];
 
@@ -277,6 +280,9 @@ function buildResultChecks(result, minConfidence, thresholds = {}) {
   if (thresholds.analysisWarnMs > 0 && analysisMs >= thresholds.analysisWarnMs) {
     warnings.push(`slow-analysis=${analysisMs}ms`);
   }
+  if (attempted >= 100 && analysisMs >= 60000 && cacheHitRate < 0.5) {
+    warnings.push(`first-pass-fragmented-score=${analysisMs}ms, sections=${attempted}, cacheMisses=${cacheMissCount}`);
+  }
 
   return {
     ok: p0Failures.length === 0,
@@ -291,6 +297,9 @@ function buildResultChecks(result, minConfidence, thresholds = {}) {
     completeness,
     totalNoteFindings: Number(summary.totalNoteFindings || 0),
     totalMeasureFindings: Number(summary.totalMeasureFindings || 0),
+    sectionCacheHitCount: cacheHitCount,
+    sectionCacheMissCount: cacheMissCount,
+    sectionCacheHitRate: Number.isFinite(cacheHitRate) ? Number(cacheHitRate.toFixed(3)) : 0,
     importMs,
     analysisMs,
   };

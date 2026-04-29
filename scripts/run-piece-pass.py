@@ -1184,6 +1184,10 @@ def main() -> int:
     summary["scoreId"] = args.score_id
     summary["audioHash"] = audio_hash
     summary["analysisReuseMode"] = "scan-window" if args.reuse_scan_analyses else "focused-analysis"
+    summary["sectionCacheHitCount"] = int(cache_hits)
+    summary["sectionCacheMissCount"] = max(0, len(section_rows) - int(cache_hits))
+    summary["sectionCacheHitRate"] = round(float(cache_hits) / max(1, len(section_rows)), 3)
+    summary["firstPassCacheBuild"] = summary["sectionCacheMissCount"] > 0
 
     json_payload = {
         "pieceId": output_key,

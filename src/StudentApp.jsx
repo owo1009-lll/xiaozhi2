@@ -1709,6 +1709,12 @@ export default function StudentApp({ onOpenResearch }) {
                 {" · "}
                 综合评分：{getDisplayCombinedScore(wholePieceSummary)}
               </p>
+              {Number.isFinite(Number(wholePieceSummary.sectionCacheHitCount)) ? (
+                <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
+                  缓存复用：{wholePieceSummary.sectionCacheHitCount || 0} / {wholePieceSummary.attemptedSectionCount || wholePieceSummary.structuredSectionCount || 0} 段。
+                  {wholePieceSummary.firstPassCacheBuild ? " 本次包含首次深度分析，之后重跑会明显更快。" : " 本次主要复用已有分析缓存。"}
+                </p>
+              ) : null}
               {wholePieceSummary.analysisReliable === false ? (
                 <p className="error-text">
                   本次整曲分析不完整：有效段落 {wholePieceSummary.matchedSectionCount || 0} / {wholePieceSummary.attemptedSectionCount || wholePieceSummary.structuredSectionCount || 0}，
