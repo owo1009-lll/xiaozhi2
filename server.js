@@ -1630,6 +1630,8 @@ function launchPiecePassTask(task) {
 
     const scriptPath = path.join(__dirname, "scripts", "run-piece-pass.py");
     const runnerScript = path.join(__dirname, "scripts", "run-python.ps1");
+    const scanConcurrency = clamp(Math.round(safeNumber(process.env.ERHU_PIECE_PASS_SCAN_CONCURRENCY, 3)), 1, 6);
+    const analysisConcurrency = clamp(Math.round(safeNumber(process.env.ERHU_PIECE_PASS_ANALYSIS_CONCURRENCY, 3)), 1, 6);
     const args = [
       "-ExecutionPolicy",
       "Bypass",
@@ -1671,9 +1673,9 @@ function launchPiecePassTask(task) {
             "--cache-dir",
             "data/piece-pass/section-cache",
             "--scan-concurrency",
-            "2",
+            String(scanConcurrency),
             "--analysis-concurrency",
-            "2",
+            String(analysisConcurrency),
             "--analysis-retry",
             "1",
             "--analysis-timeout-seconds",
