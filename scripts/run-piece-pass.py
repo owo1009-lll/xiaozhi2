@@ -63,16 +63,16 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def emit_progress(progress: float, stage: str, message: str) -> None:
+def emit_progress(progress: float, stage: str, message: str, detail: dict | None = None) -> None:
+    payload = {
+        "progress": round(max(0.0, min(1.0, float(progress))), 4),
+        "stage": stage,
+        "message": message,
+    }
+    if detail:
+        payload.update(detail)
     print(
-        "__PROGRESS__" + json.dumps(
-            {
-                "progress": round(max(0.0, min(1.0, float(progress))), 4),
-                "stage": stage,
-                "message": message,
-            },
-            ensure_ascii=False,
-        ),
+        "__PROGRESS__" + json.dumps(payload, ensure_ascii=False),
         flush=True,
     )
 
@@ -1093,6 +1093,7 @@ def main() -> int:
     section_rows = []
     cache_hits = 0
     completed_count = 0
+    failed_count = 0
     progress_lock = threading.Lock()
 
     def _run_item(pair: tuple) -> tuple[dict, bool]:
@@ -1121,6 +1122,7 @@ def main() -> int:
                 item, sec = pair
                 sys.stderr.write(f"WARNING: analysis skipped {sec.get('sectionId')} after retries: {exc}\n")
                 row, hit = build_failed_section_row(item, sec, piece, exc), False
+                failed_count += 1
             section_rows.append(row)
             cache_hits += hit
             completed_count += 1
@@ -1129,6 +1131,13 @@ def main() -> int:
                 0.35 + (completed_count / total_sections) * 0.5,
                 "analyzing-sections",
                 f"正在{label}第 {completed_count}/{total_sections} 个段落。",
+                {
+                    "currentSection": completed_count,
+                    "completedSections": completed_count,
+                    "totalSections": total_sections,
+                    "failedSections": failed_count,
+                    "cacheHits": cache_hits,
+                },
             )
     else:
         with ThreadPoolExecutor(max_workers=concurrency) as executor:
@@ -1146,12 +1155,23 @@ def main() -> int:
                 with progress_lock:
                     section_rows.append(row)
                     cache_hits += hit
+                    if row.get("analysisFailed") or row.get("failed"):
+                        failed_count += 1
                     completed_count += 1
                     n = completed_count
+                    current_failed = failed_count
+                    current_cache_hits = cache_hits
                 emit_progress(
                     0.35 + (n / total_sections) * 0.5,
                     "analyzing-sections",
                     f"正在分析整曲各段落（{n}/{total_sections}）。",
+                    {
+                        "currentSection": n,
+                        "completedSections": n,
+                        "totalSections": total_sections,
+                        "failedSections": current_failed,
+                        "cacheHits": current_cache_hits,
+                    },
                 )
 
     section_rows.sort(key=lambda row: (row.get("sequenceIndex") or 0, row.get("startSeconds") or 0))

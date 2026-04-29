@@ -22,6 +22,8 @@ function parseArgs() {
     pairOffset: 0,
     excludeTitles: [],
     minConfidence: 0.72,
+    importWarnMs: Number(process.env.ERHU_REAL_CORPUS_IMPORT_WARN_MS || 60000),
+    analysisWarnMs: Number(process.env.ERHU_REAL_CORPUS_ANALYSIS_WARN_MS || 120000),
     strict: false,
     requestTimeoutMs: 30000,
   };
@@ -35,6 +37,8 @@ function parseArgs() {
     else if (arg === "--pair-offset") parsed.pairOffset = Math.max(0, Number(args[++i]) || 0);
     else if (arg === "--exclude-title") parsed.excludeTitles.push(args[++i] || "");
     else if (arg === "--min-confidence") parsed.minConfidence = Number(args[++i]) || parsed.minConfidence;
+    else if (arg === "--import-warn-ms") parsed.importWarnMs = Math.max(0, Number(args[++i]) || parsed.importWarnMs);
+    else if (arg === "--analysis-warn-ms") parsed.analysisWarnMs = Math.max(0, Number(args[++i]) || parsed.analysisWarnMs);
     else if (arg === "--strict") parsed.strict = true;
     else if (arg === "--request-timeout-ms") parsed.requestTimeoutMs = Math.max(1000, Number(args[++i]) || parsed.requestTimeoutMs);
   }
@@ -238,7 +242,7 @@ function summarizeStatusCounts(results = []) {
   }, {});
 }
 
-function buildResultChecks(result, minConfidence) {
+function buildResultChecks(result, minConfidence, thresholds = {}) {
   const importJob = result.importJob || {};
   const pieceJob = result.piecePassJob || {};
   const summary = pieceJob.summary || {};
@@ -249,7 +253,10 @@ function buildResultChecks(result, minConfidence) {
   const timedOut = Number(summary.timedOutSectionCount || 0);
   const completeness = Number(summary.analysisCompletenessRatio ?? summary.sectionCoverageRatio ?? 0);
   const omrConfidence = Number(importJob.omrConfidence || 0);
+  const importMs = Number(result.importMs || 0);
+  const analysisMs = Number(result.analysisMs || 0);
   const p0Failures = [];
+  const warnings = [];
 
   if (result.status !== "completed") p0Failures.push(`status=${result.status || "unknown"}`);
   if (importJob.omrStatus && importJob.omrStatus !== "completed") p0Failures.push(`omr=${importJob.omrStatus}`);
@@ -264,10 +271,17 @@ function buildResultChecks(result, minConfidence) {
     p0Failures.push(`completeness=${completeness.toFixed(2)}`);
   }
   if (summary.analysisReliable === false) p0Failures.push("analysis-unreliable");
+  if (thresholds.importWarnMs > 0 && importMs >= thresholds.importWarnMs) {
+    warnings.push(`slow-import=${importMs}ms`);
+  }
+  if (thresholds.analysisWarnMs > 0 && analysisMs >= thresholds.analysisWarnMs) {
+    warnings.push(`slow-analysis=${analysisMs}ms`);
+  }
 
   return {
     ok: p0Failures.length === 0,
     p0Failures,
+    warnings,
     omrConfidence,
     structuredSectionCount: structured,
     attemptedSectionCount: attempted,
@@ -277,14 +291,15 @@ function buildResultChecks(result, minConfidence) {
     completeness,
     totalNoteFindings: Number(summary.totalNoteFindings || 0),
     totalMeasureFindings: Number(summary.totalMeasureFindings || 0),
-    importMs: Number(result.importMs || 0),
-    analysisMs: Number(result.analysisMs || 0),
+    importMs,
+    analysisMs,
   };
 }
 
-function refreshReportSummary(report, minConfidence) {
+function refreshReportSummary(report, minConfidence, thresholds = {}) {
   report.statusCounts = summarizeStatusCounts(report.results);
   report.p0Failures = [];
+  report.performanceWarnings = [];
   if (report.preflight && !report.preflight.ok) {
     report.p0Failures.push({
       title: "preflight",
@@ -293,7 +308,7 @@ function refreshReportSummary(report, minConfidence) {
     });
   }
   for (const result of report.results || []) {
-    result.checks = buildResultChecks(result, minConfidence);
+    result.checks = buildResultChecks(result, minConfidence, thresholds);
     if (!result.checks.ok) {
       report.p0Failures.push({
         title: result.title,
@@ -301,8 +316,15 @@ function refreshReportSummary(report, minConfidence) {
         failures: result.checks.p0Failures,
       });
     }
+    for (const warning of result.checks.warnings || []) {
+      report.performanceWarnings.push({
+        title: result.title,
+        warning,
+      });
+    }
   }
   report.p0FailureCount = report.p0Failures.length;
+  report.performanceWarningCount = report.performanceWarnings.length;
   report.completedCount = report.statusCounts.completed || 0;
   report.skippedCount = Object.entries(report.statusCounts)
     .filter(([key]) => key.startsWith("skipped"))
@@ -354,6 +376,10 @@ async function main() {
     strict: args.strict,
     baseUrl: args.baseUrl,
     requestTimeoutMs: args.requestTimeoutMs,
+    performanceThresholds: {
+      importWarnMs: args.importWarnMs,
+      analysisWarnMs: args.analysisWarnMs,
+    },
     excludeTitles: args.excludeTitles,
     pairs: selectedPairs,
     results: [],
@@ -367,7 +393,7 @@ async function main() {
 
   if (args.run) {
     report.preflight = await runPreflight(args.baseUrl, args.requestTimeoutMs);
-    refreshReportSummary(report, args.minConfidence);
+    refreshReportSummary(report, args.minConfidence, args);
     await writeReport();
     if (!report.preflight.ok) {
       console.log(JSON.stringify({
@@ -377,6 +403,8 @@ async function main() {
         statusCounts: report.statusCounts,
         p0FailureCount: report.p0FailureCount,
         p0Failures: report.p0Failures,
+        performanceWarningCount: report.performanceWarningCount,
+        performanceWarnings: report.performanceWarnings,
       }, null, 2));
       if (args.strict) process.exit(1);
       return;
@@ -433,7 +461,7 @@ async function main() {
     }
   }
   await writeReport();
-  refreshReportSummary(report, args.minConfidence);
+  refreshReportSummary(report, args.minConfidence, args);
   await writeReport();
   console.log(JSON.stringify({
     outputDir: args.outputDir,
@@ -442,6 +470,8 @@ async function main() {
     statusCounts: report.statusCounts,
     p0FailureCount: report.p0FailureCount,
     p0Failures: report.p0Failures,
+    performanceWarningCount: report.performanceWarningCount,
+    performanceWarnings: report.performanceWarnings,
   }, null, 2));
   if (args.strict && report.p0FailureCount > 0) {
     process.exit(1);

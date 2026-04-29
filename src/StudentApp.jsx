@@ -201,6 +201,24 @@ function buildPiecePassStatusMessage(job) {
   return "整曲分析进行中。";
 }
 
+function buildPiecePassProgressDetailText(job) {
+  const detail = job?.progressDetail;
+  const total = Math.max(0, Math.round(Number(detail?.totalSections) || 0));
+  if (!total) return "";
+  const completed = Math.max(
+    0,
+    Math.round(Number(detail?.completedSections || detail?.currentSection) || 0),
+  );
+  const failed = Math.max(0, Math.round(Number(detail?.failedSections) || 0));
+  const cacheHits = Math.max(0, Math.round(Number(detail?.cacheHits) || 0));
+  const remaining = Math.max(0, total - completed);
+  const parts = [`已完成 ${Math.min(completed, total)} / ${total} 个段落`];
+  if (job?.status === "processing" && remaining > 0) parts.push(`剩余 ${remaining} 段`);
+  if (cacheHits > 0) parts.push(`缓存复用 ${cacheHits} 段`);
+  if (failed > 0) parts.push(`失败 ${failed} 段`);
+  return parts.join("，");
+}
+
 function formatAnalysisTime(value) {
   if (!value) return "未记录";
   const date = new Date(value);
@@ -1580,7 +1598,7 @@ export default function StudentApp({ onOpenResearch }) {
               </div>
               {visiblePiecePassJob.progressDetail?.totalSections ? (
                 <p className="sidebar-meta">
-                  已完成 {visiblePiecePassJob.progressDetail.completedSections || visiblePiecePassJob.progressDetail.currentSection} / {visiblePiecePassJob.progressDetail.totalSections} 个段落
+                  {buildPiecePassProgressDetailText(visiblePiecePassJob)}
                 </p>
               ) : null}
               <p>{buildPiecePassStatusMessage(visiblePiecePassJob)}</p>
