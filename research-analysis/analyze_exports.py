@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -118,6 +119,30 @@ def ensure_numeric(frame: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
 
 def save_table(frame: pd.DataFrame, output_dir: Path, name: str) -> None:
     frame.to_csv(output_dir / f"{name}.csv", index=False, encoding="utf-8-sig")
+
+
+def json_safe_value(value):
+    if value is None or value is pd.NA:
+        return None
+    if isinstance(value, dict):
+        return {str(key): json_safe_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [json_safe_value(item) for item in value]
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, (str, int, bool)):
+        return value
+    if hasattr(value, "item"):
+        try:
+            return json_safe_value(value.item())
+        except (TypeError, ValueError):
+            pass
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    return value
 
 
 def save_figure(fig: plt.Figure, output_dir: Path, name: str) -> None:
@@ -1630,7 +1655,11 @@ def write_summary_json(
         "piecePassSummary": piece_pass_summary.to_dict(orient="records"),
         "piecePassSections": piece_pass_sections.to_dict(orient="records"),
     }
-    (output_dir / "summary.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    safe_payload = json_safe_value(payload)
+    (output_dir / "summary.json").write_text(
+        json.dumps(safe_payload, ensure_ascii=False, indent=2, allow_nan=False),
+        encoding="utf-8",
+    )
 
 
 def plot_gain_by_group(participants: pd.DataFrame, output_dir: Path) -> None:
