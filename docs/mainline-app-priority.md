@@ -62,9 +62,9 @@ Completed:
 
 Next in order:
 
-1. Run more real-corpus end-to-end tests against non-Taohuawu pieces.
+1. Run more real-corpus end-to-end tests against non-Taohuawu pieces, and inspect the score-issue page visually during the same pass.
 2. Inspect low-confidence OMR cases and improve part selection / section building.
-3. Continue visual validation of the score issue page, especially cross-page note positioning.
+3. Continue visual validation of the score issue page, especially cross-page note positioning, as part of each corpus run rather than as a delayed separate task.
 4. Polish the student result/history UI only after the diagnosis chain is stable.
 
 ## 2026-04-29 continuation checkpoint
@@ -111,3 +111,9 @@ When there is a tradeoff, prefer work that strengthens this path:
 `PDF -> score representation -> audio -> DL pitch/rhythm -> localization -> feedback UI`
 
 Do not let optional research-management features displace this mainline.
+
+## 2026-04-29 review refinement
+
+- `test:dtw-quality` now treats accompaniment projection failures as P0 failures, while `mainline` whole-piece `reviewRate` is tracked as a non-blocking warning trend.
+- Real-corpus end-to-end runs should include score-issue page visual inspection in the same pass, especially for cross-page positioning and melody-line-only highlighting.
+- Whole-piece jobs already expose section-level progress detail (`completedSections / totalSections / cacheHits`) and the student page displays it; UI polish should keep this granular state visible for long first-time analyses.

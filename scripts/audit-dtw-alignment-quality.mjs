@@ -4,6 +4,7 @@ import path from "node:path";
 const repoRoot = process.cwd();
 const outputRoot = path.join(repoRoot, "data", "real-tests", "alignment-quality");
 const MAINLINE_ANALYSIS_MODES = new Set(["whole-piece"]);
+const MAINLINE_REVIEW_WARN_THRESHOLD = Number(process.env.ERHU_MAINLINE_REVIEW_WARN_THRESHOLD || 0.35);
 
 function readJson(relativePath, fallback) {
   const absolutePath = path.join(repoRoot, relativePath);
@@ -332,6 +333,10 @@ function writeMarkdown(report, filePath) {
     `- Mainline review-needed rate: ${((report.mainline?.reviewRate || 0) * 100).toFixed(1)}%`,
     `- Mainline accompaniment failure rate: ${((report.mainline?.accompanimentFailureRate || 0) * 100).toFixed(2)}%`,
     "",
+    "## Warnings",
+    "",
+    ...(report.warnings?.length ? report.warnings.map((warning) => `- ${warning}`) : ["- None"]),
+    "",
     "## Per Analysis",
     "",
     "| Piece | Analysis | Notes exact/measure/review/fail | Measures exact/review/fail |",
@@ -376,6 +381,7 @@ const report = {
   mainline: emptyTotals(),
   perAnalysis: [],
   failures: [],
+  warnings: [],
 };
 
 for (const analysis of analyses) {
@@ -403,6 +409,16 @@ for (const totals of Object.values(report.modeBreakdown)) {
   finalizeRates(totals);
 }
 finalizeRates(report.mainline);
+if (
+  report.mainline.checkedAnalyses > 0
+  && Number.isFinite(MAINLINE_REVIEW_WARN_THRESHOLD)
+  && MAINLINE_REVIEW_WARN_THRESHOLD >= 0
+  && report.mainline.reviewRate > MAINLINE_REVIEW_WARN_THRESHOLD
+) {
+  report.warnings.push(
+    `Mainline whole-piece reviewRate ${(report.mainline.reviewRate * 100).toFixed(1)}% exceeds warning threshold ${(MAINLINE_REVIEW_WARN_THRESHOLD * 100).toFixed(1)}%.`,
+  );
+}
 report.perAnalysis.sort((left, right) => (
   (right.noteAccompanimentFailureCount + right.measureAccompanimentFailureCount)
   - (left.noteAccompanimentFailureCount + left.measureAccompanimentFailureCount)
@@ -437,8 +453,13 @@ console.log(JSON.stringify({
   mainlineMeasureLocatedRate: report.mainline.measureLocatedRate,
   mainlineReviewRate: report.mainline.reviewRate,
   mainlineAccompanimentFailureRate: report.mainline.accompanimentFailureRate,
+  warnings: report.warnings,
   output: path.relative(repoRoot, latestJsonPath),
 }, null, 2));
+
+for (const warning of report.warnings) {
+  console.warn(`[dtw-quality warning] ${warning}`);
+}
 
 if (totalFailures > 0) {
   process.exitCode = 1;
