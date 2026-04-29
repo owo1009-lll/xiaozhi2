@@ -1449,14 +1449,14 @@ export default function StudentApp({ onOpenResearch }) {
           <p>导入 PDF 曲谱，选择段落，上传或录制演奏音频。系统会自动识谱、增强二胡主旋律，并把音准和节奏问题高亮到问题谱面页。</p>
           <div className="hero-badges">
             <span>PDF 自动识谱</span>
-            <span>二胡 / 钢琴分离</span>
-            <span>深度学习音高</span>
-            <span>深度学习节奏</span>
+            <span>突出二胡旋律</span>
+            <span>音准诊断</span>
+            <span>节奏诊断</span>
           </div>
         </div>
         <div className="hero-side">
           <div className="score-badge">
-            <span>分析服务</span>
+            <span>诊断状态</span>
             <strong style={{ color: analyzerStatus?.reachable ? "var(--accent)" : "#b42318" }}>
               {analyzerStatus == null ? "检测中" : analyzerStatus.reachable ? "正常" : "离线"}
             </strong>
