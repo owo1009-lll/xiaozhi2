@@ -262,11 +262,11 @@ function isErhuMelodyNote(note, section, score = null) {
   const lineRole = String(note?.notePosition?.scoreLineRole || "").toLowerCase();
   const lineConfidence = Number(note?.notePosition?.scoreLineConfidence) || 0;
   if (lineRole === "erhu" && lineConfidence >= 0.66) {
-    if (!accompanimentPresent && !isAmbiguousImportedPart(score) && !isAmbiguousImportedPart(source)) return true;
-    // Cached OMR can contain stale/wrong scoreLineRole values.  In full-score
-    // pages with accompaniment, require the visual line to also match the
-    // expected top melody staff pattern before showing a student-facing marker.
-    return isErhuMelodySystemIndex(note?.notePosition?.systemIndex, source || score);
+    // Current schema invalidates old issue sessions and always reloads the
+    // latest server score, so the explicit line split is safer than guessing
+    // from systemIndex.  This keeps all systems of the erhu line while excluding
+    // accompaniment lines tagged below.
+    return true;
   }
   if (lineRole) return false;
   if (accompanimentPresent || isAmbiguousImportedPart(score) || isAmbiguousImportedPart(source)) return false;
@@ -780,15 +780,19 @@ export default function ScoreIssuePage() {
   useEffect(() => {
     let cancelled = false;
     async function loadScore() {
-      if (!stored?.score?.scoreId || score?.sourcePdfPath) return;
+      const scoreId = String(stored?.score?.scoreId || "").trim();
+      if (!scoreId) return;
       try {
-        const json = await fetchScore(stored.score.scoreId);
+        const json = await fetchScore(scoreId);
         if (cancelled) return;
         const nextScore = json?.score || null;
+        if (!nextScore) return;
         setScore(nextScore);
         const nextSection = resolvePreferredSection(nextScore, stored?.section, stored?.analysis);
         setSection(nextSection);
-        setCurrentPage(extractSectionPageNumber(nextSection || {}));
+        if (!isWholePieceMode) {
+          setCurrentPage(extractSectionPageNumber(nextSection || {}));
+        }
       } catch {
         if (!cancelled) {
           setError("问题谱面数据已失效，请返回结果页重新打开。");
@@ -799,7 +803,7 @@ export default function ScoreIssuePage() {
     return () => {
       cancelled = true;
     };
-  }, [score?.sourcePdfPath, stored]);
+  }, [isWholePieceMode, issueSessionId, stored?.score?.scoreId]);
 
   useEffect(() => {
     const scoreId = String(score?.scoreId || "").trim();

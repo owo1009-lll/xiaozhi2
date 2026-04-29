@@ -67,10 +67,7 @@ function isErhuNote(note, section) {
   const role = String(position.scoreLineRole || "").toLowerCase();
   const confidence = numberValue(position.scoreLineConfidence, 0);
   if (role !== "erhu" || confidence < 0.66) return false;
-  const stats = section?.scoreLineStats || {};
-  const accompanimentCount = numberValue(stats.accompanimentNoteCount, 0);
-  if (accompanimentCount <= 0) return true;
-  return isErhuMelodySystemIndex(position.systemIndex);
+  return true;
 }
 
 function isAccompanimentNote(note, section) {

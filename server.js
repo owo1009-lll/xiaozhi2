@@ -504,18 +504,6 @@ function effectiveSelectedPartConfidence(rawConfidence, sections = []) {
 function annotateImportedSectionsScoreLineRoles(sections = [], score = {}) {
   const normalizedSections = getArray(sections);
   if (!normalizedSections.length) return normalizedSections;
-  const hasExistingRoles = normalizedSections.some((section) =>
-    getArray(section?.notes).some((note) => safeString(note?.notePosition?.scoreLineRole)),
-  );
-  if (hasExistingRoles) {
-    return normalizedSections.map((section) => ({
-      ...section,
-      scoreLineStats:
-        section?.scoreLineStats && typeof section.scoreLineStats === "object"
-          ? section.scoreLineStats
-          : buildScoreLineStatsFromNotes(section?.notes),
-    }));
-  }
 
   const cleanSolo = isCleanSoloSelectedPart(score);
   const candidate = getSelectedPartCandidate(score);
@@ -2275,11 +2263,7 @@ function isErhuMelodyNote(note = {}, section = {}, score = {}) {
   const lineRole = safeString(note?.notePosition?.scoreLineRole).toLowerCase();
   const lineConfidence = safeNumber(note?.notePosition?.scoreLineConfidence, 0);
   if (lineRole === "erhu" && lineConfidence >= 0.66) {
-    if (!accompanimentPresent) return true;
-    // Do not trust stale cached scoreLineRole values by themselves when the
-    // imported score still contains accompaniment.  The marker must also sit on
-    // the expected top melody system, otherwise it becomes manual-review only.
-    return isErhuMelodySystemIndex(note?.notePosition?.systemIndex, source || score);
+    return true;
   }
   if (lineRole) return false;
   if (accompanimentPresent) return false;
