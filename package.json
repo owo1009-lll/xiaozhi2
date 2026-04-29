@@ -29,6 +29,7 @@
     "test:musicxml-import": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-musicxml-import.py",
     "test:score-issues": "node scripts\\test-score-issue-projection.mjs",
     "review:score-issues": "node scripts\\build-score-issue-review.mjs",
+    "smoke:score-issues": "node scripts\\smoke-score-issue-review.mjs",
     "test:dtw-quality": "node scripts\\audit-dtw-alignment-quality.mjs",
     "test:analyzer-mainline": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\check-mainline-analyzer.py",
     "test:pwa": "node scripts\\check-pwa.mjs",
