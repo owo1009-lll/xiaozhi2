@@ -441,6 +441,43 @@ function buildScoreLineStatsFromNotes(notes = []) {
   };
 }
 
+function buildScoreLineStatsFromSections(sections = []) {
+  const totals = {
+    noteCount: 0,
+    erhuNoteCount: 0,
+    accompanimentNoteCount: 0,
+    unknownNoteCount: 0,
+    roleCounts: {},
+  };
+  for (const section of getArray(sections)) {
+    const stats =
+      section?.scoreLineStats && typeof section.scoreLineStats === "object"
+        ? section.scoreLineStats
+        : buildScoreLineStatsFromNotes(section?.notes);
+    totals.noteCount += Math.max(0, Math.round(safeNumber(stats.noteCount, 0)));
+    totals.erhuNoteCount += Math.max(0, Math.round(safeNumber(stats.erhuNoteCount, 0)));
+    totals.accompanimentNoteCount += Math.max(0, Math.round(safeNumber(stats.accompanimentNoteCount, 0)));
+    totals.unknownNoteCount += Math.max(0, Math.round(safeNumber(stats.unknownNoteCount, 0)));
+    for (const [role, count] of Object.entries(stats.roleCounts || {})) {
+      totals.roleCounts[role] = (totals.roleCounts[role] || 0) + Math.max(0, Math.round(safeNumber(count, 0)));
+    }
+  }
+  return {
+    ...totals,
+    erhuRatio: totals.noteCount ? Number((totals.erhuNoteCount / totals.noteCount).toFixed(3)) : 0,
+    splitApplied: totals.erhuNoteCount > 0 && totals.accompanimentNoteCount > 0,
+  };
+}
+
+function effectiveSelectedPartConfidence(rawConfidence, sections = []) {
+  const confidence = clamp(safeNumber(rawConfidence, 0), 0, 1);
+  const stats = buildScoreLineStatsFromSections(sections);
+  if (stats.erhuNoteCount >= 12 && stats.splitApplied) {
+    return Math.max(confidence, 0.82);
+  }
+  return confidence;
+}
+
 function annotateImportedSectionsScoreLineRoles(sections = [], score = {}) {
   const normalizedSections = getArray(sections);
   if (!normalizedSections.length) return normalizedSections;
@@ -956,6 +993,10 @@ function normalizeImportedScoreRecord(score = {}) {
     partCandidates: getArray(score.partCandidates || score.piecePack?.partCandidates),
   });
   const normalizedOmrStats = normalizeOmrStats(score.omrStats);
+  const scoreLineStats =
+    score.scoreLineStats && typeof score.scoreLineStats === "object"
+      ? score.scoreLineStats
+      : buildScoreLineStatsFromSections(sections);
   return {
     scoreId: safeString(score.scoreId),
     pieceId: safeString(score.pieceId),
@@ -974,7 +1015,10 @@ function normalizeImportedScoreRecord(score = {}) {
     selectedPart: safeString(score.selectedPart, "erhu"),
     selectedPartId: safeString(score.selectedPartId),
     selectedPartConfirmed: safeBoolean(score.selectedPartConfirmed, false),
-    selectedPartConfidence: clamp(safeNumber(score.selectedPartConfidence, safeNumber(score.piecePack?.selectedPartConfidence, 0)), 0, 1),
+    selectedPartConfidence: effectiveSelectedPartConfidence(
+      safeNumber(score.selectedPartConfidence, safeNumber(score.piecePack?.selectedPartConfidence, 0)),
+      sections,
+    ),
     partCandidates: getArray(score.partCandidates || score.piecePack?.partCandidates)
       .map((item, index) => ({
         rank: Math.max(1, Math.round(safeNumber(item?.rank, index + 1))),
@@ -1001,7 +1045,7 @@ function normalizeImportedScoreRecord(score = {}) {
       ...buildMarkingStatsFromSections(sections),
       ...(score.markingStats && typeof score.markingStats === "object" ? score.markingStats : {}),
     },
-    scoreLineStats: score.scoreLineStats && typeof score.scoreLineStats === "object" ? score.scoreLineStats : undefined,
+    scoreLineStats,
     previewPages: getArray(score.previewPages),
     sections,
     createdAt: safeString(score.createdAt, nowIso()),
@@ -1034,6 +1078,11 @@ function importedScoreHasProjectionMetadata(score = {}) {
 
 function normalizeScoreImportJob(job = {}) {
   const normalizedOmrStats = normalizeOmrStats(job.omrStats);
+  const jobSections = getArray(job.sections || job.piecePack?.sections);
+  const scoreLineStats =
+    job.scoreLineStats && typeof job.scoreLineStats === "object"
+      ? job.scoreLineStats
+      : buildScoreLineStatsFromSections(jobSections);
   return {
     jobId: safeString(job.jobId),
     scoreId: safeString(job.scoreId),
@@ -1053,7 +1102,7 @@ function normalizeScoreImportJob(job = {}) {
     selectedPart: safeString(job.selectedPart, "erhu"),
     selectedPartCandidates: getArray(job.selectedPartCandidates).map((item) => safeString(item)).filter(Boolean),
     selectedPartConfirmed: safeBoolean(job.selectedPartConfirmed, false),
-    selectedPartConfidence: clamp(safeNumber(job.selectedPartConfidence, 0), 0, 1),
+    selectedPartConfidence: effectiveSelectedPartConfidence(job.selectedPartConfidence, jobSections),
     partCandidates: getArray(job.partCandidates)
         .map((item, index) => ({
           rank: Math.max(1, Math.round(safeNumber(item?.rank, index + 1))),
@@ -1075,8 +1124,9 @@ function normalizeScoreImportJob(job = {}) {
           isAfterExplicitPiano: safeBoolean(item?.isAfterExplicitPiano, false),
           isLikelyAccompanimentSplit: safeBoolean(item?.isLikelyAccompanimentSplit, false),
           safeForErhuProjection: safeBoolean(item?.safeForErhuProjection, false),
-        })),
+      })),
       markingStats: job.markingStats && typeof job.markingStats === "object" ? job.markingStats : {},
+      scoreLineStats,
       warnings: normalizeWarningList(job.warnings),
       cacheHit: safeBoolean(job.cacheHit),
       reusedScoreId: safeString(job.reusedScoreId),

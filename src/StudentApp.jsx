@@ -64,8 +64,39 @@ function getSelectedPartKey(job, score) {
 }
 
 function getSelectedPartConfidence(job, score) {
+  if (hasReliableErhuLineSplit(score)) {
+    const scoreConfidence = Number(score?.selectedPartConfidence);
+    const jobConfidence = Number(job?.selectedPartConfidence);
+    const bestKnown = Math.max(
+      Number.isFinite(scoreConfidence) ? scoreConfidence : 0,
+      Number.isFinite(jobConfidence) ? jobConfidence : 0,
+    );
+    return Math.max(bestKnown, 0.82);
+  }
   const numeric = Number(job?.selectedPartConfidence ?? score?.selectedPartConfidence);
   return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function hasReliableErhuLineSplit(score) {
+  const sections = Array.isArray(score?.sections) ? score.sections : [];
+  if (!sections.length) return false;
+  let erhuNotes = 0;
+  let roleTaggedNotes = 0;
+  let sectionsWithErhu = 0;
+  for (const section of sections) {
+    let sectionErhuNotes = 0;
+    for (const note of Array.isArray(section?.notes) ? section.notes : []) {
+      const role = String(note?.notePosition?.scoreLineRole || "").toLowerCase();
+      const confidence = Number(note?.notePosition?.scoreLineConfidence) || 0;
+      if (role) roleTaggedNotes += 1;
+      if (role === "erhu" && confidence >= 0.66) {
+        erhuNotes += 1;
+        sectionErhuNotes += 1;
+      }
+    }
+    if (sectionErhuNotes > 0) sectionsWithErhu += 1;
+  }
+  return erhuNotes >= 12 && sectionsWithErhu >= 2 && roleTaggedNotes >= erhuNotes;
 }
 
 function isAccompanimentCandidate(candidate) {
@@ -76,6 +107,7 @@ function isAccompanimentCandidate(candidate) {
 function needsPartReview(job, score) {
   if ((job?.omrStatus || score?.omrStatus) !== "completed") return false;
   if (job?.selectedPartConfirmed || score?.selectedPartConfirmed) return false;
+  if (hasReliableErhuLineSplit(score)) return false;
   const candidates = getPartCandidates(job, score);
   if (candidates.length <= 1) return false;
   return getSelectedPartConfidence(job, score) > 0 && getSelectedPartConfidence(job, score) < 0.7;
