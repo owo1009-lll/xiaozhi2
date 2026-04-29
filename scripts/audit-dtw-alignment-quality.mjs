@@ -279,6 +279,31 @@ function addAnalysisSummary(target, result) {
   return target;
 }
 
+function analysisTimestamp(analysis) {
+  const direct = Date.parse(analysis?.createdAt || analysis?.completedAt || analysis?.updatedAt || "");
+  if (Number.isFinite(direct)) return direct;
+  const idText = String(analysis?.analysisId || "");
+  const match = idText.match(/piecepassjob-([a-z0-9]+)-/i);
+  if (!match) return 0;
+  const value = Number.parseInt(match[1], 36);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function latestMainlineAnalyses(analyses = []) {
+  const latestByKey = new Map();
+  for (const analysis of analyses) {
+    const mode = String(analysis?.analysisMode || "");
+    if (!MAINLINE_ANALYSIS_MODES.has(mode)) continue;
+    const key = `${String(analysis?.scoreId || "")}::${String(analysis?.audioHash || "") || "no-audio"}`;
+    const timestamp = analysisTimestamp(analysis);
+    const existing = latestByKey.get(key);
+    if (!existing || timestamp >= existing.timestamp) {
+      latestByKey.set(key, { analysis, timestamp });
+    }
+  }
+  return [...latestByKey.values()].map((item) => item.analysis);
+}
+
 function auditAnalysis(score, analysis) {
   const result = emptyAnalysisSummary(analysis, score);
   const failures = [];
@@ -356,6 +381,14 @@ function writeMarkdown(report, filePath) {
     `- Mainline review-needed rate: ${((report.mainline?.reviewRate || 0) * 100).toFixed(1)}%`,
     `- Mainline accompaniment failure rate: ${((report.mainline?.accompanimentFailureRate || 0) * 100).toFixed(2)}%`,
     "",
+    "## Latest Mainline By Score/Audio",
+    "",
+    `- Latest mainline checked analyses: ${report.latestMainline?.checkedAnalyses || 0}`,
+    `- Latest mainline note exact rate: ${((report.latestMainline?.exactNoteRate || 0) * 100).toFixed(1)}%`,
+    `- Latest mainline measure-located rate: ${((report.latestMainline?.measureLocatedRate || 0) * 100).toFixed(1)}%`,
+    `- Latest mainline review-needed rate: ${((report.latestMainline?.reviewRate || 0) * 100).toFixed(1)}%`,
+    `- Latest mainline accompaniment failure rate: ${((report.latestMainline?.accompanimentFailureRate || 0) * 100).toFixed(2)}%`,
+    "",
     "## Warnings",
     "",
     ...(report.warnings?.length ? report.warnings.map((warning) => `- ${warning}`) : ["- None"]),
@@ -382,6 +415,7 @@ const piecePassStore = readJson("data/erhu-piece-pass-jobs.json", { jobs: [] });
 const studyStore = readJson("data/erhu-study-records.json", { analyses: [] });
 const scoresById = new Map((scoreStore.scores || []).map((score) => [String(score.scoreId || ""), score]));
 const analyses = collectAnalyses(piecePassStore, studyStore);
+const latestMainlineAnalysesList = latestMainlineAnalyses(analyses);
 
 const report = {
   generatedAt: new Date().toISOString(),
@@ -402,7 +436,9 @@ const report = {
   accompanimentFailureRate: 0,
   modeBreakdown: {},
   mainline: emptyTotals(),
+  latestMainline: emptyTotals(),
   perAnalysis: [],
+  latestMainlinePerAnalysis: [],
   failures: [],
   warnings: [],
 };
@@ -425,6 +461,14 @@ for (const analysis of analyses) {
   }
 }
 
+for (const analysis of latestMainlineAnalysesList) {
+  const score = scoresById.get(String(analysis.scoreId || ""));
+  if (!score) continue;
+  const { result } = auditAnalysis(score, analysis);
+  report.latestMainlinePerAnalysis.push(result);
+  addAnalysisSummary(report.latestMainline, result);
+}
+
 const totalIssues = report.noteIssueCount + report.measureIssueCount;
 const totalFailures = report.noteAccompanimentFailureCount + report.measureAccompanimentFailureCount;
 finalizeRates(report);
@@ -432,6 +476,7 @@ for (const totals of Object.values(report.modeBreakdown)) {
   finalizeRates(totals);
 }
 finalizeRates(report.mainline);
+finalizeRates(report.latestMainline);
 if (
   report.mainline.checkedAnalyses > 0
   && Number.isFinite(MAINLINE_REVIEW_WARN_THRESHOLD)
@@ -446,6 +491,10 @@ report.perAnalysis.sort((left, right) => (
   (right.noteAccompanimentFailureCount + right.measureAccompanimentFailureCount)
   - (left.noteAccompanimentFailureCount + left.measureAccompanimentFailureCount)
   || (right.noteReviewCount + right.measureReviewCount) - (left.noteReviewCount + left.measureReviewCount)
+));
+report.latestMainlinePerAnalysis.sort((left, right) => (
+  (right.noteReviewCount + right.measureReviewCount) - (left.noteReviewCount + left.measureReviewCount)
+  || String(left.pieceTitle || left.scoreId).localeCompare(String(right.pieceTitle || right.scoreId), "zh-Hans-CN")
 ));
 
 ensureDir(outputRoot);
@@ -476,6 +525,11 @@ console.log(JSON.stringify({
   mainlineMeasureLocatedRate: report.mainline.measureLocatedRate,
   mainlineReviewRate: report.mainline.reviewRate,
   mainlineAccompanimentFailureRate: report.mainline.accompanimentFailureRate,
+  latestMainlineCheckedAnalyses: report.latestMainline.checkedAnalyses,
+  latestMainlineExactNoteRate: report.latestMainline.exactNoteRate,
+  latestMainlineMeasureLocatedRate: report.latestMainline.measureLocatedRate,
+  latestMainlineReviewRate: report.latestMainline.reviewRate,
+  latestMainlineAccompanimentFailureRate: report.latestMainline.accompanimentFailureRate,
   warnings: report.warnings,
   output: path.relative(repoRoot, latestJsonPath),
 }, null, 2));
