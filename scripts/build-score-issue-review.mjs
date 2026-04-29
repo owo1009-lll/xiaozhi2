@@ -295,6 +295,11 @@ function buildReviewHtml({ report, items, baseUrl, sessionsJsonPath, manifestJso
       if (!payload) return;
       const serialized = JSON.stringify(payload);
       try {
+        for (const storage of [window.localStorage, window.sessionStorage]) {
+          for (const key of Object.keys(storage)) {
+            if (key.startsWith(storagePrefix)) storage.removeItem(key);
+          }
+        }
         window.localStorage.setItem(storagePrefix + sessionId, serialized);
         window.sessionStorage.setItem(storagePrefix + sessionId, serialized);
       } catch (error) {

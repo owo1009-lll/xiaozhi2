@@ -3,6 +3,7 @@ import path from "node:path";
 import os from "node:os";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { ISSUE_SESSION_STORAGE_PREFIX } from "../src/analysisLabels.js";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_BASE_URL = "http://127.0.0.1:3000";
@@ -16,6 +17,8 @@ function parseArgs(argv = process.argv.slice(2)) {
     screenshotDir: "",
     noScreenshots: false,
     timeoutMs: 30000,
+    allCards: false,
+    maxCards: 0,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -26,6 +29,8 @@ function parseArgs(argv = process.argv.slice(2)) {
     else if (arg === "--screenshot-dir") parsed.screenshotDir = path.resolve(REPO_ROOT, argv[++index] || "");
     else if (arg === "--no-screenshots") parsed.noScreenshots = true;
     else if (arg === "--timeout-ms") parsed.timeoutMs = Math.max(5000, Number(argv[++index]) || parsed.timeoutMs);
+    else if (arg === "--all-cards") parsed.allCards = true;
+    else if (arg === "--max-cards") parsed.maxCards = Math.max(1, Number(argv[++index]) || 0);
   }
   return parsed;
 }
@@ -209,6 +214,13 @@ async function captureScreenshot(send, screenshotDir, filename) {
   return filePath;
 }
 
+function safeScreenshotName(value) {
+  return String(value || "page")
+    .replace(/[^\w.-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "page";
+}
+
 function appBaseUrlFromReviewUrl(reviewUrl, fallbackBaseUrl) {
   try {
     const url = new URL(reviewUrl);
@@ -258,6 +270,18 @@ async function runSmoke(args) {
     }))()`);
     if (!args.noScreenshots) screenshots.push(await captureScreenshot(send, target.screenshotDir, "score-issue-review-smoke.png"));
 
+    const reviewCards = await evaluate(send, `(() => Array.from(document.querySelectorAll("button[data-session-id]")).map((button, index) => {
+      const card = button.closest(".review-card");
+      return {
+        index,
+        sessionId: button.dataset.sessionId || "",
+        title: card?.querySelector("h2")?.textContent || "",
+        riskChipCount: card?.querySelectorAll(".risk-list span").length || 0,
+      };
+    }))()`);
+    const cardLimit = args.allCards ? Math.max(1, args.maxCards || reviewCards.length) : Math.max(1, args.maxCards || 1);
+    const cardsToCheck = reviewCards.slice(0, args.allCards ? Math.min(cardLimit, reviewCards.length) : Math.min(cardLimit, 1));
+
     const clickResult = await evaluate(send, `(() => {
       const button = document.querySelector("button[data-session-id]");
       if (!button) return { ok: false, reason: "missing-button" };
@@ -271,31 +295,103 @@ async function runSmoke(args) {
       };
     })()`);
 
-    const issueUrl = new URL("/", appBaseUrlFromReviewUrl(target.reviewUrl, args.baseUrl));
-    issueUrl.searchParams.set("mode", "score-issues");
-    issueUrl.searchParams.set("issueSession", clickResult.sessionId || "");
-    await navigate(send, waitEvent, issueUrl.toString(), args.timeoutMs);
-    const issuePage = await evaluate(send, `(() => ({
-      title: document.title,
-      url: location.href,
-      hasScoreShell: Boolean(document.querySelector(".score-issue-shell")),
-      hasAudioPanel: document.body.innerText.includes("原音"),
-      hasPieceTitle: Boolean(document.querySelector(".score-issue-title")),
-      buttonCount: document.querySelectorAll("button").length,
-      textSample: document.body.innerText.slice(0, 500),
-    }))()`);
-    if (!args.noScreenshots) screenshots.push(await captureScreenshot(send, target.screenshotDir, "score-issue-page-smoke.png"));
+    const storageResults = [];
+    const checkedPages = [];
+    for (const card of cardsToCheck) {
+      await navigate(send, waitEvent, target.reviewUrl, args.timeoutMs);
+      const storageResult = await evaluate(send, `(() => {
+        const sessionId = ${JSON.stringify(card.sessionId)};
+        const storagePrefix = ${JSON.stringify(ISSUE_SESSION_STORAGE_PREFIX)};
+        const sessionsNode = document.getElementById("score-issue-sessions");
+        const sessions = sessionsNode ? JSON.parse(sessionsNode.textContent || "{}") : {};
+        const payload = sessions[sessionId];
+        if (!payload) return { sessionId, ok: false, reason: "missing-session-payload" };
+        const serialized = JSON.stringify(payload);
+        try {
+          for (const storage of [localStorage, sessionStorage]) {
+            for (const key of Object.keys(storage)) {
+              if (key.startsWith(storagePrefix)) storage.removeItem(key);
+            }
+          }
+          localStorage.setItem(storagePrefix + sessionId, serialized);
+          sessionStorage.setItem(storagePrefix + sessionId, serialized);
+          return {
+            sessionId,
+            ok: true,
+            localStored: Boolean(localStorage.getItem(storagePrefix + sessionId)),
+            sessionStored: Boolean(sessionStorage.getItem(storagePrefix + sessionId)),
+          };
+        } catch (error) {
+          return { sessionId, ok: false, reason: error.message || String(error) };
+        }
+      })()`);
+      storageResults.push(storageResult);
+
+      const issueUrl = new URL("/", appBaseUrlFromReviewUrl(target.reviewUrl, args.baseUrl));
+      issueUrl.searchParams.set("mode", "score-issues");
+      issueUrl.searchParams.set("issueSession", card.sessionId || "");
+      await navigate(send, waitEvent, issueUrl.toString(), args.timeoutMs);
+      const issuePage = await evaluate(send, `(() => {
+        const image = document.querySelector(".score-page-image");
+        const canvas = document.querySelector(".pdf-preview-canvas");
+        return {
+          title: document.title,
+          url: location.href,
+          hasScoreShell: Boolean(document.querySelector(".score-issue-shell")),
+          hasAudioPanel: Boolean(document.querySelector(".audio-player")) || document.body.innerText.includes("原音"),
+          hasPieceTitle: Boolean(document.querySelector(".score-issue-title")),
+          hasIssueList: document.querySelectorAll(".issue-list-button").length > 0,
+          issueListCount: document.querySelectorAll(".issue-list-button").length,
+          hasScorePanel: Boolean(document.querySelector(".score-page-panel")),
+          hasRenderedScore: Boolean((image && image.complete && image.naturalWidth > 0) || (canvas && canvas.width > 0 && canvas.height > 0)),
+          highlightCount: document.querySelectorAll(".score-note-highlight,.score-measure-highlight").length,
+          buttonCount: document.querySelectorAll("button").length,
+          textSample: document.body.innerText.slice(0, 500),
+        };
+      })()`);
+      const pageFailures = [];
+      if (!issuePage.hasScoreShell) pageFailures.push("issue-page-shell-missing");
+      if (!issuePage.hasAudioPanel) pageFailures.push("issue-page-audio-panel-missing");
+      if (!issuePage.hasPieceTitle) pageFailures.push("issue-page-title-missing");
+      if (!issuePage.hasIssueList) pageFailures.push("issue-page-list-missing");
+      if (!issuePage.hasScorePanel) pageFailures.push("issue-page-score-panel-missing");
+      if (!issuePage.hasRenderedScore) pageFailures.push("issue-page-score-render-missing");
+      checkedPages.push({
+        ...issuePage,
+        cardIndex: card.index,
+        cardTitle: card.title,
+        sessionId: card.sessionId,
+        riskChipCount: card.riskChipCount,
+        storageOk: Boolean(storageResult?.ok),
+        ok: pageFailures.length === 0,
+        failures: pageFailures,
+      });
+      if (!args.noScreenshots) {
+        const filename = args.allCards
+          ? `score-issue-page-smoke-${String(card.index + 1).padStart(2, "0")}-${safeScreenshotName(card.title)}.png`
+          : "score-issue-page-smoke.png";
+        screenshots.push(await captureScreenshot(send, target.screenshotDir, filename));
+      }
+    }
     ws.close();
 
     const failures = [];
     if (!review.hasExpectedText) failures.push("review-page-missing-expected-text");
     if (review.cardCount <= 0) failures.push("review-page-no-cards");
     if (review.buttonCount <= 0) failures.push("review-page-no-open-button");
+    if (cardsToCheck.length <= 0) failures.push("review-page-no-checkable-cards");
     if (!clickResult.ok) failures.push(clickResult.reason || "open-button-click-failed");
     if (!clickResult.localStored && !clickResult.sessionStored) failures.push("issue-session-not-stored");
-    if (!issuePage.hasScoreShell) failures.push("issue-page-shell-missing");
-    if (!issuePage.hasAudioPanel) failures.push("issue-page-audio-panel-missing");
-    if (!issuePage.hasPieceTitle) failures.push("issue-page-title-missing");
+    for (const storageResult of storageResults) {
+      if (!storageResult.ok || (!storageResult.localStored && !storageResult.sessionStored)) {
+        failures.push(`issue-session-storage-failed:${storageResult.sessionId}:${storageResult.reason || "not-stored"}`);
+      }
+    }
+    for (const page of checkedPages) {
+      for (const failure of page.failures || []) {
+        failures.push(`${failure}:${page.cardTitle || page.sessionId}`);
+      }
+    }
 
     return {
       ok: failures.length === 0,
@@ -303,8 +399,11 @@ async function runSmoke(args) {
       source: target.source,
       reviewUrl: target.reviewUrl,
       review,
+      checkedCardCount: checkedPages.length,
       clickResult,
-      issuePage,
+      storageResults,
+      issuePage: checkedPages[0] || null,
+      checkedPages,
       screenshots: screenshots.map((item) => path.relative(REPO_ROOT, item)),
     };
   } finally {
@@ -323,6 +422,8 @@ export async function runScoreIssueReviewSmoke(options = {}) {
     screenshotDir: "",
     noScreenshots: false,
     timeoutMs: 30000,
+    allCards: false,
+    maxCards: 0,
     ...options,
   };
   if (args.runSummary) args.runSummary = path.resolve(REPO_ROOT, args.runSummary);

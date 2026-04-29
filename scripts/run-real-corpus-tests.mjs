@@ -490,6 +490,7 @@ async function main() {
         baseUrl: args.baseUrl,
         noScreenshots: !args.smokeScreenshots,
         timeoutMs: args.requestTimeoutMs,
+        allCards: true,
       });
     } catch (error) {
       report.scoreIssueReviewSmoke = {
