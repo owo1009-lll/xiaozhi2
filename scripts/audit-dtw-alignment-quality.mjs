@@ -166,7 +166,7 @@ function auditNoteIssue(score, analysis, issue) {
   }
   if (exactNote && isAccompanimentNote(exactNote, section)) {
     return {
-      status: "accompaniment-failure",
+      status: "review",
       reason: "exact-note-on-accompaniment",
       sectionId: section.sectionId,
       noteId,
