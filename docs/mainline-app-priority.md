@@ -54,6 +54,8 @@ Latest validated state:
 - `npm run test:mainline-p0` passes.
 - Analyzer runtime reports CUDA PyTorch on `NVIDIA GeForce RTX 5060`.
 - Latest real-corpus mainline sample: `8` whole-piece analyses, `latestMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`.
+- Actual real-corpus `--run` smoke test: `20190306桃花坞`, completed with `20/20` matched sections, `0` P0 failures, `411ms` import, `3201ms` cached analysis, and `1` score issue review artifact.
+- Browser smoke check for that artifact passed: the review card opened, session data was written to browser storage, and the issue score page loaded with original-audio panel, melody-line view, and `4` problem items.
 - Historical review hotspots remain in older cached runs, mainly old `20190306桃花坞`, `炫动`, and `雪山魂塑` analyses. They are tracked as review-risk trend, not as current P0 failures.
 - Current DTW mainline does not count hidden accompaniment notes as successful visible highlights; uncertain projection is kept as `需复核`.
 
@@ -120,6 +122,7 @@ Completed:
 - Review artifacts now expose visible pages, review pages, issue pages, section pages, risk chips, weak-evidence counts, and location-review counts.
 - `test:score-issues` and `review:score-issues` now use the same projection audit module.
 - `test:dtw-quality` now prints compact review hotspots and writes the same information into `latest-dtw-alignment-quality.md`.
+- Verified one real-corpus `--run` plus headless browser smoke check against the generated review artifact.
 
 ## Next In Order
 
