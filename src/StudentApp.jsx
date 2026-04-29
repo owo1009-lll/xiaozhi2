@@ -204,7 +204,7 @@ function buildPiecePassStatusMessage(job) {
     }
     return "整曲分析完成，已更新整曲概览。";
   }
-  if (job?.stage === "checking-services") return "正在检查整曲分析服务。";
+  if (job?.stage === "checking-services") return "正在准备整曲分析。";
   if (job?.stage === "scanning-sections") return "正在扫描整曲段落。";
   if (job?.stage === "analyzing-sections") return "正在分析整曲段落。";
   if (job?.stage === "writing-results") return "正在写入整曲分析结果。";
@@ -225,7 +225,7 @@ function buildPiecePassProgressDetailText(job) {
   const parts = [`已完成 ${Math.min(completed, total)} / ${total} 个段落`];
   if (detail?.currentSectionTitle) parts.push(`当前段落：${detail.currentSectionTitle}`);
   if (job?.status === "processing" && remaining > 0) parts.push(`剩余 ${remaining} 段`);
-  if (cacheHits > 0) parts.push(`已快速处理 ${cacheHits} 段`);
+  if (cacheHits > 0) parts.push(`已直接完成 ${cacheHits} 段`);
   if (failed > 0) parts.push(`失败 ${failed} 段`);
   return parts.join("，");
 }
@@ -247,7 +247,7 @@ function buildPiecePassTimingText(job) {
   const remaining = formatDurationMs(timing.estimatedRemainingMs);
   if (elapsed) parts.push(`已用时：${elapsed}`);
   if (job?.status === "processing" && remaining) parts.push(`预计剩余：${remaining}`);
-  if (timing.slowNoProgress) parts.push("当前阶段超过 2 分钟没有新进度，系统仍在等待模型返回。");
+  if (timing.slowNoProgress) parts.push("当前阶段用时较长，系统仍在处理，请保持页面打开。");
   return parts.join("，");
 }
 
@@ -1733,8 +1733,8 @@ export default function StudentApp({ onOpenResearch }) {
               </p>
               {Number.isFinite(Number(wholePieceSummary.sectionCacheHitCount)) ? (
                 <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
-                  已快速处理：{wholePieceSummary.sectionCacheHitCount || 0} / {wholePieceSummary.attemptedSectionCount || wholePieceSummary.structuredSectionCount || 0} 段。
-                  {wholePieceSummary.firstPassCacheBuild ? " 本次有新段落需要完整分析，之后再次分析会更快。" : " 本次大部分段落已快速完成。"}
+                  可直接复用的段落：{wholePieceSummary.sectionCacheHitCount || 0} / {wholePieceSummary.attemptedSectionCount || wholePieceSummary.structuredSectionCount || 0} 段。
+                  {wholePieceSummary.firstPassCacheBuild ? " 本次有新段落需要完整分析；以后再次分析同一录音会更快。" : " 本次大部分段落已直接完成。"}
                 </p>
               ) : null}
               {wholePieceSummary.analysisReliable === false ? (
