@@ -1687,7 +1687,7 @@ export default function ScoreIssuePage() {
             <p className="sidebar-text">{summarizeOverallFeedback(visibleAnalysisForSummary)}</p>
             {ambiguousImportedScore ? (
               <p className="sidebar-meta">
-                当前谱面只高亮二胡旋律单行。无法确认属于二胡旋律的疑似问题会保留在列表中，并标记为需复核，不再投射到伴奏谱。
+                当前谱面只高亮二胡旋律单行。无法确认属于二胡旋律的疑似问题会保留在列表中，并标记为需复核，不会显示到伴奏行上。
               </p>
             ) : null}
             <p className="sidebar-meta">{formatDateTime(analysis?.createdAt || stored?.savedAt)}</p>
