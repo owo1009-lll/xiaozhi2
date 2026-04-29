@@ -42,6 +42,196 @@ function attachOriginalAudio(analysis, originalAudio) {
   };
 }
 
+function optionalNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function firstOptionalNumber(...values) {
+  for (const value of values) {
+    const numeric = optionalNumber(value);
+    if (numeric !== null) return numeric;
+  }
+  return null;
+}
+
+function clampNumber(value, min, max) {
+  const numeric = optionalNumber(value);
+  const lower = optionalNumber(min) ?? numeric ?? 0;
+  const upper = optionalNumber(max);
+  const safeUpper = upper !== null ? Math.max(lower, upper) : null;
+  if (numeric === null) return lower;
+  if (safeUpper !== null) return Math.min(Math.max(numeric, lower), safeUpper);
+  return Math.max(numeric, lower);
+}
+
+const ISSUE_TIMING_FIELDS = [
+  "startSeconds",
+  "endSeconds",
+  "audioStartSeconds",
+  "audioEndSeconds",
+  "playbackStartSeconds",
+  "playbackEndSeconds",
+  "issueStartSeconds",
+  "issueEndSeconds",
+  "expectedStartSeconds",
+  "observedStartSeconds",
+  "expectedOnsetSeconds",
+  "observedOnsetSeconds",
+  "onsetSeconds",
+  "timeSeconds",
+  "beatStart",
+  "beatDuration",
+  "expectedDurationMs",
+  "observedDurationMs",
+  "onsetErrorMs",
+  "durationErrorMs",
+];
+
+function copyIssueTimingFields(item) {
+  const timing = {};
+  for (const field of ISSUE_TIMING_FIELDS) {
+    const numeric = optionalNumber(item?.[field]);
+    if (numeric !== null) timing[field] = numeric;
+  }
+  return timing;
+}
+
+function meterBeatsValue(meter = "4/4") {
+  const beats = String(meter || "4/4").split("/")[0];
+  const numeric = Number(beats);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : 4;
+}
+
+function getSectionSecondsPerBeat(section) {
+  const tempo = clampNumber(firstOptionalNumber(section?.tempo, 72), 30, 300) || 72;
+  return 60 / tempo;
+}
+
+function getSectionMeasureRange(section) {
+  const values = (Array.isArray(section?.notes) ? section.notes : [])
+    .map((note) => optionalNumber(note?.measureIndex))
+    .filter((value) => value !== null && value > 0);
+  if (!values.length) return { min: 1, max: 1 };
+  return { min: Math.min(...values), max: Math.max(...values) };
+}
+
+function findIssueSectionSummary(analysis, issue, section) {
+  const sectionId = String(issue?.sectionId || section?.sectionId || "");
+  const summaries = Array.isArray(analysis?.sectionSummaries) ? analysis.sectionSummaries : [];
+  return summaries.find((item) => String(item?.sectionId || "") === sectionId) || null;
+}
+
+function getIssueAudioWindow(issue, section, analysis) {
+  const summary = findIssueSectionSummary(analysis, issue, section);
+  const start = firstOptionalNumber(issue?.startSeconds, summary?.startSeconds, 0) ?? 0;
+  const end = firstOptionalNumber(issue?.endSeconds, summary?.endSeconds);
+  return {
+    start: Math.max(0, start),
+    end: end !== null && end > start ? end : null,
+  };
+}
+
+function estimateIssueTimeSeconds(issue, section, kind, analysis) {
+  const window = getIssueAudioWindow(issue, section, analysis);
+  const explicitTime = firstOptionalNumber(
+    issue?.audioStartSeconds,
+    issue?.playbackStartSeconds,
+    issue?.issueStartSeconds,
+    issue?.expectedStartSeconds,
+    issue?.observedStartSeconds,
+    issue?.expectedOnsetSeconds,
+    issue?.observedOnsetSeconds,
+    issue?.onsetSeconds,
+    issue?.timeSeconds,
+  );
+  if (explicitTime !== null) {
+    const windowDuration = window.end !== null ? window.end - window.start : null;
+    const absoluteTime = window.start > 0 && windowDuration !== null && explicitTime <= windowDuration + 0.5
+      ? window.start + explicitTime
+      : explicitTime;
+    return clampNumber(absoluteTime, window.start, window.end ?? Math.max(window.start, absoluteTime));
+  }
+
+  const measureIndex = Math.max(1, Math.round(firstOptionalNumber(issue?.measureIndex, 1) ?? 1));
+  const beatStart = Math.max(0, firstOptionalNumber(issue?.beatStart, 0) ?? 0);
+  const beatsPerMeasure = meterBeatsValue(section?.meter);
+  const secondsPerBeat = getSectionSecondsPerBeat(section);
+  const range = getSectionMeasureRange(section);
+  const localMeasureOffset = Math.max(0, measureIndex - range.min);
+  const beatOffset = localMeasureOffset * beatsPerMeasure + (kind === "measure" ? 0 : beatStart);
+  const estimated = window.start + beatOffset * secondsPerBeat;
+
+  if (window.end !== null && estimated > window.end + 0.5) {
+    const totalMeasures = Math.max(1, range.max - range.min + 1);
+    const ratio = clampNumber((measureIndex - range.min) / totalMeasures, 0, 0.95);
+    return window.start + (window.end - window.start) * ratio;
+  }
+
+  if (window.end !== null) {
+    return clampNumber(estimated, window.start, window.end);
+  }
+  return Math.max(0, estimated);
+}
+
+function getIssueDurationSeconds(issue, section, kind) {
+  const secondsPerBeat = getSectionSecondsPerBeat(section);
+  if (kind === "measure") {
+    return meterBeatsValue(section?.meter) * secondsPerBeat;
+  }
+  const beatDuration = firstOptionalNumber(issue?.beatDuration);
+  if (beatDuration !== null && beatDuration > 0) return beatDuration * secondsPerBeat;
+  const durationMs = firstOptionalNumber(issue?.expectedDurationMs, issue?.observedDurationMs);
+  if (durationMs !== null && durationMs > 0) return durationMs / 1000;
+  return secondsPerBeat;
+}
+
+function buildIssuePlaybackWindow(issue, section, kind, analysis, audioElement) {
+  const estimatedCenter = estimateIssueTimeSeconds(issue, section, kind, analysis);
+  if (!Number.isFinite(estimatedCenter)) return null;
+  const audioDuration = firstOptionalNumber(
+    audioElement?.duration,
+    analysis?.audioDurationSeconds,
+    analysis?.originalAudio?.durationSeconds,
+  );
+  if (audioDuration !== null && audioDuration <= 0) return null;
+  const sectionWindow = getIssueAudioWindow(issue, section, analysis);
+  const maxAvailableTime = firstOptionalNumber(audioDuration, sectionWindow.end);
+  const center = maxAvailableTime !== null
+    ? clampNumber(estimatedCenter, 0, maxAvailableTime)
+    : Math.max(0, estimatedCenter);
+  const issueDuration = getIssueDurationSeconds(issue, section, kind);
+  const preRoll = kind === "measure" ? 0.5 : 0.8;
+  const postRoll = kind === "measure" ? 1.0 : 1.6;
+  const targetDuration = clampNumber(issueDuration + preRoll + postRoll, kind === "measure" ? 4 : 3, kind === "measure" ? 10 : 6);
+  let start = Math.max(0, center - preRoll);
+  let end = start + targetDuration;
+  if (sectionWindow.end !== null) end = Math.min(end, sectionWindow.end);
+  if (audioDuration !== null) end = Math.min(end, audioDuration);
+  if (end - start < 1.2) {
+    const maxEnd = firstOptionalNumber(audioDuration, sectionWindow.end, start + 2.5) ?? start + 2.5;
+    end = Math.min(maxEnd, start + 2.5);
+  }
+  if (audioDuration !== null && end > audioDuration) {
+    end = audioDuration;
+    start = Math.max(0, Math.min(start, end - targetDuration));
+  }
+  if (audioDuration !== null && start >= audioDuration) {
+    start = Math.max(0, audioDuration - 1.2);
+    end = audioDuration;
+  }
+  if (end <= start) end = start + 1.2;
+  return { start, end };
+}
+
+function formatPlaybackSeconds(seconds) {
+  const total = Math.max(0, Math.round(Number(seconds) || 0));
+  const minutes = Math.floor(total / 60);
+  const remainder = String(total % 60).padStart(2, "0");
+  return `${minutes}:${remainder}`;
+}
+
 const SCORE_ISSUE_LINE_MODE_PREFIX = "ai-erhu.score-issue-line-mode.";
 const SCORE_ISSUE_LINE_MODES = new Set(["auto"]);
 
@@ -442,6 +632,8 @@ function buildMeasureIssues(analysis) {
   return (analysis?.measureFindings || []).map((item) => {
     const label = String(item?.issueType || "").startsWith("pitch") ? "音准问题" : "节奏问题";
     return {
+      ...item,
+      ...copyIssueTimingFields(item),
       sectionId: String(item?.sectionId || ""),
       sectionTitle: repairMojibakeText(item?.sectionTitle || ""),
       sourcePageNumber: Number(item?.pageNumber) || 0,
@@ -465,6 +657,8 @@ function buildNoteIssues(analysis) {
     if (rhythmType && rhythmType !== "rhythm-ok" && !rhythmReview) tags.push("节奏问题");
     if (isPitchReview || rhythmReview || item?.isUncertain) tags.push("需复核");
     return {
+      ...item,
+      ...copyIssueTimingFields(item),
       sectionId: String(item?.sectionId || ""),
       sectionTitle: repairMojibakeText(item?.sectionTitle || ""),
       sourcePageNumber: Number(item?.pageNumber) || 0,
@@ -754,8 +948,10 @@ export default function ScoreIssuePage() {
   const [zoom, setZoom] = useState(1.0);
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const [lineMode, setLineMode] = useState(() => readStoredLineMode(stored?.score?.scoreId));
+  const [playbackHint, setPlaybackHint] = useState("");
   const canvasRef = useRef(null);
   const audioRef = useRef(null);
+  const playbackStopTimerRef = useRef(null);
   const viewportRef = useRef(null);
   const hasAutoFittedRef = useRef(false);
   const hasAutoSelectedInitialIssuePageRef = useRef(false);
@@ -1304,9 +1500,15 @@ export default function ScoreIssuePage() {
     "";
 
   useEffect(() => {
+    clearPlaybackStopTimer();
+    setPlaybackHint("");
     if (!originalAudioSource || !audioRef.current) return;
     audioRef.current.load();
   }, [originalAudioSource]);
+
+  useEffect(() => () => {
+    clearPlaybackStopTimer();
+  }, []);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -1340,11 +1542,57 @@ export default function ScoreIssuePage() {
     });
   }, [activeMeasureKey, selectedNoteKey]);
 
+  function clearPlaybackStopTimer() {
+    if (playbackStopTimerRef.current && typeof window !== "undefined") {
+      window.clearInterval(playbackStopTimerRef.current);
+    }
+    playbackStopTimerRef.current = null;
+  }
+
+  function playIssueAudio(issue, kind) {
+    if (!issue || !originalAudioSource || !audioRef.current) return;
+    const issueSection = resolveIssueSection(score, section, issue) || section || {};
+    const playbackWindow = buildIssuePlaybackWindow(issue, issueSection, kind, analysis, audioRef.current);
+    if (!playbackWindow) return;
+    clearPlaybackStopTimer();
+    const audio = audioRef.current;
+    try {
+      audio.currentTime = playbackWindow.start;
+    } catch {
+      setPlaybackHint("原音已加载，但浏览器暂时不能定位到该时间点。");
+      return;
+    }
+    const label = kind === "measure" ? "小节" : "音符";
+    const hint = `已定位${label}原音 ${formatPlaybackSeconds(playbackWindow.start)}-${formatPlaybackSeconds(playbackWindow.end)}`;
+    setPlaybackHint(hint);
+    const playPromise = audio.play();
+    if (playPromise?.catch) {
+      playPromise.catch(() => {
+        setPlaybackHint(`${hint}，可手动点击播放。`);
+      });
+    }
+    if (typeof window !== "undefined") {
+      playbackStopTimerRef.current = window.setInterval(() => {
+        const currentAudio = audioRef.current;
+        if (!currentAudio || currentAudio.paused || currentAudio.ended) {
+          clearPlaybackStopTimer();
+          return;
+        }
+        if (currentAudio.currentTime >= playbackWindow.end - 0.05) {
+          currentAudio.pause();
+          clearPlaybackStopTimer();
+        }
+      }, 120);
+    }
+  }
+
   function handleMeasureJump(measureIndex, item = null) {
     const key = item?.measureKey || sectionKey(item?.sectionId || resolveIssueSection(score, section, item)?.sectionId, measureIndex);
+    const playbackIssue = measureIssueEntries.find((entry) => entry.measureKey === key) || item;
     setCurrentPage(item?.pageNumber || measurePageMap.get(key) || baseSectionPage);
     setSelectedMeasureIndex(key);
     setSelectedNoteKey("");
+    playIssueAudio(playbackIssue, "measure");
   }
 
   function handlePageNavigation(nextPage) {
@@ -1367,6 +1615,7 @@ export default function ScoreIssuePage() {
     setCurrentPage(resolvedOverlay?.pageNumber || noteItem.pageNumber || measurePageMap.get(key) || baseSectionPage);
     setSelectedMeasureIndex(key);
     setSelectedNoteKey(resolvedOverlay?.key || "");
+    playIssueAudio(noteItem, "note");
   }
 
   function handleImageLoad(event) {
@@ -1429,6 +1678,7 @@ export default function ScoreIssuePage() {
             <div className="sidebar-block">
               <p className="sidebar-label">原音</p>
               <audio ref={audioRef} controls preload="metadata" className="audio-player" src={originalAudioSource} />
+              {playbackHint ? <p className="sidebar-meta">{playbackHint}</p> : null}
             </div>
           ) : null}
 
