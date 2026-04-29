@@ -127,7 +127,7 @@ function formatPartCandidateLabel(candidate, index = 0) {
 }
 
 function importProgressHeadline(job) {
-  if (job?.cacheHit) return "已复用识谱结果";
+  if (job?.cacheHit) return "已复用上次识谱结果";
   if (job?.omrStatus === "failed") return "识谱失败";
   if (job?.omrStatus === "completed") return "识谱完成";
   if (job?.stage === "omr-running") return "正在识谱";
@@ -137,7 +137,7 @@ function importProgressHeadline(job) {
 
 function buildImportStatusMessage(job) {
   if (!job) return "先导入 PDF 曲谱，再选择段落并上传音频。";
-  if (job.cacheHit) return "已复用同一份 PDF 的识谱结果，可以直接开始选择段落。";
+  if (job.cacheHit) return "同一份 PDF 已完成过识谱，可以直接选择段落。";
   if (job.omrStatus === "completed") return "识谱完成，可以开始选择段落。";
   if (job.omrStatus === "failed") return job.error || "自动识谱失败，请更换 PDF 或稍后重试。";
   return job.message || `识谱进行中：${percentText(job.progress)}`;
@@ -148,7 +148,7 @@ function analysisProgressHeadline(job) {
   if (job?.status === "completed") return "分析完成";
   if (job?.stage === "loading-score") return "正在读取曲谱";
   if (job?.stage === "detecting-section") return "正在定位段落";
-  if (job?.stage === "analyzing") return "正在执行深度分析";
+  if (job?.stage === "analyzing") return "正在分析音频";
   if (job?.stage === "saving") return "正在保存结果";
   return "分析排队中";
 }
@@ -217,7 +217,7 @@ function buildPiecePassProgressDetailText(job) {
   const parts = [`已完成 ${Math.min(completed, total)} / ${total} 个段落`];
   if (detail?.currentSectionTitle) parts.push(`当前段落：${detail.currentSectionTitle}`);
   if (job?.status === "processing" && remaining > 0) parts.push(`剩余 ${remaining} 段`);
-  if (cacheHits > 0) parts.push(`缓存复用 ${cacheHits} 段`);
+  if (cacheHits > 0) parts.push(`快速复用 ${cacheHits} 段`);
   if (failed > 0) parts.push(`失败 ${failed} 段`);
   return parts.join("，");
 }
@@ -1060,7 +1060,7 @@ export default function StudentApp({ onOpenResearch }) {
 
   async function handleImportMusicXml() {
     if (!scoreMusicXmlFile) {
-      setErrorMessage("请先选择 MusicXML 文件。");
+      setErrorMessage("请先选择备用谱文件。");
       return;
     }
     setImportingScore(true);
@@ -1077,7 +1077,7 @@ export default function StudentApp({ onOpenResearch }) {
     setAudioDuration(null);
     clearIssueSessionCache();
     setSelectedSectionId("");
-    setStatusMessage("正在导入 MusicXML，并生成可分析的结构化乐谱。");
+    setStatusMessage("正在导入备用谱文件，并准备可分析曲谱。");
     try {
       const json = await importScoreMusicXml(scoreMusicXmlFile);
       const job = json?.job || null;
@@ -1090,7 +1090,7 @@ export default function StudentApp({ onOpenResearch }) {
       }
       setStatusMessage(buildImportStatusMessage(job));
     } catch (error) {
-      setErrorMessage(error.message || "MusicXML 导入失败。");
+      setErrorMessage(error.message || "备用谱文件导入失败。");
     } finally {
       setImportingScore(false);
     }
@@ -1175,7 +1175,7 @@ export default function StudentApp({ onOpenResearch }) {
     setErrorMessage("");
     clearIssueSessionCache();
     if (file) {
-      setStatusMessage(`已选择 MusicXML：${file.name}。这是 PDF 自动识谱失败时的备用导入路径。`);
+      setStatusMessage(`已选择备用谱文件：${file.name}。PDF 自动识谱失败时可用它继续诊断。`);
     }
   }
 
@@ -1487,10 +1487,10 @@ export default function StudentApp({ onOpenResearch }) {
           />
           <div className="action-row">
             <button type="button" className="secondary-button" onClick={() => scoreMusicXmlInputRef.current?.click()}>
-              选择 MusicXML
+              选择备用谱文件
             </button>
             <button type="button" className="secondary-button" onClick={handleImportMusicXml} disabled={importingScore}>
-              {importingScore ? "导入中..." : "导入 MusicXML 备用"}
+              {importingScore ? "导入中..." : "导入备用谱文件"}
             </button>
           </div>
           <input
@@ -1586,9 +1586,9 @@ export default function StudentApp({ onOpenResearch }) {
             <label>
               <span>伴奏处理方式</span>
               <select value={separationMode} onChange={(event) => setSeparationMode(event.target.value)}>
-                <option value="auto">自动启用（推荐）</option>
-                <option value="erhu-focus">强制启用 erhu-focus</option>
-                <option value="off">关闭分离，直接分析原音</option>
+                <option value="auto">自动处理（推荐）</option>
+                <option value="erhu-focus">始终突出二胡旋律</option>
+                <option value="off">不处理伴奏，直接分析原音</option>
               </select>
             </label>
           </div>
@@ -1711,8 +1711,8 @@ export default function StudentApp({ onOpenResearch }) {
               </p>
               {Number.isFinite(Number(wholePieceSummary.sectionCacheHitCount)) ? (
                 <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
-                  缓存复用：{wholePieceSummary.sectionCacheHitCount || 0} / {wholePieceSummary.attemptedSectionCount || wholePieceSummary.structuredSectionCount || 0} 段。
-                  {wholePieceSummary.firstPassCacheBuild ? " 本次包含首次深度分析，之后重跑会明显更快。" : " 本次主要复用已有分析缓存。"}
+                  快速复用：{wholePieceSummary.sectionCacheHitCount || 0} / {wholePieceSummary.attemptedSectionCount || wholePieceSummary.structuredSectionCount || 0} 段。
+                  {wholePieceSummary.firstPassCacheBuild ? " 本次有新段落需要完整分析，之后重跑会明显更快。" : " 本次主要复用已完成的分析结果。"}
                 </p>
               ) : null}
               {wholePieceSummary.analysisReliable === false ? (
