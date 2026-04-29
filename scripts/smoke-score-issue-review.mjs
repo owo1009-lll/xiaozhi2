@@ -216,7 +216,7 @@ async function captureScreenshot(send, screenshotDir, filename) {
 
 function safeScreenshotName(value) {
   return String(value || "page")
-    .replace(/[^\w.-]+/g, "-")
+    .replace(/[^\p{L}\p{N}_.-]+/gu, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80) || "page";
 }
