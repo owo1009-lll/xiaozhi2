@@ -206,6 +206,36 @@ SYSTEM_MERGED_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
 </score-partwise>
 """
 
+TWO_STAFF_REPEATED_SYSTEMS_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <defaults>
+    <page-layout>
+      <page-height>1600</page-height>
+      <page-width>1200</page-width>
+    </page-layout>
+  </defaults>
+  <part-list>
+    <score-part id="P1"><part-name>Voice</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1" width="420">
+      <print new-system="yes"><system-layout><top-system-distance>120</top-system-distance></system-layout></print>
+      <attributes><divisions>4</divisions><staves>2</staves><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+      <note default-x="60"><pitch><step>D</step><octave>5</octave></pitch><duration>4</duration><staff>1</staff></note>
+      <note default-x="60"><chord/><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><staff>2</staff></note>
+      <note default-x="60"><chord/><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration><staff>2</staff></note>
+    </measure>
+    <measure number="2" width="420">
+      <print new-system="yes"><system-layout><top-system-distance>360</top-system-distance></system-layout></print>
+      <attributes><staves>2</staves></attributes>
+      <note default-x="60"><pitch><step>E</step><octave>5</octave></pitch><duration>4</duration><staff>1</staff></note>
+      <note default-x="60"><chord/><pitch><step>G</step><octave>3</octave></pitch><duration>4</duration><staff>2</staff></note>
+      <note default-x="60"><chord/><pitch><step>B</step><octave>3</octave></pitch><duration>4</duration><staff>2</staff></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 SPARSE_FALSE_LEAD_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
   <defaults>
@@ -313,6 +343,23 @@ def main() -> int:
             "System Merged Voice",
             1,
         )
+        two_staff_source = Path(tmp) / "two-staff-repeated-systems.musicxml"
+        two_staff_source.write_text(TWO_STAFF_REPEATED_SYSTEMS_MUSICXML, encoding="utf-8")
+        two_staff_request = ScoreImportRequest(
+            jobId="two-staff-repeated-systems-test",
+            pdfPath=str(two_staff_source),
+            originalFilename="two-staff-repeated-systems.musicxml",
+            titleHint="Two Staff Repeated Systems Test",
+            selectedPartHint="Voice",
+        )
+        two_staff_section, *_ = analyzer._parse_musicxml_source_to_section(
+            two_staff_source,
+            two_staff_request,
+            "Voice",
+            "page-001-s01",
+            "Two Staff Repeated Systems",
+            1,
+        )
         sparse_source = Path(tmp) / "sparse-false-lead.musicxml"
         sparse_source.write_text(SPARSE_FALSE_LEAD_MUSICXML, encoding="utf-8")
         sparse_request = ScoreImportRequest(
@@ -334,6 +381,7 @@ def main() -> int:
     require(section is not None, "MusicXML did not produce a section.")
     require(merged_section is not None, "Merged voice MusicXML did not produce a section.")
     require(system_section is not None, "System-merged voice MusicXML did not produce a section.")
+    require(two_staff_section is not None, "Two-staff repeated systems MusicXML did not produce a section.")
     require(sparse_section is not None, "Sparse false lead MusicXML did not produce a section.")
     merged_notes = merged_section["notes"]
     merged_staffs = {int(note["notePosition"]["staffIndex"]) for note in merged_notes if note.get("notePosition")}
@@ -347,6 +395,14 @@ def main() -> int:
     system_systems = {int(note["notePosition"]["systemIndex"]) for note in system_notes if note.get("notePosition")}
     require(system_systems == {1, 4}, f"Three-line system split should keep only erhu systems 1 and 4, got {system_systems}.")
     require([note["midiPitch"] for note in system_notes] == [74, 76], "Three-line system split should exclude piano accompaniment lines.")
+    two_staff_notes = two_staff_section["notes"]
+    two_staff_pairs = {
+        (int(note["notePosition"]["systemIndex"]), int(note["notePosition"]["staffIndex"]))
+        for note in two_staff_notes
+        if note.get("notePosition")
+    }
+    require(two_staff_pairs == {(1, 1), (2, 1)}, f"Two-staff systems should keep the top staff in every system, got {two_staff_pairs}.")
+    require([note["midiPitch"] for note in two_staff_notes] == [74, 76], "Two-staff systems should retain both erhu melody systems.")
     sparse_notes = sparse_section["notes"]
     sparse_systems = {int(note["notePosition"]["systemIndex"]) for note in sparse_notes if note.get("notePosition")}
     require(sparse_systems == {4}, f"Sparse false lead should be suppressed; kept systems {sparse_systems}.")

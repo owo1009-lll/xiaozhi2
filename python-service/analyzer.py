@@ -5796,18 +5796,38 @@ class ErhuAnalyzer:
                 ]),
             )
 
+        system_order: dict[tuple[int, int], list[tuple[int, int, int]]] = {}
+        for key in line_groups:
+            page_number, system_index, _staff_index = key
+            system_order.setdefault((page_number, system_index), []).append(key)
+        for system_key, keys in list(system_order.items()):
+            system_order[system_key] = sorted(
+                keys,
+                key=lambda key: median([
+                    safe_float((getattr(note, "notePosition", None) or {}).get("normalizedY"), 0.0)
+                    for note in line_groups.get(key, [])
+                ]),
+            )
+
+        def is_erhu_pattern_line(key: tuple[int, int, int]) -> bool:
+            page_number, system_index, _staff_index = key
+            ordered_system_keys = system_order.get((page_number, system_index), [])
+            if len(ordered_system_keys) >= 2:
+                return ordered_system_keys.index(key) == 0 if key in ordered_system_keys else False
+            ordered_page_keys = page_order.get(page_number, [])
+            line_count = max(1, len(ordered_page_keys))
+            line_rank = ordered_page_keys.index(key) if key in ordered_page_keys else 0
+            if line_count == 1:
+                return True
+            if line_count == 2:
+                return line_rank == 0
+            return line_rank % 3 == 0
+
         page_has_dense_erhu_pattern_line: dict[int, bool] = {}
         for page_number, ordered_keys in page_order.items():
-            line_count = max(1, len(ordered_keys))
             dense_pattern_found = False
-            for line_rank, candidate_key in enumerate(ordered_keys):
-                if line_count == 1:
-                    pattern_candidate = True
-                elif line_count == 2:
-                    pattern_candidate = line_rank == 0
-                else:
-                    pattern_candidate = line_rank % 3 == 0
-                if pattern_candidate and len(line_groups.get(candidate_key, [])) >= 3:
+            for candidate_key in ordered_keys:
+                if is_erhu_pattern_line(candidate_key) and len(line_groups.get(candidate_key, [])) >= 3:
                     dense_pattern_found = True
                     break
             page_has_dense_erhu_pattern_line[page_number] = dense_pattern_found
@@ -5818,6 +5838,9 @@ class ErhuAnalyzer:
             ordered_keys = page_order.get(page_number, [])
             line_rank = ordered_keys.index(key) if key in ordered_keys else 0
             line_count = max(1, len(ordered_keys))
+            ordered_system_keys = system_order.get((key[0], key[1]), [])
+            system_line_rank = ordered_system_keys.index(key) if key in ordered_system_keys else 0
+            system_line_count = max(1, len(ordered_system_keys))
 
             if clean_solo:
                 line_roles[key] = ("erhu", 0.92, "clean-solo-part")
@@ -5836,7 +5859,9 @@ class ErhuAnalyzer:
             pitch_span = (max(pitches) - min(pitches)) if pitches else 0
 
             erhu_pattern_score = 0.0
-            if line_count == 1:
+            if system_line_count >= 2:
+                erhu_pattern_score = 0.76 if system_line_rank == 0 else 0.14
+            elif line_count == 1:
                 erhu_pattern_score = 0.42
             elif line_count == 2:
                 erhu_pattern_score = 0.74 if line_rank == 0 else 0.18

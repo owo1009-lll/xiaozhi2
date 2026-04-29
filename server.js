@@ -539,6 +539,28 @@ function annotateImportedSectionsScoreLineRoles(sections = [], score = {}) {
   }
 
   const roleByLineKey = new Map();
+  const systemOrderByKey = new Map();
+  for (const group of lineGroups.values()) {
+    const systemKey = `${group.pageNumber}:${group.systemIndex}`;
+    if (!systemOrderByKey.has(systemKey)) systemOrderByKey.set(systemKey, []);
+    systemOrderByKey.get(systemKey).push({
+      ...group,
+      medianY: medianNumber(group.notes.map((note) => note?.notePosition?.normalizedY)),
+    });
+  }
+  for (const [systemKey, groups] of systemOrderByKey.entries()) {
+    systemOrderByKey.set(systemKey, groups.sort((left, right) => left.medianY - right.medianY));
+  }
+  const patternLineForGroup = (group, orderedPageGroups) => {
+    const systemGroups = systemOrderByKey.get(`${group.pageNumber}:${group.systemIndex}`) || [];
+    if (systemGroups.length >= 2) return systemGroups.findIndex((item) => item.key === group.key) === 0;
+    const lineRank = orderedPageGroups.findIndex((item) => item.key === group.key);
+    const lineCount = Math.max(1, orderedPageGroups.length);
+    if (lineCount === 1) return true;
+    if (lineCount === 2) return lineRank === 0;
+    return lineRank >= 0 && lineRank % 3 === 0;
+  };
+  const pageHasDensePatternLine = new Map();
   for (const groups of pageGroups.values()) {
     const ordered = groups
       .map((group) => ({
@@ -546,6 +568,10 @@ function annotateImportedSectionsScoreLineRoles(sections = [], score = {}) {
         medianY: medianNumber(group.notes.map((note) => note?.notePosition?.normalizedY)),
       }))
       .sort((left, right) => left.medianY - right.medianY);
+    pageHasDensePatternLine.set(
+      ordered[0]?.pageNumber || 1,
+      ordered.some((group) => patternLineForGroup(group, ordered) && group.notes.length >= 3),
+    );
     const lineCount = Math.max(1, ordered.length);
     for (let lineRank = 0; lineRank < ordered.length; lineRank += 1) {
       const group = ordered[lineRank];
@@ -566,7 +592,11 @@ function annotateImportedSectionsScoreLineRoles(sections = [], score = {}) {
       const rangeRatio = rangeHits / Math.max(1, pitches.length);
       const pitchSpan = pitches.length ? Math.max(...pitches) - Math.min(...pitches) : 0;
       let erhuPatternScore = 0.42;
-      if (lineCount === 2) {
+      const systemGroups = systemOrderByKey.get(`${group.pageNumber}:${group.systemIndex}`) || [];
+      const systemLineRank = systemGroups.findIndex((item) => item.key === group.key);
+      if (systemGroups.length >= 2) {
+        erhuPatternScore = systemLineRank === 0 ? 0.76 : 0.14;
+      } else if (lineCount === 2) {
         erhuPatternScore = lineRank === 0 ? 0.74 : 0.18;
       } else if (lineCount >= 3) {
         erhuPatternScore = lineRank % 3 === 0 ? 0.74 : 0.14;
@@ -575,6 +605,12 @@ function annotateImportedSectionsScoreLineRoles(sections = [], score = {}) {
       confidence += Math.min(0.12, rangeRatio * 0.12);
       confidence += pitchSpan <= 36 ? 0.06 : -0.05;
       confidence -= Math.min(0.18, chordRatio * 0.75);
+      if (chordRatio >= 0.18) {
+        confidence = Math.min(confidence - 0.18, 0.58);
+      }
+      if (ambiguous && lineCount >= 4 && group.notes.length <= 2 && pageHasDensePatternLine.get(group.pageNumber)) {
+        confidence = Math.min(confidence - 0.22, 0.58);
+      }
       confidence = clamp(Number(confidence.toFixed(3)), 0.05, 0.9);
       roleByLineKey.set(group.key, {
         role: confidence >= 0.66 ? "erhu" : "accompaniment",
