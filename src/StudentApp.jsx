@@ -52,6 +52,14 @@ function scoreImportQualityText(value) {
   return "需复核";
 }
 
+function scoreImportStatusText(job) {
+  if (!job) return "未开始";
+  if (job.omrStatus === "completed") return "已完成";
+  if (job.omrStatus === "failed") return "未通过";
+  if (job.omrStatus === "processing") return "处理中";
+  return "未开始";
+}
+
 function getPartCandidates(job, score) {
   return (Array.isArray(job?.partCandidates) && job.partCandidates.length ? job.partCandidates : score?.partCandidates || [])
     .filter(Boolean);
@@ -127,7 +135,7 @@ function formatPartCandidateLabel(candidate, index = 0) {
 }
 
 function importProgressHeadline(job) {
-  if (job?.cacheHit) return "已复用上次识谱结果";
+  if (job?.cacheHit) return "已沿用上次识谱结果";
   if (job?.omrStatus === "failed") return "识谱失败";
   if (job?.omrStatus === "completed") return "识谱完成";
   if (job?.stage === "omr-running") return "正在识谱";
@@ -217,7 +225,7 @@ function buildPiecePassProgressDetailText(job) {
   const parts = [`已完成 ${Math.min(completed, total)} / ${total} 个段落`];
   if (detail?.currentSectionTitle) parts.push(`当前段落：${detail.currentSectionTitle}`);
   if (job?.status === "processing" && remaining > 0) parts.push(`剩余 ${remaining} 段`);
-  if (cacheHits > 0) parts.push(`快速复用 ${cacheHits} 段`);
+  if (cacheHits > 0) parts.push(`已快速处理 ${cacheHits} 段`);
   if (failed > 0) parts.push(`失败 ${failed} 段`);
   return parts.join("，");
 }
@@ -1516,7 +1524,7 @@ export default function StudentApp({ onOpenResearch }) {
           />
           <div className="upload-meta">
             <span>PDF：{scorePdfFile?.name || "尚未选择 PDF"}</span>
-            <span>状态：{scoreJob?.omrStatus || "未开始"}</span>
+            <span>状态：{scoreImportStatusText(scoreJob)}</span>
             <span>识谱质量：{scoreJob ? scoreImportQualityText(scoreJob.omrConfidence) : "未开始"}</span>
           </div>
           {scoreJob ? (
@@ -1725,8 +1733,8 @@ export default function StudentApp({ onOpenResearch }) {
               </p>
               {Number.isFinite(Number(wholePieceSummary.sectionCacheHitCount)) ? (
                 <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
-                  快速复用：{wholePieceSummary.sectionCacheHitCount || 0} / {wholePieceSummary.attemptedSectionCount || wholePieceSummary.structuredSectionCount || 0} 段。
-                  {wholePieceSummary.firstPassCacheBuild ? " 本次有新段落需要完整分析，之后重跑会明显更快。" : " 本次主要复用已完成的分析结果。"}
+                  已快速处理：{wholePieceSummary.sectionCacheHitCount || 0} / {wholePieceSummary.attemptedSectionCount || wholePieceSummary.structuredSectionCount || 0} 段。
+                  {wholePieceSummary.firstPassCacheBuild ? " 本次有新段落需要完整分析，之后再次分析会更快。" : " 本次大部分段落已快速完成。"}
                 </p>
               ) : null}
               {wholePieceSummary.analysisReliable === false ? (
