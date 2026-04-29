@@ -525,6 +525,17 @@ function jobMatchesScore(job, score) {
   return Boolean(pieceTitle && jobTitle && pieceTitle === jobTitle);
 }
 
+function shouldShowResearchEntry() {
+  if (typeof window === "undefined") return false;
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("admin") === "1") return true;
+  try {
+    return window.localStorage.getItem("ai-erhu.show-research-entry") === "1";
+  } catch {
+    return false;
+  }
+}
+
 export default function StudentApp({ onOpenResearch }) {
   const restoredStateRef = useRef(loadPersistedStudentState());
   const stopDemoRef = useRef(() => {});
@@ -560,6 +571,7 @@ export default function StudentApp({ onOpenResearch }) {
   const [recording, setRecording] = useState(false);
   const [separationMode, setSeparationMode] = useState(restoredStateRef.current?.separationMode || "auto");
   const [analyzerStatus, setAnalyzerStatus] = useState(null);
+  const showResearchEntry = useMemo(() => shouldShowResearchEntry(), []);
 
   useEffect(() => {
     if (studentId.trim()) {
@@ -1449,9 +1461,11 @@ export default function StudentApp({ onOpenResearch }) {
               {analyzerStatus == null ? "检测中" : analyzerStatus.reachable ? "正常" : "离线"}
             </strong>
           </div>
-          <button type="button" className="secondary-button" onClick={onOpenResearch}>
-            打开研究后台
-          </button>
+          {showResearchEntry && onOpenResearch ? (
+            <button type="button" className="secondary-button" onClick={onOpenResearch}>
+              打开研究后台
+            </button>
+          ) : null}
         </div>
       </header>
 
