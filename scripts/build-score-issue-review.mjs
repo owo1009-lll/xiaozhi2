@@ -94,6 +94,151 @@ function collectSectionPages(analysis = {}, score = {}) {
   return uniqueSortedNumbers(pages);
 }
 
+function sectionPage(section = {}) {
+  return Math.max(
+    1,
+    Math.round(
+      Number(section?.pageNumber)
+      || pageNumberFromText(section?.sectionId)
+      || pageNumberFromText(section?.sourceSectionId)
+      || pageNumberFromText(section?.title)
+      || 1,
+    ),
+  );
+}
+
+function isImportedSection(section = {}) {
+  return /page[-\s]?0*\d+/i.test(`${section?.sectionId || ""} ${section?.sourceSectionId || ""} ${section?.title || ""}`);
+}
+
+function isErhuNote(note = {}, section = {}) {
+  if (!isImportedSection(section)) return true;
+  const role = String(note?.notePosition?.scoreLineRole || "").toLowerCase();
+  const confidence = Number(note?.notePosition?.scoreLineConfidence) || 0;
+  if (role === "erhu" && confidence >= 0.66) return true;
+  if (role) return false;
+  return false;
+}
+
+function isAccompanimentOnly(section = {}) {
+  const stats = section?.scoreLineStats || {};
+  const erhuCount = Number(stats.erhuNoteCount) || 0;
+  const accompanimentCount = Number(stats.accompanimentNoteCount) || 0;
+  if (erhuCount <= 0 && accompanimentCount > 0) return true;
+  const notes = Array.isArray(section?.notes) ? section.notes : [];
+  return notes.length > 0 && !notes.some((note) => isErhuNote(note, section));
+}
+
+function hasErhuMeasure(section = {}, measureIndex = 0) {
+  const numericMeasure = Number(measureIndex) || 1;
+  return (section?.notes || []).some((note) => Number(note?.measureIndex) === numericMeasure && isErhuNote(note, section));
+}
+
+function resolveIssueSection(score = {}, issue = {}) {
+  const sections = Array.isArray(score?.sections) ? score.sections : [];
+  const requestedId = String(issue?.sectionId || "").trim();
+  const measureIndex = Number(issue?.measureIndex);
+  const noteId = String(issue?.noteId || "").trim();
+  if (requestedId) {
+    const matched = sections.find((section) => (
+      String(section?.sectionId || "") === requestedId
+      || String(section?.sourceSectionId || "") === requestedId
+    ));
+    if (matched && !isAccompanimentOnly(matched) && hasErhuMeasure(matched, measureIndex)) return matched;
+  }
+  const page = Number(issue?.sourcePageNumber || issue?.pageNumber);
+  if (Number.isFinite(page) && page > 0) {
+    const pageSections = sections.filter((section) => sectionPage(section) === Math.round(page));
+    const exact = pageSections.find((section) => (section.notes || []).some((note) => (
+      Number(note?.measureIndex) === measureIndex
+      && (!noteId || String(note?.noteId || "") === noteId)
+      && isErhuNote(note, section)
+    )));
+    if (exact) return exact;
+    const measure = pageSections.find((section) => hasErhuMeasure(section, measureIndex));
+    if (measure) return measure;
+    return pageSections.find((section) => !isAccompanimentOnly(section)) || null;
+  }
+  return null;
+}
+
+function auditScoreIssueProjection(score = {}, analysis = {}) {
+  const sourcePages = [];
+  const visiblePages = [];
+  const reviewPages = [];
+  const failures = [];
+  let visibleNotes = 0;
+  let reviewNotes = 0;
+  let visibleMeasures = 0;
+  let reviewMeasures = 0;
+
+  for (const issue of analysis.noteFindings || []) {
+    const section = resolveIssueSection(score, issue);
+    const sourcePage = Number(issue?.sourcePageNumber || issue?.pageNumber) || (section ? sectionPage(section) : 0);
+    if (sourcePage > 0) sourcePages.push(sourcePage);
+    const note = (section?.notes || []).find((item) => (
+      String(item?.noteId || "") === String(issue?.noteId || "")
+      && Number(item?.measureIndex) === Number(issue?.measureIndex)
+    ));
+    if (!section || !note || !isErhuNote(note, section)) {
+      reviewNotes += 1;
+      if (sourcePage > 0) reviewPages.push(sourcePage);
+      continue;
+    }
+    visibleNotes += 1;
+    visiblePages.push(sectionPage(section));
+    const role = String(note?.notePosition?.scoreLineRole || "").toLowerCase();
+    if (role && role !== "erhu") {
+      failures.push({ type: "note-on-accompaniment", noteId: issue.noteId, sectionId: section.sectionId });
+    }
+  }
+
+  for (const issue of analysis.measureFindings || []) {
+    const section = resolveIssueSection(score, issue);
+    const sourcePage = Number(issue?.sourcePageNumber || issue?.pageNumber) || (section ? sectionPage(section) : 0);
+    if (sourcePage > 0) sourcePages.push(sourcePage);
+    if (!section || !hasErhuMeasure(section, issue.measureIndex)) {
+      reviewMeasures += 1;
+      if (sourcePage > 0) reviewPages.push(sourcePage);
+      continue;
+    }
+    visibleMeasures += 1;
+    visiblePages.push(sectionPage(section));
+    if (isAccompanimentOnly(section)) {
+      failures.push({ type: "measure-on-accompaniment", measureIndex: issue.measureIndex, sectionId: section.sectionId });
+    }
+  }
+
+  const visibleIssues = visibleNotes + visibleMeasures;
+  const reviewIssues = reviewNotes + reviewMeasures;
+  const totalIssues = visibleIssues + reviewIssues;
+  return {
+    sourcePages: uniqueSortedNumbers(sourcePages),
+    visiblePages: uniqueSortedNumbers(visiblePages),
+    reviewPages: uniqueSortedNumbers(reviewPages),
+    visibleNotes,
+    reviewNotes,
+    visibleMeasures,
+    reviewMeasures,
+    visibleIssues,
+    reviewIssues,
+    reviewRate: totalIssues ? Number((reviewIssues / totalIssues).toFixed(4)) : 0,
+    failures,
+  };
+}
+
+function buildRiskLabels(item) {
+  const labels = [];
+  if (item.omrConfidence > 0 && item.omrConfidence < 0.88) labels.push("识谱质量偏低");
+  if (item.scoreIssueAudit.reviewIssues > 0) labels.push("有复核项");
+  if (item.scoreIssueAudit.failures.length > 0) labels.push("疑似伴奏误投");
+  if (item.issuePages.length >= 5) labels.push("跨页较多");
+  if (item.noteIssueCount + item.measureIssueCount >= 50) labels.push("问题密集");
+  if (item.attemptedSections >= 80) labels.push("分段很多");
+  if (item.cacheMisses > 0) labels.push("含首次分析");
+  return labels;
+}
+
 function formatPageList(pages = []) {
   return pages.length ? pages.join(", ") : "无";
 }
@@ -152,7 +297,8 @@ function buildReviewItem(result, score) {
   const checks = result?.checks || {};
   const noteIssueCount = Array.isArray(analysis.noteFindings) ? analysis.noteFindings.length : Number(summary.totalNoteFindings || 0);
   const measureIssueCount = Array.isArray(analysis.measureFindings) ? analysis.measureFindings.length : Number(summary.totalMeasureFindings || 0);
-  const reviewIssueCount = (analysis.noteFindings || []).filter((item) => item?.isUncertain || String(item?.pitchLabel || "") === "pitch-review").length;
+  const weakEvidenceCount = (analysis.noteFindings || []).filter((item) => item?.isUncertain || String(item?.pitchLabel || "") === "pitch-review").length;
+  const scoreIssueAudit = auditScoreIssueProjection(score, analysis);
   const payload = buildIssueSessionPayload({
     analysis,
     score,
@@ -160,7 +306,7 @@ function buildReviewItem(result, score) {
     mode: "whole-piece",
     originalAudio: buildOriginalAudio(analysis),
   });
-  return {
+  const item = {
     sessionId,
     title: cleanText(result?.title || analysis.pieceTitle || score.title, "未命名曲目"),
     scoreId: score.scoreId || analysis.scoreId || "",
@@ -169,11 +315,13 @@ function buildReviewItem(result, score) {
     omrConfidence: Number(result?.importJob?.omrConfidence || score.omrConfidence || 0),
     issuePages,
     sectionPages,
-    visiblePages: result?.scoreIssueAudit?.visiblePages || [],
-    reviewPages: result?.scoreIssueAudit?.reviewPages || [],
+    visiblePages: scoreIssueAudit.visiblePages,
+    reviewPages: scoreIssueAudit.reviewPages,
     noteIssueCount,
     measureIssueCount,
-    reviewIssueCount,
+    weakEvidenceCount,
+    locationReviewIssueCount: scoreIssueAudit.reviewIssues,
+    scoreIssueAudit,
     analysisMs: result?.analysisMs || result?.piecePassJob?.durationMs || 0,
     importMs: result?.importMs || 0,
     cacheHits: Number(summary.sectionCacheHitCount || 0),
@@ -184,10 +332,17 @@ function buildReviewItem(result, score) {
     p0Failures: checks.p0Failures || [],
     payload,
   };
+  return {
+    ...item,
+    riskLabels: buildRiskLabels(item),
+  };
 }
 
 function buildReviewHtml({ report, items, baseUrl, sessionsJsonPath, manifestJsonPath }) {
   const sessionPayloads = Object.fromEntries(items.map((item) => [item.sessionId, item.payload]));
+  const riskLabelHtml = (item) => item.riskLabels.length
+    ? `<div class="risk-list">${item.riskLabels.map((label) => `<span>${htmlEscape(label)}</span>`).join("")}</div>`
+    : `<div class="risk-list"><span class="is-calm">常规复核</span></div>`;
   const rows = items.map((item) => `
     <article class="review-card">
       <div class="card-head">
@@ -197,15 +352,19 @@ function buildReviewHtml({ report, items, baseUrl, sessionsJsonPath, manifestJso
         </div>
         <button type="button" data-session-id="${htmlEscape(item.sessionId)}">打开问题谱面</button>
       </div>
+      ${riskLabelHtml(item)}
       <dl>
         <div><dt>问题</dt><dd>${item.noteIssueCount} 个音 / ${item.measureIssueCount} 个小节</dd></div>
         <div><dt>问题页</dt><dd>${htmlEscape(formatPageList(item.issuePages))}</dd></div>
+        <div><dt>可见页</dt><dd>${htmlEscape(formatPageList(item.visiblePages))}</dd></div>
+        <div><dt>需复核页</dt><dd>${htmlEscape(formatPageList(item.reviewPages))}</dd></div>
         <div><dt>段落页</dt><dd>${htmlEscape(formatPageList(item.sectionPages))}</dd></div>
         <div><dt>OMR</dt><dd>${item.omrConfidence ? item.omrConfidence.toFixed(2) : "无"}</dd></div>
         <div><dt>段落</dt><dd>${item.matchedSections}/${item.attemptedSections}</dd></div>
         <div><dt>耗时</dt><dd>导入 ${htmlEscape(formatMs(item.importMs) || "无")} / 分析 ${htmlEscape(formatMs(item.analysisMs) || "无")}</dd></div>
-        <div><dt>缓存</dt><dd>${item.cacheHits} hit / ${item.cacheMisses} miss</dd></div>
-        <div><dt>复核提示</dt><dd>${item.reviewIssueCount} 个弱证据音</dd></div>
+        <div><dt>快速复用</dt><dd>${item.cacheHits} 段 / 新分析 ${item.cacheMisses} 段</dd></div>
+        <div><dt>定位复核</dt><dd>${item.locationReviewIssueCount} 个问题项</dd></div>
+        <div><dt>弱证据</dt><dd>${item.weakEvidenceCount} 个音</dd></div>
       </dl>
       ${item.warnings.length ? `<p class="warning">警告：${htmlEscape(item.warnings.join("；"))}</p>` : ""}
       ${item.p0Failures.length ? `<p class="danger">P0：${htmlEscape(item.p0Failures.join("；"))}</p>` : ""}
@@ -231,6 +390,9 @@ function buildReviewHtml({ report, items, baseUrl, sessionsJsonPath, manifestJso
     .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
     button { border: 1px solid #1f6feb; background: #1f6feb; color: #fff; border-radius: 6px; padding: 8px 12px; cursor: pointer; white-space: nowrap; }
     button:hover { background: #1958bd; }
+    .risk-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+    .risk-list span { background: #eef4ff; border: 1px solid #c7d8ff; color: #174ea6; border-radius: 999px; padding: 3px 8px; font-size: 12px; font-weight: 600; }
+    .risk-list .is-calm { background: #edf8f0; border-color: #bbdfc6; color: #24713b; }
     dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; margin: 0; }
     dt { color: #6a747b; font-size: 12px; }
     dd { margin: 2px 0 0; font-weight: 600; overflow-wrap: anywhere; }
