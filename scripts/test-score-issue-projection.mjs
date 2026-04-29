@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { auditScoreIssueProjection } from "./score-issue-audit.mjs";
 
 const repoRoot = process.cwd();
 
@@ -56,154 +57,44 @@ function latestMainlineAnalyses(analyses = []) {
   return [...latestByKey.values()].map((item) => item.analysis);
 }
 
-function sectionPage(section) {
-  const candidates = [section?.sectionId, section?.sourceSectionId, section?.title].map((item) => String(item || ""));
-  for (const value of candidates) {
-    const match = value.match(/page[-\s]?0*(\d+)/i);
-    if (match) return Number(match[1]);
-  }
-  return Math.max(1, Math.round(Number(section?.pageNumber) || 1));
-}
-
-function isImportedSection(section) {
-  return /page[-\s]?0*\d+/i.test(`${section?.sectionId || ""} ${section?.sourceSectionId || ""} ${section?.title || ""}`);
-}
-
-function isErhuMelodySystemIndex(systemIndex) {
-  const numeric = Math.round(Number(systemIndex) || 0);
-  if (!numeric) return false;
-  return (numeric - 1) % 3 === 0;
-}
-
-function isErhuNote(note, section) {
-  if (!isImportedSection(section)) return true;
-  const role = String(note?.notePosition?.scoreLineRole || "").toLowerCase();
-  const confidence = Number(note?.notePosition?.scoreLineConfidence) || 0;
-  if (role === "erhu" && confidence >= 0.66) {
-    return true;
-  }
-  if (role) return false;
-  return false;
-}
-
-function isAccompanimentOnly(section) {
-  const stats = section?.scoreLineStats || {};
-  const erhuCount = Number(stats.erhuNoteCount) || 0;
-  const accompanimentCount = Number(stats.accompanimentNoteCount) || 0;
-  if (erhuCount <= 0 && accompanimentCount > 0) return true;
-  const notes = Array.isArray(section?.notes) ? section.notes : [];
-  return notes.length > 0 && !notes.some((note) => isErhuNote(note, section));
-}
-
-function hasErhuMeasure(section, measureIndex) {
-  const numericMeasure = Number(measureIndex) || 1;
-  return (section?.notes || []).some((note) => Number(note?.measureIndex) === numericMeasure && isErhuNote(note, section));
-}
-
-function resolveIssueSection(score, issue) {
-  const sections = Array.isArray(score?.sections) ? score.sections : [];
-  const requestedId = String(issue?.sectionId || "").trim();
-  const measureIndex = Number(issue?.measureIndex);
-  const noteId = String(issue?.noteId || "").trim();
-  if (requestedId) {
-    const matched = sections.find((section) => String(section?.sectionId || "") === requestedId || String(section?.sourceSectionId || "") === requestedId);
-    if (matched && !isAccompanimentOnly(matched) && hasErhuMeasure(matched, measureIndex)) return matched;
-  }
-  const page = Number(issue?.sourcePageNumber || issue?.pageNumber);
-  if (Number.isFinite(page) && page > 0) {
-    const pageSections = sections.filter((section) => sectionPage(section) === Math.round(page));
-    const exact = pageSections.find((section) => (section.notes || []).some((note) => (
-      Number(note?.measureIndex) === measureIndex &&
-      (!noteId || String(note?.noteId || "") === noteId) &&
-      isErhuNote(note, section)
-    )));
-    if (exact) return exact;
-    const measure = pageSections.find((section) => hasErhuMeasure(section, measureIndex));
-    if (measure) return measure;
-    return pageSections.find((section) => !isAccompanimentOnly(section)) || null;
-  }
-  return null;
-}
-
-function auditAnalysis(score, analysis) {
-  const failures = [];
-  const sourcePages = new Set();
-  const visiblePages = new Set();
-  const reviewPages = new Set();
-  let visibleNotes = 0;
-  let hiddenNotes = 0;
-  let visibleMeasures = 0;
-  let hiddenMeasures = 0;
-  for (const issue of analysis?.noteFindings || []) {
-    const section = resolveIssueSection(score, issue);
-    const sourcePage = Number(issue?.sourcePageNumber || issue?.pageNumber) || (section ? sectionPage(section) : 0);
-    if (sourcePage > 0) sourcePages.add(Math.round(sourcePage));
-    const note = (section?.notes || []).find((item) => (
-      String(item?.noteId || "") === String(issue?.noteId || "") &&
-      Number(item?.measureIndex) === Number(issue?.measureIndex)
-    ));
-    if (!section || !note || !isErhuNote(note, section)) {
-      hiddenNotes += 1;
-      if (sourcePage > 0) reviewPages.add(Math.round(sourcePage));
-      continue;
-    }
-    visibleNotes += 1;
-    visiblePages.add(sectionPage(section));
-    const role = String(note?.notePosition?.scoreLineRole || "").toLowerCase();
-    if (role && role !== "erhu") {
-      failures.push({ type: "note-on-accompaniment", analysisId: analysis.analysisId, sectionId: section.sectionId, noteId: issue.noteId });
-    }
-  }
-  for (const issue of analysis?.measureFindings || []) {
-    const section = resolveIssueSection(score, issue);
-    const sourcePage = Number(issue?.sourcePageNumber || issue?.pageNumber) || (section ? sectionPage(section) : 0);
-    if (sourcePage > 0) sourcePages.add(Math.round(sourcePage));
-    if (!section || !hasErhuMeasure(section, issue.measureIndex)) {
-      hiddenMeasures += 1;
-      if (sourcePage > 0) reviewPages.add(Math.round(sourcePage));
-      continue;
-    }
-    visibleMeasures += 1;
-    visiblePages.add(sectionPage(section));
-    if (isAccompanimentOnly(section)) {
-      failures.push({ type: "measure-on-accompaniment", analysisId: analysis.analysisId, sectionId: section.sectionId, measureIndex: issue.measureIndex });
-    }
-  }
-  const totalIssues = visibleNotes + hiddenNotes + visibleMeasures + hiddenMeasures;
-  const visibleIssues = visibleNotes + visibleMeasures;
-  const reviewIssues = hiddenNotes + hiddenMeasures;
+function buildWarnings(analysis, result) {
   const warnings = [];
   if (String(analysis?.analysisMode || "") === "whole-piece") {
-    if (sourcePages.size > 1 && visiblePages.size <= 1 && visibleIssues > 0) {
+    if (result.sourcePages.length > 1 && result.visiblePages.length <= 1 && result.visibleIssues > 0) {
       warnings.push({
         type: "low-visible-page-coverage",
         analysisId: analysis.analysisId,
-        sourcePageCount: sourcePages.size,
-        visiblePageCount: visiblePages.size,
+        sourcePageCount: result.sourcePages.length,
+        visiblePageCount: result.visiblePages.length,
       });
     }
-    const reviewRate = totalIssues ? reviewIssues / totalIssues : 0;
-    if (reviewRate > 0.35) {
+    if (result.reviewRate > 0.35) {
       warnings.push({
         type: "high-review-rate",
         analysisId: analysis.analysisId,
-        reviewRate: Number(reviewRate.toFixed(4)),
+        reviewRate: result.reviewRate,
       });
     }
   }
+  return warnings;
+}
+
+function auditAnalysis(score, analysis) {
+  const result = auditScoreIssueProjection(score, analysis);
+  const warnings = buildWarnings(analysis, result);
   return {
-    failures,
+    failures: result.failures,
     warnings,
-    visibleNotes,
-    hiddenNotes,
-    visibleMeasures,
-    hiddenMeasures,
-    sourcePages: [...sourcePages].sort((left, right) => left - right),
-    visiblePages: [...visiblePages].sort((left, right) => left - right),
-    reviewPages: [...reviewPages].sort((left, right) => left - right),
-    totalIssues,
-    visibleIssues,
-    reviewIssues,
+    visibleNotes: result.visibleNotes,
+    hiddenNotes: result.hiddenNotes,
+    visibleMeasures: result.visibleMeasures,
+    hiddenMeasures: result.hiddenMeasures,
+    sourcePages: result.sourcePages,
+    visiblePages: result.visiblePages,
+    reviewPages: result.reviewPages,
+    totalIssues: result.totalIssues,
+    visibleIssues: result.visibleIssues,
+    reviewIssues: result.reviewIssues,
   };
 }
 
