@@ -4,6 +4,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { writeScoreIssueReviewArtifacts } from "./build-score-issue-review.mjs";
+import { runScoreIssueReviewSmoke } from "./smoke-score-issue-review.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_ROOTS = [
@@ -27,6 +28,8 @@ function parseArgs() {
     analysisWarnMs: Number(process.env.ERHU_REAL_CORPUS_ANALYSIS_WARN_MS || 120000),
     strict: false,
     requestTimeoutMs: 30000,
+    smokeReview: false,
+    smokeScreenshots: false,
   };
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
@@ -42,6 +45,8 @@ function parseArgs() {
     else if (arg === "--analysis-warn-ms") parsed.analysisWarnMs = Math.max(0, Number(args[++i]) || parsed.analysisWarnMs);
     else if (arg === "--strict") parsed.strict = true;
     else if (arg === "--request-timeout-ms") parsed.requestTimeoutMs = Math.max(1000, Number(args[++i]) || parsed.requestTimeoutMs);
+    else if (arg === "--smoke-review") parsed.smokeReview = true;
+    else if (arg === "--smoke-screenshots") parsed.smokeScreenshots = true;
   }
   parsed.roots = [...new Set(parsed.roots.filter(Boolean))];
   parsed.excludeTitles = [...new Set(parsed.excludeTitles.map((item) => normalizeTitle(item)).filter(Boolean))];
@@ -478,6 +483,21 @@ async function main() {
     outputDir: args.outputDir,
     baseUrl: args.baseUrl,
   });
+  if (args.smokeReview && Number(report.scoreIssueReview?.itemCount || 0) > 0) {
+    try {
+      report.scoreIssueReviewSmoke = await runScoreIssueReviewSmoke({
+        runSummary: summaryPath,
+        baseUrl: args.baseUrl,
+        noScreenshots: !args.smokeScreenshots,
+        timeoutMs: args.requestTimeoutMs,
+      });
+    } catch (error) {
+      report.scoreIssueReviewSmoke = {
+        ok: false,
+        failures: [`score-issue-review-smoke-error: ${String(error?.message || error)}`],
+      };
+    }
+  }
   await writeReport();
   console.log(JSON.stringify({
     outputDir: args.outputDir,
@@ -489,8 +509,9 @@ async function main() {
     performanceWarningCount: report.performanceWarningCount,
     performanceWarnings: report.performanceWarnings,
     scoreIssueReview: report.scoreIssueReview,
+    scoreIssueReviewSmoke: report.scoreIssueReviewSmoke,
   }, null, 2));
-  if (args.strict && report.p0FailureCount > 0) {
+  if (args.strict && (report.p0FailureCount > 0 || report.scoreIssueReviewSmoke?.ok === false)) {
     process.exit(1);
   }
 }

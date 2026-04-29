@@ -314,6 +314,22 @@ async function runSmoke(args) {
   }
 }
 
+export async function runScoreIssueReviewSmoke(options = {}) {
+  const args = {
+    baseUrl: DEFAULT_BASE_URL,
+    chromePath: "",
+    reviewUrl: "",
+    runSummary: "",
+    screenshotDir: "",
+    noScreenshots: false,
+    timeoutMs: 30000,
+    ...options,
+  };
+  if (args.runSummary) args.runSummary = path.resolve(REPO_ROOT, args.runSummary);
+  if (args.screenshotDir) args.screenshotDir = path.resolve(REPO_ROOT, args.screenshotDir);
+  return runSmoke(args);
+}
+
 async function main() {
   const args = parseArgs();
   const result = await runSmoke(args);
@@ -321,7 +337,9 @@ async function main() {
   if (!result.ok) process.exitCode = 1;
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}
