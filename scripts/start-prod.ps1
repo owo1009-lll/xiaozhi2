@@ -18,7 +18,14 @@ $analyzerPort = 8000
 $serverAnalyzerUrl = "http://127.0.0.1:$analyzerPort"
 $analyzerUrl = "$serverAnalyzerUrl/docs"
 $isWindowsHost = ($env:OS -eq "Windows_NT") -or ($PSVersionTable.Platform -eq "Win32NT") -or ($IsWindows -eq $true)
-$analyzerWorkers = if ($isWindowsHost) { 1 } else { 2 }
+$defaultAnalyzerWorkers = if ($isWindowsHost) { 2 } else { 2 }
+$requestedAnalyzerWorkers = 0
+if ($env:ERHU_ANALYZER_WORKERS) {
+  [int]::TryParse($env:ERHU_ANALYZER_WORKERS, [ref]$requestedAnalyzerWorkers) | Out-Null
+}
+$analyzerWorkers = [Math]::Max(1, [Math]::Min(4, $(if ($requestedAnalyzerWorkers -gt 0) { $requestedAnalyzerWorkers } else { $defaultAnalyzerWorkers })))
+$piecePassScanConcurrency = if ($env:ERHU_PIECE_PASS_SCAN_CONCURRENCY) { $env:ERHU_PIECE_PASS_SCAN_CONCURRENCY } else { [string]([Math]::Max(2, $analyzerWorkers)) }
+$piecePassAnalysisConcurrency = if ($env:ERHU_PIECE_PASS_ANALYSIS_CONCURRENCY) { $env:ERHU_PIECE_PASS_ANALYSIS_CONCURRENCY } else { [string]$analyzerWorkers }
 
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 
@@ -109,7 +116,7 @@ if (-not $SkipBuild) {
 
 $serverListenerBeforeStart = @(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue)
 if ($serverListenerBeforeStart.Count -eq 0) {
-  $serverCommand = "& { `$env:NODE_ENV='production'; `$env:PORT='3000'; `$env:ERHU_ANALYZER_URL='$serverAnalyzerUrl'; node server.js }"
+  $serverCommand = "& { `$env:NODE_ENV='production'; `$env:PORT='3000'; `$env:ERHU_ANALYZER_URL='$serverAnalyzerUrl'; `$env:ERHU_PIECE_PASS_SCAN_CONCURRENCY='$piecePassScanConcurrency'; `$env:ERHU_PIECE_PASS_ANALYSIS_CONCURRENCY='$piecePassAnalysisConcurrency'; node server.js }"
   $startedServer = Start-Process -FilePath "powershell" `
     -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $serverCommand `
     -WorkingDirectory $repoRoot `
@@ -161,6 +168,8 @@ Write-Host "-------------------------"
 Write-Host "App URL:      $serverUrl"
 Write-Host "Health URL:   $serverUrl/api/health"
 Write-Host "Analyzer URL: $analyzerUrl"
+Write-Host "Analyzer workers: $analyzerWorkers"
+Write-Host "Piece-pass concurrency: scan=$piecePassScanConcurrency analysis=$piecePassAnalysisConcurrency"
 Write-Host "Site ready:   $siteReady"
 Write-Host "Analyzer:     $analyzerReady"
 Write-Host ""
