@@ -3,6 +3,7 @@ import fsSync from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { writeScoreIssueReviewArtifacts } from "./build-score-issue-review.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_ROOTS = [
@@ -472,6 +473,12 @@ async function main() {
   await writeReport();
   refreshReportSummary(report, args.minConfidence, args);
   await writeReport();
+  report.scoreIssueReview = await writeScoreIssueReviewArtifacts({
+    runSummary: summaryPath,
+    outputDir: args.outputDir,
+    baseUrl: args.baseUrl,
+  });
+  await writeReport();
   console.log(JSON.stringify({
     outputDir: args.outputDir,
     pairCount: selectedPairs.length,
@@ -481,6 +488,7 @@ async function main() {
     p0Failures: report.p0Failures,
     performanceWarningCount: report.performanceWarningCount,
     performanceWarnings: report.performanceWarnings,
+    scoreIssueReview: report.scoreIssueReview,
   }, null, 2));
   if (args.strict && report.p0FailureCount > 0) {
     process.exit(1);
