@@ -349,6 +349,39 @@ async function runSmoke(args) {
           textSample: document.body.innerText.slice(0, 500),
         };
       })()`);
+      const playbackCheck = await evaluate(send, `(() => new Promise((resolve) => {
+        const audio = document.querySelector(".audio-player");
+        const button = document.querySelector(".issue-list-button");
+        if (!audio) {
+          resolve({ ok: false, reason: "missing-audio-player" });
+          return;
+        }
+        if (!button) {
+          resolve({ ok: false, reason: "missing-issue-button" });
+          return;
+        }
+        const beforeTime = Number(audio.currentTime) || 0;
+        try {
+          button.click();
+        } catch (error) {
+          resolve({ ok: false, reason: error.message || String(error) });
+          return;
+        }
+        setTimeout(() => {
+          const metaTexts = Array.from(document.querySelectorAll(".sidebar-meta"))
+            .map((item) => item.textContent || "");
+          const hint = metaTexts.find((item) => item.includes("已定位") && item.includes("原音")) || "";
+          resolve({
+            ok: Boolean(hint),
+            reason: hint ? "" : "missing-playback-hint",
+            hint,
+            beforeTime,
+            currentTime: Number(audio.currentTime) || 0,
+            paused: Boolean(audio.paused),
+            activeIssueCount: document.querySelectorAll(".issue-list-button.is-active").length,
+          });
+        }, 800);
+      }))()`);
       const pageFailures = [];
       if (!issuePage.hasScoreShell) pageFailures.push("issue-page-shell-missing");
       if (!issuePage.hasAudioPanel) pageFailures.push("issue-page-audio-panel-missing");
@@ -356,6 +389,7 @@ async function runSmoke(args) {
       if (!issuePage.hasIssueList) pageFailures.push("issue-page-list-missing");
       if (!issuePage.hasScorePanel) pageFailures.push("issue-page-score-panel-missing");
       if (!issuePage.hasRenderedScore) pageFailures.push("issue-page-score-render-missing");
+      if (!playbackCheck.ok) pageFailures.push(`issue-page-playback-link-missing:${playbackCheck.reason || "unknown"}`);
       checkedPages.push({
         ...issuePage,
         cardIndex: card.index,
@@ -363,6 +397,7 @@ async function runSmoke(args) {
         sessionId: card.sessionId,
         riskChipCount: card.riskChipCount,
         storageOk: Boolean(storageResult?.ok),
+        playbackCheck,
         ok: pageFailures.length === 0,
         failures: pageFailures,
       });
