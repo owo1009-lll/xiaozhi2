@@ -10,6 +10,8 @@ import {
   formatScoreTitle,
   formatPracticePathLabel,
   formatSectionDisplayName,
+  formatPitchLabelText,
+  formatRhythmLabelText,
   getDisplayCombinedScore,
   getDisplayPitchScore,
   getDisplayRhythmScore,
@@ -304,6 +306,51 @@ function buildOverallFeedback(analysis) {
     parts.push(`其中有 ${uncertainCount} 个音的证据偏弱，建议结合示范回放复核。`);
   }
   return parts.join("");
+}
+
+function getAnalysisIssueStats(analysis) {
+  const noteFindings = Array.isArray(analysis?.noteFindings) ? analysis.noteFindings : [];
+  const measureFindings = Array.isArray(analysis?.measureFindings) ? analysis.measureFindings : [];
+  const pitchNoteCount = noteFindings.filter((item) => {
+    const pitchLabel = String(item?.pitchLabel || "").trim();
+    return pitchLabel && pitchLabel !== "pitch-ok";
+  }).length;
+  const rhythmNoteCount = noteFindings.filter((item) => item?.rhythmType || item?.rhythmLabel || item?.rhythmTypeLabel).length;
+  const pitchMeasureCount = measureFindings.filter((item) => String(item?.issueType || "").startsWith("pitch")).length;
+  const rhythmMeasureCount = measureFindings.filter((item) => {
+    const issueType = String(item?.issueType || "");
+    return issueType.startsWith("rhythm") || Boolean(item?.rhythmType);
+  }).length;
+  const reviewCount = noteFindings.filter((item) => item?.isUncertain || item?.pitchLabel === "pitch-review").length;
+  return {
+    noteCount: noteFindings.length,
+    measureCount: measureFindings.length,
+    pitchIssueCount: pitchNoteCount + pitchMeasureCount,
+    rhythmIssueCount: rhythmNoteCount + rhythmMeasureCount,
+    reviewCount,
+  };
+}
+
+function buildStudentPracticeAdvice(analysis) {
+  if (!analysis) return "";
+  const stats = getAnalysisIssueStats(analysis);
+  if (analysis.recommendedPracticePath === "pitch-first") {
+    return `先慢速处理音准落点，再回到原速。当前定位到 ${stats.pitchIssueCount} 处音准相关问题。`;
+  }
+  if (analysis.recommendedPracticePath === "rhythm-first") {
+    return `先用节拍器处理节奏稳定性，再合回音高。当前定位到 ${stats.rhythmIssueCount} 处节奏相关问题。`;
+  }
+  return "先打开问题谱面复核标记，再选择最明显的一处进行重练。";
+}
+
+function buildTopIssueLine(analysis) {
+  const noteFindings = Array.isArray(analysis?.noteFindings) ? analysis.noteFindings : [];
+  const pitchIssue = noteFindings.find((item) => item?.pitchLabel && item.pitchLabel !== "pitch-ok");
+  const rhythmIssue = noteFindings.find((item) => item?.rhythmType || item?.rhythmLabel || item?.rhythmTypeLabel);
+  const labels = [];
+  if (pitchIssue) labels.push(formatPitchLabelText(pitchIssue.pitchLabel));
+  if (rhythmIssue) labels.push(formatRhythmLabelText(rhythmIssue));
+  return labels.length ? labels.join("，") : "暂无明确问题音，建议查看整曲概览。";
 }
 
 function loadPersistedStudentState() {
@@ -906,6 +953,9 @@ export default function StudentApp({ onOpenResearch }) {
   }, [recentAnalyses]);
 
   const overallFeedback = buildOverallFeedback(analysis);
+  const analysisIssueStats = useMemo(() => getAnalysisIssueStats(analysis), [analysis]);
+  const studentPracticeAdvice = useMemo(() => buildStudentPracticeAdvice(analysis), [analysis]);
+  const topIssueLine = useMemo(() => buildTopIssueLine(analysis), [analysis]);
   const analysisBusy = analyzing || analysisJob?.status === "processing";
   const wholePieceBusy = piecePassRunning || piecePassJob?.status === "processing";
 
@@ -1557,6 +1607,19 @@ export default function StudentApp({ onOpenResearch }) {
                 <h3>总体反馈</h3>
                 <p>{overallFeedback}</p>
               </div>
+              <div className="summary-grid">
+                <div className="history-card">
+                  <h3>本次重点</h3>
+                  <p>{formatPracticePathLabel(analysis.recommendedPracticePath)}</p>
+                  <p>{studentPracticeAdvice}</p>
+                </div>
+                <div className="history-card">
+                  <h3>问题概览</h3>
+                  <p>问题音：{analysisIssueStats.noteCount} 个</p>
+                  <p>问题小节：{analysisIssueStats.measureCount} 个</p>
+                  <p>主要类型：{topIssueLine}</p>
+                </div>
+              </div>
               <div className="history-card">
                 <h3>下一步</h3>
                 <div className="action-row">
@@ -1646,9 +1709,9 @@ export default function StudentApp({ onOpenResearch }) {
         <section className="panel-card">
           <StepTitle step="05" title="练习记录" description="最近几次练习记录，按时间显示，不再限定为当前下拉段落。" />
           <div className="upload-meta">
-            <span>学生编号：{studentId || "未设置"}</span>
+            <span>当前曲目：{score ? formatScoreTitle(score) : "未导入"}</span>
             <span>当前段落：{selectedSection ? formatSectionDisplayName(selectedSection) : "未选择"}</span>
-            <span>{historyLoading ? "正在刷新记录..." : `记录条数：${recentHistory.length}`}</span>
+            <span>{historyLoading ? "正在刷新记录..." : `最近练习 ${recentHistory.length} 次`}</span>
           </div>
           <div className="summary-grid">
             <div className="history-card">
@@ -1658,7 +1721,7 @@ export default function StudentApp({ onOpenResearch }) {
               <p>平均节奏：{historySummary.averageRhythm}</p>
               {currentSectionHistory.length > 0 ? (
                 <button type="button" className="secondary-button" onClick={handleClearSectionStats} style={{ marginTop: 8 }}>
-                  清零当前段统计
+                  隐藏当前段记录
                 </button>
               ) : null}
             </div>
@@ -1703,14 +1766,20 @@ export default function StudentApp({ onOpenResearch }) {
                     <p>
                       综合 {clampScore(getDisplayCombinedScore(item))} · 音准 {clampScore(getDisplayPitchScore(item))} · 节奏 {clampScore(getDisplayRhythmScore(item))}
                     </p>
-                    <p>练习路径 {formatPracticePathLabel(item.recommendedPracticePath)}</p>
+                    <p>
+                      {formatPracticePathLabel(item.recommendedPracticePath)}
+                      {" · "}
+                      问题音 {getAnalysisIssueStats(item).noteCount}
+                      {" · "}
+                      问题小节 {getAnalysisIssueStats(item).measureCount}
+                    </p>
                   </div>
                   <div className="action-col">
                     <button type="button" className="secondary-button" onClick={() => handleLoadHistoryItem(item)}>
                       查看结果
                     </button>
                     <button type="button" className="secondary-button" onClick={() => handleDeleteHistoryItem(item.analysisId)}>
-                      删除
+                      隐藏
                     </button>
                   </div>
                 </div>
