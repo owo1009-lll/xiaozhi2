@@ -56,6 +56,7 @@ Latest validated state:
 - Latest real-corpus mainline sample: `8` whole-piece analyses, `latestMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`.
 - Actual real-corpus `--run` coverage now includes all 8 matched corpus pairs: `20190306桃花坞`, `第二二胡狂想曲`, `第四二胡狂想曲`, `浮生`, `古巷深处`, `维奥莱塔组曲07 - 二胡 中胡`, `雪山魂塑`, and `炫动`.
 - The 8-song cached end-to-end pass completed with `0` P0 failures, all sections matched, and score issue review artifacts generated for each run batch.
+- The all-in-one routine `npm run test:real-corpus -- --run --smoke-review --strict --request-timeout-ms 60000` has been verified across all 8 pairs: `8/8` completed, score issue review item count `8`, browser smoke `ok`.
 - Browser smoke checks for generated review artifacts are now reusable both as `npm run smoke:score-issues` and as the real-corpus `--smoke-review` option; review cards open, session data is written to browser storage, and the issue score page loads with original-audio panel and melody-line view.
 - Historical review hotspots remain in older cached runs, mainly old `20190306桃花坞`, `炫动`, and `雪山魂塑` analyses. They are tracked as review-risk trend, not as current P0 failures.
 - Current DTW mainline does not count hidden accompaniment notes as successful visible highlights; uncertain projection is kept as `需复核`.
@@ -127,6 +128,8 @@ Completed:
 - Verified all 8 real-corpus `--run` pairs across separate run batches, with `npm run smoke:score-issues` passing for each generated artifact batch.
 - Added `--smoke-review` to the real-corpus runner so end-to-end corpus batches can fail strict mode when the generated score issue review page does not open correctly.
 - Improved OMR melody/accompaniment line splitting for repeated multi-staff systems: the importer now keeps the top staff in each system instead of relying only on whole-page line modulo, with a regression case in `test:score-markings`.
+- Cleaned student-facing status wording so import states and whole-piece speed notes no longer expose raw internal status or cache wording.
+- Re-verified the full real-corpus strict routine after the cleanup; latest DTW quality is `latestMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`, and historical `reviewRate = 0.0905`.
 
 ## Next In Order
 
