@@ -25,6 +25,7 @@
     "score:export:taohuawu": "node scripts\\export-piece-score.mjs --piece-id taohuawu-test-fragment --output-dir data/score-exports/taohuawu-test-fragment",
     "test:real-corpus": "node scripts\\run-real-corpus-tests.mjs",
     "test:real-corpus:run": "node scripts\\run-real-corpus-tests.mjs --run",
+    "test:real-corpus:strict": "node scripts\\run-real-corpus-tests.mjs --run --smoke-review --strict --request-timeout-ms 60000",
     "test:score-markings": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-score-markings.py",
     "test:musicxml-import": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-musicxml-import.py",
     "test:score-issues": "node scripts\\test-score-issue-projection.mjs",

@@ -56,7 +56,7 @@ Latest validated state:
 - Latest real-corpus mainline sample: `8` whole-piece analyses, `latestMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`.
 - Actual real-corpus `--run` coverage now includes all 8 matched corpus pairs: `20190306桃花坞`, `第二二胡狂想曲`, `第四二胡狂想曲`, `浮生`, `古巷深处`, `维奥莱塔组曲07 - 二胡 中胡`, `雪山魂塑`, and `炫动`.
 - The 8-song cached end-to-end pass completed with `0` P0 failures, all sections matched, and score issue review artifacts generated for each run batch.
-- The all-in-one routine `npm run test:real-corpus -- --run --smoke-review --strict --request-timeout-ms 60000` has been verified across all 8 pairs: `8/8` completed, score issue review item count `8`, browser smoke `ok`.
+- The all-in-one routine `npm run test:real-corpus:strict` has been verified across all 8 pairs: `8/8` completed, score issue review item count `8`, browser smoke `ok`.
 - Browser smoke checks for generated review artifacts are now reusable both as `npm run smoke:score-issues` and as the real-corpus `--smoke-review` option; review cards open, session data is written to browser storage, and the issue score page loads with original-audio panel and melody-line view.
 - Historical review hotspots remain in older cached runs, mainly old `20190306桃花坞`, `炫动`, and `雪山魂塑` analyses. They are tracked as review-risk trend, not as current P0 failures.
 - Current DTW mainline does not count hidden accompaniment notes as successful visible highlights; uncertain projection is kept as `需复核`.
@@ -133,7 +133,7 @@ Completed:
 
 ## Next In Order
 
-1. Keep periodic real-corpus `--run` tests in the routine, using `npm run test:real-corpus -- --run --smoke-review --strict` for automated review-page smoke checks during each batch. `npm run smoke:score-issues -- --run-summary <run-summary.json>` remains available for already-generated runs.
+1. Keep periodic real-corpus `--run` tests in the routine, using `npm run test:real-corpus:strict` for automated review-page smoke checks during each batch. `npm run smoke:score-issues -- --run-summary <run-summary.json>` remains available for already-generated runs.
 2. Continue improving OMR section/voice quality so historical and unknown-PDF review items become reliable note or measure highlights.
 3. Do deeper human visual review on complex scores beyond smoke checks: `浮生`, `古巷深处`, `炫动`, `第四二胡狂想曲`, and `维奥莱塔组曲07 - 二胡 中胡`.
 4. Continue student UI cleanup where technical labels remain visible outside the main upload/import path.
