@@ -32,6 +32,30 @@ function collectRealCorpusAnalyses() {
   return analyses;
 }
 
+function analysisTimestamp(analysis) {
+  const direct = Date.parse(analysis?.createdAt || analysis?.completedAt || analysis?.updatedAt || "");
+  if (Number.isFinite(direct)) return direct;
+  const idText = String(analysis?.analysisId || "");
+  const match = idText.match(/piecepassjob-([a-z0-9]+)-/i);
+  if (!match) return 0;
+  const value = Number.parseInt(match[1], 36);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function latestMainlineAnalyses(analyses = []) {
+  const latestByKey = new Map();
+  for (const analysis of analyses) {
+    if (String(analysis?.analysisMode || "") !== "whole-piece") continue;
+    const key = `${String(analysis?.scoreId || "")}::${String(analysis?.audioHash || "") || "no-audio"}`;
+    const timestamp = analysisTimestamp(analysis);
+    const existing = latestByKey.get(key);
+    if (!existing || timestamp >= existing.timestamp) {
+      latestByKey.set(key, { analysis, timestamp });
+    }
+  }
+  return [...latestByKey.values()].map((item) => item.analysis);
+}
+
 function sectionPage(section) {
   const candidates = [section?.sectionId, section?.sourceSectionId, section?.title].map((item) => String(item || ""));
   for (const value of candidates) {
@@ -200,6 +224,7 @@ for (const analysis of collectRealCorpusAnalyses()) {
   analysesById.set(analysis.analysisId, analysis);
 }
 const analyses = [...analysesById.values()];
+const latestMainlineAnalysesList = latestMainlineAnalyses(analyses);
 
 const summary = {
   checkedAnalyses: 0,
@@ -212,6 +237,21 @@ const summary = {
   visiblePages: [],
   reviewPages: [],
   perAnalysis: [],
+  latestMainline: {
+    checkedAnalyses: 0,
+    visibleNotes: 0,
+    hiddenNotes: 0,
+    visibleMeasures: 0,
+    hiddenMeasures: 0,
+    visibleIssues: 0,
+    reviewIssues: 0,
+    sourcePages: [],
+    visiblePages: [],
+    reviewPages: [],
+    perAnalysis: [],
+    warnings: [],
+    failures: [],
+  },
   warnings: [],
   failures: [],
 };
@@ -257,7 +297,39 @@ summary.sourcePages = [...new Set(summary.sourcePages)].sort((left, right) => le
 summary.visiblePages = [...new Set(summary.visiblePages)].sort((left, right) => left - right);
 summary.reviewPages = [...new Set(summary.reviewPages)].sort((left, right) => left - right);
 
+for (const analysis of latestMainlineAnalysesList) {
+  const score = scoresById.get(String(analysis.scoreId || ""));
+  if (!score) continue;
+  const result = auditAnalysis(score, analysis);
+  summary.latestMainline.checkedAnalyses += 1;
+  summary.latestMainline.visibleNotes += result.visibleNotes;
+  summary.latestMainline.hiddenNotes += result.hiddenNotes;
+  summary.latestMainline.visibleMeasures += result.visibleMeasures;
+  summary.latestMainline.hiddenMeasures += result.hiddenMeasures;
+  summary.latestMainline.visibleIssues += result.visibleIssues;
+  summary.latestMainline.reviewIssues += result.reviewIssues;
+  for (const page of result.sourcePages) summary.latestMainline.sourcePages.push(page);
+  for (const page of result.visiblePages) summary.latestMainline.visiblePages.push(page);
+  for (const page of result.reviewPages) summary.latestMainline.reviewPages.push(page);
+  summary.latestMainline.warnings.push(...result.warnings);
+  summary.latestMainline.failures.push(...result.failures);
+  summary.latestMainline.perAnalysis.push({
+    analysisId: analysis.analysisId,
+    pieceTitle: analysis.pieceTitle,
+    sourcePages: result.sourcePages,
+    visiblePages: result.visiblePages,
+    reviewPages: result.reviewPages,
+    visibleIssues: result.visibleIssues,
+    reviewIssues: result.reviewIssues,
+    warnings: result.warnings,
+  });
+}
+
+summary.latestMainline.sourcePages = [...new Set(summary.latestMainline.sourcePages)].sort((left, right) => left - right);
+summary.latestMainline.visiblePages = [...new Set(summary.latestMainline.visiblePages)].sort((left, right) => left - right);
+summary.latestMainline.reviewPages = [...new Set(summary.latestMainline.reviewPages)].sort((left, right) => left - right);
+
 console.log(JSON.stringify(summary, null, 2));
-if (summary.failures.length) {
+if (summary.failures.length || summary.latestMainline.failures.length || summary.latestMainline.warnings.length) {
   process.exitCode = 1;
 }
