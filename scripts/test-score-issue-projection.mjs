@@ -9,6 +9,29 @@ function readJson(relativePath, fallback) {
   return JSON.parse(fs.readFileSync(absolutePath, "utf8"));
 }
 
+function collectRealCorpusAnalyses() {
+  const corpusRoot = path.join(repoRoot, "data", "real-tests", "corpus-runs");
+  if (!fs.existsSync(corpusRoot)) return [];
+  const analyses = [];
+  for (const entry of fs.readdirSync(corpusRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const summaryPath = path.join(corpusRoot, entry.name, "run-summary.json");
+    if (!fs.existsSync(summaryPath)) continue;
+    try {
+      const summary = JSON.parse(fs.readFileSync(summaryPath, "utf8"));
+      for (const result of summary.results || []) {
+        const analysis = result?.piecePassJob?.wholePieceAnalysis;
+        if (result?.status === "completed" && analysis?.analysisId) {
+          analyses.push(analysis);
+        }
+      }
+    } catch (error) {
+      console.warn(`[score-issues] Skipping unreadable corpus summary ${path.relative(repoRoot, summaryPath)}: ${error.message}`);
+    }
+  }
+  return analyses;
+}
+
 function sectionPage(section) {
   const candidates = [section?.sectionId, section?.sourceSectionId, section?.title].map((item) => String(item || ""));
   for (const value of candidates) {
@@ -167,15 +190,19 @@ const scoreStore = readJson("data/erhu-score-imports.json", { scores: [] });
 const piecePassStore = readJson("data/erhu-piece-pass-jobs.json", { jobs: [] });
 const studyStore = readJson("data/erhu-study-records.json", { analyses: [] });
 const scoresById = new Map((scoreStore.scores || []).map((score) => [score.scoreId, score]));
-const analyses = [];
+const analysesById = new Map();
 
 for (const job of piecePassStore.jobs || []) {
   if (job.status !== "completed" || !job.wholePieceAnalysis) continue;
-  analyses.push(job.wholePieceAnalysis);
+  analysesById.set(job.wholePieceAnalysis.analysisId, job.wholePieceAnalysis);
 }
 for (const analysis of studyStore.analyses || []) {
-  analyses.push(analysis);
+  if (analysis?.analysisId) analysesById.set(analysis.analysisId, analysis);
 }
+for (const analysis of collectRealCorpusAnalyses()) {
+  analysesById.set(analysis.analysisId, analysis);
+}
+const analyses = [...analysesById.values()];
 
 const summary = {
   checkedAnalyses: 0,

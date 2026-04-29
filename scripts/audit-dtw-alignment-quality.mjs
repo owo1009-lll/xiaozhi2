@@ -12,6 +12,29 @@ function readJson(relativePath, fallback) {
   return JSON.parse(fs.readFileSync(absolutePath, "utf8"));
 }
 
+function collectRealCorpusAnalyses() {
+  const corpusRoot = path.join(repoRoot, "data", "real-tests", "corpus-runs");
+  if (!fs.existsSync(corpusRoot)) return [];
+  const analyses = [];
+  for (const entry of fs.readdirSync(corpusRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const summaryPath = path.join(corpusRoot, entry.name, "run-summary.json");
+    if (!fs.existsSync(summaryPath)) continue;
+    try {
+      const summary = JSON.parse(fs.readFileSync(summaryPath, "utf8"));
+      for (const result of summary.results || []) {
+        const analysis = result?.piecePassJob?.wholePieceAnalysis;
+        if (result?.status === "completed" && analysis?.analysisId) {
+          analyses.push(analysis);
+        }
+      }
+    } catch (error) {
+      console.warn(`[dtw-quality] Skipping unreadable corpus summary ${path.relative(repoRoot, summaryPath)}: ${error.message}`);
+    }
+  }
+  return analyses;
+}
+
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
 }
@@ -303,6 +326,9 @@ function collectAnalyses(piecePassStore, studyStore) {
   }
   for (const analysis of studyStore.analyses || []) {
     if (analysis?.analysisId) byId.set(analysis.analysisId, analysis);
+  }
+  for (const analysis of collectRealCorpusAnalyses()) {
+    byId.set(analysis.analysisId, analysis);
   }
   return [...byId.values()];
 }
