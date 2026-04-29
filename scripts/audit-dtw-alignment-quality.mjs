@@ -223,6 +223,11 @@ function emptyAnalysisSummary(analysis, score) {
     measureExactCount: 0,
     measureReviewCount: 0,
     measureAccompanimentFailureCount: 0,
+    issueCount: 0,
+    reviewIssueCount: 0,
+    reviewRate: 0,
+    accompanimentFailureCount: 0,
+    accompanimentFailureRate: 0,
   };
 }
 
@@ -257,6 +262,18 @@ function finalizeRates(target) {
   target.exactNoteRate = rate(target.noteExactCount, target.noteIssueCount);
   target.measureLocatedRate = rate(target.noteExactCount + target.noteMeasureOnlyCount + target.measureExactCount, totalIssues);
   target.reviewRate = rate(totalReview, totalIssues);
+  target.accompanimentFailureRate = rate(totalFailures, totalIssues);
+  return target;
+}
+
+function finalizeAnalysisSummary(target) {
+  const totalIssues = target.noteIssueCount + target.measureIssueCount;
+  const totalFailures = target.noteAccompanimentFailureCount + target.measureAccompanimentFailureCount;
+  const totalReview = target.noteReviewCount + target.measureReviewCount;
+  target.issueCount = totalIssues;
+  target.reviewIssueCount = totalReview;
+  target.reviewRate = rate(totalReview, totalIssues);
+  target.accompanimentFailureCount = totalFailures;
   target.accompanimentFailureRate = rate(totalFailures, totalIssues);
   return target;
 }
@@ -333,7 +350,21 @@ function auditAnalysis(score, analysis) {
     }
   }
 
-  return { result, failures };
+  return { result: finalizeAnalysisSummary(result), failures };
+}
+
+function reviewHotspots(items = [], limit = 5) {
+  return items
+    .filter((item) => item.reviewIssueCount > 0 || item.accompanimentFailureCount > 0)
+    .slice(0, limit)
+    .map((item) => ({
+      pieceTitle: item.pieceTitle || item.scoreId,
+      analysisId: item.analysisId,
+      issueCount: item.issueCount,
+      reviewIssueCount: item.reviewIssueCount,
+      reviewRate: item.reviewRate,
+      accompanimentFailureCount: item.accompanimentFailureCount,
+    }));
 }
 
 function collectAnalyses(piecePassStore, studyStore) {
@@ -389,17 +420,33 @@ function writeMarkdown(report, filePath) {
     `- Latest mainline review-needed rate: ${((report.latestMainline?.reviewRate || 0) * 100).toFixed(1)}%`,
     `- Latest mainline accompaniment failure rate: ${((report.latestMainline?.accompanimentFailureRate || 0) * 100).toFixed(2)}%`,
     "",
+    "## Latest Mainline Per Analysis",
+    "",
+    "| Piece | Analysis | Issues | Review-needed | Review % | Accompaniment failures |",
+    "| --- | --- | ---: | ---: | ---: | ---: |",
+    ...(report.latestMainlinePerAnalysis?.length
+      ? report.latestMainlinePerAnalysis.map((item) => `| ${item.pieceTitle || item.scoreId} | ${item.analysisId} | ${item.issueCount} | ${item.reviewIssueCount} | ${(item.reviewRate * 100).toFixed(1)}% | ${item.accompanimentFailureCount} |`)
+      : ["| None |  | 0 | 0 | 0.0% | 0 |"]),
+    "",
+    "## Review Hotspots",
+    "",
+    "| Piece | Analysis | Issues | Review-needed | Review % | Accompaniment failures |",
+    "| --- | --- | ---: | ---: | ---: | ---: |",
+    ...(reviewHotspots(report.perAnalysis, 10).length
+      ? reviewHotspots(report.perAnalysis, 10).map((item) => `| ${item.pieceTitle} | ${item.analysisId} | ${item.issueCount} | ${item.reviewIssueCount} | ${(item.reviewRate * 100).toFixed(1)}% | ${item.accompanimentFailureCount} |`)
+      : ["| None |  | 0 | 0 | 0.0% | 0 |"]),
+    "",
     "## Warnings",
     "",
     ...(report.warnings?.length ? report.warnings.map((warning) => `- ${warning}`) : ["- None"]),
     "",
     "## Per Analysis",
     "",
-    "| Piece | Analysis | Notes exact/measure/review/fail | Measures exact/review/fail |",
-    "| --- | --- | --- | --- |",
+    "| Piece | Analysis | Notes exact/measure/review/fail | Measures exact/review/fail | Review % |",
+    "| --- | --- | --- | --- | ---: |",
   ];
   for (const item of report.perAnalysis) {
-    lines.push(`| ${item.pieceTitle || item.scoreId} | ${item.analysisId} | ${item.noteExactCount}/${item.noteMeasureOnlyCount}/${item.noteReviewCount}/${item.noteAccompanimentFailureCount} | ${item.measureExactCount}/${item.measureReviewCount}/${item.measureAccompanimentFailureCount} |`);
+    lines.push(`| ${item.pieceTitle || item.scoreId} | ${item.analysisId} | ${item.noteExactCount}/${item.noteMeasureOnlyCount}/${item.noteReviewCount}/${item.noteAccompanimentFailureCount} | ${item.measureExactCount}/${item.measureReviewCount}/${item.measureAccompanimentFailureCount} | ${(item.reviewRate * 100).toFixed(1)}% |`);
   }
   if (report.failures.length) {
     lines.push("", "## Failures", "");
@@ -488,12 +535,11 @@ if (
   );
 }
 report.perAnalysis.sort((left, right) => (
-  (right.noteAccompanimentFailureCount + right.measureAccompanimentFailureCount)
-  - (left.noteAccompanimentFailureCount + left.measureAccompanimentFailureCount)
-  || (right.noteReviewCount + right.measureReviewCount) - (left.noteReviewCount + left.measureReviewCount)
+  right.accompanimentFailureCount - left.accompanimentFailureCount
+  || right.reviewIssueCount - left.reviewIssueCount
 ));
 report.latestMainlinePerAnalysis.sort((left, right) => (
-  (right.noteReviewCount + right.measureReviewCount) - (left.noteReviewCount + left.measureReviewCount)
+  right.reviewIssueCount - left.reviewIssueCount
   || String(left.pieceTitle || left.scoreId).localeCompare(String(right.pieceTitle || right.scoreId), "zh-Hans-CN")
 ));
 
@@ -530,6 +576,8 @@ console.log(JSON.stringify({
   latestMainlineMeasureLocatedRate: report.latestMainline.measureLocatedRate,
   latestMainlineReviewRate: report.latestMainline.reviewRate,
   latestMainlineAccompanimentFailureRate: report.latestMainline.accompanimentFailureRate,
+  latestMainlineReviewHotspots: reviewHotspots(report.latestMainlinePerAnalysis),
+  historicalReviewHotspots: reviewHotspots(report.perAnalysis),
   warnings: report.warnings,
   output: path.relative(repoRoot, latestJsonPath),
 }, null, 2));
