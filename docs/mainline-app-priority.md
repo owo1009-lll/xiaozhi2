@@ -129,7 +129,7 @@ Completed:
 - Added `--smoke-review` to the real-corpus runner so end-to-end corpus batches can fail strict mode when the generated score issue review page does not open correctly.
 - Improved OMR melody/accompaniment line splitting for repeated multi-staff systems: the importer now keeps the top staff in each system instead of relying only on whole-page line modulo, with a regression case in `test:score-markings`.
 - Cleaned student-facing status wording so import states and whole-piece speed notes no longer expose raw internal status or cache wording.
-- Re-verified the full real-corpus strict routine after the cleanup; latest DTW quality is `latestMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`, and historical `reviewRate = 0.0905`.
+- Re-verified the full real-corpus strict routine after the cleanup; latest DTW quality is `latestMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`, and historical `reviewRate = 0.0883`.
 
 ## Next In Order
 
