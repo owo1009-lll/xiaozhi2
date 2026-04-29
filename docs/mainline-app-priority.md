@@ -2,19 +2,19 @@
 
 This file records the highest-priority product line for this project.
 
-## Mainline task
+## Mainline Task
 
-Build a `Web / PWA / shell-app` style erhu practice system with the following core flow:
+Build a `Web / PWA / shell-app` style erhu practice system with this core flow:
 
 1. learner imports a `PDF` score
 2. learner uploads or records performance audio
 3. the system analyzes pitch and rhythm
 4. the system localizes problems at note and measure level
-5. the system gives demo playback and structured feedback to the learner
+5. the system gives original-audio playback, score highlighting, and structured feedback to the learner
 
 Everything else is secondary to this chain.
 
-## Priority order
+## Priority Order
 
 Highest priority:
 
@@ -33,65 +33,71 @@ Lower priority:
 - heavy research admin features
 - optional external evaluation layers
 
-## Deep-learning requirement
+## Deep-Learning Requirement
 
-This project should now treat both of the following as required:
+This project treats both of the following as required:
 
 - pitch diagnosis must use a deep-learning model
-- rhythm diagnosis must also move toward a deep-learning model
+- rhythm diagnosis must move toward a deep-learning model
 
 Current status:
 
-- pitch: already on a deep-learning path through `torchcrepe`
+- pitch: on a deep-learning path through `torchcrepe`
 - rhythm: mainline uses `madmom RNN onset/beat + score-aware DTW`, with the older onset/rule stack kept as fallback
 
-So the current rhythm stack is acceptable for the prototype mainline only when `madmom` is available; fallback results must be labeled as lower confidence.
+The current rhythm stack is acceptable for the prototype mainline when `madmom` is available. Fallback results must remain lower confidence.
 
-## 2026-04-28 P0 implementation checkpoint
+## Current Mainline Status, 2026-04-30
+
+Latest validated state:
+
+- `npm run test:mainline-p0` passes.
+- Analyzer runtime reports CUDA PyTorch on `NVIDIA GeForce RTX 5060`.
+- Latest real-corpus mainline sample: `8` whole-piece analyses, `latestMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`.
+- Historical review hotspots remain in older cached runs, mainly old `20190306桃花坞`, `炫动`, and `雪山魂塑` analyses. They are tracked as review-risk trend, not as current P0 failures.
+- Current DTW mainline does not count hidden accompaniment notes as successful visible highlights; uncertain projection is kept as `需复核`.
+
+Recently completed:
+
+- Original-audio snippet playback from problem notes/measures in the score issue page.
+- Real-corpus score issue review artifacts: `score-issue-review.html`, manifest JSON, and session JSON.
+- Review artifact risk labels for OMR confidence, many pages, dense issues, many sections, first-run analysis, location review, and accompaniment-projection suspicion.
+- Shared score issue projection audit rules between the P0 test and review artifact generator.
+- DTW quality report now includes latest-mainline per-piece rows and historical review hotspots.
+- Student-facing copy has been cleaned for the main upload/import flow: technical cache and fallback wording is less exposed.
+
+## 2026-04-28 P0 Implementation Checkpoint
 
 Completed:
 
 - Added a formal `MusicXML` fallback import path so new pieces are not blocked entirely when Audiveris OMR fails.
 - Exposed the fallback through `POST /api/erhu/scores/import-musicxml` and `/score/import-musicxml`.
-- Added a student-side `MusicXML` backup import button, while keeping `PDF` as the default main route.
+- Added a student-side backup score-file import button while keeping `PDF` as the default main route.
 - Updated `start-prod` so if an old Python analyzer is still occupying port `8000`, the app can automatically start the current analyzer on `8100` and point Node to it.
-- Verified one real-corpus end-to-end run after the change: `20190306桃花坞`, `22/22` attempted sections matched, no score-issue projection failure.
+- Verified one real-corpus end-to-end run for `20190306桃花坞`: `22/22` attempted sections matched, with no score-issue projection failure.
 - Fixed imported-score whole-piece filtering so sections with explicit `erhu` line evidence are no longer discarded just because the global part candidate is low confidence.
 - Verified `第二二胡狂想曲`: `19/19` attempted sections matched after the filter fix.
 - Reduced imported-score whole-piece wait time by enabling bounded scan/analysis concurrency and lowering duplicate retries; the cached verification pass completed in about `3.2s`.
 
-Next in order:
-
-1. Run more real-corpus end-to-end tests against non-Taohuawu pieces, and inspect the score-issue page visually during the same pass.
-2. Inspect low-confidence OMR cases and improve part selection / section building.
-3. Continue visual validation of the score issue page, especially cross-page note positioning, as part of each corpus run rather than as a delayed separate task.
-4. Polish the student result/history UI only after the diagnosis chain is stable.
-
-## 2026-04-29 continuation checkpoint
+## 2026-04-29 Continuation Checkpoint
 
 Completed:
 
 - Enabled the production launcher to prefer the global CUDA PyTorch runtime while still loading the project virtualenv packages, so `torchcrepe` can use the local GPU when available.
 - Verified analyzer runtime reports `torch 2.11.0+cu128`, `cuda`, and `NVIDIA GeForce RTX 5060`.
 - Ran non-Taohuawu real-corpus end-to-end tests for `第四二胡狂想曲`, `浮生`, and `古巷深处`.
-- Added stricter issue-score projection guards: when a score contains accompaniment, stale cached `scoreLineRole=erhu` is no longer trusted by itself; a marker must also satisfy the expected melody-line geometry, otherwise it becomes `需复核`.
+- Added stricter issue-score projection guards: when a score contains accompaniment, stale cached `scoreLineRole=erhu` is no longer trusted by itself; unreliable markers become `需复核`.
 - Added a DTW alignment quality report with mode-level breakdown, separating new whole-piece results from old historical external/fallback analyses.
 
-Latest validation:
+Latest validation from that checkpoint:
 
 - `第四二胡狂想曲`: PDF import cache hit, `104/104` sections matched, whole-piece analysis completed, but runtime was still long at about `659s`.
 - `浮生`: PDF import cache hit, `11/11` sections matched, whole-piece analysis completed in about `3.1s`.
 - `古巷深处`: PDF import cache hit, `17/17` sections matched, whole-piece analysis completed in about `154s`.
 - `test:score-issues`: no accompaniment projection failures.
-- `test:dtw-quality`: no accompaniment projection failures; new `whole-piece` analyses have `100%` exact note/measure localization, while old historical external/fallback records remain mostly `需复核`.
+- `test:dtw-quality`: no accompaniment projection failures.
 
-Still P0:
-
-1. Reduce worst-case whole-piece analysis time, especially large OMR packs such as `第四二胡狂想曲`.
-2. Continue improving OMR section quality so more sections are safe for exact note highlighting instead of `需复核`.
-3. Keep manual MusicXML import as the fallback for PDFs whose Audiveris output is too noisy.
-
-## 2026-04-29 speed checkpoint
+## 2026-04-29 Speed Checkpoint
 
 Completed:
 
@@ -104,16 +110,30 @@ Current caveat:
 
 - This checkpoint proves repeated/manual retests are now fast. A completely first-time long score with no section cache will still take longer because the first deep pitch/rhythm pass must create the cache.
 
-## Immediate implication
+## 2026-04-30 Review And UI Checkpoint
+
+Completed:
+
+- Fixed research `summary.json` serialization so `NaN` / `Infinity` become `null`, and JSON writing uses `allow_nan=false` equivalent behavior where applicable.
+- Score issue page can play the corresponding original-audio segment for a clicked problem note or measure.
+- Real-corpus end-to-end runs automatically emit score issue review artifacts for browser visual inspection.
+- Review artifacts now expose visible pages, review pages, issue pages, section pages, risk chips, weak-evidence counts, and location-review counts.
+- `test:score-issues` and `review:score-issues` now use the same projection audit module.
+- `test:dtw-quality` now prints compact review hotspots and writes the same information into `latest-dtw-alignment-quality.md`.
+
+## Next In Order
+
+1. Run periodic real-corpus `--run` tests, not only pairing audits, and inspect the generated `score-issue-review.html` in the browser.
+2. Continue improving OMR section/voice quality so historical and unknown-PDF review items become reliable note or measure highlights.
+3. Browser-check complex scores: `浮生`, `古巷深处`, `炫动`, `第四二胡狂想曲`, and `维奥莱塔组曲07 - 二胡 中胡`.
+4. Continue student UI cleanup where technical labels remain visible outside the main upload/import path.
+5. Keep manual `MusicXML` import as the fallback for PDFs whose Audiveris output is too noisy.
+6. Treat installable shell-app packaging as lower priority until the diagnosis chain is visually reliable.
+
+## Immediate Implication
 
 When there is a tradeoff, prefer work that strengthens this path:
 
 `PDF -> score representation -> audio -> DL pitch/rhythm -> localization -> feedback UI`
 
 Do not let optional research-management features displace this mainline.
-
-## 2026-04-29 review refinement
-
-- `test:dtw-quality` now treats accompaniment projection failures as P0 failures, while `mainline` whole-piece `reviewRate` is tracked as a non-blocking warning trend.
-- Real-corpus end-to-end runs should include score-issue page visual inspection in the same pass, especially for cross-page positioning and melody-line-only highlighting.
-- Whole-piece jobs already expose section-level progress detail (`completedSections / totalSections / cacheHits`) and the student page displays it; UI polish should keep this granular state visible for long first-time analyses.
