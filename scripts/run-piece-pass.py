@@ -243,6 +243,7 @@ def analyze_window(
         "audioPath": str(audio_path),
         "windowStartSeconds": round(start_seconds, 3),
         "windowEndSeconds": round(start_seconds + duration_seconds, 3),
+        "persistAudioVariants": False,
     }
     return post_json(f"{analyzer_url}/analyze", payload, timeout_seconds=timeout_seconds).get("analysis") or {}
 

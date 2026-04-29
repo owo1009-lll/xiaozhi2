@@ -18,7 +18,7 @@ $analyzerPort = 8000
 $serverAnalyzerUrl = "http://127.0.0.1:$analyzerPort"
 $analyzerUrl = "$serverAnalyzerUrl/docs"
 $isWindowsHost = ($env:OS -eq "Windows_NT") -or ($PSVersionTable.Platform -eq "Win32NT") -or ($IsWindows -eq $true)
-$defaultAnalyzerWorkers = if ($isWindowsHost) { 2 } else { 2 }
+$defaultAnalyzerWorkers = if ($isWindowsHost) { 4 } else { 2 }
 $requestedAnalyzerWorkers = 0
 if ($env:ERHU_ANALYZER_WORKERS) {
   [int]::TryParse($env:ERHU_ANALYZER_WORKERS, [ref]$requestedAnalyzerWorkers) | Out-Null

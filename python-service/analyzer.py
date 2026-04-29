@@ -16,6 +16,7 @@ import zipfile
 import collections
 import collections.abc
 import gc
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
@@ -117,6 +118,16 @@ class AudioArtifact:
     ffmpeg_path: str | None = None
     audio_hash: str = ""
     cache_key: str | None = None
+
+
+@dataclass(slots=True)
+class DecodedAudioCacheItem:
+    cache_key: str
+    waveform: Any
+    sample_rate: int
+    duration_seconds: float
+    decode_method: str
+    last_access: float
 
 
 @dataclass(slots=True)
@@ -302,6 +313,13 @@ def normalize_part_label(value: str | None) -> str:
 class ErhuAnalyzer:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
+        self._decoded_audio_cache: dict[str, DecodedAudioCacheItem] = {}
+        self._decoded_audio_cache_lock = threading.Lock()
+        self._madmom_processor_lock = threading.Lock()
+        self._madmom_onset_processor: Any | None = None
+        self._madmom_peak_picker: Any | None = None
+        self._madmom_beat_processor: Any | None = None
+        self._madmom_beat_tracker: Any | None = None
 
     def dependency_report(self) -> dict[str, bool]:
         report = {
@@ -517,6 +535,178 @@ class ErhuAnalyzer:
         except Exception:
             return None
         return None
+
+    def _get_madmom_onset_processors(self) -> tuple[Any, Any] | None:
+        if RNNOnsetProcessor is None or OnsetPeakPickingProcessor is None:
+            return None
+        with self._madmom_processor_lock:
+            if self._madmom_onset_processor is None:
+                self._madmom_onset_processor = RNNOnsetProcessor()
+            if self._madmom_peak_picker is None:
+                self._madmom_peak_picker = OnsetPeakPickingProcessor(fps=self.settings.madmom_fps)
+            return self._madmom_onset_processor, self._madmom_peak_picker
+
+    def _get_madmom_beat_processors(self) -> tuple[Any, Any] | None:
+        if RNNBeatProcessor is None or DBNBeatTrackingProcessor is None:
+            return None
+        with self._madmom_processor_lock:
+            if self._madmom_beat_processor is None:
+                self._madmom_beat_processor = RNNBeatProcessor()
+            if self._madmom_beat_tracker is None:
+                self._madmom_beat_tracker = DBNBeatTrackingProcessor(fps=self.settings.madmom_fps)
+            return self._madmom_beat_processor, self._madmom_beat_tracker
+
+    def _audio_file_cache_identity(self, audio_path: str) -> dict[str, Any] | None:
+        try:
+            path = Path(audio_path)
+            stat = path.stat()
+            return {
+                "path": str(path.resolve()).lower(),
+                "size": int(stat.st_size),
+                "mtimeNs": int(getattr(stat, "st_mtime_ns", int(stat.st_mtime * 1_000_000_000))),
+                "sampleRate": int(self.settings.target_sample_rate),
+                "version": "decoded-audio-memory-v1",
+            }
+        except Exception:
+            return None
+
+    def _decode_full_audio_file_for_cache(
+        self,
+        audio_path: str,
+        ffmpeg_path: str | None,
+        cache_key: str,
+    ) -> DecodedAudioCacheItem | None:
+        if np is None:
+            return None
+        target_sample_rate = int(self.settings.target_sample_rate)
+        waveform = None
+        sample_rate = None
+        decode_method = ""
+
+        if sf is not None:
+            try:
+                samples, loaded_sr = sf.read(audio_path, always_2d=False)
+                loaded_waveform = np.asarray(samples, dtype=np.float32)
+                if loaded_waveform.ndim > 1:
+                    loaded_waveform = loaded_waveform.mean(axis=1)
+                sample_rate = int(loaded_sr)
+                if sample_rate != target_sample_rate and librosa is not None:
+                    loaded_waveform = librosa.resample(
+                        loaded_waveform,
+                        orig_sr=sample_rate,
+                        target_sr=target_sample_rate,
+                    ).astype(np.float32)
+                    sample_rate = target_sample_rate
+                waveform = loaded_waveform
+                decode_method = "soundfile-file-memory-cache"
+            except Exception:
+                waveform = None
+                sample_rate = None
+
+        if waveform is None and librosa is not None and ffmpeg_path:
+            try:
+                with tempfile.TemporaryDirectory(prefix="ai-erhu-audio-full-cache-") as temp_dir:
+                    output_path = os.path.join(temp_dir, "decoded.wav")
+                    subprocess.run(
+                        [
+                            ffmpeg_path,
+                            "-y",
+                            "-i",
+                            audio_path,
+                            "-ac",
+                            "1",
+                            "-ar",
+                            str(target_sample_rate),
+                            output_path,
+                        ],
+                        check=True,
+                        capture_output=True,
+                    )
+                    loaded_waveform, loaded_sr = librosa.load(output_path, sr=target_sample_rate, mono=True)
+                    waveform = np.asarray(loaded_waveform, dtype=np.float32)
+                    sample_rate = int(loaded_sr)
+                    decode_method = "ffmpeg-librosa-file-memory-cache"
+            except Exception:
+                return None
+
+        if waveform is None or not sample_rate:
+            return None
+        duration_seconds = float(len(waveform) / max(int(sample_rate), 1))
+        return DecodedAudioCacheItem(
+            cache_key=cache_key,
+            waveform=waveform,
+            sample_rate=int(sample_rate),
+            duration_seconds=duration_seconds,
+            decode_method=decode_method or "file-memory-cache",
+            last_access=time.time(),
+        )
+
+    def _load_decoded_audio_memory_cache(self, audio_path: str, ffmpeg_path: str | None) -> DecodedAudioCacheItem | None:
+        if not bool(self.settings.enable_decoded_audio_memory_cache):
+            return None
+        if np is None or not audio_path or not os.path.exists(audio_path):
+            return None
+        identity = self._audio_file_cache_identity(audio_path)
+        if not identity:
+            return None
+        cache_key = self._json_hash(identity)
+        with self._decoded_audio_cache_lock:
+            cached = self._decoded_audio_cache.get(cache_key)
+            if cached is not None:
+                cached.last_access = time.time()
+                return cached
+            decoded = self._decode_full_audio_file_for_cache(audio_path, ffmpeg_path, cache_key)
+            if decoded is None:
+                return None
+            max_seconds = float(self.settings.decoded_audio_memory_cache_max_seconds)
+            max_entries = max(0, int(self.settings.decoded_audio_memory_cache_entries))
+            if max_entries > 0 and decoded.duration_seconds <= max_seconds:
+                self._decoded_audio_cache[cache_key] = decoded
+                while len(self._decoded_audio_cache) > max_entries:
+                    oldest_key = min(
+                        self._decoded_audio_cache,
+                        key=lambda item_key: self._decoded_audio_cache[item_key].last_access,
+                    )
+                    self._decoded_audio_cache.pop(oldest_key, None)
+            return decoded
+
+    def _slice_decoded_audio_window(
+        self,
+        decoded: DecodedAudioCacheItem,
+        audio_path: str,
+        window_start: float,
+        window_end: float,
+    ) -> AudioArtifact | None:
+        if np is None or decoded.waveform is None or decoded.sample_rate <= 0:
+            return None
+        sample_rate = int(decoded.sample_rate)
+        start_sample = max(0, int(round(float(window_start) * sample_rate)))
+        end_sample = max(start_sample + 1, int(round(float(window_end) * sample_rate)))
+        end_sample = min(end_sample, len(decoded.waveform))
+        if end_sample <= start_sample:
+            return None
+        waveform = np.asarray(decoded.waveform[start_sample:end_sample], dtype=np.float32).copy()
+        window_hash = self._json_hash(
+            {
+                "source": decoded.cache_key,
+                "path": str(Path(audio_path).resolve()).lower(),
+                "windowStart": round(float(window_start), 3),
+                "windowEnd": round(float(window_end), 3),
+                "sampleRate": sample_rate,
+                "version": "decoded-audio-window-v1",
+            }
+        )
+        duration = float(len(waveform) / sample_rate)
+        return AudioArtifact(
+            raw_bytes=b"",
+            duration_seconds=duration,
+            sample_rate=sample_rate,
+            waveform=waveform,
+            decode_method=f"{decoded.decode_method}+memory-window",
+            ffmpeg_path=self._resolve_ffmpeg_path(),
+            audio_hash=window_hash,
+            cache_key=f"raw-{self.settings.clip_feature_cache_version}-{window_hash}",
+        )
 
     def _read_cached_preprocessed_audio(
         self,
@@ -2572,6 +2762,7 @@ class ErhuAnalyzer:
             pitch_track,
             preprocess_mode,
             section_calibration,
+            persist_outputs=bool(getattr(request, "persistAudioVariants", True)),
         )
         if preprocess_applied:
             pitch_track, pitch_source = self._estimate_pitch_track(request, analysis_audio, score_notes)
@@ -3568,6 +3759,19 @@ class ErhuAnalyzer:
         sample_rate = None
         decode_method = "none"
         ffmpeg_path = self._resolve_ffmpeg_path()
+
+        if requested_window is not None and audio_path and os.path.exists(audio_path):
+            window_start, window_end = requested_window
+            decoded_full_audio = self._load_decoded_audio_memory_cache(audio_path, ffmpeg_path)
+            if decoded_full_audio is not None:
+                window_audio = self._slice_decoded_audio_window(
+                    decoded_full_audio,
+                    audio_path,
+                    window_start,
+                    window_end,
+                )
+                if window_audio is not None:
+                    return window_audio
 
         if requested_window is not None and audio_path and os.path.exists(audio_path) and librosa is not None and ffmpeg_path:
             window_start, window_end = requested_window
@@ -6088,10 +6292,13 @@ class ErhuAnalyzer:
             wav_path: Path | None = None
             try:
                 wav_path = self._create_madmom_temp_wav(audio, "ai-erhu-madmom-onset-")
-                onset_processor = RNNOnsetProcessor()
-                activations = onset_processor(str(wav_path))
-                peak_picker = OnsetPeakPickingProcessor(fps=self.settings.madmom_fps)
-                onset_times = peak_picker(activations)
+                processors = self._get_madmom_onset_processors()
+                if processors is None:
+                    raise RuntimeError("madmom onset processors unavailable")
+                onset_processor, peak_picker = processors
+                with self._madmom_processor_lock:
+                    activations = onset_processor(str(wav_path))
+                    onset_times = peak_picker(activations)
                 onset_list = [{"time": float(value)} for value in onset_times]
                 if len(onset_list) >= self._minimum_reasonable_onset_count(score_notes):
                     self._write_cached_feature(audio, "onset", onset_list, "madmom-rnn-onset")
@@ -6146,10 +6353,13 @@ class ErhuAnalyzer:
             wav_path: Path | None = None
             try:
                 wav_path = self._create_madmom_temp_wav(audio, "ai-erhu-madmom-beat-")
-                beat_processor = RNNBeatProcessor()
-                activations = beat_processor(str(wav_path))
-                tracker = DBNBeatTrackingProcessor(fps=self.settings.madmom_fps)
-                beat_times = tracker(activations)
+                processors = self._get_madmom_beat_processors()
+                if processors is None:
+                    raise RuntimeError("madmom beat processors unavailable")
+                beat_processor, tracker = processors
+                with self._madmom_processor_lock:
+                    activations = beat_processor(str(wav_path))
+                    beat_times = tracker(activations)
                 beat_list = [{"time": float(value)} for value in beat_times]
                 if len(beat_list) >= max(2, self._minimum_reasonable_onset_count(score_notes) - 1):
                     self._write_cached_feature(audio, "beat", beat_list, "madmom-rnn-beat")

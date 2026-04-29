@@ -69,6 +69,7 @@ class AnalyzeRequest(BaseModel):
     audioDataUrl: str | None = None
     windowStartSeconds: float | None = None
     windowEndSeconds: float | None = None
+    persistAudioVariants: bool = True
 
 
 class MeasureFinding(BaseModel):
