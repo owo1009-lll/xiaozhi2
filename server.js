@@ -361,6 +361,14 @@ function buildJobTiming(job = {}) {
   return { elapsedMs, stalledMs };
 }
 
+function firstPositiveNumber(...values) {
+  for (const value of values) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  }
+  return 0;
+}
+
 function createId(prefix) {
   const randomPart = Math.random().toString(36).slice(2, 8);
   return `${prefix}-${Date.now().toString(36)}-${randomPart}`;
@@ -1405,7 +1413,11 @@ function buildPiecePassPrimaryAnalysis({ task = {}, passPayload = {}, summary = 
 
   const analysisId = `${safeString(task.jobId, "piecepass")}-${safeString(sourceRow.sectionId, "section")}`;
   const originalAudioUrl = toWebPathFromAbsolute(task.payload?.audioPath);
-  const originalAudioDuration = Number(task.payload?.audioSubmission?.duration);
+  const originalAudioDuration = firstPositiveNumber(
+    task.payload?.audioSubmission?.duration,
+    summary?.audioCoverage?.audioDurationSeconds,
+    passPayload?.audioCoverage?.audioDurationSeconds,
+  );
   const originalAudio = originalAudioUrl ? {
     url: originalAudioUrl,
     durationSeconds: Number.isFinite(originalAudioDuration) && originalAudioDuration > 0 ? originalAudioDuration : null,
@@ -1571,7 +1583,11 @@ function buildWholePieceAnalysis({ task = {}, passPayload = {}, summary = null }
     100,
   );
   const originalAudioUrl = toWebPathFromAbsolute(task.payload?.audioPath);
-  const originalAudioDuration = Number(task.payload?.audioSubmission?.duration);
+  const originalAudioDuration = firstPositiveNumber(
+    task.payload?.audioSubmission?.duration,
+    summary?.audioCoverage?.audioDurationSeconds,
+    passPayload?.audioCoverage?.audioDurationSeconds,
+  );
   const originalAudio = originalAudioUrl ? {
     url: originalAudioUrl,
     durationSeconds: Number.isFinite(originalAudioDuration) && originalAudioDuration > 0 ? originalAudioDuration : null,
