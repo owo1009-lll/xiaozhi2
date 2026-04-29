@@ -1126,6 +1126,7 @@ def main() -> int:
             section_rows.append(row)
             cache_hits += hit
             completed_count += 1
+            section_title = row.get("sectionTitle") or sec.get("title") or sec.get("sectionId") or ""
             label = "复用并汇总" if hit else "分析"
             emit_progress(
                 0.35 + (completed_count / total_sections) * 0.5,
@@ -1137,6 +1138,7 @@ def main() -> int:
                     "totalSections": total_sections,
                     "failedSections": failed_count,
                     "cacheHits": cache_hits,
+                    "currentSectionTitle": section_title,
                 },
             )
     else:
@@ -1161,6 +1163,7 @@ def main() -> int:
                     n = completed_count
                     current_failed = failed_count
                     current_cache_hits = cache_hits
+                    section_title = row.get("sectionTitle") or pair[1].get("title") or pair[1].get("sectionId") or ""
                 emit_progress(
                     0.35 + (n / total_sections) * 0.5,
                     "analyzing-sections",
@@ -1171,6 +1174,7 @@ def main() -> int:
                         "totalSections": total_sections,
                         "failedSections": current_failed,
                         "cacheHits": current_cache_hits,
+                        "currentSectionTitle": section_title,
                     },
                 )
 

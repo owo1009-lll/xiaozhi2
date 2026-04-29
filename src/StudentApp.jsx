@@ -215,9 +215,31 @@ function buildPiecePassProgressDetailText(job) {
   const cacheHits = Math.max(0, Math.round(Number(detail?.cacheHits) || 0));
   const remaining = Math.max(0, total - completed);
   const parts = [`已完成 ${Math.min(completed, total)} / ${total} 个段落`];
+  if (detail?.currentSectionTitle) parts.push(`当前段落：${detail.currentSectionTitle}`);
   if (job?.status === "processing" && remaining > 0) parts.push(`剩余 ${remaining} 段`);
   if (cacheHits > 0) parts.push(`缓存复用 ${cacheHits} 段`);
   if (failed > 0) parts.push(`失败 ${failed} 段`);
+  return parts.join("，");
+}
+
+function formatDurationMs(value) {
+  const ms = Math.max(0, Math.round(Number(value) || 0));
+  if (!ms) return "";
+  const totalSeconds = Math.round(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes <= 0) return `${seconds} 秒`;
+  return `${minutes} 分 ${String(seconds).padStart(2, "0")} 秒`;
+}
+
+function buildPiecePassTimingText(job) {
+  const timing = job?.timing || {};
+  const parts = [];
+  const elapsed = formatDurationMs(timing.elapsedMs);
+  const remaining = formatDurationMs(timing.estimatedRemainingMs);
+  if (elapsed) parts.push(`已用时：${elapsed}`);
+  if (job?.status === "processing" && remaining) parts.push(`预计剩余：${remaining}`);
+  if (timing.slowNoProgress) parts.push("当前阶段超过 2 分钟没有新进度，系统仍在等待模型返回。");
   return parts.join("，");
 }
 
@@ -1662,6 +1684,11 @@ export default function StudentApp({ onOpenResearch }) {
               {visiblePiecePassJob.progressDetail?.totalSections ? (
                 <p className="sidebar-meta">
                   {buildPiecePassProgressDetailText(visiblePiecePassJob)}
+                </p>
+              ) : null}
+              {buildPiecePassTimingText(visiblePiecePassJob) ? (
+                <p className="sidebar-meta">
+                  {buildPiecePassTimingText(visiblePiecePassJob)}
                 </p>
               ) : null}
               <p>{buildPiecePassStatusMessage(visiblePiecePassJob)}</p>

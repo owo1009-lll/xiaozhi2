@@ -346,6 +346,21 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function parseTimestampMs(value) {
+  const parsed = Date.parse(safeString(value));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function buildJobTiming(job = {}) {
+  const startedMs = parseTimestampMs(job.createdAt);
+  const updatedMs = parseTimestampMs(job.updatedAt) || startedMs;
+  const completedMs = parseTimestampMs(job.completedAt);
+  const referenceMs = completedMs || Date.now();
+  const elapsedMs = startedMs ? Math.max(0, referenceMs - startedMs) : 0;
+  const stalledMs = job.status === "processing" && updatedMs ? Math.max(0, Date.now() - updatedMs) : 0;
+  return { elapsedMs, stalledMs };
+}
+
 function createId(prefix) {
   const randomPart = Math.random().toString(36).slice(2, 8);
   return `${prefix}-${Date.now().toString(36)}-${randomPart}`;
@@ -1166,6 +1181,21 @@ function normalizeAnalysisJob(job = {}) {
 }
 
 function normalizePiecePassJob(job = {}) {
+  const detail = job.progressDetail && typeof job.progressDetail === "object" ? {
+    currentSection: Math.max(0, Math.round(safeNumber(job.progressDetail.currentSection, 0))),
+    totalSections: Math.max(0, Math.round(safeNumber(job.progressDetail.totalSections, 0))),
+    completedSections: Math.max(0, Math.round(safeNumber(job.progressDetail.completedSections, job.progressDetail.currentSection || 0))),
+    failedSections: Math.max(0, Math.round(safeNumber(job.progressDetail.failedSections, 0))),
+    cacheHits: Math.max(0, Math.round(safeNumber(job.progressDetail.cacheHits, 0))),
+    currentSectionTitle: safeString(job.progressDetail.currentSectionTitle),
+  } : null;
+  const timing = buildJobTiming(job);
+  const totalSections = Math.max(0, Math.round(safeNumber(detail?.totalSections, 0)));
+  const completedSections = Math.max(0, Math.round(safeNumber(detail?.completedSections || detail?.currentSection, 0)));
+  const estimatedRemainingMs =
+    job.status === "processing" && totalSections > 0 && completedSections > 0 && timing.elapsedMs > 0
+      ? Math.max(0, Math.round((timing.elapsedMs / completedSections) * Math.max(0, totalSections - completedSections)))
+      : 0;
   return {
     jobId: safeString(job.jobId),
     participantId: safeString(job.participantId),
@@ -1176,13 +1206,12 @@ function normalizePiecePassJob(job = {}) {
     progress: clamp(safeNumber(job.progress, 0), 0, 1),
     stage: safeString(job.stage, "queued"),
     message: safeString(job.message),
-    progressDetail: job.progressDetail && typeof job.progressDetail === "object" ? {
-      currentSection: Math.max(0, Math.round(safeNumber(job.progressDetail.currentSection, 0))),
-      totalSections: Math.max(0, Math.round(safeNumber(job.progressDetail.totalSections, 0))),
-      completedSections: Math.max(0, Math.round(safeNumber(job.progressDetail.completedSections, job.progressDetail.currentSection || 0))),
-      failedSections: Math.max(0, Math.round(safeNumber(job.progressDetail.failedSections, 0))),
-      cacheHits: Math.max(0, Math.round(safeNumber(job.progressDetail.cacheHits, 0))),
-    } : null,
+    progressDetail: detail,
+    timing: {
+      ...timing,
+      estimatedRemainingMs,
+      slowNoProgress: job.status === "processing" && timing.stalledMs > 120000,
+    },
     warnings: normalizeWarningList(job.warnings),
     error: safeString(job.error),
     audioHash: safeString(job.audioHash),
@@ -1218,13 +1247,15 @@ function buildPiecePassProgressDetail(payload = {}) {
   const completedSections = Math.max(0, Math.round(safeNumber(payload.completedSections, currentSection)));
   const failedSections = Math.max(0, Math.round(safeNumber(payload.failedSections, 0)));
   const cacheHits = Math.max(0, Math.round(safeNumber(payload.cacheHits, 0)));
-  if (!currentSection && !totalSections && !completedSections && !failedSections && !cacheHits) return null;
+  const currentSectionTitle = safeString(payload.currentSectionTitle || payload.sectionTitle);
+  if (!currentSection && !totalSections && !completedSections && !failedSections && !cacheHits && !currentSectionTitle) return null;
   return {
     currentSection,
     totalSections,
     completedSections,
     failedSections,
     cacheHits,
+    currentSectionTitle,
   };
 }
 
