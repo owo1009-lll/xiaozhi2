@@ -3,24 +3,31 @@ import { createRoot } from "react-dom/client";
 import App from "./MainApp.jsx";
 import "./styles.css";
 
+const clearServiceWorkerState = () => {
+  navigator.serviceWorker
+    .getRegistrations()
+    .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+    .catch(() => {});
+  if ("caches" in window) {
+    window.caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys.filter((key) => key.startsWith("ai-erhu") || key.includes("vite")).map((key) => window.caches.delete(key)),
+        ),
+      )
+      .catch(() => {});
+  }
+};
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    // During local prototyping, stale service-worker caches can keep old labels,
-    // old score pages, and old issue sessions alive after a rebuild.
-    navigator.serviceWorker
-      .getRegistrations()
-      .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
-      .catch(() => {});
-    if ("caches" in window) {
-      window.caches
-        .keys()
-        .then((keys) =>
-          Promise.all(
-            keys.filter((key) => key.startsWith("ai-erhu") || key.includes("vite")).map((key) => window.caches.delete(key)),
-          ),
-        )
-        .catch(() => {});
+    const shouldClear = import.meta.env.DEV || new URLSearchParams(window.location.search).has("clear-sw");
+    if (shouldClear) {
+      clearServiceWorkerState();
+      return;
     }
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
   });
 }
 
