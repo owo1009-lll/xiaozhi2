@@ -5122,6 +5122,9 @@ class ErhuAnalyzer:
         if preprocess_mode == "auto" and separation_confidence < float(self.settings.separation_auto_confidence_threshold):
             separation_meta["warnings"].append("自动判断分离置信度偏低，已回退到原音频分析。")
             return audio, False, "off", separation_meta
+        if preprocess_mode == "auto" and self._should_reject_auto_separation_for_score_band(separation_quality):
+            separation_meta["warnings"].append("自动判断分离音高与谱面音域匹配度偏低，已回退到原音频分析。")
+            return audio, False, "off", separation_meta
 
         processed_audio = AudioArtifact(
             raw_bytes=audio.raw_bytes,
@@ -5140,6 +5143,17 @@ class ErhuAnalyzer:
         )
         separation_meta["separationApplied"] = True
         return processed_audio, True, "erhu-focus", separation_meta
+
+    def _should_reject_auto_separation_for_score_band(self, separation_quality: dict[str, Any]) -> bool:
+        min_score_band_ratio = max(0.0, min(1.0, float(self.settings.separation_auto_min_score_band_ratio)))
+        if min_score_band_ratio <= 0.0:
+            return False
+        min_points = max(0, int(self.settings.separation_auto_min_score_band_points))
+        confident_points = int(safe_float(separation_quality.get("separationConfidentPitchCount"), 0))
+        if confident_points < min_points:
+            return False
+        score_band_ratio = max(0.0, min(1.0, safe_float(separation_quality.get("separationScoreBandRatio"), 0.0)))
+        return score_band_ratio < min_score_band_ratio
 
     def _apply_melody_focus_mask(
         self,

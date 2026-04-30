@@ -66,6 +66,33 @@ def main() -> int:
     )
     require(int(quality["separationConfidentPitchCount"]) == 3, f"bad confident count: {quality}")
     require(int(quality["separationScoreBandHitCount"]) == 2, f"bad hit count: {quality}")
+    require(
+        analyzer._should_reject_auto_separation_for_score_band(
+            {
+                "separationScoreBandRatio": 0.02,
+                "separationConfidentPitchCount": 64,
+            }
+        ),
+        "auto separation should reject low score-band matches when enough pitch evidence exists",
+    )
+    require(
+        not analyzer._should_reject_auto_separation_for_score_band(
+            {
+                "separationScoreBandRatio": 0.02,
+                "separationConfidentPitchCount": 4,
+            }
+        ),
+        "auto separation should not reject sparse pitch evidence by score-band ratio alone",
+    )
+    require(
+        not analyzer._should_reject_auto_separation_for_score_band(
+            {
+                "separationScoreBandRatio": 0.5,
+                "separationConfidentPitchCount": 64,
+            }
+        ),
+        "auto separation should keep usable score-band matches",
+    )
     wrapped_confidence = analyzer._estimate_separation_confidence(
         score_notes,
         pitch_track,

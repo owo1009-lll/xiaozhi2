@@ -22,8 +22,8 @@ import soundfile as sf
 SCRIPT_ROOT = Path(__file__).resolve().parents[1]
 CWD_ROOT = Path.cwd().resolve()
 REPO_ROOT = CWD_ROOT if (CWD_ROOT / "package.json").exists() and (CWD_ROOT / "scripts").exists() else SCRIPT_ROOT
-SECTION_CACHE_KEY_VERSION = "piece-pass-section-v5-separation-quality"
-SECTION_CACHE_PAYLOAD_VERSION = "piece-pass-section-v9-separation-quality"
+SECTION_CACHE_KEY_VERSION = "piece-pass-section-v6-separation-score-band-gate"
+SECTION_CACHE_PAYLOAD_VERSION = "piece-pass-section-v10-separation-score-band-gate"
 
 
 def parse_args() -> argparse.Namespace:

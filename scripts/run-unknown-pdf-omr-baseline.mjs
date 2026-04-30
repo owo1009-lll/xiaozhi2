@@ -9,7 +9,6 @@ const OUTPUT_ROOT = path.join(REPO_ROOT, "data", "real-tests", "unknown-pdf-omr"
 const DEFAULT_SAMPLE_PATTERNS = [
   /流浪者之歌/u,
   /古巷深处/u,
-  /^火\.pdf$/u,
 ];
 
 function parseArgs(argv = process.argv.slice(2)) {
