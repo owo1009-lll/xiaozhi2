@@ -149,6 +149,7 @@ Completed:
 - Added PNG maskable PWA icons and strengthened `test:pwa` so install compatibility is checked beyond SVG icon presence.
 - Extended the MusicXML fallback test to cover compressed `.mxl` uploads, matching the student backup-score file picker.
 - Re-verified the full real-corpus strict routine after the cleanup with run batch `2026-04-30T02-49-24-929Z`; `8/8` completed, score issue smoke checked `8` cards, latest DTW quality is `latestMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`, and historical `reviewRate = 0.0669`.
+- Re-ran the full real-corpus strict routine with run batch `2026-04-30T05-47-54-108Z`; `8/8` completed with `0` P0 failures, desktop smoke checked all `8` review cards, mobile smoke passed at `390x844`, and refreshed DTW quality is `latestMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`, historical `reviewRate = 0.0616`.
 
 ## Next In Order
 
