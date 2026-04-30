@@ -215,6 +215,21 @@ def safe_float(value: Any, default: float = 0.0) -> float:
         return default
 
 
+def parse_musicxml_measure_index(value: Any, fallback: int) -> int:
+    text = str(value or "").strip()
+    fallback_index = int(safe_float(fallback, 1))
+    if not text:
+        return fallback_index
+    try:
+        return int(text)
+    except Exception:
+        pass
+    match = re.search(r"-?\d+", text)
+    if match:
+        return int(match.group(0))
+    return fallback_index
+
+
 def trimmed_median(values: list[float], trim_ratio: float = 0.15) -> float:
     cleaned = sorted(float(value) for value in values if math.isfinite(float(value)))
     if not cleaned:
@@ -1978,7 +1993,7 @@ class ErhuAnalyzer:
             divisions_node = self._xml_child(attributes, "divisions")
             if divisions_node is not None and divisions_node.text:
                 divisions = max(1.0, safe_float(divisions_node.text, divisions))
-            measure_index = int(measure.attrib.get("number", measure_position) or measure_position)
+            measure_index = parse_musicxml_measure_index(measure.attrib.get("number"), measure_position)
             for direction in self._xml_children(measure, "direction"):
                 offset_node = self._xml_child(direction, "offset")
                 beat_start = max(0.0, safe_float(offset_node.text if offset_node is not None else 0.0, 0.0) / divisions)
@@ -5608,7 +5623,7 @@ class ErhuAnalyzer:
                     current_clef_octave_change = int(safe_float(octave_change_node.text if octave_change_node is not None else 0, 0))
 
             current_beat = 0.0
-            measure_index = int(measure.attrib.get("number", measure_position) or measure_position)
+            measure_index = parse_musicxml_measure_index(measure.attrib.get("number"), measure_position)
             clef_reference_diatonic, clef_reference_line = musicxml_clef_reference(
                 current_clef_sign,
                 current_clef_line,

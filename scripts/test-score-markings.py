@@ -340,6 +340,30 @@ WHOLE_PDF_NEW_PAGE_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
 </score-partwise>
 """
 
+NON_NUMERIC_MEASURE_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Erhu</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1A" width="420">
+      <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+      <note default-x="60"><pitch><step>D</step><octave>5</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="X2" width="420">
+      <direction placement="above">
+        <direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>88</per-minute></metronome></direction-type>
+        <sound tempo="88"/>
+      </direction>
+      <note default-x="60"><pitch><step>E</step><octave>5</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="coda" width="420">
+      <note default-x="60"><pitch><step>F</step><octave>5</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 CHINESE_PIANO_THEN_VOICE_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
   <part-list>
@@ -494,6 +518,23 @@ def main() -> int:
             "Whole PDF New Page",
             1,
         )
+        non_numeric_source = Path(tmp) / "non-numeric-measures.musicxml"
+        non_numeric_source.write_text(NON_NUMERIC_MEASURE_MUSICXML, encoding="utf-8")
+        non_numeric_request = ScoreImportRequest(
+            jobId="non-numeric-measures-test",
+            pdfPath=str(non_numeric_source),
+            originalFilename="non-numeric-measures.musicxml",
+            titleHint="Non Numeric Measures Test",
+            selectedPartHint="Erhu",
+        )
+        non_numeric_section, _, _, _, non_numeric_marking_stats = analyzer._parse_musicxml_source_to_section(
+            non_numeric_source,
+            non_numeric_request,
+            "Erhu",
+            "section-a",
+            "Non Numeric Measures",
+            1,
+        )
 
     chinese_piano_candidates = analyzer._extract_musicxml_part_candidates(
         CHINESE_PIANO_THEN_VOICE_MUSICXML,
@@ -508,6 +549,7 @@ def main() -> int:
     require(sparse_section is not None, "Sparse false lead MusicXML did not produce a section.")
     require(system_sparse_section is not None, "System sparse lead MusicXML did not produce a section.")
     require(whole_pdf_section is not None, "Whole-PDF new-page MusicXML did not produce a section.")
+    require(non_numeric_section is not None, "Non-numeric measure MusicXML did not produce a section.")
     require(chinese_voice is not None, "Chinese piano fixture should include the trailing Voice candidate.")
     require(
         chinese_voice.get("isAfterExplicitPiano") is True,
@@ -557,6 +599,12 @@ def main() -> int:
     whole_pdf_systems = [int(note["notePosition"]["systemIndex"]) for note in whole_pdf_notes if note.get("notePosition")]
     require(whole_pdf_pages == [1, 1, 2, 2], f"Whole-PDF MusicXML should honor print new-page markers, got pages {whole_pdf_pages}.")
     require(whole_pdf_systems == [1, 1, 1, 1], f"Whole-PDF MusicXML should reset system index on a new page, got systems {whole_pdf_systems}.")
+    non_numeric_notes = non_numeric_section["notes"]
+    require(
+        [note["measureIndex"] for note in non_numeric_notes] == [1, 2, 3],
+        f"Non-numeric measure labels should parse numeric parts or fall back to sequence order, got {[note['measureIndex'] for note in non_numeric_notes]}.",
+    )
+    require(non_numeric_marking_stats.get("tempoChangeCount", 0) >= 1, "Non-numeric measure labels should not drop tempo markings.")
     notes = section["notes"]
     first_note = notes[0]
     require(selected_part == "Erhu", f"Expected Erhu selected part, got {selected_part!r}.")
