@@ -364,6 +364,33 @@ NON_NUMERIC_MEASURE_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
 </score-partwise>
 """
 
+BACKUP_FORWARD_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Erhu</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1" width="420">
+      <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+      <note default-x="60">
+        <pitch><step>D</step><octave>5</octave></pitch>
+        <duration>8</duration>
+      </note>
+      <backup><duration>8</duration></backup>
+      <note default-x="60">
+        <pitch><step>A</step><octave>4</octave></pitch>
+        <duration>4</duration>
+      </note>
+      <forward><duration>4</duration></forward>
+      <note default-x="220">
+        <pitch><step>E</step><octave>5</octave></pitch>
+        <duration>4</duration>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 CHINESE_PIANO_THEN_VOICE_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
   <part-list>
@@ -535,12 +562,34 @@ def main() -> int:
             "Non Numeric Measures",
             1,
         )
+        backup_forward_source = Path(tmp) / "backup-forward.musicxml"
+        backup_forward_source.write_text(BACKUP_FORWARD_MUSICXML, encoding="utf-8")
+        backup_forward_request = ScoreImportRequest(
+            jobId="backup-forward-test",
+            pdfPath=str(backup_forward_source),
+            originalFilename="backup-forward.musicxml",
+            titleHint="Backup Forward Test",
+            selectedPartHint="Erhu",
+        )
+        backup_forward_section, *_ = analyzer._parse_musicxml_source_to_section(
+            backup_forward_source,
+            backup_forward_request,
+            "Erhu",
+            "section-a",
+            "Backup Forward",
+            1,
+        )
 
     chinese_piano_candidates = analyzer._extract_musicxml_part_candidates(
         CHINESE_PIANO_THEN_VOICE_MUSICXML,
         "Voice",
     )
     chinese_voice = next((candidate for candidate in chinese_piano_candidates if candidate.get("id") == "P2"), None)
+    backup_forward_candidates = analyzer._extract_musicxml_part_candidates(
+        BACKUP_FORWARD_MUSICXML,
+        "Erhu",
+    )
+    backup_forward_erhu = next((candidate for candidate in backup_forward_candidates if candidate.get("id") == "P1"), None)
 
     require(section is not None, "MusicXML did not produce a section.")
     require(merged_section is not None, "Merged voice MusicXML did not produce a section.")
@@ -550,7 +599,9 @@ def main() -> int:
     require(system_sparse_section is not None, "System sparse lead MusicXML did not produce a section.")
     require(whole_pdf_section is not None, "Whole-PDF new-page MusicXML did not produce a section.")
     require(non_numeric_section is not None, "Non-numeric measure MusicXML did not produce a section.")
+    require(backup_forward_section is not None, "Backup/forward MusicXML did not produce a section.")
     require(chinese_voice is not None, "Chinese piano fixture should include the trailing Voice candidate.")
+    require(backup_forward_erhu is not None, "Backup/forward fixture should expose the Erhu part candidate.")
     require(
         chinese_voice.get("isAfterExplicitPiano") is True,
         "Voice after a Chinese-named piano part should be flagged as after explicit piano.",
@@ -605,6 +656,19 @@ def main() -> int:
         f"Non-numeric measure labels should parse numeric parts or fall back to sequence order, got {[note['measureIndex'] for note in non_numeric_notes]}.",
     )
     require(non_numeric_marking_stats.get("tempoChangeCount", 0) >= 1, "Non-numeric measure labels should not drop tempo markings.")
+    backup_forward_notes = backup_forward_section["notes"]
+    require(
+        [note["midiPitch"] for note in backup_forward_notes] == [74, 76],
+        f"Backup/forward MusicXML should collapse same-beat secondary voices and keep the melody, got {[note['midiPitch'] for note in backup_forward_notes]}.",
+    )
+    require(
+        [round(float(note["beatStart"]), 3) for note in backup_forward_notes] == [0.0, 2.0],
+        f"Backup/forward MusicXML should honor timeline rewinds and forwards, got {[note['beatStart'] for note in backup_forward_notes]}.",
+    )
+    require(
+        backup_forward_erhu.get("chordRatio", 0) > 0,
+        "Backup/forward MusicXML part scoring should count overlapping voices as chord evidence.",
+    )
     notes = section["notes"]
     first_note = notes[0]
     require(selected_part == "Erhu", f"Expected Erhu selected part, got {selected_part!r}.")

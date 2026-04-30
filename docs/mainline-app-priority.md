@@ -137,6 +137,7 @@ Completed:
 - Improved ambiguous OMR line splitting when a sparse pseudo-line appears above the real melody within the same system: dense monophonic lower melody lines can now be promoted while the one-note artifact is suppressed, with a regression case in `test:score-markings`.
 - Improved whole-PDF MusicXML page localization: `<print new-page="yes">` now advances the score page and resets system numbering, so smaller whole-file OMR outputs do not project later-page issues onto page 1.
 - Improved unknown-MusicXML measure parsing so non-numeric printed measure labels such as `1A`, `X2`, or coda labels no longer abort score import; numeric parts are preserved and fully non-numeric labels fall back to sequence order.
+- Improved MusicXML multi-voice timing support: `<backup>` and `<forward>` now adjust the per-measure beat cursor, so OMR exports that encode overlapping voices do not push secondary or resumed melody notes onto the wrong beat.
 - Tightened MusicXML part-candidate scoring for Chinese-named piano parts (`钢琴` / `鋼琴`), so a following generic `Voice` part is treated as accompaniment-split risk instead of being auto-trusted as erhu projection.
 - Cleaned student-facing status wording so import states and whole-piece speed notes no longer expose raw internal status or cache wording.
 - Cleaned remaining student whole-piece progress wording so long waits and repeated runs no longer mention model internals, backend services, or cache mechanics.

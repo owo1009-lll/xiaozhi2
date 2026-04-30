@@ -1644,7 +1644,20 @@ class ErhuAnalyzer:
                 divisions = max(1.0, safe_float(divisions_node.text if divisions_node is not None else 1.0, 1.0))
                 current_beat = 0.0
                 last_note_start = 0.0
-                for note in self._xml_children(measure, "note"):
+                for element in list(measure):
+                    local_tag = self._xml_local_tag(element)
+                    if local_tag in {"backup", "forward"}:
+                        duration_node = self._xml_child(element, "duration")
+                        duration_beats = safe_float(duration_node.text if duration_node is not None else 0.0) / divisions
+                        if local_tag == "backup":
+                            current_beat = max(0.0, current_beat - max(0.0, duration_beats))
+                        else:
+                            current_beat += max(0.0, duration_beats)
+                        last_note_start = current_beat
+                        continue
+                    if local_tag != "note":
+                        continue
+                    note = element
                     is_rest = self._xml_child(note, "rest") is not None
                     is_chord = self._xml_child(note, "chord") is not None
                     duration_node = self._xml_child(note, "duration")
@@ -5654,7 +5667,22 @@ class ErhuAnalyzer:
                     if dynamic_label:
                         current_dynamic = dynamic_label
                         current_dynamic_value = dynamic_value
-            for note_index, note in enumerate(children(measure, "note"), start=1):
+            note_index = 0
+            for element in list(measure):
+                local_tag = element.tag.rsplit("}", 1)[-1]
+                if local_tag in {"backup", "forward"}:
+                    duration_node = child(element, "duration")
+                    duration_beats = safe_float(duration_node.text if duration_node is not None else 0.0) / divisions
+                    if local_tag == "backup":
+                        current_beat = max(0.0, current_beat - max(0.0, duration_beats))
+                    else:
+                        current_beat += max(0.0, duration_beats)
+                    last_note_start = current_beat
+                    continue
+                if local_tag != "note":
+                    continue
+                note = element
+                note_index += 1
                 is_rest = child(note, "rest") is not None
                 is_chord = child(note, "chord") is not None
                 duration_node = child(note, "duration")
