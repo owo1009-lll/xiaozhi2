@@ -53,10 +53,12 @@ Latest validated state:
 
 - `npm run test:mainline-p0` passes.
 - Analyzer runtime reports CUDA PyTorch on `NVIDIA GeForce RTX 5060`.
+- Historical `reviewRate` values that still appear in DTW quality reports are archived/stale trend data from older runs. They are not evidence of a regression in the current mainline.
 - Latest real-corpus mainline sample: `8` whole-piece analyses, `latestMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`.
 - Actual real-corpus `--run` coverage now includes all 8 matched corpus pairs: `20190306桃花坞`, `第二二胡狂想曲`, `第四二胡狂想曲`, `浮生`, `古巷深处`, `维奥莱塔组曲07 - 二胡 中胡`, `雪山魂塑`, and `炫动`.
 - The 8-song cached end-to-end pass completed with `0` P0 failures, all sections matched, and score issue review artifacts generated for each run batch.
 - The all-in-one routine `npm run test:real-corpus:strict` has been verified across all 8 pairs: `8/8` completed, score issue review item count `8`, browser smoke `ok`.
+- `npm run review:p0-score-issues -- --run-summary <run-summary.json>` remains the manual P0 review helper for the score-issue page. It clicks every issue in `炫动` and `古巷深处` and verifies that original-audio playback seeks to a nonzero timestamp instead of replaying from `0:00`.
 - Browser smoke checks for generated review artifacts are now reusable both as `npm run smoke:score-issues` and as the real-corpus `--smoke-review` option; strict corpus runs now check every generated review card, write only one issue session at a time to avoid browser storage quota collisions, and verify that each issue score page loads with original-audio panel, issue list, rendered score, melody-line view, and problem-item audio seek feedback.
 - Historical review hotspots remain in older cached runs, mainly old `20190306桃花坞`, `炫动`, and `雪山魂塑` analyses. They are tracked as review-risk trend, not as current P0 failures.
 - Current DTW mainline does not count hidden accompaniment notes as successful visible highlights; uncertain projection is kept as `需复核`.
