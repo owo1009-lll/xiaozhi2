@@ -161,17 +161,17 @@ function formatPartCandidateLabel(candidate, index = 0) {
 }
 
 function importProgressHeadline(job) {
-  if (job?.cacheHit) return "已沿用上次识谱结果";
+  if (job?.cacheHit) return "曲谱已准备好";
   if (job?.omrStatus === "failed") return "识谱失败";
   if (job?.omrStatus === "completed") return "识谱完成";
   if (job?.stage === "omr-running") return "正在识谱";
   if (job?.stage === "building-piecepack") return "正在整理段落";
-  return "识谱排队中";
+  return "正在等待识谱";
 }
 
 function buildImportStatusMessage(job) {
   if (!job) return "先导入 PDF 曲谱，再选择段落并上传音频。";
-  if (job.cacheHit) return "同一份 PDF 已完成过识谱，可以直接选择段落。";
+  if (job.cacheHit) return "这份 PDF 的曲谱已准备好，可以直接选择段落。";
   if (job.omrStatus === "completed") return "识谱完成，可以开始选择段落。";
   if (job.omrStatus === "failed") return friendlyErrorMessage(job.error, "自动识谱失败，请更换 PDF 或稍后重试。");
   return friendlyStatusMessage(job.message, `识谱进行中：${percentText(job.progress)}`);
@@ -184,7 +184,7 @@ function analysisProgressHeadline(job) {
   if (job?.stage === "detecting-section") return "正在定位段落";
   if (job?.stage === "analyzing") return "正在分析音频";
   if (job?.stage === "saving") return "正在保存结果";
-  return "分析排队中";
+  return "正在等待诊断";
 }
 
 function buildAnalysisStatusMessage(job) {
@@ -199,9 +199,9 @@ function piecePassProgressHeadline(job) {
   if (job?.status === "completed") return "整曲分析完成";
   if (job?.stage === "scanning-sections") return "正在扫描整曲段落";
   if (job?.stage === "analyzing-sections") return "正在分析整曲段落";
-  if (job?.stage === "writing-results") return "正在写入整曲结果";
+  if (job?.stage === "writing-results") return "正在整理整曲结果";
   if (job?.stage === "checking-services") return "正在准备整曲分析";
-  return "整曲分析排队中";
+  return "正在等待整曲分析";
 }
 
 function getPiecePassCompletionState(summary = {}) {
@@ -233,7 +233,7 @@ function buildPiecePassStatusMessage(job) {
   if (job?.stage === "checking-services") return "正在准备整曲分析。";
   if (job?.stage === "scanning-sections") return "正在扫描整曲段落。";
   if (job?.stage === "analyzing-sections") return "正在分析整曲段落。";
-  if (job?.stage === "writing-results") return "正在写入整曲分析结果。";
+  if (job?.stage === "writing-results") return "正在整理整曲分析结果。";
   return "整曲分析进行中。";
 }
 

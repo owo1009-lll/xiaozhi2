@@ -46,6 +46,13 @@ const rawStudentErrorPatterns = [
   },
 ];
 
+const staleStudentCopyPatterns = [
+  {
+    pattern: /已沿用上次识谱结果|同一份 PDF 已完成过识谱|识谱排队中|分析排队中|整曲分析排队中|正在写入整曲/g,
+    reason: "Student status copy should describe learner-visible progress instead of queue/cache/write mechanics.",
+  },
+];
+
 function lineNumberForOffset(text, offset) {
   return text.slice(0, offset).split(/\r?\n/).length;
 }
@@ -81,6 +88,15 @@ for (const relativePath of ["src/StudentApp.jsx", "src/ScoreIssuePage.jsx"]) {
   const absolutePath = path.join(repoRoot, relativePath);
   const text = fs.readFileSync(absolutePath, "utf8");
   for (const { pattern, reason } of rawStudentErrorPatterns) {
+    for (const match of text.matchAll(pattern)) {
+      failures.push({
+        path: relativePath,
+        line: lineNumberForOffset(text, match.index || 0),
+        reason,
+      });
+    }
+  }
+  for (const { pattern, reason } of staleStudentCopyPatterns) {
     for (const match of text.matchAll(pattern)) {
       failures.push({
         path: relativePath,

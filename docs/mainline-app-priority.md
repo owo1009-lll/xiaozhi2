@@ -138,6 +138,7 @@ Completed:
 - Tightened MusicXML part-candidate scoring for Chinese-named piano parts (`钢琴` / `鋼琴`), so a following generic `Voice` part is treated as accompaniment-split risk instead of being auto-trusted as erhu projection.
 - Cleaned student-facing status wording so import states and whole-piece speed notes no longer expose raw internal status or cache wording.
 - Cleaned remaining student whole-piece progress wording so long waits and repeated runs no longer mention model internals, backend services, or cache mechanics.
+- Cleaned remaining queue/cache/write-style student status wording in the import and whole-piece progress panels, and added a copy guard so those phrases do not return.
 - Cleaned student-facing failure banners so analyzer/job/API/path details are replaced with learner-readable retry guidance.
 - Added `test:student-ui-copy` to the P0 routine so student-facing mojibake and raw backend error leaks are caught before release.
 - Extended the student UI copy guard to the problem-score page and to display source labels, preventing raw model/library/fallback labels from reappearing in learner-facing text.
