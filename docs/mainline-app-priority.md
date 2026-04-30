@@ -134,6 +134,7 @@ Completed:
 - Improved ambiguous OMR line splitting when a sparse pseudo-line appears above the real melody within the same system: dense monophonic lower melody lines can now be promoted while the one-note artifact is suppressed, with a regression case in `test:score-markings`.
 - Cleaned student-facing status wording so import states and whole-piece speed notes no longer expose raw internal status or cache wording.
 - Cleaned remaining student whole-piece progress wording so long waits and repeated runs no longer mention model internals, backend services, or cache mechanics.
+- Cleaned student-facing failure banners so analyzer/job/API/path details are replaced with learner-readable retry guidance.
 - Re-verified the full real-corpus strict routine after the cleanup; latest DTW quality is `latestMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`, and historical `reviewRate = 0.0883`.
 
 ## Next In Order

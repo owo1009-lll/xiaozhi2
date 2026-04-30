@@ -60,6 +60,32 @@ function scoreImportStatusText(job) {
   return "未开始";
 }
 
+function friendlyErrorMessage(errorOrMessage, fallback = "操作失败，请稍后重试。") {
+  const raw = typeof errorOrMessage === "string" ? errorOrMessage : errorOrMessage?.message;
+  const text = String(raw || "").trim();
+  if (!text) return fallback;
+  const lower = text.toLowerCase();
+  if (/failed to fetch|networkerror|econnrefused|connection refused|load failed/.test(lower)) {
+    return "暂时无法连接诊断程序，请确认应用已启动后重试。";
+  }
+  if (/外部识谱服务|audiveris|omr|musicxml/.test(lower)) {
+    return "自动识谱暂时不可用，请稍后重试。";
+  }
+  if (/\b(analysis|score|job|request failed|not found|http|external)\b|外部分析器|analyzer|piece-pass|score import|traceback|exception|stack|enoent|eacces|localhost|127\.0\.0\.1|\/api\/|https?:\/\/|[a-z]:\\|python|uvicorn|json|error:/i.test(text)) {
+    return fallback;
+  }
+  return text.length > 120 ? fallback : text;
+}
+
+function friendlyStatusMessage(message, fallback) {
+  const text = String(message || "").trim();
+  if (!text) return fallback;
+  if (/\b(analysis|score|job|request failed|not found|http|external|omr)\b|外部分析器|analyzer|piece-pass|score import|traceback|exception|stack|enoent|eacces|localhost|127\.0\.0\.1|\/api\/|https?:\/\/|[a-z]:\\|python|uvicorn|json|error:/i.test(text)) {
+    return fallback;
+  }
+  return text.length > 160 ? fallback : text;
+}
+
 function getPartCandidates(job, score) {
   return (Array.isArray(job?.partCandidates) && job.partCandidates.length ? job.partCandidates : score?.partCandidates || [])
     .filter(Boolean);
@@ -147,8 +173,8 @@ function buildImportStatusMessage(job) {
   if (!job) return "先导入 PDF 曲谱，再选择段落并上传音频。";
   if (job.cacheHit) return "同一份 PDF 已完成过识谱，可以直接选择段落。";
   if (job.omrStatus === "completed") return "识谱完成，可以开始选择段落。";
-  if (job.omrStatus === "failed") return job.error || "自动识谱失败，请更换 PDF 或稍后重试。";
-  return job.message || `识谱进行中：${percentText(job.progress)}`;
+  if (job.omrStatus === "failed") return friendlyErrorMessage(job.error, "自动识谱失败，请更换 PDF 或稍后重试。");
+  return friendlyStatusMessage(job.message, `识谱进行中：${percentText(job.progress)}`);
 }
 
 function analysisProgressHeadline(job) {
@@ -163,9 +189,9 @@ function analysisProgressHeadline(job) {
 
 function buildAnalysisStatusMessage(job) {
   if (!job) return "";
-  if (job?.status === "failed") return job.error || "分析失败，请稍后重试。";
+  if (job?.status === "failed") return friendlyErrorMessage(job.error, "分析失败，请稍后重试。");
   if (job?.status === "completed") return "诊断完成，可以打开问题谱面页。";
-  return job?.message || `分析进行中：${percentText(job?.progress)}`;
+  return friendlyStatusMessage(job?.message, `分析进行中：${percentText(job?.progress)}`);
 }
 
 function piecePassProgressHeadline(job) {
@@ -196,7 +222,7 @@ function buildIncompletePiecePassMessage(summary = {}) {
 
 function buildPiecePassStatusMessage(job) {
   if (!job) return "";
-  if (job?.status === "failed") return job.error || "整曲分析失败，请稍后重试。";
+  if (job?.status === "failed") return friendlyErrorMessage(job.error, "整曲分析失败，请稍后重试。");
   if (job?.status === "completed") {
     const summary = job?.summary || {};
     if (summary?.analysisReliable === false || !getPiecePassCompletionState(summary).complete) {
@@ -570,7 +596,9 @@ export default function StudentApp({ onOpenResearch }) {
   const [excludedAnalysisIds, setExcludedAnalysisIds] = useState(() => new Set());
   const [piecePassSummary, setPiecePassSummary] = useState(restoredStateRef.current?.piecePassSummary || null);
   const [piecePassLoading, setPiecePassLoading] = useState(false);
-  const [statusMessage, setStatusMessage] = useState(restoredStateRef.current?.statusMessage || "先导入 PDF 曲谱，再选择段落并上传音频。");
+  const [statusMessage, setStatusMessage] = useState(
+    friendlyStatusMessage(restoredStateRef.current?.statusMessage, "先导入 PDF 曲谱，再选择段落并上传音频。"),
+  );
   const [errorMessage, setErrorMessage] = useState("");
   const [importingScore, setImportingScore] = useState(false);
   const [selectingPart, setSelectingPart] = useState(false);
@@ -666,7 +694,7 @@ export default function StudentApp({ onOpenResearch }) {
           }
           if (!cancelled) {
             setImportingScore(false);
-            setErrorMessage(error.message || "读取识谱进度失败。");
+            setErrorMessage(friendlyErrorMessage(error, "读取识谱进度失败。"));
           }
           return;
         }
@@ -715,7 +743,7 @@ export default function StudentApp({ onOpenResearch }) {
             return;
           }
           if (nextJob?.status === "failed") {
-            setErrorMessage(nextJob.error || "分析失败。");
+            setErrorMessage(friendlyErrorMessage(nextJob.error, "分析失败。"));
             setAnalyzing(false);
             return;
           }
@@ -727,7 +755,7 @@ export default function StudentApp({ onOpenResearch }) {
             setStatusMessage("当前分析任务已失效，请重新上传音频并开始诊断。");
             setErrorMessage("分析任务已失效，请重新开始诊断。");
           } else {
-            setErrorMessage(error.message || "读取分析进度失败。");
+            setErrorMessage(friendlyErrorMessage(error, "读取分析进度失败。"));
           }
           setAnalyzing(false);
           return;
@@ -792,7 +820,7 @@ export default function StudentApp({ onOpenResearch }) {
             return;
           }
           if (nextJob?.status === "failed") {
-            setErrorMessage(nextJob.error || "整曲分析失败。");
+            setErrorMessage(friendlyErrorMessage(nextJob.error, "整曲分析失败。"));
             setPiecePassRunning(false);
             return;
           }
@@ -804,7 +832,7 @@ export default function StudentApp({ onOpenResearch }) {
             setStatusMessage("当前整曲分析任务已失效，请重新运行整曲分析。");
             setErrorMessage("整曲分析任务已失效，请重新运行整曲分析。");
           } else {
-            setErrorMessage(error.message || "读取整曲分析进度失败。");
+            setErrorMessage(friendlyErrorMessage(error, "读取整曲分析进度失败。"));
           }
           setPiecePassRunning(false);
           return;
@@ -853,7 +881,7 @@ export default function StudentApp({ onOpenResearch }) {
   useEffect(() => {
     if (scoreJob?.omrStatus !== "failed") return undefined;
     setImportingScore(false);
-    setErrorMessage(scoreJob?.error || "自动识谱失败。");
+    setErrorMessage(friendlyErrorMessage(scoreJob?.error, "自动识谱失败。"));
     setStatusMessage(buildImportStatusMessage(scoreJob));
     return undefined;
   }, [scoreJob?.error, scoreJob?.omrStatus]);
@@ -1074,7 +1102,7 @@ export default function StudentApp({ onOpenResearch }) {
       }
     } catch (error) {
       setImportingScore(false);
-      setErrorMessage(error.message || "PDF 导入失败。");
+      setErrorMessage(friendlyErrorMessage(error, "PDF 导入失败。"));
     }
   }
 
@@ -1110,7 +1138,7 @@ export default function StudentApp({ onOpenResearch }) {
       }
       setStatusMessage(buildImportStatusMessage(job));
     } catch (error) {
-      setErrorMessage(error.message || "备用谱文件导入失败。");
+      setErrorMessage(friendlyErrorMessage(error, "备用谱文件导入失败。"));
     } finally {
       setImportingScore(false);
     }
@@ -1140,7 +1168,7 @@ export default function StudentApp({ onOpenResearch }) {
       }
       setStatusMessage(buildImportStatusMessage(job));
     } catch (error) {
-      setErrorMessage(error.message || "声部重选失败，请稍后重试。");
+      setErrorMessage(friendlyErrorMessage(error, "声部重选失败，请稍后重试。"));
       setImportingScore(false);
     } finally {
       setSelectingPart(false);
@@ -1291,7 +1319,7 @@ export default function StudentApp({ onOpenResearch }) {
       setAnalysisJob(nextJob);
       setStatusMessage(buildAnalysisStatusMessage(nextJob));
     } catch (error) {
-      setErrorMessage(error.message || "分析失败。");
+      setErrorMessage(friendlyErrorMessage(error, "分析失败。"));
       setAnalyzing(false);
     }
   }
@@ -1355,7 +1383,7 @@ export default function StudentApp({ onOpenResearch }) {
       setStatusMessage(buildPiecePassStatusMessage(nextJob));
     } catch (error) {
       setPiecePassRunning(false);
-      setErrorMessage(error.message || "整曲分析失败。");
+      setErrorMessage(friendlyErrorMessage(error, "整曲分析失败。"));
     }
   }
 
@@ -1718,7 +1746,7 @@ export default function StudentApp({ onOpenResearch }) {
           ) : null}
           {piecePassJob?.status === "failed" ? (
             <div className="error-banner" style={{ marginTop: 14 }}>
-              整曲分析失败：{piecePassJob.error || "请检查音频文件后重试。"}
+              整曲分析失败：{friendlyErrorMessage(piecePassJob.error, "请检查音频文件后重试。")}
             </div>
           ) : null}
           {piecePassLoading ? (
