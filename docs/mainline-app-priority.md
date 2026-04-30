@@ -134,6 +134,7 @@ Completed:
 - Added mobile viewport coverage to `npm run smoke:score-issues` with horizontal-overflow detection, and adjusted the mobile problem-score layout so the issue list scrolls inside its own block instead of clipping the whole sidebar.
 - Improved OMR melody/accompaniment line splitting for repeated multi-staff systems: the importer now keeps the top staff in each system instead of relying only on whole-page line modulo, with a regression case in `test:score-markings`.
 - Improved ambiguous OMR line splitting when a sparse pseudo-line appears above the real melody within the same system: dense monophonic lower melody lines can now be promoted while the one-note artifact is suppressed, with a regression case in `test:score-markings`.
+- Improved whole-PDF MusicXML page localization: `<print new-page="yes">` now advances the score page and resets system numbering, so smaller whole-file OMR outputs do not project later-page issues onto page 1.
 - Tightened MusicXML part-candidate scoring for Chinese-named piano parts (`钢琴` / `鋼琴`), so a following generic `Voice` part is treated as accompaniment-split risk instead of being auto-trusted as erhu projection.
 - Cleaned student-facing status wording so import states and whole-piece speed notes no longer expose raw internal status or cache wording.
 - Cleaned remaining student whole-piece progress wording so long waits and repeated runs no longer mention model internals, backend services, or cache mechanics.

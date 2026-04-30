@@ -309,6 +309,37 @@ SYSTEM_SPARSE_LEAD_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
 </score-partwise>
 """
 
+WHOLE_PDF_NEW_PAGE_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <defaults>
+    <page-layout>
+      <page-height>1600</page-height>
+      <page-width>1200</page-width>
+    </page-layout>
+  </defaults>
+  <part-list>
+    <score-part id="P1"><part-name>Erhu</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1" width="420">
+      <print new-system="yes"><system-layout><top-system-distance>120</top-system-distance></system-layout></print>
+      <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+      <note default-x="60"><pitch><step>D</step><octave>5</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2" width="420">
+      <note default-x="60"><pitch><step>E</step><octave>5</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3" width="420">
+      <print new-page="yes" new-system="yes"><system-layout><top-system-distance>130</top-system-distance></system-layout></print>
+      <note default-x="60"><pitch><step>F</step><octave>5</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4" width="420">
+      <note default-x="60"><pitch><step>G</step><octave>5</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 CHINESE_PIANO_THEN_VOICE_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
   <part-list>
@@ -446,6 +477,23 @@ def main() -> int:
             "System Sparse Lead",
             1,
         )
+        whole_pdf_source = Path(tmp) / "whole-pdf-new-page.musicxml"
+        whole_pdf_source.write_text(WHOLE_PDF_NEW_PAGE_MUSICXML, encoding="utf-8")
+        whole_pdf_request = ScoreImportRequest(
+            jobId="whole-pdf-new-page-test",
+            pdfPath=str(whole_pdf_source),
+            originalFilename="whole-pdf-new-page.musicxml",
+            titleHint="Whole PDF New Page Test",
+            selectedPartHint="Erhu",
+        )
+        whole_pdf_section, *_ = analyzer._parse_musicxml_source_to_section(
+            whole_pdf_source,
+            whole_pdf_request,
+            "Erhu",
+            "section-a",
+            "Whole PDF New Page",
+            1,
+        )
 
     chinese_piano_candidates = analyzer._extract_musicxml_part_candidates(
         CHINESE_PIANO_THEN_VOICE_MUSICXML,
@@ -459,6 +507,7 @@ def main() -> int:
     require(two_staff_section is not None, "Two-staff repeated systems MusicXML did not produce a section.")
     require(sparse_section is not None, "Sparse false lead MusicXML did not produce a section.")
     require(system_sparse_section is not None, "System sparse lead MusicXML did not produce a section.")
+    require(whole_pdf_section is not None, "Whole-PDF new-page MusicXML did not produce a section.")
     require(chinese_voice is not None, "Chinese piano fixture should include the trailing Voice candidate.")
     require(
         chinese_voice.get("isAfterExplicitPiano") is True,
@@ -503,6 +552,11 @@ def main() -> int:
         [note["midiPitch"] for note in system_sparse_notes] == [74, 76, 77],
         "System sparse lead should suppress the one-note pseudo top staff and keep the real melody line.",
     )
+    whole_pdf_notes = whole_pdf_section["notes"]
+    whole_pdf_pages = [int(note["notePosition"]["pageNumber"]) for note in whole_pdf_notes if note.get("notePosition")]
+    whole_pdf_systems = [int(note["notePosition"]["systemIndex"]) for note in whole_pdf_notes if note.get("notePosition")]
+    require(whole_pdf_pages == [1, 1, 2, 2], f"Whole-PDF MusicXML should honor print new-page markers, got pages {whole_pdf_pages}.")
+    require(whole_pdf_systems == [1, 1, 1, 1], f"Whole-PDF MusicXML should reset system index on a new page, got systems {whole_pdf_systems}.")
     notes = section["notes"]
     first_note = notes[0]
     require(selected_part == "Erhu", f"Expected Erhu selected part, got {selected_part!r}.")

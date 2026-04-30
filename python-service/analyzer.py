@@ -5559,6 +5559,14 @@ class ErhuAnalyzer:
             print_node = child(measure, "print")
             new_system = measure_position == 1
             system_layout = child(print_node, "system-layout") if print_node is not None else None
+            new_page = print_node is not None and str(print_node.attrib.get("new-page", "")).strip().lower() == "yes"
+            if new_page and measure_position > 1:
+                page_number += 1
+                current_system_index = 0
+                current_system_top_line = page_top_margin + 140.0
+                current_measure_offset = 0.0
+                last_system_top_line = None
+                new_system = True
             if print_node is not None and str(print_node.attrib.get("new-system", "")).strip().lower() == "yes":
                 new_system = True
             if system_layout is not None:
