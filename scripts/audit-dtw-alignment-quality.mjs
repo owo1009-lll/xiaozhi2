@@ -359,6 +359,22 @@ function latestMainlineAnalyses(analyses = []) {
   return [...latestByKey.values()].map((item) => item.analysis);
 }
 
+function currentMainlineAnalyses(analyses = []) {
+  const latestByScore = new Map();
+  for (const analysis of analyses) {
+    const mode = String(analysis?.analysisMode || "");
+    if (!MAINLINE_ANALYSIS_MODES.has(mode)) continue;
+    const key = String(analysis?.scoreId || analysis?.pieceId || analysis?.pieceTitle || "").trim();
+    if (!key) continue;
+    const timestamp = analysisTimestamp(analysis);
+    const existing = latestByScore.get(key);
+    if (!existing || timestamp >= existing.timestamp) {
+      latestByScore.set(key, { analysis, timestamp });
+    }
+  }
+  return [...latestByScore.values()].map((item) => item.analysis);
+}
+
 function auditAnalysis(score, analysis) {
   const result = emptyAnalysisSummary(analysis, score);
   const failures = [];
@@ -444,8 +460,10 @@ function collectAnalyses(piecePassStore, studyStore) {
 
 function writeMarkdown(report, filePath) {
   const latestReviewHotspots = reviewHotspots(report.latestMainlinePerAnalysis, 10);
+  const currentReviewHotspots = reviewHotspots(report.currentMainlinePerAnalysis, 10);
   const allReviewHotspots = reviewHotspots(report.perAnalysis, 10);
   const latestReviewSamples = reviewIssueSamples(report.latestMainlinePerAnalysis, 20);
+  const currentReviewSamples = reviewIssueSamples(report.currentMainlinePerAnalysis, 20);
   const allReviewSamples = reviewIssueSamples(report.perAnalysis, 20);
   const lines = [
     "# DTW Alignment Quality Report",
@@ -480,6 +498,30 @@ function writeMarkdown(report, filePath) {
     `- Latest mainline review-needed rate: ${((report.latestMainline?.reviewRate || 0) * 100).toFixed(1)}%`,
     `- Latest mainline accompaniment failure rate: ${((report.latestMainline?.accompanimentFailureRate || 0) * 100).toFixed(2)}%`,
     "",
+    "## Current Mainline By Score",
+    "",
+    `- Current mainline checked analyses: ${report.currentMainline?.checkedAnalyses || 0}`,
+    `- Current mainline note exact rate: ${((report.currentMainline?.exactNoteRate || 0) * 100).toFixed(1)}%`,
+    `- Current mainline measure-located rate: ${((report.currentMainline?.measureLocatedRate || 0) * 100).toFixed(1)}%`,
+    `- Current mainline review-needed rate: ${((report.currentMainline?.reviewRate || 0) * 100).toFixed(1)}%`,
+    `- Current mainline accompaniment failure rate: ${((report.currentMainline?.accompanimentFailureRate || 0) * 100).toFixed(2)}%`,
+    "",
+    "## Current Mainline Per Analysis",
+    "",
+    "| Piece | Analysis | Issues | Review-needed | Review % | Accompaniment failures |",
+    "| --- | --- | ---: | ---: | ---: | ---: |",
+    ...(report.currentMainlinePerAnalysis?.length
+      ? report.currentMainlinePerAnalysis.map((item) => `| ${item.pieceTitle || item.scoreId} | ${item.analysisId} | ${item.issueCount} | ${item.reviewIssueCount} | ${(item.reviewRate * 100).toFixed(1)}% | ${item.accompanimentFailureCount} |`)
+      : ["| None |  | 0 | 0 | 0.0% | 0 |"]),
+    "",
+    "## Current Mainline Review Hotspots",
+    "",
+    "| Piece | Analysis | Issues | Review-needed | Review % | Top reasons | Accompaniment failures |",
+    "| --- | --- | ---: | ---: | ---: | --- | ---: |",
+    ...(currentReviewHotspots.length
+      ? currentReviewHotspots.map((item) => `| ${item.pieceTitle} | ${item.analysisId} | ${item.issueCount} | ${item.reviewIssueCount} | ${(item.reviewRate * 100).toFixed(1)}% | ${item.topReviewReasons || ""} | ${item.accompanimentFailureCount} |`)
+      : ["| None |  | 0 | 0 | 0.0% |  | 0 |"]),
+    "",
     "## Latest Mainline Per Analysis",
     "",
     "| Piece | Analysis | Issues | Review-needed | Review % | Accompaniment failures |",
@@ -507,6 +549,7 @@ function writeMarkdown(report, filePath) {
     "## Review Reason Breakdown",
     "",
     `- Latest mainline: ${topReasonText(report.latestMainlineReviewReasonBreakdown) || "none"}`,
+    `- Current mainline: ${topReasonText(report.currentMainlineReviewReasonBreakdown) || "none"}`,
     `- Mainline: ${topReasonText(report.mainlineReviewReasonBreakdown) || "none"}`,
     `- All analyses: ${topReasonText(report.reviewReasonBreakdown) || "none"}`,
     "",
@@ -516,6 +559,14 @@ function writeMarkdown(report, filePath) {
     "| --- | --- | --- | --- | --- | ---: | ---: | --- |",
     ...(latestReviewSamples.length
       ? latestReviewSamples.map((item) => `| ${item.pieceTitle} | ${item.analysisId} | ${item.issueType} | ${item.reason} | ${item.sectionId || ""} | ${item.pageNumber || ""} | ${item.measureIndex || ""} | ${item.noteId || ""} |`)
+      : ["| None |  |  |  |  |  |  |  |"]),
+    "",
+    "## Current Mainline Review Samples",
+    "",
+    "| Piece | Analysis | Type | Reason | Section | Page | Measure | Note |",
+    "| --- | --- | --- | --- | --- | ---: | ---: | --- |",
+    ...(currentReviewSamples.length
+      ? currentReviewSamples.map((item) => `| ${item.pieceTitle} | ${item.analysisId} | ${item.issueType} | ${item.reason} | ${item.sectionId || ""} | ${item.pageNumber || ""} | ${item.measureIndex || ""} | ${item.noteId || ""} |`)
       : ["| None |  |  |  |  |  |  |  |"]),
     "",
     "## Historical / All Review Samples",
@@ -553,6 +604,7 @@ const studyStore = readJson("data/erhu-study-records.json", { analyses: [] });
 const scoresById = new Map((scoreStore.scores || []).map((score) => [String(score.scoreId || ""), score]));
 const analyses = collectAnalyses(piecePassStore, studyStore);
 const latestMainlineAnalysesList = latestMainlineAnalyses(analyses);
+const currentMainlineAnalysesList = currentMainlineAnalyses(analyses);
 
 const report = {
   generatedAt: new Date().toISOString(),
@@ -574,11 +626,14 @@ const report = {
   modeBreakdown: {},
   mainline: emptyTotals(),
   latestMainline: emptyTotals(),
+  currentMainline: emptyTotals(),
   perAnalysis: [],
   latestMainlinePerAnalysis: [],
+  currentMainlinePerAnalysis: [],
   reviewReasonBreakdown: {},
   mainlineReviewReasonBreakdown: {},
   latestMainlineReviewReasonBreakdown: {},
+  currentMainlineReviewReasonBreakdown: {},
   failures: [],
   warnings: [],
 };
@@ -612,6 +667,15 @@ for (const analysis of latestMainlineAnalysesList) {
   mergeReasonBreakdown(report.latestMainlineReviewReasonBreakdown, result.reviewReasonBreakdown);
 }
 
+for (const analysis of currentMainlineAnalysesList) {
+  const score = scoresById.get(String(analysis.scoreId || ""));
+  if (!score) continue;
+  const { result } = auditAnalysis(score, analysis);
+  report.currentMainlinePerAnalysis.push(result);
+  addAnalysisSummary(report.currentMainline, result);
+  mergeReasonBreakdown(report.currentMainlineReviewReasonBreakdown, result.reviewReasonBreakdown);
+}
+
 const totalIssues = report.noteIssueCount + report.measureIssueCount;
 const totalFailures = report.noteAccompanimentFailureCount + report.measureAccompanimentFailureCount;
 finalizeRates(report);
@@ -620,6 +684,7 @@ for (const totals of Object.values(report.modeBreakdown)) {
 }
 finalizeRates(report.mainline);
 finalizeRates(report.latestMainline);
+finalizeRates(report.currentMainline);
 if (
   report.mainline.checkedAnalyses > 0
   && Number.isFinite(MAINLINE_REVIEW_WARN_THRESHOLD)
@@ -635,6 +700,10 @@ report.perAnalysis.sort((left, right) => (
   || right.reviewIssueCount - left.reviewIssueCount
 ));
 report.latestMainlinePerAnalysis.sort((left, right) => (
+  right.reviewIssueCount - left.reviewIssueCount
+  || String(left.pieceTitle || left.scoreId).localeCompare(String(right.pieceTitle || right.scoreId), "zh-Hans-CN")
+));
+report.currentMainlinePerAnalysis.sort((left, right) => (
   right.reviewIssueCount - left.reviewIssueCount
   || String(left.pieceTitle || left.scoreId).localeCompare(String(right.pieceTitle || right.scoreId), "zh-Hans-CN")
 ));
@@ -675,6 +744,14 @@ console.log(JSON.stringify({
   latestMainlineReviewHotspots: reviewHotspots(report.latestMainlinePerAnalysis),
   latestMainlineReviewReasonBreakdown: report.latestMainlineReviewReasonBreakdown,
   latestMainlineReviewSamples: reviewIssueSamples(report.latestMainlinePerAnalysis, 10),
+  currentMainlineCheckedAnalyses: report.currentMainline.checkedAnalyses,
+  currentMainlineExactNoteRate: report.currentMainline.exactNoteRate,
+  currentMainlineMeasureLocatedRate: report.currentMainline.measureLocatedRate,
+  currentMainlineReviewRate: report.currentMainline.reviewRate,
+  currentMainlineAccompanimentFailureRate: report.currentMainline.accompanimentFailureRate,
+  currentMainlineReviewHotspots: reviewHotspots(report.currentMainlinePerAnalysis),
+  currentMainlineReviewReasonBreakdown: report.currentMainlineReviewReasonBreakdown,
+  currentMainlineReviewSamples: reviewIssueSamples(report.currentMainlinePerAnalysis, 10),
   historicalReviewHotspots: reviewHotspots(report.perAnalysis),
   historicalReviewReasonBreakdown: report.reviewReasonBreakdown,
   historicalReviewSamples: reviewIssueSamples(report.perAnalysis, 10),

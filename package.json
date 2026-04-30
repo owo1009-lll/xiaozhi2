@@ -28,6 +28,8 @@
     "test:real-corpus": "node scripts\\run-real-corpus-tests.mjs",
     "test:real-corpus:run": "node scripts\\run-real-corpus-tests.mjs --run",
     "test:real-corpus:strict": "node scripts\\run-real-corpus-tests.mjs --run --smoke-review --strict --request-timeout-ms 60000",
+    "audit:real-corpus-trend": "node scripts\\summarize-real-corpus-trend.mjs",
+    "audit:unknown-pdf-omr": "node scripts\\run-unknown-pdf-omr-baseline.mjs",
     "test:score-markings": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-score-markings.py",
     "test:musicxml-import": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-musicxml-import.py",
     "test:separation-quality": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-separation-quality.py",

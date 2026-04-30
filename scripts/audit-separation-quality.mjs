@@ -293,6 +293,8 @@ function writeMarkdown(report, filePath) {
     `- Separation records: ${report.recordCount}`,
     `- Records with energy/score-band metrics: ${report.recordsWithQualityBreakdown}`,
     `- Usable records with energy/score-band metrics: ${report.recordsWithUsableQualityBreakdown}`,
+    `- Applied records with usable metrics: ${report.recordsWithAppliedQualityBreakdown}`,
+    `- Auto-rejected records with usable metrics: ${report.recordsWithRejectedQualityBreakdown}`,
     `- Records missing energy/score-band metrics: ${report.recordsMissingQualityBreakdown}`,
     `- Inconsistent stale metric records: ${report.inconsistentQualityBreakdownCount}`,
     `- Separation applied records: ${report.separationAppliedCount}`,
@@ -314,12 +316,32 @@ function writeMarkdown(report, filePath) {
     `- count: ${report.scoreBandRatio.count || 0}`,
     `- min/p50/max: ${report.scoreBandRatio.min ?? ""}/${report.scoreBandRatio.p50 ?? ""}/${report.scoreBandRatio.max ?? ""}`,
     "",
-    "## Worst Records",
+    "## Applied Separation Metrics",
+    "",
+    `- confidence count/min/p50/max: ${report.appliedConfidence.count || 0}/${report.appliedConfidence.min ?? ""}/${report.appliedConfidence.p50 ?? ""}/${report.appliedConfidence.max ?? ""}`,
+    `- energy count/min/p50/max: ${report.appliedEnergyRatio.count || 0}/${report.appliedEnergyRatio.min ?? ""}/${report.appliedEnergyRatio.p50 ?? ""}/${report.appliedEnergyRatio.max ?? ""}`,
+    `- score-band count/min/p50/max: ${report.appliedScoreBandRatio.count || 0}/${report.appliedScoreBandRatio.min ?? ""}/${report.appliedScoreBandRatio.p50 ?? ""}/${report.appliedScoreBandRatio.max ?? ""}`,
+    "",
+    "## Auto-Rejected Separation Metrics",
+    "",
+    `- confidence count/min/p50/max: ${report.rejectedConfidence.count || 0}/${report.rejectedConfidence.min ?? ""}/${report.rejectedConfidence.p50 ?? ""}/${report.rejectedConfidence.max ?? ""}`,
+    `- energy count/min/p50/max: ${report.rejectedEnergyRatio.count || 0}/${report.rejectedEnergyRatio.min ?? ""}/${report.rejectedEnergyRatio.p50 ?? ""}/${report.rejectedEnergyRatio.max ?? ""}`,
+    `- score-band count/min/p50/max: ${report.rejectedScoreBandRatio.count || 0}/${report.rejectedScoreBandRatio.min ?? ""}/${report.rejectedScoreBandRatio.p50 ?? ""}/${report.rejectedScoreBandRatio.max ?? ""}`,
+    "",
+    "## Worst Applied Records",
     "",
     "| Piece | Section | Confidence | Energy | Score band | Applied | Source |",
     "| --- | --- | ---: | ---: | ---: | --- | --- |",
     ...(report.worstRecords.length
       ? report.worstRecords.map((record) => `| ${record.pieceTitle || record.scoreId || ""} | ${record.sectionTitle || record.sectionId || ""} | ${record.separationConfidence} | ${record.separationEnergyRatio ?? ""} | ${record.separationScoreBandRatio ?? ""} | ${record.separationApplied ? "yes" : "no"} | ${record.sourcePath} |`)
+      : ["| None |  |  |  |  |  |  |"]),
+    "",
+    "## Auto-Rejected Records",
+    "",
+    "| Piece | Section | Confidence | Energy | Score band | Applied | Source |",
+    "| --- | --- | ---: | ---: | ---: | --- | --- |",
+    ...(report.rejectedRecords.length
+      ? report.rejectedRecords.map((record) => `| ${record.pieceTitle || record.scoreId || ""} | ${record.sectionTitle || record.sectionId || ""} | ${record.separationConfidence} | ${record.separationEnergyRatio ?? ""} | ${record.separationScoreBandRatio ?? ""} | ${record.separationApplied ? "yes" : "no"} | ${record.sourcePath} |`)
       : ["| None |  |  |  |  |  |  |"]),
     "",
     "## By Piece",
@@ -358,9 +380,18 @@ for (const filePath of files) {
 const qualityBreakdownRecords = records.filter(hasQualityBreakdown);
 const inconsistentQualityBreakdownRecords = qualityBreakdownRecords.filter(hasInconsistentQualityBreakdown);
 const usableQualityBreakdownRecords = qualityBreakdownRecords.filter((record) => !hasInconsistentQualityBreakdown(record));
+const usableAppliedRecords = usableQualityBreakdownRecords.filter((record) => record.separationApplied);
+const usableRejectedRecords = usableQualityBreakdownRecords.filter((record) => !record.separationApplied);
 const recordsWithQualityBreakdown = qualityBreakdownRecords.length;
-const worstRecordCandidates = usableQualityBreakdownRecords.length
-  ? usableQualityBreakdownRecords
+const worstRecordCandidates = usableAppliedRecords.length
+  ? usableAppliedRecords
+  : usableQualityBreakdownRecords.length
+    ? usableQualityBreakdownRecords
+    : qualityBreakdownRecords.length
+      ? qualityBreakdownRecords
+      : records;
+const rejectedRecordCandidates = usableRejectedRecords.length
+  ? usableRejectedRecords
   : qualityBreakdownRecords.length
     ? qualityBreakdownRecords
     : records;
@@ -379,6 +410,13 @@ const worstRecords = [...worstRecordCandidates]
     || String(left.pieceTitle || left.sourcePath).localeCompare(String(right.pieceTitle || right.sourcePath), "zh-Hans-CN")
   ))
   .slice(0, Math.max(1, args.limit));
+const rejectedRecords = [...rejectedRecordCandidates]
+  .sort((left, right) => (
+    left.separationConfidence - right.separationConfidence
+    || (left.separationScoreBandRatio ?? 1) - (right.separationScoreBandRatio ?? 1)
+    || String(left.pieceTitle || left.sourcePath).localeCompare(String(right.pieceTitle || right.sourcePath), "zh-Hans-CN")
+  ))
+  .slice(0, Math.max(1, args.limit));
 
 const report = {
   generatedAt: new Date().toISOString(),
@@ -388,17 +426,26 @@ const report = {
   recordCount: records.length,
   recordsWithQualityBreakdown,
   recordsWithUsableQualityBreakdown: usableQualityBreakdownRecords.length,
+  recordsWithAppliedQualityBreakdown: usableAppliedRecords.length,
+  recordsWithRejectedQualityBreakdown: usableRejectedRecords.length,
   recordsMissingQualityBreakdown: Math.max(0, records.length - recordsWithQualityBreakdown),
   inconsistentQualityBreakdownCount: inconsistentQualityBreakdownRecords.length,
-  worstRecordScope: usableQualityBreakdownRecords.length ? "usable-quality-breakdown" : (qualityBreakdownRecords.length ? "quality-breakdown" : "all-records"),
+  worstRecordScope: usableAppliedRecords.length ? "applied-quality-breakdown" : (usableQualityBreakdownRecords.length ? "usable-quality-breakdown" : (qualityBreakdownRecords.length ? "quality-breakdown" : "all-records")),
   separationAppliedCount: records.filter((record) => record.separationApplied).length,
   lowConfidenceThreshold: args.lowConfidenceThreshold,
   lowConfidenceCount: records.filter((record) => record.separationConfidence < args.lowConfidenceThreshold).length,
   confidence: summarize(records.map((record) => record.separationConfidence)),
   energyRatio: summarize(usableQualityBreakdownRecords.map((record) => record.separationEnergyRatio).filter((value) => value !== null)),
   scoreBandRatio: summarize(usableQualityBreakdownRecords.map((record) => record.separationScoreBandRatio).filter((value) => value !== null)),
+  appliedConfidence: summarize(usableAppliedRecords.map((record) => record.separationConfidence)),
+  appliedEnergyRatio: summarize(usableAppliedRecords.map((record) => record.separationEnergyRatio).filter((value) => value !== null)),
+  appliedScoreBandRatio: summarize(usableAppliedRecords.map((record) => record.separationScoreBandRatio).filter((value) => value !== null)),
+  rejectedConfidence: summarize(usableRejectedRecords.map((record) => record.separationConfidence)),
+  rejectedEnergyRatio: summarize(usableRejectedRecords.map((record) => record.separationEnergyRatio).filter((value) => value !== null)),
+  rejectedScoreBandRatio: summarize(usableRejectedRecords.map((record) => record.separationScoreBandRatio).filter((value) => value !== null)),
   byPiece: groupByPiece(records, args.lowConfidenceThreshold),
   worstRecords,
+  rejectedRecords,
   warnings,
 };
 
@@ -421,6 +468,8 @@ console.log(JSON.stringify({
   recordCount: report.recordCount,
   recordsWithQualityBreakdown: report.recordsWithQualityBreakdown,
   recordsWithUsableQualityBreakdown: report.recordsWithUsableQualityBreakdown,
+  recordsWithAppliedQualityBreakdown: report.recordsWithAppliedQualityBreakdown,
+  recordsWithRejectedQualityBreakdown: report.recordsWithRejectedQualityBreakdown,
   recordsMissingQualityBreakdown: report.recordsMissingQualityBreakdown,
   inconsistentQualityBreakdownCount: report.inconsistentQualityBreakdownCount,
   worstRecordScope: report.worstRecordScope,
@@ -429,9 +478,25 @@ console.log(JSON.stringify({
   confidence: report.confidence,
   energyRatio: report.energyRatio,
   scoreBandRatio: report.scoreBandRatio,
+  appliedConfidence: report.appliedConfidence,
+  appliedEnergyRatio: report.appliedEnergyRatio,
+  appliedScoreBandRatio: report.appliedScoreBandRatio,
+  rejectedConfidence: report.rejectedConfidence,
+  rejectedEnergyRatio: report.rejectedEnergyRatio,
+  rejectedScoreBandRatio: report.rejectedScoreBandRatio,
   worstRecords: report.worstRecords.slice(0, 10).map((record) => ({
     pieceTitle: record.pieceTitle,
     sectionTitle: record.sectionTitle,
+    separationApplied: record.separationApplied,
+    separationConfidence: record.separationConfidence,
+    separationEnergyRatio: record.separationEnergyRatio,
+    separationScoreBandRatio: record.separationScoreBandRatio,
+    sourcePath: record.sourcePath,
+  })),
+  rejectedRecords: report.rejectedRecords.slice(0, 10).map((record) => ({
+    pieceTitle: record.pieceTitle,
+    sectionTitle: record.sectionTitle,
+    separationApplied: record.separationApplied,
     separationConfidence: record.separationConfidence,
     separationEnergyRatio: record.separationEnergyRatio,
     separationScoreBandRatio: record.separationScoreBandRatio,
