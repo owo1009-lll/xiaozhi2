@@ -135,7 +135,7 @@ Completed:
 - Cleaned student-facing status wording so import states and whole-piece speed notes no longer expose raw internal status or cache wording.
 - Cleaned remaining student whole-piece progress wording so long waits and repeated runs no longer mention model internals, backend services, or cache mechanics.
 - Cleaned student-facing failure banners so analyzer/job/API/path details are replaced with learner-readable retry guidance.
-- Re-verified the full real-corpus strict routine after the cleanup; latest DTW quality is `latestMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`, and historical `reviewRate = 0.0883`.
+- Re-verified the full real-corpus strict routine after the cleanup with run batch `2026-04-30T02-49-24-929Z`; `8/8` completed, score issue smoke checked `8` cards, latest DTW quality is `latestMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`, and historical `reviewRate = 0.0669`.
 
 ## Next In Order
 
