@@ -1337,8 +1337,15 @@ button {
   }
 
   .score-sidebar {
-    max-height: 60vh;
-    min-height: 280px;
+    max-height: none;
+    min-height: auto;
+    overflow: visible;
+  }
+
+  .sidebar-block.sidebar-issues {
+    flex: 0 0 auto;
+    max-height: 320px;
+    overflow-y: auto;
   }
 
   .score-zoom-group {

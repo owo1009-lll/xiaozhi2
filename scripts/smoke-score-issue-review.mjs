@@ -19,6 +19,9 @@ function parseArgs(argv = process.argv.slice(2)) {
     timeoutMs: 30000,
     allCards: false,
     maxCards: 0,
+    viewportWidth: 1440,
+    viewportHeight: 1100,
+    mobile: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -31,6 +34,15 @@ function parseArgs(argv = process.argv.slice(2)) {
     else if (arg === "--timeout-ms") parsed.timeoutMs = Math.max(5000, Number(argv[++index]) || parsed.timeoutMs);
     else if (arg === "--all-cards") parsed.allCards = true;
     else if (arg === "--max-cards") parsed.maxCards = Math.max(1, Number(argv[++index]) || 0);
+    else if (arg === "--viewport") {
+      const [width, height] = String(argv[++index] || "").split(/[xX]/).map((item) => Math.round(Number(item)));
+      if (Number.isFinite(width) && width >= 320) parsed.viewportWidth = width;
+      if (Number.isFinite(height) && height >= 480) parsed.viewportHeight = height;
+    } else if (arg === "--mobile") {
+      parsed.mobile = true;
+      if (parsed.viewportWidth === 1440) parsed.viewportWidth = 390;
+      if (parsed.viewportHeight === 1100) parsed.viewportHeight = 844;
+    }
   }
   return parsed;
 }
@@ -253,10 +265,10 @@ async function runSmoke(args) {
     await send("Page.enable");
     await send("Runtime.enable");
     await send("Emulation.setDeviceMetricsOverride", {
-      width: 1440,
-      height: 1100,
+      width: args.viewportWidth,
+      height: args.viewportHeight,
       deviceScaleFactor: 1,
-      mobile: false,
+      mobile: Boolean(args.mobile),
     });
 
     await navigate(send, waitEvent, target.reviewUrl, args.timeoutMs);
@@ -346,6 +358,11 @@ async function runSmoke(args) {
           hasRenderedScore: Boolean((image && image.complete && image.naturalWidth > 0) || (canvas && canvas.width > 0 && canvas.height > 0)),
           highlightCount: document.querySelectorAll(".score-note-highlight,.score-measure-highlight").length,
           buttonCount: document.querySelectorAll("button").length,
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+          documentWidth: document.documentElement.scrollWidth,
+          bodyWidth: document.body.scrollWidth,
+          hasHorizontalBodyOverflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) > window.innerWidth + 8,
           textSample: document.body.innerText.slice(0, 500),
         };
       })()`);
@@ -389,6 +406,7 @@ async function runSmoke(args) {
       if (!issuePage.hasIssueList) pageFailures.push("issue-page-list-missing");
       if (!issuePage.hasScorePanel) pageFailures.push("issue-page-score-panel-missing");
       if (!issuePage.hasRenderedScore) pageFailures.push("issue-page-score-render-missing");
+      if (issuePage.hasHorizontalBodyOverflow) pageFailures.push("issue-page-horizontal-overflow");
       if (!playbackCheck.ok) pageFailures.push(`issue-page-playback-link-missing:${playbackCheck.reason || "unknown"}`);
       checkedPages.push({
         ...issuePage,
@@ -433,6 +451,11 @@ async function runSmoke(args) {
       failures,
       source: target.source,
       reviewUrl: target.reviewUrl,
+      viewport: {
+        width: args.viewportWidth,
+        height: args.viewportHeight,
+        mobile: Boolean(args.mobile),
+      },
       review,
       checkedCardCount: checkedPages.length,
       clickResult,
@@ -459,6 +482,9 @@ export async function runScoreIssueReviewSmoke(options = {}) {
     timeoutMs: 30000,
     allCards: false,
     maxCards: 0,
+    viewportWidth: 1440,
+    viewportHeight: 1100,
+    mobile: false,
     ...options,
   };
   if (args.runSummary) args.runSummary = path.resolve(REPO_ROOT, args.runSummary);

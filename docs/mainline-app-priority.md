@@ -131,6 +131,7 @@ Completed:
 - Added original-audio snippet linkage to the score issue smoke check: each checked issue page clicks a problem item and verifies the playback hint plus active issue state.
 - Ran screenshot-based visual review on the complex-score issue pages for `浮生`, `古巷深处`, `炫动`, `第四二胡狂想曲`, and `维奥莱塔组曲07 - 二胡 中胡`; first issue pages showed readable controls, rendered score images, and visible highlights.
 - Re-ran the latest 8-card strict review batch with `npm run smoke:score-issues -- --all-cards`, saving screenshots under `data/real-tests/visual-review/2026-04-30T02-49-24-929Z`; every issue page opened, rendered its score, showed highlights, and linked the first problem item to original-audio playback.
+- Added mobile viewport coverage to `npm run smoke:score-issues` with horizontal-overflow detection, and adjusted the mobile problem-score layout so the issue list scrolls inside its own block instead of clipping the whole sidebar.
 - Improved OMR melody/accompaniment line splitting for repeated multi-staff systems: the importer now keeps the top staff in each system instead of relying only on whole-page line modulo, with a regression case in `test:score-markings`.
 - Improved ambiguous OMR line splitting when a sparse pseudo-line appears above the real melody within the same system: dense monophonic lower melody lines can now be promoted while the one-note artifact is suppressed, with a regression case in `test:score-markings`.
 - Tightened MusicXML part-candidate scoring for Chinese-named piano parts (`钢琴` / `鋼琴`), so a following generic `Voice` part is treated as accompaniment-split risk instead of being auto-trusted as erhu projection.
@@ -149,7 +150,7 @@ Completed:
 
 1. Keep periodic real-corpus `--run` tests in the routine, using `npm run test:real-corpus:strict` for automated review-page smoke checks during each batch. `npm run smoke:score-issues -- --run-summary <run-summary.json>` remains available for already-generated runs.
 2. Continue improving OMR section/voice quality so historical and unknown-PDF review items become reliable note or measure highlights.
-3. Do deeper human visual review on saved complex-score screenshots beyond smoke assertions: `浮生`, `古巷深处`, `炫动`, `第四二胡狂想曲`, and `维奥莱塔组曲07 - 二胡 中胡`.
+3. Continue deeper human visual review on saved complex-score screenshots beyond smoke assertions, especially cross-checking desktop and mobile captures for `浮生`, `古巷深处`, `炫动`, `第四二胡狂想曲`, and `维奥莱塔组曲07 - 二胡 中胡`.
 4. Continue student UI cleanup where technical labels remain visible outside the main upload/import path.
 5. Keep manual `MusicXML` import as the fallback for PDFs whose Audiveris output is too noisy.
 6. Treat deeper installer packaging beyond local Windows shortcuts as lower priority until the diagnosis chain is visually reliable.
