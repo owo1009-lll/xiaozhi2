@@ -51,7 +51,12 @@ function New-AppShortcut {
 
 $targetDirectories = @()
 if ($OutputDir.Trim()) {
-  $targetDirectories += (Join-Path $repoRoot $OutputDir)
+  $requestedOutputDir = $OutputDir.Trim()
+  if ([System.IO.Path]::IsPathRooted($requestedOutputDir)) {
+    $targetDirectories += $requestedOutputDir
+  } else {
+    $targetDirectories += (Join-Path $repoRoot $requestedOutputDir)
+  }
 } else {
   $desktop = [Environment]::GetFolderPath("Desktop")
   $programs = [Environment]::GetFolderPath("Programs")

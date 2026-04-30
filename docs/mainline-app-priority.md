@@ -145,6 +145,7 @@ Completed:
 - Extended the student UI copy guard to the problem-score page and to display source labels, preventing raw model/library/fallback labels from reappearing in learner-facing text.
 - Updated the installable PWA manifest and browser title from research-prototype wording to the student-facing `二胡 AI 自主练习` product name.
 - Added a Windows local shell-app installer script, `npm run install:windows`, that creates Start/Stop shortcuts targeting the production launcher without changing the diagnosis chain.
+- Hardened the Windows shortcut installer so `-OutputDir` works with both relative and absolute paths, making local install smoke checks safer.
 - Added PNG maskable PWA icons and strengthened `test:pwa` so install compatibility is checked beyond SVG icon presence.
 - Extended the MusicXML fallback test to cover compressed `.mxl` uploads, matching the student backup-score file picker.
 - Re-verified the full real-corpus strict routine after the cleanup with run batch `2026-04-30T02-49-24-929Z`; `8/8` completed, score issue smoke checked `8` cards, latest DTW quality is `latestMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`, and historical `reviewRate = 0.0669`.
