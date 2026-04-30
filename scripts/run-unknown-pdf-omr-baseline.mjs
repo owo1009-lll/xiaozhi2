@@ -88,8 +88,13 @@ async function walk(root, out = []) {
 
 async function defaultSamplePdfs(root) {
   const allPdfs = await walk(root);
+  const patterns = [
+    new RegExp("\\u6d41\\u6d6a\\u8005\\u4e4b\\u6b4c", "u"),
+    new RegExp("\\u6d6e\\u751f", "u"),
+    new RegExp("\\u7ef4\\u5965\\u83b1\\u5854\\u7ec4\\u66f207", "u"),
+  ];
   const samples = [];
-  for (const pattern of DEFAULT_SAMPLE_PATTERNS) {
+  for (const pattern of patterns) {
     const match = allPdfs.find((filePath) => pattern.test(path.basename(filePath)));
     if (match) samples.push(match);
   }

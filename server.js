@@ -545,6 +545,14 @@ function annotateImportedSectionsScoreLineRoles(sections = [], score = {}) {
       safeNumber(candidate?.chordRatio, 0) >= 0.18 ||
       Math.max(1, safeNumber(candidate?.staffCount, 1)) >= 2);
   if (!cleanSolo && !ambiguous) return normalizedSections;
+  const safePageMelodyProjection =
+    ambiguous &&
+    safeBoolean(candidate?.safeForErhuProjection, false) &&
+    !safeBoolean(candidate?.isLikelyPiano, false) &&
+    !safeBoolean(candidate?.isLikelyAccompanimentSplit, false) &&
+    Math.max(1, safeNumber(candidate?.staffCount, 1)) <= 1 &&
+    safeNumber(candidate?.chordRatio, 0) < 0.08 &&
+    safeNumber(candidate?.erhuRangeRatio, 0) >= 0.75;
 
   const lineGroups = new Map();
   for (const section of normalizedSections) {
@@ -623,6 +631,9 @@ function annotateImportedSectionsScoreLineRoles(sections = [], score = {}) {
   const patternLineForGroup = (group, orderedPageGroups) => {
     const systemGroups = systemOrderByKey.get(`${group.pageNumber}:${group.systemIndex}`) || [];
     if (systemGroups.length >= 2) return systemGroups.findIndex((item) => item.key === group.key) === 0;
+    if (safePageMelodyProjection && (orderedPageGroups.length >= 2 || lineMetrics(group).noteCount >= 4)) {
+      return true;
+    }
     const lineRank = orderedPageGroups.findIndex((item) => item.key === group.key);
     const lineCount = Math.max(1, orderedPageGroups.length);
     if (lineCount === 1) return true;
@@ -665,6 +676,8 @@ function annotateImportedSectionsScoreLineRoles(sections = [], score = {}) {
       const systemLineRank = systemGroups.findIndex((item) => item.key === group.key);
       if (systemGroups.length >= 2) {
         erhuPatternScore = systemLineRank === 0 ? 0.76 : 0.14;
+      } else if (safePageMelodyProjection && (lineCount >= 2 || group.notes.length >= 4)) {
+        erhuPatternScore = 0.74;
       } else if (lineCount === 2) {
         erhuPatternScore = lineRank === 0 ? 0.74 : 0.18;
       } else if (lineCount >= 3) {

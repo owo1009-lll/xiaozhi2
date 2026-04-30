@@ -447,6 +447,42 @@ CHINESE_PIANO_THEN_VOICE_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
 </score-partwise>
 """
 
+SAFE_VOICE_WITH_PIANO_MULTI_SYSTEM_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <defaults>
+    <page-layout>
+      <page-height>1600</page-height>
+      <page-width>1200</page-width>
+    </page-layout>
+  </defaults>
+  <part-list>
+    <score-part id="P1"><part-name>Voice</part-name></score-part>
+    <score-part id="P2"><part-name>Piano</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1" width="420">
+      <print new-system="yes"><system-layout><top-system-distance>120</top-system-distance></system-layout></print>
+      <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+      <note default-x="80"><pitch><step>D</step><octave>5</octave></pitch><duration>4</duration></note>
+      <note default-x="220"><pitch><step>E</step><octave>5</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2" width="420">
+      <print new-system="yes"><system-layout><top-system-distance>360</top-system-distance></system-layout></print>
+      <note default-x="80"><pitch><step>F</step><octave>5</octave></pitch><duration>4</duration></note>
+      <note default-x="220"><pitch><step>G</step><octave>5</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+  <part id="P2">
+    <measure number="1" width="420">
+      <attributes><divisions>4</divisions><staves>2</staves></attributes>
+      <note default-x="80"><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><staff>1</staff></note>
+      <note default-x="80"><chord/><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration><staff>1</staff></note>
+      <note default-x="80"><chord/><pitch><step>G</step><octave>3</octave></pitch><duration>4</duration><staff>2</staff></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 
 def require(condition: bool, message: str) -> None:
     if not condition:
@@ -626,6 +662,23 @@ def main() -> int:
             "Grace Cue",
             1,
         )
+        safe_voice_source = Path(tmp) / "safe-voice-with-piano-multi-system.musicxml"
+        safe_voice_source.write_text(SAFE_VOICE_WITH_PIANO_MULTI_SYSTEM_MUSICXML, encoding="utf-8")
+        safe_voice_request = ScoreImportRequest(
+            jobId="safe-voice-with-piano-multi-system-test",
+            pdfPath=str(safe_voice_source),
+            originalFilename="safe-voice-with-piano-multi-system.musicxml",
+            titleHint="Safe Voice With Piano Multi System",
+            selectedPartHint="Voice",
+        )
+        safe_voice_section, *_ = analyzer._parse_musicxml_source_to_section(
+            safe_voice_source,
+            safe_voice_request,
+            "Voice",
+            "section-safe",
+            "Safe Voice With Piano Multi System",
+            1,
+        )
 
     chinese_piano_candidates = analyzer._extract_musicxml_part_candidates(
         CHINESE_PIANO_THEN_VOICE_MUSICXML,
@@ -642,6 +695,11 @@ def main() -> int:
         "Erhu",
     )
     grace_cue_erhu = next((candidate for candidate in grace_cue_candidates if candidate.get("id") == "P1"), None)
+    safe_voice_candidates = analyzer._extract_musicxml_part_candidates(
+        SAFE_VOICE_WITH_PIANO_MULTI_SYSTEM_MUSICXML,
+        "Voice",
+    )
+    safe_voice_candidate = next((candidate for candidate in safe_voice_candidates if candidate.get("id") == "P1"), None)
 
     require(section is not None, "MusicXML did not produce a section.")
     require(merged_section is not None, "Merged voice MusicXML did not produce a section.")
@@ -653,9 +711,11 @@ def main() -> int:
     require(non_numeric_section is not None, "Non-numeric measure MusicXML did not produce a section.")
     require(backup_forward_section is not None, "Backup/forward MusicXML did not produce a section.")
     require(grace_cue_section is not None, "Grace/cue MusicXML did not produce a section.")
+    require(safe_voice_section is not None, "Safe voice with piano multi-system MusicXML did not produce a section.")
     require(chinese_voice is not None, "Chinese piano fixture should include the trailing Voice candidate.")
     require(backup_forward_erhu is not None, "Backup/forward fixture should expose the Erhu part candidate.")
     require(grace_cue_erhu is not None, "Grace/cue fixture should expose the Erhu part candidate.")
+    require(safe_voice_candidate is not None, "Safe voice fixture should expose the leading Voice part candidate.")
     require(
         chinese_voice.get("isAfterExplicitPiano") is True,
         "Voice after a Chinese-named piano part should be flagged as after explicit piano.",
@@ -735,6 +795,24 @@ def main() -> int:
     require(
         grace_cue_erhu.get("noteCount") == 2,
         f"Grace/cue MusicXML part scoring should ignore unscored notes, got noteCount={grace_cue_erhu.get('noteCount')}.",
+    )
+    require(
+        safe_voice_candidate.get("safeForErhuProjection") is True,
+        "Leading monophonic Voice part should remain safe for erhu projection even with a separate piano part.",
+    )
+    require(
+        safe_voice_candidate.get("isLikelyAccompanimentSplit") is False,
+        "Leading monophonic Voice part should not be treated as an accompaniment split risk.",
+    )
+    safe_voice_notes = safe_voice_section["notes"]
+    safe_voice_systems = {int(note["notePosition"]["systemIndex"]) for note in safe_voice_notes if note.get("notePosition")}
+    require(
+        len(safe_voice_systems) == 2,
+        f"Safe leading Voice part should keep both melody systems on the page, got {safe_voice_systems}.",
+    )
+    require(
+        [note["midiPitch"] for note in safe_voice_notes] == [74, 76, 77, 79],
+        f"Safe leading Voice part should retain both monophonic melody systems, got {[note['midiPitch'] for note in safe_voice_notes]}.",
     )
     notes = section["notes"]
     first_note = notes[0]

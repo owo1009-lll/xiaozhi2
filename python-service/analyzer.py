@@ -5978,6 +5978,15 @@ class ErhuAnalyzer:
         ambiguous = self._is_ambiguous_part_candidate(selected_part_candidate, part_candidates)
         if not clean_solo and not ambiguous:
             return note_events
+        safe_page_melody_projection = (
+            ambiguous
+            and bool((selected_part_candidate or {}).get("safeForErhuProjection"))
+            and not bool((selected_part_candidate or {}).get("isLikelyPiano"))
+            and not bool((selected_part_candidate or {}).get("isLikelyAccompanimentSplit"))
+            and int(safe_float((selected_part_candidate or {}).get("staffCount"), 1)) <= 1
+            and safe_float((selected_part_candidate or {}).get("chordRatio"), 0.0) < 0.08
+            and safe_float((selected_part_candidate or {}).get("erhuRangeRatio"), 0.0) >= 0.75
+        )
 
         line_groups: dict[tuple[int, int, int], list[NoteEvent]] = {}
         for note in note_events:
@@ -6067,6 +6076,10 @@ class ErhuAnalyzer:
             if len(ordered_system_keys) >= 2:
                 return ordered_system_keys.index(key) == 0 if key in ordered_system_keys else False
             ordered_page_keys = page_order.get(page_number, [])
+            if safe_page_melody_projection and (
+                len(ordered_page_keys) >= 2 or line_metrics(key)["note_count"] >= 4
+            ):
+                return True
             line_count = max(1, len(ordered_page_keys))
             line_rank = ordered_page_keys.index(key) if key in ordered_page_keys else 0
             if line_count == 1:
@@ -6113,6 +6126,8 @@ class ErhuAnalyzer:
             erhu_pattern_score = 0.0
             if system_line_count >= 2:
                 erhu_pattern_score = 0.76 if system_line_rank == 0 else 0.14
+            elif safe_page_melody_projection and (line_count >= 2 or len(notes) >= 4):
+                erhu_pattern_score = 0.74
             elif line_count == 1:
                 erhu_pattern_score = 0.42
             elif line_count == 2:
