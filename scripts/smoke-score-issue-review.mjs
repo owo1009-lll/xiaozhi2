@@ -354,9 +354,19 @@ async function runSmoke(args) {
           hasPieceTitle: Boolean(document.querySelector(".score-issue-title")),
           hasIssueList: document.querySelectorAll(".issue-list-button").length > 0,
           issueListCount: document.querySelectorAll(".issue-list-button").length,
+          issueNumberChipCount: document.querySelectorAll(".issue-list-button .issue-number-chip").length,
           hasScorePanel: Boolean(document.querySelector(".score-page-panel")),
           hasRenderedScore: Boolean((image && image.complete && image.naturalWidth > 0) || (canvas && canvas.width > 0 && canvas.height > 0)),
           highlightCount: document.querySelectorAll(".score-note-highlight,.score-measure-highlight").length,
+          highlightNumberCount: Array.from(document.querySelectorAll(".score-note-highlight .score-note-index,.score-measure-highlight span"))
+            .filter((item) => (item.textContent || "").trim()).length,
+          highlightToneClassCount: Array.from(document.querySelectorAll(".score-note-highlight,.score-measure-highlight"))
+            .filter((item) => Array.from(item.classList).some((className) => className.startsWith("issue-tone-"))).length,
+          hasIssueColorLegend: Boolean(document.querySelector(".issue-color-legend")),
+          colorLegendDotCount: document.querySelectorAll(".issue-color-legend .legend-dot").length,
+          hasMelodyLineMode: Boolean(document.querySelector(".issue-line-mode")),
+          listToneClassCount: Array.from(document.querySelectorAll(".issue-list-button"))
+            .filter((item) => Array.from(item.classList).some((className) => className.startsWith("issue-tone-"))).length,
           buttonCount: document.querySelectorAll("button").length,
           viewportWidth: window.innerWidth,
           viewportHeight: window.innerHeight,
@@ -404,8 +414,14 @@ async function runSmoke(args) {
       if (!issuePage.hasAudioPanel) pageFailures.push("issue-page-audio-panel-missing");
       if (!issuePage.hasPieceTitle) pageFailures.push("issue-page-title-missing");
       if (!issuePage.hasIssueList) pageFailures.push("issue-page-list-missing");
+      if (issuePage.issueNumberChipCount < issuePage.issueListCount) pageFailures.push("issue-page-issue-numbering-incomplete");
       if (!issuePage.hasScorePanel) pageFailures.push("issue-page-score-panel-missing");
       if (!issuePage.hasRenderedScore) pageFailures.push("issue-page-score-render-missing");
+      if (issuePage.highlightCount > 0 && issuePage.highlightNumberCount <= 0) pageFailures.push("issue-page-highlight-numbering-missing");
+      if (issuePage.highlightToneClassCount < issuePage.highlightCount) pageFailures.push("issue-page-highlight-tone-class-missing");
+      if (!issuePage.hasIssueColorLegend || issuePage.colorLegendDotCount < 3) pageFailures.push("issue-page-color-legend-missing");
+      if (issuePage.listToneClassCount < issuePage.issueListCount) pageFailures.push("issue-page-list-tone-class-missing");
+      if (!issuePage.hasMelodyLineMode) pageFailures.push("issue-page-melody-line-mode-missing");
       if (issuePage.hasHorizontalBodyOverflow) pageFailures.push("issue-page-horizontal-overflow");
       if (!playbackCheck.ok) pageFailures.push(`issue-page-playback-link-missing:${playbackCheck.reason || "unknown"}`);
       checkedPages.push({

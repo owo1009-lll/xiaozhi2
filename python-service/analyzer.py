@@ -762,6 +762,7 @@ class ErhuAnalyzer:
                     "enhancedWaveform": enhanced_waveform,
                     "residualWaveform": residual_waveform,
                     "separationConfidence": float(meta.get("separationConfidence", 0.0)),
+                    "separationQuality": meta.get("separationQuality") if isinstance(meta.get("separationQuality"), dict) else {},
                     "scope": scope,
                     "cacheKey": cache_key,
                 },
@@ -779,9 +780,15 @@ class ErhuAnalyzer:
         enhanced_waveform: Any,
         residual_waveform: Any,
         separation_confidence: float,
+        separation_quality: dict[str, Any] | None = None,
     ) -> None:
         if audio.waveform is None or audio.sample_rate is None:
             return
+        quality_meta = {
+            key: value
+            for key, value in (separation_quality or {}).items()
+            if key != "separationConfidence" and isinstance(value, (int, float)) and math.isfinite(float(value))
+        }
         for scope in ("exact", "piece"):
             cache_key = self._preprocessed_audio_cache_key(
                 request,
@@ -806,6 +813,7 @@ class ErhuAnalyzer:
                             "preprocessMode": preprocess_mode,
                             "scope": scope,
                             "separationConfidence": float(separation_confidence),
+                            "separationQuality": quality_meta,
                         },
                         ensure_ascii=False,
                     ),
@@ -1660,15 +1668,18 @@ class ErhuAnalyzer:
                     note = element
                     is_rest = self._xml_child(note, "rest") is not None
                     is_chord = self._xml_child(note, "chord") is not None
+                    is_grace = self._xml_child(note, "grace") is not None
+                    is_cue = self._xml_child(note, "cue") is not None
+                    is_unscored_note = is_grace or is_cue
                     duration_node = self._xml_child(note, "duration")
                     duration_beats = safe_float(duration_node.text if duration_node is not None else 0.0) / divisions
                     if not is_chord:
                         last_note_start = current_beat
-                    onset_key = (measure_position, round(last_note_start, 4))
-                    if onset_key in previous_measure_note_onsets:
-                        chord_count += 1
-                    previous_measure_note_onsets.add(onset_key)
-                    if not is_rest:
+                    if not is_rest and not is_unscored_note:
+                        onset_key = (measure_position, round(last_note_start, 4))
+                        if onset_key in previous_measure_note_onsets:
+                            chord_count += 1
+                        previous_measure_note_onsets.add(onset_key)
                         pitch = self._xml_child(note, "pitch")
                         step_node = self._xml_child(pitch, "step")
                         octave_node = self._xml_child(pitch, "octave")
@@ -1684,7 +1695,7 @@ class ErhuAnalyzer:
                                     int(safe_float(alter_node.text if alter_node is not None else 0, 0)),
                                 )
                             )
-                    if not is_chord:
+                    if not is_chord and not is_grace:
                         current_beat += max(duration_beats, 0.0)
 
             min_pitch = min(pitches) if pitches else 0
@@ -2784,6 +2795,10 @@ class ErhuAnalyzer:
             separationApplied=preprocess_applied,
             separationMode=applied_mode,
             separationConfidence=float(separation_meta.get("separationConfidence", 0.0)),
+            separationEnergyRatio=safe_float(separation_meta.get("separationEnergyRatio"), None),
+            separationScoreBandRatio=safe_float(separation_meta.get("separationScoreBandRatio"), None),
+            separationConfidentPitchCount=int(safe_float(separation_meta.get("separationConfidentPitchCount"), 0)),
+            separationScoreBandHitCount=int(safe_float(separation_meta.get("separationScoreBandHitCount"), 0)),
             inputAudioPath=separation_meta.get("rawAudioPath"),
             erhuEnhancedAudioPath=separation_meta.get("erhuEnhancedAudioPath"),
             accompanimentResidualPath=separation_meta.get("accompanimentResidualPath"),
@@ -4988,7 +5003,22 @@ class ErhuAnalyzer:
         if cached_preprocessed_audio:
             enhanced_waveform = np.asarray(cached_preprocessed_audio["enhancedWaveform"], dtype=np.float32)
             residual_waveform = np.asarray(cached_preprocessed_audio["residualWaveform"], dtype=np.float32)
+            separation_quality = self._measure_separation_quality(
+                score_notes,
+                pitch_track,
+                base_waveform,
+                enhanced_waveform,
+            )
+            cached_quality = cached_preprocessed_audio.get("separationQuality")
+            if isinstance(cached_quality, dict):
+                separation_quality.update(
+                    {
+                        key: safe_float(value, separation_quality.get(key, 0.0))
+                        for key, value in cached_quality.items()
+                    }
+                )
             separation_confidence = float(cached_preprocessed_audio.get("separationConfidence", 0.0))
+            separation_quality["separationConfidence"] = separation_confidence
             separation_meta["warnings"].append(
                 f"preprocessed-audio-cache:{cached_preprocessed_audio.get('scope', 'unknown')}"
             )
@@ -4998,12 +5028,13 @@ class ErhuAnalyzer:
                 separation_meta["warnings"].append("二胡增强分离未生成有效波形，已回退原音分析。")
                 return audio, False, "off", separation_meta
             residual_waveform = np.asarray(base_waveform - enhanced_waveform, dtype=np.float32)
-            separation_confidence = self._estimate_separation_confidence(
+            separation_quality = self._measure_separation_quality(
                 score_notes,
                 pitch_track,
                 base_waveform,
                 enhanced_waveform,
             )
+            separation_confidence = float(separation_quality.get("separationConfidence", 0.0))
             self._write_cached_preprocessed_audio(
                 request,
                 audio,
@@ -5013,6 +5044,7 @@ class ErhuAnalyzer:
                 enhanced_waveform,
                 residual_waveform,
                 separation_confidence,
+                separation_quality,
             )
 
         media_paths = (
@@ -5028,6 +5060,10 @@ class ErhuAnalyzer:
             {
                 "separationMode": "erhu-focus",
                 "separationConfidence": round(float(separation_confidence), 3),
+                "separationEnergyRatio": round(safe_float(separation_quality.get("separationEnergyRatio"), 0.0), 3),
+                "separationScoreBandRatio": round(safe_float(separation_quality.get("separationScoreBandRatio"), 0.0), 3),
+                "separationConfidentPitchCount": int(safe_float(separation_quality.get("separationConfidentPitchCount"), 0)),
+                "separationScoreBandHitCount": int(safe_float(separation_quality.get("separationScoreBandHitCount"), 0)),
                 "rawAudioPath": media_paths.get("rawAudioPath"),
                 "erhuEnhancedAudioPath": media_paths.get("erhuEnhancedAudioPath"),
                 "accompanimentResidualPath": media_paths.get("accompanimentResidualPath"),
@@ -5217,15 +5253,21 @@ class ErhuAnalyzer:
             enhanced_waveform = enhanced_waveform / peak
         return enhanced_waveform.astype(np.float32)
 
-    def _estimate_separation_confidence(
+    def _measure_separation_quality(
         self,
         score_notes: list[SymbolicNote],
         pitch_track: list[dict[str, float]],
         base_waveform: Any,
         enhanced_waveform: Any,
-    ) -> float:
+    ) -> dict[str, Any]:
         if np is None:
-            return 0.0
+            return {
+                "separationConfidence": 0.0,
+                "separationEnergyRatio": 0.0,
+                "separationScoreBandRatio": 0.0,
+                "separationConfidentPitchCount": 0,
+                "separationScoreBandHitCount": 0,
+            }
         base_energy = float(np.mean(np.abs(base_waveform))) if len(base_waveform) else 0.0
         enhanced_energy = float(np.mean(np.abs(enhanced_waveform))) if len(enhanced_waveform) else 0.0
         energy_ratio = min(1.0, enhanced_energy / max(base_energy, 1e-6))
@@ -5244,7 +5286,29 @@ class ErhuAnalyzer:
                 score_band_hits += 1
         band_ratio = (score_band_hits / confident_points) if confident_points else 0.0
         confidence = (energy_ratio * 0.52) + (band_ratio * 0.36) + float(self.settings.separation_auto_score_band_bonus)
-        return max(0.0, min(0.98, confidence))
+        return {
+            "separationConfidence": max(0.0, min(0.98, confidence)),
+            "separationEnergyRatio": max(0.0, min(1.0, energy_ratio)),
+            "separationScoreBandRatio": max(0.0, min(1.0, band_ratio)),
+            "separationConfidentPitchCount": int(confident_points),
+            "separationScoreBandHitCount": int(score_band_hits),
+        }
+
+    def _estimate_separation_confidence(
+        self,
+        score_notes: list[SymbolicNote],
+        pitch_track: list[dict[str, float]],
+        base_waveform: Any,
+        enhanced_waveform: Any,
+    ) -> float:
+        return float(
+            self._measure_separation_quality(
+                score_notes,
+                pitch_track,
+                base_waveform,
+                enhanced_waveform,
+            ).get("separationConfidence", 0.0)
+        )
 
     def _persist_audio_variants(
         self,
@@ -5685,13 +5749,16 @@ class ErhuAnalyzer:
                 note_index += 1
                 is_rest = child(note, "rest") is not None
                 is_chord = child(note, "chord") is not None
+                is_grace = child(note, "grace") is not None
+                is_cue = child(note, "cue") is not None
+                is_unscored_note = is_grace or is_cue
                 duration_node = child(note, "duration")
                 duration_beats = safe_float(duration_node.text if duration_node is not None else 0.0) / divisions
                 if not is_chord:
                     last_note_start = current_beat
                 beat_start = last_note_start if is_chord else current_beat
 
-                if not is_rest:
+                if not is_rest and not is_unscored_note:
                     pitch = child(note, "pitch")
                     if pitch is not None:
                         step_node = child(pitch, "step")
@@ -5755,7 +5822,7 @@ class ErhuAnalyzer:
                                     dynamicValue=current_dynamic_value,
                                 )
                             )
-                if not is_chord:
+                if not is_chord and not is_grace:
                     current_beat += max(duration_beats, 0.0)
             current_measure_offset += max(0.0, safe_float(measure.attrib.get("width"), 0.0))
 

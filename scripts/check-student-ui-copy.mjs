@@ -6,6 +6,8 @@ import { formatSourceLabel } from "../src/analysisLabels.js";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const checkedFiles = [
+  "index.html",
+  "public/manifest.webmanifest",
   "src/StudentApp.jsx",
   "src/ScoreIssuePage.jsx",
   "src/analysisLabels.js",
@@ -71,6 +73,36 @@ for (const relativePath of checkedFiles) {
         reason: `Possible mojibake marker ${JSON.stringify(marker)} found.`,
       });
     }
+  }
+}
+
+const productCopyExpectations = [
+  {
+    path: "index.html",
+    requiredText: ["二胡 AI 自主练习", "导入 PDF 曲谱和演奏音频"],
+  },
+  {
+    path: "public/manifest.webmanifest",
+    requiredText: ["二胡 AI 自主练习", "AI 二胡", "导入 PDF 曲谱和演奏音频"],
+  },
+];
+for (const expectation of productCopyExpectations) {
+  const text = fs.readFileSync(path.join(repoRoot, expectation.path), "utf8");
+  for (const requiredText of expectation.requiredText) {
+    if (!text.includes(requiredText)) {
+      failures.push({
+        path: expectation.path,
+        line: 1,
+        reason: `Student app shell copy must include ${JSON.stringify(requiredText)}.`,
+      });
+    }
+  }
+  if (/\b(research|prototype)\b/i.test(text)) {
+    failures.push({
+      path: expectation.path,
+      line: 1,
+      reason: "Student app shell copy must not expose research/prototype wording.",
+    });
   }
 }
 

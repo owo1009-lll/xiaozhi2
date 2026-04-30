@@ -209,6 +209,10 @@ class SeparateErhuResult(BaseModel):
     separationApplied: bool
     separationMode: str
     separationConfidence: float = 0.0
+    separationEnergyRatio: float | None = None
+    separationScoreBandRatio: float | None = None
+    separationConfidentPitchCount: int | None = None
+    separationScoreBandHitCount: int | None = None
     inputAudioPath: str | None = None
     erhuEnhancedAudioPath: str | None = None
     accompanimentResidualPath: str | None = None

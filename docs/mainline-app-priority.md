@@ -133,21 +133,26 @@ Completed:
 - Re-ran the latest 8-card strict review batch with `npm run smoke:score-issues -- --all-cards`, saving screenshots under `data/real-tests/visual-review/2026-04-30T02-49-24-929Z`; every issue page opened, rendered its score, showed highlights, and linked the first problem item to original-audio playback.
 - Added mobile viewport coverage to `npm run smoke:score-issues` with horizontal-overflow detection, and adjusted the mobile problem-score layout so the issue list scrolls inside its own block instead of clipping the whole sidebar.
 - Added `npm run smoke:score-issues:mobile` as the fixed 390x844 mobile review-page smoke entry point for already-generated corpus runs.
+- Strengthened score issue smoke checks so complex-score review pages must keep problem numbering, issue tone color classes, color legend, and erhu melody-line mode visible.
 - Improved OMR melody/accompaniment line splitting for repeated multi-staff systems: the importer now keeps the top staff in each system instead of relying only on whole-page line modulo, with a regression case in `test:score-markings`.
 - Improved ambiguous OMR line splitting when a sparse pseudo-line appears above the real melody within the same system: dense monophonic lower melody lines can now be promoted while the one-note artifact is suppressed, with a regression case in `test:score-markings`.
 - Improved whole-PDF MusicXML page localization: `<print new-page="yes">` now advances the score page and resets system numbering, so smaller whole-file OMR outputs do not project later-page issues onto page 1.
 - Improved unknown-MusicXML measure parsing so non-numeric printed measure labels such as `1A`, `X2`, or coda labels no longer abort score import; numeric parts are preserved and fully non-numeric labels fall back to sequence order.
 - Improved MusicXML multi-voice timing support: `<backup>` and `<forward>` now adjust the per-measure beat cursor, so OMR exports that encode overlapping voices do not push secondary or resumed melody notes onto the wrong beat.
+- Improved MusicXML ornament handling so `<grace>` and `<cue>` notes are ignored as formal diagnosis/highlight notes while cue-note duration still preserves the following beat timeline.
 - Tightened MusicXML part-candidate scoring for Chinese-named piano parts (`钢琴` / `鋼琴`), so a following generic `Voice` part is treated as accompaniment-split risk instead of being auto-trusted as erhu projection.
 - Cleaned student-facing status wording so import states and whole-piece speed notes no longer expose raw internal status or cache wording.
 - Cleaned remaining student whole-piece progress wording so long waits and repeated runs no longer mention model internals, backend services, or cache mechanics.
 - Cleaned remaining queue/cache/write-style student status wording in the import and whole-piece progress panels, and added a copy guard so those phrases do not return.
 - Cleaned student-facing failure banners so analyzer/job/API/path details are replaced with learner-readable retry guidance.
 - Added `test:student-ui-copy` to the P0 routine so student-facing mojibake and raw backend error leaks are caught before release.
+- Extended the student UI copy guard to the app shell title/description and PWA manifest so release packaging does not regress to research/prototype wording or mojibake.
+- Added `test:separation-quality` to the P0 routine so erhu-focus separation confidence remains auditable through energy ratio and score-band pitch-hit diagnostics.
 - Extended the student UI copy guard to the problem-score page and to display source labels, preventing raw model/library/fallback labels from reappearing in learner-facing text.
 - Updated the installable PWA manifest and browser title from research-prototype wording to the student-facing `二胡 AI 自主练习` product name.
 - Added a Windows local shell-app installer script, `npm run install:windows`, that creates Start/Stop shortcuts targeting the production launcher without changing the diagnosis chain.
 - Hardened the Windows shortcut installer so `-OutputDir` works with both relative and absolute paths, making local install smoke checks safer.
+- Added `test:windows-installer` to create temporary Start/Stop shortcuts and verify their launcher targets before deleting the smoke directory.
 - Added PNG maskable PWA icons and strengthened `test:pwa` so install compatibility is checked beyond SVG icon presence.
 - Extended the MusicXML fallback test to cover compressed `.mxl` uploads, matching the student backup-score file picker.
 - Re-verified the full real-corpus strict routine after the cleanup with run batch `2026-04-30T02-49-24-929Z`; `8/8` completed, score issue smoke checked `8` cards, latest DTW quality is `latestMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`, and historical `reviewRate = 0.0669`.

@@ -391,6 +391,36 @@ BACKUP_FORWARD_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
 </score-partwise>
 """
 
+GRACE_CUE_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Erhu</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1" width="420">
+      <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+      <note default-x="40">
+        <grace/>
+        <pitch><step>C</step><octave>6</octave></pitch>
+      </note>
+      <note default-x="80">
+        <pitch><step>D</step><octave>5</octave></pitch>
+        <duration>4</duration>
+      </note>
+      <note default-x="150">
+        <cue/>
+        <pitch><step>A</step><octave>4</octave></pitch>
+        <duration>4</duration>
+      </note>
+      <note default-x="240">
+        <pitch><step>E</step><octave>5</octave></pitch>
+        <duration>4</duration>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 CHINESE_PIANO_THEN_VOICE_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
   <part-list>
@@ -579,6 +609,23 @@ def main() -> int:
             "Backup Forward",
             1,
         )
+        grace_cue_source = Path(tmp) / "grace-cue.musicxml"
+        grace_cue_source.write_text(GRACE_CUE_MUSICXML, encoding="utf-8")
+        grace_cue_request = ScoreImportRequest(
+            jobId="grace-cue-test",
+            pdfPath=str(grace_cue_source),
+            originalFilename="grace-cue.musicxml",
+            titleHint="Grace Cue Test",
+            selectedPartHint="Erhu",
+        )
+        grace_cue_section, *_ = analyzer._parse_musicxml_source_to_section(
+            grace_cue_source,
+            grace_cue_request,
+            "Erhu",
+            "section-a",
+            "Grace Cue",
+            1,
+        )
 
     chinese_piano_candidates = analyzer._extract_musicxml_part_candidates(
         CHINESE_PIANO_THEN_VOICE_MUSICXML,
@@ -590,6 +637,11 @@ def main() -> int:
         "Erhu",
     )
     backup_forward_erhu = next((candidate for candidate in backup_forward_candidates if candidate.get("id") == "P1"), None)
+    grace_cue_candidates = analyzer._extract_musicxml_part_candidates(
+        GRACE_CUE_MUSICXML,
+        "Erhu",
+    )
+    grace_cue_erhu = next((candidate for candidate in grace_cue_candidates if candidate.get("id") == "P1"), None)
 
     require(section is not None, "MusicXML did not produce a section.")
     require(merged_section is not None, "Merged voice MusicXML did not produce a section.")
@@ -600,8 +652,10 @@ def main() -> int:
     require(whole_pdf_section is not None, "Whole-PDF new-page MusicXML did not produce a section.")
     require(non_numeric_section is not None, "Non-numeric measure MusicXML did not produce a section.")
     require(backup_forward_section is not None, "Backup/forward MusicXML did not produce a section.")
+    require(grace_cue_section is not None, "Grace/cue MusicXML did not produce a section.")
     require(chinese_voice is not None, "Chinese piano fixture should include the trailing Voice candidate.")
     require(backup_forward_erhu is not None, "Backup/forward fixture should expose the Erhu part candidate.")
+    require(grace_cue_erhu is not None, "Grace/cue fixture should expose the Erhu part candidate.")
     require(
         chinese_voice.get("isAfterExplicitPiano") is True,
         "Voice after a Chinese-named piano part should be flagged as after explicit piano.",
@@ -668,6 +722,19 @@ def main() -> int:
     require(
         backup_forward_erhu.get("chordRatio", 0) > 0,
         "Backup/forward MusicXML part scoring should count overlapping voices as chord evidence.",
+    )
+    grace_cue_notes = grace_cue_section["notes"]
+    require(
+        [note["midiPitch"] for note in grace_cue_notes] == [74, 76],
+        f"Grace/cue MusicXML should exclude unscored ornament and cue notes, got {[note['midiPitch'] for note in grace_cue_notes]}.",
+    )
+    require(
+        [round(float(note["beatStart"]), 3) for note in grace_cue_notes] == [0.0, 2.0],
+        f"Grace/cue MusicXML should keep cue duration in the timeline while excluding cue notes, got {[note['beatStart'] for note in grace_cue_notes]}.",
+    )
+    require(
+        grace_cue_erhu.get("noteCount") == 2,
+        f"Grace/cue MusicXML part scoring should ignore unscored notes, got noteCount={grace_cue_erhu.get('noteCount')}.",
     )
     notes = section["notes"]
     first_note = notes[0]
