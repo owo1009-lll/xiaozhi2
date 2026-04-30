@@ -4,6 +4,7 @@ import json
 import sys
 import tempfile
 import warnings
+import zipfile
 from pathlib import Path
 
 
@@ -90,6 +91,35 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
+def assert_import_result(result, label: str) -> dict:
+    piece_pack = result.piecePack or {}
+    sections = piece_pack.get("sections") or []
+    notes = [note for section in sections for note in (section.get("notes") or [])]
+    part_candidates = result.partCandidates or piece_pack.get("partCandidates") or []
+
+    require(result.omrStatus == "completed", f"{label} import should complete, got {result.omrStatus!r}.")
+    require(bool(result.scoreId), f"{label} import should create a scoreId.")
+    require(bool(piece_pack), f"{label} import should create a piecePack.")
+    require(len(sections) >= 1, f"{label} import should create at least one section.")
+    require(len(notes) == 3, f"{label} import should retain the three erhu melody notes, got {len(notes)}.")
+    require([note.get("midiPitch") for note in notes] == [74, 76, 78], f"{label} import should retain erhu melody pitches only.")
+    require(result.selectedPart == "Erhu", f"Expected selectedPart Erhu for {label}, got {result.selectedPart!r}.")
+    require(part_candidates and part_candidates[0].get("label") == "Erhu", f"Erhu should rank ahead of piano in {label} candidates.")
+    require(result.selectedPartConfidence and result.selectedPartConfidence >= 0.7, f"Selected erhu part confidence should be usable for {label}.")
+    require(piece_pack.get("markingStats", {}).get("tempoChangeCount", 0) >= 1, f"Tempo marking should be preserved for {label}.")
+    require(piece_pack.get("markingStats", {}).get("dynamicChangeCount", 0) >= 1, f"Dynamic marking should be preserved for {label}.")
+
+    return {
+        "scoreId": result.scoreId,
+        "selectedPart": result.selectedPart,
+        "selectedPartConfidence": result.selectedPartConfidence,
+        "sectionCount": len(sections),
+        "noteCount": len(notes),
+        "topPartCandidate": part_candidates[0] if part_candidates else None,
+        "markingStats": piece_pack.get("markingStats", {}),
+    }
+
+
 def main() -> int:
     analyzer = ErhuAnalyzer(Settings())
     with tempfile.TemporaryDirectory() as tmp:
@@ -107,34 +137,40 @@ def main() -> int:
             )
         )
 
-    piece_pack = result.piecePack or {}
-    sections = piece_pack.get("sections") or []
-    notes = [note for section in sections for note in (section.get("notes") or [])]
-    part_candidates = result.partCandidates or piece_pack.get("partCandidates") or []
+        mxl_source = Path(tmp) / "fallback-import.mxl"
+        mxl_output_dir = Path(tmp) / "mxl-out"
+        with zipfile.ZipFile(mxl_source, "w") as archive:
+            archive.writestr(
+                "META-INF/container.xml",
+                """<?xml version="1.0" encoding="UTF-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="score.musicxml" media-type="application/vnd.recordare.musicxml+xml"/>
+  </rootfiles>
+</container>
+""",
+            )
+            archive.writestr("score.musicxml", SAMPLE_MUSICXML)
+        mxl_result = analyzer.import_musicxml_score(
+            MusicXmlImportRequest(
+                jobId="mxl-fallback-test",
+                musicxmlPath=str(mxl_source),
+                originalFilename=mxl_source.name,
+                titleHint="MXL Fallback Test",
+                selectedPartHint="erhu",
+                outputDir=str(mxl_output_dir),
+            )
+        )
 
-    require(result.omrStatus == "completed", f"MusicXML import should complete, got {result.omrStatus!r}.")
-    require(bool(result.scoreId), "MusicXML import should create a scoreId.")
-    require(bool(piece_pack), "MusicXML import should create a piecePack.")
-    require(len(sections) >= 1, "MusicXML import should create at least one section.")
-    require(len(notes) == 3, f"MusicXML import should retain the three erhu melody notes, got {len(notes)}.")
-    require([note.get("midiPitch") for note in notes] == [74, 76, 78], "MusicXML import should retain erhu melody pitches only.")
-    require(result.selectedPart == "Erhu", f"Expected selectedPart Erhu, got {result.selectedPart!r}.")
-    require(part_candidates and part_candidates[0].get("label") == "Erhu", "Erhu should rank ahead of piano in part candidates.")
-    require(result.selectedPartConfidence and result.selectedPartConfidence >= 0.7, "Selected erhu part confidence should be usable.")
-    require(piece_pack.get("markingStats", {}).get("tempoChangeCount", 0) >= 1, "Tempo marking should be preserved.")
-    require(piece_pack.get("markingStats", {}).get("dynamicChangeCount", 0) >= 1, "Dynamic marking should be preserved.")
+    musicxml_summary = assert_import_result(result, "MusicXML")
+    mxl_summary = assert_import_result(mxl_result, "MXL")
 
     print(
         json.dumps(
             {
                 "ok": True,
-                "scoreId": result.scoreId,
-                "selectedPart": result.selectedPart,
-                "selectedPartConfidence": result.selectedPartConfidence,
-                "sectionCount": len(sections),
-                "noteCount": len(notes),
-                "topPartCandidate": part_candidates[0] if part_candidates else None,
-                "markingStats": piece_pack.get("markingStats", {}),
+                "musicxml": musicxml_summary,
+                "mxl": mxl_summary,
             },
             ensure_ascii=False,
             indent=2,

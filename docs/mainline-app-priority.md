@@ -137,6 +137,7 @@ Completed:
 - Cleaned student-facing failure banners so analyzer/job/API/path details are replaced with learner-readable retry guidance.
 - Added `test:student-ui-copy` to the P0 routine so student-facing mojibake and raw backend error leaks are caught before release.
 - Updated the installable PWA manifest and browser title from research-prototype wording to the student-facing `二胡 AI 自主练习` product name.
+- Extended the MusicXML fallback test to cover compressed `.mxl` uploads, matching the student backup-score file picker.
 - Re-verified the full real-corpus strict routine after the cleanup with run batch `2026-04-30T02-49-24-929Z`; `8/8` completed, score issue smoke checked `8` cards, latest DTW quality is `latestMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`, and historical `reviewRate = 0.0669`.
 
 ## Next In Order
