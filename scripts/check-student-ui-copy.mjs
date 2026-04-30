@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { formatSourceLabel } from "../src/analysisLabels.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -28,12 +29,12 @@ const mojibakeMarkers = [
 
 const rawStudentErrorPatterns = [
   {
-    pattern: /setErrorMessage\([^;\n]*(?:error|err)\.message\s*\|\|/g,
-    reason: "setErrorMessage must not expose raw error.message in the student UI.",
+    pattern: /set(?:Error|ErrorMessage)\([^;\n]*(?:error|err)\.message\s*\|\|/g,
+    reason: "Student error setters must not expose raw error.message.",
   },
   {
-    pattern: /setErrorMessage\([^;\n]*(?:job|nextJob|scoreJob|analysisJob|piecePassJob)\??\.error\s*\|\|/g,
-    reason: "setErrorMessage must not expose raw job.error in the student UI.",
+    pattern: /set(?:Error|ErrorMessage)\([^;\n]*(?:job|nextJob|scoreJob|analysisJob|piecePassJob)\??\.error\s*\|\|/g,
+    reason: "Student error setters must not expose raw job.error.",
   },
   {
     pattern: /\{[^}\n]*(?:job|nextJob|scoreJob|analysisJob|piecePassJob)\??\.error\s*\|\|[^}\n]*\}/g,
@@ -76,12 +77,40 @@ if (!studentAppText.includes("function friendlyErrorMessage(")) {
   });
 }
 
-for (const { pattern, reason } of rawStudentErrorPatterns) {
-  for (const match of studentAppText.matchAll(pattern)) {
+for (const relativePath of ["src/StudentApp.jsx", "src/ScoreIssuePage.jsx"]) {
+  const absolutePath = path.join(repoRoot, relativePath);
+  const text = fs.readFileSync(absolutePath, "utf8");
+  for (const { pattern, reason } of rawStudentErrorPatterns) {
+    for (const match of text.matchAll(pattern)) {
+      failures.push({
+        path: relativePath,
+        line: lineNumberForOffset(text, match.index || 0),
+        reason,
+      });
+    }
+  }
+}
+
+const sourceLabelInputs = [
+  "torchcrepe",
+  "madmom-rnn-onset",
+  "madmom-rnn-beat",
+  "madmom-onset-beat-grid",
+  "librosa-onset",
+  "librosa-pyin",
+  "score-fallback",
+  "score-beat-fallback",
+  "synthetic",
+  "unexpected-internal-source",
+  "",
+];
+for (const input of sourceLabelInputs) {
+  const output = formatSourceLabel(input);
+  if (/\b(torchcrepe|madmom|librosa|fallback|synthetic|unknown|internal)\b/i.test(output)) {
     failures.push({
-      path: "src/StudentApp.jsx",
-      line: lineNumberForOffset(studentAppText, match.index || 0),
-      reason,
+      path: "src/analysisLabels.js",
+      line: 1,
+      reason: `formatSourceLabel(${JSON.stringify(input)}) exposes technical text: ${JSON.stringify(output)}.`,
     });
   }
 }

@@ -69,15 +69,15 @@ export function formatPreprocessModeLabel(value) {
 }
 
 export function formatSourceLabel(value) {
-  if (value === "torchcrepe") return "torchcrepe";
-  if (value === "madmom-rnn-onset" || value === "madmom-rnn-onset-relaxed") return "madmom RNN onset";
-  if (value === "madmom-rnn-beat") return "madmom RNN beat";
-  if (value === "madmom-onset-beat-grid") return "madmom onset beat grid";
-  if (value === "librosa-onset") return "librosa onset";
-  if (value === "librosa-pyin") return "librosa pYIN";
-  if (value === "score-fallback" || value === "score-beat-fallback") return "score fallback";
-  if (value === "synthetic") return "synthetic";
-  return String(value || "unknown");
+  if (value === "torchcrepe") return "音准识别";
+  if (value === "madmom-rnn-onset" || value === "madmom-rnn-onset-relaxed") return "节奏识别";
+  if (value === "madmom-rnn-beat") return "节拍识别";
+  if (value === "madmom-onset-beat-grid") return "节奏定位";
+  if (value === "librosa-onset") return "节奏粗检";
+  if (value === "librosa-pyin") return "音高粗检";
+  if (value === "score-fallback" || value === "score-beat-fallback") return "乐谱估计";
+  if (value === "synthetic") return "示范音";
+  return value ? "分析结果" : "未标注来源";
 }
 
 export function formatPitchLabelText(value) {
