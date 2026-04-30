@@ -1,7 +1,7 @@
 {
-  "name": "AI Erhu Research Prototype",
-  "short_name": "AI Erhu",
-  "description": "AI Erhu self-practice and score analysis prototype.",
+  "name": "二胡 AI 自主练习",
+  "short_name": "AI 二胡",
+  "description": "导入 PDF 曲谱和演奏音频，定位二胡练习中的音准与节奏问题。",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#edf3ea",
