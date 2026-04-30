@@ -309,6 +309,32 @@ SYSTEM_SPARSE_LEAD_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
 </score-partwise>
 """
 
+CHINESE_PIANO_THEN_VOICE_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>钢琴</part-name></score-part>
+    <score-part id="P2"><part-name>Voice</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1" width="420">
+      <attributes><divisions>4</divisions><staves>2</staves></attributes>
+      <note default-x="60"><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><staff>1</staff></note>
+      <note default-x="60"><chord/><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration><staff>1</staff></note>
+      <note default-x="60"><chord/><pitch><step>G</step><octave>3</octave></pitch><duration>4</duration><staff>2</staff></note>
+    </measure>
+  </part>
+  <part id="P2">
+    <measure number="1" width="420">
+      <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+      <note default-x="60"><pitch><step>D</step><octave>5</octave></pitch><duration>4</duration></note>
+      <note default-x="160"><pitch><step>E</step><octave>5</octave></pitch><duration>4</duration></note>
+      <note default-x="260"><pitch><step>F</step><octave>5</octave></pitch><duration>4</duration></note>
+      <note default-x="360"><pitch><step>G</step><octave>5</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 
 def require(condition: bool, message: str) -> None:
     if not condition:
@@ -421,12 +447,31 @@ def main() -> int:
             1,
         )
 
+    chinese_piano_candidates = analyzer._extract_musicxml_part_candidates(
+        CHINESE_PIANO_THEN_VOICE_MUSICXML,
+        "Voice",
+    )
+    chinese_voice = next((candidate for candidate in chinese_piano_candidates if candidate.get("id") == "P2"), None)
+
     require(section is not None, "MusicXML did not produce a section.")
     require(merged_section is not None, "Merged voice MusicXML did not produce a section.")
     require(system_section is not None, "System-merged voice MusicXML did not produce a section.")
     require(two_staff_section is not None, "Two-staff repeated systems MusicXML did not produce a section.")
     require(sparse_section is not None, "Sparse false lead MusicXML did not produce a section.")
     require(system_sparse_section is not None, "System sparse lead MusicXML did not produce a section.")
+    require(chinese_voice is not None, "Chinese piano fixture should include the trailing Voice candidate.")
+    require(
+        chinese_voice.get("isAfterExplicitPiano") is True,
+        "Voice after a Chinese-named piano part should be flagged as after explicit piano.",
+    )
+    require(
+        chinese_voice.get("isLikelyAccompanimentSplit") is True,
+        "Voice after a Chinese-named piano part should be treated as an accompaniment split risk.",
+    )
+    require(
+        chinese_voice.get("safeForErhuProjection") is False,
+        "Voice after a Chinese-named piano part should not be auto-trusted for erhu projection.",
+    )
     merged_notes = merged_section["notes"]
     merged_staffs = {int(note["notePosition"]["staffIndex"]) for note in merged_notes if note.get("notePosition")}
     require(merged_staffs == {1}, f"Merged voice should keep only erhu/top staff, got {merged_staffs}.")

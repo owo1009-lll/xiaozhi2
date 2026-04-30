@@ -1575,6 +1575,20 @@ class ErhuAnalyzer:
         except ET.ParseError:
             return []
 
+        def is_piano_part_name(label: str) -> bool:
+            label_lower = label.lower()
+            return (
+                "piano" in label_lower
+                or "pianoforte" in label_lower
+                or "pno" in label_lower
+                or "pn." in label_lower
+                or "钢琴" in label
+                or "鋼琴" in label
+                or "閽㈢惔" in label
+                or "閶肩惔" in label
+                or "闁姐垻鎯?" in label
+            )
+
         part_names: dict[str, str] = {}
         for element in root.iter():
             if self._xml_local_tag(element) != "score-part":
@@ -1595,8 +1609,7 @@ class ErhuAnalyzer:
             normalized_label = normalize_part_label(part_name)
             normalized_label_counts[normalized_label] = normalized_label_counts.get(normalized_label, 0) + 1
             part_order.append((part_index, part, part_id, part_name))
-            part_name_lower = part_name.lower()
-            if explicit_piano_part_index is None and ("piano" in part_name_lower or "閽㈢惔" in part_name or "閶肩惔" in part_name or "闁姐垻鎯?" in part_name):
+            if explicit_piano_part_index is None and is_piano_part_name(part_name):
                 explicit_piano_part_index = part_index
 
         candidates: list[dict[str, Any]] = []
@@ -1653,7 +1666,7 @@ class ErhuAnalyzer:
             normalized_name = normalize_part_label(part_name)
             name_lower = part_name.lower()
             erhu_name = ("erhu" in name_lower) or ("二胡" in part_name) or ("浜岃儭" in part_name)
-            piano_name = "piano" in name_lower or "钢琴" in part_name or "鋼琴" in part_name or "閽㈢惔" in part_name
+            piano_name = is_piano_part_name(part_name)
             voice_name = "voice" in name_lower or normalized_name == "voice"
             duplicate_label_count = normalized_label_counts.get(normalized_name, 0)
             is_generic_voice = voice_name and not erhu_name and not piano_name
@@ -5723,7 +5736,16 @@ class ErhuAnalyzer:
     def _has_accompaniment_part_candidate(self, candidates: list[dict[str, Any]] | None) -> bool:
         for candidate in candidates or []:
             label = " ".join(str(candidate.get(key) or "") for key in ("id", "name", "label")).lower()
-            if "piano" in label or "pno" in label or "accompaniment" in label or "钢琴" in label or "伴奏" in label:
+            if (
+                "piano" in label
+                or "pianoforte" in label
+                or "pno" in label
+                or "pn." in label
+                or "accompaniment" in label
+                or "钢琴" in label
+                or "鋼琴" in label
+                or "伴奏" in label
+            ):
                 return True
             if bool(candidate.get("isLikelyPiano")):
                 return True

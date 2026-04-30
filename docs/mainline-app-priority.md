@@ -132,6 +132,7 @@ Completed:
 - Ran screenshot-based visual review on the complex-score issue pages for `浮生`, `古巷深处`, `炫动`, `第四二胡狂想曲`, and `维奥莱塔组曲07 - 二胡 中胡`; first issue pages showed readable controls, rendered score images, and visible highlights.
 - Improved OMR melody/accompaniment line splitting for repeated multi-staff systems: the importer now keeps the top staff in each system instead of relying only on whole-page line modulo, with a regression case in `test:score-markings`.
 - Improved ambiguous OMR line splitting when a sparse pseudo-line appears above the real melody within the same system: dense monophonic lower melody lines can now be promoted while the one-note artifact is suppressed, with a regression case in `test:score-markings`.
+- Tightened MusicXML part-candidate scoring for Chinese-named piano parts (`钢琴` / `鋼琴`), so a following generic `Voice` part is treated as accompaniment-split risk instead of being auto-trusted as erhu projection.
 - Cleaned student-facing status wording so import states and whole-piece speed notes no longer expose raw internal status or cache wording.
 - Cleaned remaining student whole-piece progress wording so long waits and repeated runs no longer mention model internals, backend services, or cache mechanics.
 - Cleaned student-facing failure banners so analyzer/job/API/path details are replaced with learner-readable retry guidance.

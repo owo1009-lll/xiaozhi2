@@ -2275,7 +2275,7 @@ function isExplicitErhuPartCandidate(candidate = {}) {
 function hasAccompanimentPartCandidate(score = {}) {
   return getArray(score?.partCandidates).some((candidate) => {
     const label = `${safeString(candidate?.id)} ${safeString(candidate?.name)} ${safeString(candidate?.label)}`;
-    return /\b(piano|pno|accompaniment)\b|钢琴|伴奏|閽㈢惔|閶肩惔/i.test(label)
+    return /\b(piano|pno|pianoforte|accompaniment)\b|\bpn\.|钢琴|鋼琴|伴奏|閽㈢惔|閶肩惔/i.test(label)
       || safeBoolean(candidate?.isLikelyPiano, false)
       || Math.max(1, safeNumber(candidate?.staffCount, 1)) >= 2;
   });
