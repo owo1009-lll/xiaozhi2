@@ -25,11 +25,18 @@ if (!manifest.name || !manifest.short_name || manifest.display !== "standalone" 
 if (!Array.isArray(manifest.icons) || manifest.icons.length < 2) {
   fail("manifest must include installable icons");
 } else {
+  let hasMaskablePng = false;
   for (const icon of manifest.icons) {
     const iconPath = String(icon.src || "").replace(/^\//, "");
     if (!iconPath || !fs.existsSync(path.join(root, "public", iconPath.replace(/^public[\\/]/, "")))) {
       fail(`manifest icon is missing: ${icon.src}`);
     }
+    if (String(icon.type || "") === "image/png" && /\bmaskable\b/.test(String(icon.purpose || ""))) {
+      hasMaskablePng = true;
+    }
+  }
+  if (!hasMaskablePng) {
+    fail("manifest must include at least one maskable PNG icon for install compatibility");
   }
 }
 
@@ -63,6 +70,7 @@ if (!process.exitCode) {
         manifest: manifest.short_name,
         display: manifest.display,
         icons: manifest.icons.length,
+        maskablePng: true,
         dynamicCacheBypass: ["/api/", "/data/", "/exports/", "/score/"],
       },
       null,
