@@ -150,6 +150,8 @@ Completed:
 - Added `test:student-ui-copy` to the P0 routine so student-facing mojibake and raw backend error leaks are caught before release.
 - Extended the student UI copy guard to the app shell title/description and PWA manifest so release packaging does not regress to research/prototype wording or mojibake.
 - Added `test:separation-quality` to the P0 routine so erhu-focus separation confidence remains auditable through energy ratio and score-band pitch-hit diagnostics.
+- Added `npm run audit:separation-quality` and `npm run audit:separation-quality:all` to rank real-corpus and cached separation confidence distributions. The latest real-corpus audit currently finds `16` separation records, `5` below `0.4`, median confidence `0.592`, and the lowest current cases are `第四二胡狂想曲`, `20190306桃花坞`, `雪山魂塑`, and `浮生`.
+- Extended `test:dtw-quality` so review hotspots include reason breakdowns plus concrete page/measure/note samples. The latest mainline score/audio set still has `latestMainlineReviewRate = 0`; the remaining historical review load is dominated by `exact-note-on-accompaniment` and `accompaniment-only-section` in stale analyses.
 - Extended the student UI copy guard to the problem-score page and to display source labels, preventing raw model/library/fallback labels from reappearing in learner-facing text.
 - Updated the installable PWA manifest and browser title from research-prototype wording to the student-facing `二胡 AI 自主练习` product name.
 - Added a Windows local shell-app installer script, `npm run install:windows`, that creates Start/Stop shortcuts targeting the production launcher without changing the diagnosis chain.
@@ -168,6 +170,12 @@ Completed:
 4. Continue student UI cleanup where technical labels remain visible outside the main upload/import path.
 5. Keep manual `MusicXML` import as the fallback for PDFs whose Audiveris output is too noisy.
 6. Treat deeper installer packaging beyond local Windows shortcuts as lower priority until the diagnosis chain is visually reliable.
+
+## Current P1/P2 Focus
+
+- Refresh at least one targeted real-corpus `--run` after separation metrics are present in the cache, then use `npm run audit:separation-quality` to inspect `separationEnergyRatio` and `separationScoreBandRatio`, not only legacy confidence.
+- Continue OMR section/voice improvements with `test:dtw-quality` review samples as the selector for exact pages, measures, and note IDs.
+- Add 2-3 unknown/scanned PDF benchmark samples before treating unknown-PDF robustness as done.
 
 ## Immediate Implication
 

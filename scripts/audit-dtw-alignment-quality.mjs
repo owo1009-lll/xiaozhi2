@@ -228,6 +228,8 @@ function emptyAnalysisSummary(analysis, score) {
     reviewRate: 0,
     accompanimentFailureCount: 0,
     accompanimentFailureRate: 0,
+    reviewReasonBreakdown: {},
+    reviewSamples: [],
   };
 }
 
@@ -276,6 +278,42 @@ function finalizeAnalysisSummary(target) {
   target.accompanimentFailureCount = totalFailures;
   target.accompanimentFailureRate = rate(totalFailures, totalIssues);
   return target;
+}
+
+function addReason(target, reason) {
+  const key = String(reason || "unknown-review-reason");
+  target[key] = (target[key] || 0) + 1;
+}
+
+function mergeReasonBreakdown(target, source = {}) {
+  for (const [reason, count] of Object.entries(source || {})) {
+    target[reason] = (target[reason] || 0) + numberValue(count, 0);
+  }
+  return target;
+}
+
+function topReasonText(source = {}, limit = 3) {
+  return Object.entries(source || {})
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, limit)
+    .map(([reason, count]) => `${reason}:${count}`)
+    .join(", ");
+}
+
+function addReviewSample(result, issueType, issue, auditItem) {
+  const reason = auditItem?.reason || "unknown-review-reason";
+  addReason(result.reviewReasonBreakdown, reason);
+  if (result.reviewSamples.length >= 20) return;
+  result.reviewSamples.push({
+    issueType,
+    reason,
+    sectionId: auditItem?.sectionId || issue?.sectionId || "",
+    pageNumber: Number(issue?.sourcePageNumber || issue?.pageNumber) || null,
+    measureIndex: Number(issue?.measureIndex) || null,
+    noteId: issue?.noteId || "",
+    severity: issue?.severity || "",
+    issueKind: issue?.type || issue?.issueType || "",
+  });
 }
 
 function addAnalysisSummary(target, result) {
@@ -335,6 +373,7 @@ function auditAnalysis(score, analysis) {
       failures.push({ type: "note-on-accompaniment", ...item });
     } else {
       result.noteReviewCount += 1;
+      addReviewSample(result, "note", issue, item);
     }
   }
 
@@ -347,6 +386,7 @@ function auditAnalysis(score, analysis) {
       failures.push({ type: "measure-on-accompaniment", ...item });
     } else {
       result.measureReviewCount += 1;
+      addReviewSample(result, "measure", issue, item);
     }
   }
 
@@ -364,7 +404,23 @@ function reviewHotspots(items = [], limit = 5) {
       reviewIssueCount: item.reviewIssueCount,
       reviewRate: item.reviewRate,
       accompanimentFailureCount: item.accompanimentFailureCount,
+      topReviewReasons: topReasonText(item.reviewReasonBreakdown),
     }));
+}
+
+function reviewIssueSamples(items = [], limit = 20) {
+  const samples = [];
+  for (const item of items) {
+    for (const sample of item.reviewSamples || []) {
+      samples.push({
+        pieceTitle: item.pieceTitle || item.scoreId,
+        analysisId: item.analysisId,
+        ...sample,
+      });
+      if (samples.length >= limit) return samples;
+    }
+  }
+  return samples;
 }
 
 function collectAnalyses(piecePassStore, studyStore) {
@@ -387,6 +443,10 @@ function collectAnalyses(piecePassStore, studyStore) {
 }
 
 function writeMarkdown(report, filePath) {
+  const latestReviewHotspots = reviewHotspots(report.latestMainlinePerAnalysis, 10);
+  const allReviewHotspots = reviewHotspots(report.perAnalysis, 10);
+  const latestReviewSamples = reviewIssueSamples(report.latestMainlinePerAnalysis, 20);
+  const allReviewSamples = reviewIssueSamples(report.perAnalysis, 20);
   const lines = [
     "# DTW Alignment Quality Report",
     "",
@@ -428,13 +488,43 @@ function writeMarkdown(report, filePath) {
       ? report.latestMainlinePerAnalysis.map((item) => `| ${item.pieceTitle || item.scoreId} | ${item.analysisId} | ${item.issueCount} | ${item.reviewIssueCount} | ${(item.reviewRate * 100).toFixed(1)}% | ${item.accompanimentFailureCount} |`)
       : ["| None |  | 0 | 0 | 0.0% | 0 |"]),
     "",
-    "## Review Hotspots",
+    "## Latest Mainline Review Hotspots",
     "",
-    "| Piece | Analysis | Issues | Review-needed | Review % | Accompaniment failures |",
-    "| --- | --- | ---: | ---: | ---: | ---: |",
-    ...(reviewHotspots(report.perAnalysis, 10).length
-      ? reviewHotspots(report.perAnalysis, 10).map((item) => `| ${item.pieceTitle} | ${item.analysisId} | ${item.issueCount} | ${item.reviewIssueCount} | ${(item.reviewRate * 100).toFixed(1)}% | ${item.accompanimentFailureCount} |`)
-      : ["| None |  | 0 | 0 | 0.0% | 0 |"]),
+    "| Piece | Analysis | Issues | Review-needed | Review % | Top reasons | Accompaniment failures |",
+    "| --- | --- | ---: | ---: | ---: | --- | ---: |",
+    ...(latestReviewHotspots.length
+      ? latestReviewHotspots.map((item) => `| ${item.pieceTitle} | ${item.analysisId} | ${item.issueCount} | ${item.reviewIssueCount} | ${(item.reviewRate * 100).toFixed(1)}% | ${item.topReviewReasons || ""} | ${item.accompanimentFailureCount} |`)
+      : ["| None |  | 0 | 0 | 0.0% |  | 0 |"]),
+    "",
+    "## Historical / All Review Hotspots",
+    "",
+    "| Piece | Analysis | Issues | Review-needed | Review % | Top reasons | Accompaniment failures |",
+    "| --- | --- | ---: | ---: | ---: | --- | ---: |",
+    ...(allReviewHotspots.length
+      ? allReviewHotspots.map((item) => `| ${item.pieceTitle} | ${item.analysisId} | ${item.issueCount} | ${item.reviewIssueCount} | ${(item.reviewRate * 100).toFixed(1)}% | ${item.topReviewReasons || ""} | ${item.accompanimentFailureCount} |`)
+      : ["| None |  | 0 | 0 | 0.0% |  | 0 |"]),
+    "",
+    "## Review Reason Breakdown",
+    "",
+    `- Latest mainline: ${topReasonText(report.latestMainlineReviewReasonBreakdown) || "none"}`,
+    `- Mainline: ${topReasonText(report.mainlineReviewReasonBreakdown) || "none"}`,
+    `- All analyses: ${topReasonText(report.reviewReasonBreakdown) || "none"}`,
+    "",
+    "## Latest Mainline Review Samples",
+    "",
+    "| Piece | Analysis | Type | Reason | Section | Page | Measure | Note |",
+    "| --- | --- | --- | --- | --- | ---: | ---: | --- |",
+    ...(latestReviewSamples.length
+      ? latestReviewSamples.map((item) => `| ${item.pieceTitle} | ${item.analysisId} | ${item.issueType} | ${item.reason} | ${item.sectionId || ""} | ${item.pageNumber || ""} | ${item.measureIndex || ""} | ${item.noteId || ""} |`)
+      : ["| None |  |  |  |  |  |  |  |"]),
+    "",
+    "## Historical / All Review Samples",
+    "",
+    "| Piece | Analysis | Type | Reason | Section | Page | Measure | Note |",
+    "| --- | --- | --- | --- | --- | ---: | ---: | --- |",
+    ...(allReviewSamples.length
+      ? allReviewSamples.map((item) => `| ${item.pieceTitle} | ${item.analysisId} | ${item.issueType} | ${item.reason} | ${item.sectionId || ""} | ${item.pageNumber || ""} | ${item.measureIndex || ""} | ${item.noteId || ""} |`)
+      : ["| None |  |  |  |  |  |  |  |"]),
     "",
     "## Warnings",
     "",
@@ -486,6 +576,9 @@ const report = {
   latestMainline: emptyTotals(),
   perAnalysis: [],
   latestMainlinePerAnalysis: [],
+  reviewReasonBreakdown: {},
+  mainlineReviewReasonBreakdown: {},
+  latestMainlineReviewReasonBreakdown: {},
   failures: [],
   warnings: [],
 };
@@ -502,9 +595,11 @@ for (const analysis of analyses) {
   const mode = String(result.analysisMode || "unknown");
   if (!report.modeBreakdown[mode]) report.modeBreakdown[mode] = emptyTotals();
   addAnalysisSummary(report, result);
+  mergeReasonBreakdown(report.reviewReasonBreakdown, result.reviewReasonBreakdown);
   addAnalysisSummary(report.modeBreakdown[mode], result);
   if (MAINLINE_ANALYSIS_MODES.has(mode)) {
     addAnalysisSummary(report.mainline, result);
+    mergeReasonBreakdown(report.mainlineReviewReasonBreakdown, result.reviewReasonBreakdown);
   }
 }
 
@@ -514,6 +609,7 @@ for (const analysis of latestMainlineAnalysesList) {
   const { result } = auditAnalysis(score, analysis);
   report.latestMainlinePerAnalysis.push(result);
   addAnalysisSummary(report.latestMainline, result);
+  mergeReasonBreakdown(report.latestMainlineReviewReasonBreakdown, result.reviewReasonBreakdown);
 }
 
 const totalIssues = report.noteIssueCount + report.measureIssueCount;
@@ -577,7 +673,11 @@ console.log(JSON.stringify({
   latestMainlineReviewRate: report.latestMainline.reviewRate,
   latestMainlineAccompanimentFailureRate: report.latestMainline.accompanimentFailureRate,
   latestMainlineReviewHotspots: reviewHotspots(report.latestMainlinePerAnalysis),
+  latestMainlineReviewReasonBreakdown: report.latestMainlineReviewReasonBreakdown,
+  latestMainlineReviewSamples: reviewIssueSamples(report.latestMainlinePerAnalysis, 10),
   historicalReviewHotspots: reviewHotspots(report.perAnalysis),
+  historicalReviewReasonBreakdown: report.reviewReasonBreakdown,
+  historicalReviewSamples: reviewIssueSamples(report.perAnalysis, 10),
   warnings: report.warnings,
   output: path.relative(repoRoot, latestJsonPath),
 }, null, 2));

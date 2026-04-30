@@ -31,6 +31,8 @@
     "test:score-markings": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-score-markings.py",
     "test:musicxml-import": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-musicxml-import.py",
     "test:separation-quality": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-separation-quality.py",
+    "audit:separation-quality": "node scripts\\audit-separation-quality.mjs",
+    "audit:separation-quality:all": "node scripts\\audit-separation-quality.mjs --all",
     "test:score-issues": "node scripts\\test-score-issue-projection.mjs",
     "review:score-issues": "node scripts\\build-score-issue-review.mjs",
     "review:p0-score-issues": "node scripts\\review-p0-score-issues.mjs",
