@@ -551,6 +551,44 @@ function annotateImportedSectionsScoreLineRoles(sections = [], score = {}) {
   for (const [systemKey, groups] of systemOrderByKey.entries()) {
     systemOrderByKey.set(systemKey, groups.sort((left, right) => left.medianY - right.medianY));
   }
+  const lineMetricCache = new Map();
+  const lineMetrics = (group) => {
+    if (lineMetricCache.has(group.key)) return lineMetricCache.get(group.key);
+    const onsetCounts = new Map();
+    const pitches = [];
+    for (const note of group.notes) {
+      const onsetKey = `${Math.max(1, Math.round(safeNumber(note?.measureIndex, 1)))}:${safeNumber(note?.beatStart, 0).toFixed(4)}`;
+      onsetCounts.set(onsetKey, (onsetCounts.get(onsetKey) || 0) + 1);
+      pitches.push(Math.round(safeNumber(note?.midiPitch, 69)));
+    }
+    const chordExcess = [...onsetCounts.values()].reduce((sum, count) => sum + Math.max(0, count - 1), 0);
+    const rangeHits = pitches.filter((pitch) => pitch >= 52 && pitch <= 96).length;
+    const metrics = {
+      noteCount: group.notes.length,
+      chordRatio: chordExcess / Math.max(1, group.notes.length),
+      rangeRatio: rangeHits / Math.max(1, pitches.length),
+      pitchSpan: pitches.length ? Math.max(...pitches) - Math.min(...pitches) : 0,
+    };
+    lineMetricCache.set(group.key, metrics);
+    return metrics;
+  };
+  const sparseSystemLeadNoise = new Set();
+  const sparseSystemLeadMelody = new Set();
+  if (ambiguous) {
+    for (const groups of systemOrderByKey.values()) {
+      if (groups.length < 2) continue;
+      const firstGroup = groups[0];
+      if (lineMetrics(firstGroup).noteCount > 2) continue;
+      const melodyGroup = groups.slice(1).find((group) => {
+        const metrics = lineMetrics(group);
+        return metrics.noteCount >= 3 && metrics.chordRatio < 0.12 && metrics.rangeRatio >= 0.75 && metrics.pitchSpan <= 36;
+      });
+      if (melodyGroup) {
+        sparseSystemLeadNoise.add(firstGroup.key);
+        sparseSystemLeadMelody.add(melodyGroup.key);
+      }
+    }
+  }
   const patternLineForGroup = (group, orderedPageGroups) => {
     const systemGroups = systemOrderByKey.get(`${group.pageNumber}:${group.systemIndex}`) || [];
     if (systemGroups.length >= 2) return systemGroups.findIndex((item) => item.key === group.key) === 0;
@@ -601,6 +639,9 @@ function annotateImportedSectionsScoreLineRoles(sections = [], score = {}) {
       } else if (lineCount >= 3) {
         erhuPatternScore = lineRank % 3 === 0 ? 0.74 : 0.14;
       }
+      if (sparseSystemLeadMelody.has(group.key)) {
+        erhuPatternScore = Math.max(erhuPatternScore, 0.74);
+      }
       let confidence = erhuPatternScore;
       confidence += Math.min(0.12, rangeRatio * 0.12);
       confidence += pitchSpan <= 36 ? 0.06 : -0.05;
@@ -609,6 +650,9 @@ function annotateImportedSectionsScoreLineRoles(sections = [], score = {}) {
         confidence = Math.min(confidence - 0.18, 0.58);
       }
       if (ambiguous && lineCount >= 4 && group.notes.length <= 2 && pageHasDensePatternLine.get(group.pageNumber)) {
+        confidence = Math.min(confidence - 0.22, 0.58);
+      }
+      if (sparseSystemLeadNoise.has(group.key)) {
         confidence = Math.min(confidence - 0.22, 0.58);
       }
       confidence = clamp(Number(confidence.toFixed(3)), 0.05, 0.9);

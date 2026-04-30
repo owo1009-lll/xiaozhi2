@@ -283,6 +283,32 @@ SPARSE_FALSE_LEAD_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
 </score-partwise>
 """
 
+SYSTEM_SPARSE_LEAD_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <defaults>
+    <page-layout>
+      <page-height>1600</page-height>
+      <page-width>1200</page-width>
+    </page-layout>
+  </defaults>
+  <part-list>
+    <score-part id="P1"><part-name>Voice</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1" width="420">
+      <print new-system="yes"><system-layout><top-system-distance>120</top-system-distance></system-layout></print>
+      <attributes><divisions>4</divisions><staves>3</staves><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+      <note default-x="60"><pitch><step>D</step><octave>6</octave></pitch><duration>4</duration><staff>1</staff></note>
+      <note default-x="60"><pitch><step>D</step><octave>5</octave></pitch><duration>4</duration><staff>2</staff></note>
+      <note default-x="160"><pitch><step>E</step><octave>5</octave></pitch><duration>4</duration><staff>2</staff></note>
+      <note default-x="260"><pitch><step>F</step><octave>5</octave></pitch><duration>4</duration><staff>2</staff></note>
+      <note default-x="60"><pitch><step>C</step><octave>3</octave></pitch><duration>4</duration><staff>3</staff></note>
+      <note default-x="60"><chord/><pitch><step>G</step><octave>3</octave></pitch><duration>4</duration><staff>3</staff></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 
 def require(condition: bool, message: str) -> None:
     if not condition:
@@ -377,12 +403,30 @@ def main() -> int:
             "Sparse False Lead",
             1,
         )
+        system_sparse_source = Path(tmp) / "system-sparse-lead.musicxml"
+        system_sparse_source.write_text(SYSTEM_SPARSE_LEAD_MUSICXML, encoding="utf-8")
+        system_sparse_request = ScoreImportRequest(
+            jobId="system-sparse-lead-test",
+            pdfPath=str(system_sparse_source),
+            originalFilename="system-sparse-lead.musicxml",
+            titleHint="System Sparse Lead Test",
+            selectedPartHint="Voice",
+        )
+        system_sparse_section, *_ = analyzer._parse_musicxml_source_to_section(
+            system_sparse_source,
+            system_sparse_request,
+            "Voice",
+            "page-001-s01",
+            "System Sparse Lead",
+            1,
+        )
 
     require(section is not None, "MusicXML did not produce a section.")
     require(merged_section is not None, "Merged voice MusicXML did not produce a section.")
     require(system_section is not None, "System-merged voice MusicXML did not produce a section.")
     require(two_staff_section is not None, "Two-staff repeated systems MusicXML did not produce a section.")
     require(sparse_section is not None, "Sparse false lead MusicXML did not produce a section.")
+    require(system_sparse_section is not None, "System sparse lead MusicXML did not produce a section.")
     merged_notes = merged_section["notes"]
     merged_staffs = {int(note["notePosition"]["staffIndex"]) for note in merged_notes if note.get("notePosition")}
     require(merged_staffs == {1}, f"Merged voice should keep only erhu/top staff, got {merged_staffs}.")
@@ -407,6 +451,13 @@ def main() -> int:
     sparse_systems = {int(note["notePosition"]["systemIndex"]) for note in sparse_notes if note.get("notePosition")}
     require(sparse_systems == {4}, f"Sparse false lead should be suppressed; kept systems {sparse_systems}.")
     require([note["midiPitch"] for note in sparse_notes] == [74, 76, 77], "Sparse false lead should keep only the real erhu melody system.")
+    system_sparse_notes = system_sparse_section["notes"]
+    system_sparse_staffs = {int(note["notePosition"]["staffIndex"]) for note in system_sparse_notes if note.get("notePosition")}
+    require(system_sparse_staffs == {2}, f"System sparse lead should promote dense melody staff 2, got {system_sparse_staffs}.")
+    require(
+        [note["midiPitch"] for note in system_sparse_notes] == [74, 76, 77],
+        "System sparse lead should suppress the one-note pseudo top staff and keep the real melody line.",
+    )
     notes = section["notes"]
     first_note = notes[0]
     require(selected_part == "Erhu", f"Expected Erhu selected part, got {selected_part!r}.")

@@ -5809,6 +5809,54 @@ class ErhuAnalyzer:
                 ]),
             )
 
+        line_metric_cache: dict[tuple[int, int, int], dict[str, float]] = {}
+
+        def line_metrics(key: tuple[int, int, int]) -> dict[str, float]:
+            if key in line_metric_cache:
+                return line_metric_cache[key]
+            notes = line_groups.get(key, [])
+            onset_counts: dict[tuple[int, float], int] = {}
+            pitches: list[int] = []
+            for note in notes:
+                onset_key = (int(note.measureIndex), round(float(note.beatStart), 4))
+                onset_counts[onset_key] = onset_counts.get(onset_key, 0) + 1
+                pitches.append(int(note.midiPitch))
+            chord_excess = sum(max(0, count - 1) for count in onset_counts.values())
+            range_hits = sum(1 for value in pitches if 52 <= value <= 96)
+            metrics = {
+                "note_count": float(len(notes)),
+                "chord_ratio": chord_excess / max(1, len(notes)),
+                "range_ratio": range_hits / max(1, len(pitches)),
+                "pitch_span": float((max(pitches) - min(pitches)) if pitches else 0),
+            }
+            line_metric_cache[key] = metrics
+            return metrics
+
+        sparse_system_lead_noise: set[tuple[int, int, int]] = set()
+        sparse_system_lead_melody: set[tuple[int, int, int]] = set()
+        if ambiguous:
+            for keys in system_order.values():
+                if len(keys) < 2:
+                    continue
+                first_key = keys[0]
+                first_metrics = line_metrics(first_key)
+                if first_metrics["note_count"] > 2:
+                    continue
+                melody_key = next(
+                    (
+                        candidate_key
+                        for candidate_key in keys[1:]
+                        if line_metrics(candidate_key)["note_count"] >= 3
+                        and line_metrics(candidate_key)["chord_ratio"] < 0.12
+                        and line_metrics(candidate_key)["range_ratio"] >= 0.75
+                        and line_metrics(candidate_key)["pitch_span"] <= 36
+                    ),
+                    None,
+                )
+                if melody_key:
+                    sparse_system_lead_noise.add(first_key)
+                    sparse_system_lead_melody.add(melody_key)
+
         def is_erhu_pattern_line(key: tuple[int, int, int]) -> bool:
             page_number, system_index, _staff_index = key
             ordered_system_keys = system_order.get((page_number, system_index), [])
@@ -5867,6 +5915,8 @@ class ErhuAnalyzer:
                 erhu_pattern_score = 0.74 if line_rank == 0 else 0.18
             else:
                 erhu_pattern_score = 0.74 if line_rank % 3 == 0 else 0.14
+            if key in sparse_system_lead_melody:
+                erhu_pattern_score = max(erhu_pattern_score, 0.74)
 
             confidence = erhu_pattern_score
             confidence += min(0.12, range_ratio * 0.12)
@@ -5883,6 +5933,10 @@ class ErhuAnalyzer:
                 # the real system.  In student-facing diagnosis it is safer to
                 # suppress those sparse pseudo-lines than to highlight them as
                 # erhu issues.
+                confidence = min(confidence - 0.22, 0.58)
+            if key in sparse_system_lead_noise:
+                # A very sparse pseudo-line above a dense monophonic line is more
+                # likely an OMR text/ornament artifact than the erhu melody.
                 confidence = min(confidence - 0.22, 0.58)
             confidence = max(0.05, min(0.9, confidence))
             role = "erhu" if confidence >= 0.66 else "accompaniment"
