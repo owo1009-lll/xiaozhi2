@@ -164,6 +164,17 @@ Completed:
 - Re-verified the full real-corpus strict routine after the cleanup with run batch `2026-04-30T02-49-24-929Z`; `8/8` completed, score issue smoke checked `8` cards, latest DTW quality is `latestMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`, and historical `reviewRate = 0.0669`.
 - Re-ran the full real-corpus strict routine with run batch `2026-04-30T05-47-54-108Z`; `8/8` completed with `0` P0 failures, desktop smoke checked all `8` review cards, mobile smoke passed at `390x844`, and refreshed DTW quality is `latestMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`, historical `reviewRate = 0.0616`.
 
+## 2026-05-01 Scanned PDF And Corpus Checkpoint
+
+Completed:
+
+- Added `弦歌吟.pdf` as the first real scanned-PDF baseline sample. `npm run audit:unknown-pdf-omr -- --pdf "C:\Users\Administrator\Music\弦歌吟.pdf"` completed with `omrConfidence = 0.86`, `33` structured sections, and `501` notes.
+- Fixed the unknown-PDF OMR baseline reporter so cached PDF-import jobs count structured sections from the persisted score store instead of reporting `0` sections when the import job omits `piecePack.sections`.
+- Recorded the current scanned-score failure mode: `弦歌吟` imports successfully, but OMR voice splitting marks only `123/501` notes as erhu melody. The supplied recording also skips score measures `202-211`; current pagewise OMR uses local page/system measure numbers, so this is tracked as a known-gapped baseline rather than a clean no-gap regression test.
+- Ran the `弦歌吟` end-to-end sample once: `12/12` sections matched, `0` failed sections, first cache-miss analysis took about `18.3s`, and score-issue smoke verified original-audio seek playback.
+- Ran the next diverse 5-song real-corpus batch (`古巷深处`, `维奥莱塔组曲07 - 二胡 中胡`, `雪山魂塑`, `弦歌吟`, `炫动`) with `--run --smoke-review --strict`: `5/5` completed, `0` P0 failures, review-page smoke passed for all `5` cards.
+- Refreshed the real-corpus trend report after the batch; latest trend summary has `completedPairCount = 71` and `p0FailureCount = 0`.
+
 ## Next In Order
 
 1. Keep periodic real-corpus `--run` tests in the routine, using `npm run test:real-corpus:strict` for automated review-page smoke checks during each batch. `npm run smoke:score-issues -- --run-summary <run-summary.json>` remains available for already-generated runs.

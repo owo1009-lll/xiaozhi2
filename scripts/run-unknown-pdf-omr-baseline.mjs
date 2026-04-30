@@ -46,6 +46,18 @@ function titleFromPdf(filePath) {
   return stripExtension(path.basename(filePath)).trim();
 }
 
+async function readScoreRecord(scoreId) {
+  if (!scoreId) return null;
+  const storePath = path.join(REPO_ROOT, "data", "erhu-score-imports.json");
+  if (!fsSync.existsSync(storePath)) return null;
+  try {
+    const store = JSON.parse(await fs.readFile(storePath, "utf8"));
+    return (store.scores || []).find((score) => String(score?.scoreId || "") === String(scoreId)) || null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 30000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -124,23 +136,40 @@ async function pollImport(baseUrl, jobId, timeoutMs) {
   throw new Error("PDF import timed out");
 }
 
-function summarizeJob(pdfPath, postResult, pollResult) {
+function getStructuredSections(job, scoreRecord) {
+  const scoreSections = Array.isArray(scoreRecord?.sections) ? scoreRecord.sections : [];
+  if (scoreSections.length) return { sections: scoreSections, source: "score-store" };
+  const scorePackSections = Array.isArray(scoreRecord?.piecePack?.sections) ? scoreRecord.piecePack.sections : [];
+  if (scorePackSections.length) return { sections: scorePackSections, source: "score-store-piece-pack" };
+  const jobSections = Array.isArray(job?.sections) ? job.sections : [];
+  if (jobSections.length) return { sections: jobSections, source: "job" };
+  const jobPackSections = Array.isArray(job?.piecePack?.sections) ? job.piecePack.sections : [];
+  if (jobPackSections.length) return { sections: jobPackSections, source: "job-piece-pack" };
+  if (Array.isArray(job?.piecePack?.notes) && job.piecePack.notes.length) {
+    return { sections: [job.piecePack], source: "job-single-piece-pack" };
+  }
+  return { sections: [], source: "missing" };
+}
+
+function summarizeJob(pdfPath, postResult, pollResult, scoreRecord = null) {
   const job = pollResult.job || {};
-  const sections = Array.isArray(job.piecePack?.sections) ? job.piecePack.sections : [];
+  const structured = getStructuredSections(job, scoreRecord);
+  const sections = structured.sections;
   const notes = sections.flatMap((section) => Array.isArray(section.notes) ? section.notes : []);
   return {
     title: titleFromPdf(pdfPath),
     pdfPath,
     status: job.omrStatus || "unknown",
     scoreId: job.scoreId || "",
-    selectedPart: job.selectedPart || "",
-    selectedPartConfidence: Number(job.selectedPartConfidence || 0),
-    detectedParts: job.detectedParts || [],
-    omrConfidence: Number(job.omrConfidence || 0),
-    omrStats: job.omrStats || {},
+    selectedPart: job.selectedPart || scoreRecord?.selectedPart || "",
+    selectedPartConfidence: Number(job.selectedPartConfidence || scoreRecord?.selectedPartConfidence || 0),
+    detectedParts: job.detectedParts || scoreRecord?.detectedParts || [],
+    omrConfidence: Number(job.omrConfidence || scoreRecord?.omrConfidence || 0),
+    omrStats: job.omrStats || scoreRecord?.omrStats || {},
+    structureSource: structured.source,
     sectionCount: sections.length || Number(job.piecePack?.sections?.length || 0),
     noteCount: notes.length || Number(job.piecePack?.noteCount || 0),
-    scoreLineStats: job.scoreLineStats || job.piecePack?.scoreLineStats || {},
+    scoreLineStats: scoreRecord?.scoreLineStats || job.scoreLineStats || job.piecePack?.scoreLineStats || {},
     warnings: job.warnings || [],
     requestMs: postResult.requestMs,
     importMs: postResult.requestMs + pollResult.pollMs,
@@ -172,7 +201,8 @@ async function main() {
       const jobId = postResult.response?.job?.jobId || postResult.response?.jobId;
       if (!jobId) throw new Error("missing import job id");
       const pollResult = await pollImport(args.baseUrl, jobId, args.timeoutMs);
-      report.samples.push(summarizeJob(pdfPath, postResult, pollResult));
+      const scoreRecord = await readScoreRecord(pollResult.job?.scoreId || "");
+      report.samples.push(summarizeJob(pdfPath, postResult, pollResult, scoreRecord));
     } catch (error) {
       const failure = {
         title,
