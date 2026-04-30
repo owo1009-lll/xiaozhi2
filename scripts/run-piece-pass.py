@@ -22,6 +22,8 @@ import soundfile as sf
 SCRIPT_ROOT = Path(__file__).resolve().parents[1]
 CWD_ROOT = Path.cwd().resolve()
 REPO_ROOT = CWD_ROOT if (CWD_ROOT / "package.json").exists() and (CWD_ROOT / "scripts").exists() else SCRIPT_ROOT
+SECTION_CACHE_KEY_VERSION = "piece-pass-section-v5-separation-quality"
+SECTION_CACHE_PAYLOAD_VERSION = "piece-pass-section-v9-separation-quality"
 
 
 def parse_args() -> argparse.Namespace:
@@ -95,6 +97,55 @@ def safe_number(value, fallback=0.0) -> float:
     except (TypeError, ValueError):
         return float(fallback)
     return numeric if numeric == numeric else float(fallback)
+
+
+def optional_number(value):
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    return numeric if numeric == numeric else None
+
+
+def optional_int(value):
+    numeric = optional_number(value)
+    return max(0, int(round(numeric))) if numeric is not None else None
+
+
+def safe_bool(value, fallback=False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"true", "1", "yes"}:
+            return True
+        if lowered in {"false", "0", "no"}:
+            return False
+    if value is None:
+        return fallback
+    return bool(value)
+
+
+def separation_quality_fields(source: dict | None) -> dict:
+    source = source or {}
+    diagnostics = source.get("diagnostics") if isinstance(source.get("diagnostics"), dict) else {}
+
+    def pick(key, fallback=None):
+        if key in source:
+            return source.get(key)
+        if key in diagnostics:
+            return diagnostics.get(key)
+        return fallback
+
+    return {
+        "separationApplied": safe_bool(pick("separationApplied"), False),
+        "separationMode": str(pick("separationMode", pick("appliedPreprocessMode", "")) or ""),
+        "separationConfidence": optional_number(pick("separationConfidence")),
+        "separationEnergyRatio": optional_number(pick("separationEnergyRatio")),
+        "separationScoreBandRatio": optional_number(pick("separationScoreBandRatio")),
+        "separationConfidentPitchCount": optional_int(pick("separationConfidentPitchCount")),
+        "separationScoreBandHitCount": optional_int(pick("separationScoreBandHitCount")),
+    }
 
 
 def meter_beats(meter: str | None) -> float:
@@ -651,7 +702,7 @@ def build_section_cache_key(
 ) -> str:
     return hash_json(
         {
-            "version": "piece-pass-section-v3",
+            "version": SECTION_CACHE_KEY_VERSION,
             "audioHash": audio_hash,
             "pieceId": piece_id,
             "pieceFingerprint": piece_hash,
@@ -748,7 +799,7 @@ def write_cached_section_row(
     cache_path.write_text(
         json.dumps(
             {
-                "cacheVersion": "piece-pass-section-v7-imported-rhythm-outlier-review",
+                "cacheVersion": SECTION_CACHE_PAYLOAD_VERSION,
                 "audioHash": audio_hash,
                 "pieceFingerprint": piece_hash,
                 "sectionFingerprint": section_hash,
@@ -927,6 +978,7 @@ def _analyze_section_item(
                 / 2.0
             ),
         ),
+        **separation_quality_fields(analysis),
         "recommendedPracticePath": analysis.get("recommendedPracticePath"),
         "measureFindingCount": len(analysis.get("measureFindings") or []),
         "noteFindingCount": len(analysis.get("noteFindings") or []),
@@ -990,6 +1042,7 @@ def build_section_row_from_scan_item(item: dict, section: dict, piece: dict) -> 
             "studentCombinedScore",
             round((safe_number(overall_pitch, 0) + safe_number(overall_rhythm, 0)) / 2.0),
         ),
+        **separation_quality_fields(item),
         "recommendedPracticePath": item.get("recommendedPracticePath"),
         "measureFindingCount": item.get("measureFindingCount", 0),
         "noteFindingCount": item.get("noteFindingCount", 0),

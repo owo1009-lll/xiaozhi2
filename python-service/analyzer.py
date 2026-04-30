@@ -215,6 +215,44 @@ def safe_float(value: Any, default: float = 0.0) -> float:
         return default
 
 
+def optional_float(value: Any) -> float | None:
+    try:
+        numeric = float(value)
+        return numeric if math.isfinite(numeric) else None
+    except Exception:
+        return None
+
+
+def optional_ratio(value: Any) -> float | None:
+    numeric = optional_float(value)
+    return max(0.0, min(1.0, numeric)) if numeric is not None else None
+
+
+def optional_count(value: Any) -> int | None:
+    numeric = optional_float(value)
+    return max(0, int(round(numeric))) if numeric is not None else None
+
+
+def analysis_separation_result_fields(
+    separation_meta: dict[str, Any] | None,
+    preprocess_applied: bool = False,
+    applied_preprocess_mode: str = "off",
+) -> dict[str, Any]:
+    meta = separation_meta or {}
+    return {
+        "separationApplied": bool(meta.get("separationApplied", preprocess_applied)),
+        "separationMode": str(meta.get("separationMode", applied_preprocess_mode or "off")),
+        "separationConfidence": optional_ratio(meta.get("separationConfidence")) or 0.0,
+        "separationEnergyRatio": optional_ratio(meta.get("separationEnergyRatio")),
+        "separationScoreBandRatio": optional_ratio(meta.get("separationScoreBandRatio")),
+        "separationConfidentPitchCount": optional_count(meta.get("separationConfidentPitchCount")),
+        "separationScoreBandHitCount": optional_count(meta.get("separationScoreBandHitCount")),
+        "rawAudioPath": meta.get("rawAudioPath"),
+        "erhuEnhancedAudioPath": meta.get("erhuEnhancedAudioPath"),
+        "accompanimentResidualPath": meta.get("accompanimentResidualPath"),
+    }
+
+
 def parse_musicxml_measure_index(value: Any, fallback: int) -> int:
     text = str(value or "").strip()
     fallback_index = int(safe_float(fallback, 1))
@@ -3611,6 +3649,11 @@ class ErhuAnalyzer:
             return AnalyzeResult(
                 overallPitchScore=0,
                 overallRhythmScore=0,
+                **analysis_separation_result_fields(
+                    separation_meta,
+                    preprocess_applied,
+                    applied_preprocess_mode or preprocess_mode or "off",
+                ),
                 measureFindings=[],
                 noteFindings=[],
                 demoSegments=[],
@@ -3726,6 +3769,11 @@ class ErhuAnalyzer:
             studentPitchScore=student_pitch_score,
             studentRhythmScore=student_rhythm_score,
             studentCombinedScore=student_combined_score,
+            **analysis_separation_result_fields(
+                separation_meta,
+                preprocess_applied,
+                applied_preprocess_mode or preprocess_mode or "off",
+            ),
             measureFindings=[],
             noteFindings=[],
             demoSegments=[],
@@ -5009,16 +5057,18 @@ class ErhuAnalyzer:
                 base_waveform,
                 enhanced_waveform,
             )
-            cached_quality = cached_preprocessed_audio.get("separationQuality")
-            if isinstance(cached_quality, dict):
-                separation_quality.update(
-                    {
-                        key: safe_float(value, separation_quality.get(key, 0.0))
-                        for key, value in cached_quality.items()
-                    }
-                )
-            separation_confidence = float(cached_preprocessed_audio.get("separationConfidence", 0.0))
-            separation_quality["separationConfidence"] = separation_confidence
+            separation_confidence = float(separation_quality.get("separationConfidence", 0.0))
+            self._write_cached_preprocessed_audio(
+                request,
+                audio,
+                preprocess_mode,
+                score_notes,
+                section_calibration,
+                enhanced_waveform,
+                residual_waveform,
+                separation_confidence,
+                separation_quality,
+            )
             separation_meta["warnings"].append(
                 f"preprocessed-audio-cache:{cached_preprocessed_audio.get('scope', 'unknown')}"
             )
@@ -7759,6 +7809,11 @@ class ErhuAnalyzer:
             return AnalyzeResult(
                 overallPitchScore=0,
                 overallRhythmScore=0,
+                **analysis_separation_result_fields(
+                    separation_meta,
+                    preprocess_applied,
+                    applied_preprocess_mode or preprocess_mode or "off",
+                ),
                 measureFindings=[],
                 noteFindings=[],
                 demoSegments=[],
@@ -8009,12 +8064,11 @@ class ErhuAnalyzer:
             studentPitchScore=student_pitch_score,
             studentRhythmScore=student_rhythm_score,
             studentCombinedScore=student_combined_score,
-            separationApplied=bool(separation_meta.get("separationApplied", preprocess_applied)),
-            separationMode=str(separation_meta.get("separationMode", applied_preprocess_mode or preprocess_mode or "off")),
-            separationConfidence=float(separation_meta.get("separationConfidence", 0.0)),
-            rawAudioPath=separation_meta.get("rawAudioPath"),
-            erhuEnhancedAudioPath=separation_meta.get("erhuEnhancedAudioPath"),
-            accompanimentResidualPath=separation_meta.get("accompanimentResidualPath"),
+            **analysis_separation_result_fields(
+                separation_meta,
+                preprocess_applied,
+                applied_preprocess_mode or preprocess_mode or "off",
+            ),
             measureFindings=measure_findings,
             noteFindings=note_findings,
             demoSegments=demo_segments,

@@ -214,6 +214,25 @@ function summarize(values) {
   };
 }
 
+function hasQualityBreakdown(record) {
+  return record.separationEnergyRatio !== null || record.separationScoreBandRatio !== null;
+}
+
+function hasInconsistentQualityBreakdown(record) {
+  if (!hasQualityBreakdown(record)) return false;
+  const energyRatio = record.separationEnergyRatio ?? 0;
+  const scoreBandRatio = record.separationScoreBandRatio ?? 0;
+  const confidentPitchCount = record.separationConfidentPitchCount ?? 0;
+  const scoreBandHitCount = record.separationScoreBandHitCount ?? 0;
+  return (
+    record.separationConfidence > 0.13
+    && energyRatio === 0
+    && scoreBandRatio === 0
+    && confidentPitchCount === 0
+    && scoreBandHitCount === 0
+  );
+}
+
 function groupByPiece(records, lowConfidenceThreshold) {
   const groups = new Map();
   for (const record of records) {
@@ -273,6 +292,9 @@ function writeMarkdown(report, filePath) {
     `- Scanned files: ${report.scannedFileCount}`,
     `- Separation records: ${report.recordCount}`,
     `- Records with energy/score-band metrics: ${report.recordsWithQualityBreakdown}`,
+    `- Usable records with energy/score-band metrics: ${report.recordsWithUsableQualityBreakdown}`,
+    `- Records missing energy/score-band metrics: ${report.recordsMissingQualityBreakdown}`,
+    `- Inconsistent stale metric records: ${report.inconsistentQualityBreakdownCount}`,
     `- Separation applied records: ${report.separationAppliedCount}`,
     `- Low confidence threshold: ${report.lowConfidenceThreshold}`,
     `- Low confidence records: ${report.lowConfidenceCount}`,
@@ -333,16 +355,27 @@ for (const filePath of files) {
   }
 }
 
-const recordsWithQualityBreakdown = records.filter((record) => (
-  record.separationEnergyRatio !== null || record.separationScoreBandRatio !== null
-)).length;
+const qualityBreakdownRecords = records.filter(hasQualityBreakdown);
+const inconsistentQualityBreakdownRecords = qualityBreakdownRecords.filter(hasInconsistentQualityBreakdown);
+const usableQualityBreakdownRecords = qualityBreakdownRecords.filter((record) => !hasInconsistentQualityBreakdown(record));
+const recordsWithQualityBreakdown = qualityBreakdownRecords.length;
+const worstRecordCandidates = usableQualityBreakdownRecords.length
+  ? usableQualityBreakdownRecords
+  : qualityBreakdownRecords.length
+    ? qualityBreakdownRecords
+    : records;
 if (records.length && recordsWithQualityBreakdown === 0) {
   warnings.push("No records include separationEnergyRatio or separationScoreBandRatio yet; refresh analyses after the quality-metric change to populate them.");
 }
+if (inconsistentQualityBreakdownRecords.length) {
+  warnings.push(`${inconsistentQualityBreakdownRecords.length} records have inconsistent separation quality metrics and were excluded from quality distributions; refresh those analyses to replace stale zeroed metrics.`);
+}
 
-const worstRecords = [...records]
+const worstRecords = [...worstRecordCandidates]
   .sort((left, right) => (
     left.separationConfidence - right.separationConfidence
+    || (left.separationEnergyRatio ?? 1) - (right.separationEnergyRatio ?? 1)
+    || (left.separationScoreBandRatio ?? 1) - (right.separationScoreBandRatio ?? 1)
     || String(left.pieceTitle || left.sourcePath).localeCompare(String(right.pieceTitle || right.sourcePath), "zh-Hans-CN")
   ))
   .slice(0, Math.max(1, args.limit));
@@ -354,12 +387,16 @@ const report = {
   scannedFileCount: files.length,
   recordCount: records.length,
   recordsWithQualityBreakdown,
+  recordsWithUsableQualityBreakdown: usableQualityBreakdownRecords.length,
+  recordsMissingQualityBreakdown: Math.max(0, records.length - recordsWithQualityBreakdown),
+  inconsistentQualityBreakdownCount: inconsistentQualityBreakdownRecords.length,
+  worstRecordScope: usableQualityBreakdownRecords.length ? "usable-quality-breakdown" : (qualityBreakdownRecords.length ? "quality-breakdown" : "all-records"),
   separationAppliedCount: records.filter((record) => record.separationApplied).length,
   lowConfidenceThreshold: args.lowConfidenceThreshold,
   lowConfidenceCount: records.filter((record) => record.separationConfidence < args.lowConfidenceThreshold).length,
   confidence: summarize(records.map((record) => record.separationConfidence)),
-  energyRatio: summarize(records.map((record) => record.separationEnergyRatio).filter((value) => value !== null)),
-  scoreBandRatio: summarize(records.map((record) => record.separationScoreBandRatio).filter((value) => value !== null)),
+  energyRatio: summarize(usableQualityBreakdownRecords.map((record) => record.separationEnergyRatio).filter((value) => value !== null)),
+  scoreBandRatio: summarize(usableQualityBreakdownRecords.map((record) => record.separationScoreBandRatio).filter((value) => value !== null)),
   byPiece: groupByPiece(records, args.lowConfidenceThreshold),
   worstRecords,
   warnings,
@@ -383,6 +420,10 @@ console.log(JSON.stringify({
   scannedFileCount: report.scannedFileCount,
   recordCount: report.recordCount,
   recordsWithQualityBreakdown: report.recordsWithQualityBreakdown,
+  recordsWithUsableQualityBreakdown: report.recordsWithUsableQualityBreakdown,
+  recordsMissingQualityBreakdown: report.recordsMissingQualityBreakdown,
+  inconsistentQualityBreakdownCount: report.inconsistentQualityBreakdownCount,
+  worstRecordScope: report.worstRecordScope,
   separationAppliedCount: report.separationAppliedCount,
   lowConfidenceCount: report.lowConfidenceCount,
   confidence: report.confidence,

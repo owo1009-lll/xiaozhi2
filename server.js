@@ -283,6 +283,37 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+function nullableRatio(value) {
+  const numeric = safeNumber(value, NaN);
+  return Number.isFinite(numeric) ? clamp(numeric, 0, 1) : null;
+}
+
+function nullableInteger(value) {
+  const numeric = safeNumber(value, NaN);
+  return Number.isFinite(numeric) ? Math.max(0, Math.round(numeric)) : null;
+}
+
+function separationQualityFields(source = {}, { confidenceFallback = 0, modeFallback = "" } = {}) {
+  const diagnostics = source?.diagnostics && typeof source.diagnostics === "object" ? source.diagnostics : {};
+  const pick = (key, fallback = null) => (
+    source?.[key] !== undefined
+      ? source[key]
+      : diagnostics?.[key] !== undefined
+        ? diagnostics[key]
+        : fallback
+  );
+  const confidence = safeNumber(pick("separationConfidence"), confidenceFallback);
+  return {
+    separationApplied: safeBoolean(pick("separationApplied"), false),
+    separationMode: safeString(pick("separationMode", pick("appliedPreprocessMode", modeFallback))),
+    separationConfidence: Number.isFinite(confidence) ? clamp(confidence, 0, 1) : null,
+    separationEnergyRatio: nullableRatio(pick("separationEnergyRatio")),
+    separationScoreBandRatio: nullableRatio(pick("separationScoreBandRatio")),
+    separationConfidentPitchCount: nullableInteger(pick("separationConfidentPitchCount")),
+    separationScoreBandHitCount: nullableInteger(pick("separationScoreBandHitCount")),
+  };
+}
+
 function normalizeMarkingItem(item = {}, fallback = {}) {
   const measureIndex = Math.max(1, Math.round(safeNumber(item?.measureIndex, fallback.measureIndex || 1)));
   const pageNumber = Math.max(1, Math.round(safeNumber(item?.pageNumber, fallback.pageNumber || 1)));
@@ -1492,6 +1523,10 @@ function buildPiecePassPrimaryAnalysis({ task = {}, passPayload = {}, summary = 
     filename: repairMojibakeText(task.payload?.audioSubmission?.name),
     audioHash: safeString(task.payload?.audioHash, safeString(summary?.audioHash, passPayload.audioHash)),
   } : null;
+  const separationQuality = separationQualityFields(sourceRow, {
+    confidenceFallback: 0,
+    modeFallback: safeString(task.payload?.separationMode, safeString(task.payload?.preprocessMode, "auto")),
+  });
   return {
     analysisId,
     participantId: safeString(task.payload?.participantId),
@@ -1513,6 +1548,7 @@ function buildPiecePassPrimaryAnalysis({ task = {}, passPayload = {}, summary = 
     studentPitchScore: clamp(safeNumber(sourceRow.studentPitchScore, safeNumber(sourceRow.overallPitchScore, 0)), 0, 100),
     studentRhythmScore: clamp(safeNumber(sourceRow.studentRhythmScore, safeNumber(sourceRow.overallRhythmScore, 0)), 0, 100),
     studentCombinedScore: clamp(safeNumber(sourceRow.studentCombinedScore, safeNumber(sourceRow.combinedScore, 0)), 0, 100),
+    ...separationQuality,
     measureFindings: getArray(sourceRow.measureFindings),
     noteFindings: getArray(sourceRow.noteFindings),
     demoSegments: getArray(sourceRow.demoSegments),
@@ -1633,6 +1669,10 @@ function buildWholePieceAnalysis({ task = {}, passPayload = {}, summary = null }
   }
 
   const firstDiagnostics = rows.find((row) => row?.diagnostics)?.diagnostics || {};
+  const separationQuality = separationQualityFields(firstDiagnostics, {
+    confidenceFallback: null,
+    modeFallback: safeString(task.payload?.separationMode, safeString(task.payload?.preprocessMode, "auto")),
+  });
   const overallPitchScore = clamp(
     safeNumber(summary?.weightedPitchScore, safeNumber(summary?.overallPitchScore, medianNumber(successfulRows.map((row) => row.overallPitchScore)))),
     0,
@@ -1684,9 +1724,7 @@ function buildWholePieceAnalysis({ task = {}, passPayload = {}, summary = null }
     studentPitchScore,
     studentRhythmScore,
     studentCombinedScore,
-    separationApplied: safeBoolean(firstDiagnostics?.separationApplied, false),
-    separationMode: safeString(firstDiagnostics?.separationMode),
-    separationConfidence: safeNumber(firstDiagnostics?.separationConfidence, null),
+    ...separationQuality,
     rawAudioPath: safeString(firstDiagnostics?.rawAudioPath),
     erhuEnhancedAudioPath: safeString(firstDiagnostics?.erhuEnhancedAudioPath),
     accompanimentResidualPath: safeString(firstDiagnostics?.accompanimentResidualPath),
@@ -1747,6 +1785,7 @@ function launchPiecePassTask(task) {
     const runnerScript = path.join(__dirname, "scripts", "run-python.ps1");
     const scanConcurrency = clamp(Math.round(safeNumber(process.env.ERHU_PIECE_PASS_SCAN_CONCURRENCY, 3)), 1, 6);
     const analysisConcurrency = clamp(Math.round(safeNumber(process.env.ERHU_PIECE_PASS_ANALYSIS_CONCURRENCY, 3)), 1, 6);
+    const analyzerUrl = safeString(process.env.ERHU_ANALYZER_URL, "http://127.0.0.1:8000").replace(/\/+$/, "");
     const args = [
       "-ExecutionPolicy",
       "Bypass",
@@ -1756,7 +1795,7 @@ function launchPiecePassTask(task) {
       "--base-url",
       `http://127.0.0.1:${port}`,
       "--analyzer-url",
-      "http://127.0.0.1:8000",
+      analyzerUrl || "http://127.0.0.1:8000",
       ...(task.sourceType === "score"
         ? ["--score-id", task.pieceKey]
         : ["--piece-id", task.pieceKey]),
@@ -2972,7 +3011,7 @@ function buildSectionFingerprint(section = {}) {
 
 function buildSectionAnalysisCacheKey(payload = {}, section = {}) {
   return hashJson({
-    analysisVersion: "v33-imported-rhythm-outlier-review",
+    analysisVersion: "v36-recomputed-separation-quality",
     audioHash: safeString(payload.audioHash),
     scoreId: safeString(payload.scoreId),
     pieceId: safeString(section?.pieceId, payload.pieceId),
@@ -2991,7 +3030,7 @@ function buildSectionAnalysisCacheKey(payload = {}, section = {}) {
 
 function buildSectionDetectionCacheKey(payload = {}, piece = {}, sections = [], options = {}) {
   return hashJson({
-    detectionVersion: "v33-imported-rhythm-outlier-review",
+    detectionVersion: "v36-recomputed-separation-quality",
     audioHash: safeString(payload.audioHash),
     scoreId: safeString(payload.scoreId),
     pieceId: safeString(piece?.pieceId, payload.pieceId),
@@ -3555,9 +3594,7 @@ function compactDetectionCandidate(candidate = {}) {
           scoreSource: safeString(diagnostics?.scoreSource),
           scoreNoteCount: Math.max(0, Math.round(safeNumber(diagnostics?.scoreNoteCount, 0))),
           alignedNoteCount: Math.max(0, Math.round(safeNumber(diagnostics?.alignedNoteCount, 0))),
-          separationApplied: safeBoolean(diagnostics?.separationApplied, false),
-          separationMode: safeString(diagnostics?.separationMode),
-          separationConfidence: clamp(safeNumber(diagnostics?.separationConfidence, 0), 0, 1),
+          ...separationQualityFields(diagnostics),
           detectedWindowStartSeconds: Number.isFinite(safeNumber(diagnostics?.detectedWindowStartSeconds, NaN))
             ? safeNumber(diagnostics?.detectedWindowStartSeconds)
             : null,
@@ -3595,9 +3632,7 @@ function buildDetectionSummaryAnalysis(candidate = {}) {
     demoSegments: [],
     analysisMode: "detection-summary",
     diagnostics,
-    separationApplied: safeBoolean(diagnostics?.separationApplied, false),
-    separationMode: safeString(diagnostics?.separationMode),
-    separationConfidence: clamp(safeNumber(diagnostics?.separationConfidence, 0), 0, 1),
+    ...separationQualityFields(diagnostics),
   };
 }
 
@@ -6411,6 +6446,14 @@ async function executePreparedAnalysisRequest(payload, { onProgress } = {}) {
       ),
       0,
       1,
+    ),
+    separationEnergyRatio: nullableRatio(analysis.separationEnergyRatio ?? analysis.diagnostics?.separationEnergyRatio),
+    separationScoreBandRatio: nullableRatio(analysis.separationScoreBandRatio ?? analysis.diagnostics?.separationScoreBandRatio),
+    separationConfidentPitchCount: nullableInteger(
+      analysis.separationConfidentPitchCount ?? analysis.diagnostics?.separationConfidentPitchCount,
+    ),
+    separationScoreBandHitCount: nullableInteger(
+      analysis.separationScoreBandHitCount ?? analysis.diagnostics?.separationScoreBandHitCount,
     ),
     rawAudioPath: safeString(analysis.rawAudioPath, safeString(analysis.diagnostics?.rawAudioPath)),
     erhuEnhancedAudioPath: safeString(

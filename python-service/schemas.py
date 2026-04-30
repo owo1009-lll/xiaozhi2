@@ -137,6 +137,10 @@ class AnalyzeResult(BaseModel):
     separationApplied: bool | None = None
     separationMode: str | None = None
     separationConfidence: float | None = None
+    separationEnergyRatio: float | None = None
+    separationScoreBandRatio: float | None = None
+    separationConfidentPitchCount: int | None = None
+    separationScoreBandHitCount: int | None = None
     rawAudioPath: str | None = None
     erhuEnhancedAudioPath: str | None = None
     accompanimentResidualPath: str | None = None
