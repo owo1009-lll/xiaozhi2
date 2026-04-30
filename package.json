@@ -33,6 +33,7 @@
     "test:separation-quality": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-separation-quality.py",
     "test:score-issues": "node scripts\\test-score-issue-projection.mjs",
     "review:score-issues": "node scripts\\build-score-issue-review.mjs",
+    "review:p0-score-issues": "node scripts\\review-p0-score-issues.mjs",
     "smoke:score-issues": "node scripts\\smoke-score-issue-review.mjs",
     "smoke:score-issues:mobile": "node scripts\\smoke-score-issue-review.mjs --mobile --viewport 390x844",
     "test:dtw-quality": "node scripts\\audit-dtw-alignment-quality.mjs",

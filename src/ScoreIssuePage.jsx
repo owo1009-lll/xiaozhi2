@@ -1395,7 +1395,6 @@ export default function ScoreIssuePage() {
         const [measureSectionId, measureText] = String(measureKey).split("::");
         const measureIndex = Number(measureText) || 1;
         const measureSection = effectiveSections.find((item) => String(item?.sectionId || "") === measureSectionId) || section;
-        if (shouldProjectImportedFullScoreSection(measureSection)) return null;
         const sectionStaffIndex = getErhuStaffIndex(measureSection, dominantStaffIndex);
         const absolutePage = getAbsoluteIssuePage(measureSection);
         const measureNotes = (Array.isArray(measureSection?.notes) ? measureSection.notes : [])

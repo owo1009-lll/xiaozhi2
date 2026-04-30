@@ -134,6 +134,8 @@ Completed:
 - Added mobile viewport coverage to `npm run smoke:score-issues` with horizontal-overflow detection, and adjusted the mobile problem-score layout so the issue list scrolls inside its own block instead of clipping the whole sidebar.
 - Added `npm run smoke:score-issues:mobile` as the fixed 390x844 mobile review-page smoke entry point for already-generated corpus runs.
 - Strengthened score issue smoke checks so complex-score review pages must keep problem numbering, issue tone color classes, color legend, and erhu melody-line mode visible.
+- Added a targeted P0 browser review helper, `npm run review:p0-score-issues`, for clicking every issue in `炫动` and `古巷深处`, capturing screenshots, checking highlight-number correspondence, and verifying original-audio seek times.
+- Fixed imported whole-score measure highlights so reliable problem-measure items render exact measure boxes from erhu melody note coordinates, instead of only showing same-page note highlights.
 - Improved OMR melody/accompaniment line splitting for repeated multi-staff systems: the importer now keeps the top staff in each system instead of relying only on whole-page line modulo, with a regression case in `test:score-markings`.
 - Improved ambiguous OMR line splitting when a sparse pseudo-line appears above the real melody within the same system: dense monophonic lower melody lines can now be promoted while the one-note artifact is suppressed, with a regression case in `test:score-markings`.
 - Improved whole-PDF MusicXML page localization: `<print new-page="yes">` now advances the score page and resets system numbering, so smaller whole-file OMR outputs do not project later-page issues onto page 1.
