@@ -12,6 +12,7 @@
     "start-prod": "powershell -ExecutionPolicy Bypass -File scripts\\start-prod.ps1",
     "start-web": "powershell -ExecutionPolicy Bypass -File scripts\\start-prod.ps1 -OpenBrowser",
     "stop-prod": "powershell -ExecutionPolicy Bypass -File scripts\\stop-prod.ps1",
+    "install:windows": "powershell -ExecutionPolicy Bypass -File scripts\\install-windows-shortcuts.ps1",
     "preview:local": "powershell -ExecutionPolicy Bypass -File scripts\\start-local-preview.ps1",
     "preview:stop": "powershell -ExecutionPolicy Bypass -File scripts\\stop-local-preview.ps1",
     "pdf:render": "node scripts\\render-pdf-pages.mjs",

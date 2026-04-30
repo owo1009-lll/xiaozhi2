@@ -140,6 +140,7 @@ Completed:
 - Added `test:student-ui-copy` to the P0 routine so student-facing mojibake and raw backend error leaks are caught before release.
 - Extended the student UI copy guard to the problem-score page and to display source labels, preventing raw model/library/fallback labels from reappearing in learner-facing text.
 - Updated the installable PWA manifest and browser title from research-prototype wording to the student-facing `二胡 AI 自主练习` product name.
+- Added a Windows local shell-app installer script, `npm run install:windows`, that creates Start/Stop shortcuts targeting the production launcher without changing the diagnosis chain.
 - Extended the MusicXML fallback test to cover compressed `.mxl` uploads, matching the student backup-score file picker.
 - Re-verified the full real-corpus strict routine after the cleanup with run batch `2026-04-30T02-49-24-929Z`; `8/8` completed, score issue smoke checked `8` cards, latest DTW quality is `latestMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`, and historical `reviewRate = 0.0669`.
 
@@ -150,7 +151,7 @@ Completed:
 3. Do deeper human visual review on saved complex-score screenshots beyond smoke assertions: `浮生`, `古巷深处`, `炫动`, `第四二胡狂想曲`, and `维奥莱塔组曲07 - 二胡 中胡`.
 4. Continue student UI cleanup where technical labels remain visible outside the main upload/import path.
 5. Keep manual `MusicXML` import as the fallback for PDFs whose Audiveris output is too noisy.
-6. Treat installable shell-app packaging as lower priority until the diagnosis chain is visually reliable.
+6. Treat deeper installer packaging beyond local Windows shortcuts as lower priority until the diagnosis chain is visually reliable.
 
 ## Immediate Implication
 

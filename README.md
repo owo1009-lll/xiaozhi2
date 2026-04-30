@@ -42,6 +42,14 @@ npm run preview:local
 npm run preview:stop
 ```
 
+### Windows 本地快捷方式
+
+当前项目可以作为本机壳应用使用。下面命令会在桌面和开始菜单创建“启动/关闭”快捷方式，启动后会打开 `http://127.0.0.1:3000` 并拉起配套分析服务：
+
+```powershell
+npm run install:windows
+```
+
 ### 1. 启动 Node 网关
 
 ```powershell
