@@ -24,6 +24,7 @@ Invoke-Step "server syntax" { node --check server.js }
 Invoke-Step "DL analyzer dependencies" { powershell -ExecutionPolicy Bypass -File scripts\run-python.ps1 scripts\check-mainline-analyzer.py }
 Invoke-Step "PWA delivery" { npm run test:pwa }
 Invoke-Step "frontend build" { npm run build }
+Invoke-Step "student UI copy guard" { npm run test:student-ui-copy }
 Invoke-Step "MusicXML fallback import" { npm run test:musicxml-import }
 Invoke-Step "score markings" { npm run test:score-markings }
 Invoke-Step "score issue projection" { npm run test:score-issues }
