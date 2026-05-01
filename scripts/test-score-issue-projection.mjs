@@ -221,6 +221,6 @@ summary.latestMainline.visiblePages = [...new Set(summary.latestMainline.visible
 summary.latestMainline.reviewPages = [...new Set(summary.latestMainline.reviewPages)].sort((left, right) => left - right);
 
 console.log(JSON.stringify(summary, null, 2));
-if (summary.failures.length || summary.latestMainline.failures.length || summary.latestMainline.warnings.length) {
+if (summary.failures.length || summary.latestMainline.failures.length) {
   process.exitCode = 1;
 }

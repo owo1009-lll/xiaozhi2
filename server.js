@@ -1179,7 +1179,7 @@ function buildReusedOmrStats(stats = {}, previewPages = []) {
 }
 
 function normalizeImportedScoreRecord(score = {}) {
-  const sections = normalizeImportedSections(score.sections, {
+  let sections = normalizeImportedSections(score.sections, {
     pieceId: safeString(score.pieceId),
     title: repairMojibakeText(score.title),
     composer: safeString(score.composer),
@@ -1187,6 +1187,7 @@ function normalizeImportedScoreRecord(score = {}) {
     selectedPartId: safeString(score.selectedPartId),
     partCandidates: getArray(score.partCandidates || score.piecePack?.partCandidates),
   });
+  sections = applyLegacyPagewiseMeasureNumbers(sections, score);
   const normalizedOmrStats = normalizeOmrStats(score.omrStats);
   const computedScoreLineStats = buildScoreLineStatsFromSections(sections);
   const scoreLineStats =
@@ -1247,6 +1248,148 @@ function normalizeImportedScoreRecord(score = {}) {
     createdAt: safeString(score.createdAt, nowIso()),
     updatedAt: safeString(score.updatedAt, score.createdAt || nowIso()),
   };
+}
+
+function parsePagewiseSectionPage(section = {}) {
+  const sectionText = `${safeString(section.sectionId)} ${safeString(section.sourceSectionId)}`;
+  const sectionMatch = sectionText.match(/\bpage-(\d+)/i);
+  if (sectionMatch) return Math.max(1, Math.round(safeNumber(sectionMatch[1], 1)));
+  const notePage = getArray(section.notes)
+    .map((note) => safeNumber(note?.notePosition?.pageNumber, NaN))
+    .find((value) => Number.isFinite(value) && value > 0);
+  if (Number.isFinite(notePage)) return Math.max(1, Math.round(notePage));
+  const numberingPage = safeNumber(section?.measureNumbering?.pageIndex, NaN);
+  return Number.isFinite(numberingPage) && numberingPage > 0 ? Math.max(1, Math.round(numberingPage)) : 0;
+}
+
+function collectLocalMeasuresForPage(pageSections = []) {
+  const seen = new Set();
+  const out = [];
+  const add = (value) => {
+    const numeric = Math.max(1, Math.round(safeNumber(value, 1)));
+    if (seen.has(numeric)) return;
+    seen.add(numeric);
+    out.push(numeric);
+  };
+  for (const section of pageSections) {
+    for (const note of getArray(section.notes)) add(note?.notePosition?.localMeasureIndex || note?.measureIndex);
+    const range = getArray(section.measureRange);
+    if (!getArray(section.notes).length && range.length >= 2) {
+      const start = Math.max(1, Math.round(safeNumber(range[0], 1)));
+      const end = Math.max(start, Math.round(safeNumber(range[1], start)));
+      for (let value = start; value <= end; value += 1) add(value);
+    }
+  }
+  return out.sort((left, right) => left - right);
+}
+
+function applyLegacyPagewiseMeasureNumbers(sections = [], score = {}) {
+  const normalizedSections = getArray(sections);
+  if (!normalizedSections.length || importedScoreHasCurrentMeasureNumbering({ ...score, sections: normalizedSections })) {
+    return normalizedSections;
+  }
+  const looksPagewise =
+    safeString(score?.omrStats?.mode) === "pagewise" ||
+    getArray(score?.previewPages).length > 1 ||
+    normalizedSections.some((section) => parsePagewiseSectionPage(section) > 0);
+  if (!looksPagewise) return normalizedSections;
+
+  const pageMap = new Map();
+  for (const section of normalizedSections) {
+    const pageNumber = parsePagewiseSectionPage(section);
+    if (!pageNumber) return normalizedSections;
+    if (!pageMap.has(pageNumber)) pageMap.set(pageNumber, []);
+    pageMap.get(pageNumber).push(section);
+  }
+
+  let nextGlobalMeasure = 1;
+  const pageMappings = new Map();
+  for (const pageNumber of [...pageMap.keys()].sort((left, right) => left - right)) {
+    const pageSections = pageMap.get(pageNumber).sort((left, right) =>
+      safeNumber(left.sequenceIndex, 0) - safeNumber(right.sequenceIndex, 0) ||
+      safeString(left.sectionId).localeCompare(safeString(right.sectionId)),
+    );
+    const localMeasures = collectLocalMeasuresForPage(pageSections);
+    if (!localMeasures.length) continue;
+    const localToGlobal = new Map();
+    localMeasures.forEach((localMeasure, offset) => {
+      localToGlobal.set(localMeasure, nextGlobalMeasure + offset);
+    });
+    pageMappings.set(pageNumber, {
+      firstGlobalMeasure: nextGlobalMeasure,
+      localMeasureCount: localMeasures.length,
+      localToGlobal,
+    });
+    nextGlobalMeasure += localMeasures.length;
+  }
+  if (!pageMappings.size) return normalizedSections;
+
+  return normalizedSections.map((section) => {
+    const pageNumber = parsePagewiseSectionPage(section);
+    const mapping = pageMappings.get(pageNumber);
+    if (!mapping) return section;
+    const fallbackOrdinals = new Map();
+    let nextFallbackOrdinal = mapping.localMeasureCount;
+    const mapMeasure = (value) => {
+      const localMeasure = Math.max(1, Math.round(safeNumber(value, 1)));
+      if (mapping.localToGlobal.has(localMeasure)) return mapping.localToGlobal.get(localMeasure);
+      if (!fallbackOrdinals.has(localMeasure)) {
+        fallbackOrdinals.set(localMeasure, nextFallbackOrdinal);
+        nextFallbackOrdinal += 1;
+      }
+      return mapping.firstGlobalMeasure + fallbackOrdinals.get(localMeasure);
+    };
+    const notes = getArray(section.notes).map((note, noteIndex) => {
+      const localMeasure = Math.max(1, Math.round(safeNumber(note?.notePosition?.localMeasureIndex || note?.measureIndex, 1)));
+      const globalMeasure = mapMeasure(localMeasure);
+      const notePosition = {
+        ...(note.notePosition || {}),
+        localMeasureIndex: localMeasure,
+        globalMeasureIndex: globalMeasure,
+        measureNumberSource: "pagewise-count",
+        localNoteId: safeString(note?.notePosition?.localNoteId || note?.noteId),
+      };
+      const noteIdMatch = safeString(note?.noteId).match(/-n(\d+)\b/i);
+      const noteOrdinal = noteIdMatch ? Math.max(1, Math.round(safeNumber(noteIdMatch[1], noteIndex + 1))) : noteIndex + 1;
+      return {
+        ...note,
+        measureIndex: globalMeasure,
+        noteId: `xml-m${globalMeasure}-n${noteOrdinal}`,
+        notePosition,
+      };
+    });
+    const patchMarkings = (items = []) => getArray(items).map((item) => {
+      if (!item || typeof item !== "object") return item;
+      const localMeasure = Math.max(1, Math.round(safeNumber(item.localMeasureIndex || item.measureIndex, 1)));
+      return {
+        ...item,
+        localMeasureIndex: localMeasure,
+        measureIndex: mapMeasure(localMeasure),
+        measureNumberSource: "pagewise-count",
+      };
+    });
+    const globalMeasures = notes
+      .map((note) => Math.max(0, Math.round(safeNumber(note.measureIndex, 0))))
+      .filter((value) => value > 0);
+    const localCount = Math.max(mapping.localMeasureCount, nextFallbackOrdinal);
+    return {
+      ...section,
+      notes,
+      markings: patchMarkings(section.markings),
+      tempoChanges: patchMarkings(section.tempoChanges),
+      dynamicChanges: patchMarkings(section.dynamicChanges),
+      repeatStructure: patchMarkings(section.repeatStructure),
+      measureRange: globalMeasures.length ? [Math.min(...globalMeasures), Math.max(...globalMeasures)] : section.measureRange,
+      measureNumbering: {
+        source: "pagewise-count",
+        pageIndex: pageNumber,
+        firstGlobalMeasure: mapping.firstGlobalMeasure,
+        lastGlobalMeasure: mapping.firstGlobalMeasure + localCount - 1,
+        localMeasureCount: localCount,
+        inferredFromLegacyScore: true,
+      },
+    };
+  });
 }
 
 function importedScoreHasExactNotePositions(score = {}) {
