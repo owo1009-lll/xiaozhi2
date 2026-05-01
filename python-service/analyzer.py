@@ -6120,14 +6120,17 @@ class ErhuAnalyzer:
         chord_ratio = safe_float(selected_part_candidate.get("chordRatio"), 1.0)
         candidate_score = safe_float(selected_part_candidate.get("score"), 0.0)
         candidate_confidence = safe_float(selected_part_candidate.get("selectedPartConfidence"), candidate_score)
-        if note_count < 8 or erhu_range_ratio < 0.82 or chord_ratio > 0.08:
+        if note_count < 8 or erhu_range_ratio < 0.82 or chord_ratio > 0.14:
             return False
         if bool(selected_part_candidate.get("safeForErhuProjection")):
             return True
+        candidate_strength = max(candidate_score, candidate_confidence)
         return (
             erhu_range_ratio >= 0.9
-            and chord_ratio <= 0.04
-            and max(candidate_score, candidate_confidence) >= 0.55
+            and (
+                (chord_ratio <= 0.04 and candidate_strength >= 0.55)
+                or (chord_ratio <= 0.14 and candidate_strength >= 0.75)
+            )
         )
 
     def _annotate_score_line_roles(

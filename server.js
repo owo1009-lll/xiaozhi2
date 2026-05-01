@@ -567,11 +567,13 @@ function annotateImportedSectionsScoreLineRoles(sections = [], score = {}) {
     Math.max(1, safeNumber(candidate?.staffCount, 1)) <= 1 &&
     safeNumber(candidate?.noteCount, 0) >= 8 &&
     safeNumber(candidate?.erhuRangeRatio, 0) >= 0.82 &&
-    safeNumber(candidate?.chordRatio, 1) <= 0.08 &&
+    safeNumber(candidate?.chordRatio, 1) <= 0.14 &&
     (safeBoolean(candidate?.safeForErhuProjection, false) ||
       (safeNumber(candidate?.erhuRangeRatio, 0) >= 0.9 &&
-        safeNumber(candidate?.chordRatio, 1) <= 0.04 &&
-        Math.max(safeNumber(candidate?.score, 0), safeNumber(candidate?.selectedPartConfidence, 0)) >= 0.55));
+        ((safeNumber(candidate?.chordRatio, 1) <= 0.04 &&
+          Math.max(safeNumber(candidate?.score, 0), safeNumber(candidate?.selectedPartConfidence, 0)) >= 0.55) ||
+          (safeNumber(candidate?.chordRatio, 1) <= 0.14 &&
+            Math.max(safeNumber(candidate?.score, 0), safeNumber(candidate?.selectedPartConfidence, 0)) >= 0.75))));
 
   const lineGroups = new Map();
   const onsetCounts = new Map();

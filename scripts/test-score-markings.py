@@ -812,6 +812,21 @@ def main() -> int:
         "Voice",
     )
     safe_voice_candidate = next((candidate for candidate in safe_voice_candidates if candidate.get("id") == "P1"), None)
+    moderate_chord_scanned_candidate = {
+        "noteCount": 33,
+        "erhuRangeRatio": 1.0,
+        "chordRatio": 0.121,
+        "score": 0.824,
+        "selectedPartConfidence": 0.806,
+        "staffCount": 1,
+        "isLikelyPiano": False,
+        "isLikelyAccompanimentSplit": False,
+        "safeForErhuProjection": False,
+    }
+    split_risk_scanned_candidate = {
+        **moderate_chord_scanned_candidate,
+        "isLikelyPiano": True,
+    }
 
     require(section is not None, "MusicXML did not produce a section.")
     require(merged_section is not None, "Merged voice MusicXML did not produce a section.")
@@ -936,6 +951,24 @@ def main() -> int:
     require(
         scanned_fallback_section.get("scoreLineStats", {}).get("sourceCounts", {}).get("erhu-range-fallback", 0) >= 6,
         f"Range fallback should mark lower scanned lines as erhu candidates, got stats {scanned_fallback_section.get('scoreLineStats')}.",
+    )
+    require(
+        analyzer._should_apply_erhu_range_fallback(
+            moderate_chord_scanned_candidate,
+            clean_solo=False,
+            ambiguous=True,
+        )
+        is True,
+        "Range fallback should accept a high-confidence scanned Voice candidate with moderate chord evidence.",
+    )
+    require(
+        analyzer._should_apply_erhu_range_fallback(
+            split_risk_scanned_candidate,
+            clean_solo=False,
+            ambiguous=True,
+        )
+        is False,
+        "Range fallback should not promote candidates that look like piano.",
     )
     pagewise_notes = [
         note
