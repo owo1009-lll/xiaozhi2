@@ -331,6 +331,8 @@ function normalizeMarkingItem(item = {}, fallback = {}) {
     wedgeType: safeString(item?.wedgeType),
     direction: safeString(item?.direction),
     times: safeString(item?.times),
+    localMeasureIndex: nullableInteger(item?.localMeasureIndex) || undefined,
+    measureNumberSource: safeString(item?.measureNumberSource),
   };
 }
 
@@ -430,6 +432,10 @@ function normalizePiecePackOverride(piecePack = {}, fallback = {}) {
               scoreLineConfidence: clamp(safeNumber(note?.notePosition?.scoreLineConfidence, 0), 0, 1),
               scoreLineSource: safeString(note?.notePosition?.scoreLineSource),
               scoreLineId: safeString(note?.notePosition?.scoreLineId),
+              localMeasureIndex: nullableInteger(note?.notePosition?.localMeasureIndex) || undefined,
+              globalMeasureIndex: nullableInteger(note?.notePosition?.globalMeasureIndex) || undefined,
+              measureNumberSource: safeString(note?.notePosition?.measureNumberSource),
+              localNoteId: safeString(note?.notePosition?.localNoteId),
             }
           : null;
       return {
@@ -984,6 +990,15 @@ function normalizeImportedSections(sections = [], scoreFallback = {}) {
       researchWindowHints: getArray(raw?.researchWindowHints).map((item) => safeNumber(item)).filter((item) => Number.isFinite(item)),
       sourceSectionId: safeString(raw?.sourceSectionId),
       measureRange: getArray(raw?.measureRange).map((item) => Math.round(safeNumber(item))).filter((item) => Number.isFinite(item)),
+      measureNumbering: raw?.measureNumbering && typeof raw.measureNumbering === "object"
+        ? {
+            source: safeString(raw.measureNumbering.source),
+            pageIndex: nullableInteger(raw.measureNumbering.pageIndex),
+            firstGlobalMeasure: nullableInteger(raw.measureNumbering.firstGlobalMeasure),
+            lastGlobalMeasure: nullableInteger(raw.measureNumbering.lastGlobalMeasure),
+            localMeasureCount: nullableInteger(raw.measureNumbering.localMeasureCount),
+          }
+        : undefined,
       pageImagePath: safeString(raw?.pageImagePath, normalized.pageImagePath),
       selectedPart: safeString(raw?.selectedPart, scoreFallback?.selectedPart),
       selectedPartId: safeString(raw?.selectedPartId),
@@ -1211,6 +1226,19 @@ function importedScoreHasProjectionMetadata(score = {}) {
   });
 }
 
+function importedScoreHasCurrentMeasureNumbering(score = {}) {
+  const sections = getArray(score.sections);
+  const looksPagewise =
+    safeString(score?.omrStats?.mode) === "pagewise" ||
+    getArray(score?.previewPages).length > 1 ||
+    sections.some((section) => /^page-\d+/i.test(safeString(section?.sectionId || section?.sourceSectionId)));
+  if (!looksPagewise) return true;
+  return sections.some((section) =>
+    safeString(section?.measureNumbering?.source) === "pagewise-count" ||
+    getArray(section?.notes).some((note) => safeString(note?.notePosition?.measureNumberSource) === "pagewise-count"),
+  );
+}
+
 function normalizeScoreImportJob(job = {}) {
   const normalizedOmrStats = normalizeOmrStats(job.omrStats);
   const jobSections = getArray(job.sections || job.piecePack?.sections);
@@ -1396,6 +1424,7 @@ function findReusableImportedScore(store, { pdfHash = "", selectedPart = "erhu",
         ) &&
         importedScoreHasExactNotePositions(score) &&
         importedScoreHasProjectionMetadata(score) &&
+        importedScoreHasCurrentMeasureNumbering(score) &&
         getArray(score.sections).length > 0,
     ) || null
   );
@@ -2282,12 +2311,14 @@ function estimateSectionDurationSeconds(section = {}) {
   const notes = getArray(section.notes);
   const tempo = Math.max(30, safeNumber(section.tempo, 72));
   const beatsPerMeasure = meterBeatsValue(section.meter);
+  const measureIndices = notes.map((note) => Math.max(1, safeNumber(note?.measureIndex, 1)));
+  const minMeasureIndex = measureIndices.length ? Math.max(1, Math.min(...measureIndices)) : 1;
   let maxBeatOffset = beatsPerMeasure;
   for (const note of notes) {
     const measureIndex = Math.max(1, safeNumber(note?.measureIndex, 1));
     const beatStart = safeNumber(note?.beatStart, 0);
     const beatDuration = Math.max(0.25, safeNumber(note?.beatDuration, 1));
-    const endBeat = (measureIndex - 1) * beatsPerMeasure + beatStart + beatDuration;
+    const endBeat = (measureIndex - minMeasureIndex) * beatsPerMeasure + beatStart + beatDuration;
     maxBeatOffset = Math.max(maxBeatOffset, endBeat);
   }
   return (maxBeatOffset * 60) / tempo;

@@ -44,6 +44,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-sections", type=int, default=0, help="Optional cap for faster test passes.")
     parser.add_argument("--section-id", action="append", default=[], help="Only evaluate selected section ids. Repeatable.")
     parser.add_argument("--section-ids", default="", help="Comma-separated section ids. Safer than repeated flags on Windows.")
+    parser.add_argument("--omit-measures", default="", help="Comma-separated score measure ranges skipped by the audio, e.g. 202-211.")
     parser.add_argument("--skip-scan", action="store_true", help="Reuse an existing scan JSON in the output directory instead of re-running the scan.")
     parser.add_argument("--cache-dir", default="", help="Optional directory for per-section cached pass rows. Defaults to <output-dir>/section-cache.")
     parser.add_argument("--refresh-cache", action="store_true", help="Ignore existing per-section cache and recompute all section passes.")
@@ -161,15 +162,84 @@ def meter_beats(meter: str | None) -> float:
 def section_length_beats(section: dict) -> float:
     beats_per_measure = meter_beats(section.get("meter"))
     notes = section.get("notes") or []
+    min_measure_index = min(
+        (safe_number(note.get("measureIndex"), 1) for note in notes),
+        default=1.0,
+    )
     max_offset = 0.0
     for note in notes:
         end_beat = (
-            (safe_number(note.get("measureIndex"), 1) - 1.0) * beats_per_measure
+            (safe_number(note.get("measureIndex"), 1) - min_measure_index) * beats_per_measure
             + safe_number(note.get("beatStart"), 0.0)
             + safe_number(note.get("beatDuration"), 1.0)
         )
         max_offset = max(max_offset, end_beat)
     return max(max_offset, beats_per_measure)
+
+
+def parse_measure_ranges(raw: str | None) -> list[tuple[int, int]]:
+    ranges: list[tuple[int, int]] = []
+    for token in str(raw or "").replace(";", ",").split(","):
+        text = token.strip()
+        if not text:
+            continue
+        if "-" in text:
+            left, right = text.split("-", 1)
+        elif ":" in text:
+            left, right = text.split(":", 1)
+        else:
+            left = right = text
+        try:
+            start = max(1, int(float(left.strip())))
+            end = max(1, int(float(right.strip())))
+        except ValueError:
+            continue
+        ranges.append((min(start, end), max(start, end)))
+    return ranges
+
+
+def positive_int(value: object) -> int:
+    try:
+        numeric = int(float(value))  # type: ignore[arg-type]
+        return numeric if numeric > 0 else 0
+    except (TypeError, ValueError):
+        return 0
+
+
+def section_measure_bounds(section: dict) -> tuple[int, int] | None:
+    measures = [
+        positive_int(note.get("measureIndex"))
+        for note in (section.get("notes") or [])
+        if positive_int(note.get("measureIndex")) > 0
+    ]
+    if not measures:
+        measures = [positive_int(value) for value in (section.get("measureRange") or []) if positive_int(value) > 0]
+    if not measures:
+        return None
+    return min(measures), max(measures)
+
+
+def section_intersects_measure_ranges(section: dict, ranges: list[tuple[int, int]]) -> bool:
+    if not ranges:
+        return False
+    bounds = section_measure_bounds(section)
+    if bounds is None:
+        return False
+    start, end = bounds
+    return any(start <= range_end and end >= range_start for range_start, range_end in ranges)
+
+
+def filter_omitted_sections(sections: list[dict], ranges: list[tuple[int, int]]) -> tuple[list[dict], list[dict]]:
+    if not ranges:
+        return sections, []
+    kept: list[dict] = []
+    omitted: list[dict] = []
+    for section in sections:
+        if section_intersects_measure_ranges(section, ranges):
+            omitted.append(section)
+        else:
+            kept.append(section)
+    return kept, omitted
 
 
 def estimate_section_duration_seconds(
@@ -362,6 +432,8 @@ def run_scan(args: argparse.Namespace, scan_output_dir: Path) -> Path:
         command.extend(["--piece-id", args.piece_id])
     if args.max_sections and args.max_sections > 0:
         command.extend(["--max-sections", str(args.max_sections)])
+    if args.omit_measures:
+        command.extend(["--omit-measures", args.omit_measures])
 
     merged_section_ids = [value.strip() for value in args.section_id if value and value.strip()]
     if args.section_ids:
@@ -408,13 +480,20 @@ def run_scan(args: argparse.Namespace, scan_output_dir: Path) -> Path:
     return scan_json
 
 
-def _selected_sections_for_pass(args: argparse.Namespace, piece: dict) -> list[dict]:
+def _selected_sections_for_pass(args: argparse.Namespace, piece: dict, apply_omit: bool = True) -> list[dict]:
     selected_section_ids = {value.strip() for value in args.section_id if value and value.strip()}
     if args.section_ids:
         selected_section_ids.update(value.strip() for value in str(args.section_ids).split(",") if value.strip())
     sections = [section for section in (piece.get("sections") or []) if section.get("notes")]
     if selected_section_ids:
         sections = [section for section in sections if section.get("sectionId") in selected_section_ids]
+    if apply_omit:
+        sections, omitted = filter_omitted_sections(sections, parse_measure_ranges(args.omit_measures))
+        if omitted:
+            sys.stderr.write(
+                f"INFO: omitted measure ranges {parse_measure_ranges(args.omit_measures)}; "
+                f"skipping {len(omitted)} intersecting sections.\n"
+            )
     sections.sort(key=lambda item: int(safe_number(item.get("sequenceIndex"), 0)))
     if args.max_sections and args.max_sections > 0:
         sections = sections[: args.max_sections]
@@ -481,8 +560,16 @@ def build_fast_sequence_scan(args: argparse.Namespace, scan_output_dir: Path, pi
     except Exception:
         audio_duration = 0.0
 
+    omitted_measure_ranges = parse_measure_ranges(args.omit_measures)
+    selected_sections = _selected_sections_for_pass(args, piece, apply_omit=False)
+    selected_sections, omitted_sections = filter_omitted_sections(selected_sections, omitted_measure_ranges)
+    if omitted_sections:
+        sys.stderr.write(
+            f"INFO: omitted measure ranges {omitted_measure_ranges}; "
+            f"skipping {len(omitted_sections)} intersecting sections.\n"
+        )
     sections, estimated_piece_duration = _patch_missing_or_oversized_hints(
-        _selected_sections_for_pass(args, piece),
+        selected_sections,
         audio_duration,
     )
     sequence_path: list[dict] = []
@@ -564,9 +651,11 @@ def build_fast_sequence_scan(args: argparse.Namespace, scan_output_dir: Path, pi
         "estimatedPieceDurationSeconds": round(estimated_piece_duration, 2),
         "isPartial": False,
         "scannedSectionCount": len(sequence_path),
-        "skippedSectionCount": 0,
+        "skippedSectionCount": len(omitted_sections),
         "lastScannedSectionId": sequence_path[-1]["sectionId"] if sequence_path else None,
-        "skippedSectionIds": [],
+        "skippedSectionIds": [section.get("sectionId") for section in omitted_sections],
+        "omittedMeasureRanges": [[start, end] for start, end in omitted_measure_ranges],
+        "omittedSectionIds": [section.get("sectionId") for section in omitted_sections],
         "scanMode": "fast-sequence-window",
     }
     payload = {

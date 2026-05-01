@@ -483,6 +483,41 @@ SAFE_VOICE_WITH_PIANO_MULTI_SYSTEM_MUSICXML = """<?xml version="1.0" encoding="U
 </score-partwise>
 """
 
+PAGEWISE_MEASURE_PAGE_1 = """<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Erhu</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1" width="300">
+      <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+      <note default-x="60"><pitch><step>D</step><octave>5</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2" width="300">
+      <note default-x="60"><pitch><step>E</step><octave>5</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+PAGEWISE_MEASURE_PAGE_2 = """<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Erhu</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1" width="300">
+      <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+      <note default-x="60"><pitch><step>F</step><octave>5</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2" width="300">
+      <direction><direction-type><words>page-local marking</words></direction-type></direction>
+      <note default-x="60"><pitch><step>G</step><octave>5</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 
 def require(condition: bool, message: str) -> None:
     if not condition:
@@ -679,6 +714,22 @@ def main() -> int:
             "Safe Voice With Piano Multi System",
             1,
         )
+        pagewise_source_1 = Path(tmp) / "pagewise-001.musicxml"
+        pagewise_source_2 = Path(tmp) / "pagewise-002.musicxml"
+        pagewise_source_1.write_text(PAGEWISE_MEASURE_PAGE_1, encoding="utf-8")
+        pagewise_source_2.write_text(PAGEWISE_MEASURE_PAGE_2, encoding="utf-8")
+        pagewise_request = ScoreImportRequest(
+            jobId="pagewise-measure-test",
+            pdfPath=str(pagewise_source_1),
+            originalFilename="pagewise-measure-test.pdf",
+            titleHint="Pagewise Measure Test",
+            selectedPartHint="Erhu",
+        )
+        pagewise_piece_pack, _, _ = analyzer._build_piece_pack_from_musicxml_sources(
+            [pagewise_source_1, pagewise_source_2],
+            pagewise_request,
+            "Erhu",
+        )
 
     chinese_piano_candidates = analyzer._extract_musicxml_part_candidates(
         CHINESE_PIANO_THEN_VOICE_MUSICXML,
@@ -712,6 +763,7 @@ def main() -> int:
     require(backup_forward_section is not None, "Backup/forward MusicXML did not produce a section.")
     require(grace_cue_section is not None, "Grace/cue MusicXML did not produce a section.")
     require(safe_voice_section is not None, "Safe voice with piano multi-system MusicXML did not produce a section.")
+    require(pagewise_piece_pack is not None, "Pagewise MusicXML sources did not produce a piece pack.")
     require(chinese_voice is not None, "Chinese piano fixture should include the trailing Voice candidate.")
     require(backup_forward_erhu is not None, "Backup/forward fixture should expose the Erhu part candidate.")
     require(grace_cue_erhu is not None, "Grace/cue fixture should expose the Erhu part candidate.")
@@ -813,6 +865,28 @@ def main() -> int:
     require(
         [note["midiPitch"] for note in safe_voice_notes] == [74, 76, 77, 79],
         f"Safe leading Voice part should retain both monophonic melody systems, got {[note['midiPitch'] for note in safe_voice_notes]}.",
+    )
+    pagewise_notes = [
+        note
+        for section_item in pagewise_piece_pack["sections"]
+        for note in section_item["notes"]
+    ]
+    require(
+        [note["measureIndex"] for note in pagewise_notes] == [1, 2, 3, 4],
+        f"Pagewise MusicXML should infer global measure numbers across local page resets, got {[note['measureIndex'] for note in pagewise_notes]}.",
+    )
+    require(
+        [note["notePosition"]["localMeasureIndex"] for note in pagewise_notes] == [1, 2, 1, 2],
+        "Pagewise MusicXML should preserve original page-local measure indices for diagnostics.",
+    )
+    pagewise_markings = [
+        marking
+        for section_item in pagewise_piece_pack["sections"]
+        for marking in section_item.get("markings", [])
+    ]
+    require(
+        pagewise_markings and pagewise_markings[0]["measureIndex"] == 4 and pagewise_markings[0]["localMeasureIndex"] == 2,
+        f"Pagewise markings should be remapped to global measure numbers, got {pagewise_markings}.",
     )
     notes = section["notes"]
     first_note = notes[0]

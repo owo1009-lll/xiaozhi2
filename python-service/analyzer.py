@@ -2316,6 +2316,109 @@ class ErhuAnalyzer:
         }
         return section, detected_parts, resolved_part_label or resolved_part, part_candidates, score_markings.get("markingStats", {})
 
+    def _extract_selected_part_measure_sequence(self, xml_text: str, selected_part_hint: str | None) -> list[int]:
+        if not xml_text.strip():
+            return []
+        try:
+            root = ET.fromstring(xml_text)
+        except ET.ParseError:
+            return []
+
+        candidates = self._extract_musicxml_part_candidates(xml_text, selected_part_hint)
+        selected_candidate, _ = self._resolve_selected_part_from_candidates(candidates, selected_part_hint)
+        selected_part_id = str((selected_candidate or {}).get("id") or "").strip()
+        parts = [element for element in root.iter() if self._xml_local_tag(element) == "part"]
+        part = next(
+            (
+                element
+                for element in parts
+                if selected_part_id and element.attrib.get("id", "").strip() == selected_part_id
+            ),
+            parts[0] if parts else None,
+        )
+        if part is None:
+            return []
+        return [
+            parse_musicxml_measure_index(measure.attrib.get("number"), measure_position)
+            for measure_position, measure in enumerate(self._xml_children(part, "measure"), start=1)
+        ]
+
+    def _apply_pagewise_global_measure_numbers(
+        self,
+        section: dict[str, Any],
+        xml_text: str,
+        selected_part_hint: str | None,
+        first_global_measure: int,
+        page_index: int,
+    ) -> tuple[dict[str, Any], int]:
+        notes = list(section.get("notes") or [])
+        measure_sequence = self._extract_selected_part_measure_sequence(xml_text, selected_part_hint)
+        if not measure_sequence:
+            seen_note_measures: list[int] = []
+            for note in notes:
+                measure_index = max(1, int(safe_float(note.get("measureIndex"), 1)))
+                if measure_index not in seen_note_measures:
+                    seen_note_measures.append(measure_index)
+            measure_sequence = seen_note_measures
+        if not measure_sequence:
+            return section, first_global_measure
+
+        local_to_global: dict[int, int] = {}
+        for offset, local_measure in enumerate(measure_sequence):
+            local_to_global.setdefault(int(local_measure), first_global_measure + offset)
+        note_fallback_ordinals: dict[int, int] = {}
+        next_fallback_ordinal = len(measure_sequence)
+
+        def map_measure(local_measure: int) -> int:
+            nonlocal next_fallback_ordinal
+            local_measure = max(1, int(local_measure))
+            if local_measure in local_to_global:
+                return local_to_global[local_measure]
+            if local_measure not in note_fallback_ordinals:
+                note_fallback_ordinals[local_measure] = next_fallback_ordinal
+                next_fallback_ordinal += 1
+            return first_global_measure + note_fallback_ordinals[local_measure]
+
+        for note_order, note in enumerate(notes, start=1):
+            local_measure = max(1, int(safe_float(note.get("measureIndex"), 1)))
+            global_measure = map_measure(local_measure)
+            note_position = dict(note.get("notePosition") or {})
+            note_position.setdefault("localMeasureIndex", local_measure)
+            note_position["globalMeasureIndex"] = global_measure
+            note_position["measureNumberSource"] = "pagewise-count"
+            note["notePosition"] = note_position
+            note["measureIndex"] = global_measure
+            original_note_id = str(note.get("noteId") or "")
+            note_position.setdefault("localNoteId", original_note_id)
+            note_index_match = re.search(r"-n(\d+)\b", original_note_id)
+            note_index = int(note_index_match.group(1)) if note_index_match else note_order
+            note["noteId"] = f"xml-m{global_measure}-n{note_index}"
+
+        for collection_key in ("markings", "tempoChanges", "dynamicChanges", "repeatStructure"):
+            for item in list(section.get(collection_key) or []):
+                if not isinstance(item, dict):
+                    continue
+                local_measure = max(1, int(safe_float(item.get("measureIndex"), 1)))
+                item["localMeasureIndex"] = local_measure
+                item["measureIndex"] = map_measure(local_measure)
+                item["measureNumberSource"] = "pagewise-count"
+
+        global_measures = [
+            int(note.get("measureIndex", 0))
+            for note in notes
+            if int(safe_float(note.get("measureIndex"), 0)) > 0
+        ]
+        if global_measures:
+            section["measureRange"] = [min(global_measures), max(global_measures)]
+        section["measureNumbering"] = {
+            "source": "pagewise-count",
+            "pageIndex": page_index,
+            "firstGlobalMeasure": first_global_measure,
+            "lastGlobalMeasure": first_global_measure + len(measure_sequence) - 1,
+            "localMeasureCount": len(measure_sequence),
+        }
+        return section, first_global_measure + next_fallback_ordinal
+
     def _build_piece_pack_from_musicxml_sources(
         self,
         musicxml_sources: list[Path],
@@ -2341,6 +2444,7 @@ class ErhuAnalyzer:
         resolved_part_label = selected_part_hint or "erhu"
         resolved_part_id = ""
         multiple_sources = len(musicxml_sources) > 1
+        next_global_measure = 1
 
         for index, source_path in enumerate(musicxml_sources, start=1):
             section_id = "section-a" if not multiple_sources and index == 1 else f"page-{index:02d}"
@@ -2369,6 +2473,15 @@ class ErhuAnalyzer:
             if section:
                 resolved_part_label = str(section.get("selectedPart") or resolved_part_label or resolved_part).strip() or resolved_part_label
                 resolved_part_id = str(section.get("selectedPartId") or resolved_part_id).strip()
+                if multiple_sources:
+                    xml_text = self._read_musicxml_source(source_path)
+                    section, next_global_measure = self._apply_pagewise_global_measure_numbers(
+                        section,
+                        xml_text,
+                        resolved_part_id or resolved_part,
+                        next_global_measure,
+                        index,
+                    )
                 section_line_stats = section.get("scoreLineStats") or {}
                 for key in aggregate_score_line_stats:
                     aggregate_score_line_stats[key] += int(safe_float(section_line_stats.get(key), 0))

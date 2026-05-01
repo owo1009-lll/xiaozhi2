@@ -34,6 +34,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-sections", type=int, default=0, help="Optional hard cap on section count for faster scans.")
     parser.add_argument("--section-id", action="append", default=[], help="Only scan selected section ids. Repeatable.")
     parser.add_argument("--section-ids", default="", help="Comma-separated section ids. Prefer this on Windows shells that mangle repeated flags.")
+    parser.add_argument("--omit-measures", default="", help="Comma-separated score measure ranges skipped by the audio, e.g. 202-211.")
     parser.add_argument("--scan-preprocess-mode", default="off", help="preprocessMode sent to the analyzer during scan windows. 'off' skips source separation for speed.")
     parser.add_argument("--concurrency", type=int, default=2, help="Number of sections to scan in parallel.")
     parser.add_argument("--retry", type=int, default=2, help="Max retries per section on connection errors.")
@@ -65,11 +66,68 @@ def meter_beats(meter: str | None) -> float:
 def section_length_beats(section: dict) -> float:
     beats_per_measure = meter_beats(section.get("meter"))
     notes = section.get("notes") or []
+    min_measure_index = min(
+        (float(note.get("measureIndex", 1)) for note in notes),
+        default=1.0,
+    )
     max_offset = 0.0
     for note in notes:
-        end_beat = (float(note.get("measureIndex", 1)) - 1.0) * beats_per_measure + float(note.get("beatStart", 0.0)) + float(note.get("beatDuration", 1.0))
+        end_beat = (float(note.get("measureIndex", 1)) - min_measure_index) * beats_per_measure + float(note.get("beatStart", 0.0)) + float(note.get("beatDuration", 1.0))
         max_offset = max(max_offset, end_beat)
     return max(max_offset, beats_per_measure)
+
+
+def parse_measure_ranges(raw: str | None) -> list[tuple[int, int]]:
+    ranges: list[tuple[int, int]] = []
+    for token in str(raw or "").replace(";", ",").split(","):
+        text = token.strip()
+        if not text:
+            continue
+        if "-" in text:
+            left, right = text.split("-", 1)
+        elif ":" in text:
+            left, right = text.split(":", 1)
+        else:
+            left = right = text
+        try:
+            start = max(1, int(float(left.strip())))
+            end = max(1, int(float(right.strip())))
+        except ValueError:
+            continue
+        ranges.append((min(start, end), max(start, end)))
+    return ranges
+
+
+def positive_int(value: object) -> int:
+    try:
+        numeric = int(float(value))  # type: ignore[arg-type]
+        return numeric if numeric > 0 else 0
+    except (TypeError, ValueError):
+        return 0
+
+
+def section_measure_bounds(section: dict) -> tuple[int, int] | None:
+    measures = [
+        positive_int(note.get("measureIndex"))
+        for note in (section.get("notes") or [])
+        if positive_int(note.get("measureIndex")) > 0
+    ]
+    if not measures:
+        raw_range = section.get("measureRange") or []
+        measures = [positive_int(value) for value in raw_range if positive_int(value) > 0]
+    if not measures:
+        return None
+    return min(measures), max(measures)
+
+
+def section_intersects_measure_ranges(section: dict, ranges: list[tuple[int, int]]) -> bool:
+    if not ranges:
+        return False
+    bounds = section_measure_bounds(section)
+    if bounds is None:
+        return False
+    start, end = bounds
+    return any(start <= range_end and end >= range_start for range_start, range_end in ranges)
 
 
 def slice_audio(audio_path: Path, start_seconds: float, duration_seconds: float) -> tuple[bytes, float]:
@@ -314,6 +372,20 @@ def main() -> int:
         sections = sections[: args.max_sections]
 
     sections_to_scan = [s for s in sections if s.get("notes")]
+    omitted_measure_ranges = parse_measure_ranges(args.omit_measures)
+    omitted_sections: list[dict] = []
+    if omitted_measure_ranges:
+        kept_sections: list[dict] = []
+        for section in sections_to_scan:
+            if section_intersects_measure_ranges(section, omitted_measure_ranges):
+                omitted_sections.append(section)
+            else:
+                kept_sections.append(section)
+        sections_to_scan = kept_sections
+        sys.stderr.write(
+            f"INFO: omitted measure ranges {omitted_measure_ranges}; "
+            f"skipping {len(omitted_sections)} intersecting sections.\n"
+        )
 
     # Coverage detection: if audio is shorter than the piece, only scan reachable sections.
     audio_duration = 0.0
@@ -439,9 +511,11 @@ def main() -> int:
         "estimatedPieceDurationSeconds": round(estimated_piece_duration, 2),
         "isPartial": is_partial,
         "scannedSectionCount": len(scan_results),
-        "skippedSectionCount": len(skipped_beyond_audio),
+        "skippedSectionCount": len(skipped_beyond_audio) + len(omitted_sections),
         "lastScannedSectionId": last_scanned_section_id,
-        "skippedSectionIds": [s.get("sectionId") for s in skipped_beyond_audio],
+        "skippedSectionIds": [s.get("sectionId") for s in skipped_beyond_audio] + [s.get("sectionId") for s in omitted_sections],
+        "omittedMeasureRanges": [[start, end] for start, end in omitted_measure_ranges],
+        "omittedSectionIds": [s.get("sectionId") for s in omitted_sections],
     }
     (output_dir / f"{output_key}-segment-scan.json").write_text(
         json.dumps(
