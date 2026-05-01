@@ -6078,6 +6078,33 @@ class ErhuAnalyzer:
             or safe_float(candidate.get("chordRatio"), 0.0) >= 0.18
         )
 
+    def _should_apply_erhu_range_fallback(
+        self,
+        selected_part_candidate: dict[str, Any] | None,
+        clean_solo: bool,
+        ambiguous: bool,
+    ) -> bool:
+        if clean_solo or not ambiguous or not selected_part_candidate:
+            return False
+        if bool(selected_part_candidate.get("isLikelyPiano")):
+            return False
+        if int(safe_float(selected_part_candidate.get("staffCount"), 1)) > 1:
+            return False
+        note_count = int(safe_float(selected_part_candidate.get("noteCount"), 0))
+        erhu_range_ratio = safe_float(selected_part_candidate.get("erhuRangeRatio"), 0.0)
+        chord_ratio = safe_float(selected_part_candidate.get("chordRatio"), 1.0)
+        candidate_score = safe_float(selected_part_candidate.get("score"), 0.0)
+        candidate_confidence = safe_float(selected_part_candidate.get("selectedPartConfidence"), candidate_score)
+        if note_count < 8 or erhu_range_ratio < 0.82 or chord_ratio > 0.08:
+            return False
+        if bool(selected_part_candidate.get("safeForErhuProjection")):
+            return True
+        return (
+            erhu_range_ratio >= 0.9
+            and chord_ratio <= 0.04
+            and max(candidate_score, candidate_confidence) >= 0.55
+        )
+
     def _annotate_score_line_roles(
         self,
         note_events: list[NoteEvent],
@@ -6100,14 +6127,22 @@ class ErhuAnalyzer:
             and safe_float((selected_part_candidate or {}).get("chordRatio"), 0.0) < 0.08
             and safe_float((selected_part_candidate or {}).get("erhuRangeRatio"), 0.0) >= 0.75
         )
+        erhu_range_fallback = self._should_apply_erhu_range_fallback(
+            selected_part_candidate,
+            clean_solo,
+            ambiguous,
+        )
 
         line_groups: dict[tuple[int, int, int], list[NoteEvent]] = {}
+        global_onset_counts: dict[tuple[int, float], int] = {}
         for note in note_events:
             position = getattr(note, "notePosition", None) or {}
             page_number = int(safe_float(position.get("pageNumber"), 1))
             system_index = int(safe_float(position.get("systemIndex"), 1))
             staff_index = int(safe_float(position.get("staffIndex"), 1))
             line_groups.setdefault((page_number, system_index, staff_index), []).append(note)
+            onset_key = (int(note.measureIndex), round(float(note.beatStart), 4))
+            global_onset_counts[onset_key] = global_onset_counts.get(onset_key, 0) + 1
 
         page_order: dict[int, list[tuple[int, int, int]]] = {}
         for key, notes in line_groups.items():
@@ -6141,13 +6176,13 @@ class ErhuAnalyzer:
             if key in line_metric_cache:
                 return line_metric_cache[key]
             notes = line_groups.get(key, [])
-            onset_counts: dict[tuple[int, float], int] = {}
+            line_onset_counts: dict[tuple[int, float], int] = {}
             pitches: list[int] = []
             for note in notes:
                 onset_key = (int(note.measureIndex), round(float(note.beatStart), 4))
-                onset_counts[onset_key] = onset_counts.get(onset_key, 0) + 1
+                line_onset_counts[onset_key] = line_onset_counts.get(onset_key, 0) + 1
                 pitches.append(int(note.midiPitch))
-            chord_excess = sum(max(0, count - 1) for count in onset_counts.values())
+            chord_excess = sum(max(0, count - 1) for count in line_onset_counts.values())
             range_hits = sum(1 for value in pitches if 52 <= value <= 96)
             metrics = {
                 "note_count": float(len(notes)),
@@ -6283,6 +6318,28 @@ class ErhuAnalyzer:
                 int(safe_float(position.get("staffIndex"), 1)),
             )
             role, confidence, source = line_roles.get(key, ("unknown", 0.0, "none"))
+            if erhu_range_fallback and role != "erhu":
+                metrics = line_metrics(key)
+                page_number = key[0]
+                ordered_keys = page_order.get(page_number, [])
+                sparse_page_noise = (
+                    ambiguous
+                    and len(ordered_keys) >= 4
+                    and len(line_groups.get(key, [])) <= 2
+                    and page_has_dense_erhu_pattern_line.get(page_number, False)
+                )
+                onset_key = (int(note.measureIndex), round(float(note.beatStart), 4))
+                if (
+                    62 <= int(note.midiPitch) <= 93
+                    and global_onset_counts.get(onset_key, 0) == 1
+                    and metrics["chord_ratio"] <= 0.08
+                    and metrics["range_ratio"] >= 0.75
+                    and key not in sparse_system_lead_noise
+                    and not sparse_page_noise
+                ):
+                    role = "erhu"
+                    confidence = max(float(confidence), 0.68)
+                    source = "erhu-range-fallback"
             position.update(
                 {
                     "scoreLineRole": role,

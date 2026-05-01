@@ -483,6 +483,50 @@ SAFE_VOICE_WITH_PIANO_MULTI_SYSTEM_MUSICXML = """<?xml version="1.0" encoding="U
 </score-partwise>
 """
 
+SCANNED_RANGE_FALLBACK_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <defaults>
+    <page-layout>
+      <page-height>1600</page-height>
+      <page-width>1200</page-width>
+    </page-layout>
+  </defaults>
+  <part-list>
+    <score-part id="P1"><part-name>Piano</part-name></score-part>
+    <score-part id="P2"><part-name>Voice</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1" width="420">
+      <attributes><divisions>4</divisions><staves>2</staves></attributes>
+      <note default-x="80"><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><staff>1</staff></note>
+      <note default-x="80"><chord/><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration><staff>1</staff></note>
+      <note default-x="80"><chord/><pitch><step>G</step><octave>3</octave></pitch><duration>4</duration><staff>2</staff></note>
+    </measure>
+  </part>
+  <part id="P2">
+    <measure number="1" width="420">
+      <print new-system="yes"><system-layout><top-system-distance>120</top-system-distance></system-layout></print>
+      <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+      <note default-x="80"><pitch><step>D</step><octave>5</octave></pitch><duration>4</duration></note>
+      <note default-x="200"><pitch><step>E</step><octave>5</octave></pitch><duration>4</duration></note>
+      <note default-x="320"><pitch><step>F</step><octave>5</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2" width="420">
+      <print new-system="yes"><system-layout><top-system-distance>320</top-system-distance></system-layout></print>
+      <note default-x="80"><pitch><step>G</step><octave>5</octave></pitch><duration>4</duration></note>
+      <note default-x="200"><pitch><step>A</step><octave>5</octave></pitch><duration>4</duration></note>
+      <note default-x="320"><pitch><step>B</step><octave>5</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3" width="420">
+      <print new-system="yes"><system-layout><top-system-distance>520</top-system-distance></system-layout></print>
+      <note default-x="80"><pitch><step>C</step><octave>6</octave></pitch><duration>4</duration></note>
+      <note default-x="200"><pitch><step>D</step><octave>6</octave></pitch><duration>4</duration></note>
+      <note default-x="320"><pitch><step>E</step><octave>6</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 PAGEWISE_MEASURE_PAGE_1 = """<?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
   <part-list>
@@ -714,6 +758,23 @@ def main() -> int:
             "Safe Voice With Piano Multi System",
             1,
         )
+        scanned_fallback_source = Path(tmp) / "scanned-range-fallback.musicxml"
+        scanned_fallback_source.write_text(SCANNED_RANGE_FALLBACK_MUSICXML, encoding="utf-8")
+        scanned_fallback_request = ScoreImportRequest(
+            jobId="scanned-range-fallback-test",
+            pdfPath=str(scanned_fallback_source),
+            originalFilename="scanned-range-fallback.musicxml",
+            titleHint="Scanned Range Fallback Test",
+            selectedPartHint="Voice",
+        )
+        scanned_fallback_section, *_ = analyzer._parse_musicxml_source_to_section(
+            scanned_fallback_source,
+            scanned_fallback_request,
+            "Voice",
+            "section-range-fallback",
+            "Scanned Range Fallback",
+            1,
+        )
         pagewise_source_1 = Path(tmp) / "pagewise-001.musicxml"
         pagewise_source_2 = Path(tmp) / "pagewise-002.musicxml"
         pagewise_source_1.write_text(PAGEWISE_MEASURE_PAGE_1, encoding="utf-8")
@@ -763,6 +824,7 @@ def main() -> int:
     require(backup_forward_section is not None, "Backup/forward MusicXML did not produce a section.")
     require(grace_cue_section is not None, "Grace/cue MusicXML did not produce a section.")
     require(safe_voice_section is not None, "Safe voice with piano multi-system MusicXML did not produce a section.")
+    require(scanned_fallback_section is not None, "Scanned range fallback MusicXML did not produce a section.")
     require(pagewise_piece_pack is not None, "Pagewise MusicXML sources did not produce a piece pack.")
     require(chinese_voice is not None, "Chinese piano fixture should include the trailing Voice candidate.")
     require(backup_forward_erhu is not None, "Backup/forward fixture should expose the Erhu part candidate.")
@@ -865,6 +927,15 @@ def main() -> int:
     require(
         [note["midiPitch"] for note in safe_voice_notes] == [74, 76, 77, 79],
         f"Safe leading Voice part should retain both monophonic melody systems, got {[note['midiPitch'] for note in safe_voice_notes]}.",
+    )
+    scanned_fallback_notes = scanned_fallback_section["notes"]
+    require(
+        len(scanned_fallback_notes) == 9,
+        f"Range fallback should recover monophonic in-range scanned Voice lines, got {len(scanned_fallback_notes)} notes.",
+    )
+    require(
+        scanned_fallback_section.get("scoreLineStats", {}).get("sourceCounts", {}).get("erhu-range-fallback", 0) >= 6,
+        f"Range fallback should mark lower scanned lines as erhu candidates, got stats {scanned_fallback_section.get('scoreLineStats')}.",
     )
     pagewise_notes = [
         note

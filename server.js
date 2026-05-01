@@ -559,8 +559,22 @@ function annotateImportedSectionsScoreLineRoles(sections = [], score = {}) {
     Math.max(1, safeNumber(candidate?.staffCount, 1)) <= 1 &&
     safeNumber(candidate?.chordRatio, 0) < 0.08 &&
     safeNumber(candidate?.erhuRangeRatio, 0) >= 0.75;
+  const erhuRangeFallback =
+    !cleanSolo &&
+    ambiguous &&
+    candidate &&
+    !safeBoolean(candidate?.isLikelyPiano, false) &&
+    Math.max(1, safeNumber(candidate?.staffCount, 1)) <= 1 &&
+    safeNumber(candidate?.noteCount, 0) >= 8 &&
+    safeNumber(candidate?.erhuRangeRatio, 0) >= 0.82 &&
+    safeNumber(candidate?.chordRatio, 1) <= 0.08 &&
+    (safeBoolean(candidate?.safeForErhuProjection, false) ||
+      (safeNumber(candidate?.erhuRangeRatio, 0) >= 0.9 &&
+        safeNumber(candidate?.chordRatio, 1) <= 0.04 &&
+        Math.max(safeNumber(candidate?.score, 0), safeNumber(candidate?.selectedPartConfidence, 0)) >= 0.55));
 
   const lineGroups = new Map();
+  const onsetCounts = new Map();
   for (const section of normalizedSections) {
     for (const note of getArray(section?.notes)) {
       const position = note?.notePosition || {};
@@ -573,6 +587,8 @@ function annotateImportedSectionsScoreLineRoles(sections = [], score = {}) {
         lineGroups.set(key, { key, pageNumber, systemIndex, staffIndex, notes: [] });
       }
       lineGroups.get(key).notes.push(note);
+      const onsetKey = `${Math.max(1, Math.round(safeNumber(note?.measureIndex, 1)))}:${safeNumber(note?.beatStart, 0).toFixed(4)}`;
+      onsetCounts.set(onsetKey, (onsetCounts.get(onsetKey) || 0) + 1);
     }
   }
   if (!lineGroups.size) return normalizedSections;
@@ -721,7 +737,36 @@ function annotateImportedSectionsScoreLineRoles(sections = [], score = {}) {
       const systemIndex = Math.max(1, Math.round(safeNumber(position.systemIndex, 1)));
       const staffIndex = Math.max(1, Math.round(safeNumber(position.staffIndex, 1)));
       const key = `${pageNumber}:${systemIndex}:${staffIndex}`;
-      const line = roleByLineKey.get(key);
+      const originalLine = roleByLineKey.get(key);
+      let line = originalLine;
+      if (erhuRangeFallback && originalLine && originalLine.role !== "erhu") {
+        const group = lineGroups.get(key);
+        const metrics = group ? lineMetrics(group) : null;
+        const orderedPageGroups = pageGroups.get(pageNumber) || [];
+        const sparsePageNoise =
+          ambiguous &&
+          orderedPageGroups.length >= 4 &&
+          (group?.notes?.length || 0) <= 2 &&
+          pageHasDensePatternLine.get(pageNumber);
+        const onsetKey = `${Math.max(1, Math.round(safeNumber(note?.measureIndex, 1)))}:${safeNumber(note?.beatStart, 0).toFixed(4)}`;
+        const midiPitch = Math.round(safeNumber(note?.midiPitch, 0));
+        if (
+          metrics &&
+          midiPitch >= 62 &&
+          midiPitch <= 93 &&
+          (onsetCounts.get(onsetKey) || 0) === 1 &&
+          metrics.chordRatio <= 0.08 &&
+          metrics.rangeRatio >= 0.75 &&
+          !sparseSystemLeadNoise.has(key) &&
+          !sparsePageNoise
+        ) {
+          line = {
+            role: "erhu",
+            confidence: Math.max(safeNumber(originalLine.confidence, 0), 0.68),
+            source: "erhu-range-fallback-js",
+          };
+        }
+      }
       if (!line || !note?.notePosition) return note;
       return {
         ...note,
@@ -1143,10 +1188,11 @@ function normalizeImportedScoreRecord(score = {}) {
     partCandidates: getArray(score.partCandidates || score.piecePack?.partCandidates),
   });
   const normalizedOmrStats = normalizeOmrStats(score.omrStats);
+  const computedScoreLineStats = buildScoreLineStatsFromSections(sections);
   const scoreLineStats =
     score.scoreLineStats && typeof score.scoreLineStats === "object"
-      ? score.scoreLineStats
-      : buildScoreLineStatsFromSections(sections);
+      ? { ...score.scoreLineStats, ...computedScoreLineStats }
+      : computedScoreLineStats;
   return {
     scoreId: safeString(score.scoreId),
     pieceId: safeString(score.pieceId),
@@ -1242,10 +1288,11 @@ function importedScoreHasCurrentMeasureNumbering(score = {}) {
 function normalizeScoreImportJob(job = {}) {
   const normalizedOmrStats = normalizeOmrStats(job.omrStats);
   const jobSections = getArray(job.sections || job.piecePack?.sections);
+  const computedScoreLineStats = buildScoreLineStatsFromSections(jobSections);
   const scoreLineStats =
     job.scoreLineStats && typeof job.scoreLineStats === "object"
-      ? job.scoreLineStats
-      : buildScoreLineStatsFromSections(jobSections);
+      ? { ...job.scoreLineStats, ...computedScoreLineStats }
+      : computedScoreLineStats;
   return {
     jobId: safeString(job.jobId),
     scoreId: safeString(job.scoreId),

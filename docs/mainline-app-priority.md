@@ -174,6 +174,8 @@ Completed:
 - Ran the `弦歌吟` end-to-end sample once: `12/12` sections matched, `0` failed sections, first cache-miss analysis took about `18.3s`, and score-issue smoke verified original-audio seek playback.
 - Ran the next diverse 5-song real-corpus batch (`古巷深处`, `维奥莱塔组曲07 - 二胡 中胡`, `雪山魂塑`, `弦歌吟`, `炫动`) with `--run --smoke-review --strict`: `5/5` completed, `0` P0 failures, review-page smoke passed for all `5` cards.
 - Refreshed the real-corpus trend report after the batch; latest trend summary has `completedPairCount = 71` and `p0FailureCount = 0`.
+- Added a guarded erhu-range fallback for scanned/generic `Voice` imports: when the selected candidate is single-staff, non-piano, high `erhuRangeRatio`, and very low `chordRatio`, isolated in-range notes on low-confidence lines can be promoted to `erhu-range-fallback` instead of being dropped as accompaniment. `npm run test:score-markings` now covers a piano-plus-scanned-Voice fixture.
+- Ran the fourth-rhapsody 3-worker cache-miss performance experiment on port `8102` with a fresh `ERHU_CLIP_FEATURE_CACHE_VERSION`: `104/104` sections matched, `cacheHits = 0`, no failed sections, elapsed `108.23s`. This is slower than the current accepted baseline, so do not raise the production analyzer worker default to `3` yet.
 
 ## Next In Order
 
