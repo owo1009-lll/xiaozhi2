@@ -5234,9 +5234,19 @@ class ErhuAnalyzer:
         )
         if preprocess_mode == "auto" and separation_confidence < float(self.settings.separation_auto_confidence_threshold):
             separation_meta["warnings"].append("自动判断分离置信度偏低，已回退到原音频分析。")
+            separation_meta["separationApplied"] = False
+            separation_meta["separationMode"] = "off"
             return audio, False, "off", separation_meta
         if preprocess_mode == "auto" and self._should_reject_auto_separation_for_score_band(separation_quality):
             separation_meta["warnings"].append("自动判断分离音高与谱面音域匹配度偏低，已回退到原音频分析。")
+            separation_meta["separationApplied"] = False
+            separation_meta["separationMode"] = "off"
+            return audio, False, "off", separation_meta
+
+        if preprocess_mode == "auto" and self._should_reject_borderline_auto_separation(separation_quality):
+            separation_meta["warnings"].append("auto-separation-borderline-score-band-rejected")
+            separation_meta["separationApplied"] = False
+            separation_meta["separationMode"] = "off"
             return audio, False, "off", separation_meta
 
         processed_audio = AudioArtifact(
@@ -5267,6 +5277,21 @@ class ErhuAnalyzer:
             return False
         score_band_ratio = max(0.0, min(1.0, safe_float(separation_quality.get("separationScoreBandRatio"), 0.0)))
         return score_band_ratio < min_score_band_ratio
+
+    def _should_reject_borderline_auto_separation(self, separation_quality: dict[str, Any]) -> bool:
+        confidence_threshold = max(0.0, min(1.0, float(self.settings.separation_auto_borderline_confidence_threshold)))
+        score_band_threshold = max(0.0, min(1.0, float(self.settings.separation_auto_borderline_min_score_band_ratio)))
+        if confidence_threshold <= 0.0 or score_band_threshold <= 0.0:
+            return False
+        confidence = max(0.0, min(1.0, safe_float(separation_quality.get("separationConfidence"), 0.0)))
+        if confidence >= confidence_threshold:
+            return False
+        min_points = max(0, int(self.settings.separation_auto_min_score_band_points))
+        confident_points = int(safe_float(separation_quality.get("separationConfidentPitchCount"), 0))
+        if confident_points < min_points:
+            return False
+        score_band_ratio = max(0.0, min(1.0, safe_float(separation_quality.get("separationScoreBandRatio"), 0.0)))
+        return score_band_ratio < score_band_threshold
 
     def _apply_melody_focus_mask(
         self,

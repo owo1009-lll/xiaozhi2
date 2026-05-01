@@ -121,6 +121,36 @@ def main() -> int:
         ),
         "auto separation should keep usable score-band matches",
     )
+    require(
+        analyzer._should_reject_borderline_auto_separation(
+            {
+                "separationConfidence": 0.42,
+                "separationScoreBandRatio": 0.35,
+                "separationConfidentPitchCount": 64,
+            }
+        ),
+        "borderline auto separation should reject weak score-band matches",
+    )
+    require(
+        not analyzer._should_reject_borderline_auto_separation(
+            {
+                "separationConfidence": 0.42,
+                "separationScoreBandRatio": 0.49,
+                "separationConfidentPitchCount": 64,
+            }
+        ),
+        "borderline auto separation should keep strong score-band matches",
+    )
+    require(
+        not analyzer._should_reject_borderline_auto_separation(
+            {
+                "separationConfidence": 0.5,
+                "separationScoreBandRatio": 0.2,
+                "separationConfidentPitchCount": 64,
+            }
+        ),
+        "confident auto separation should not use the borderline guard",
+    )
     wrapped_confidence = analyzer._estimate_separation_confidence(
         score_notes,
         pitch_track,

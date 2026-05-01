@@ -190,6 +190,8 @@ Completed:
 - Fixed the analyzer request schema so legacy `preprocessMode=off` is no longer overridden by the default `separationMode=auto`. This makes separation on/off experiments truthful for direct analyzer and script callers while explicit `separationMode` still takes precedence.
 - Rechecked the current separation hotspot `Xueshan Hunsu page-06-s03`: current auto separation remains a real low-but-accepted case (`confidence = 0.421`, `energyRatio = 0.335`, `scoreBandRatio = 0.351`). After the schema fix, the `preprocessMode=off` control correctly reports `separationApplied = false`, confirming that future separation strategy experiments can compare auto vs raw audio reliably.
 - Re-ran the full `npm run test:mainline-p0` after the schema fix: P0 still passes, including analyzer dependency checks, PWA, Windows shortcuts, frontend build, student copy guard, MusicXML, separation quality, score markings, score issue projection, DTW alignment quality, and real-corpus pairing audit.
+- Tuned auto separation acceptance with a borderline guard: if separation confidence is below `0.43` and score-band match is below `0.40` with enough pitch evidence, auto now falls back to raw audio. Targeted checks show `Xueshan Hunsu page-06-s03` now falls back to `appliedPreprocessMode = off`, removing the extra low-confidence rhythm finding, while `Violeta Suite 07 page-04-s12` and `Xian Ge Yin page-08-s04` still keep erhu-focus separation.
+- Re-ran `npm run test:mainline-p0` after the borderline separation guard: P0 still passes and DTW remains `latestMainlineReviewRate = 0`, `currentMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`.
 
 ## Next In Order
 
