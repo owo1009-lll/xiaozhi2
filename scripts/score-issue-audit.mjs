@@ -43,33 +43,62 @@ export function isAccompanimentOnly(section = {}) {
   return notes.length > 0 && !notes.some((note) => isErhuNote(note, section));
 }
 
-export function hasErhuMeasure(section = {}, measureIndex = 0) {
-  const numericMeasure = Number(measureIndex) || 1;
-  return (section?.notes || []).some((note) => Number(note?.measureIndex) === numericMeasure && isErhuNote(note, section));
+export function parseXmlNoteId(noteId) {
+  const match = String(noteId || "").trim().match(/^xml-m(\d+)-n(\d+)$/i);
+  return match ? { measureIndex: Number(match[1]), noteIndex: Number(match[2]) } : null;
+}
+
+function issueMeasureIndex(issueOrMeasure = 0) {
+  if (issueOrMeasure && typeof issueOrMeasure === "object") {
+    return Number(issueOrMeasure.measureIndex) || parseXmlNoteId(issueOrMeasure.noteId)?.measureIndex || 1;
+  }
+  return Number(issueOrMeasure) || 1;
+}
+
+function noteMeasureMatchesIssue(note = {}, issueOrMeasure = 0) {
+  const numericMeasure = issueMeasureIndex(issueOrMeasure);
+  if (Number(note?.measureIndex) === numericMeasure) return true;
+  const position = note?.notePosition || {};
+  if (Number(position.localMeasureIndex) === numericMeasure) return true;
+  const localNote = parseXmlNoteId(position.localNoteId);
+  return Boolean(localNote && localNote.measureIndex === numericMeasure);
+}
+
+function noteIdMatchesIssue(note = {}, issue = {}) {
+  const noteId = String(issue?.noteId || "").trim();
+  if (!noteId) return true;
+  if (String(note?.noteId || "") === noteId) return true;
+  const position = note?.notePosition || {};
+  return String(position.localNoteId || "") === noteId;
+}
+
+function noteMatchesIssue(note = {}, issue = {}) {
+  return noteMeasureMatchesIssue(note, issue) && noteIdMatchesIssue(note, issue);
+}
+
+export function hasErhuMeasure(section = {}, issueOrMeasure = 0) {
+  return (section?.notes || []).some((note) => noteMeasureMatchesIssue(note, issueOrMeasure) && isErhuNote(note, section));
 }
 
 export function resolveIssueSection(score = {}, issue = {}) {
   const sections = Array.isArray(score?.sections) ? score.sections : [];
   const requestedId = String(issue?.sectionId || "").trim();
-  const measureIndex = Number(issue?.measureIndex);
-  const noteId = String(issue?.noteId || "").trim();
   if (requestedId) {
     const matched = sections.find((section) => (
       String(section?.sectionId || "") === requestedId
       || String(section?.sourceSectionId || "") === requestedId
     ));
-    if (matched && !isAccompanimentOnly(matched) && hasErhuMeasure(matched, measureIndex)) return matched;
+    if (matched && !isAccompanimentOnly(matched) && hasErhuMeasure(matched, issue)) return matched;
   }
   const page = Number(issue?.sourcePageNumber || issue?.pageNumber);
   if (Number.isFinite(page) && page > 0) {
     const pageSections = sections.filter((section) => sectionPage(section) === Math.round(page));
     const exact = pageSections.find((section) => (section.notes || []).some((note) => (
-      Number(note?.measureIndex) === measureIndex
-      && (!noteId || String(note?.noteId || "") === noteId)
+      noteMatchesIssue(note, issue)
       && isErhuNote(note, section)
     )));
     if (exact) return exact;
-    const measure = pageSections.find((section) => hasErhuMeasure(section, measureIndex));
+    const measure = pageSections.find((section) => hasErhuMeasure(section, issue));
     if (measure) return measure;
     return pageSections.find((section) => !isAccompanimentOnly(section)) || null;
   }
@@ -91,8 +120,7 @@ export function auditScoreIssueProjection(score = {}, analysis = {}) {
     const sourcePage = Number(issue?.sourcePageNumber || issue?.pageNumber) || (section ? sectionPage(section) : 0);
     if (sourcePage > 0) sourcePages.push(sourcePage);
     const note = (section?.notes || []).find((item) => (
-      String(item?.noteId || "") === String(issue?.noteId || "")
-      && Number(item?.measureIndex) === Number(issue?.measureIndex)
+      noteMatchesIssue(item, issue)
     ));
     if (!section || !note || !isErhuNote(note, section)) {
       reviewNotes += 1;
@@ -116,7 +144,7 @@ export function auditScoreIssueProjection(score = {}, analysis = {}) {
     const section = resolveIssueSection(score, issue);
     const sourcePage = Number(issue?.sourcePageNumber || issue?.pageNumber) || (section ? sectionPage(section) : 0);
     if (sourcePage > 0) sourcePages.push(sourcePage);
-    if (!section || !hasErhuMeasure(section, issue.measureIndex)) {
+    if (!section || !hasErhuMeasure(section, issue)) {
       reviewMeasures += 1;
       if (sourcePage > 0) reviewPages.push(sourcePage);
       continue;

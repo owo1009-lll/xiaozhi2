@@ -183,6 +183,8 @@ Completed:
 - Re-ran the first 3 real-corpus strict pairs after the legacy pagewise reuse fix: `3/3` completed, `0` P0 failures, review smoke passed for all cards, and original-audio seek playback was verified for Taohuawu, Second Erhu Rhapsody, and Fourth Erhu Rhapsody.
 - Current DTW projection audits still report `latestMainlineAccompanimentFailureRate = 0`, so hidden-accompaniment points are not counted as successful visible highlights. The latest/current `reviewRate` warning is now a P1 OMR voice-line quality signal rather than a P0 projection failure; the active hotspots are Violeta Suite 07, Xuandong, Fusheng, Guxiang Shenchu, and Xueshan Hunsu.
 - The latest 3-pair strict run also shows the remaining first-pass performance risk: Fourth Erhu Rhapsody took about `264.974s` with `106` cache misses in that batch, so long fragmented scores still need performance work even though the P0 flow completes.
+- Added legacy pagewise issue-location compatibility in the DTW audit, P0 score-issue projection audit, and student score-issue page. Older analyses that still store page-local `measureIndex` / `noteId` now resolve through `sourcePageNumber + localMeasureIndex + localNoteId` against normalized global-measure scores instead of being treated as review-only.
+- Re-ran `test:score-issues` and `test:dtw-quality` after that compatibility fix: latest/current mainline now reports `latestMainlineReviewRate = 0`, `currentMainlineReviewRate = 0`, and `latestMainlineAccompanimentFailureRate = 0`. The previous hotspots in Violeta Suite 07, Xuandong, Fusheng, Guxiang Shenchu, and Xueshan Hunsu are no longer active current-mainline review hotspots.
 
 ## Next In Order
 
