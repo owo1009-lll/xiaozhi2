@@ -177,6 +177,7 @@ Completed:
 - Added a guarded erhu-range fallback for scanned/generic `Voice` imports: when the selected candidate is single-staff, non-piano, high `erhuRangeRatio`, and very low `chordRatio`, isolated in-range notes on low-confidence lines can be promoted to `erhu-range-fallback` instead of being dropped as accompaniment. `npm run test:score-markings` now covers a piano-plus-scanned-Voice fixture.
 - Re-ran the Xian Ge Yin scanned-PDF baseline after the fallback: `completed`, `omrConfidence = 0.9`, `58` structured sections, `1034` notes, and `1032/1034` notes marked as erhu melody (`erhuRatio = 0.998`). This replaces the earlier `123/501` scanned voice-splitting failure as the current baseline for this sample.
 - Ran the fourth-rhapsody 3-worker cache-miss performance experiment on port `8102` with a fresh `ERHU_CLIP_FEATURE_CACHE_VERSION`: `104/104` sections matched, `cacheHits = 0`, no failed sections, elapsed `108.23s`. This is slower than the current accepted baseline, so do not raise the production analyzer worker default to `3` yet.
+- Refreshed the fourth-rhapsody separation hotspots reported by the all-cache audit (`page-09-s14`, `page-09-s16`, `page-10-s06`) with the current analyzer and `--refresh-cache`: `3/3` sections matched, `cacheHits = 0`, no failures, and the refreshed applied `separationScoreBandRatio` values were `0.864`, `1.0`, and `1.0`. The old low score-band records are stale cache artifacts, not current strategy failures.
 
 ## Next In Order
 
