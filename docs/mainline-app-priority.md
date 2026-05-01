@@ -176,6 +176,7 @@ Completed:
 - Refreshed the real-corpus trend report after the batch; latest trend summary has `completedPairCount = 71` and `p0FailureCount = 0`.
 - Added a guarded erhu-range fallback for scanned/generic `Voice` imports: when the selected candidate is single-staff, non-piano, high `erhuRangeRatio`, and very low `chordRatio`, isolated in-range notes on low-confidence lines can be promoted to `erhu-range-fallback` instead of being dropped as accompaniment. `npm run test:score-markings` now covers a piano-plus-scanned-Voice fixture.
 - Re-ran the Xian Ge Yin scanned-PDF baseline after the fallback: `completed`, `omrConfidence = 0.9`, `58` structured sections, `1034` notes, and `1032/1034` notes marked as erhu melody (`erhuRatio = 0.998`). This replaces the earlier `123/501` scanned voice-splitting failure as the current baseline for this sample.
+- Added a local complex-PDF OMR benchmark batch with `Liulangzhe Zhi Ge`, `Fusheng`, and `Violeta Suite 07`: `3/3` completed. Current results are `Liulangzhe Zhi Ge` `25` sections / `494` notes / `erhuRatio = 1.0`, `Fusheng` `23` sections / `452` notes / `erhuRatio = 0.319`, and `Violeta Suite 07` `154` sections / `2054` notes / `erhuRatio = 1.0`; `Fusheng` remains the useful voice-splitting regression target.
 - Ran the fourth-rhapsody 3-worker cache-miss performance experiment on port `8102` with a fresh `ERHU_CLIP_FEATURE_CACHE_VERSION`: `104/104` sections matched, `cacheHits = 0`, no failed sections, elapsed `108.23s`. This is slower than the current accepted baseline, so do not raise the production analyzer worker default to `3` yet.
 - Refreshed the fourth-rhapsody separation hotspots reported by the all-cache audit (`page-09-s14`, `page-09-s16`, `page-10-s06`) with the current analyzer and `--refresh-cache`: `3/3` sections matched, `cacheHits = 0`, no failures, and the refreshed applied `separationScoreBandRatio` values were `0.864`, `1.0`, and `1.0`. The old low score-band records are stale cache artifacts, not current strategy failures.
 - Fixed legacy pagewise imported-score reuse for older cached OMR records that predate `measureNumberSource = pagewise-count`. Normalization now infers global measure numbers from page-local measure order, keeps local page measure metadata, and lets real-corpus reruns reuse known-good pagewise scores instead of replacing them with a weaker fresh OMR import.
@@ -210,7 +211,7 @@ Completed:
 - Keep performance work focused on quality-preserving reductions: analyze whether fragmented-score window shortening can be guarded by score coverage or confidence before changing production defaults.
 - Continue separation strategy work as diagnosis quality work: use targeted auto/off pairs for low-score sections, but do not assume separation skipping will reduce first-pass latency.
 - Continue OMR section/voice improvements with `test:dtw-quality` review samples as the selector for exact pages, measures, and note IDs.
-- Add 2-3 unknown/scanned PDF benchmark samples before treating unknown-PDF robustness as done.
+- Add truly external scanned/non-standard PDF samples when available; the local complex-PDF benchmark now has `3/3` completed samples, with `Fusheng` still exposing a voice-splitting weakness.
 
 ## Immediate Implication
 
