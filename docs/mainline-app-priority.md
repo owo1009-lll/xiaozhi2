@@ -192,6 +192,9 @@ Completed:
 - Re-ran the full `npm run test:mainline-p0` after the schema fix: P0 still passes, including analyzer dependency checks, PWA, Windows shortcuts, frontend build, student copy guard, MusicXML, separation quality, score markings, score issue projection, DTW alignment quality, and real-corpus pairing audit.
 - Tuned auto separation acceptance with a borderline guard: if separation confidence is below `0.43` and score-band match is below `0.40` with enough pitch evidence, auto now falls back to raw audio. Targeted checks show `Xueshan Hunsu page-06-s03` now falls back to `appliedPreprocessMode = off`, removing the extra low-confidence rhythm finding, while `Violeta Suite 07 page-04-s12` and `Xian Ge Yin page-08-s04` still keep erhu-focus separation.
 - Re-ran `npm run test:mainline-p0` after the borderline separation guard: P0 still passes and DTW remains `latestMainlineReviewRate = 0`, `currentMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`.
+- Ran a no-feature-cache Fourth Erhu Rhapsody concurrency microbench on the current `106`-section score with a temporary analyzer on port `8103`: the same `12` cache-miss sections took `29.81s` at analysis concurrency `1`, `22.67s` at `2`, `16.16s` at `3`, and `12.53s` at `4`, all with `0` failed sections. This supports keeping the current Windows `4`-worker/concurrency default; it does not override the earlier full-piece `3`-worker cache-miss result (`108.23s`), so there is no worker-default change.
+- Tested fast-sequence window tightening on the first `40` Fourth Erhu Rhapsody sections with feature cache disabled and analysis concurrency `4`: production `max=8s` took `33.61s` with weighted combined `90.61` and `50` note findings; `max=5s` took `21.76s` but changed diagnosis to weighted combined `89.33` and `59` note findings; `max=6s` was unstable at `69.29s` and `70` note findings. Do not lower `--fast-window-max-duration` globally until a quality guard can prove the shorter window is safe.
+- Checked separation as a performance lever on the same `40` Fourth Erhu Rhapsody sections: `preprocess-mode=off` took `33.04s`, similar to auto, while weighted combined improved to `92.88` and note findings dropped to `48`. Skipping separation is not a speed fix here; any future auto-vs-raw choice should be treated as a diagnosis-quality strategy, not as the primary first-pass performance optimization.
 
 ## Next In Order
 
@@ -204,7 +207,8 @@ Completed:
 
 ## Current P1/P2 Focus
 
-- Refresh at least one targeted real-corpus `--run` after separation metrics are present in the cache, then use `npm run audit:separation-quality` to inspect `separationEnergyRatio` and `separationScoreBandRatio`, not only legacy confidence.
+- Keep performance work focused on quality-preserving reductions: analyze whether fragmented-score window shortening can be guarded by score coverage or confidence before changing production defaults.
+- Continue separation strategy work as diagnosis quality work: use targeted auto/off pairs for low-score sections, but do not assume separation skipping will reduce first-pass latency.
 - Continue OMR section/voice improvements with `test:dtw-quality` review samples as the selector for exact pages, measures, and note IDs.
 - Add 2-3 unknown/scanned PDF benchmark samples before treating unknown-PDF robustness as done.
 
