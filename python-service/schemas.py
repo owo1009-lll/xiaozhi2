@@ -62,7 +62,7 @@ class AnalyzeRequest(BaseModel):
     pieceId: str | None = None
     sectionId: str | None = None
     preprocessMode: str | None = "off"
-    separationMode: str | None = "auto"
+    separationMode: str | None = None
     piecePack: PiecePack
     audioSubmission: AudioSubmission | None = None
     audioPath: str | None = None
@@ -230,7 +230,7 @@ class RankSectionsRequest(BaseModel):
     scoreId: str | None = None
     pieceId: str | None = None
     preprocessMode: str | None = "off"
-    separationMode: str | None = "auto"
+    separationMode: str | None = None
     piecePacks: list[PiecePack] = Field(default_factory=list)
     audioSubmission: AudioSubmission | None = None
     audioPath: str | None = None

@@ -13,6 +13,7 @@ warnings.filterwarnings("ignore", message="pkg_resources is deprecated.*")
 
 from analyzer import ErhuAnalyzer, SymbolicNote, midi_to_frequency  # noqa: E402
 from config import Settings  # noqa: E402
+from schemas import AnalyzeRequest, PiecePack, RankSectionsRequest  # noqa: E402
 
 
 def require(condition: bool, message: str) -> None:
@@ -24,6 +25,33 @@ def main() -> int:
     import numpy as np
 
     analyzer = ErhuAnalyzer(Settings())
+    require(
+        analyzer._resolve_preprocess_mode(
+            AnalyzeRequest(participantId="legacy-off", preprocessMode="off", piecePack=PiecePack(notes=[]))
+        ) == "off",
+        "legacy preprocessMode=off should not be overridden by the separationMode default",
+    )
+    require(
+        analyzer._resolve_preprocess_mode(
+            AnalyzeRequest(participantId="legacy-auto", preprocessMode="auto", piecePack=PiecePack(notes=[]))
+        ) == "auto",
+        "legacy preprocessMode=auto should still request automatic separation",
+    )
+    require(
+        analyzer._resolve_preprocess_mode(
+            AnalyzeRequest(
+                participantId="explicit-separation",
+                preprocessMode="off",
+                separationMode="erhu-focus",
+                piecePack=PiecePack(notes=[]),
+            )
+        ) == "erhu-focus",
+        "explicit separationMode should override preprocessMode",
+    )
+    require(
+        analyzer._resolve_preprocess_mode(RankSectionsRequest(preprocessMode="off")) == "off",
+        "rank-section preprocessMode=off should not be overridden by the separationMode default",
+    )
     score_notes = [
         SymbolicNote(
             note_id="n1",
