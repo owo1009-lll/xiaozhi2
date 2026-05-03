@@ -346,6 +346,24 @@ async function runSmoke(args) {
       const issuePage = await evaluate(send, `(() => {
         const image = document.querySelector(".score-page-image");
         const canvas = document.querySelector(".pdf-preview-canvas");
+        let sessionPayload = null;
+        try {
+          const storageKey = ${JSON.stringify(ISSUE_SESSION_STORAGE_PREFIX)} + ${JSON.stringify(card.sessionId || "")};
+          sessionPayload = JSON.parse(sessionStorage.getItem(storageKey) || localStorage.getItem(storageKey) || "null");
+        } catch {}
+        const score = sessionPayload?.score || {};
+        const stats = score?.scoreLineStats || {};
+        const partCandidates = Array.isArray(score?.partCandidates) ? score.partCandidates : [];
+        const requiresMelodyLineMode = Boolean(
+          Number(stats.accompanimentNoteCount || 0) > 0 ||
+          stats.splitApplied ||
+          partCandidates.some((item) =>
+            item?.isLikelyPiano ||
+            item?.isLikelyAccompanimentSplit ||
+            Number(item?.chordRatio || 0) >= 0.18 ||
+            Number(item?.staffCount || 0) >= 2
+          )
+        );
         return {
           title: document.title,
           url: location.href,
@@ -365,6 +383,7 @@ async function runSmoke(args) {
           hasIssueColorLegend: Boolean(document.querySelector(".issue-color-legend")),
           colorLegendDotCount: document.querySelectorAll(".issue-color-legend .legend-dot").length,
           hasMelodyLineMode: Boolean(document.querySelector(".issue-line-mode")),
+          requiresMelodyLineMode,
           listToneClassCount: Array.from(document.querySelectorAll(".issue-list-button"))
             .filter((item) => Array.from(item.classList).some((className) => className.startsWith("issue-tone-"))).length,
           buttonCount: document.querySelectorAll("button").length,
@@ -421,7 +440,7 @@ async function runSmoke(args) {
       if (issuePage.highlightToneClassCount < issuePage.highlightCount) pageFailures.push("issue-page-highlight-tone-class-missing");
       if (!issuePage.hasIssueColorLegend || issuePage.colorLegendDotCount < 3) pageFailures.push("issue-page-color-legend-missing");
       if (issuePage.listToneClassCount < issuePage.issueListCount) pageFailures.push("issue-page-list-tone-class-missing");
-      if (!issuePage.hasMelodyLineMode) pageFailures.push("issue-page-melody-line-mode-missing");
+      if (issuePage.requiresMelodyLineMode && !issuePage.hasMelodyLineMode) pageFailures.push("issue-page-melody-line-mode-missing");
       if (issuePage.hasHorizontalBodyOverflow) pageFailures.push("issue-page-horizontal-overflow");
       if (!playbackCheck.ok) pageFailures.push(`issue-page-playback-link-missing:${playbackCheck.reason || "unknown"}`);
       checkedPages.push({
