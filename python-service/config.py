@@ -79,6 +79,7 @@ class Settings:
     separation_auto_min_score_band_points: int = int(os.getenv("ERHU_SEPARATION_AUTO_MIN_SCORE_BAND_POINTS", "24"))
     separation_auto_borderline_confidence_threshold: float = float(os.getenv("ERHU_SEPARATION_AUTO_BORDERLINE_CONFIDENCE_THRESHOLD", "0.43"))
     separation_auto_borderline_min_score_band_ratio: float = float(os.getenv("ERHU_SEPARATION_AUTO_BORDERLINE_MIN_SCORE_BAND_RATIO", "0.40"))
+    separation_auto_clean_solo_min_score_band_ratio: float = float(os.getenv("ERHU_SEPARATION_AUTO_CLEAN_SOLO_MIN_SCORE_BAND_RATIO", "0.82"))
     enable_clip_feature_cache: bool = env_bool("ERHU_ENABLE_CLIP_FEATURE_CACHE", True)
     clip_feature_cache_version: str = os.getenv("ERHU_CLIP_FEATURE_CACHE_VERSION", "v14-windowed-analysis")
     ranking_pitch_hop_ms: int = int(os.getenv("ERHU_RANKING_PITCH_HOP_MS", "25"))

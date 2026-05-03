@@ -5152,6 +5152,30 @@ class ErhuAnalyzer:
             return audio, False, "off", separation_meta
 
         section_calibration = section_calibration or {}
+        if preprocess_mode == "auto":
+            clean_solo_quality = self._clean_solo_pitch_quality(request, score_notes, pitch_track)
+            if self._should_skip_auto_separation_for_clean_solo(request, clean_solo_quality):
+                separation_meta.update(
+                    {
+                        "separationConfidence": round(
+                            safe_float(clean_solo_quality.get("cleanSoloScoreBandRatio"), 0.0),
+                            3,
+                        ),
+                        "separationScoreBandRatio": round(
+                            safe_float(clean_solo_quality.get("cleanSoloScoreBandRatio"), 0.0),
+                            3,
+                        ),
+                        "separationConfidentPitchCount": int(
+                            safe_float(clean_solo_quality.get("cleanSoloConfidentPitchCount"), 0)
+                        ),
+                        "separationScoreBandHitCount": int(
+                            safe_float(clean_solo_quality.get("cleanSoloScoreBandHitCount"), 0)
+                        ),
+                    }
+                )
+                separation_meta["warnings"].append("auto-separation-clean-solo-skipped")
+                return audio, False, "off", separation_meta
+
         base_waveform = np.asarray(audio.waveform, dtype=np.float32)
         cached_preprocessed_audio, processed_cache_key = self._read_cached_preprocessed_audio(
             request,
@@ -5292,6 +5316,105 @@ class ErhuAnalyzer:
             return False
         score_band_ratio = max(0.0, min(1.0, safe_float(separation_quality.get("separationScoreBandRatio"), 0.0)))
         return score_band_ratio < score_band_threshold
+
+    def _clean_solo_pitch_quality(
+        self,
+        request: AnalyzeRequest | SeparateErhuRequest | RankSectionsRequest,
+        score_notes: list[SymbolicNote],
+        pitch_track: list[dict[str, float]],
+    ) -> dict[str, Any]:
+        score_min = min((note.midi_pitch for note in score_notes), default=55)
+        score_max = max((note.midi_pitch for note in score_notes), default=88)
+        score_band_hits = 0
+        confident_points = 0
+        for item in pitch_track:
+            confidence = float(item.get("confidence", 0.0))
+            if confidence < self.settings.separation_pitch_confidence:
+                continue
+            confident_points += 1
+            midi_value = frequency_to_midi(float(item.get("frequency", 0.0)))
+            if score_min - 4 <= midi_value <= score_max + 4:
+                score_band_hits += 1
+        band_ratio = (score_band_hits / confident_points) if confident_points else 0.0
+        return {
+            "cleanSoloScoreBandRatio": max(0.0, min(1.0, band_ratio)),
+            "cleanSoloConfidentPitchCount": int(confident_points),
+            "cleanSoloScoreBandHitCount": int(score_band_hits),
+            "explicitSoloScore": self._has_explicit_solo_score_context(request),
+        }
+
+    def _has_explicit_solo_score_context(self, request: AnalyzeRequest | SeparateErhuRequest | RankSectionsRequest) -> bool:
+        piece_pack = getattr(request, "piecePack", None)
+        if piece_pack is None and isinstance(getattr(request, "piecePacks", None), list):
+            packs = [item for item in getattr(request, "piecePacks", []) if item is not None]
+            if len(packs) != 1:
+                return False
+            piece_pack = packs[0]
+        if piece_pack is None:
+            return False
+
+        score_line_stats = getattr(piece_pack, "scoreLineStats", None) or {}
+        if isinstance(score_line_stats, dict) and score_line_stats:
+            if safe_float(score_line_stats.get("accompanimentNoteCount"), 0.0) > 0:
+                return False
+            if bool(score_line_stats.get("splitApplied")):
+                return False
+            if safe_float(score_line_stats.get("erhuNoteCount"), 0.0) > 0:
+                return True
+
+        part_candidates = getattr(piece_pack, "partCandidates", None) or []
+        if not isinstance(part_candidates, list) or not part_candidates:
+            return False
+
+        safe_candidates = 0
+        for candidate in part_candidates:
+            if not isinstance(candidate, dict):
+                continue
+            label = " ".join(
+                str(candidate.get(key) or "")
+                for key in ("name", "label", "qualifiedLabel", "selectionKey", "id")
+            ).lower()
+            if (
+                bool(candidate.get("isLikelyPiano"))
+                or bool(candidate.get("isLikelyAccompanimentSplit"))
+                or "piano" in label
+                or "pno" in label
+                or "accompaniment" in label
+                or "钢琴" in label
+                or "鋼琴" in label
+                or "伴奏" in label
+                or safe_float(candidate.get("staffCount"), 1.0) >= 2
+                or safe_float(candidate.get("chordRatio"), 0.0) >= 0.18
+            ):
+                return False
+            if (
+                safe_float(candidate.get("staffCount"), 1.0) <= 1
+                and safe_float(candidate.get("chordRatio"), 0.0) < 0.12
+                and safe_float(candidate.get("erhuRangeRatio"), 1.0) >= 0.72
+            ):
+                safe_candidates += 1
+        return safe_candidates > 0
+
+    def _should_skip_auto_separation_for_clean_solo(
+        self,
+        request: AnalyzeRequest | SeparateErhuRequest | RankSectionsRequest,
+        clean_solo_quality: dict[str, Any],
+    ) -> bool:
+        if not bool(clean_solo_quality.get("explicitSoloScore")):
+            return False
+        min_points = max(0, int(self.settings.separation_auto_min_score_band_points))
+        confident_points = int(safe_float(clean_solo_quality.get("cleanSoloConfidentPitchCount"), 0))
+        if confident_points < min_points:
+            return False
+        threshold = max(
+            0.0,
+            min(1.0, float(self.settings.separation_auto_clean_solo_min_score_band_ratio)),
+        )
+        score_band_ratio = max(
+            0.0,
+            min(1.0, safe_float(clean_solo_quality.get("cleanSoloScoreBandRatio"), 0.0)),
+        )
+        return score_band_ratio >= threshold
 
     def _apply_melody_focus_mask(
         self,

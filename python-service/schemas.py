@@ -43,6 +43,8 @@ class PiecePack(BaseModel):
     tempoChanges: list[dict[str, Any]] = Field(default_factory=list)
     dynamicChanges: list[dict[str, Any]] = Field(default_factory=list)
     repeatStructure: list[dict[str, Any]] = Field(default_factory=list)
+    partCandidates: list[dict[str, Any]] = Field(default_factory=list)
+    scoreLineStats: dict[str, Any] | None = None
     notes: list[NoteEvent] = Field(default_factory=list)
     scoreSource: SymbolicScoreSource | None = None
 

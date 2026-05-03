@@ -151,6 +151,68 @@ def main() -> int:
         ),
         "confident auto separation should not use the borderline guard",
     )
+    solo_request = AnalyzeRequest(
+        participantId="clean-solo",
+        preprocessMode="auto",
+        piecePack=PiecePack(
+            scoreLineStats={
+                "erhuNoteCount": 2,
+                "accompanimentNoteCount": 0,
+                "splitApplied": False,
+            },
+            partCandidates=[
+                {
+                    "staffCount": 1,
+                    "chordRatio": 0,
+                    "erhuRangeRatio": 1,
+                    "isLikelyPiano": False,
+                    "isLikelyAccompanimentSplit": False,
+                }
+            ],
+            notes=[],
+        ),
+    )
+    clean_pitch_track = [
+        {"time": index * 0.05, "frequency": midi_to_frequency(74 if index % 2 == 0 else 76), "confidence": 0.9}
+        for index in range(32)
+    ]
+    clean_solo_quality = analyzer._clean_solo_pitch_quality(solo_request, score_notes, clean_pitch_track)
+    require(
+        analyzer._should_skip_auto_separation_for_clean_solo(solo_request, clean_solo_quality),
+        f"auto separation should skip explicit clean solo audio: {clean_solo_quality}",
+    )
+    accompaniment_request = AnalyzeRequest(
+        participantId="accompaniment-score",
+        preprocessMode="auto",
+        piecePack=PiecePack(
+            scoreLineStats={
+                "erhuNoteCount": 2,
+                "accompanimentNoteCount": 12,
+                "splitApplied": True,
+            },
+            partCandidates=[
+                {
+                    "staffCount": 2,
+                    "chordRatio": 0.34,
+                    "erhuRangeRatio": 0.4,
+                    "isLikelyPiano": True,
+                    "isLikelyAccompanimentSplit": True,
+                }
+            ],
+            notes=[],
+        ),
+    )
+    accompaniment_quality = analyzer._clean_solo_pitch_quality(accompaniment_request, score_notes, clean_pitch_track)
+    require(
+        not analyzer._should_skip_auto_separation_for_clean_solo(accompaniment_request, accompaniment_quality),
+        "auto separation should not skip when the score exposes accompaniment context",
+    )
+    low_match_quality = dict(clean_solo_quality)
+    low_match_quality["cleanSoloScoreBandRatio"] = 0.25
+    require(
+        not analyzer._should_skip_auto_separation_for_clean_solo(solo_request, low_match_quality),
+        "auto separation should not skip clean-solo guard when raw pitch is outside the score band",
+    )
     wrapped_confidence = analyzer._estimate_separation_confidence(
         score_notes,
         pitch_track,
