@@ -996,6 +996,9 @@ def main() -> int:
     first_note = notes[0]
     require(selected_part == "Erhu", f"Expected Erhu selected part, got {selected_part!r}.")
     require(part_candidates and part_candidates[0]["label"] == "Erhu", "Erhu should rank ahead of piano.")
+    require(part_candidates[0].get("selectionAmbiguous") is False, "Explicit Erhu part should not be marked ambiguous.")
+    require(part_candidates[0].get("scoreGapToNext", 0) >= 0.9, "Erhu candidate should report a decisive gap over piano.")
+    require(part_candidates[0].get("measureQuality", 0) > 0, "Part candidate should include measure quality diagnostics.")
     require(first_note["activeTempo"] == 96, "Tempo should propagate to notes.")
     require(first_note["activeDynamic"] == "mf", "Dynamic should propagate to notes.")
     require("staccato" in first_note["articulations"], "Articulation staccato missing.")

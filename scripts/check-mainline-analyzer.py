@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import collections
 import collections.abc
@@ -17,7 +18,11 @@ def main():
         "ok": True,
         "errors": [],
         "warnings": [],
+        "preferCudaPython": os.getenv("ERHU_PREFER_CUDA_PYTHON", ""),
+        "torchConfiguredDevice": os.getenv("ERHU_TORCH_DEVICE", "cpu").strip().lower() or "cpu",
+        "cudaVisibleDevices": os.getenv("CUDA_VISIBLE_DEVICES", ""),
     }
+    status["torchDevice"] = "cuda" if status["torchConfiguredDevice"] in {"cuda", "auto"} else "cpu"
 
     try:
         import torch
@@ -25,7 +30,11 @@ def main():
         status["torch"] = getattr(torch, "__version__", "unknown")
         status["cudaAvailable"] = bool(torch.cuda.is_available())
         status["cudaDevice"] = torch.cuda.get_device_name(0) if torch.cuda.is_available() else ""
-        if not status["cudaAvailable"]:
+        if status["torchDevice"] != "cpu":
+            status["warnings"].append("ERHU_TORCH_DEVICE is not cpu; analysis may use CUDA if available.")
+        elif status["cudaAvailable"]:
+            status["warnings"].append("CUDA is installed but ERHU_TORCH_DEVICE=cpu, so analyzer inference remains CPU-only.")
+        else:
             status["warnings"].append("torch CUDA is not available; analysis will run on CPU.")
     except Exception as exc:
         status["ok"] = False

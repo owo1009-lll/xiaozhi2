@@ -18,7 +18,7 @@ $analyzerPort = 8000
 $serverAnalyzerUrl = "http://127.0.0.1:$analyzerPort"
 $analyzerUrl = "$serverAnalyzerUrl/docs"
 $isWindowsHost = ($env:OS -eq "Windows_NT") -or ($PSVersionTable.Platform -eq "Win32NT") -or ($IsWindows -eq $true)
-$defaultAnalyzerWorkers = if ($isWindowsHost) { 4 } else { 2 }
+$defaultAnalyzerWorkers = 1
 $requestedAnalyzerWorkers = 0
 if ($env:ERHU_ANALYZER_WORKERS) {
   [int]::TryParse($env:ERHU_ANALYZER_WORKERS, [ref]$requestedAnalyzerWorkers) | Out-Null
@@ -26,6 +26,7 @@ if ($env:ERHU_ANALYZER_WORKERS) {
 $analyzerWorkers = [Math]::Max(1, [Math]::Min(4, $(if ($requestedAnalyzerWorkers -gt 0) { $requestedAnalyzerWorkers } else { $defaultAnalyzerWorkers })))
 $piecePassScanConcurrency = if ($env:ERHU_PIECE_PASS_SCAN_CONCURRENCY) { $env:ERHU_PIECE_PASS_SCAN_CONCURRENCY } else { [string]([Math]::Max(2, $analyzerWorkers)) }
 $piecePassAnalysisConcurrency = if ($env:ERHU_PIECE_PASS_ANALYSIS_CONCURRENCY) { $env:ERHU_PIECE_PASS_ANALYSIS_CONCURRENCY } else { [string]$analyzerWorkers }
+$scoreStoreBackend = if ($env:ERHU_SCORE_STORE_BACKEND) { $env:ERHU_SCORE_STORE_BACKEND } else { "auto" }
 
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 
@@ -116,7 +117,7 @@ if (-not $SkipBuild) {
 
 $serverListenerBeforeStart = @(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue)
 if ($serverListenerBeforeStart.Count -eq 0) {
-  $serverCommand = "& { `$env:NODE_ENV='production'; `$env:PORT='3000'; `$env:ERHU_ANALYZER_URL='$serverAnalyzerUrl'; `$env:ERHU_PIECE_PASS_SCAN_CONCURRENCY='$piecePassScanConcurrency'; `$env:ERHU_PIECE_PASS_ANALYSIS_CONCURRENCY='$piecePassAnalysisConcurrency'; node server.js }"
+  $serverCommand = "& { `$env:NODE_ENV='production'; `$env:PORT='3000'; `$env:ERHU_ANALYZER_URL='$serverAnalyzerUrl'; `$env:ERHU_SCORE_STORE_BACKEND='$scoreStoreBackend'; `$env:ERHU_PIECE_PASS_SCAN_CONCURRENCY='$piecePassScanConcurrency'; `$env:ERHU_PIECE_PASS_ANALYSIS_CONCURRENCY='$piecePassAnalysisConcurrency'; node server.js }"
   $startedServer = Start-Process -FilePath "powershell" `
     -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $serverCommand `
     -WorkingDirectory $repoRoot `
@@ -130,7 +131,7 @@ $analyzerProcess = $null
 if (Test-Path $pythonRunner) {
   $analyzerListenerBeforeStart = @(Get-NetTCPConnection -LocalPort $analyzerPort -State Listen -ErrorAction SilentlyContinue)
   if ($analyzerListenerBeforeStart.Count -eq 0) {
-    $analyzerCommand = "& { `$env:ERHU_ENABLE_TORCHCREPE='true'; `$env:ERHU_ENABLE_MADMOM='true'; `$env:ERHU_PREFER_CUDA_PYTHON='true'; `$env:ERHU_TORCH_DEVICE='cuda'; `$env:ERHU_PORT='$analyzerPort'; & '$pythonRunner' -m uvicorn app:app --app-dir python-service --host 127.0.0.1 --port $analyzerPort --workers $analyzerWorkers --log-level warning }"
+    $analyzerCommand = "& { `$env:ERHU_ENABLE_TORCHCREPE='true'; `$env:ERHU_ENABLE_MADMOM='true'; `$env:ERHU_PREFER_CUDA_PYTHON='false'; `$env:ERHU_TORCH_DEVICE='cpu'; `$env:CUDA_VISIBLE_DEVICES=''; `$env:ERHU_PORT='$analyzerPort'; & '$pythonRunner' -m uvicorn app:app --app-dir python-service --host 127.0.0.1 --port $analyzerPort --workers $analyzerWorkers --log-level warning }"
     $startedAnalyzer = Start-Process -FilePath "powershell" `
       -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $analyzerCommand `
       -WorkingDirectory $repoRoot `
@@ -158,6 +159,18 @@ $analyzerPid = if ($analyzerListener.Count -gt 0) { $analyzerListener[0].OwningP
   analyzerPid = $analyzerPid
   analyzerPort = $analyzerPort
   analyzerUrl = $serverAnalyzerUrl
+  scoreStoreBackend = $scoreStoreBackend
+  cpuOnly = @{
+    preferCudaPython = "false"
+    torchDevice = "cpu"
+    cudaVisibleDevices = ""
+  }
+  logs = @{
+    server = $serverLog
+    serverError = $serverErrLog
+    analyzer = $analyzerLog
+    analyzerError = $analyzerErrLog
+  }
   updatedAt = (Get-Date).ToString("o")
   mode = "production"
 } | ConvertTo-Json | Set-Content -Path $pidFile -Encoding UTF8
@@ -167,11 +180,21 @@ Write-Host "Production project server"
 Write-Host "-------------------------"
 Write-Host "App URL:      $serverUrl"
 Write-Host "Health URL:   $serverUrl/api/health"
+Write-Host "Ops URL:      $serverUrl/?mode=health"
+Write-Host "Ops API:      $serverUrl/api/erhu/ops/health"
 Write-Host "Analyzer URL: $analyzerUrl"
 Write-Host "Analyzer workers: $analyzerWorkers"
 Write-Host "Piece-pass concurrency: scan=$piecePassScanConcurrency analysis=$piecePassAnalysisConcurrency"
+Write-Host "Score store:  $scoreStoreBackend"
+Write-Host "CPU-only:     ERHU_TORCH_DEVICE=cpu CUDA_VISIBLE_DEVICES=<empty>"
 Write-Host "Site ready:   $siteReady"
 Write-Host "Analyzer:     $analyzerReady"
+if (-not $siteReady) {
+  Write-Host "Site is not ready. Check port 3000 and the server logs below."
+}
+if (-not $analyzerReady) {
+  Write-Host "Python analyzer is not ready. Check port $analyzerPort and the analyzer logs below."
+}
 Write-Host ""
 Write-Host "Logs:"
 Write-Host "  $serverLog"

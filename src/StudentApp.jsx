@@ -30,6 +30,7 @@ import {
   importScorePdf,
   selectScorePart,
 } from "./researchApi";
+import { MetricCard, StepTitle } from "./student/StudentLayout.jsx";
 
 const STUDENT_APP_STATE_KEY = "ai-erhu.student-app-state-v6";
 const LEGACY_STUDENT_APP_STATE_KEYS = [
@@ -58,6 +59,12 @@ function scoreImportStatusText(job) {
   if (job.omrStatus === "failed") return "未通过";
   if (job.omrStatus === "processing") return "处理中";
   return "未开始";
+}
+
+function hasScoreMusicXmlFallback(job) {
+  if (!job) return false;
+  const actions = Array.isArray(job.fallbackActions) ? job.fallbackActions : [];
+  return Boolean(job.musicxmlFallbackAvailable || actions.includes("import-musicxml"));
 }
 
 function friendlyErrorMessage(errorOrMessage, fallback = "操作失败，请稍后重试。") {
@@ -310,29 +317,6 @@ function getAudioDuration(file) {
       resolve(null);
     };
   });
-}
-
-function MetricCard({ label, value, suffix = "" }) {
-  const numeric = Number(value);
-  const displayValue = Number.isFinite(numeric) ? `${clampScore(numeric)}${suffix}` : String(value || "--");
-  return (
-    <div className="score-badge">
-      <span>{label}</span>
-      <strong>{displayValue}</strong>
-    </div>
-  );
-}
-
-function StepTitle({ step, title, description }) {
-  return (
-    <div className="section-title">
-      <span className="section-step">{step}</span>
-      <div>
-        <h2>{title}</h2>
-        <p>{description}</p>
-      </div>
-    </div>
-  );
 }
 
 function summarizePrimaryFocus(analysis) {
@@ -957,6 +941,7 @@ export default function StudentApp({ onOpenResearch }) {
     ? selectedPartKey
     : getPartCandidateKey(partCandidates[0], 0);
   const shouldReviewPart = needsPartReview(scoreJob, score);
+  const showMusicXmlFallback = scoreJob?.omrStatus === "failed" && hasScoreMusicXmlFallback(scoreJob);
 
   const selectedSection = useMemo(
     () => visibleSections.find((section) => section.sectionId === selectedSectionId) || null,
@@ -1572,6 +1557,20 @@ export default function StudentApp({ onOpenResearch }) {
                   </a>
                 </div>
               ) : null}
+            </div>
+          ) : null}
+          {showMusicXmlFallback ? (
+            <div className="history-card warning-card">
+              <h3>可改用备用谱文件</h3>
+              <p>PDF 自动识谱失败时，可以上传 MusicXML、XML 或 MXL 文件继续建立谱面，不需要等待本次 PDF 任务恢复。</p>
+              <div className="action-row">
+                <button type="button" className="secondary-button" onClick={() => scoreMusicXmlInputRef.current?.click()}>
+                  选择备用谱文件
+                </button>
+                <button type="button" className="secondary-button" onClick={handleImportMusicXml} disabled={importingScore}>
+                  {importingScore ? "导入中..." : "导入备用谱文件"}
+                </button>
+              </div>
             </div>
           ) : null}
           {shouldReviewPart ? (

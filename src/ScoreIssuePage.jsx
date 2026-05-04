@@ -16,6 +16,13 @@ import {
   repairMojibakeText,
 } from "./analysisLabels.js";
 import { fetchScore } from "./researchApi.js";
+import {
+  ScoreIssueHeader,
+  ScoreIssueSidebar,
+  ScorePageNav,
+  ScorePageStage,
+  ScorePageToolbar,
+} from "./scoreIssue/ScoreIssueLayout.jsx";
 
 GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
 
@@ -1706,224 +1713,83 @@ export default function ScoreIssuePage() {
 
   return (
     <div className="app-shell score-issue-shell">
-      <header className="panel-card score-issue-header">
-        <div className="score-issue-title">
-          <h1>{sectionDisplayName || "问题谱面"}</h1>
-          <div className="score-inline-scores">
-            <span className="score-inline-chip">音准 <strong>{getDisplayPitchScore(analysis)}</strong></span>
-            <span className="score-inline-chip">节奏 <strong>{getDisplayRhythmScore(analysis)}</strong></span>
-            <span className="score-inline-chip">综合 <strong>{getDisplayCombinedScore(analysis)}</strong></span>
-            <span className="score-inline-chip is-muted">{formatPracticePathLabel(analysis?.recommendedPracticePath)}</span>
-          </div>
-        </div>
-        <div className="score-issue-actions">
-          <button type="button" className="secondary-button" onClick={() => window.close()}>关闭</button>
-          {score?.sourcePdfPath ? (
-            <a className="secondary-link" href={score.sourcePdfPath} target="_blank" rel="noreferrer">打开 PDF</a>
-          ) : null}
-        </div>
-      </header>
+      <ScoreIssueHeader
+        sectionDisplayName={sectionDisplayName}
+        pitchScore={getDisplayPitchScore(analysis)}
+        rhythmScore={getDisplayRhythmScore(analysis)}
+        combinedScore={getDisplayCombinedScore(analysis)}
+        practicePathLabel={formatPracticePathLabel(analysis?.recommendedPracticePath)}
+        sourcePdfPath={score?.sourcePdfPath}
+      />
 
       {error ? <div className="error-banner">{error}</div> : null}
 
       <div className="score-issue-layout">
-        <aside className="panel-card score-sidebar">
-          {originalAudioSource ? (
-            <div className="sidebar-block">
-              <p className="sidebar-label">原音</p>
-              <audio ref={audioRef} controls preload="metadata" className="audio-player" src={originalAudioSource} />
-              {playbackHint ? <p className="sidebar-meta">{playbackHint}</p> : null}
-            </div>
-          ) : null}
-
-          <div className="sidebar-block">
-            <p className="sidebar-label">总体反馈</p>
-            <p className="sidebar-text">{summarizeOverallFeedback(visibleAnalysisForSummary)}</p>
-            {ambiguousImportedScore ? (
-              <p className="sidebar-meta">
-                当前谱面只高亮二胡旋律单行。无法确认属于二胡旋律的疑似问题会保留在列表中，并标记为需复核，不会显示到伴奏行上。
-              </p>
-            ) : null}
-            <p className="sidebar-meta">{formatDateTime(analysis?.createdAt || stored?.savedAt)}</p>
-          </div>
-
-          <div className="sidebar-block sidebar-issues">
-            <p className="sidebar-label">问题列表</p>
-            <div className="issue-list-block">
-              {issueEntries.map((item, index) => {
-                if (item.issueKind === "measure") {
-                  return (
-                    <button
-                      type="button"
-                      key={item.issueKey}
-                      ref={(element) => setIssueListRef(item.issueKey, element)}
-                      className={`issue-list-button${issueToneClass(item.issueTone)}${activeMeasureKey === item.measureKey && !selectedNoteKey ? " is-active" : ""}`}
-                      onClick={() => handleMeasureJump(item.measureIndex, item)}
-                    >
-                      <strong>
-                        <span className="issue-number-chip">{item.issueNumber}</span>
-                        {formatDisplayMeasureLabel(item.measureIndex, item.displayMeasureIndex)}
-                      </strong>
-                      <span>
-                        {item.label}
-                        {item.needsReview ? `，${item.reviewReason || "需复核"}` : ""}
-                      </span>
-                    </button>
-                  );
-                }
-                const overlayItem = item.overlayItem || null;
-                const overlayKey = item.overlayKey || item.listKey || "";
-                return (
-                  <button
-                    type="button"
-                    key={`note-${item.noteId || index}-${item.measureIndex}`}
-                    ref={(element) => setIssueListRef(overlayKey, element)}
-                    className={`issue-list-button${issueToneClass(item.issueTone)}${selectedNoteKey && selectedNoteKey === overlayKey ? " is-active" : ""}`}
-                    onClick={() => handleNoteJump(item, overlayItem)}
-                  >
-                    <strong>
-                      <span className="issue-number-chip">{item.issueNumber}</span>
-                      {formatDisplayNoteLabel(item.noteId, item.measureIndex, item.displayMeasureIndex, item.noteOrdinal)}
-                    </strong>
-                    <span>
-                      {item.tags.join("、")}
-                      {item.needsReview ? `，${item.reviewReason || "需复核"}` : ""}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </aside>
+        <ScoreIssueSidebar
+          originalAudioSource={originalAudioSource}
+          audioRef={audioRef}
+          playbackHint={playbackHint}
+          summaryText={summarizeOverallFeedback(visibleAnalysisForSummary)}
+          ambiguousImportedScore={ambiguousImportedScore}
+          createdAtText={formatDateTime(analysis?.createdAt || stored?.savedAt)}
+          issueEntries={issueEntries}
+          activeMeasureKey={activeMeasureKey}
+          selectedNoteKey={selectedNoteKey}
+          setIssueListRef={setIssueListRef}
+          onMeasureJump={handleMeasureJump}
+          onNoteJump={handleNoteJump}
+          issueToneClass={issueToneClass}
+          formatDisplayMeasureLabel={formatDisplayMeasureLabel}
+          formatDisplayNoteLabel={formatDisplayNoteLabel}
+        />
 
         <section className="panel-card score-page-panel">
-          <div className="score-page-toolbar">
-            <span>{sectionDisplayName || "当前段落"}</span>
-            <span>第 {currentPage} 页{pageCount > 0 ? ` / ${pageCount}` : ""}</span>
-            <span>本页 {currentPageHighlightCount} 个高亮 / 全曲 {issueEntries.length} 个问题</span>
-            <span className="issue-color-legend">
-              <i className="legend-dot issue-tone-pitch" />音准
-              <i className="legend-dot issue-tone-rhythm" />节奏
-              <i className="legend-dot issue-tone-both" />二者
-            </span>
-            {hasImportedScoreSections ? (
-              <span className={`issue-line-mode${ambiguousImportedScore ? " is-ambiguous" : ""}`}>
-                二胡旋律单行视图
-              </span>
-            ) : null}
-          </div>
+          <ScorePageToolbar
+            sectionDisplayName={sectionDisplayName}
+            currentPage={currentPage}
+            pageCount={pageCount}
+            currentPageHighlightCount={currentPageHighlightCount}
+            totalIssueCount={issueEntries.length}
+            hasImportedScoreSections={hasImportedScoreSections}
+            ambiguousImportedScore={ambiguousImportedScore}
+          />
 
-          <div className="score-page-nav">
-            <button type="button" className="secondary-button" onClick={() => handlePageNavigation(currentPage - 1)} disabled={currentPage <= 1}>
-              上一页
-            </button>
-            <button type="button" className="secondary-button" onClick={() => handlePageNavigation(firstIssuePage)}>
-              回到问题页
-            </button>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => handlePageNavigation(currentPage + 1)}
-              disabled={pageCount > 0 && currentPage >= pageCount}
-            >
-              下一页
-            </button>
-            <div className="score-zoom-group">
-              <button type="button" className="secondary-button" onClick={() => setZoom((value) => Math.max(0.75, Number((value - 0.15).toFixed(2))))}>
-                缩小
-              </button>
-              <span className="score-zoom-label">{Math.round(zoom * 100)}%</span>
-              <button type="button" className="secondary-button" onClick={() => setZoom((value) => Math.min(4, Number((value + 0.15).toFixed(2))))}>
-                放大
-              </button>
-              <button type="button" className="secondary-button" onClick={() => {
-                const w = stageSize.width;
-                const cw = viewportRef.current?.clientWidth;
-                if (w && cw) {
-                  setZoom(Math.max(0.75, Math.min(4, parseFloat(((cw - 8) / w).toFixed(2)))));
-                } else {
-                  setZoom(1.0);
-                }
-              }}>
-                适应宽度
-              </button>
-            </div>
-          </div>
+          <ScorePageNav
+            currentPage={currentPage}
+            pageCount={pageCount}
+            firstIssuePage={firstIssuePage}
+            zoom={zoom}
+            setZoom={setZoom}
+            stageSize={stageSize}
+            viewportRef={viewportRef}
+            onPageNavigation={handlePageNavigation}
+          />
 
           <div ref={viewportRef} className="score-page-viewport">
-            <div
-              className={`score-page-stage${melodyBand ? " is-melody-band" : ""}`}
-              style={{
-                width: effectiveWidth ? `${effectiveWidth}px` : undefined,
-                height: displayHeight ? `${displayHeight}px` : undefined,
-              }}
-            >
-              {usePageImage ? (
-                <img
-                  className={`score-page-image${melodyBand ? " score-page-source-cropped" : ""}`}
-                  src={pageImagePath}
-                  alt={`score-page-${currentPage}`}
-                  onError={() => setPageImageFailed(true)}
-                  onLoad={handleImageLoad}
-                  style={{
-                    width: effectiveWidth ? `${effectiveWidth}px` : undefined,
-                    height: effectiveHeight ? `${effectiveHeight}px` : undefined,
-                    top: melodyBand ? `${sourceOffsetTop}px` : undefined,
-                  }}
-                />
-              ) : (
-                <canvas
-                  ref={canvasRef}
-                  className={`pdf-preview-canvas${melodyBand ? " score-page-source-cropped" : ""}`}
-                  style={{
-                    width: effectiveWidth ? `${effectiveWidth}px` : undefined,
-                    height: effectiveHeight ? `${effectiveHeight}px` : undefined,
-                    top: melodyBand ? `${sourceOffsetTop}px` : undefined,
-                  }}
-                />
-              )}
-              <div className="score-measure-overlay" aria-hidden="true">
-                {displayOverlayItems.map((item) => (
-                  <button
-                    type="button"
-                    key={`measure-${item.measureKey}`}
-                    className={`score-measure-highlight${issueToneClass(item.issueTone)}${activeMeasureKey === item.measureKey ? " is-active" : ""}`}
-                    onClick={() => handleMeasureJump(item.measureIndex, item)}
-                    style={{
-                      left: `${item.left}%`,
-                      top: `${item.top}%`,
-                      width: `${item.width}%`,
-                      height: `${item.height}%`,
-                    }}
-                  >
-                    <span>{measureIssueNumberMap.get(item.measureKey) || item.measureIndex}</span>
-                  </button>
-                ))}
-                {displayNoteOverlayItems
-                  .map((item) => {
-                    const relatedIssue =
-                      noteIssueEntries.find((noteIssue) => String(noteIssue.noteId || "") === String(item.noteId || "") && noteIssue.measureIndex === item.measureIndex && noteIssue.sectionId === item.sectionId)
-                      || { noteId: item.noteId, measureIndex: item.measureIndex };
-                    return (
-                      <button
-                        type="button"
-                        key={item.key}
-                        className={`score-note-highlight${issueToneClass(item.issueTone)}${item.exact ? " is-exact" : ""}${selectedNoteKey === item.key ? " is-selected" : ""}`}
-                        style={{ left: `${item.left}%`, top: `${item.top}%` }}
-                        onClick={() => handleNoteJump(relatedIssue, item)}
-                        aria-label={formatDisplayNoteLabel(
-                          item.noteId,
-                          item.measureIndex,
-                          relatedIssue.displayMeasureIndex || item.displayMeasureIndex,
-                          relatedIssue.noteOrdinal || item.noteOrdinal,
-                        )}
-                      >
-                        <span className="score-note-index">{noteIssueNumberMap.get(item.key) || "•"}</span>
-                      </button>
-                    );
-                  })}
-              </div>
-            </div>
+            <ScorePageStage
+              canvasRef={canvasRef}
+              usePageImage={usePageImage}
+              pageImagePath={pageImagePath}
+              currentPage={currentPage}
+              onImageError={() => setPageImageFailed(true)}
+              onImageLoad={handleImageLoad}
+              effectiveWidth={effectiveWidth}
+              effectiveHeight={effectiveHeight}
+              displayHeight={displayHeight}
+              melodyBand={melodyBand}
+              sourceOffsetTop={sourceOffsetTop}
+              displayOverlayItems={displayOverlayItems}
+              displayNoteOverlayItems={displayNoteOverlayItems}
+              activeMeasureKey={activeMeasureKey}
+              selectedNoteKey={selectedNoteKey}
+              onMeasureJump={handleMeasureJump}
+              onNoteJump={handleNoteJump}
+              issueToneClass={issueToneClass}
+              measureIssueNumberMap={measureIssueNumberMap}
+              noteIssueNumberMap={noteIssueNumberMap}
+              noteIssueEntries={noteIssueEntries}
+              formatDisplayNoteLabel={formatDisplayNoteLabel}
+            />
           </div>
         </section>
       </div>

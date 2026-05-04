@@ -155,6 +155,139 @@ button {
   line-height: 1.65;
 }
 
+.ops-shell {
+  max-width: 1440px;
+}
+
+.ops-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.ops-header h1 {
+  margin: 0 0 8px;
+}
+
+.ops-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.ops-pill {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  min-height: 54px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card);
+}
+
+.ops-pill span {
+  color: var(--text-muted);
+}
+
+.ops-pill.is-ok strong {
+  color: #146c43;
+}
+
+.ops-pill.is-danger strong {
+  color: #b42318;
+}
+
+.ops-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.ops-section {
+  margin-top: 18px;
+}
+
+.ops-section h2 {
+  margin: 0 0 14px;
+  font-size: 20px;
+}
+
+.ops-kv {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.4fr) minmax(0, 1fr);
+  gap: 10px 14px;
+  align-items: center;
+}
+
+.ops-kv span,
+.ops-table .sidebar-meta {
+  color: var(--text-muted);
+}
+
+.ops-table-wrap {
+  overflow-x: auto;
+}
+
+.ops-table {
+  min-width: 860px;
+}
+
+.ops-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ops-status.is-ok {
+  background: #eaf7ef;
+  color: #146c43;
+}
+
+.ops-status.is-danger {
+  background: #fff2f1;
+  color: #b42318;
+}
+
+.ops-status.is-active {
+  background: #fff8e6;
+  color: #8a5b00;
+}
+
+.ops-action-row {
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.ops-action-row .secondary-button {
+  min-height: 34px;
+  padding: 7px 10px;
+}
+
+.ops-log-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.ops-log-grid code {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-soft);
+}
+
 .grid-layout {
   display: grid;
   gap: 18px;
@@ -1294,7 +1427,16 @@ button {
   }
 
   .hero-card,
-  .grid-layout {
+  .grid-layout,
+  .ops-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ops-header {
+    flex-direction: column;
+  }
+
+  .ops-kv {
     grid-template-columns: 1fr;
   }
 

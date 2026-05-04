@@ -174,200 +174,59 @@ class ObservedNote:
     trill_switch_count: int
 
 
-def midi_to_frequency(midi_pitch: int) -> float:
-    return 440.0 * (2.0 ** ((int(midi_pitch) - 69) / 12.0))
+from analyzer_utils import (
+    analysis_separation_result_fields,
+    beats_per_measure,
+    cents_between,
+    cents_error,
+    count_sign_changes,
+    frequency_to_midi,
+    lowpass_series,
+    midi_to_frequency,
+    musicxml_clef_reference,
+    musicxml_pitch_to_midi,
+    musicxml_step_to_diatonic,
+    normalize_part_label,
+    optional_count,
+    optional_float,
+    optional_ratio,
+    parse_musicxml_measure_index,
+    percentile,
+    safe_float,
+    severity_label,
+    trimmed_median,
+)
+from analyzer_musicxml import (
+    candidate_matches_selected_hint,
+    extract_candidate_layout_profile,
+    extract_dynamic_label,
+    extract_musicxml_markings,
+    extract_musicxml_part_candidates,
+    refine_selected_part_candidate_with_layout,
+    resolve_selected_part_from_candidates,
+    score_layout_candidate,
+    xml_child,
+    xml_children,
+    xml_local_tag,
+)
+from analyzer_score_import import ScoreImportMixin
+from analyzer_score_roles import (
+    collapse_erhu_melody_events,
+    find_musicxml_part_candidate,
+    has_accompaniment_part_candidate,
+    is_ambiguous_part_candidate,
+    is_clean_solo_part_candidate,
+    is_explicit_erhu_part_candidate,
+    should_apply_erhu_range_fallback,
+)
 
-
-def frequency_to_midi(frequency: float) -> float:
-    if frequency <= 0:
-        return 0.0
-    return 69.0 + 12.0 * math.log2(frequency / 440.0)
-
-
-def cents_error(frequency: float, midi_pitch: int) -> float:
-    expected = midi_to_frequency(midi_pitch)
-    if frequency <= 0 or expected <= 0:
-        return 0.0
-    return 1200.0 * math.log2(frequency / expected)
-
-
-def cents_between(frequency: float, reference_frequency: float) -> float:
-    if frequency <= 0 or reference_frequency <= 0:
-        return 0.0
-    return 1200.0 * math.log2(frequency / reference_frequency)
-
-
-def beats_per_measure(meter: str | None) -> float:
-    if not meter:
-        return 4.0
-    try:
-        numerator = float(str(meter).split("/", 1)[0])
-        return numerator if numerator > 0 else 4.0
-    except Exception:
-        return 4.0
-
-
-def safe_float(value: Any, default: float = 0.0) -> float:
-    try:
-        numeric = float(value)
-        return numeric if math.isfinite(numeric) else default
-    except Exception:
-        return default
-
-
-def optional_float(value: Any) -> float | None:
-    try:
-        numeric = float(value)
-        return numeric if math.isfinite(numeric) else None
-    except Exception:
-        return None
-
-
-def optional_ratio(value: Any) -> float | None:
-    numeric = optional_float(value)
-    return max(0.0, min(1.0, numeric)) if numeric is not None else None
-
-
-def optional_count(value: Any) -> int | None:
-    numeric = optional_float(value)
-    return max(0, int(round(numeric))) if numeric is not None else None
-
-
-def analysis_separation_result_fields(
-    separation_meta: dict[str, Any] | None,
-    preprocess_applied: bool = False,
-    applied_preprocess_mode: str = "off",
-) -> dict[str, Any]:
-    meta = separation_meta or {}
-    return {
-        "separationApplied": bool(meta.get("separationApplied", preprocess_applied)),
-        "separationMode": str(meta.get("separationMode", applied_preprocess_mode or "off")),
-        "separationConfidence": optional_ratio(meta.get("separationConfidence")) or 0.0,
-        "separationEnergyRatio": optional_ratio(meta.get("separationEnergyRatio")),
-        "separationScoreBandRatio": optional_ratio(meta.get("separationScoreBandRatio")),
-        "separationConfidentPitchCount": optional_count(meta.get("separationConfidentPitchCount")),
-        "separationScoreBandHitCount": optional_count(meta.get("separationScoreBandHitCount")),
-        "rawAudioPath": meta.get("rawAudioPath"),
-        "erhuEnhancedAudioPath": meta.get("erhuEnhancedAudioPath"),
-        "accompanimentResidualPath": meta.get("accompanimentResidualPath"),
-    }
-
-
-def parse_musicxml_measure_index(value: Any, fallback: int) -> int:
-    text = str(value or "").strip()
-    fallback_index = int(safe_float(fallback, 1))
-    if not text:
-        return fallback_index
-    try:
-        return int(text)
-    except Exception:
-        pass
-    match = re.search(r"-?\d+", text)
-    if match:
-        return int(match.group(0))
-    return fallback_index
-
-
-def trimmed_median(values: list[float], trim_ratio: float = 0.15) -> float:
-    cleaned = sorted(float(value) for value in values if math.isfinite(float(value)))
-    if not cleaned:
-        return 0.0
-    if len(cleaned) < 5 or trim_ratio <= 0:
-        return float(median(cleaned))
-    trim_count = min(len(cleaned) // 3, int(len(cleaned) * trim_ratio))
-    if trim_count > 0 and len(cleaned) - (trim_count * 2) >= 3:
-        cleaned = cleaned[trim_count : len(cleaned) - trim_count]
-    return float(median(cleaned))
-
-
-def musicxml_pitch_to_midi(step: str, octave: int, alter: int = 0) -> int:
-    pitch_class = {
-        "C": 0,
-        "D": 2,
-        "E": 4,
-        "F": 5,
-        "G": 7,
-        "A": 9,
-        "B": 11,
-    }.get(step.upper(), 0)
-    return int((octave + 1) * 12 + pitch_class + alter)
-
-
-def musicxml_step_to_diatonic(step: str, octave: int) -> int:
-    step_index = {
-        "C": 0,
-        "D": 1,
-        "E": 2,
-        "F": 3,
-        "G": 4,
-        "A": 5,
-        "B": 6,
-    }.get(str(step or "").upper(), 0)
-    return (int(octave) * 7) + step_index
-
-
-def musicxml_clef_reference(sign: str, line: int, octave_change: int = 0) -> tuple[int, int]:
-    normalized_sign = str(sign or "G").strip().upper()
-    normalized_line = max(1, min(5, int(line or 2)))
-    if normalized_sign == "F":
-        base_step, base_octave = "F", 3
-    elif normalized_sign == "C":
-        base_step, base_octave = "C", 4
-    else:
-        base_step, base_octave = "G", 4
-    return musicxml_step_to_diatonic(base_step, base_octave + int(octave_change or 0)), normalized_line
-
-
-def percentile(values: list[float], quantile: float) -> float:
-    if not values:
-        return 0.0
-    if np is not None:
-        return float(np.percentile(np.asarray(values, dtype=np.float32), quantile))
-    ordered = sorted(values)
-    index = max(0, min(len(ordered) - 1, int(round((len(ordered) - 1) * (quantile / 100.0)))))
-    return float(ordered[index])
-
-
-def lowpass_series(times: list[float], values: list[float], cutoff_hz: float) -> list[float]:
-    if not times or not values or cutoff_hz <= 0:
-        return list(values)
-    rc = 1.0 / (2.0 * math.pi * cutoff_hz)
-    filtered = [float(values[0])]
-    for index in range(1, min(len(times), len(values))):
-        dt = max(1e-4, float(times[index]) - float(times[index - 1]))
-        alpha = dt / (rc + dt)
-        filtered.append(filtered[-1] + (alpha * (float(values[index]) - filtered[-1])))
-    return filtered
-
-
-def count_sign_changes(values: list[float], threshold: float = 0.0) -> int:
-    signs: list[int] = []
-    for value in values:
-        if abs(value) <= threshold:
-            continue
-        signs.append(1 if value > 0 else -1)
-    if len(signs) < 2:
-        return 0
-    return sum(1 for left, right in zip(signs, signs[1:], strict=False) if left != right)
-
-
-def severity_label(value: float, low: float, high: float) -> str:
-    if value >= high:
-        return "high"
-    if value >= low:
-        return "medium"
-    return "low"
-
-
-def normalize_part_label(value: str | None) -> str:
-    return "".join((value or "").strip().lower().split())
-
-
-class ErhuAnalyzer:
+class ErhuAnalyzer(ScoreImportMixin):
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self._decoded_audio_cache: dict[str, DecodedAudioCacheItem] = {}
         self._decoded_audio_cache_lock = threading.Lock()
+        self._feature_cache: dict[str, tuple[list[dict[str, float]], str]] = {}
+        self._feature_cache_lock = threading.Lock()
         self._madmom_processor_lock = threading.Lock()
         self._madmom_onset_processor: Any | None = None
         self._madmom_peak_picker: Any | None = None
@@ -390,7 +249,16 @@ class ErhuAnalyzer:
         }
         if torch is not None:
             report["torchCuda"] = bool(torch.cuda.is_available())
+            report["torchCudaEnabled"] = self._torchcrepe_device() == "cuda"
         return report
+
+    def _torchcrepe_device(self) -> str:
+        requested_device = (self.settings.torch_device or "cpu").strip().lower()
+        if requested_device == "cuda" and torch is not None and torch.cuda.is_available():
+            return "cuda"
+        if requested_device == "auto" and torch is not None and torch.cuda.is_available():
+            return "cuda"
+        return "cpu"
 
     def runtime_report(self) -> dict[str, Any]:
         torch_version = ""
@@ -401,16 +269,17 @@ class ErhuAnalyzer:
             torch_version = str(getattr(torch, "__version__", ""))
             cuda_version = str(getattr(torch.version, "cuda", "") or "")
             if torch.cuda.is_available():
-                torch_device = "cuda"
                 try:
                     cuda_device_name = str(torch.cuda.get_device_name(0))
                 except Exception:
                     cuda_device_name = "cuda"
             else:
-                torch_device = "cpu"
+                cuda_device_name = ""
+            torch_device = self._torchcrepe_device()
         return {
             "torchVersion": torch_version,
             "torchCudaVersion": cuda_version,
+            "torchConfiguredDevice": self.settings.torch_device,
             "torchDevice": torch_device,
             "cudaDeviceName": cuda_device_name,
         }
@@ -532,6 +401,20 @@ class ErhuAnalyzer:
     def _feature_cache_file(self, cache_key: str, kind: str) -> Path:
         safe_key = self._json_hash({"cacheKey": cache_key, "kind": kind, "version": self.settings.clip_feature_cache_version})
         return self._clip_feature_cache_dir() / f"{safe_key}-{kind}.json"
+
+    def _feature_memory_cache_key(self, cache_key: str, kind: str) -> str:
+        return self._json_hash({"cacheKey": cache_key, "kind": kind, "version": self.settings.clip_feature_cache_version})
+
+    def _remember_feature_cache(self, memory_key: str, track: list[dict[str, float]], source: str) -> None:
+        max_entries = max(0, int(getattr(self.settings, "clip_feature_memory_cache_entries", 0) or 0))
+        if max_entries <= 0:
+            return
+        with self._feature_cache_lock:
+            if memory_key in self._feature_cache:
+                self._feature_cache.pop(memory_key, None)
+            self._feature_cache[memory_key] = (track, source)
+            while len(self._feature_cache) > max_entries:
+                self._feature_cache.pop(next(iter(self._feature_cache)), None)
 
     def _preprocessed_audio_cache_key(
         self,
@@ -863,6 +746,12 @@ class ErhuAnalyzer:
     def _read_cached_feature(self, audio: AudioArtifact, kind: str) -> tuple[list[dict[str, float]] | None, str | None]:
         if not bool(self.settings.enable_clip_feature_cache) or not audio.cache_key:
             return None, None
+        memory_key = self._feature_memory_cache_key(audio.cache_key, kind)
+        with self._feature_cache_lock:
+            cached_feature = self._feature_cache.pop(memory_key, None)
+            if cached_feature is not None:
+                self._feature_cache[memory_key] = cached_feature
+                return cached_feature
         cache_file = self._feature_cache_file(audio.cache_key, kind)
         if not cache_file.exists():
             return None, None
@@ -871,6 +760,7 @@ class ErhuAnalyzer:
             track = payload.get("track")
             source = str(payload.get("source") or "")
             if isinstance(track, list) and source:
+                self._remember_feature_cache(memory_key, track, source)
                 return track, source
         except Exception:
             return None, None
@@ -879,6 +769,7 @@ class ErhuAnalyzer:
     def _write_cached_feature(self, audio: AudioArtifact, kind: str, track: list[dict[str, float]], source: str) -> None:
         if not bool(self.settings.enable_clip_feature_cache) or not audio.cache_key:
             return
+        self._remember_feature_cache(self._feature_memory_cache_key(audio.cache_key, kind), track, source)
         cache_file = self._feature_cache_file(audio.cache_key, kind)
         payload = {
             "cachedAt": Path(cache_file).name,
@@ -1171,10 +1062,19 @@ class ErhuAnalyzer:
         tile_render_cache_misses = 0
         page_omr_runs = 0
         tile_omr_runs = 0
+        deduped_page_tasks = 0
 
         try:
             page_tasks: list[dict[str, Any]] = []
             generated_sources_with_order: list[tuple[int, str]] = []
+            pending_fingerprint_pages: dict[str, list[int]] = {}
+
+            def append_generated_source(task: dict[str, Any], source_path: str) -> None:
+                page_fingerprint = str(task.get("pageFingerprint") or "")
+                page_indexes = pending_fingerprint_pages.pop(page_fingerprint, None) or [int(task["pageIndex"])]
+                for source_page_index in page_indexes:
+                    generated_sources_with_order.append((int(source_page_index), source_path))
+
             for page_index, page in enumerate(reader.pages, start=1):
                 single_pdf_path = output_dir / f"page-{page_index:03d}.pdf"
                 page_output_dir = output_dir / f"page-{page_index:03d}"
@@ -1221,6 +1121,36 @@ class ErhuAnalyzer:
                     generated_sources_with_order.append((page_index, str(page_result_cache_path)))
                     continue
                 page_result_cache_misses += 1
+
+                if page_fingerprint in pending_fingerprint_pages:
+                    deduped_page_tasks += 1
+                    pending_fingerprint_pages[page_fingerprint].append(page_index)
+                    preview_status = "missing"
+                    if fitz_document is not None:
+                        try:
+                            if 0 <= (page_index - 1) < fitz_document.page_count:
+                                fitz_page = fitz_document.load_page(page_index - 1)
+                                _, preview_status = self._ensure_page_preview_image(
+                                    output_dir,
+                                    page_index,
+                                    page_fingerprint,
+                                    fitz_page=fitz_page,
+                                )
+                        except Exception:
+                            preview_status = "missing"
+                    else:
+                        _, preview_status = self._ensure_page_preview_image(
+                            output_dir,
+                            page_index,
+                            page_fingerprint,
+                            pdf_path=pdf_path,
+                        )
+                    if preview_status == "cache-hit":
+                        render_cache_hits += 1
+                    elif preview_status == "rendered":
+                        render_cache_misses += 1
+                    continue
+                pending_fingerprint_pages[page_fingerprint] = [page_index]
 
                 audiveris_input_path: Path | None = None
                 fitz_page = None
@@ -1290,7 +1220,7 @@ class ErhuAnalyzer:
                                 generated_musicxml = str(cache_path)
                         except Exception:
                             pass
-                        generated_sources_with_order.append((int(task["pageIndex"]), generated_musicxml))
+                        append_generated_source(task, generated_musicxml)
                     else:
                         failed_tasks.append(task)
             else:
@@ -1315,7 +1245,7 @@ class ErhuAnalyzer:
                                     generated_musicxml = str(cache_path)
                             except Exception:
                                 pass
-                            generated_sources_with_order.append((int(task["pageIndex"]), generated_musicxml))
+                            append_generated_source(task, generated_musicxml)
                         else:
                             failed_tasks.append(task)
 
@@ -1377,7 +1307,7 @@ class ErhuAnalyzer:
                                 tile_musicxml = str(cache_path)
                         except Exception:
                             pass
-                        generated_sources_with_order.append((int(task["pageIndex"]), tile_musicxml))
+                        append_generated_source(task, tile_musicxml)
                         break
             generated_sources_with_order.sort(key=lambda item: item[0])
             pagewise_cache_hit_rate = round(page_result_cache_hits / page_count, 4) if page_count else 0.0
@@ -1397,6 +1327,10 @@ class ErhuAnalyzer:
                 "tileRenderCacheHitRate": tile_render_cache_hit_rate,
                 "pageOmrRuns": page_omr_runs,
                 "tileOmrRuns": tile_omr_runs,
+                "dedupedPageTasks": deduped_page_tasks,
+                "uniquePageOmrTasks": len(page_tasks),
+                "reusedPageResults": page_result_cache_hits + deduped_page_tasks,
+                "pageTaskReductionRate": round((page_result_cache_hits + deduped_page_tasks) / page_count, 4) if page_count else 0.0,
                 "resultCount": len(generated_sources_with_order),
                 "workers": max_workers,
             }
@@ -1611,329 +1545,36 @@ class ErhuAnalyzer:
         return 72
 
     def _xml_local_tag(self, node: ET.Element | None) -> str:
-        if node is None:
-            return ""
-        return node.tag.rsplit("}", 1)[-1]
+        return xml_local_tag(node)
 
     def _xml_child(self, node: ET.Element | None, tag: str) -> ET.Element | None:
-        if node is None:
-            return None
-        for element in list(node):
-            if self._xml_local_tag(element) == tag:
-                return element
-        return None
+        return xml_child(node, tag)
 
     def _xml_children(self, node: ET.Element | None, tag: str) -> list[ET.Element]:
-        if node is None:
-            return []
-        return [element for element in list(node) if self._xml_local_tag(element) == tag]
+        return xml_children(node, tag)
 
     def _extract_musicxml_part_candidates(self, xml_text: str, selected_hint: str | None = None) -> list[dict[str, Any]]:
-        if not xml_text.strip():
-            return []
-        try:
-            root = ET.fromstring(xml_text)
-        except ET.ParseError:
-            return []
-
-        def is_piano_part_name(label: str) -> bool:
-            label_lower = label.lower()
-            return (
-                "piano" in label_lower
-                or "pianoforte" in label_lower
-                or "pno" in label_lower
-                or "pn." in label_lower
-                or "钢琴" in label
-                or "鋼琴" in label
-                or "閽㈢惔" in label
-                or "閶肩惔" in label
-                or "闁姐垻鎯?" in label
-            )
-
-        part_names: dict[str, str] = {}
-        for element in root.iter():
-            if self._xml_local_tag(element) != "score-part":
-                continue
-            part_id = element.attrib.get("id", "").strip()
-            part_name_node = self._xml_child(element, "part-name")
-            part_name = (part_name_node.text or "").strip() if part_name_node is not None else ""
-            if part_id:
-                part_names[part_id] = part_name or part_id
-
-        part_elements = [element for element in root.iter() if self._xml_local_tag(element) == "part"]
-        normalized_label_counts: dict[str, int] = {}
-        part_order: list[tuple[int, ET.Element, str, str]] = []
-        explicit_piano_part_index: int | None = None
-        for part_index, part in enumerate(part_elements, start=1):
-            part_id = part.attrib.get("id", "").strip()
-            part_name = part_names.get(part_id, part_id or "Voice")
-            normalized_label = normalize_part_label(part_name)
-            normalized_label_counts[normalized_label] = normalized_label_counts.get(normalized_label, 0) + 1
-            part_order.append((part_index, part, part_id, part_name))
-            if explicit_piano_part_index is None and is_piano_part_name(part_name):
-                explicit_piano_part_index = part_index
-
-        candidates: list[dict[str, Any]] = []
-        normalized_hint = normalize_part_label(selected_hint)
-        for part_index, part, part_id, part_name in part_order:
-            pitches: list[int] = []
-            staff_indices: set[int] = set()
-            note_count = 0
-            measure_count = 0
-            chord_count = 0
-            previous_measure_note_onsets: set[tuple[int, float]] = set()
-
-            for measure_position, measure in enumerate(self._xml_children(part, "measure"), start=1):
-                measure_count += 1
-                attributes = self._xml_child(measure, "attributes")
-                divisions_node = self._xml_child(attributes, "divisions")
-                divisions = max(1.0, safe_float(divisions_node.text if divisions_node is not None else 1.0, 1.0))
-                current_beat = 0.0
-                last_note_start = 0.0
-                for element in list(measure):
-                    local_tag = self._xml_local_tag(element)
-                    if local_tag in {"backup", "forward"}:
-                        duration_node = self._xml_child(element, "duration")
-                        duration_beats = safe_float(duration_node.text if duration_node is not None else 0.0) / divisions
-                        if local_tag == "backup":
-                            current_beat = max(0.0, current_beat - max(0.0, duration_beats))
-                        else:
-                            current_beat += max(0.0, duration_beats)
-                        last_note_start = current_beat
-                        continue
-                    if local_tag != "note":
-                        continue
-                    note = element
-                    is_rest = self._xml_child(note, "rest") is not None
-                    is_chord = self._xml_child(note, "chord") is not None
-                    is_grace = self._xml_child(note, "grace") is not None
-                    is_cue = self._xml_child(note, "cue") is not None
-                    is_unscored_note = is_grace or is_cue
-                    duration_node = self._xml_child(note, "duration")
-                    duration_beats = safe_float(duration_node.text if duration_node is not None else 0.0) / divisions
-                    if not is_chord:
-                        last_note_start = current_beat
-                    if not is_rest and not is_unscored_note:
-                        onset_key = (measure_position, round(last_note_start, 4))
-                        if onset_key in previous_measure_note_onsets:
-                            chord_count += 1
-                        previous_measure_note_onsets.add(onset_key)
-                        pitch = self._xml_child(note, "pitch")
-                        step_node = self._xml_child(pitch, "step")
-                        octave_node = self._xml_child(pitch, "octave")
-                        alter_node = self._xml_child(pitch, "alter")
-                        if step_node is not None and octave_node is not None and step_node.text and octave_node.text:
-                            note_count += 1
-                            staff_node = self._xml_child(note, "staff")
-                            staff_indices.add(max(1, int(safe_float(staff_node.text if staff_node is not None else 1, 1))))
-                            pitches.append(
-                                musicxml_pitch_to_midi(
-                                    step_node.text.strip(),
-                                    int(safe_float(octave_node.text, 4)),
-                                    int(safe_float(alter_node.text if alter_node is not None else 0, 0)),
-                                )
-                            )
-                    if not is_chord and not is_grace:
-                        current_beat += max(duration_beats, 0.0)
-
-            min_pitch = min(pitches) if pitches else 0
-            max_pitch = max(pitches) if pitches else 0
-            pitch_span = max_pitch - min_pitch if pitches else 0
-            staff_count = len(staff_indices) or 1
-            normalized_name = normalize_part_label(part_name)
-            name_lower = part_name.lower()
-            erhu_name = ("erhu" in name_lower) or ("二胡" in part_name) or ("浜岃儭" in part_name)
-            piano_name = is_piano_part_name(part_name)
-            voice_name = "voice" in name_lower or normalized_name == "voice"
-            duplicate_label_count = normalized_label_counts.get(normalized_name, 0)
-            is_generic_voice = voice_name and not erhu_name and not piano_name
-            is_after_explicit_piano = explicit_piano_part_index is not None and part_index > explicit_piano_part_index
-            range_hits = sum(1 for value in pitches if 52 <= value <= 96)
-            range_ratio = (range_hits / len(pitches)) if pitches else 0.0
-            chord_ratio = (chord_count / max(1, note_count)) if note_count else 0.0
-            low_range_penalty = 0.0
-            if min_pitch and min_pitch < 48:
-                low_range_penalty = min(0.22, ((48 - min_pitch) / 24.0) * 0.12)
-            dense_voice_penalty = 0.12 if note_count >= 60 and chord_ratio >= 0.1 else 0.0
-            after_piano_penalty = 0.36 if is_generic_voice and is_after_explicit_piano else 0.0
-            chord_penalty = min(0.28, chord_ratio * 0.9) if chord_ratio >= 0.12 else min(0.14, chord_ratio * 0.55)
-            likely_accompaniment_split = bool(
-                is_generic_voice
-                and (
-                    is_after_explicit_piano
-                    or chord_ratio >= 0.18
-                    or min_pitch < 48
-                    or (note_count >= 60 and chord_ratio >= 0.1)
-                )
-            )
-            safe_for_erhu_projection = bool(
-                erhu_name
-                or (
-                    note_count >= 4
-                    and staff_count == 1
-                    and range_ratio >= 0.72
-                    and chord_ratio <= 0.12
-                    and min_pitch >= 52
-                    and not likely_accompaniment_split
-                    and (not is_after_explicit_piano or explicit_piano_part_index is None)
-                )
-            )
-            score = (
-                0.18
-                + min(0.22, note_count / 480.0)
-                + (range_ratio * 0.28)
-                + (0.16 if staff_count == 1 else -0.16)
-                + (0.14 if pitch_span <= 36 else -0.04)
-                - chord_penalty
-                + (0.25 if erhu_name else 0.0)
-                + (0.08 if voice_name else 0.0)
-                - (0.35 if piano_name else 0.0)
-                - low_range_penalty
-                - dense_voice_penalty
-                - after_piano_penalty
-                + (0.18 if safe_for_erhu_projection else 0.0)
-            )
-            if normalized_hint and normalized_hint in normalize_part_label(part_name):
-                score += 0.12
-            if note_count <= 0:
-                score = 0.0
-            elif note_count < 4:
-                score -= 0.14
-            selection_key = part_id or part_name
-            candidates.append(
-                {
-                    "partIndex": part_index,
-                    "id": part_id,
-                    "name": part_name,
-                    "label": part_name,
-                    "selectionKey": selection_key,
-                    "qualifiedLabel": f"{part_name} [{part_id}]" if duplicate_label_count > 1 and part_id else part_name,
-                    "score": round(max(0.0, min(1.0, score)), 3),
-                    "noteCount": note_count,
-                    "measureCount": measure_count,
-                    "staffCount": staff_count,
-                    "pitchRange": [min_pitch, max_pitch] if pitches else [],
-                    "erhuRangeRatio": round(range_ratio, 3),
-                    "chordRatio": round(chord_ratio, 3),
-                    "isLikelyPiano": bool(piano_name or staff_count >= 2 or chord_ratio > 0.18),
-                    "isGenericVoice": bool(is_generic_voice),
-                    "isAfterExplicitPiano": bool(is_after_explicit_piano),
-                    "isLikelyAccompanimentSplit": likely_accompaniment_split,
-                    "safeForErhuProjection": safe_for_erhu_projection,
-                }
-            )
-        candidates.sort(key=lambda item: (float(item.get("score", 0.0)), int(item.get("noteCount", 0))), reverse=True)
-        if len(candidates) >= 2:
-            gap = float(candidates[0].get("score", 0.0)) - float(candidates[1].get("score", 0.0))
-            confidence = max(0.45, min(0.96, 0.58 + gap))
-        elif candidates:
-            confidence = max(0.55, min(0.96, float(candidates[0].get("score", 0.0))))
-        else:
-            confidence = 0.0
-        for index, candidate in enumerate(candidates):
-            candidate_confidence = confidence if index == 0 else max(0.25, confidence - 0.18)
-            if not bool(candidate.get("safeForErhuProjection")):
-                candidate_confidence = min(candidate_confidence, 0.58 if index == 0 else 0.42)
-            candidate["rank"] = index + 1
-            candidate["selectedPartConfidence"] = round(candidate_confidence, 3)
-        return candidates
+        return extract_musicxml_part_candidates(xml_text, selected_hint)
 
     def _candidate_matches_selected_hint(self, candidate: dict[str, Any], selected_hint: str | None) -> bool:
-        raw_hint = str(selected_hint or "").strip()
-        if not raw_hint:
-            return False
-        raw_hint_lower = raw_hint.lower()
-        candidate_id = str(candidate.get("id") or "").strip().lower()
-        candidate_key = str(candidate.get("selectionKey") or "").strip().lower()
-        candidate_qualified = str(candidate.get("qualifiedLabel") or "").strip().lower()
-        if raw_hint_lower and raw_hint_lower in {candidate_id, candidate_key, candidate_qualified}:
-            return True
-        normalized_hint = normalize_part_label(selected_hint)
-        if not normalized_hint:
-            return False
-        for field in ("label", "name", "qualifiedLabel"):
-            normalized_value = normalize_part_label(str(candidate.get(field) or ""))
-            if normalized_value and (normalized_hint in normalized_value or normalized_value in normalized_hint):
-                return True
-        return False
+        return candidate_matches_selected_hint(candidate, selected_hint)
 
     def _resolve_selected_part_from_candidates(
         self,
         candidates: list[dict[str, Any]],
         selected_hint: str | None,
     ) -> tuple[dict[str, Any] | None, float]:
-        if not candidates:
-            return None, 0.0
-        for candidate in candidates:
-            if self._candidate_matches_selected_hint(candidate, selected_hint):
-                return candidate, float(candidate.get("selectedPartConfidence", candidate.get("score", 0.65)))
-        safe_candidates = [
-            candidate
-            for candidate in candidates
-            if bool(candidate.get("safeForErhuProjection")) and int(safe_float(candidate.get("noteCount"), 0)) > 0
-        ]
-        best = safe_candidates[0] if safe_candidates else candidates[0]
-        return best, float(best.get("selectedPartConfidence", best.get("score", 0.5)))
+        return resolve_selected_part_from_candidates(candidates, selected_hint)
 
     def _extract_candidate_layout_profile(self, parsed_notes: list[SymbolicNote]) -> dict[str, float | bool]:
-        y_values: list[float] = []
-        pitch_values: list[float] = []
-        system_values: list[int] = []
-        for note in parsed_notes or []:
-            position = getattr(note, "notePosition", None) or getattr(note, "note_position", None) or {}
-            normalized_y = safe_float(position.get("normalizedY"), None)
-            if normalized_y is not None:
-                y_values.append(float(normalized_y))
-            system_index = int(safe_float(position.get("systemIndex"), 0))
-            if system_index > 0:
-                system_values.append(system_index)
-            pitch_values.append(float(getattr(note, "midiPitch", getattr(note, "midi_pitch", 0)) or 0))
-        if not y_values:
-            return {
-                "hasLayout": False,
-                "medianY": 1.0,
-                "minY": 1.0,
-                "maxY": 1.0,
-                "ySpread": 1.0,
-                "medianPitch": 0.0,
-                "systemCount": 0.0,
-            }
-        median_y = trimmed_median(y_values, 0.12)
-        min_y = min(y_values)
-        max_y = max(y_values)
-        median_pitch = trimmed_median(pitch_values, 0.12) if pitch_values else 0.0
-        return {
-            "hasLayout": True,
-            "medianY": float(median_y),
-            "minY": float(min_y),
-            "maxY": float(max_y),
-            "ySpread": float(max_y - min_y),
-            "medianPitch": float(median_pitch),
-            "systemCount": float(len(set(system_values))),
-        }
+        return extract_candidate_layout_profile(parsed_notes)
 
     def _score_layout_candidate(
         self,
         candidate: dict[str, Any],
         profile: dict[str, float | bool],
     ) -> float:
-        base_score = max(0.0, min(1.0, safe_float(candidate.get("score"), 0.0)))
-        if not bool(profile.get("hasLayout")):
-            return base_score
-        median_y = max(0.0, min(1.0, safe_float(profile.get("medianY"), 1.0)))
-        y_spread = max(0.0, min(1.0, safe_float(profile.get("ySpread"), 1.0)))
-        median_pitch = safe_float(profile.get("medianPitch"), 0.0)
-        top_bias = 1.0 - median_y
-        compactness = 1.0 - min(1.0, y_spread / 0.42)
-        pitch_bias = max(0.0, min(1.0, (median_pitch - 52.0) / 28.0))
-        layout_score = (base_score * 0.56) + (top_bias * 0.28) + (compactness * 0.08) + (pitch_bias * 0.08)
-        if bool(candidate.get("isLikelyAccompanimentSplit")):
-            layout_score -= 0.18
-        if bool(candidate.get("isAfterExplicitPiano")):
-            layout_score -= 0.12
-        if bool(candidate.get("isLikelyPiano")):
-            layout_score -= 0.18
-        return max(0.0, min(1.0, layout_score))
+        return score_layout_candidate(candidate, profile)
 
     def _refine_selected_part_candidate_with_layout(
         self,
@@ -1942,75 +1583,17 @@ class ErhuAnalyzer:
         candidates: list[dict[str, Any]],
         selected_candidate: dict[str, Any] | None,
     ) -> dict[str, Any] | None:
-        if not candidates:
-            return selected_candidate
-        if self._is_explicit_erhu_part_candidate(selected_candidate):
-            return selected_candidate
-        safe_candidates = [
-            candidate
-            for candidate in candidates
-            if bool(candidate.get("safeForErhuProjection")) and int(safe_float(candidate.get("noteCount"), 0)) > 0
-        ]
-        if len(safe_candidates) < 2:
-            return selected_candidate
-
-        preview_candidates = safe_candidates[: min(3, len(safe_candidates))]
-        scored_previews: list[tuple[float, dict[str, Any], dict[str, float | bool]]] = []
-        for candidate in preview_candidates:
-            candidate_hint = str(candidate.get("selectionKey") or candidate.get("id") or candidate.get("label") or "").strip()
-            if not candidate_hint:
-                continue
-            preview_notes = self._parse_musicxml_score(xml_text, request, candidate_hint)
-            profile = self._extract_candidate_layout_profile(preview_notes)
-            if not bool(profile.get("hasLayout")):
-                continue
-            scored_previews.append((self._score_layout_candidate(candidate, profile), candidate, profile))
-        if not scored_previews:
-            return selected_candidate
-
-        scored_previews.sort(key=lambda item: item[0], reverse=True)
-        best_score, best_candidate, _best_profile = scored_previews[0]
-        current_candidate = selected_candidate or preview_candidates[0]
-        current_entry = next(
-            (item for item in scored_previews if str(item[1].get("selectionKey") or item[1].get("id") or "") == str(current_candidate.get("selectionKey") or current_candidate.get("id") or "")),
-            None,
+        return refine_selected_part_candidate_with_layout(
+            xml_text,
+            request,
+            candidates,
+            selected_candidate,
+            self._parse_musicxml_score,
+            self._is_explicit_erhu_part_candidate,
         )
-        current_score = current_entry[0] if current_entry else self._score_layout_candidate(
-            current_candidate,
-            self._extract_candidate_layout_profile(
-                self._parse_musicxml_score(
-                    xml_text,
-                    request,
-                    str(current_candidate.get("selectionKey") or current_candidate.get("id") or current_candidate.get("label") or "").strip(),
-                )
-            ),
-        )
-        if best_candidate is current_candidate:
-            return current_candidate
-        if best_score >= (current_score + 0.08):
-            return best_candidate
-        if not bool(current_candidate.get("safeForErhuProjection")) and bool(best_candidate.get("safeForErhuProjection")):
-            return best_candidate
-        return current_candidate
 
     def _extract_dynamic_label(self, dynamics_node: ET.Element | None, sound_value: str | None = None) -> tuple[str, float | None]:
-        if dynamics_node is not None:
-            for child in list(dynamics_node):
-                tag = self._xml_local_tag(child).strip()
-                if tag:
-                    return tag, safe_float(sound_value, 0.0) or None
-        value = safe_float(sound_value, 0.0)
-        if value > 0:
-            if value <= 45:
-                return "p", value
-            if value <= 65:
-                return "mp", value
-            if value <= 85:
-                return "mf", value
-            if value <= 110:
-                return "f", value
-            return "ff", value
-        return "", None
+        return extract_dynamic_label(dynamics_node, sound_value)
 
     def _extract_musicxml_markings(
         self,
@@ -2020,914 +1603,9 @@ class ErhuAnalyzer:
         page_number: int,
         default_tempo: int,
     ) -> dict[str, Any]:
-        if not xml_text.strip():
-            return {"markings": [], "tempoChanges": [], "dynamicChanges": [], "repeatStructure": [], "markingStats": {}}
-        try:
-            root = ET.fromstring(xml_text)
-        except ET.ParseError:
-            return {"markings": [], "tempoChanges": [], "dynamicChanges": [], "repeatStructure": [], "markingStats": {}}
+        return extract_musicxml_markings(xml_text, selected_part_hint, section_id, page_number, default_tempo)
 
-        part_names = {}
-        for element in root.iter():
-            if self._xml_local_tag(element) != "score-part":
-                continue
-            part_id = element.attrib.get("id", "").strip()
-            name_node = self._xml_child(element, "part-name")
-            if part_id:
-                part_names[part_id] = (name_node.text or part_id).strip() if name_node is not None else part_id
-        candidates = self._extract_musicxml_part_candidates(xml_text, selected_part_hint)
-        selected_candidate, _ = self._resolve_selected_part_from_candidates(candidates, selected_part_hint)
-        selected_part_id = str((selected_candidate or {}).get("id") or "").strip()
-        parts = [element for element in root.iter() if self._xml_local_tag(element) == "part"]
-        part = next((element for element in parts if element.attrib.get("id", "").strip() == selected_part_id), parts[0] if parts else None)
-        if part is None:
-            return {"markings": [], "tempoChanges": [], "dynamicChanges": [], "repeatStructure": [], "markingStats": {}}
-
-        markings: list[dict[str, Any]] = []
-        tempo_changes: list[dict[str, Any]] = []
-        dynamic_changes: list[dict[str, Any]] = []
-        repeat_structure: list[dict[str, Any]] = []
-        divisions = 1.0
-        current_tempo = int(default_tempo or 72)
-        current_dynamic = ""
-        for measure_position, measure in enumerate(self._xml_children(part, "measure"), start=1):
-            attributes = self._xml_child(measure, "attributes")
-            divisions_node = self._xml_child(attributes, "divisions")
-            if divisions_node is not None and divisions_node.text:
-                divisions = max(1.0, safe_float(divisions_node.text, divisions))
-            measure_index = parse_musicxml_measure_index(measure.attrib.get("number"), measure_position)
-            for direction in self._xml_children(measure, "direction"):
-                offset_node = self._xml_child(direction, "offset")
-                beat_start = max(0.0, safe_float(offset_node.text if offset_node is not None else 0.0, 0.0) / divisions)
-                placement = direction.attrib.get("placement", "")
-                sound_node = self._xml_child(direction, "sound")
-                sound_tempo = sound_node.attrib.get("tempo") if sound_node is not None else None
-                sound_dynamic = sound_node.attrib.get("dynamics") if sound_node is not None else None
-                for direction_type in self._xml_children(direction, "direction-type"):
-                    words_node = self._xml_child(direction_type, "words")
-                    if words_node is not None and (words_node.text or "").strip():
-                        text = (words_node.text or "").strip()
-                        markings.append(
-                            {
-                                "type": "text",
-                                "text": text,
-                                "measureIndex": measure_index,
-                                "beatStart": beat_start,
-                                "pageNumber": page_number,
-                                "placement": placement,
-                                "sectionId": section_id,
-                            }
-                        )
-                    metronome = self._xml_child(direction_type, "metronome")
-                    per_minute = self._xml_child(metronome, "per-minute")
-                    tempo_value = safe_float(sound_tempo, 0.0) or safe_float(per_minute.text if per_minute is not None else None, 0.0)
-                    if tempo_value > 0:
-                        current_tempo = int(round(tempo_value))
-                        change = {
-                            "type": "tempo",
-                            "tempo": current_tempo,
-                            "measureIndex": measure_index,
-                            "beatStart": beat_start,
-                            "pageNumber": page_number,
-                            "sectionId": section_id,
-                        }
-                        tempo_changes.append(change)
-                        markings.append({**change, "text": f"♩={current_tempo}"})
-                    dynamics = self._xml_child(direction_type, "dynamics")
-                    dynamic_label, dynamic_value = self._extract_dynamic_label(dynamics, sound_dynamic)
-                    if dynamic_label:
-                        current_dynamic = dynamic_label
-                        change = {
-                            "type": "dynamic",
-                            "dynamic": dynamic_label,
-                            "dynamicValue": dynamic_value,
-                            "measureIndex": measure_index,
-                            "beatStart": beat_start,
-                            "pageNumber": page_number,
-                            "placement": placement,
-                            "sectionId": section_id,
-                        }
-                        dynamic_changes.append(change)
-                        markings.append({**change, "text": dynamic_label})
-                    wedge = self._xml_child(direction_type, "wedge")
-                    if wedge is not None:
-                        wedge_type = wedge.attrib.get("type", "").strip()
-                        if wedge_type:
-                            markings.append(
-                                {
-                                    "type": "wedge",
-                                    "wedgeType": wedge_type,
-                                    "text": "渐强" if wedge_type == "crescendo" else "渐弱" if wedge_type == "diminuendo" else wedge_type,
-                                    "measureIndex": measure_index,
-                                    "beatStart": beat_start,
-                                    "pageNumber": page_number,
-                                    "placement": placement,
-                                    "sectionId": section_id,
-                                }
-                            )
-                if sound_tempo and not any(item.get("measureIndex") == measure_index and item.get("beatStart") == beat_start for item in tempo_changes):
-                    tempo_value = safe_float(sound_tempo, 0.0)
-                    if tempo_value > 0:
-                        current_tempo = int(round(tempo_value))
-                        change = {
-                            "type": "tempo",
-                            "tempo": current_tempo,
-                            "measureIndex": measure_index,
-                            "beatStart": beat_start,
-                            "pageNumber": page_number,
-                            "sectionId": section_id,
-                        }
-                        tempo_changes.append(change)
-                        markings.append({**change, "text": f"♩={current_tempo}"})
-                if sound_dynamic:
-                    dynamic_label, dynamic_value = self._extract_dynamic_label(None, sound_dynamic)
-                    if dynamic_label and dynamic_label != current_dynamic:
-                        current_dynamic = dynamic_label
-                        change = {
-                            "type": "dynamic",
-                            "dynamic": dynamic_label,
-                            "dynamicValue": dynamic_value,
-                            "measureIndex": measure_index,
-                            "beatStart": beat_start,
-                            "pageNumber": page_number,
-                            "sectionId": section_id,
-                        }
-                        dynamic_changes.append(change)
-                        markings.append({**change, "text": dynamic_label})
-
-            for barline in self._xml_children(measure, "barline"):
-                repeat = self._xml_child(barline, "repeat")
-                if repeat is not None:
-                    repeat_structure.append(
-                        {
-                            "type": "repeat",
-                            "direction": repeat.attrib.get("direction", ""),
-                            "times": repeat.attrib.get("times", ""),
-                            "measureIndex": measure_index,
-                            "pageNumber": page_number,
-                            "sectionId": section_id,
-                        }
-                    )
-
-        stats = {
-            "markingCount": len(markings),
-            "tempoChangeCount": len(tempo_changes),
-            "dynamicChangeCount": len(dynamic_changes),
-            "repeatCount": len(repeat_structure),
-        }
-        return {
-            "markings": markings,
-            "tempoChanges": tempo_changes,
-            "dynamicChanges": dynamic_changes,
-            "repeatStructure": repeat_structure,
-            "markingStats": stats,
-        }
-
-    def _parse_musicxml_source_to_section(
-        self,
-        source_path: Path,
-        request: ScoreImportRequest,
-        selected_part_hint: str,
-        section_id: str,
-        section_title: str,
-        sequence_index: int,
-    ) -> tuple[dict[str, Any] | None, list[str], str, list[dict[str, Any]], dict[str, Any]]:
-        xml_text = self._read_musicxml_source(source_path)
-        if not xml_text.strip():
-            return None, [], selected_part_hint, [], {}
-
-        detected_parts = self._extract_musicxml_parts(xml_text)
-        part_candidates = self._extract_musicxml_part_candidates(xml_text, selected_part_hint)
-        resolved_candidate, selected_part_confidence = self._resolve_selected_part_from_candidates(part_candidates, selected_part_hint)
-        resolved_part = str((resolved_candidate or {}).get("selectionKey") or (resolved_candidate or {}).get("id") or "").strip()
-        resolved_part_label = str((resolved_candidate or {}).get("label") or (resolved_candidate or {}).get("name") or "").strip()
-        resolved_part_id = str((resolved_candidate or {}).get("id") or "").strip()
-        if not resolved_part:
-            resolved_part = self._resolve_selected_part(detected_parts, selected_part_hint)
-        if not resolved_part_label:
-            resolved_part_label = self._resolve_selected_part(detected_parts, selected_part_hint)
-        detected_tempo = self._extract_musicxml_tempo(xml_text)
-        # If MusicXML has no tempo (Audiveris missed it), try image-based OCR on the page PDF.
-        # Typical layout: pagewise/page-NNN/page-NNN.mxl → PDF at pagewise/page-NNN.pdf
-        if detected_tempo == 72:
-            page_stem = source_path.stem.split(".")[0]  # "page-001" from "page-001.mvt2"
-            page_pdf = source_path.parent.parent / (page_stem + ".pdf")
-            if not page_pdf.exists():
-                page_pdf = source_path.parent / (page_stem + ".pdf")
-            if not page_pdf.exists():
-                page_pdf = source_path.with_suffix(".pdf")
-            if page_pdf.exists():
-                ocr_tempo = self._extract_tempo_from_pdf_image(page_pdf)
-                if ocr_tempo:
-                    detected_tempo = ocr_tempo
-        temp_request = AnalyzeRequest(
-            participantId="score-import",
-            pieceId=request.jobId,
-            sectionId=section_id,
-            piecePack={
-                "pieceId": request.jobId,
-                "sectionId": section_id,
-                "title": request.titleHint or request.originalFilename or request.jobId,
-                "meter": "4/4",
-                "tempo": detected_tempo,
-                "notes": [],
-                "scoreSource": {"format": "musicxml", "encoding": "utf-8", "data": xml_text},
-            },
-        )
-        refined_candidate = self._refine_selected_part_candidate_with_layout(
-            xml_text,
-            temp_request,
-            part_candidates,
-            resolved_candidate,
-        )
-        if refined_candidate is not None:
-            resolved_candidate = refined_candidate
-            resolved_part = str((resolved_candidate or {}).get("selectionKey") or (resolved_candidate or {}).get("id") or resolved_part).strip() or resolved_part
-            resolved_part_label = str((resolved_candidate or {}).get("label") or (resolved_candidate or {}).get("name") or resolved_part_label).strip() or resolved_part_label
-            resolved_part_id = str((resolved_candidate or {}).get("id") or resolved_part_id).strip() or resolved_part_id
-            selected_part_confidence = float((resolved_candidate or {}).get("selectedPartConfidence", selected_part_confidence or 0.0))
-        parsed_notes = self._parse_musicxml_score(xml_text, temp_request, resolved_part)
-        if not parsed_notes:
-            return None, detected_parts, resolved_part, part_candidates, {}
-        page_number_match = re.search(r"page[-\s]?0*(\d+)", section_id, flags=re.IGNORECASE)
-        page_number = int(page_number_match.group(1)) if page_number_match else 1
-        score_markings = self._extract_musicxml_markings(
-            xml_text,
-            resolved_part,
-            section_id,
-            page_number,
-            detected_tempo,
-        )
-        score_line_counts: dict[str, int] = {}
-        score_line_sources: dict[str, int] = {}
-        for note in parsed_notes:
-            note_position = getattr(note, "note_position", None) or {}
-            role = str(note_position.get("scoreLineRole") or "missing")
-            source = str(note_position.get("scoreLineSource") or "missing")
-            score_line_counts[role] = score_line_counts.get(role, 0) + 1
-            score_line_sources[source] = score_line_sources.get(source, 0) + 1
-        score_line_note_count = max(1, len(parsed_notes))
-        score_line_stats = {
-            "noteCount": len(parsed_notes),
-            "erhuNoteCount": int(score_line_counts.get("erhu", 0)),
-            "accompanimentNoteCount": int(score_line_counts.get("accompaniment", 0)),
-            "unknownNoteCount": int(score_line_counts.get("unknown", 0) + score_line_counts.get("missing", 0)),
-            "erhuRatio": round(float(score_line_counts.get("erhu", 0)) / score_line_note_count, 3),
-            "splitApplied": bool(score_line_counts.get("erhu", 0) and score_line_counts.get("accompaniment", 0)),
-            "roleCounts": score_line_counts,
-            "sourceCounts": score_line_sources,
-        }
-
-        section = {
-            "sectionId": section_id,
-            "title": section_title,
-            "tempo": detected_tempo,
-            "meter": "4/4",
-            "demoAudio": "",
-            "sequenceIndex": sequence_index,
-            "notes": [
-                {
-                    "noteId": note.note_id,
-                    "measureIndex": note.measure_index,
-                    "beatStart": note.beat_start,
-                    "beatDuration": note.beat_duration,
-                    "midiPitch": note.midi_pitch,
-                    "notePosition": dict(note.note_position or {}) if getattr(note, "note_position", None) else None,
-                    "articulations": list(note.articulations or []),
-                    "notations": list(note.notations or []),
-                    "techniques": list(note.techniques or []),
-                    "activeTempo": note.active_tempo or detected_tempo,
-                    "activeDynamic": note.active_dynamic or "",
-                    "dynamicValue": note.dynamic_value,
-                }
-                for note in parsed_notes
-            ],
-            "markings": score_markings.get("markings", []),
-            "tempoChanges": score_markings.get("tempoChanges", []),
-            "dynamicChanges": score_markings.get("dynamicChanges", []),
-            "repeatStructure": score_markings.get("repeatStructure", []),
-            "partCandidates": part_candidates,
-            "selectedPart": resolved_part_label or resolved_part,
-            "selectedPartId": resolved_part_id,
-            "selectedPartConfidence": round(float(selected_part_confidence or 0.0), 3),
-            "erhuProjectionMode": "exact" if bool((resolved_candidate or {}).get("safeForErhuProjection")) else "blocked",
-            "erhuProjectionReason": "" if bool((resolved_candidate or {}).get("safeForErhuProjection")) else "no-safe-erhu-part-candidate",
-            "scoreLineStats": score_line_stats,
-        }
-        return section, detected_parts, resolved_part_label or resolved_part, part_candidates, score_markings.get("markingStats", {})
-
-    def _extract_selected_part_measure_sequence(self, xml_text: str, selected_part_hint: str | None) -> list[int]:
-        if not xml_text.strip():
-            return []
-        try:
-            root = ET.fromstring(xml_text)
-        except ET.ParseError:
-            return []
-
-        candidates = self._extract_musicxml_part_candidates(xml_text, selected_part_hint)
-        selected_candidate, _ = self._resolve_selected_part_from_candidates(candidates, selected_part_hint)
-        selected_part_id = str((selected_candidate or {}).get("id") or "").strip()
-        parts = [element for element in root.iter() if self._xml_local_tag(element) == "part"]
-        part = next(
-            (
-                element
-                for element in parts
-                if selected_part_id and element.attrib.get("id", "").strip() == selected_part_id
-            ),
-            parts[0] if parts else None,
-        )
-        if part is None:
-            return []
-        return [
-            parse_musicxml_measure_index(measure.attrib.get("number"), measure_position)
-            for measure_position, measure in enumerate(self._xml_children(part, "measure"), start=1)
-        ]
-
-    def _apply_pagewise_global_measure_numbers(
-        self,
-        section: dict[str, Any],
-        xml_text: str,
-        selected_part_hint: str | None,
-        first_global_measure: int,
-        page_index: int,
-    ) -> tuple[dict[str, Any], int]:
-        notes = list(section.get("notes") or [])
-        measure_sequence = self._extract_selected_part_measure_sequence(xml_text, selected_part_hint)
-        if not measure_sequence:
-            seen_note_measures: list[int] = []
-            for note in notes:
-                measure_index = max(1, int(safe_float(note.get("measureIndex"), 1)))
-                if measure_index not in seen_note_measures:
-                    seen_note_measures.append(measure_index)
-            measure_sequence = seen_note_measures
-        if not measure_sequence:
-            return section, first_global_measure
-
-        local_to_global: dict[int, int] = {}
-        for offset, local_measure in enumerate(measure_sequence):
-            local_to_global.setdefault(int(local_measure), first_global_measure + offset)
-        note_fallback_ordinals: dict[int, int] = {}
-        next_fallback_ordinal = len(measure_sequence)
-
-        def map_measure(local_measure: int) -> int:
-            nonlocal next_fallback_ordinal
-            local_measure = max(1, int(local_measure))
-            if local_measure in local_to_global:
-                return local_to_global[local_measure]
-            if local_measure not in note_fallback_ordinals:
-                note_fallback_ordinals[local_measure] = next_fallback_ordinal
-                next_fallback_ordinal += 1
-            return first_global_measure + note_fallback_ordinals[local_measure]
-
-        for note_order, note in enumerate(notes, start=1):
-            local_measure = max(1, int(safe_float(note.get("measureIndex"), 1)))
-            global_measure = map_measure(local_measure)
-            note_position = dict(note.get("notePosition") or {})
-            note_position.setdefault("localMeasureIndex", local_measure)
-            note_position["globalMeasureIndex"] = global_measure
-            note_position["measureNumberSource"] = "pagewise-count"
-            note["notePosition"] = note_position
-            note["measureIndex"] = global_measure
-            original_note_id = str(note.get("noteId") or "")
-            note_position.setdefault("localNoteId", original_note_id)
-            note_index_match = re.search(r"-n(\d+)\b", original_note_id)
-            note_index = int(note_index_match.group(1)) if note_index_match else note_order
-            note["noteId"] = f"xml-m{global_measure}-n{note_index}"
-
-        for collection_key in ("markings", "tempoChanges", "dynamicChanges", "repeatStructure"):
-            for item in list(section.get(collection_key) or []):
-                if not isinstance(item, dict):
-                    continue
-                local_measure = max(1, int(safe_float(item.get("measureIndex"), 1)))
-                item["localMeasureIndex"] = local_measure
-                item["measureIndex"] = map_measure(local_measure)
-                item["measureNumberSource"] = "pagewise-count"
-
-        global_measures = [
-            int(note.get("measureIndex", 0))
-            for note in notes
-            if int(safe_float(note.get("measureIndex"), 0)) > 0
-        ]
-        if global_measures:
-            section["measureRange"] = [min(global_measures), max(global_measures)]
-        section["measureNumbering"] = {
-            "source": "pagewise-count",
-            "pageIndex": page_index,
-            "firstGlobalMeasure": first_global_measure,
-            "lastGlobalMeasure": first_global_measure + len(measure_sequence) - 1,
-            "localMeasureCount": len(measure_sequence),
-        }
-        return section, first_global_measure + next_fallback_ordinal
-
-    def _build_piece_pack_from_musicxml_sources(
-        self,
-        musicxml_sources: list[Path],
-        request: ScoreImportRequest,
-        selected_part_hint: str,
-    ) -> tuple[dict[str, Any] | None, list[str], str]:
-        sections: list[dict[str, Any]] = []
-        detected_parts: list[str] = []
-        all_part_candidates: list[dict[str, Any]] = []
-        aggregate_marking_stats: dict[str, int] = {
-            "markingCount": 0,
-            "tempoChangeCount": 0,
-            "dynamicChangeCount": 0,
-            "repeatCount": 0,
-        }
-        aggregate_score_line_stats: dict[str, int] = {
-            "noteCount": 0,
-            "erhuNoteCount": 0,
-            "accompanimentNoteCount": 0,
-            "unknownNoteCount": 0,
-        }
-        resolved_part = selected_part_hint or "erhu"
-        resolved_part_label = selected_part_hint or "erhu"
-        resolved_part_id = ""
-        multiple_sources = len(musicxml_sources) > 1
-        next_global_measure = 1
-
-        for index, source_path in enumerate(musicxml_sources, start=1):
-            section_id = "section-a" if not multiple_sources and index == 1 else f"page-{index:02d}"
-            section_title = "自动识谱段落" if not multiple_sources and index == 1 else f"自动识谱第 {index} 页"
-            section, parts, next_resolved_part, part_candidates, marking_stats = self._parse_musicxml_source_to_section(
-                source_path,
-                request,
-                resolved_part,
-                section_id,
-                section_title,
-                index,
-            )
-            for candidate in part_candidates:
-                candidate_key = str(candidate.get("selectionKey") or candidate.get("id") or candidate.get("label") or candidate.get("name") or "").strip()
-                if candidate_key and not any(
-                    str(existing.get("selectionKey") or existing.get("id") or existing.get("label") or existing.get("name") or "").strip() == candidate_key
-                    for existing in all_part_candidates
-                ):
-                    all_part_candidates.append(candidate)
-            for key in aggregate_marking_stats:
-                aggregate_marking_stats[key] += int(safe_float(marking_stats.get(key), 0))
-            for part_name in parts:
-                if part_name and part_name not in detected_parts:
-                    detected_parts.append(part_name)
-            resolved_part = next_resolved_part or resolved_part
-            if section:
-                resolved_part_label = str(section.get("selectedPart") or resolved_part_label or resolved_part).strip() or resolved_part_label
-                resolved_part_id = str(section.get("selectedPartId") or resolved_part_id).strip()
-                if multiple_sources:
-                    xml_text = self._read_musicxml_source(source_path)
-                    section, next_global_measure = self._apply_pagewise_global_measure_numbers(
-                        section,
-                        xml_text,
-                        resolved_part_id or resolved_part,
-                        next_global_measure,
-                        index,
-                    )
-                section_line_stats = section.get("scoreLineStats") or {}
-                for key in aggregate_score_line_stats:
-                    aggregate_score_line_stats[key] += int(safe_float(section_line_stats.get(key), 0))
-                page_image_path = ""
-                if request.outputDir:
-                    candidate_image = Path(request.outputDir) / "pagewise" / f"page-{index:03d}.png"
-                    if candidate_image.exists():
-                        page_image_path = f"/data/score-imports/{request.jobId}/pagewise/{candidate_image.name}"
-                if page_image_path:
-                    section["pageImagePath"] = page_image_path
-                sections.extend(self._chunk_imported_section(section))
-
-        if not sections:
-            return None, detected_parts or [selected_part_hint], resolved_part_label or resolved_part
-
-        piece_pack = {
-            "pieceId": request.jobId,
-            "title": request.titleHint or request.originalFilename or request.jobId,
-            "composer": "Audiveris OMR",
-            "selectedPart": resolved_part_label or resolved_part,
-            "selectedPartId": resolved_part_id,
-            "detectedParts": detected_parts or [resolved_part_label or resolved_part],
-            "selectedPartConfidence": round(
-                float(
-                    next(
-                        (
-                            item.get("selectedPartConfidence", item.get("score", 0.0))
-                            for item in all_part_candidates
-                            if (
-                                str(item.get("selectionKey") or item.get("id") or "").strip() == resolved_part
-                                or str(item.get("id") or "").strip() == resolved_part_id
-                                or str(item.get("label") or item.get("name") or "").strip() == resolved_part_label
-                            )
-                        ),
-                        0.0,
-                    )
-                ),
-                3,
-            ),
-            "partCandidates": all_part_candidates,
-            "markingStats": aggregate_marking_stats,
-            "scoreLineStats": {
-                **aggregate_score_line_stats,
-                "erhuRatio": round(
-                    float(aggregate_score_line_stats.get("erhuNoteCount", 0))
-                    / max(1, int(aggregate_score_line_stats.get("noteCount", 0))),
-                    3,
-                ),
-                "splitApplied": bool(
-                    aggregate_score_line_stats.get("erhuNoteCount", 0)
-                    and aggregate_score_line_stats.get("accompanimentNoteCount", 0)
-                ),
-            },
-            "sections": sections,
-        }
-        return piece_pack, list(piece_pack["detectedParts"]), resolved_part_label or resolved_part
-
-    def _chunk_imported_section(self, section: dict[str, Any]) -> list[dict[str, Any]]:
-        notes = list(section.get("notes") or [])
-        if not notes:
-            return [section]
-        if len(notes) <= 20:
-            return [section]
-
-        measure_beats = beats_per_measure(section.get("meter"))
-        ordered_notes = sorted(
-            notes,
-            key=lambda note: (
-                int(note.get("measureIndex", 0)),
-                float(note.get("beatStart", 0.0)),
-                float(note.get("beatDuration", 0.0)),
-                int(note.get("midiPitch", 0)),
-            ),
-        )
-        enriched_notes: list[dict[str, Any]] = []
-        measure_groups: dict[int, list[dict[str, Any]]] = {}
-        absolute_beat_min = math.inf
-        absolute_beat_max = 0.0
-        for note in ordered_notes:
-            measure_index = max(1, int(note.get("measureIndex", 1)))
-            beat_start = float(note.get("beatStart", 0.0))
-            beat_duration = max(0.125, float(note.get("beatDuration", 0.0)) or 0.25)
-            absolute_start = ((measure_index - 1) * measure_beats) + beat_start
-            absolute_end = absolute_start + beat_duration
-            enriched_note = {
-                **note,
-                "_absoluteBeatStart": absolute_start,
-                "_absoluteBeatEnd": absolute_end,
-            }
-            enriched_notes.append(enriched_note)
-            measure_groups.setdefault(measure_index, []).append(enriched_note)
-            absolute_beat_min = min(absolute_beat_min, absolute_start)
-            absolute_beat_max = max(absolute_beat_max, absolute_end)
-
-        total_measure_count = len(measure_groups)
-        total_beat_span = max(0.0, absolute_beat_max - (0.0 if math.isinf(absolute_beat_min) else absolute_beat_min))
-        note_density = float(len(enriched_notes)) / max(1, total_measure_count)
-        if len(enriched_notes) <= 36 and total_measure_count <= 3 and total_beat_span <= 12.0:
-            return [section]
-
-        dense_import = len(enriched_notes) >= 100 or note_density >= 10.0 or total_beat_span >= 28.0
-        very_dense_import = len(enriched_notes) >= 180 or note_density >= 16.0 or total_beat_span >= 48.0
-        target_note_count = 22 if very_dense_import else (30 if dense_import else 40)
-        max_note_count = 34 if very_dense_import else (46 if dense_import else 58)
-        target_measure_span = 2 if very_dense_import else (3 if dense_import else 4)
-        max_measure_span = target_measure_span + 1
-        target_beat_span = 8.0 if very_dense_import else (12.0 if dense_import else 16.0)
-        hard_beat_span = target_beat_span + 4.0
-        gap_trigger_beats = 1.25 if dense_import else 1.75
-
-        chunks: list[dict[str, Any]] = []
-        current_notes: list[dict[str, Any]] = []
-        current_measures: list[int] = []
-        current_beat_start = 0.0
-        current_beat_end = 0.0
-
-        def flush_chunk() -> None:
-            nonlocal current_notes, current_measures, current_beat_start, current_beat_end
-            if not current_notes:
-                return
-            chunk_index = len(chunks) + 1
-            base_sequence = int(section.get("sequenceIndex", 1))
-            sanitized_notes = [
-                {
-                    key: value
-                    for key, value in note.items()
-                    if not str(key).startswith("_")
-                }
-                for note in current_notes
-            ]
-            chunk_role_counts: dict[str, int] = {}
-            for note in sanitized_notes:
-                role = str((note.get("notePosition") or {}).get("scoreLineRole") or "missing")
-                chunk_role_counts[role] = chunk_role_counts.get(role, 0) + 1
-            chunk_note_count = max(1, len(sanitized_notes))
-            chunk = {
-                **section,
-                "sectionId": f"{section.get('sectionId', 'section')}-s{chunk_index:02d}",
-                "title": f"{section.get('title', '自动识谱段落')} 片段 {chunk_index}",
-                "sequenceIndex": (base_sequence * 100) + chunk_index,
-                "notes": sanitized_notes,
-                "sourceSectionId": section.get("sectionId", ""),
-                "measureRange": [min(current_measures), max(current_measures)] if current_measures else [],
-                "chunkBeatRange": [round(current_beat_start, 3), round(current_beat_end, 3)] if current_notes else [],
-                "chunkedImported": True,
-                "scoreLineStats": {
-                    "noteCount": len(sanitized_notes),
-                    "erhuNoteCount": int(chunk_role_counts.get("erhu", 0)),
-                    "accompanimentNoteCount": int(chunk_role_counts.get("accompaniment", 0)),
-                    "unknownNoteCount": int(chunk_role_counts.get("unknown", 0) + chunk_role_counts.get("missing", 0)),
-                    "erhuRatio": round(float(chunk_role_counts.get("erhu", 0)) / chunk_note_count, 3),
-                    "splitApplied": bool(chunk_role_counts.get("erhu", 0) and chunk_role_counts.get("accompaniment", 0)),
-                    "roleCounts": chunk_role_counts,
-                },
-            }
-            chunks.append(chunk)
-            current_notes = []
-            current_measures = []
-            current_beat_start = 0.0
-            current_beat_end = 0.0
-
-        measure_items = sorted(measure_groups.items(), key=lambda item: item[0])
-        for measure_index, measure_notes in measure_items:
-            measure_start = min(float(note.get("_absoluteBeatStart", 0.0)) for note in measure_notes)
-            measure_end = max(float(note.get("_absoluteBeatEnd", 0.0)) for note in measure_notes)
-            if current_notes and (
-                (
-                    (measure_start - current_beat_end) > gap_trigger_beats
-                    and len(current_notes) >= max(8, target_note_count // 2)
-                )
-                or ((max(current_measures) - min(current_measures) + 1) >= max_measure_span)
-                or ((current_beat_end - current_beat_start) >= hard_beat_span)
-                or (len(current_notes) + len(measure_notes) > max_note_count)
-                or (
-                    len(current_notes) >= target_note_count
-                    and (
-                        len(current_measures) >= target_measure_span
-                        or (current_beat_end - current_beat_start) >= target_beat_span
-                    )
-                )
-            ):
-                flush_chunk()
-            current_notes.extend(measure_notes)
-            current_measures.append(measure_index)
-            current_beat_start = measure_start if len(current_notes) == len(measure_notes) else min(current_beat_start, measure_start)
-            current_beat_end = max(current_beat_end, measure_end)
-        flush_chunk()
-
-        if len(chunks) >= 2 and len(chunks[-1]["notes"]) < 12:
-            tail = chunks.pop()
-            chunks[-1]["notes"].extend(tail["notes"])
-            merged_role_counts: dict[str, int] = {}
-            for note in chunks[-1]["notes"]:
-                role = str((note.get("notePosition") or {}).get("scoreLineRole") or "missing")
-                merged_role_counts[role] = merged_role_counts.get(role, 0) + 1
-            merged_note_count = max(1, len(chunks[-1]["notes"]))
-            chunks[-1]["scoreLineStats"] = {
-                "noteCount": len(chunks[-1]["notes"]),
-                "erhuNoteCount": int(merged_role_counts.get("erhu", 0)),
-                "accompanimentNoteCount": int(merged_role_counts.get("accompaniment", 0)),
-                "unknownNoteCount": int(merged_role_counts.get("unknown", 0) + merged_role_counts.get("missing", 0)),
-                "erhuRatio": round(float(merged_role_counts.get("erhu", 0)) / merged_note_count, 3),
-                "splitApplied": bool(merged_role_counts.get("erhu", 0) and merged_role_counts.get("accompaniment", 0)),
-                "roleCounts": merged_role_counts,
-            }
-            measure_range = list(chunks[-1].get("measureRange") or [])
-            tail_range = list(tail.get("measureRange") or [])
-            if measure_range and tail_range:
-                chunks[-1]["measureRange"] = [min(measure_range[0], tail_range[0]), max(measure_range[-1], tail_range[-1])]
-            beat_range = list(chunks[-1].get("chunkBeatRange") or [])
-            tail_beat_range = list(tail.get("chunkBeatRange") or [])
-            if beat_range and tail_beat_range:
-                chunks[-1]["chunkBeatRange"] = [min(beat_range[0], tail_beat_range[0]), max(beat_range[-1], tail_beat_range[-1])]
-
-        return chunks or [section]
-
-    def import_pdf_score(self, request: ScoreImportRequest) -> ScoreImportJobResult:
-        output_dir = Path(request.outputDir or (Path(self.settings.data_root) / "score-imports" / request.jobId))
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        pdf_path = Path(request.pdfPath)
-        selected_part = (request.selectedPartHint or "erhu").strip() or "erhu"
-        preview_pages = self._build_preview_pages(pdf_path, request.jobId)
-        pdf_page_count = 1
-        if PdfReader is not None:
-            try:
-                pdf_page_count = max(1, len(PdfReader(str(pdf_path)).pages))
-            except Exception:
-                pdf_page_count = 1
-
-        warnings: list[str] = []
-        piece_pack = None
-        musicxml_path = ""
-        omr_confidence = 0.0
-        detected_parts: list[str] = [selected_part]
-        omr_stats: dict[str, Any] = {"mode": "none", "pageCount": pdf_page_count}
-
-        audiveris_cli = self.settings.audiveris_cli.strip()
-        if audiveris_cli and os.path.exists(audiveris_cli):
-            musicxml_sources: list[Path] = []
-            generated_musicxml = None
-            whole_pdf_attempted = False
-            if pdf_page_count <= max(1, int(self.settings.omr_whole_pdf_max_pages)):
-                whole_pdf_attempted = True
-                generated_musicxml = self._run_audiveris(pdf_path, output_dir)
-            else:
-                warnings.append("多页五线谱已直接按页识谱，以缩短导入等待时间。")
-            if generated_musicxml:
-                musicxml_sources = [Path(generated_musicxml)]
-                musicxml_path = generated_musicxml
-                omr_confidence = 0.82
-                omr_stats = {
-                    "mode": "whole-pdf",
-                    "pageCount": pdf_page_count,
-                    "resultCount": 1,
-                    "wholePdfAttempted": True,
-                }
-            else:
-                pagewise_sources, pagewise_stats = self._run_audiveris_pagewise(pdf_path, output_dir / "pagewise")
-                if pagewise_sources:
-                    musicxml_sources = [Path(item) for item in pagewise_sources]
-                    musicxml_path = str(musicxml_sources[0])
-                    omr_confidence = self._estimate_pagewise_omr_confidence(pagewise_stats, len(pagewise_sources))
-                    omr_stats = {
-                        **pagewise_stats,
-                        "wholePdfAttempted": whole_pdf_attempted,
-                        "mode": str(pagewise_stats.get("mode") or "pagewise"),
-                    }
-                    warnings.append("整份 PDF 自动识谱失败，已回退到按页识谱。")
-                else:
-                    warnings.append("Audiveris 已调用，但未生成可用 MusicXML。")
-
-            if musicxml_sources and not piece_pack:
-                built_piece_pack, detected_parts, resolved_part = self._build_piece_pack_from_musicxml_sources(
-                    musicxml_sources,
-                    request,
-                    selected_part,
-                )
-                if built_piece_pack:
-                    piece_pack = built_piece_pack
-                    selected_part = resolved_part
-                else:
-                    warnings.append("已生成 MusicXML，但当前未能稳定解析为结构化音符。")
-        else:
-            warnings.append("本机未配置 Audiveris，当前将优先使用已知曲目自动匹配。")
-
-        warnings = self._compact_import_warnings(warnings)
-
-        if not piece_pack:
-            return ScoreImportJobResult(
-                jobId=request.jobId,
-                omrStatus="failed",
-                omrConfidence=0.0,
-                scoreId=None,
-                title=request.titleHint or request.originalFilename or request.jobId,
-                sourcePdfPath=request.pdfPath,
-                musicxmlPath=musicxml_path or None,
-                previewPages=preview_pages,
-                detectedParts=[selected_part],
-                selectedPart=selected_part,
-                selectedPartCandidates=[selected_part],
-                piecePack=None,
-                omrStats=omr_stats,
-                warnings=warnings,
-                error="当前 PDF 尚未自动转换为可分析乐谱。请检查 Audiveris 是否正常输出，或导入已知内置曲目。",
-            )
-
-        if isinstance(piece_pack, dict):
-            piece_pack["selectedPart"] = piece_pack.get("selectedPart") or selected_part
-            piece_pack["detectedParts"] = list(piece_pack.get("detectedParts") or detected_parts or [selected_part])
-            selected_part = str(piece_pack.get("selectedPart") or selected_part)
-            detected_parts = list(piece_pack.get("detectedParts") or [selected_part])
-        part_candidates = list(piece_pack.get("partCandidates") or []) if isinstance(piece_pack, dict) else []
-        selected_part_confidence = (
-            safe_float(piece_pack.get("selectedPartConfidence"), 0.0)
-            if isinstance(piece_pack, dict)
-            else 0.0
-        )
-        marking_stats = dict(piece_pack.get("markingStats") or {}) if isinstance(piece_pack, dict) else {}
-
-        return ScoreImportJobResult(
-            jobId=request.jobId,
-            omrStatus="completed",
-            omrConfidence=omr_confidence or (0.44 if request.fallbackPieceId else 0.58),
-            scoreId=request.jobId,
-            title=request.titleHint or request.originalFilename or request.jobId,
-            sourcePdfPath=request.pdfPath,
-            musicxmlPath=musicxml_path or None,
-            previewPages=preview_pages,
-            detectedParts=detected_parts,
-            selectedPart=selected_part,
-            selectedPartCandidates=detected_parts,
-            selectedPartConfidence=round(float(selected_part_confidence or 0.0), 3),
-            partCandidates=part_candidates,
-            markingStats=marking_stats,
-            piecePack=piece_pack,
-            omrStats=omr_stats,
-            warnings=warnings,
-            error=None,
-        )
-
-    def import_musicxml_score(self, request: MusicXmlImportRequest) -> ScoreImportJobResult:
-        output_dir = Path(request.outputDir or (Path(self.settings.data_root) / "score-imports" / request.jobId))
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        musicxml_path = Path(request.musicxmlPath)
-        selected_part = (request.selectedPartHint or "erhu").strip() or "erhu"
-        warnings: list[str] = []
-        detected_parts: list[str] = [selected_part]
-
-        if not musicxml_path.exists():
-            return ScoreImportJobResult(
-                jobId=request.jobId,
-                omrStatus="failed",
-                omrConfidence=0.0,
-                scoreId=None,
-                title=request.titleHint or request.originalFilename or request.jobId,
-                sourcePdfPath=None,
-                musicxmlPath=str(musicxml_path),
-                detectedParts=detected_parts,
-                selectedPart=selected_part,
-                selectedPartCandidates=detected_parts,
-                warnings=["MusicXML 文件不存在。"],
-                error="MusicXML 文件不存在，无法生成结构化乐谱。",
-            )
-
-        try:
-            piece_pack, detected_parts, resolved_part = self._build_piece_pack_from_musicxml_sources(
-                [musicxml_path],
-                request,
-                selected_part,
-            )
-        except Exception as error:
-            return ScoreImportJobResult(
-                jobId=request.jobId,
-                omrStatus="failed",
-                omrConfidence=0.0,
-                scoreId=None,
-                title=request.titleHint or request.originalFilename or request.jobId,
-                sourcePdfPath=None,
-                musicxmlPath=str(musicxml_path),
-                detectedParts=detected_parts,
-                selectedPart=selected_part,
-                selectedPartCandidates=detected_parts,
-                warnings=[str(error)],
-                error="MusicXML 解析失败，无法生成结构化乐谱。",
-            )
-
-        if not piece_pack:
-            return ScoreImportJobResult(
-                jobId=request.jobId,
-                omrStatus="failed",
-                omrConfidence=0.0,
-                scoreId=None,
-                title=request.titleHint or request.originalFilename or request.jobId,
-                sourcePdfPath=None,
-                musicxmlPath=str(musicxml_path),
-                detectedParts=detected_parts,
-                selectedPart=selected_part,
-                selectedPartCandidates=detected_parts,
-                warnings=["MusicXML 中没有解析出可分析的二胡旋律音符。"],
-                error="MusicXML 未生成可分析曲库，请检查声部选择或文件内容。",
-            )
-
-        if isinstance(piece_pack, dict):
-            piece_pack["composer"] = piece_pack.get("composer") or "MusicXML import"
-            piece_pack["selectedPart"] = piece_pack.get("selectedPart") or resolved_part
-            piece_pack["detectedParts"] = list(piece_pack.get("detectedParts") or detected_parts or [resolved_part])
-            selected_part = str(piece_pack.get("selectedPart") or resolved_part)
-            detected_parts = list(piece_pack.get("detectedParts") or [selected_part])
-
-        part_candidates = list(piece_pack.get("partCandidates") or []) if isinstance(piece_pack, dict) else []
-        selected_part_confidence = (
-            safe_float(piece_pack.get("selectedPartConfidence"), 0.0)
-            if isinstance(piece_pack, dict)
-            else 0.0
-        )
-        marking_stats = dict(piece_pack.get("markingStats") or {}) if isinstance(piece_pack, dict) else {}
-        section_count = len(piece_pack.get("sections") or []) if isinstance(piece_pack, dict) else 0
-        omr_confidence = max(0.65, min(0.96, float(selected_part_confidence or 0.0) or 0.88))
-
-        return ScoreImportJobResult(
-            jobId=request.jobId,
-            omrStatus="completed",
-            omrConfidence=omr_confidence,
-            scoreId=request.jobId,
-            title=request.titleHint or request.originalFilename or request.jobId,
-            sourcePdfPath=None,
-            musicxmlPath=str(musicxml_path),
-            previewPages=[],
-            detectedParts=detected_parts,
-            selectedPart=selected_part,
-            selectedPartCandidates=detected_parts,
-            selectedPartConfidence=round(float(selected_part_confidence or 0.0), 3),
-            partCandidates=part_candidates,
-            markingStats=marking_stats,
-            piecePack=piece_pack,
-            omrStats={
-                "mode": "musicxml-upload",
-                "pageCount": 0,
-                "resultCount": section_count,
-                "wholePdfAttempted": False,
-            },
-            warnings=warnings,
-            error=None,
-        )
+    # Score import methods live in analyzer_score_import.ScoreImportMixin.
 
     def separate_erhu(self, request: SeparateErhuRequest) -> SeparateErhuResult:
         audio = self._decode_audio(request)
@@ -3503,7 +2181,7 @@ class ErhuAnalyzer:
                     fmin=120.0,
                     fmax=1400.0,
                     batch_size=512,
-                    device="cuda" if torch.cuda.is_available() else "cpu",
+                    device=self._torchcrepe_device(),
                     return_periodicity=True,
                 )
                 pitch_values = pitch.squeeze(0).detach().cpu().numpy()
@@ -6156,75 +4834,27 @@ class ErhuAnalyzer:
         return self._hydrate_piece_notes(note_events, request)
 
     def _find_musicxml_part_candidate(self, candidates: list[dict[str, Any]], selected_label: str | None) -> dict[str, Any] | None:
-        if not candidates:
-            return None
-        normalized_selected = normalize_part_label(selected_label)
-        if normalized_selected:
-            for candidate in candidates:
-                labels = [
-                    normalize_part_label(str(candidate.get("id") or "")),
-                    normalize_part_label(str(candidate.get("name") or "")),
-                    normalize_part_label(str(candidate.get("label") or "")),
-                ]
-                if normalized_selected in labels:
-                    return candidate
-        return candidates[0]
+        return find_musicxml_part_candidate(candidates, selected_label)
 
     def _is_explicit_erhu_part_candidate(self, candidate: dict[str, Any] | None) -> bool:
-        if not candidate:
-            return False
-        label = " ".join(str(candidate.get(key) or "") for key in ("id", "name", "label")).lower()
-        return "erhu" in label or "二胡" in label
+        return is_explicit_erhu_part_candidate(candidate)
 
     def _has_accompaniment_part_candidate(self, candidates: list[dict[str, Any]] | None) -> bool:
-        for candidate in candidates or []:
-            label = " ".join(str(candidate.get(key) or "") for key in ("id", "name", "label")).lower()
-            if (
-                "piano" in label
-                or "pianoforte" in label
-                or "pno" in label
-                or "pn." in label
-                or "accompaniment" in label
-                or "钢琴" in label
-                or "鋼琴" in label
-                or "伴奏" in label
-            ):
-                return True
-            if bool(candidate.get("isLikelyPiano")):
-                return True
-            if int(safe_float(candidate.get("staffCount"), 1)) >= 2:
-                return True
-        return False
+        return has_accompaniment_part_candidate(candidates)
 
     def _is_clean_solo_part_candidate(
         self,
         candidate: dict[str, Any] | None,
         candidates: list[dict[str, Any]] | None = None,
     ) -> bool:
-        if not candidate:
-            return False
-        if self._is_explicit_erhu_part_candidate(candidate):
-            return True
-        if self._has_accompaniment_part_candidate(candidates):
-            return False
-        return (
-            not bool(candidate.get("isLikelyPiano"))
-            and safe_float(candidate.get("chordRatio"), 0.0) < 0.18
-            and int(safe_float(candidate.get("staffCount"), 1)) <= 1
-        )
+        return is_clean_solo_part_candidate(candidate, candidates)
 
     def _is_ambiguous_part_candidate(
         self,
         candidate: dict[str, Any] | None,
         candidates: list[dict[str, Any]] | None = None,
     ) -> bool:
-        if not candidate or self._is_explicit_erhu_part_candidate(candidate):
-            return False
-        return (
-            self._has_accompaniment_part_candidate(candidates)
-            or bool(candidate.get("isLikelyPiano"))
-            or safe_float(candidate.get("chordRatio"), 0.0) >= 0.18
-        )
+        return is_ambiguous_part_candidate(candidate, candidates)
 
     def _should_apply_erhu_range_fallback(
         self,
@@ -6232,29 +4862,7 @@ class ErhuAnalyzer:
         clean_solo: bool,
         ambiguous: bool,
     ) -> bool:
-        if clean_solo or not ambiguous or not selected_part_candidate:
-            return False
-        if bool(selected_part_candidate.get("isLikelyPiano")):
-            return False
-        if int(safe_float(selected_part_candidate.get("staffCount"), 1)) > 1:
-            return False
-        note_count = int(safe_float(selected_part_candidate.get("noteCount"), 0))
-        erhu_range_ratio = safe_float(selected_part_candidate.get("erhuRangeRatio"), 0.0)
-        chord_ratio = safe_float(selected_part_candidate.get("chordRatio"), 1.0)
-        candidate_score = safe_float(selected_part_candidate.get("score"), 0.0)
-        candidate_confidence = safe_float(selected_part_candidate.get("selectedPartConfidence"), candidate_score)
-        if note_count < 8 or erhu_range_ratio < 0.82 or chord_ratio > 0.14:
-            return False
-        if bool(selected_part_candidate.get("safeForErhuProjection")):
-            return True
-        candidate_strength = max(candidate_score, candidate_confidence)
-        return (
-            erhu_range_ratio >= 0.9
-            and (
-                (chord_ratio <= 0.04 and candidate_strength >= 0.55)
-                or (chord_ratio <= 0.14 and candidate_strength >= 0.75)
-            )
-        )
+        return should_apply_erhu_range_fallback(selected_part_candidate, clean_solo, ambiguous)
 
     def _annotate_score_line_roles(
         self,
@@ -6518,119 +5126,7 @@ class ErhuAnalyzer:
         return annotated
 
     def _collapse_erhu_melody_events(self, note_events: list[NoteEvent]) -> list[NoteEvent]:
-        if len(note_events) <= 1:
-            return note_events
-
-        role_filtered = [
-            note
-            for note in note_events
-            if str((getattr(note, "notePosition", None) or {}).get("scoreLineRole") or "").lower() == "erhu"
-            and safe_float((getattr(note, "notePosition", None) or {}).get("scoreLineConfidence"), 0.0) >= 0.66
-        ]
-        if role_filtered:
-            # Strong mode: once OMR has separated melody/accompaniment lines, only
-            # the erhu melody line is allowed into pitch/rhythm diagnosis.
-            note_events = role_filtered
-        elif any(str((getattr(note, "notePosition", None) or {}).get("scoreLineRole") or "").strip() for note in note_events):
-            # If line-role analysis ran and found no reliable erhu line, keep the
-            # section out of automatic diagnosis instead of falling back to piano.
-            return []
-
-        staff_counts: dict[int, int] = {}
-        for note in note_events:
-            position = getattr(note, "notePosition", None) or {}
-            staff_index = int(safe_float(position.get("staffIndex"), 1))
-            if staff_index >= 1:
-                staff_counts[staff_index] = staff_counts.get(staff_index, 0) + 1
-        if len(staff_counts) > 1:
-            # Imported full scores can put erhu and piano into one generic Voice.
-            # For diagnosis and score highlighting, keep the solo erhu melody staff
-            # (normally the top staff) before collapsing chords/voices.
-            preferred_staff = min(staff_counts.keys())
-            staff_filtered = [
-                note
-                for note in note_events
-                if int(safe_float((getattr(note, "notePosition", None) or {}).get("staffIndex"), 1)) == preferred_staff
-            ]
-            if staff_filtered:
-                note_events = staff_filtered
-
-        ordered = sorted(
-            note_events,
-            key=lambda item: (int(item.measureIndex), round(float(item.beatStart), 4), -float(item.beatDuration), int(item.midiPitch)),
-        )
-
-        groups: list[list[NoteEvent]] = []
-        current_group: list[NoteEvent] = []
-        current_key: tuple[int, float] | None = None
-        for note in ordered:
-            group_key = (int(note.measureIndex), round(float(note.beatStart), 4))
-            if current_key != group_key:
-                if current_group:
-                    groups.append(current_group)
-                current_group = [note]
-                current_key = group_key
-            else:
-                current_group.append(note)
-        if current_group:
-            groups.append(current_group)
-
-        collapsed: list[NoteEvent] = []
-        previous_pitch: int | None = None
-        erhu_min_pitch = 52
-        erhu_max_pitch = 96
-
-        for group in groups:
-            deduped_by_pitch: dict[int, NoteEvent] = {}
-            for note in group:
-                midi_pitch = int(note.midiPitch)
-                existing = deduped_by_pitch.get(midi_pitch)
-                if existing is None or float(note.beatDuration) > float(existing.beatDuration):
-                    deduped_by_pitch[midi_pitch] = note
-
-            candidates = list(deduped_by_pitch.values())
-            in_range = [note for note in candidates if erhu_min_pitch <= int(note.midiPitch) <= erhu_max_pitch]
-            working = in_range or candidates
-
-            if previous_pitch is None:
-                chosen = max(working, key=lambda item: (float(item.beatDuration), int(item.midiPitch)))
-            else:
-                chosen = min(
-                    working,
-                    key=lambda item: (
-                        abs(int(item.midiPitch) - previous_pitch),
-                        -float(item.beatDuration),
-                        -int(item.midiPitch),
-                    ),
-                )
-                close_candidates = [
-                    note for note in working if abs(int(note.midiPitch) - previous_pitch) <= 7
-                ]
-                if close_candidates:
-                    chosen = max(close_candidates, key=lambda item: (float(item.beatDuration), -abs(int(item.midiPitch) - previous_pitch)))
-
-            previous_pitch = int(chosen.midiPitch)
-            collapsed.append(chosen)
-
-        normalized: list[NoteEvent] = []
-        for index, note in enumerate(collapsed, start=1):
-            normalized.append(
-                NoteEvent(
-                    noteId=note.noteId or f"xml-note-{index}",
-                    measureIndex=int(note.measureIndex),
-                    beatStart=float(note.beatStart),
-                    beatDuration=max(float(note.beatDuration), 0.25),
-                    midiPitch=int(note.midiPitch),
-                    notePosition=dict(note.notePosition or {}) if getattr(note, "notePosition", None) else None,
-                    articulations=list(getattr(note, "articulations", []) or []),
-                    notations=list(getattr(note, "notations", []) or []),
-                    techniques=list(getattr(note, "techniques", []) or []),
-                    activeTempo=int(getattr(note, "activeTempo", 0) or 0) or None,
-                    activeDynamic=str(getattr(note, "activeDynamic", "") or "").strip() or None,
-                    dynamicValue=safe_float(getattr(note, "dynamicValue", None), 0.0) or None,
-                )
-            )
-        return normalized
+        return collapse_erhu_melody_events(note_events)
 
     def _parse_midi_score(self, midi_bytes: bytes, request: AnalyzeRequest) -> list[SymbolicNote]:
         if not midi_bytes or pretty_midi is None:
@@ -6706,7 +5202,7 @@ class ErhuAnalyzer:
                     fmin=120.0,
                     fmax=1400.0,
                     batch_size=256,
-                    device="cuda" if torch.cuda.is_available() else "cpu",
+                    device=self._torchcrepe_device(),
                     return_periodicity=True,
                 )
                 pitch_values = pitch.squeeze(0).detach().cpu().numpy()

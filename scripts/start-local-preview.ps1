@@ -14,6 +14,7 @@ $pidFile = Join-Path $dataDir "local-preview-pids.json"
 $pythonRunner = Join-Path $repoRoot "scripts\run-python.ps1"
 $serverUrl = "http://127.0.0.1:3000"
 $analyzerUrl = "http://127.0.0.1:8000/docs"
+$scoreStoreBackend = if ($env:ERHU_SCORE_STORE_BACKEND) { $env:ERHU_SCORE_STORE_BACKEND } else { "auto" }
 
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 
@@ -98,6 +99,7 @@ if (-not $SkipBuild) {
 
 $serverProcess = Find-ProcessByCommandLine -Patterns @($repoRoot, "node", "server.js")
 if (-not $serverProcess) {
+  $env:ERHU_SCORE_STORE_BACKEND = $scoreStoreBackend
   $startedServer = Start-Process -FilePath "node" `
     -ArgumentList "server.js" `
     -WorkingDirectory $repoRoot `
@@ -111,8 +113,11 @@ $analyzerProcess = $null
 if (Test-Path $pythonRunner) {
   $analyzerProcess = Find-ProcessByCommandLine -Patterns @($repoRoot, "uvicorn", "python-service")
   if (-not $analyzerProcess) {
+    $env:ERHU_PREFER_CUDA_PYTHON = "false"
+    $env:ERHU_TORCH_DEVICE = "cpu"
+    $env:CUDA_VISIBLE_DEVICES = ""
     $startedAnalyzer = Start-Process -FilePath "powershell" `
-      -ArgumentList "-ExecutionPolicy", "Bypass", "-File", $pythonRunner, "-m", "uvicorn", "app:app", "--app-dir", "python-service", "--host", "127.0.0.1", "--port", "8000", "--workers", "4" `
+      -ArgumentList "-ExecutionPolicy", "Bypass", "-File", $pythonRunner, "-m", "uvicorn", "app:app", "--app-dir", "python-service", "--host", "127.0.0.1", "--port", "8000", "--workers", "1" `
       -WorkingDirectory $repoRoot `
       -RedirectStandardOutput $analyzerLog `
       -RedirectStandardError $analyzerErrLog `
@@ -136,6 +141,18 @@ $analyzerPid = if ($analyzerListener.Count -gt 0) { $analyzerListener[0].OwningP
   repoRoot = $repoRoot
   serverPid = $serverPid
   analyzerPid = $analyzerPid
+  scoreStoreBackend = $scoreStoreBackend
+  cpuOnly = @{
+    preferCudaPython = "false"
+    torchDevice = "cpu"
+    cudaVisibleDevices = ""
+  }
+  logs = @{
+    server = $serverLog
+    serverError = $serverErrLog
+    analyzer = $analyzerLog
+    analyzerError = $analyzerErrLog
+  }
   updatedAt = (Get-Date).ToString("o")
 } | ConvertTo-Json | Set-Content -Path $pidFile -Encoding UTF8
 
@@ -144,9 +161,19 @@ Write-Host "Local project preview"
 Write-Host "---------------------"
 Write-Host "App URL:      $serverUrl"
 Write-Host "Health URL:   $serverUrl/api/health"
+Write-Host "Ops URL:      $serverUrl/?mode=health"
+Write-Host "Ops API:      $serverUrl/api/erhu/ops/health"
 Write-Host "Analyzer URL: $analyzerUrl"
+Write-Host "Score store:  $scoreStoreBackend"
+Write-Host "CPU-only:     ERHU_TORCH_DEVICE=cpu CUDA_VISIBLE_DEVICES=<empty>"
 Write-Host "Site ready:   $siteReady"
 Write-Host "Analyzer:     $analyzerReady"
+if (-not $siteReady) {
+  Write-Host "Site is not ready. Check port 3000 and the server logs below."
+}
+if (-not $analyzerReady) {
+  Write-Host "Python analyzer is not ready. Check port 8000 and the analyzer logs below."
+}
 Write-Host ""
 Write-Host "Logs:"
 Write-Host "  $serverLog"

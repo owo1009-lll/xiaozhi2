@@ -47,12 +47,17 @@ Current status:
 
 The current rhythm stack is acceptable for the prototype mainline when `madmom` is available. Fallback results must remain lower confidence.
 
-## Current Mainline Status, 2026-04-30
+## Current Mainline Status, 2026-05-04
 
 Latest validated state:
 
 - `npm run test:mainline-p0` passes.
-- Analyzer runtime reports CUDA PyTorch on `NVIDIA GeForce RTX 5060`.
+- Analyzer runtime is forced to CPU-only for local stability: `ERHU_TORCH_DEVICE=cpu`, `ERHU_PREFER_CUDA_PYTHON=false`, and `CUDA_VISIBLE_DEVICES=""`. CUDA should be opt-in only for isolated performance profiling.
+- P2 split work now has dedicated modules for server JSON/score-store/OMR-stats/audio-payload/analyzer-client support, score-line role annotation, score import orchestration, MusicXML candidate extraction/layout refinement/score-role helpers, and research-page shell/workspace/protocol/dashboard UI chunks. `analyzer.py` is now below the P2 target line at about `6973` lines.
+- P3 storage work is validated behind `ERHU_SCORE_STORE_BACKEND=auto|sqlite`. A migrated `erhu-score-imports.sqlite` now becomes the runtime store automatically, so score-import writes no longer rewrite `erhu-score-imports.json`; clean installs without a DB still fall back to JSON.
+- P3 benchmark coverage now includes `npm run benchmark:complex-pdf-omr`, which normalizes complex/unknown PDF OMR reports with page count, Audiveris run count, whole-PDF skip reason, dedupe/cache fields, section/note counts, `erhuRatio`, and elapsed time.
+- P3 frontend decomposition moved score-issue layout blocks into `src/scoreIssue/ScoreIssueLayout.jsx` and shared student cards into `src/student/StudentLayout.jsx`; route-level lazy loading remains in place.
+- Large PDF first-import OMR now skips whole-file Audiveris when `ERHU_OMR_WHOLE_PDF_MAX_FILE_MB` is exceeded, going directly to pagewise OMR with diagnostics for skipped reason, file size, and page-task reduction.
 - Historical `reviewRate` values that still appear in DTW quality reports are archived/stale trend data from older runs. They are not evidence of a regression in the current mainline.
 - Latest real-corpus mainline sample: `8` whole-piece analyses, `latestMainlineReviewRate = 0`, `latestMainlineAccompanimentFailureRate = 0`.
 - Actual real-corpus `--run` coverage now includes all 8 matched corpus pairs: `20190306桃花坞`, `第二二胡狂想曲`, `第四二胡狂想曲`, `浮生`, `古巷深处`, `维奥莱塔组曲07 - 二胡 中胡`, `雪山魂塑`, and `炫动`.
@@ -89,8 +94,8 @@ Completed:
 
 Completed:
 
-- Enabled the production launcher to prefer the global CUDA PyTorch runtime while still loading the project virtualenv packages, so `torchcrepe` can use the local GPU when available.
-- Verified analyzer runtime reports `torch 2.11.0+cu128`, `cuda`, and `NVIDIA GeForce RTX 5060`.
+- Historical note: the production launcher previously preferred the global CUDA PyTorch runtime, but the current default is CPU-only to avoid local GPU-driver instability.
+- Previous CUDA profiling verified `torch 2.11.0+cu128`, `cuda`, and `NVIDIA GeForce RTX 5060`; this is no longer the default launch path.
 - Ran non-Taohuawu real-corpus end-to-end tests for `第四二胡狂想曲`, `浮生`, and `古巷深处`.
 - Added stricter issue-score projection guards: when a score contains accompaniment, stale cached `scoreLineRole=erhu` is no longer trusted by itself; unreliable markers become `需复核`.
 - Added a DTW alignment quality report with mode-level breakdown, separating new whole-piece results from old historical external/fallback analyses.
@@ -207,12 +212,82 @@ Completed:
 5. Keep manual `MusicXML` import as the fallback for PDFs whose Audiveris output is too noisy.
 6. Treat deeper installer packaging beyond local Windows shortcuts as lower priority until the diagnosis chain is visually reliable.
 
-## Current P1/P2 Focus
+## 2026-05-04 P2 Contract Checkpoint
+
+Job API state contract:
+
+- Score import jobs use `omrStatus: processing|completed|failed`; analysis and piece-pass jobs use `status: processing|completed|failed`, with `stage` carrying finer-grained values such as `queued`, `omr-running`, `running`, and `failed`.
+- Startup recovery marks stale in-flight jobs as terminal `failed` and adds `interruptedByRestart: true`, `recoveryReason: "node-service-restart"`, and `retryable: true`.
+- Failed PDF score imports expose `musicxmlFallbackAvailable: true` and `fallbackActions: ["import-musicxml"]` so the student UI can show the backup-score import path.
+- Failed direct MusicXML imports stay retryable but do not advertise MusicXML as their own fallback.
+- P4 retry/cancel/resume UI should build on these fields instead of inferring recovery from localized warning text.
+- CPU-only phase diagnostics now run cold and warm passes against the same synthetic audio. On this machine the cold path is dominated by TorchCrepe pitch extraction, while the in-process feature memory cache reduces repeated pitch/onset/beat reads for the same audio window to near-zero overhead.
+
+## 2026-05-04 P3 Storage Checkpoint
+
+SQLite score-store migration foundation:
+
+- Added a SQLite schema for active and archived score-import jobs/scores without adding a native npm dependency; it uses Node's built-in `node:sqlite`.
+- Added `scripts/migrate-score-imports-sqlite.mjs` with `--dry-run`, `--force`, JSON backup creation, archive-file import, and rollback guidance.
+- Added isolated migration coverage for dry-run, JSON backup, archive import, active-over-archive duplicate precedence, active-only reads, and include-archive reads.
+- Ran a real dry-run and then migrated the current active store into `data/erhu-score-imports.sqlite`: `304` jobs and `51` scores, with a JSON backup under `data/sqlite-backups`.
+- Added runtime score-store backend selection with `ERHU_SCORE_STORE_BACKEND=auto|sqlite|json` / `ERHU_SCORE_STORE_SQLITE_FILE`.
+- `upsertScoreImportJob()` now uses direct SQLite row upsert under the SQLite backend; full read/write paths use SQLite tables instead of touching the active JSON file.
+- JSON remains the fallback backend when no migrated SQLite DB exists, so clean installs do not start with an empty migrated store by accident.
+- Added `npm run test:server-sqlite-store`, which starts an isolated server in `auto` backend mode with a mocked analyzer, completes one PDF import, verifies completed job/score rows in SQLite, and fails if `erhu-score-imports.json` is rewritten.
+
+## 2026-05-04 P3 Completion Checkpoint
+
+Completed:
+
+- Storage migration path: SQLite schema, dry-run/backup migration, active/archive import, explicit runtime backend flag, and runtime write-path verification.
+- Complex PDF OMR reporting: `npm run benchmark:complex-pdf-omr -- --strict --min-samples 3` generated `data/real-tests/complex-pdf-omr/latest-complex-pdf-omr-benchmark.json` with `3/3` completed samples, average `erhuRatio = 1.0`, and required page/run/cache/dedupe/elapsed fields.
+- CPU performance: CPU-only phase diagnostics remain the gate; current cold path is still TorchCrepe pitch extraction, while warm repeated feature reads are served by the in-process feature memory cache. CUDA remains disabled by default.
+- Frontend decomposition: score-issue header/sidebar/toolbar/nav/stage moved into `src/scoreIssue/ScoreIssueLayout.jsx`; shared student metric/section components moved into `src/student/StudentLayout.jsx`.
+- Frontend smoke: desktop and mobile score-issue smoke both passed against the latest generated review manifest at `390x844` mobile, with no horizontal body overflow and original-audio seek verified.
+
+Validation:
+
+- `npm run test:server-sqlite-store`
+- `npm run benchmark:complex-pdf-omr -- --strict --min-samples 3`
+- `npm run test:analyzer-cpu-phases` with CPU-only runtime (`torch 2.7.0+cpu`, CUDA unavailable/disabled)
+- `npm run test:score-markings`
+- `npm run test:dtw-quality` with `latestMainlineReviewRate = 0` and `latestMainlineAccompanimentFailureRate = 0`
+- `npm run build`
+- `npm run test:frontend-split`
+- `npm run smoke:score-issues -- --base-url http://127.0.0.1:3101 --no-screenshots --max-cards 2`
+- `npm run smoke:score-issues:mobile -- --base-url http://127.0.0.1:3101 --no-screenshots --max-cards 2`
+- CPU-only `npm run test:mainline-p0`
+
+## 2026-05-04 P4 Operations Checkpoint
+
+Completed:
+
+- Added an operations health surface at `/?mode=health`, split behind `React.lazy`, with Node/Python reachability, CPU-only state, score-store backend, recent failures, archive/log visibility, and task actions.
+- Added sanitized operations APIs: `GET /api/erhu/ops/health`, `GET /api/erhu/ops/jobs`, and task `cancel`, `retry`, and `resume` endpoints.
+- Wired score-import retry/resume to create a new linked job with `previousJobId`; analysis and piece-pass jobs now return a clear no-reusable-payload response until their payload contracts are formalized.
+- Wired cancel for processing score-import, analysis, and piece-pass jobs. Cancelled jobs are preserved against late async writes from an in-flight analyzer call.
+- Updated Windows production/local launchers to print the ops URL/API, CPU-only configuration, score-store backend, log paths, and port/service guidance. Stop scripts now surface log locations before shutdown cleanup.
+- Added P4 guard tests for ops health/task controls and Windows launcher contracts, and included both in `test:mainline-p0`.
+
+Validation:
+
+- `npm run test:ops-health` against both JSON and SQLite score-store backends.
+- `npm run test:windows-launcher`
+- `node --no-warnings --check server.js`
+- `npm run build`
+- `npm run test:frontend-split`
+- `npm run test:student-ui-copy`
+- CPU-only `npm run test:mainline-p0`
+- Local HTTP smoke of `/?mode=health` plus `/api/erhu/ops/health` on an isolated temp data directory with `ERHU_TORCH_DEVICE=cpu`, `ERHU_PREFER_CUDA_PYTHON=false`, and `CUDA_VISIBLE_DEVICES=""`.
+
+## Current Post-P4 Focus
 
 - Keep performance work focused on quality-preserving reductions: analyze whether fragmented-score window shortening can be guarded by score coverage or confidence before changing production defaults.
 - Continue separation strategy work as diagnosis quality work: use targeted auto/off pairs for low-score sections, but do not assume separation skipping will reduce first-pass latency.
 - Continue OMR section/voice improvements with `test:dtw-quality` review samples as the selector for exact pages, measures, and note IDs.
 - Add truly external scanned/non-standard PDF samples when available; the local complex-PDF benchmark now has `3/3` completed samples and all three currently project erhu melody at `erhuRatio = 1.0`.
+- Treat further `server.js`/`analyzer.py` decomposition as incremental lower-risk extraction behind the CPU-only `test:mainline-p0` gate, not as a rewrite.
 
 ## Immediate Implication
 
@@ -221,3 +296,19 @@ When there is a tradeoff, prefer work that strengthens this path:
 `PDF -> score representation -> audio -> DL pitch/rhythm -> localization -> feedback UI`
 
 Do not let optional research-management features displace this mainline.
+
+## 2026-05-04 Post-P4 Completion Checkpoint
+
+Completed:
+
+- Extended the P4 task contract from score-import only to all three long-running task types. Failed analysis and piece-pass jobs now keep a reusable CPU-safe audio payload and can create linked retry/resume jobs with `previousJobId`.
+- Kept reusable payload internals out of public job responses while still exposing `reusablePayloadAvailable` and ops actions.
+- Preserved the existing cancel safety rule: cancelled processing jobs are not overwritten by late async completions.
+- Kept piece-pass resume behind the existing runner path, with a test-only runner override so the contract can be validated without running a full analyzer pass.
+- Re-validated JSON and SQLite score-store backends through the same ops test.
+
+Validation:
+
+- `node --no-warnings --check server.js`
+- `node --check scripts/test-ops-health-and-jobs.mjs`
+- CPU-only `npm run test:ops-health` covering score-import, analysis, and piece-pass cancel/resume paths on JSON and SQLite score-store backends.

@@ -221,6 +221,38 @@ export async function fetchAnalyzerStatus() {
   return readJson(await fetch("/api/erhu/analyzer-status"));
 }
 
+export async function fetchOpsHealth() {
+  return readJson(await fetch("/api/erhu/ops/health"));
+}
+
+export async function fetchOpsJobs() {
+  return readJson(await fetch("/api/erhu/ops/jobs"));
+}
+
+export async function cancelOpsJob(type, jobId) {
+  return readJson(
+    await fetch(`/api/erhu/ops/jobs/${encodeURIComponent(type)}/${encodeURIComponent(jobId)}/cancel`, {
+      method: "POST",
+    }),
+  );
+}
+
+export async function retryOpsJob(type, jobId) {
+  return readJson(
+    await fetch(`/api/erhu/ops/jobs/${encodeURIComponent(type)}/${encodeURIComponent(jobId)}/retry`, {
+      method: "POST",
+    }),
+  );
+}
+
+export async function resumeOpsJob(type, jobId) {
+  return readJson(
+    await fetch(`/api/erhu/ops/jobs/${encodeURIComponent(type)}/${encodeURIComponent(jobId)}/resume`, {
+      method: "POST",
+    }),
+  );
+}
+
 export async function saveExpertRating(payload) {
   return readJson(
     await fetch("/api/erhu/expert-rating", {

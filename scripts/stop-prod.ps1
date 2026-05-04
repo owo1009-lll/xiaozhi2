@@ -26,6 +26,12 @@ if (Test-Path $pidFile) {
     $payload = Get-Content $pidFile -Raw | ConvertFrom-Json
     Stop-Pid -TargetPid ([int]$payload.serverPid)
     Stop-Pid -TargetPid ([int]$payload.analyzerPid)
+    if ($payload.logs) {
+      Write-Host "Logs were:"
+      foreach ($entry in $payload.logs.PSObject.Properties) {
+        Write-Host ("  {0}: {1}" -f $entry.Name, $entry.Value)
+      }
+    }
   } catch {
     Write-Host ("Unable to read {0}: {1}" -f $pidFile, $_.Exception.Message)
   }

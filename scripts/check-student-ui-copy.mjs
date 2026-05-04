@@ -10,6 +10,8 @@ const checkedFiles = [
   "public/manifest.webmanifest",
   "src/StudentApp.jsx",
   "src/ScoreIssuePage.jsx",
+  "src/student/StudentLayout.jsx",
+  "src/scoreIssue/ScoreIssueLayout.jsx",
   "src/analysisLabels.js",
 ];
 
@@ -116,7 +118,7 @@ if (!studentAppText.includes("function friendlyErrorMessage(")) {
   });
 }
 
-for (const relativePath of ["src/StudentApp.jsx", "src/ScoreIssuePage.jsx"]) {
+for (const relativePath of ["src/StudentApp.jsx", "src/ScoreIssuePage.jsx", "src/student/StudentLayout.jsx", "src/scoreIssue/ScoreIssueLayout.jsx"]) {
   const absolutePath = path.join(repoRoot, relativePath);
   const text = fs.readFileSync(absolutePath, "utf8");
   for (const { pattern, reason } of rawStudentErrorPatterns) {
