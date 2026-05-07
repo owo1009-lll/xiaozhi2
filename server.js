@@ -7,7 +7,6 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import multer from "multer";
 import { getErhuPiece, getErhuPieceSummaries, getErhuSection } from "./src/erhuStudyPieces.js";
-import { RESEARCH_TEMPLATE_LIBRARY } from "./src/researchProtocolData.js";
 import {
   clamp,
   createId,
@@ -68,6 +67,24 @@ import {
   persistUploadedAudioFile,
 } from "./src/server/audioPayload.js";
 import { createAnalyzerClient } from "./src/server/analyzerClient.js";
+import { createTaskGate, queueFullPayload } from "./src/server/taskQueue.js";
+import { createAnalysisRouter } from "./src/server/analysisRoutes.js";
+import { createOpsRouter } from "./src/server/opsRoutes.js";
+import { createResearchRouter } from "./src/server/researchRoutes.js";
+import { createScoreRouter } from "./src/server/scoreRoutes.js";
+import { createTeacherValidationService } from "./src/server/teacherValidationService.js";
+import { createTeacherValidationRouter } from "./src/server/teacherValidationRoutes.js";
+import {
+  appendAnalysisToParticipant,
+  buildValidationSummary,
+  createValidationReview,
+  ensureParticipantRecord,
+  normalizeAdjudicationRecord,
+  normalizeInterviewRecord,
+  normalizeParticipantRecord,
+  normalizeTaskPlanRecord,
+  normalizeValidationReview,
+} from "./src/server/researchService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -84,21 +101,45 @@ const ANALYSIS_JOB_STORE_FILE = path.join(DATA_DIR, "erhu-analysis-jobs.json");
 const PIECE_PASS_JOB_STORE_FILE = path.join(DATA_DIR, "erhu-piece-pass-jobs.json");
 const SCORE_IMPORTS_DIR = path.join(DATA_DIR, "score-imports");
 const PIECE_PASS_DIR = path.join(DATA_DIR, "piece-pass");
+const TEACHER_VALIDATION_PACKS_DIR = path.join(DATA_DIR, "teacher-validation", "packs");
 const AUDIO_CACHE_DIR = path.join(DATA_DIR, "analysis-audio-cache");
 const SECTION_DETECTION_CACHE_DIR = path.join(DATA_DIR, "section-detection-cache");
 const SECTION_ANALYSIS_CACHE_DIR = path.join(DATA_DIR, "section-analysis-cache");
 const PERF_TRACE_FILE = path.join(DATA_DIR, "perf-trace.log");
 const ASCII_RUNTIME_ROOT = path.join(path.dirname(__dirname), "ai_erhu_runtime");
 const DIST_DIR = path.join(__dirname, "dist");
-const REQUIRED_VALIDATION_RATERS = Math.max(1, safeNumber(process.env.ERHU_VALIDATION_RATERS_REQUIRED, 2));
-const ADJUDICATION_OVERALL_GAP_THRESHOLD = 2;
-const ADJUDICATION_NOTE_F1_THRESHOLD = 0.67;
-const ADJUDICATION_MEASURE_F1_THRESHOLD = 0.67;
 const STORE_ARCHIVE_DIR = path.join(DATA_DIR, "store-archive");
 const SCORE_STORE_LIMITS = readScoreStoreLimits(process.env);
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 40 * 1024 * 1024 },
+});
+const SCORE_IMPORT_TASK_GATE = createTaskGate({
+  name: "score-import",
+  concurrency: safeNumber(process.env.ERHU_SCORE_IMPORT_CONCURRENCY, 1),
+  maxPending: safeNumber(process.env.ERHU_SCORE_IMPORT_MAX_PENDING, 6),
+});
+const ANALYSIS_TASK_GATE = createTaskGate({
+  name: "analysis",
+  concurrency: safeNumber(process.env.ERHU_ANALYSIS_JOB_CONCURRENCY, 2),
+  maxPending: safeNumber(process.env.ERHU_ANALYSIS_JOB_MAX_PENDING, 12),
+});
+const PIECE_PASS_TASK_GATE = createTaskGate({
+  name: "piece-pass",
+  concurrency: safeNumber(process.env.ERHU_PIECE_PASS_JOB_CONCURRENCY, 1),
+  maxPending: safeNumber(process.env.ERHU_PIECE_PASS_JOB_MAX_PENDING, 3),
+});
+const teacherValidationService = createTeacherValidationService({
+  packsDir: TEACHER_VALIDATION_PACKS_DIR,
+  repoRoot: __dirname,
+  dataDir: DATA_DIR,
+  asciiRuntimeRoot: ASCII_RUNTIME_ROOT,
+  readScoreStore,
+  readStudyStore,
+  writeStudyStore,
+  ensureParticipantRecord,
+  createValidationReview,
+  buildValidationSummary,
 });
 
 app.use(express.json({ limit: "120mb" }));
@@ -1879,7 +1920,10 @@ function launchPiecePassTask(task) {
   const existingTask = activePiecePassTasks.get(task.jobId);
   if (existingTask) return existingTask;
 
+  const taskRecord = { promise: null, ticket: null, child: null };
   const runner = (async () => {
+    const ticket = await PIECE_PASS_TASK_GATE.enter(task.jobId);
+    taskRecord.ticket = ticket;
     const startedAt = Date.now();
     const outputDir = path.join(PIECE_PASS_DIR, "jobs", task.jobId);
     const baseJob = {
@@ -1969,6 +2013,7 @@ function launchPiecePassTask(task) {
       cwd: __dirname,
       windowsHide: true,
     });
+    taskRecord.child = child;
 
     let stdoutBuffer = "";
     let stderrBuffer = "";
@@ -2099,11 +2144,34 @@ function launchPiecePassTask(task) {
         updatedAt: nowIso(),
       });
     }
-  })().finally(() => {
+  })()
+    .catch(async (error) => {
+      await upsertPiecePassJob({
+        jobId: task.jobId,
+        previousJobId: safeString(task.previousJobId),
+        participantId: safeString(task.payload?.participantId),
+        scoreId: safeString(task.payload?.scoreId),
+        pieceId: safeString(task.pieceKey),
+        pieceTitle: safeString(task.pieceTitle),
+        sourceType: safeString(task.sourceType),
+        preprocessMode: safeString(task.payload?.preprocessMode, "auto"),
+        status: "failed",
+        progress: 1,
+        stage: "failed",
+        message: "整曲分析任务未能启动，请稍后重试。",
+        error: safeString(error?.message, "piece-pass queue failed"),
+        retryable: true,
+        completedAt: nowIso(),
+        updatedAt: nowIso(),
+      });
+    })
+    .finally(() => {
+    PIECE_PASS_TASK_GATE.release(taskRecord.ticket);
     activePiecePassTasks.delete(task.jobId);
   });
 
-  activePiecePassTasks.set(task.jobId, runner);
+  taskRecord.promise = runner;
+  activePiecePassTasks.set(task.jobId, taskRecord);
   return runner;
 }
 
@@ -2154,7 +2222,10 @@ function launchScoreImportTask(task) {
   const existingTask = activeScoreImportTasks.get(task.jobId);
   if (existingTask) return existingTask;
 
+  const taskRecord = { promise: null, ticket: null, child: null };
   const runner = (async () => {
+    const ticket = await SCORE_IMPORT_TASK_GATE.enter(task.jobId);
+    taskRecord.ticket = ticket;
     const {
       jobId,
       titleHint,
@@ -2390,10 +2461,12 @@ function launchScoreImportTask(task) {
       });
     })
     .finally(() => {
+      SCORE_IMPORT_TASK_GATE.release(taskRecord.ticket);
       activeScoreImportTasks.delete(task.jobId);
     });
 
-  activeScoreImportTasks.set(task.jobId, runner);
+  taskRecord.promise = runner;
+  activeScoreImportTasks.set(task.jobId, taskRecord);
   return runner;
 }
 
@@ -2626,239 +2699,6 @@ function toWebPathFromAbsolute(filePath) {
     return toWebDataPath(aliasRelative);
   }
   return absolute;
-}
-
-function average(values = []) {
-  if (!values.length) return 0;
-  return values.reduce((sum, value) => sum + safeNumber(value), 0) / values.length;
-}
-
-function normalizeTaskPlanRecord(taskPlan = {}) {
-  const status = safeString(taskPlan.status, "assigned");
-  return {
-    taskId: safeString(taskPlan.taskId),
-    stage: safeString(taskPlan.stage, "week1"),
-    pieceId: safeString(taskPlan.pieceId),
-    sectionId: safeString(taskPlan.sectionId),
-    focus: safeString(taskPlan.focus),
-    instructions: safeString(taskPlan.instructions),
-    practiceTargetMinutes: clamp(safeNumber(taskPlan.practiceTargetMinutes, 30), 0, 600),
-    dueDate: safeString(taskPlan.dueDate),
-    status,
-    assignedBy: safeString(taskPlan.assignedBy, "researcher"),
-    createdAt: safeString(taskPlan.createdAt, nowIso()),
-    updatedAt: safeString(taskPlan.updatedAt, taskPlan.createdAt || nowIso()),
-    completedAt: status === "completed" ? safeString(taskPlan.completedAt, taskPlan.updatedAt || nowIso()) : safeString(taskPlan.completedAt),
-  };
-}
-
-function normalizeInterviewRecord(interview = {}) {
-  return {
-    interviewId: safeString(interview.interviewId),
-    stage: safeString(interview.stage, "posttest"),
-    interviewerId: safeString(interview.interviewerId, "researcher"),
-    summary: safeString(interview.summary),
-    barriers: safeString(interview.barriers),
-    strategyChanges: safeString(interview.strategyChanges),
-    representativeQuote: safeString(interview.representativeQuote),
-    nextAction: safeString(interview.nextAction),
-    followUpNeeded: safeBoolean(interview.followUpNeeded, false),
-    submittedAt: safeString(interview.submittedAt, nowIso()),
-  };
-}
-
-function normalizeInterviewSamplingRecord(sampling = {}) {
-  return {
-    selected: safeBoolean(sampling.selected, false),
-    priority: safeString(sampling.priority, "candidate"),
-    reason: safeString(sampling.reason),
-    markedBy: safeString(sampling.markedBy, "researcher"),
-    updatedAt: safeString(sampling.updatedAt, nowIso()),
-  };
-}
-
-function toUniqueStringList(value) {
-  if (Array.isArray(value)) {
-    return Array.from(new Set(value.map((item) => safeString(item).trim()).filter(Boolean)));
-  }
-  return Array.from(new Set(String(value || "").split(/[\s,，;；]+/).map((item) => item.trim()).filter(Boolean)));
-}
-
-function toUniqueNumberList(value) {
-  return Array.from(
-    new Set(
-      toUniqueStringList(value)
-        .map((item) => Number(item))
-        .filter((item) => Number.isFinite(item))
-        .map((item) => Math.round(item)),
-    ),
-  );
-}
-
-function calculateBinaryMetrics(systemValues = [], teacherValues = []) {
-  const systemSet = new Set(systemValues);
-  const teacherSet = new Set(teacherValues);
-  const matched = Array.from(teacherSet).filter((item) => systemSet.has(item));
-  const precision = systemSet.size ? matched.length / systemSet.size : null;
-  const recall = teacherSet.size ? matched.length / teacherSet.size : null;
-  const f1 = precision != null && recall != null && (precision + recall) > 0 ? (2 * precision * recall) / (precision + recall) : null;
-  return {
-    matched,
-    matchedCount: matched.length,
-    missedTeacherValues: Array.from(teacherSet).filter((item) => !systemSet.has(item)),
-    extraSystemValues: Array.from(systemSet).filter((item) => !teacherSet.has(item)),
-    precision,
-    recall,
-    f1,
-  };
-}
-
-function getAnalysisSystemNoteIds(analysis = {}) {
-  return Array.from(new Set(getArray(analysis.noteFindings).map((item) => safeString(item.noteId)).filter(Boolean)));
-}
-
-function getAnalysisSystemMeasureIndexes(analysis = {}) {
-  return Array.from(
-    new Set(
-      getArray(analysis.measureFindings)
-        .map((item) => safeNumber(item.measureIndex))
-        .filter((item) => Number.isFinite(item)),
-    ),
-  );
-}
-
-function getAnalysisRecommendedPracticePath(analysis = {}) {
-  return safeString(analysis.recommendedPracticePath) || safeString(getArray(analysis.practiceTargets)[0]?.practicePath) || "review-first";
-}
-
-function normalizeValidationReview(review = {}) {
-  return {
-    reviewId: safeString(review.reviewId),
-    analysisId: safeString(review.analysisId),
-    participantId: safeString(review.participantId),
-    groupId: safeString(review.groupId, "experimental"),
-    sessionStage: safeString(review.sessionStage),
-    pieceId: safeString(review.pieceId),
-    sectionId: safeString(review.sectionId),
-    raterId: safeString(review.raterId, "expert"),
-    overallAgreement: clamp(safeNumber(review.overallAgreement, 0), 0, 5),
-    teacherPrimaryPath: safeString(review.teacherPrimaryPath, "review-first"),
-    teacherIssueNoteIds: toUniqueStringList(review.teacherIssueNoteIds),
-    teacherIssueMeasureIndexes: toUniqueNumberList(review.teacherIssueMeasureIndexes),
-    comments: safeString(review.comments),
-    noteMatchedCount: safeNumber(review.noteMatchedCount, 0),
-    notePrecision: review.notePrecision == null ? null : safeNumber(review.notePrecision, 0),
-    noteRecall: review.noteRecall == null ? null : safeNumber(review.noteRecall, 0),
-    noteF1: review.noteF1 == null ? null : safeNumber(review.noteF1, 0),
-    measureMatchedCount: safeNumber(review.measureMatchedCount, 0),
-    measurePrecision: review.measurePrecision == null ? null : safeNumber(review.measurePrecision, 0),
-    measureRecall: review.measureRecall == null ? null : safeNumber(review.measureRecall, 0),
-    measureF1: review.measureF1 == null ? null : safeNumber(review.measureF1, 0),
-    missedTeacherNoteIds: toUniqueStringList(review.missedTeacherNoteIds),
-    extraSystemNoteIds: toUniqueStringList(review.extraSystemNoteIds),
-    missedTeacherMeasureIndexes: toUniqueNumberList(review.missedTeacherMeasureIndexes),
-    extraSystemMeasureIndexes: toUniqueNumberList(review.extraSystemMeasureIndexes),
-    systemRecommendedPath: safeString(review.systemRecommendedPath),
-    pathAgreement: safeBoolean(review.pathAgreement, false),
-    submittedAt: safeString(review.submittedAt, nowIso()),
-  };
-}
-
-function normalizeAdjudicationRecord(adjudication = {}) {
-  return {
-    adjudicationId: safeString(adjudication.adjudicationId),
-    analysisId: safeString(adjudication.analysisId),
-    participantId: safeString(adjudication.participantId),
-    groupId: safeString(adjudication.groupId, "experimental"),
-    sessionStage: safeString(adjudication.sessionStage),
-    pieceId: safeString(adjudication.pieceId),
-    sectionId: safeString(adjudication.sectionId),
-    adjudicatorId: safeString(adjudication.adjudicatorId, "researcher"),
-    sourceRaterIds: toUniqueStringList(adjudication.sourceRaterIds),
-    triggerReasons: toUniqueStringList(adjudication.triggerReasons),
-    finalPrimaryPath: safeString(adjudication.finalPrimaryPath, "review-first"),
-    finalIssueNoteIds: toUniqueStringList(adjudication.finalIssueNoteIds),
-    finalIssueMeasureIndexes: toUniqueNumberList(adjudication.finalIssueMeasureIndexes),
-    comments: safeString(adjudication.comments),
-    noteMatchedCount: safeNumber(adjudication.noteMatchedCount, 0),
-    notePrecision: adjudication.notePrecision == null ? null : safeNumber(adjudication.notePrecision, 0),
-    noteRecall: adjudication.noteRecall == null ? null : safeNumber(adjudication.noteRecall, 0),
-    noteF1: adjudication.noteF1 == null ? null : safeNumber(adjudication.noteF1, 0),
-    measureMatchedCount: safeNumber(adjudication.measureMatchedCount, 0),
-    measurePrecision: adjudication.measurePrecision == null ? null : safeNumber(adjudication.measurePrecision, 0),
-    measureRecall: adjudication.measureRecall == null ? null : safeNumber(adjudication.measureRecall, 0),
-    measureF1: adjudication.measureF1 == null ? null : safeNumber(adjudication.measureF1, 0),
-    systemRecommendedPath: safeString(adjudication.systemRecommendedPath),
-    pathAgreement: safeBoolean(adjudication.pathAgreement, false),
-    resolvedAt: safeString(adjudication.resolvedAt, nowIso()),
-  };
-}
-
-function normalizeParticipantRecord(participant = {}) {
-  const questionnaires = Array.isArray(participant.questionnaires)
-    ? participant.questionnaires
-    : participant.experienceScales?.submittedAt
-      ? [participant.experienceScales]
-      : [];
-
-  return {
-    participantId: safeString(participant.participantId),
-    groupId: safeString(participant.groupId, "experimental"),
-    createdAt: safeString(participant.createdAt, nowIso()),
-    lastActiveAt: safeString(participant.lastActiveAt, participant.createdAt || nowIso()),
-    profile:
-      participant.profile && typeof participant.profile === "object"
-        ? {
-            alias: safeString(participant.profile.alias),
-            institution: safeString(participant.profile.institution),
-            major: safeString(participant.profile.major),
-            grade: safeString(participant.profile.grade),
-            yearsOfTraining: safeNumber(participant.profile.yearsOfTraining, 0),
-            weeklyPracticeMinutes: safeNumber(participant.profile.weeklyPracticeMinutes, 0),
-            deviceLabel: safeString(participant.profile.deviceLabel),
-            consentSigned: safeBoolean(participant.profile.consentSigned, false),
-            notes: safeString(participant.profile.notes),
-            updatedAt: safeString(participant.profile.updatedAt, participant.createdAt || nowIso()),
-          }
-        : null,
-    pretest: participant.pretest || null,
-    weeklySessions: getArray(participant.weeklySessions),
-    posttest: participant.posttest || null,
-    experienceScales: participant.experienceScales || null,
-    questionnaires,
-    usageLogs: getArray(participant.usageLogs),
-    taskPlans: getArray(participant.taskPlans).map((item) => normalizeTaskPlanRecord(item)),
-    interviews: getArray(participant.interviews).map((item) => normalizeInterviewRecord(item)),
-    interviewSampling: normalizeInterviewSamplingRecord(participant.interviewSampling || {}),
-    expertRatings:
-      participant.expertRatings && typeof participant.expertRatings === "object"
-        ? {
-            pretest: participant.expertRatings.pretest || null,
-            posttest: participant.expertRatings.posttest || null,
-            weekly: getArray(participant.expertRatings.weekly),
-          }
-        : {
-            pretest: null,
-            posttest: null,
-            weekly: [],
-          },
-  };
-}
-
-function escapeCsvCell(value) {
-  const text = value == null ? "" : String(value);
-  if (/[",\n]/.test(text)) {
-    return `"${text.replace(/"/g, "\"\"")}"`;
-  }
-  return text;
-}
-
-function convertRowsToCsv(headers, rows) {
-  const lines = [headers.map((header) => escapeCsvCell(header)).join(",")];
-  rows.forEach((row) => {
-    lines.push(headers.map((header) => escapeCsvCell(row[header])).join(","));
-  });
-  return lines.join("\n");
 }
 
 function getExpectedDurationSeconds(section) {
@@ -4223,1153 +4063,6 @@ async function autoDetectPieceSection(payload, piece, options = {}) {
   return detection;
 }
 
-function ensureParticipantRecord(store, participantId, groupId) {
-  let participant = store.participants.find((item) => item.participantId === participantId);
-  if (!participant) {
-    participant = normalizeParticipantRecord({
-      participantId,
-      groupId,
-      createdAt: nowIso(),
-      lastActiveAt: nowIso(),
-    });
-    store.participants.push(participant);
-  } else if (groupId) {
-    participant.groupId = groupId;
-  }
-  participant = Object.assign(participant, normalizeParticipantRecord(participant));
-  return participant;
-}
-
-function appendAnalysisToParticipant(participant, payload, analysisRecord) {
-  const usageLog = {
-    analysisId: analysisRecord.analysisId,
-    scoreId: analysisRecord.scoreId,
-    pieceId: analysisRecord.pieceId,
-    sectionId: analysisRecord.sectionId,
-    pieceTitle: analysisRecord.pieceTitle,
-    sectionTitle: analysisRecord.sectionTitle,
-    audioHash: analysisRecord.audioHash,
-    sessionStage: analysisRecord.sessionStage,
-    overallPitchScore: analysisRecord.overallPitchScore,
-    overallRhythmScore: analysisRecord.overallRhythmScore,
-    confidence: analysisRecord.confidence,
-    at: analysisRecord.createdAt,
-  };
-  participant.usageLogs = getArray(participant.usageLogs).concat(usageLog).slice(-100);
-  participant.lastActiveAt = analysisRecord.createdAt;
-
-  const summary = {
-    analysisId: analysisRecord.analysisId,
-    scoreId: analysisRecord.scoreId,
-    pieceId: analysisRecord.pieceId,
-    sectionId: analysisRecord.sectionId,
-    pieceTitle: analysisRecord.pieceTitle,
-    sectionTitle: analysisRecord.sectionTitle,
-    audioHash: analysisRecord.audioHash,
-    pitchScore: analysisRecord.overallPitchScore,
-    rhythmScore: analysisRecord.overallRhythmScore,
-    at: analysisRecord.createdAt,
-  };
-
-  if (payload.sessionStage === "pretest") {
-    participant.pretest = summary;
-    return;
-  }
-  if (payload.sessionStage === "posttest") {
-    participant.posttest = summary;
-    return;
-  }
-  participant.weeklySessions = getArray(participant.weeklySessions).concat({
-    stage: payload.sessionStage,
-    ...summary,
-  }).slice(-24);
-}
-
-function applyExperienceScale(participant, payload) {
-  const questionnaire = {
-    questionnaireId: createId("questionnaire"),
-    usefulness: safeNumber(payload.experienceScales?.usefulness, 0),
-    easeOfUse: safeNumber(payload.experienceScales?.easeOfUse, 0),
-    feedbackClarity: safeNumber(payload.experienceScales?.feedbackClarity, 0),
-    confidence: safeNumber(payload.experienceScales?.confidence, 0),
-    continuance: safeNumber(payload.experienceScales?.continuance, 0),
-    notes: safeString(payload.notes),
-    submittedAt: nowIso(),
-    sessionStage: safeString(payload.sessionStage),
-  };
-  const questionnaireIndex = getArray(participant.questionnaires).findIndex(
-    (item) => item.sessionStage === questionnaire.sessionStage,
-  );
-  if (questionnaireIndex >= 0) {
-    const current = getArray(participant.questionnaires)[questionnaireIndex];
-    participant.questionnaires[questionnaireIndex] = {
-      ...current,
-      ...questionnaire,
-      questionnaireId: current.questionnaireId || questionnaire.questionnaireId,
-    };
-    participant.experienceScales = participant.questionnaires[questionnaireIndex];
-  } else {
-    participant.questionnaires = getArray(participant.questionnaires).concat(questionnaire).slice(-24);
-    participant.experienceScales = questionnaire;
-  }
-  participant.lastActiveAt = participant.experienceScales.submittedAt;
-}
-
-function applyExpertRating(participant, payload) {
-  const rating = {
-    ratingId: createId("rating"),
-    stage: safeString(payload.stage, "pretest"),
-    pitchScore: clamp(safeNumber(payload.pitchScore, 0), 0, 100),
-    rhythmScore: clamp(safeNumber(payload.rhythmScore, 0), 0, 100),
-    raterId: safeString(payload.raterId, "expert"),
-    comments: safeString(payload.comments),
-    submittedAt: nowIso(),
-  };
-
-  if (rating.stage === "pretest") {
-    participant.expertRatings.pretest = rating;
-  } else if (rating.stage === "posttest") {
-    participant.expertRatings.posttest = rating;
-  } else {
-    const weekly = getArray(participant.expertRatings.weekly);
-    const existingIndex = weekly.findIndex((item) => item.stage === rating.stage && item.raterId === rating.raterId);
-    if (existingIndex >= 0) {
-      weekly[existingIndex] = {
-        ...weekly[existingIndex],
-        ...rating,
-        ratingId: weekly[existingIndex].ratingId || rating.ratingId,
-      };
-      participant.expertRatings.weekly = weekly;
-    } else {
-      participant.expertRatings.weekly = weekly.concat(rating).slice(-24);
-    }
-  }
-  participant.lastActiveAt = rating.submittedAt;
-}
-
-function applyParticipantProfile(participant, payload) {
-  participant.profile = {
-    alias: safeString(payload.profile?.alias),
-    institution: safeString(payload.profile?.institution),
-    major: safeString(payload.profile?.major),
-    grade: safeString(payload.profile?.grade),
-    yearsOfTraining: clamp(safeNumber(payload.profile?.yearsOfTraining, 0), 0, 80),
-    weeklyPracticeMinutes: clamp(safeNumber(payload.profile?.weeklyPracticeMinutes, 0), 0, 10080),
-    deviceLabel: safeString(payload.profile?.deviceLabel),
-    consentSigned: safeBoolean(payload.profile?.consentSigned, false),
-    notes: safeString(payload.profile?.notes),
-    updatedAt: nowIso(),
-  };
-  participant.lastActiveAt = participant.profile.updatedAt;
-}
-
-function applyTaskPlan(participant, payload) {
-  const nextTask = normalizeTaskPlanRecord({
-    taskId: safeString(payload.taskId) || createId("task"),
-    stage: safeString(payload.stage, "week1"),
-    pieceId: safeString(payload.pieceId),
-    sectionId: safeString(payload.sectionId),
-    focus: safeString(payload.focus),
-    instructions: safeString(payload.instructions),
-    practiceTargetMinutes: safeNumber(payload.practiceTargetMinutes, 30),
-    dueDate: safeString(payload.dueDate),
-    status: safeString(payload.status, "assigned"),
-    assignedBy: safeString(payload.assignedBy, "researcher"),
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  });
-
-  const existingTasks = getArray(participant.taskPlans);
-  const taskIndex = existingTasks.findIndex(
-    (item) => item.taskId === nextTask.taskId || (!payload.taskId && item.stage === nextTask.stage),
-  );
-
-  if (taskIndex >= 0) {
-    const current = normalizeTaskPlanRecord(existingTasks[taskIndex]);
-    existingTasks[taskIndex] = normalizeTaskPlanRecord({
-      ...current,
-      ...nextTask,
-      taskId: current.taskId || nextTask.taskId,
-      createdAt: current.createdAt || nextTask.createdAt,
-      completedAt: nextTask.status === "completed" ? nowIso() : current.completedAt,
-    });
-    participant.taskPlans = existingTasks;
-  } else {
-    participant.taskPlans = existingTasks.concat(nextTask).slice(-48);
-  }
-
-  participant.lastActiveAt = nowIso();
-}
-
-function applyInterviewNote(participant, payload) {
-  const nextInterview = normalizeInterviewRecord({
-    interviewId: safeString(payload.interviewId) || createId("interview"),
-    stage: safeString(payload.stage, "posttest"),
-    interviewerId: safeString(payload.interviewerId, "researcher"),
-    summary: safeString(payload.summary),
-    barriers: safeString(payload.barriers),
-    strategyChanges: safeString(payload.strategyChanges),
-    representativeQuote: safeString(payload.representativeQuote),
-    nextAction: safeString(payload.nextAction),
-    followUpNeeded: safeBoolean(payload.followUpNeeded, false),
-    submittedAt: nowIso(),
-  });
-
-  const interviews = getArray(participant.interviews);
-  const interviewIndex = interviews.findIndex(
-    (item) =>
-      item.interviewId === nextInterview.interviewId ||
-      (!payload.interviewId && item.stage === nextInterview.stage && item.interviewerId === nextInterview.interviewerId),
-  );
-
-  if (interviewIndex >= 0) {
-    interviews[interviewIndex] = normalizeInterviewRecord({
-      ...interviews[interviewIndex],
-      ...nextInterview,
-      interviewId: interviews[interviewIndex].interviewId || nextInterview.interviewId,
-    });
-    participant.interviews = interviews;
-  } else {
-    participant.interviews = interviews.concat(nextInterview).slice(-24);
-  }
-
-  participant.lastActiveAt = nextInterview.submittedAt;
-}
-
-function applyInterviewSampling(participant, payload) {
-  participant.interviewSampling = normalizeInterviewSamplingRecord({
-    selected: payload.selected,
-    priority: payload.priority,
-    reason: payload.reason,
-    markedBy: payload.markedBy,
-    updatedAt: nowIso(),
-  });
-  participant.lastActiveAt = participant.interviewSampling.updatedAt;
-}
-
-function matchesAnalysisScope(analysis, scoreId = "", pieceId = "") {
-  const normalizedScoreId = safeString(scoreId).trim();
-  const normalizedPieceId = safeString(pieceId).trim();
-  if (!normalizedScoreId && !normalizedPieceId) return true;
-  const analysisScoreId = safeString(analysis?.scoreId);
-  const analysisPieceId = safeString(analysis?.pieceId);
-  if (normalizedScoreId && (analysisScoreId === normalizedScoreId || analysisPieceId === normalizedScoreId)) {
-    return true;
-  }
-  if (normalizedPieceId && analysisPieceId === normalizedPieceId) {
-    return true;
-  }
-  return false;
-}
-
-function buildParticipantView(participant, store, options = {}) {
-  const scoreId = safeString(options.scoreId);
-  const pieceId = safeString(options.pieceId);
-  const hasScope = Boolean(scoreId || pieceId);
-  const analyses = store.analyses
-    .filter((item) => item.participantId === participant.participantId)
-    .filter((item) => matchesAnalysisScope(item, scoreId, pieceId))
-    .sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)));
-  const scopedAnalysisIds = new Set(analyses.map((item) => item.analysisId).filter(Boolean));
-  const validationReviews = getArray(store.validationReviews)
-    .filter((item) => item.participantId === participant.participantId)
-    .filter((item) => !hasScope || scopedAnalysisIds.has(item.analysisId))
-    .sort((left, right) => String(right.submittedAt).localeCompare(String(left.submittedAt)));
-  const adjudications = getArray(store.adjudications)
-    .filter((item) => item.participantId === participant.participantId)
-    .filter((item) => !hasScope || scopedAnalysisIds.has(item.analysisId))
-    .sort((left, right) => String(right.resolvedAt).localeCompare(String(left.resolvedAt)));
-
-  const pitchGain =
-    participant.pretest && participant.posttest
-      ? safeNumber(participant.posttest.pitchScore) - safeNumber(participant.pretest.pitchScore)
-      : null;
-  const rhythmGain =
-    participant.pretest && participant.posttest
-      ? safeNumber(participant.posttest.rhythmScore) - safeNumber(participant.pretest.rhythmScore)
-      : null;
-
-  return {
-    ...participant,
-    analyses,
-    validationReviews,
-    adjudications,
-    pitchGain,
-    rhythmGain,
-  };
-}
-
-function buildParticipantSummary(participant, store) {
-  const view = buildParticipantView(participant, store);
-  const latestQuestionnaire = getArray(view.questionnaires)
-    .slice()
-    .sort((left, right) => String(right.submittedAt).localeCompare(String(left.submittedAt)))[0] || null;
-  const latestInterview = getArray(view.interviews)
-    .slice()
-    .sort((left, right) => String(right.submittedAt).localeCompare(String(left.submittedAt)))[0] || null;
-  const latestValidation = getArray(view.validationReviews)[0] || null;
-  const latestAdjudication = getArray(view.adjudications)[0] || null;
-  const participantAnalysisIds = new Set(getArray(view.analyses).map((item) => item.analysisId).filter(Boolean));
-  const pendingAdjudicationCount = buildPendingAdjudications(store).filter((item) => participantAnalysisIds.has(item.analysisId)).length;
-  const adjudicationStatuses = getArray(view.analyses).map((item) => getAdjudicationStatusForAnalysis(store, item.analysisId));
-  const adjudicationStatus = adjudicationStatuses.includes("pending")
-    ? "pending"
-    : adjudicationStatuses.includes("resolved")
-      ? "resolved"
-      : adjudicationStatuses.includes("not-ready")
-        ? "not-ready"
-        : "not-needed";
-  return {
-    participantId: view.participantId,
-    groupId: view.groupId,
-    createdAt: view.createdAt,
-    lastActiveAt: view.lastActiveAt || view.createdAt,
-    analysisCount: view.analyses.length,
-    weeklySessionCount: getArray(view.weeklySessions).length,
-    profileCompleted: Boolean(view.profile?.updatedAt),
-    consentSigned: Boolean(view.profile?.consentSigned),
-    institution: view.profile?.institution || "",
-    grade: view.profile?.grade || "",
-    pretestPitch: view.pretest?.pitchScore ?? null,
-    posttestPitch: view.posttest?.pitchScore ?? null,
-    pretestRhythm: view.pretest?.rhythmScore ?? null,
-    posttestRhythm: view.posttest?.rhythmScore ?? null,
-    pitchGain: view.pitchGain,
-    rhythmGain: view.rhythmGain,
-    usefulness: view.experienceScales?.usefulness ?? null,
-    easeOfUse: view.experienceScales?.easeOfUse ?? null,
-    feedbackClarity: view.experienceScales?.feedbackClarity ?? null,
-    confidence: view.experienceScales?.confidence ?? null,
-    continuance: view.experienceScales?.continuance ?? null,
-    questionnaireCount: getArray(view.questionnaires).length,
-    latestQuestionnaireStage: latestQuestionnaire?.sessionStage ?? null,
-    taskPlanCount: getArray(view.taskPlans).length,
-    completedTaskCount: getArray(view.taskPlans).filter((item) => item.status === "completed").length,
-    interviewCount: getArray(view.interviews).length,
-    latestInterviewStage: latestInterview?.stage ?? null,
-    interviewSamplingSelected: Boolean(view.interviewSampling?.selected),
-    interviewSamplingPriority: view.interviewSampling?.priority || "",
-    interviewSamplingReason: view.interviewSampling?.reason || "",
-    expertPretestPitch: view.expertRatings?.pretest?.pitchScore ?? null,
-    expertPosttestPitch: view.expertRatings?.posttest?.pitchScore ?? null,
-    expertPretestRhythm: view.expertRatings?.pretest?.rhythmScore ?? null,
-    expertPosttestRhythm: view.expertRatings?.posttest?.rhythmScore ?? null,
-    validationReviewCount: getArray(view.validationReviews).length,
-    latestValidationAt: latestValidation?.submittedAt ?? null,
-    averageValidationAgreement:
-      getArray(view.validationReviews).length
-        ? Number(average(getArray(view.validationReviews).map((item) => item.overallAgreement)).toFixed(2))
-        : null,
-    latestValidationPathAgreement: latestValidation?.pathAgreement ?? null,
-    adjudicationCount: getArray(view.adjudications).length,
-    latestAdjudicationAt: latestAdjudication?.resolvedAt ?? null,
-    latestAdjudicationPathAgreement: latestAdjudication?.pathAgreement ?? null,
-    pendingAdjudicationCount,
-    adjudicationStatus,
-  };
-}
-
-function buildParticipantExportRows(store) {
-  return store.participants.map((participant) => buildParticipantSummary(participant, store));
-}
-
-function buildQuestionnaireExportRows(store) {
-  return store.participants.flatMap((participant) =>
-    getArray(participant.questionnaires).map((questionnaire) => ({
-      participantId: participant.participantId,
-      groupId: participant.groupId,
-      sessionStage: questionnaire.sessionStage,
-      usefulness: questionnaire.usefulness,
-      easeOfUse: questionnaire.easeOfUse,
-      feedbackClarity: questionnaire.feedbackClarity,
-      confidence: questionnaire.confidence,
-      continuance: questionnaire.continuance,
-      notes: questionnaire.notes,
-      submittedAt: questionnaire.submittedAt,
-    })),
-  );
-}
-
-function buildExpertRatingExportRows(store) {
-  return store.participants.flatMap((participant) => {
-    const prePost = [participant.expertRatings?.pretest, participant.expertRatings?.posttest].filter(Boolean);
-    const weekly = getArray(participant.expertRatings?.weekly);
-    return prePost.concat(weekly).map((rating) => ({
-      participantId: participant.participantId,
-      groupId: participant.groupId,
-      stage: rating.stage,
-      pitchScore: rating.pitchScore,
-      rhythmScore: rating.rhythmScore,
-      raterId: rating.raterId,
-      comments: rating.comments,
-      submittedAt: rating.submittedAt,
-    }));
-  });
-}
-
-function buildAnalysisExportRows(store) {
-  return store.analyses.map((analysis) => ({
-    analysisId: analysis.analysisId,
-    participantId: analysis.participantId,
-    groupId: analysis.groupId,
-    sessionStage: analysis.sessionStage,
-    scoreId: analysis.scoreId || "",
-    pieceId: analysis.pieceId,
-    sectionId: analysis.sectionId,
-    audioHash: analysis.audioHash || "",
-    overallPitchScore: analysis.overallPitchScore,
-    overallRhythmScore: analysis.overallRhythmScore,
-    confidence: analysis.confidence,
-    recommendedPracticePath: analysis.recommendedPracticePath || "",
-    analysisMode: analysis.analysisMode,
-    createdAt: analysis.createdAt,
-  }));
-}
-
-function buildValidationReviewRows(store) {
-  return getArray(store.validationReviews).map((review) => ({
-    reviewId: review.reviewId,
-    analysisId: review.analysisId,
-    participantId: review.participantId,
-    groupId: review.groupId,
-    sessionStage: review.sessionStage,
-    pieceId: review.pieceId,
-    sectionId: review.sectionId,
-    raterId: review.raterId,
-    overallAgreement: review.overallAgreement,
-    teacherPrimaryPath: review.teacherPrimaryPath,
-    systemRecommendedPath: review.systemRecommendedPath,
-    pathAgreement: review.pathAgreement,
-    noteMatchedCount: review.noteMatchedCount,
-    notePrecision: review.notePrecision,
-    noteRecall: review.noteRecall,
-    noteF1: review.noteF1,
-    measureMatchedCount: review.measureMatchedCount,
-    measurePrecision: review.measurePrecision,
-    measureRecall: review.measureRecall,
-    measureF1: review.measureF1,
-    teacherIssueNoteIds: getArray(review.teacherIssueNoteIds).join("|"),
-    teacherIssueMeasureIndexes: getArray(review.teacherIssueMeasureIndexes).join("|"),
-    missedTeacherNoteIds: getArray(review.missedTeacherNoteIds).join("|"),
-    extraSystemNoteIds: getArray(review.extraSystemNoteIds).join("|"),
-    missedTeacherMeasureIndexes: getArray(review.missedTeacherMeasureIndexes).join("|"),
-    extraSystemMeasureIndexes: getArray(review.extraSystemMeasureIndexes).join("|"),
-    comments: review.comments,
-    submittedAt: review.submittedAt,
-  }));
-}
-
-function buildAdjudicationRows(store) {
-  return getArray(store.adjudications).map((adjudication) => ({
-    adjudicationId: adjudication.adjudicationId,
-    analysisId: adjudication.analysisId,
-    participantId: adjudication.participantId,
-    groupId: adjudication.groupId,
-    sessionStage: adjudication.sessionStage,
-    pieceId: adjudication.pieceId,
-    sectionId: adjudication.sectionId,
-    adjudicatorId: adjudication.adjudicatorId,
-    sourceRaterIds: getArray(adjudication.sourceRaterIds).join("|"),
-    triggerReasons: getArray(adjudication.triggerReasons).join("|"),
-    finalPrimaryPath: adjudication.finalPrimaryPath,
-    systemRecommendedPath: adjudication.systemRecommendedPath,
-    pathAgreement: adjudication.pathAgreement,
-    noteMatchedCount: adjudication.noteMatchedCount,
-    notePrecision: adjudication.notePrecision,
-    noteRecall: adjudication.noteRecall,
-    noteF1: adjudication.noteF1,
-    measureMatchedCount: adjudication.measureMatchedCount,
-    measurePrecision: adjudication.measurePrecision,
-    measureRecall: adjudication.measureRecall,
-    measureF1: adjudication.measureF1,
-    finalIssueNoteIds: getArray(adjudication.finalIssueNoteIds).join("|"),
-    finalIssueMeasureIndexes: getArray(adjudication.finalIssueMeasureIndexes).join("|"),
-    comments: adjudication.comments,
-    resolvedAt: adjudication.resolvedAt,
-  }));
-}
-
-function buildTaskExportRows(store) {
-  return store.participants.flatMap((participant) =>
-    getArray(participant.taskPlans).map((task) => ({
-      participantId: participant.participantId,
-      groupId: participant.groupId,
-      taskId: task.taskId,
-      stage: task.stage,
-      pieceId: task.pieceId,
-      sectionId: task.sectionId,
-      focus: task.focus,
-      instructions: task.instructions,
-      practiceTargetMinutes: task.practiceTargetMinutes,
-      dueDate: task.dueDate,
-      status: task.status,
-      assignedBy: task.assignedBy,
-      createdAt: task.createdAt,
-      updatedAt: task.updatedAt,
-      completedAt: task.completedAt,
-    })),
-  );
-}
-
-function buildInterviewExportRows(store) {
-  return store.participants.flatMap((participant) =>
-    getArray(participant.interviews).map((interview) => ({
-      participantId: participant.participantId,
-      groupId: participant.groupId,
-      interviewId: interview.interviewId,
-      stage: interview.stage,
-      interviewerId: interview.interviewerId,
-      summary: interview.summary,
-      barriers: interview.barriers,
-      strategyChanges: interview.strategyChanges,
-      representativeQuote: interview.representativeQuote,
-      nextAction: interview.nextAction,
-      followUpNeeded: interview.followUpNeeded,
-      submittedAt: interview.submittedAt,
-    })),
-  );
-}
-
-function buildSamplingExportRows(store) {
-  return store.participants.map((participant) => ({
-    participantId: participant.participantId,
-    groupId: participant.groupId,
-    selected: Boolean(participant.interviewSampling?.selected),
-    priority: participant.interviewSampling?.priority || "",
-    reason: participant.interviewSampling?.reason || "",
-    markedBy: participant.interviewSampling?.markedBy || "",
-    updatedAt: participant.interviewSampling?.updatedAt || "",
-    interviewCount: getArray(participant.interviews).length,
-  }));
-}
-
-function isTaskOverdue(task) {
-  if (!task?.dueDate || task.status === "completed") return false;
-  const due = new Date(task.dueDate);
-  if (Number.isNaN(due.getTime())) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  due.setHours(0, 0, 0, 0);
-  return due < today;
-}
-
-function buildTaskQualityBoard(store) {
-  const rows = [];
-  const stageKeys = new Set();
-  store.participants.forEach((participant) => {
-    getArray(participant.taskPlans).forEach((task) => {
-      stageKeys.add(task.stage || "week1");
-    });
-  });
-  const groups = ["experimental", "control"];
-  const stages = Array.from(stageKeys).sort((left, right) => String(left).localeCompare(String(right)));
-
-  stages.forEach((stage) => {
-    groups.forEach((groupId) => {
-      const stageTasks = buildTaskExportRows(store).filter((item) => item.stage === stage && item.groupId === groupId);
-      const assigned = stageTasks.length;
-      const completed = stageTasks.filter((item) => item.status === "completed").length;
-      const inProgress = stageTasks.filter((item) => item.status === "in-progress").length;
-      const overdue = stageTasks.filter((item) => isTaskOverdue(item)).length;
-      rows.push({
-        stage,
-        groupId,
-        assignedCount: assigned,
-        completedCount: completed,
-        inProgressCount: inProgress,
-        overdueCount: overdue,
-        completionRate: assigned ? Number(((completed / assigned) * 100).toFixed(2)) : 0,
-      });
-    });
-  });
-
-  return rows;
-}
-
-function buildDataQualityOverview(store) {
-  const pendingAdjudications = buildPendingAdjudications(store);
-  const pendingAnalysisIds = new Set(pendingAdjudications.map((item) => item.analysisId));
-  const reminders = store.participants
-    .map((participant) => {
-      const missingItems = [];
-      const posttestQuestionnaire = getArray(participant.questionnaires).some((item) => item.sessionStage === "posttest");
-      const overdueTaskCount = getArray(participant.taskPlans).filter((task) => isTaskOverdue(task)).length;
-      const participantAnalysisIds = new Set(
-        getArray(store.analyses)
-          .filter((analysis) => analysis.participantId === participant.participantId)
-          .map((analysis) => analysis.analysisId)
-          .filter(Boolean),
-      );
-      const pendingAdjudicationCount = Array.from(participantAnalysisIds).filter((analysisId) => pendingAnalysisIds.has(analysisId)).length;
-
-      if (!participant.profile?.updatedAt) missingItems.push("profile");
-      if (!participant.pretest) missingItems.push("pretest-analysis");
-      if (!participant.posttest) missingItems.push("posttest-analysis");
-      if (participant.pretest && !participant.expertRatings?.pretest) missingItems.push("pretest-expert-rating");
-      if (participant.posttest && !participant.expertRatings?.posttest) missingItems.push("posttest-expert-rating");
-      if (participant.posttest && !posttestQuestionnaire) missingItems.push("posttest-questionnaire");
-      if (overdueTaskCount > 0) missingItems.push("overdue-task");
-      if (participant.interviewSampling?.selected && getArray(participant.interviews).length === 0) missingItems.push("pending-interview");
-      if (pendingAdjudicationCount > 0) missingItems.push("pending-adjudication");
-
-      return {
-        participantId: participant.participantId,
-        groupId: participant.groupId,
-        missingItems,
-        overdueTaskCount,
-        pendingAdjudicationCount,
-        interviewSamplingSelected: Boolean(participant.interviewSampling?.selected),
-        interviewSamplingPriority: participant.interviewSampling?.priority || "",
-        interviewSamplingReason: participant.interviewSampling?.reason || "",
-        needsAttention: missingItems.length > 0,
-        lastActiveAt: participant.lastActiveAt || participant.createdAt,
-      };
-    })
-    .filter((item) => item.needsAttention)
-    .sort((left, right) => String(right.lastActiveAt).localeCompare(String(left.lastActiveAt)));
-
-  const allParticipants = store.participants;
-  const samplingRows = buildSamplingExportRows(store);
-
-  return {
-    reminderCount: reminders.length,
-    missingProfileCount: allParticipants.filter((item) => !item.profile?.updatedAt).length,
-    missingPretestCount: allParticipants.filter((item) => !item.pretest).length,
-    missingPosttestCount: allParticipants.filter((item) => !item.posttest).length,
-    overdueTaskParticipantCount: reminders.filter((item) => item.missingItems.includes("overdue-task")).length,
-    pendingInterviewCount: reminders.filter((item) => item.missingItems.includes("pending-interview")).length,
-    pendingAdjudicationCount: pendingAdjudications.length,
-    samplingCount: samplingRows.filter((item) => item.selected).length,
-    samplingCompletedCount: samplingRows.filter((item) => item.selected && item.interviewCount > 0).length,
-    reminders,
-    taskBoard: buildTaskQualityBoard(store),
-    pendingAdjudications,
-    samplingRows: samplingRows
-      .filter((item) => item.selected)
-      .sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt))),
-  };
-}
-
-function buildPendingRatings(store) {
-  return store.participants
-    .map((participant) => {
-      const pendingStages = [];
-      if (participant.pretest && !participant.expertRatings?.pretest) {
-        pendingStages.push("pretest");
-      }
-      if (participant.posttest && !participant.expertRatings?.posttest) {
-        pendingStages.push("posttest");
-      }
-      return {
-        participantId: participant.participantId,
-        groupId: participant.groupId,
-        pendingStages,
-        lastActiveAt: participant.lastActiveAt || participant.createdAt,
-      };
-    })
-    .filter((item) => item.pendingStages.length)
-    .sort((left, right) => String(right.lastActiveAt).localeCompare(String(left.lastActiveAt)));
-}
-
-function buildPendingValidationReviews(store) {
-  const requiredRaterCount = REQUIRED_VALIDATION_RATERS;
-  return store.analyses
-    .map((analysis) => {
-      const analysisReviews = getArray(store.validationReviews).filter((review) => review.analysisId === analysis.analysisId);
-      const uniqueRaters = Array.from(new Set(analysisReviews.map((review) => safeString(review.raterId)).filter(Boolean)));
-      return {
-        analysis,
-        reviewCount: analysisReviews.length,
-        uniqueRaterCount: uniqueRaters.length,
-        requiredRaterCount,
-      };
-    })
-    .filter((item) => item.uniqueRaterCount < requiredRaterCount)
-    .sort((left, right) => String(right.analysis.createdAt).localeCompare(String(left.analysis.createdAt)))
-    .map(({ analysis, reviewCount, uniqueRaterCount, requiredRaterCount: requiredCount }) => ({
-      analysisId: analysis.analysisId,
-      participantId: analysis.participantId,
-      groupId: analysis.groupId,
-      sessionStage: analysis.sessionStage,
-      pieceId: analysis.pieceId,
-      sectionId: analysis.sectionId,
-      createdAt: analysis.createdAt,
-      noteFindingCount: getArray(analysis.noteFindings).length,
-      measureFindingCount: getArray(analysis.measureFindings).length,
-      recommendedPracticePath: safeString(analysis.recommendedPracticePath),
-      reviewCount,
-      uniqueRaterCount,
-      requiredRaterCount: requiredCount,
-    }));
-}
-
-function createValidationReview(store, payload) {
-  const analysisId = safeString(payload.analysisId).trim();
-  const analysis = store.analyses.find((item) => item.analysisId === analysisId);
-  if (!analysis) {
-    throw new Error("analysis not found.");
-  }
-
-  const teacherIssueNoteIds = toUniqueStringList(payload.teacherIssueNoteIds);
-  const teacherIssueMeasureIndexes = toUniqueNumberList(payload.teacherIssueMeasureIndexes);
-  const systemNoteIds = getAnalysisSystemNoteIds(analysis);
-  const systemMeasureIndexes = getAnalysisSystemMeasureIndexes(analysis);
-  const noteMetrics = calculateBinaryMetrics(systemNoteIds, teacherIssueNoteIds);
-  const measureMetrics = calculateBinaryMetrics(systemMeasureIndexes, teacherIssueMeasureIndexes);
-  const systemRecommendedPath = getAnalysisRecommendedPracticePath(analysis);
-
-  return normalizeValidationReview({
-    reviewId: safeString(payload.reviewId) || createId("validation"),
-    analysisId: analysis.analysisId,
-    participantId: analysis.participantId,
-    groupId: analysis.groupId,
-    sessionStage: analysis.sessionStage,
-    pieceId: analysis.pieceId,
-    sectionId: analysis.sectionId,
-    raterId: safeString(payload.raterId, "expert"),
-    overallAgreement: safeNumber(payload.overallAgreement, 0),
-    teacherPrimaryPath: safeString(payload.teacherPrimaryPath, "review-first"),
-    teacherIssueNoteIds,
-    teacherIssueMeasureIndexes,
-    comments: safeString(payload.comments),
-    noteMatchedCount: noteMetrics.matchedCount,
-    notePrecision: noteMetrics.precision,
-    noteRecall: noteMetrics.recall,
-    noteF1: noteMetrics.f1,
-    measureMatchedCount: measureMetrics.matchedCount,
-    measurePrecision: measureMetrics.precision,
-    measureRecall: measureMetrics.recall,
-    measureF1: measureMetrics.f1,
-    missedTeacherNoteIds: noteMetrics.missedTeacherValues,
-    extraSystemNoteIds: noteMetrics.extraSystemValues,
-    missedTeacherMeasureIndexes: measureMetrics.missedTeacherValues,
-    extraSystemMeasureIndexes: measureMetrics.extraSystemValues,
-    systemRecommendedPath,
-    pathAgreement: safeString(payload.teacherPrimaryPath, "review-first") === systemRecommendedPath,
-    submittedAt: nowIso(),
-  });
-}
-
-function computeAdjudicationReasonsFromPair(pair = {}) {
-  const reasons = [];
-  if (!safeBoolean(pair.pathMatch, false)) {
-    reasons.push("practice-path mismatch");
-  }
-  if (safeNumber(pair.overallAgreementGap, 0) >= ADJUDICATION_OVERALL_GAP_THRESHOLD) {
-    reasons.push("overall-agreement gap >= 2");
-  }
-  if (pair.noteOverlapF1 != null && safeNumber(pair.noteOverlapF1, 1) < ADJUDICATION_NOTE_F1_THRESHOLD) {
-    reasons.push("note-overlap F1 < 0.67");
-  }
-  if (pair.measureOverlapF1 != null && safeNumber(pair.measureOverlapF1, 1) < ADJUDICATION_MEASURE_F1_THRESHOLD) {
-    reasons.push("measure-overlap F1 < 0.67");
-  }
-  return reasons;
-}
-
-function buildValidationPairRecords(store) {
-  return store.analyses
-    .map((analysis) => {
-      const latestByRater = new Map();
-      getArray(store.validationReviews)
-        .filter((review) => review.analysisId === analysis.analysisId)
-        .sort((left, right) => String(right.submittedAt).localeCompare(String(left.submittedAt)))
-        .forEach((review) => {
-          const raterId = safeString(review.raterId);
-          if (raterId && !latestByRater.has(raterId)) {
-            latestByRater.set(raterId, review);
-          }
-        });
-
-      const sourceReviews = Array.from(latestByRater.values())
-        .slice(0, REQUIRED_VALIDATION_RATERS)
-        .sort((left, right) => safeString(left.raterId).localeCompare(safeString(right.raterId)));
-
-      if (sourceReviews.length < REQUIRED_VALIDATION_RATERS) {
-        return null;
-      }
-
-      const [first, second] = sourceReviews;
-      const noteOverlap = calculateBinaryMetrics(first.teacherIssueNoteIds, second.teacherIssueNoteIds);
-      const measureOverlap = calculateBinaryMetrics(first.teacherIssueMeasureIndexes, second.teacherIssueMeasureIndexes);
-      const pair = {
-        analysisId: analysis.analysisId,
-        participantId: analysis.participantId,
-        groupId: analysis.groupId,
-        sessionStage: analysis.sessionStage,
-        pieceId: analysis.pieceId,
-        sectionId: analysis.sectionId,
-        scoreUnit: `${analysis.pieceId}/${analysis.sectionId}`,
-        sourceRaterIds: sourceReviews.map((item) => item.raterId),
-        raterAId: first.raterId,
-        raterBId: second.raterId,
-        overallAgreementA: first.overallAgreement,
-        overallAgreementB: second.overallAgreement,
-        overallAgreementGap: Math.abs(safeNumber(first.overallAgreement) - safeNumber(second.overallAgreement)),
-        teacherPrimaryPathA: first.teacherPrimaryPath,
-        teacherPrimaryPathB: second.teacherPrimaryPath,
-        pathMatch: safeString(first.teacherPrimaryPath) === safeString(second.teacherPrimaryPath),
-        noteOverlapPrecision: noteOverlap.precision,
-        noteOverlapRecall: noteOverlap.recall,
-        noteOverlapF1: noteOverlap.f1,
-        measureOverlapPrecision: measureOverlap.precision,
-        measureOverlapRecall: measureOverlap.recall,
-        measureOverlapF1: measureOverlap.f1,
-      };
-      const reasons = computeAdjudicationReasonsFromPair(pair);
-      return {
-        ...pair,
-        adjudicationReason: reasons.join(" | "),
-        requiresAdjudication: reasons.length > 0,
-      };
-    })
-    .filter(Boolean);
-}
-
-function buildPendingAdjudications(store) {
-  const adjudicatedAnalysisIds = new Set(getArray(store.adjudications).map((item) => item.analysisId).filter(Boolean));
-  return buildValidationPairRecords(store)
-    .filter((item) => item.requiresAdjudication && !adjudicatedAnalysisIds.has(item.analysisId))
-    .sort((left, right) => String(right.analysisId).localeCompare(String(left.analysisId)));
-}
-
-function buildAdjudicationSummary(store) {
-  const pairRecords = buildValidationPairRecords(store);
-  const adjudications = getArray(store.adjudications);
-  const pendingAdjudications = buildPendingAdjudications(store);
-
-  return {
-    pairCount: pairRecords.length,
-    adjudicationRequiredCount: pairRecords.filter((item) => item.requiresAdjudication).length,
-    pendingAdjudicationCount: pendingAdjudications.length,
-    adjudicationResolvedCount: adjudications.length,
-    averagePathAgreement: adjudications.length ? Number((adjudications.filter((item) => item.pathAgreement).length / adjudications.length).toFixed(3)) : 0,
-    averageNoteF1: adjudications.length ? Number(average(adjudications.map((item) => item.noteF1)).toFixed(3)) : 0,
-    averageMeasureF1: adjudications.length ? Number(average(adjudications.map((item) => item.measureF1)).toFixed(3)) : 0,
-    pendingAdjudications,
-  };
-}
-
-function getAdjudicationStatusForAnalysis(store, analysisId) {
-  if (getArray(store.adjudications).some((item) => item.analysisId === analysisId)) {
-    return "resolved";
-  }
-
-  const uniqueRaters = new Set(
-    getArray(store.validationReviews)
-      .filter((item) => item.analysisId === analysisId)
-      .map((item) => safeString(item.raterId))
-      .filter(Boolean),
-  );
-
-  if (uniqueRaters.size < REQUIRED_VALIDATION_RATERS) {
-    return "not-ready";
-  }
-
-  const pendingPair = buildPendingAdjudications(store).find((item) => item.analysisId === analysisId);
-  return pendingPair ? "pending" : "not-needed";
-}
-
-function createAdjudication(store, payload) {
-  const analysisId = safeString(payload.analysisId).trim();
-  const analysis = store.analyses.find((item) => item.analysisId === analysisId);
-  if (!analysis) {
-    throw new Error("analysis not found.");
-  }
-
-  const sourcePair = buildValidationPairRecords(store).find((item) => item.analysisId === analysisId);
-  if (!sourcePair) {
-    throw new Error("at least two validation reviews are required before adjudication.");
-  }
-
-  const finalIssueNoteIds = toUniqueStringList(payload.finalIssueNoteIds);
-  const finalIssueMeasureIndexes = toUniqueNumberList(payload.finalIssueMeasureIndexes);
-  const systemNoteIds = getAnalysisSystemNoteIds(analysis);
-  const systemMeasureIndexes = getAnalysisSystemMeasureIndexes(analysis);
-  const noteMetrics = calculateBinaryMetrics(systemNoteIds, finalIssueNoteIds);
-  const measureMetrics = calculateBinaryMetrics(systemMeasureIndexes, finalIssueMeasureIndexes);
-  const triggerReasons = toUniqueStringList(payload.triggerReasons).length
-    ? toUniqueStringList(payload.triggerReasons)
-    : sourcePair.adjudicationReason
-      ? sourcePair.adjudicationReason.split(" | ").filter(Boolean)
-      : ["manual-review"];
-  const systemRecommendedPath = getAnalysisRecommendedPracticePath(analysis);
-
-  return normalizeAdjudicationRecord({
-    adjudicationId: safeString(payload.adjudicationId) || createId("adjudication"),
-    analysisId: analysis.analysisId,
-    participantId: analysis.participantId,
-    groupId: analysis.groupId,
-    sessionStage: analysis.sessionStage,
-    pieceId: analysis.pieceId,
-    sectionId: analysis.sectionId,
-    adjudicatorId: safeString(payload.adjudicatorId, "researcher"),
-    sourceRaterIds: sourcePair.sourceRaterIds,
-    triggerReasons,
-    finalPrimaryPath: safeString(payload.finalPrimaryPath, "review-first"),
-    finalIssueNoteIds,
-    finalIssueMeasureIndexes,
-    comments: safeString(payload.comments),
-    noteMatchedCount: noteMetrics.matchedCount,
-    notePrecision: noteMetrics.precision,
-    noteRecall: noteMetrics.recall,
-    noteF1: noteMetrics.f1,
-    measureMatchedCount: measureMetrics.matchedCount,
-    measurePrecision: measureMetrics.precision,
-    measureRecall: measureMetrics.recall,
-    measureF1: measureMetrics.f1,
-    systemRecommendedPath,
-    pathAgreement: safeString(payload.finalPrimaryPath, "review-first") === systemRecommendedPath,
-    resolvedAt: nowIso(),
-  });
-}
-
-function buildValidationSummary(store) {
-  const reviews = getArray(store.validationReviews);
-  const analysesWithValidation = Array.from(new Set(reviews.map((item) => item.analysisId).filter(Boolean)));
-  const fullyValidatedAnalysisCount = store.analyses.filter((analysis) => {
-    const uniqueRaters = new Set(
-      reviews.filter((item) => item.analysisId === analysis.analysisId).map((item) => safeString(item.raterId)).filter(Boolean),
-    );
-    return uniqueRaters.size >= REQUIRED_VALIDATION_RATERS;
-  }).length;
-  return {
-    reviewCount: reviews.length,
-    validatedAnalysisCount: analysesWithValidation.length,
-    fullyValidatedAnalysisCount,
-    requiredRaterCount: REQUIRED_VALIDATION_RATERS,
-    averageAgreement: reviews.length ? Number(average(reviews.map((item) => item.overallAgreement)).toFixed(2)) : 0,
-    averageNotePrecision: reviews.length ? Number(average(reviews.map((item) => item.notePrecision)).toFixed(3)) : 0,
-    averageNoteRecall: reviews.length ? Number(average(reviews.map((item) => item.noteRecall)).toFixed(3)) : 0,
-    averageNoteF1: reviews.length ? Number(average(reviews.map((item) => item.noteF1)).toFixed(3)) : 0,
-    averageMeasurePrecision: reviews.length ? Number(average(reviews.map((item) => item.measurePrecision)).toFixed(3)) : 0,
-    averageMeasureRecall: reviews.length ? Number(average(reviews.map((item) => item.measureRecall)).toFixed(3)) : 0,
-    averageMeasureF1: reviews.length ? Number(average(reviews.map((item) => item.measureF1)).toFixed(3)) : 0,
-    pathAgreementRate: reviews.length ? Number((reviews.filter((item) => item.pathAgreement).length / reviews.length).toFixed(3)) : 0,
-    pendingValidationCount: buildPendingValidationReviews(store).length,
-  };
-}
-
-function buildExportPayload(store, dataset) {
-  const normalizedDataset = safeString(dataset, "participants").toLowerCase();
-  if (normalizedDataset === "questionnaires") {
-    const rows = buildQuestionnaireExportRows(store);
-    const headers = [
-      "participantId",
-      "groupId",
-      "sessionStage",
-      "usefulness",
-      "easeOfUse",
-      "feedbackClarity",
-      "confidence",
-      "continuance",
-      "notes",
-      "submittedAt",
-    ];
-    return { dataset: normalizedDataset, rows, headers };
-  }
-  if (normalizedDataset === "expert-ratings") {
-    const rows = buildExpertRatingExportRows(store);
-    const headers = ["participantId", "groupId", "stage", "pitchScore", "rhythmScore", "raterId", "comments", "submittedAt"];
-    return { dataset: normalizedDataset, rows, headers };
-  }
-  if (normalizedDataset === "analyses") {
-    const rows = buildAnalysisExportRows(store);
-    const headers = [
-      "analysisId",
-      "participantId",
-      "groupId",
-      "sessionStage",
-      "scoreId",
-      "pieceId",
-      "sectionId",
-      "audioHash",
-      "overallPitchScore",
-      "overallRhythmScore",
-      "confidence",
-      "recommendedPracticePath",
-      "analysisMode",
-      "createdAt",
-    ];
-    return { dataset: normalizedDataset, rows, headers };
-  }
-  if (normalizedDataset === "validation-reviews") {
-    const rows = buildValidationReviewRows(store);
-    const headers = [
-      "reviewId",
-      "analysisId",
-      "participantId",
-      "groupId",
-      "sessionStage",
-      "pieceId",
-      "sectionId",
-      "raterId",
-      "overallAgreement",
-      "teacherPrimaryPath",
-      "systemRecommendedPath",
-      "pathAgreement",
-      "noteMatchedCount",
-      "notePrecision",
-      "noteRecall",
-      "noteF1",
-      "measureMatchedCount",
-      "measurePrecision",
-      "measureRecall",
-      "measureF1",
-      "teacherIssueNoteIds",
-      "teacherIssueMeasureIndexes",
-      "missedTeacherNoteIds",
-      "extraSystemNoteIds",
-      "missedTeacherMeasureIndexes",
-      "extraSystemMeasureIndexes",
-      "comments",
-      "submittedAt",
-    ];
-    return { dataset: normalizedDataset, rows, headers };
-  }
-  if (normalizedDataset === "adjudications") {
-    const rows = buildAdjudicationRows(store);
-    const headers = [
-      "adjudicationId",
-      "analysisId",
-      "participantId",
-      "groupId",
-      "sessionStage",
-      "pieceId",
-      "sectionId",
-      "adjudicatorId",
-      "sourceRaterIds",
-      "triggerReasons",
-      "finalPrimaryPath",
-      "systemRecommendedPath",
-      "pathAgreement",
-      "noteMatchedCount",
-      "notePrecision",
-      "noteRecall",
-      "noteF1",
-      "measureMatchedCount",
-      "measurePrecision",
-      "measureRecall",
-      "measureF1",
-      "finalIssueNoteIds",
-      "finalIssueMeasureIndexes",
-      "comments",
-      "resolvedAt",
-    ];
-    return { dataset: normalizedDataset, rows, headers };
-  }
-  if (normalizedDataset === "tasks") {
-    const rows = buildTaskExportRows(store);
-    const headers = [
-      "participantId",
-      "groupId",
-      "taskId",
-      "stage",
-      "pieceId",
-      "sectionId",
-      "focus",
-      "instructions",
-      "practiceTargetMinutes",
-      "dueDate",
-      "status",
-      "assignedBy",
-      "createdAt",
-      "updatedAt",
-      "completedAt",
-    ];
-    return { dataset: normalizedDataset, rows, headers };
-  }
-  if (normalizedDataset === "interviews") {
-    const rows = buildInterviewExportRows(store);
-    const headers = [
-      "participantId",
-      "groupId",
-      "interviewId",
-      "stage",
-      "interviewerId",
-      "summary",
-      "barriers",
-      "strategyChanges",
-      "representativeQuote",
-      "nextAction",
-      "followUpNeeded",
-      "submittedAt",
-    ];
-    return { dataset: normalizedDataset, rows, headers };
-  }
-  if (normalizedDataset === "sampling") {
-    const rows = buildSamplingExportRows(store);
-    const headers = ["participantId", "groupId", "selected", "priority", "reason", "markedBy", "updatedAt", "interviewCount"];
-    return { dataset: normalizedDataset, rows, headers };
-  }
-  const rows = buildParticipantExportRows(store);
-  const headers = [
-    "participantId",
-    "groupId",
-    "createdAt",
-    "lastActiveAt",
-    "analysisCount",
-    "weeklySessionCount",
-    "profileCompleted",
-    "consentSigned",
-    "institution",
-    "grade",
-    "pretestPitch",
-    "posttestPitch",
-    "pretestRhythm",
-    "posttestRhythm",
-    "pitchGain",
-    "rhythmGain",
-    "usefulness",
-    "easeOfUse",
-    "feedbackClarity",
-    "confidence",
-    "continuance",
-    "questionnaireCount",
-    "latestQuestionnaireStage",
-    "taskPlanCount",
-    "completedTaskCount",
-    "interviewCount",
-    "latestInterviewStage",
-    "interviewSamplingSelected",
-    "interviewSamplingPriority",
-    "interviewSamplingReason",
-    "expertPretestPitch",
-    "expertPosttestPitch",
-    "expertPretestRhythm",
-    "expertPosttestRhythm",
-    "validationReviewCount",
-    "averageValidationAgreement",
-    "adjudicationCount",
-    "pendingAdjudicationCount",
-    "adjudicationStatus",
-    "latestAdjudicationAt",
-    "latestAdjudicationPathAgreement",
-  ];
-  return { dataset: "participants", rows, headers };
-}
-
-function buildGroupOverview(participants = []) {
-  const groups = ["experimental", "control"];
-  return groups.map((groupId) => {
-    const groupParticipants = participants.filter((participant) => participant.groupId === groupId);
-    const completed = groupParticipants.filter((participant) => participant.pitchGain != null);
-    return {
-      groupId,
-      participantCount: groupParticipants.length,
-      completedPairCount: completed.length,
-      averagePitchGain: Number(average(completed.map((participant) => participant.pitchGain)).toFixed(2)),
-      averageRhythmGain: Number(average(completed.map((participant) => participant.rhythmGain)).toFixed(2)),
-      averageUsefulness: Number(
-        average(groupParticipants.map((participant) => participant.experienceScales?.usefulness)).toFixed(2),
-      ),
-      averageContinuance: Number(
-        average(groupParticipants.map((participant) => participant.experienceScales?.continuance)).toFixed(2),
-      ),
-    };
-  });
-}
-
 async function fetchAnalyzerStatus() {
   const analyzerUrl = safeString(process.env.ERHU_ANALYZER_URL).replace(/\/+$/, "");
   if (!analyzerUrl) {
@@ -5411,1090 +4104,111 @@ async function fetchAnalyzerStatus() {
   }
 }
 
-function dataWebPathToAbsolute(webPath = "") {
-  const value = safeString(webPath).trim();
-  if (!value) return "";
-  if (value.startsWith("/data/")) {
-    return path.join(DATA_DIR, value.slice("/data/".length).replace(/\//g, path.sep));
-  }
-  return value;
-}
-
-async function fileSummary(filePath) {
-  const value = safeString(filePath);
-  if (!value) return { path: "", exists: false, sizeBytes: 0, updatedAt: "" };
-  try {
-    const stat = await fs.stat(value);
-    return {
-      path: value,
-      exists: true,
-      sizeBytes: stat.size,
-      updatedAt: stat.mtime.toISOString(),
-    };
-  } catch {
-    return { path: value, exists: false, sizeBytes: 0, updatedAt: "" };
-  }
-}
-
-async function listRecentArchiveFiles(limit = 5) {
-  try {
-    const entries = await fs.readdir(STORE_ARCHIVE_DIR, { withFileTypes: true });
-    const files = [];
-    for (const entry of entries) {
-      if (!entry.isFile() || !/^erhu-score-imports-archive-.*\.json$/i.test(entry.name)) continue;
-      const archivePath = path.join(STORE_ARCHIVE_DIR, entry.name);
-      const stat = await fs.stat(archivePath);
-      files.push({
-        path: archivePath,
-        name: entry.name,
-        sizeBytes: stat.size,
-        updatedAt: stat.mtime.toISOString(),
-      });
-    }
-    return files
-      .sort((left, right) => (Date.parse(right.updatedAt) || 0) - (Date.parse(left.updatedAt) || 0))
-      .slice(0, Math.max(0, limit));
-  } catch {
-    return [];
-  }
-}
-
-function publicTaskError(error) {
-  const text = repairMojibakeText(error).trim();
-  if (!text) return "";
-  if (/\b(traceback|exception|stack|enoent|eacces|localhost|127\.0\.0\.1|\/api\/|https?:\/\/|[a-z]:\\|python|uvicorn|json|error:)\b/i.test(text)) {
-    return "任务失败，请检查服务状态后重试。";
-  }
-  return text.length > 120 ? `${text.slice(0, 117)}...` : text;
-}
-
-function taskStatusForType(type, job = {}) {
-  if (type === "score-import") return safeString(job.omrStatus);
-  return safeString(job.status);
-}
-
-function reusableJobAudioPath(job = {}) {
-  const candidate = safeString(job.requestPayload?.audioPath || job.audioPath).trim();
-  if (!candidate) return "";
-  const absolutePath = dataWebPathToAbsolute(candidate);
-  return absolutePath && fsSync.existsSync(absolutePath) ? candidate : "";
-}
-
-function canRetryJob(type, job = {}) {
-  const status = taskStatusForType(type, job);
-  if (status !== "failed") return false;
-  if (type === "score-import") {
-    return Boolean(safeString(job.sourcePdfPath) && fsSync.existsSync(dataWebPathToAbsolute(job.sourcePdfPath)));
-  }
-  if (type === "analysis") {
-    return Boolean(reusableJobAudioPath(job) && (safeString(job.scoreId) || safeString(job.pieceId) || job.requestPayload?.piecePackOverride));
-  }
-  if (type === "piece-pass") {
-    return Boolean(reusableJobAudioPath(job) && (safeString(job.scoreId) || safeString(job.pieceId)));
-  }
-  return false;
-}
-
-function canCancelJob(type, job = {}) {
-  return taskStatusForType(type, job) === "processing";
-}
-
-function summarizeTaskJob(type, job = {}) {
-  const status = taskStatusForType(type, job);
-  return {
-    type,
-    jobId: safeString(job.jobId),
-    previousJobId: safeString(job.previousJobId),
-    title: repairMojibakeText(job.title || job.pieceTitle || job.sectionTitle || job.scoreId || job.pieceId || job.jobId),
-    scoreId: safeString(job.scoreId),
-    pieceId: safeString(job.pieceId),
-    status,
-    stage: safeString(job.stage),
-    progress: clamp(safeNumber(job.progress, status === "completed" || status === "failed" ? 1 : 0), 0, 1),
-    updatedAt: safeString(job.updatedAt || job.completedAt || job.createdAt),
-    createdAt: safeString(job.createdAt),
-    retryable: safeBoolean(job.retryable, status === "failed"),
-    interruptedByRestart: safeBoolean(job.interruptedByRestart, false),
-    recoveryReason: safeString(job.recoveryReason),
-    error: publicTaskError(job.error),
-    actions: {
-      canCancel: canCancelJob(type, job),
-      canRetry: canRetryJob(type, job),
-      canResume: canRetryJob(type, job),
-    },
-  };
-}
-
-async function readOpsJobs() {
-  const [scoreStore, analysisStore, piecePassStore] = await Promise.all([
-    readScoreStore(),
-    readAnalysisJobStore(),
-    readPiecePassJobStore(),
-  ]);
-  const jobs = [
-    ...getArray(scoreStore.jobs).map((job) => summarizeTaskJob("score-import", normalizeScoreImportJob(job))),
-    ...getArray(analysisStore.jobs).map((job) => summarizeTaskJob("analysis", normalizeAnalysisJob(job))),
-    ...getArray(piecePassStore.jobs).map((job) => summarizeTaskJob("piece-pass", normalizePiecePassJob(job))),
-  ].filter((job) => job.jobId);
-  return jobs.sort((left, right) => (Date.parse(right.updatedAt) || 0) - (Date.parse(left.updatedAt) || 0));
-}
-
-async function buildOpsHealth() {
-  const [analyzer, jsonStoreFile, sqliteStoreFile, analysisFile, piecePassFile, archiveFiles, jobs] = await Promise.all([
-    fetchAnalyzerStatus(),
-    fileSummary(SCORE_STORE_FILE),
-    fileSummary(SCORE_STORE_SQLITE_FILE),
-    fileSummary(ANALYSIS_JOB_STORE_FILE),
-    fileSummary(PIECE_PASS_JOB_STORE_FILE),
-    listRecentArchiveFiles(5),
-    readOpsJobs(),
-  ]);
-  const failedJobs = jobs.filter((job) => job.status === "failed").slice(0, 10);
-  const processingJobs = jobs.filter((job) => job.status === "processing").slice(0, 10);
-  const sqliteSummary = sqliteStoreFile.exists ? summarizeScoreStoreSqlite(SCORE_STORE_SQLITE_FILE) : null;
-  const scoreBackend = scoreStoreUsesSqlite() ? "sqlite" : "json";
-  return {
-    ok: true,
-    generatedAt: nowIso(),
-    node: {
-      pid: process.pid,
-      version: process.version,
-      uptimeSeconds: Math.round(process.uptime()),
-      port,
-    },
-    analyzer: {
-      configured: Boolean(analyzer.configured),
-      reachable: Boolean(analyzer.reachable),
-      mode: safeString(analyzer.mode),
-      serviceUrl: safeString(analyzer.serviceUrl),
-      statusCode: nullableInteger(analyzer.statusCode),
-      error: publicTaskError(analyzer.error),
-    },
-    cpuOnly: {
-      preferCudaPython: safeString(process.env.ERHU_PREFER_CUDA_PYTHON, "false"),
-      torchDevice: safeString(process.env.ERHU_TORCH_DEVICE, "cpu"),
-      cudaVisibleDevices: safeString(process.env.CUDA_VISIBLE_DEVICES),
-      expectedCpuOnly:
-        safeString(process.env.ERHU_PREFER_CUDA_PYTHON, "false") === "false" &&
-        safeString(process.env.ERHU_TORCH_DEVICE, "cpu") === "cpu" &&
-        safeString(process.env.CUDA_VISIBLE_DEVICES) === "",
-    },
-    store: {
-      backend: scoreBackend,
-      configuredBackend: SCORE_STORE_BACKEND,
-      dataDir: DATA_DIR,
-      scoreJson: jsonStoreFile,
-      scoreSqlite: sqliteStoreFile,
-      sqliteSummary,
-      analysisJobs: analysisFile,
-      piecePassJobs: piecePassFile,
-      archiveDir: STORE_ARCHIVE_DIR,
-      recentArchives: archiveFiles,
-    },
-    tasks: {
-      active: {
-        scoreImports: activeScoreImportTasks.size,
-        analyses: activeAnalysisTasks.size,
-        piecePasses: activePiecePassTasks.size,
-      },
-      counts: {
-        total: jobs.length,
-        processing: jobs.filter((job) => job.status === "processing").length,
-        failed: jobs.filter((job) => job.status === "failed").length,
-        completed: jobs.filter((job) => job.status === "completed").length,
-      },
-      processingJobs,
-      recentFailedJobs: failedJobs,
-    },
-    logs: {
-      production: {
-        server: path.join(DATA_DIR, "prod-server.log"),
-        serverError: path.join(DATA_DIR, "prod-server-error.log"),
-        analyzer: path.join(DATA_DIR, "prod-analyzer.log"),
-        analyzerError: path.join(DATA_DIR, "prod-analyzer-error.log"),
-      },
-      preview: {
-        server: path.join(DATA_DIR, "preview-server.log"),
-        serverError: path.join(DATA_DIR, "preview-server-error.log"),
-        analyzer: path.join(DATA_DIR, "preview-analyzer.log"),
-        analyzerError: path.join(DATA_DIR, "preview-analyzer-error.log"),
-      },
-      perfTrace: PERF_TRACE_FILE,
-    },
-  };
-}
-
-function httpError(statusCode, message) {
-  const error = new Error(message);
-  error.statusCode = statusCode;
-  return error;
-}
-
-function normalizeOpsJobType(type) {
-  const value = safeString(type).toLowerCase();
-  if (value === "score" || value === "score-import" || value === "score-imports") return "score-import";
-  if (value === "analysis" || value === "analyze") return "analysis";
-  if (value === "piece" || value === "piece-pass" || value === "piecepass") return "piece-pass";
-  return "";
-}
-
-async function cancelOpsJob(type, jobId) {
-  const normalizedType = normalizeOpsJobType(type);
-  const id = safeString(jobId);
-  if (!normalizedType || !id) throw httpError(400, "invalid job type or job id");
-  if (normalizedType === "score-import") {
-    return enqueueStoreOperation(SCORE_STORE_FILE, async () => {
-      const store = await readScoreStoreUnlocked();
-      const index = store.jobs.findIndex((job) => job.jobId === id);
-      if (index < 0) throw httpError(404, "job not found");
-      const current = normalizeScoreImportJob(store.jobs[index]);
-      if (current.omrStatus !== "processing") throw httpError(409, "only processing jobs can be cancelled");
-      cancelledScoreImportJobIds.add(id);
-      const nextJob = normalizeScoreImportJob({
-        ...current,
-        omrStatus: "failed",
-        progress: 1,
-        stage: "cancelled",
-        error: "user cancelled",
-        retryable: true,
-        completedAt: nowIso(),
-        updatedAt: nowIso(),
-      });
-      store.jobs[index] = nextJob;
-      await writeScoreStoreUnlocked(store);
-      activeScoreImportTasks.delete(id);
-      return summarizeTaskJob("score-import", nextJob);
-    });
-  }
-  if (normalizedType === "analysis") {
-    return enqueueStoreOperation(ANALYSIS_JOB_STORE_FILE, async () => {
-      const store = await readAnalysisJobStoreUnlocked();
-      const index = store.jobs.findIndex((job) => job.jobId === id);
-      if (index < 0) throw httpError(404, "job not found");
-      const current = normalizeAnalysisJob(store.jobs[index]);
-      if (current.status !== "processing") throw httpError(409, "only processing jobs can be cancelled");
-      cancelledAnalysisJobIds.add(id);
-      const nextJob = normalizeAnalysisJob({
-        ...current,
-        status: "failed",
-        progress: 1,
-        stage: "cancelled",
-        error: "user cancelled",
-        retryable: false,
-        completedAt: nowIso(),
-        updatedAt: nowIso(),
-      });
-      store.jobs[index] = nextJob;
-      await writeAnalysisJobStoreUnlocked(store);
-      activeAnalysisTasks.delete(id);
-      return summarizeTaskJob("analysis", nextJob);
-    });
-  }
-  return enqueueStoreOperation(PIECE_PASS_JOB_STORE_FILE, async () => {
-    const store = await readPiecePassJobStoreUnlocked();
-    const index = store.jobs.findIndex((job) => job.jobId === id);
-    if (index < 0) throw httpError(404, "job not found");
-    const current = normalizePiecePassJob(store.jobs[index]);
-    if (current.status !== "processing") throw httpError(409, "only processing jobs can be cancelled");
-    cancelledPiecePassJobIds.add(id);
-    const nextJob = normalizePiecePassJob({
-      ...current,
-      status: "failed",
-      progress: 1,
-      stage: "cancelled",
-      error: "user cancelled",
-      retryable: false,
-      completedAt: nowIso(),
-      updatedAt: nowIso(),
-    });
-    store.jobs[index] = nextJob;
-    await writePiecePassJobStoreUnlocked(store);
-    activePiecePassTasks.delete(id);
-    return summarizeTaskJob("piece-pass", nextJob);
-  });
-}
-
-async function resumeScoreImportJob(jobId, operation = "resume") {
-  const previousJobId = safeString(jobId);
-  const store = await readScoreStore();
-  const previous = store.jobs.find((job) => job.jobId === previousJobId);
-  if (!previous) throw httpError(404, "job not found");
-  const normalizedPrevious = normalizeScoreImportJob(previous);
-  if (normalizedPrevious.omrStatus !== "failed") throw httpError(409, "only failed score-import jobs can be retried");
-  const sourcePdfAbs = dataWebPathToAbsolute(normalizedPrevious.sourcePdfPath);
-  if (!sourcePdfAbs || !fsSync.existsSync(sourcePdfAbs)) {
-    throw httpError(409, "job has no reusable PDF payload");
-  }
-
-  const jobIdNew = createId("scorejob");
-  const jobDir = path.join(SCORE_IMPORTS_DIR, jobIdNew);
-  const pdfPath = path.join(jobDir, "source.pdf");
-  const webPdfPath = toWebDataPath("score-imports", jobIdNew, "source.pdf");
-  await fs.mkdir(jobDir, { recursive: true });
-  await fs.copyFile(sourcePdfAbs, pdfPath);
-  const titleHint = safeString(normalizedPrevious.title, path.parse(normalizedPrevious.originalFilename || "score").name);
-  const selectedPartHint = safeString(normalizedPrevious.selectedPart, "erhu") || "erhu";
-  const originalFilename = safeString(normalizedPrevious.originalFilename, path.basename(sourcePdfAbs));
-  const pdfHash = safeString(normalizedPrevious.pdfHash) || sha1(await fs.readFile(pdfPath));
-  const previewPages = [{ pageNumber: 1, type: "pdf", url: webPdfPath }];
-  const knownPiece = findKnownPieceForPdf(titleHint, originalFilename);
-  const fallbackPiece = knownPiece ? cloneLibraryPieceForImport(knownPiece) : null;
-  const initialJob = await upsertScoreImportJob({
-    jobId: jobIdNew,
-    previousJobId,
-    originalFilename,
-    title: titleHint,
-    sourcePdfPath: webPdfPath,
-    pdfHash,
-    omrStatus: "processing",
-    omrConfidence: 0,
-    previewPages,
-    detectedParts: [selectedPartHint],
-    selectedPart: selectedPartHint,
-    selectedPartCandidates: [selectedPartHint],
-    selectedPartConfirmed: safeBoolean(normalizedPrevious.selectedPartConfirmed, false),
-    omrStats: { mode: "pending", pageCount: getArray(previewPages).length },
-    warnings: [operation === "retry" ? "任务已重新提交。" : "任务已创建新的续跑任务。"],
-    error: "",
-    progress: 0.05,
-    stage: "queued",
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  });
-
-  void launchScoreImportTask({
-    jobId: jobIdNew,
-    previousJobId,
-    titleHint,
-    selectedPartHint,
-    pdfHash,
-    pdfPath,
-    webPdfPath,
-    originalFilename,
-    fallbackPiece,
-    previewPages,
-    selectedPartConfirmed: safeBoolean(normalizedPrevious.selectedPartConfirmed, false),
-  });
-  return summarizeTaskJob("score-import", initialJob);
-}
-
-function buildReusableAnalysisPayload(job = {}) {
-  const requestPayload = job.requestPayload && typeof job.requestPayload === "object" ? job.requestPayload : {};
-  const audioPath = reusableJobAudioPath(job);
-  if (!audioPath) return null;
-  return {
-    ...requestPayload,
-    participantId: safeString(requestPayload.participantId, job.participantId),
-    groupId: safeString(requestPayload.groupId, job.groupId || "self-practice"),
-    sessionStage: safeString(requestPayload.sessionStage, job.sessionStage || "self-practice"),
-    scoreId: safeString(requestPayload.scoreId, job.scoreId),
-    pieceId: safeString(requestPayload.pieceId, job.pieceId),
-    sectionId: safeString(requestPayload.sectionId, job.sectionId),
-    preprocessMode: safeString(requestPayload.preprocessMode, job.preprocessMode || "off"),
-    separationMode: safeString(requestPayload.separationMode, job.separationMode || requestPayload.preprocessMode || "auto"),
-    audioPath,
-    audioHash: safeString(requestPayload.audioHash, job.audioHash),
-    audioSubmission: requestPayload.audioSubmission || job.audioSubmission || null,
-    audioDataUrl: null,
-    async: true,
-  };
-}
-
-async function resumeAnalysisJob(jobId, operation = "resume") {
-  const previousJobId = safeString(jobId);
-  const store = await readAnalysisJobStore();
-  const previous = store.jobs.find((job) => job.jobId === previousJobId);
-  if (!previous) throw httpError(404, "job not found");
-  const normalizedPrevious = normalizeAnalysisJob(previous);
-  if (normalizedPrevious.status !== "failed") throw httpError(409, "only failed analysis jobs can be retried");
-  const reusablePayload = buildReusableAnalysisPayload(normalizedPrevious);
-  if (!reusablePayload) throw httpError(409, "job has no reusable audio payload");
-
-  const newJobId = createId("analysisjob");
-  const initialJob = await upsertAnalysisJob({
-    jobId: newJobId,
-    previousJobId,
-    participantId: safeString(reusablePayload.participantId),
-    groupId: safeString(reusablePayload.groupId, "self-practice"),
-    sessionStage: safeString(reusablePayload.sessionStage, "self-practice"),
-    scoreId: safeString(reusablePayload.scoreId),
-    pieceId: safeString(reusablePayload.pieceId),
-    sectionId: safeString(reusablePayload.sectionId),
-    audioHash: safeString(reusablePayload.audioHash),
-    audioPath: safeString(reusablePayload.audioPath),
-    audioSubmission: reusablePayload.audioSubmission || null,
-    preprocessMode: safeString(reusablePayload.preprocessMode),
-    separationMode: safeString(reusablePayload.separationMode),
-    requestPayload: reusablePayload,
-    status: "processing",
-    progress: 0.04,
-    stage: "queued",
-    message: operation === "retry" ? "分析任务已重新提交。" : "分析任务已创建新的续跑任务。",
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  });
-
-  void launchAnalysisTask({
-    jobId: newJobId,
-    previousJobId,
-    payload: reusablePayload,
-  });
-  return summarizeTaskJob("analysis", initialJob);
-}
-
-function buildReusablePiecePassPayload(job = {}) {
-  const requestPayload = job.requestPayload && typeof job.requestPayload === "object" ? job.requestPayload : {};
-  const audioPath = reusableJobAudioPath(job);
-  if (!audioPath) return null;
-  const sourceType = safeString(job.sourceType, safeString(job.scoreId) ? "score" : "piece");
-  const pieceKey = sourceType === "score"
-    ? safeString(job.scoreId || requestPayload.scoreId || job.pieceId)
-    : safeString(job.pieceId || requestPayload.pieceId);
-  if (!pieceKey) return null;
-  return {
-    payload: {
-      ...requestPayload,
-      participantId: safeString(requestPayload.participantId, job.participantId),
-      scoreId: sourceType === "score" ? pieceKey : safeString(requestPayload.scoreId, job.scoreId),
-      pieceId: sourceType === "piece" ? pieceKey : safeString(requestPayload.pieceId),
-      title: safeString(requestPayload.title, job.pieceTitle),
-      preprocessMode: safeString(requestPayload.preprocessMode, job.preprocessMode || "auto"),
-      audioPath,
-      audioHash: safeString(requestPayload.audioHash, job.audioHash),
-      audioSubmission: requestPayload.audioSubmission || job.audioSubmission || null,
-      audioDataUrl: null,
-    },
-    pieceKey,
-    pieceTitle: safeString(job.pieceTitle, pieceKey),
-    sourceType,
-  };
-}
-
-async function resumePiecePassJob(jobId, operation = "resume") {
-  const previousJobId = safeString(jobId);
-  const store = await readPiecePassJobStore();
-  const previous = store.jobs.find((job) => job.jobId === previousJobId);
-  if (!previous) throw httpError(404, "job not found");
-  const normalizedPrevious = normalizePiecePassJob(previous);
-  if (normalizedPrevious.status !== "failed") throw httpError(409, "only failed piece-pass jobs can be retried");
-  const reusable = buildReusablePiecePassPayload(normalizedPrevious);
-  if (!reusable) throw httpError(409, "job has no reusable payload");
-
-  const newJobId = createId("piecepassjob");
-  const initialJob = await upsertPiecePassJob({
-    jobId: newJobId,
-    previousJobId,
-    participantId: safeString(reusable.payload.participantId),
-    scoreId: safeString(reusable.payload.scoreId),
-    pieceId: safeString(reusable.pieceKey),
-    pieceTitle: safeString(reusable.pieceTitle),
-    sourceType: safeString(reusable.sourceType),
-    preprocessMode: safeString(reusable.payload.preprocessMode, "auto"),
-    status: "processing",
-    progress: 0.04,
-    stage: "queued",
-    message: operation === "retry" ? "整曲分析任务已重新提交。" : "整曲分析任务已创建新的续跑任务。",
-    audioHash: safeString(reusable.payload.audioHash),
-    audioPath: safeString(reusable.payload.audioPath),
-    audioSubmission: reusable.payload.audioSubmission || null,
-    requestPayload: reusable.payload,
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  });
-
-  void launchPiecePassTask({
-    jobId: newJobId,
-    previousJobId,
-    payload: reusable.payload,
-    pieceKey: reusable.pieceKey,
-    pieceTitle: reusable.pieceTitle,
-    sourceType: reusable.sourceType,
-  });
-  return summarizeTaskJob("piece-pass", initialJob);
-}
-
-async function retryOpsJob(type, jobId, operation = "retry") {
-  const normalizedType = normalizeOpsJobType(type);
-  if (normalizedType === "score-import") {
-    return resumeScoreImportJob(jobId, operation);
-  }
-  if (normalizedType === "analysis") {
-    return resumeAnalysisJob(jobId, operation);
-  }
-  if (normalizedType === "piece-pass") {
-    return resumePiecePassJob(jobId, operation);
-  }
-  throw httpError(400, "invalid job type");
-}
-
-app.get("/api/health", (req, res) => {
-  res.json({ ok: true, service: "ai-erhu-research-prototype", at: nowIso() });
-});
-
-app.get("/api/erhu/analyzer-status", async (req, res) => {
-  const analyzer = await fetchAnalyzerStatus();
-  res.json({ ok: true, analyzer });
-});
-
-app.get("/api/erhu/ops/health", async (req, res) => {
-  try {
-    res.json(await buildOpsHealth());
-  } catch (error) {
-    res.status(500).json({ ok: false, error: publicTaskError(error?.message) || "health check failed" });
-  }
-});
-
-app.get("/api/erhu/ops/jobs", async (req, res) => {
-  try {
-    const jobs = await readOpsJobs();
-    res.json({ ok: true, jobs });
-  } catch (error) {
-    res.status(500).json({ ok: false, error: publicTaskError(error?.message) || "job list failed" });
-  }
-});
-
-app.post("/api/erhu/ops/jobs/:type/:jobId/cancel", async (req, res) => {
-  try {
-    const job = await cancelOpsJob(req.params.type, req.params.jobId);
-    res.json({ ok: true, job });
-  } catch (error) {
-    res.status(error.statusCode || 500).json({ ok: false, error: publicTaskError(error?.message) || "cancel failed" });
-  }
-});
-
-app.post("/api/erhu/ops/jobs/:type/:jobId/retry", async (req, res) => {
-  try {
-    const job = await retryOpsJob(req.params.type, req.params.jobId, "retry");
-    res.status(202).json({ ok: true, job, previousJobId: safeString(req.params.jobId) });
-  } catch (error) {
-    res.status(error.statusCode || 500).json({ ok: false, error: publicTaskError(error?.message) || "retry failed" });
-  }
-});
-
-app.post("/api/erhu/ops/jobs/:type/:jobId/resume", async (req, res) => {
-  try {
-    const job = await retryOpsJob(req.params.type, req.params.jobId, "resume");
-    res.status(202).json({ ok: true, job, previousJobId: safeString(req.params.jobId) });
-  } catch (error) {
-    res.status(error.statusCode || 500).json({ ok: false, error: publicTaskError(error?.message) || "resume failed" });
-  }
-});
-
-app.post("/api/erhu/scores/import-pdf", upload.single("pdf"), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "pdf file is required." });
-  }
-
-  const titleHint = safeString(req.body?.titleHint, path.parse(req.file.originalname || "score").name);
-  const selectedPartHint = safeString(req.body?.selectedPartHint, "erhu") || "erhu";
-  const pdfHash = sha1(req.file.buffer);
-  const jobId = createId("scorejob");
-  const jobDir = path.join(SCORE_IMPORTS_DIR, jobId);
-  const pdfPath = path.join(jobDir, "source.pdf");
-  const webPdfPath = toWebDataPath("score-imports", jobId, "source.pdf");
-  const knownPiece = findKnownPieceForPdf(titleHint, req.file.originalname || "");
-  const fallbackPiece = knownPiece ? cloneLibraryPieceForImport(knownPiece) : null;
-  const store = await readScoreStore();
-  const reusableScore = findReusableImportedScore(store, { pdfHash, selectedPart: selectedPartHint, allowReuse: true });
-
-  await fs.mkdir(jobDir, { recursive: true });
-  await fs.writeFile(pdfPath, req.file.buffer);
-
-  if (reusableScore) {
-    const previewPages = buildCachedImportPreviewPages(
-      reusableScore,
-      [{ pageNumber: 1, type: "pdf", url: webPdfPath }],
-      webPdfPath,
-    );
-    const reusableScoreRecord = normalizeImportedScoreRecord({
-      ...reusableScore,
-      sourcePdfPath: webPdfPath,
-      previewPages,
-      omrStats: buildReusedOmrStats(reusableScore.omrStats, previewPages),
-      updatedAt: nowIso(),
-    });
-    const cachedJob = normalizeScoreImportJob({
-      jobId,
-      scoreId: reusableScoreRecord.scoreId,
-      reusedScoreId: reusableScoreRecord.scoreId,
-      title: reusableScoreRecord.title || titleHint,
-      sourcePdfPath: webPdfPath,
-      pdfHash,
-      originalFilename: req.file.originalname,
-      omrStatus: "completed",
-      omrConfidence: reusableScoreRecord.omrConfidence,
-      musicxmlPath: reusableScoreRecord.musicxmlPath,
-      previewPages,
-      detectedParts: reusableScoreRecord.detectedParts,
-      selectedPart: reusableScoreRecord.selectedPart,
-      selectedPartCandidates: reusableScoreRecord.detectedParts,
-      selectedPartConfirmed: reusableScoreRecord.selectedPartConfirmed,
-      selectedPartConfidence: reusableScoreRecord.selectedPartConfidence,
-      partCandidates: reusableScoreRecord.partCandidates,
-      omrStats: buildReusedOmrStats(reusableScoreRecord.omrStats, previewPages),
-      warnings: ["已复用相同 PDF 的识谱结果，已跳过重复读谱。"],
-      cacheHit: true,
-      progress: 1,
-      stage: "completed",
-      error: "",
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
-    });
-    const persistedCachedJob = await enqueueStoreOperation(SCORE_STORE_FILE, async () => {
-      const nextStore = await readScoreStoreUnlocked();
-      const existingScoreIndex = nextStore.scores.findIndex((item) => item.scoreId === reusableScoreRecord.scoreId);
-      if (existingScoreIndex >= 0) {
-        nextStore.scores[existingScoreIndex] = reusableScoreRecord;
-      } else {
-        nextStore.scores.push(reusableScoreRecord);
-      }
-      const existingJobIndex = nextStore.jobs.findIndex((item) => item.jobId === cachedJob.jobId);
-      if (existingJobIndex >= 0) {
-        nextStore.jobs[existingJobIndex] = cachedJob;
-      } else {
-        nextStore.jobs.push(cachedJob);
-      }
-      await writeScoreStoreUnlocked(nextStore);
-      return cachedJob;
-    });
-    return res.json({ ok: true, scoreImportJobId: persistedCachedJob.jobId, job: persistedCachedJob });
-  }
-
-  const previewPages = [{ pageNumber: 1, type: "pdf", url: webPdfPath }];
-  const initialJob = await upsertScoreImportJob({
-    jobId,
-    originalFilename: req.file.originalname,
-    title: titleHint,
-    sourcePdfPath: webPdfPath,
-    pdfHash,
-    omrStatus: "processing",
-    omrConfidence: 0,
-    previewPages,
-    detectedParts: [selectedPartHint],
-    selectedPart: selectedPartHint,
-    selectedPartCandidates: [selectedPartHint],
-    selectedPartConfirmed: false,
-    omrStats: { mode: "pending", pageCount: getArray(previewPages).length },
-    warnings: ["正在后台识谱，请稍候。"],
-    error: "",
-    progress: 0.05,
-    stage: "queued",
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  });
-
-  void launchScoreImportTask({
-    jobId,
-    titleHint,
-    selectedPartHint,
-    pdfHash,
-    pdfPath,
-    webPdfPath,
-    originalFilename: req.file.originalname,
-    fallbackPiece,
-    previewPages,
-    selectedPartConfirmed: false,
-  });
-
-  return res.status(202).json({ ok: true, scoreImportJobId: initialJob.jobId, job: initialJob });
-});
-
-app.post("/api/erhu/scores/import-musicxml", upload.single("musicxml"), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "musicxml file is required." });
-  }
-
-  const originalName = req.file.originalname || "score.musicxml";
-  const originalExt = path.extname(originalName).toLowerCase();
-  const fileExt = [".musicxml", ".xml", ".mxl"].includes(originalExt) ? originalExt : ".musicxml";
-  const titleHint = safeString(req.body?.titleHint, path.parse(originalName).name);
-  const selectedPartHint = safeString(req.body?.selectedPartHint, "erhu") || "erhu";
-  const musicxmlHash = sha1(req.file.buffer);
-  const jobId = createId("scorejob");
-  const jobDir = path.join(SCORE_IMPORTS_DIR, jobId);
-  const musicxmlPath = path.join(jobDir, `source${fileExt}`);
-  const webMusicXmlPath = toWebDataPath("score-imports", jobId, `source${fileExt}`);
-  await fs.mkdir(jobDir, { recursive: true });
-  await fs.writeFile(musicxmlPath, req.file.buffer);
-
-  let jobResult = null;
-  let serviceWarning = "";
-  try {
-    jobResult = await callExternalMusicXmlImportLongTimeout({
-      jobId,
-      musicxmlPath,
-      originalFilename: originalName,
-      titleHint,
-      selectedPartHint,
-      outputDir: jobDir,
-    });
-  } catch (error) {
-    serviceWarning = safeString(error?.message, "external MusicXML import unavailable");
-  }
-
-  let normalizedJob = normalizeScoreImportJob({
-    jobId,
-    originalFilename: originalName,
-    title: titleHint,
-    sourcePdfPath: "",
-    pdfHash: `musicxml:${musicxmlHash}`,
-    omrStatus: "failed",
-    omrConfidence: 0,
-    musicxmlPath: webMusicXmlPath,
-    previewPages: [],
-    detectedParts: [selectedPartHint],
-    selectedPart: selectedPartHint,
-    selectedPartCandidates: [selectedPartHint],
-    warnings: serviceWarning ? [serviceWarning] : [],
-    musicxmlFallbackAvailable: false,
-    fallbackActions: [],
-    retryable: true,
-    error: "MusicXML 导入失败。",
-    progress: 1,
-    stage: "failed",
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  });
-  let scoreRecord = null;
-
-  if (jobResult?.omrStatus === "completed" && jobResult.piecePack) {
-    const upstreamScoreId = safeString(jobResult.scoreId);
-    const scoreId = upstreamScoreId.startsWith("score-") ? upstreamScoreId : createId("score");
-    const importedSections = getArray(jobResult.piecePack?.sections).length ? jobResult.piecePack.sections : [jobResult.piecePack];
-    scoreRecord = normalizeImportedScoreRecord({
-      scoreId,
-      pieceId: safeString(jobResult.piecePack?.pieceId),
-      title: safeString(jobResult.title, titleHint),
-      composer: safeString(jobResult.piecePack?.composer, "MusicXML import"),
-      sourcePdfPath: "",
-      pdfHash: `musicxml:${musicxmlHash}`,
-      musicxmlPath: webMusicXmlPath,
-      omrStatus: "completed",
-      omrConfidence: safeNumber(jobResult.omrConfidence, 0.88),
-      omrStats: jobResult.omrStats,
-      detectedParts: getArray(jobResult.detectedParts).length ? jobResult.detectedParts : [selectedPartHint],
-      selectedPart: safeString(jobResult.selectedPart, selectedPartHint),
-      selectedPartId: safeString(jobResult.piecePack?.selectedPartId),
-      selectedPartConfidence: safeNumber(jobResult.selectedPartConfidence, safeNumber(jobResult.piecePack?.selectedPartConfidence, 0)),
-      partCandidates: getArray(jobResult.partCandidates || jobResult.piecePack?.partCandidates),
-      markingStats: jobResult.markingStats || jobResult.piecePack?.markingStats || buildMarkingStatsFromSections(importedSections),
-      previewPages: [],
-      sections: importedSections,
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
-    });
-    normalizedJob = normalizeScoreImportJob({
-      ...jobResult,
-      jobId,
-      scoreId,
-      title: scoreRecord.title,
-      sourcePdfPath: "",
-      pdfHash: `musicxml:${musicxmlHash}`,
-      musicxmlPath: webMusicXmlPath,
-      originalFilename: originalName,
-      previewPages: [],
-      warnings: [...getArray(jobResult.warnings), ...(serviceWarning ? [serviceWarning] : [])],
-      error: jobResult.error,
-      progress: 1,
-      stage: "completed",
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
-    });
-  } else if (serviceWarning) {
-    normalizedJob.warnings = [serviceWarning];
-    normalizedJob.error = "MusicXML 导入失败，Python 识谱服务不可用或解析失败。";
-  }
-
-  normalizedJob = await enqueueStoreOperation(SCORE_STORE_FILE, async () => {
-    const store = await readScoreStoreUnlocked();
-    if (scoreRecord) {
-      const existingScoreIndex = store.scores.findIndex((item) => item.scoreId === scoreRecord.scoreId);
-      if (existingScoreIndex >= 0) {
-        store.scores[existingScoreIndex] = scoreRecord;
-      } else {
-        store.scores.push(scoreRecord);
-      }
-    }
-    const existingJobIndex = store.jobs.findIndex((item) => item.jobId === normalizedJob.jobId);
-    if (existingJobIndex >= 0) {
-      store.jobs[existingJobIndex] = normalizedJob;
-    } else {
-      store.jobs.push(normalizedJob);
-    }
-    await writeScoreStoreUnlocked(store);
-    return normalizedJob;
-  });
-
-  return res.status(normalizedJob.omrStatus === "completed" ? 200 : 502).json({
-    ok: normalizedJob.omrStatus === "completed",
-    error: normalizedJob.omrStatus === "completed" ? "" : normalizedJob.error,
-    scoreImportJobId: normalizedJob.jobId,
-    job: normalizedJob,
-  });
-});
-
-app.get("/api/erhu/scores/import-pdf/:jobId", async (req, res) => {
-  const store = await readScoreStore();
-  const job = store.jobs.find((item) => item.jobId === req.params.jobId);
-  if (!job) {
-    if (activeScoreImportTasks.has(req.params.jobId)) {
-      return res.json({
-        ok: true,
-        job: normalizeScoreImportJob({
-          jobId: req.params.jobId,
-          omrStatus: "processing",
-          warnings: ["正在后台识谱，请稍候。"],
-          progress: 0.2,
-          stage: "queued",
-          createdAt: nowIso(),
-          updatedAt: nowIso(),
-        }),
-      });
-    }
-    return res.status(404).json({ error: "score import job not found." });
-  }
-  return res.json({ ok: true, job });
-});
-
-app.get("/api/erhu/scores/:scoreId", async (req, res) => {
-  const store = await readScoreStore();
-  const score = getImportedScore(store, req.params.scoreId);
-  if (!score) {
-    return res.status(404).json({ error: "score not found." });
-  }
-  return res.json({ ok: true, score });
-});
-
-app.post("/api/erhu/scores/:scoreId/select-part", async (req, res) => {
-  const selectedPartHint = safeString(req.body?.selectedPart || req.body?.selectedPartHint).trim();
-  if (!selectedPartHint) {
-    return res.status(400).json({ error: "selectedPart is required." });
-  }
-  const store = await readScoreStore();
-  const score = getImportedScore(store, req.params.scoreId);
-  if (!score) {
-    return res.status(404).json({ error: "score not found." });
-  }
-  const webSourcePdfPath = safeString(score.sourcePdfPath);
-  const sourcePdfAbs = webSourcePdfPath.startsWith("/data/")
-    ? path.join(__dirname, webSourcePdfPath.slice(1))
-    : webSourcePdfPath;
-  if (!sourcePdfAbs || !fsSync.existsSync(sourcePdfAbs)) {
-    return res.status(404).json({ error: "source PDF file is not available for part rebuild." });
-  }
-
-  const jobId = createId("scorejob");
-  const jobDir = path.join(SCORE_IMPORTS_DIR, jobId);
-  const pdfPath = path.join(jobDir, "source.pdf");
-  const webPdfPath = toWebDataPath("score-imports", jobId, "source.pdf");
-  await fs.mkdir(jobDir, { recursive: true });
-  await fs.copyFile(sourcePdfAbs, pdfPath);
-
-  const initialJob = await upsertScoreImportJob({
-    jobId,
-    originalFilename: path.basename(sourcePdfAbs),
-    title: score.title,
-    sourcePdfPath: webPdfPath,
-    pdfHash: safeString(score.pdfHash),
-    omrStatus: "processing",
-    omrConfidence: 0,
-    previewPages: buildCachedImportPreviewPages(score, [], webPdfPath),
-    detectedParts: getArray(score.detectedParts),
-    selectedPart: selectedPartHint,
-    selectedPartCandidates: getArray(score.detectedParts),
-    selectedPartConfirmed: true,
-    partCandidates: getArray(score.partCandidates),
-    omrStats: { mode: "pending", pageCount: getArray(score.previewPages).length },
-    warnings: ["正在按新声部重新识谱。"],
-    error: "",
-    progress: 0.05,
-    stage: "queued",
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  });
-
-  void launchScoreImportTask({
-    jobId,
-    titleHint: score.title,
-    selectedPartHint,
-    selectedPartConfirmed: true,
-    pdfHash: safeString(score.pdfHash),
-    pdfPath,
-    webPdfPath,
-    originalFilename: path.basename(sourcePdfAbs),
-    fallbackPiece: null,
-    previewPages: initialJob.previewPages,
-  });
-
-  return res.status(202).json({ ok: true, scoreImportJobId: initialJob.jobId, job: initialJob });
-});
-
-app.get("/api/erhu/piece-pass/latest", async (req, res) => {
-  const pieceId = safeString(req.query.pieceId);
-  const scoreId = safeString(req.query.scoreId);
-  const title = safeString(req.query.title);
-  const audioHash = safeString(req.query.audioHash);
-  const participantId = safeString(req.query.participantId);
-  const piecePass = await readLatestPiecePassSummary({ pieceId, scoreId, title, audioHash, participantId });
-  return res.json({ ok: true, piecePass });
-});
-
-app.post("/api/erhu/piece-pass-jobs", upload.single("audio"), async (req, res) => {
-  const incomingPayload = parseIncomingPayload(req);
-  const payload = {
-    ...incomingPayload,
-    audioSubmission: buildAudioSubmissionFromUpload(req.file, incomingPayload.audioSubmission),
-  };
-  const preparedPayload = await prepareAnalysisPayload(payload, req.file || null);
-  if (!safeString(preparedPayload.audioPath)) {
-    return res.status(400).json({ error: "audio is required." });
-  }
-
-  const target = await resolvePiecePassTarget({
-    scoreId: safeString(payload.scoreId),
-    pieceId: safeString(payload.pieceId),
-    title: safeString(payload.title),
-  });
-  if (!target) {
-    return res.status(404).json({ error: "piece for whole-piece analysis not found." });
-  }
-
-  const jobId = createId("piecepassjob");
-  const initialJob = await upsertPiecePassJob({
-    jobId,
-    participantId: safeString(payload.participantId),
-    scoreId: safeString(payload.scoreId),
-    pieceId: safeString(target.pieceKey),
-    pieceTitle: safeString(target.pieceTitle),
-    sourceType: safeString(target.sourceType),
-    preprocessMode: safeString(preparedPayload.preprocessMode, "auto"),
-    status: "processing",
-    progress: 0.04,
-    stage: "queued",
-    message: "整曲分析任务已提交，正在排队。",
-    audioHash: safeString(preparedPayload.audioHash),
-    audioPath: safeString(preparedPayload.audioPath),
-    audioSubmission: preparedPayload.audioSubmission || null,
-    requestPayload: { ...preparedPayload, audioDataUrl: null },
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  });
-
-  void launchPiecePassTask({
-    jobId,
-    payload: preparedPayload,
-    pieceKey: target.pieceKey,
-    pieceTitle: target.pieceTitle,
-    sourceType: target.sourceType,
-  });
-
-  return res.status(202).json({ ok: true, piecePassJobId: jobId, job: stripReusableJobPayload(initialJob) });
-});
-
-app.get("/api/erhu/piece-pass-jobs/:jobId", async (req, res) => {
-  const store = await readPiecePassJobStore();
-  const job = store.jobs.find((item) => item.jobId === req.params.jobId);
-  if (!job) {
-    if (activePiecePassTasks.has(req.params.jobId)) {
-      return res.json({
-        ok: true,
-        job: stripReusableJobPayload(normalizePiecePassJob({
-          jobId: req.params.jobId,
-          status: "processing",
-          progress: 0.1,
-          stage: "queued",
-          message: "整曲分析任务已提交，正在排队。",
-          createdAt: nowIso(),
-          updatedAt: nowIso(),
-        })),
-      });
-    }
-    return res.status(404).json({ error: "piece-pass job not found." });
-  }
-  return res.json({ ok: true, job: stripReusableJobPayload(normalizePiecePassJob(job)) });
-});
-
-app.get("/api/erhu/pieces", (req, res) => {
-  res.json({ ok: true, pieces: getErhuPieceSummaries() });
-});
-
-app.get("/api/erhu/pieces/from-score/:scoreId", async (req, res) => {
-  const store = await readScoreStore();
-  const score = getImportedScore(store, req.params.scoreId);
-  if (!score) {
-    return res.status(404).json({ error: "score not found" });
-  }
-  return res.json({ ok: true, piece: buildDerivedPieceFromScore(score) });
-});
-
-app.get("/api/erhu/pieces/:pieceId", async (req, res) => {
-  const piece = getErhuPiece(req.params.pieceId);
-  if (piece) {
-    return res.json({ ok: true, piece });
-  }
-  const store = await readScoreStore();
-  const importedScore = getImportedScore(store, req.params.pieceId)
-    || store.scores.find((item) => safeString(item.pieceId) === req.params.pieceId)
-    || null;
-  if (!importedScore) {
-    return res.status(404).json({ error: "piece not found" });
-  }
-  return res.json({ ok: true, piece: buildDerivedPieceFromScore(importedScore) });
-});
-
-app.post("/api/erhu/auto-detect-section", upload.single("audio"), async (req, res) => {
-  const incomingPayload = parseIncomingPayload(req);
-  const payload = {
-    ...incomingPayload,
-    audioSubmission: buildAudioSubmissionFromUpload(req.file, incomingPayload.audioSubmission),
-  };
-  const participantId = safeString(payload.participantId).trim();
-  const scoreId = safeString(payload.scoreId);
-  const pieceId = safeString(payload.pieceId);
-
-  if (!participantId) {
-    return res.status(400).json({ error: "participantId is required." });
-  }
-  if (!pieceId && !scoreId) {
-    return res.status(400).json({ error: "pieceId or scoreId is required." });
-  }
-
-  const scoreStore = await readScoreStore();
-  const importedScore = scoreId ? getImportedScore(scoreStore, scoreId) : null;
-  const piece = getErhuPiece(pieceId);
-  if (!piece && !importedScore) {
-    return res.status(404).json({ error: "piece not found." });
-  }
-
-  const persistedAudio = req.file
-    ? await persistUploadedAudioFile(req.file, { audioCacheDir: AUDIO_CACHE_DIR })
-    : await persistPayloadAudio(payload, { audioCacheDir: AUDIO_CACHE_DIR });
-  const preparedPayload = await normalizePreparedPayloadForAnalyzer(buildPreparedAudioPayload(
-    payload,
-    persistedAudio,
-  ), toAnalyzerPath);
-
-  const detectionPiece = importedScore ? buildDerivedPieceFromScore(importedScore) : piece;
-  const detection = await autoDetectPieceSection({ ...preparedPayload, scoreId }, detectionPiece, {
-    candidateSectionIds: payload.candidateSectionIds,
-    maxSections: payload.maxSections,
-    windowStartSeconds: payload.windowStartSeconds,
-    expectedSequenceIndex: payload.expectedSequenceIndex,
-  });
-
-  if (!detection.bestSection) {
-    return res.status(404).json({ error: "no detectable section candidates found." });
-  }
-
-  return res.json({
-    ok: true,
-    pieceId: pieceId || importedScore?.pieceId || "",
-    scoreId,
-    section: detection.bestSection,
-    analysis: detection.bestAnalysis || buildDetectionSummaryAnalysis(getArray(detection.candidates)[0] || {}),
-    candidates: getArray(detection.candidates).slice(0, 8).map((candidate) => compactDetectionCandidate(candidate)),
-  });
-});
+app.use(createOpsRouter({
+  DATA_DIR,
+  STORE_ARCHIVE_DIR,
+  PERF_TRACE_FILE,
+  SCORE_STORE_FILE,
+  SCORE_STORE_SQLITE_FILE,
+  ANALYSIS_JOB_STORE_FILE,
+  PIECE_PASS_JOB_STORE_FILE,
+  SCORE_STORE_BACKEND,
+  SCORE_IMPORTS_DIR,
+  port,
+  scoreStoreUsesSqlite,
+  fetchAnalyzerStatus,
+  readScoreStore,
+  readScoreStoreUnlocked,
+  writeScoreStoreUnlocked,
+  readAnalysisJobStore,
+  readAnalysisJobStoreUnlocked,
+  writeAnalysisJobStoreUnlocked,
+  readPiecePassJobStore,
+  readPiecePassJobStoreUnlocked,
+  writePiecePassJobStoreUnlocked,
+  normalizeScoreImportJob,
+  normalizeAnalysisJob,
+  normalizePiecePassJob,
+  SCORE_IMPORT_TASK_GATE,
+  ANALYSIS_TASK_GATE,
+  PIECE_PASS_TASK_GATE,
+  activeScoreImportTasks,
+  activeAnalysisTasks,
+  activePiecePassTasks,
+  cancelledScoreImportJobIds,
+  cancelledAnalysisJobIds,
+  cancelledPiecePassJobIds,
+  toWebDataPath,
+  findKnownPieceForPdf,
+  cloneLibraryPieceForImport,
+  upsertScoreImportJob,
+  upsertAnalysisJob,
+  upsertPiecePassJob,
+  launchScoreImportTask,
+  launchAnalysisTask,
+  launchPiecePassTask,
+}));
+
+app.use(createScoreRouter({
+  upload,
+  repoRoot: __dirname,
+  SCORE_IMPORT_TASK_GATE,
+  SCORE_STORE_FILE,
+  SCORE_IMPORTS_DIR,
+  readScoreStore,
+  readScoreStoreUnlocked,
+  writeScoreStoreUnlocked,
+  normalizeScoreImportJob,
+  normalizeImportedScoreRecord,
+  findReusableImportedScore,
+  findKnownPieceForPdf,
+  cloneLibraryPieceForImport,
+  toWebDataPath,
+  upsertScoreImportJob,
+  launchScoreImportTask,
+  callExternalMusicXmlImportLongTimeout,
+  buildMarkingStatsFromSections,
+  getImportedScore,
+  activeScoreImportTasks,
+}));
+
+app.use(createAnalysisRouter({
+  upload,
+  AUDIO_CACHE_DIR,
+  ANALYSIS_TASK_GATE,
+  PIECE_PASS_TASK_GATE,
+  readLatestPiecePassSummary,
+  parseIncomingPayload,
+  buildAudioSubmissionFromUpload,
+  prepareAnalysisPayload,
+  resolvePiecePassTarget,
+  upsertPiecePassJob,
+  launchPiecePassTask,
+  stripReusableJobPayload,
+  readPiecePassJobStore,
+  activePiecePassTasks,
+  normalizePiecePassJob,
+  getErhuPieceSummaries,
+  getErhuPiece,
+  readScoreStore,
+  getImportedScore,
+  buildDerivedPieceFromScore,
+  persistUploadedAudioFile,
+  persistPayloadAudio,
+  normalizePreparedPayloadForAnalyzer,
+  buildPreparedAudioPayload,
+  toAnalyzerPath,
+  autoDetectPieceSection,
+  buildDetectionSummaryAnalysis,
+  compactDetectionCandidate,
+  upsertAnalysisJob,
+  launchAnalysisTask,
+  executePreparedAnalysisRequest,
+  readAnalysisJobStore,
+  activeAnalysisTasks,
+  normalizeAnalysisJob,
+  hydrateAnalysisJob,
+}));
 
 async function executePreparedAnalysisRequest(payload, { onProgress } = {}) {
   const requestStartedAt = Date.now();
@@ -6720,7 +4434,10 @@ function launchAnalysisTask(task) {
   const existingTask = activeAnalysisTasks.get(task.jobId);
   if (existingTask) return existingTask;
 
+  const taskRecord = { promise: null, ticket: null, child: null };
   const runner = (async () => {
+    const ticket = await ANALYSIS_TASK_GATE.enter(task.jobId);
+    taskRecord.ticket = ticket;
     const startedAt = Date.now();
     const baseJob = {
       jobId: task.jobId,
@@ -6782,500 +4499,45 @@ function launchAnalysisTask(task) {
         updatedAt: nowIso(),
       });
     }
-  })().finally(() => {
+  })()
+    .catch(async (error) => {
+      await upsertAnalysisJob({
+        jobId: task.jobId,
+        previousJobId: safeString(task.previousJobId),
+        participantId: safeString(task.payload?.participantId),
+        groupId: safeString(task.payload?.groupId),
+        sessionStage: safeString(task.payload?.sessionStage),
+        scoreId: safeString(task.payload?.scoreId),
+        pieceId: safeString(task.payload?.pieceId),
+        sectionId: safeString(task.payload?.sectionId),
+        audioHash: safeString(task.payload?.audioHash),
+        audioPath: safeString(task.payload?.audioPath),
+        audioSubmission: task.payload?.audioSubmission || null,
+        preprocessMode: safeString(task.payload?.preprocessMode),
+        separationMode: safeString(task.payload?.separationMode),
+        requestPayload: { ...(task.payload || {}), audioDataUrl: null },
+        status: "failed",
+        progress: 1,
+        stage: "failed",
+        message: "分析任务未能启动，请稍后重试。",
+        error: safeString(error?.message, "analysis queue failed"),
+        retryable: true,
+        completedAt: nowIso(),
+        updatedAt: nowIso(),
+      });
+    })
+    .finally(() => {
+    ANALYSIS_TASK_GATE.release(taskRecord.ticket);
     activeAnalysisTasks.delete(task.jobId);
   });
 
-  activeAnalysisTasks.set(task.jobId, runner);
+  taskRecord.promise = runner;
+  activeAnalysisTasks.set(task.jobId, taskRecord);
   return runner;
 }
 
-app.post("/api/erhu/analyze", upload.single("audio"), async (req, res) => {
-  const incomingPayload = parseIncomingPayload(req);
-  const payload = {
-    ...incomingPayload,
-    audioSubmission: buildAudioSubmissionFromUpload(req.file, incomingPayload.audioSubmission),
-  };
-  const preparedPayload = await prepareAnalysisPayload(payload, req.file || null);
-  if (safeBoolean(payload.async, false)) {
-    const jobId = createId("analysisjob");
-    const initialJob = await upsertAnalysisJob({
-      jobId,
-      participantId: safeString(payload.participantId),
-      groupId: safeString(payload.groupId, "self-practice"),
-      sessionStage: safeString(payload.sessionStage, "self-practice"),
-      scoreId: safeString(payload.scoreId),
-      pieceId: safeString(payload.pieceId),
-      sectionId: safeString(payload.sectionId),
-      audioHash: safeString(preparedPayload.audioHash),
-      audioPath: safeString(preparedPayload.audioPath),
-      audioSubmission: preparedPayload.audioSubmission || null,
-      preprocessMode: safeString(preparedPayload.preprocessMode),
-      separationMode: safeString(preparedPayload.separationMode),
-      requestPayload: { ...preparedPayload, audioDataUrl: null },
-      status: "processing",
-      progress: 0.04,
-      stage: "queued",
-      message: "分析任务已提交，正在排队。",
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
-    });
-    void launchAnalysisTask({
-      jobId,
-      payload: preparedPayload,
-    });
-    return res.status(202).json({ ok: true, analysisJobId: jobId, job: stripReusableJobPayload(initialJob) });
-  }
-
-  try {
-    const result = await executePreparedAnalysisRequest(preparedPayload);
-    return res.json({
-      ok: true,
-      analysis: result.analysisRecord,
-    });
-  } catch (error) {
-    if (String(error?.message || "").includes("piece section not found")) {
-      return res.status(404).json({ error: "piece section not found." });
-    }
-    if (String(error?.message || "").includes("participantId is required")) {
-      return res.status(400).json({ error: "participantId is required." });
-    }
-    return res.status(500).json({ error: safeString(error?.message, "analysis failed") });
-  }
-});
-
-app.get("/api/erhu/analyze-jobs/:jobId", async (req, res) => {
-  const store = await readAnalysisJobStore();
-  const job = store.jobs.find((item) => item.jobId === req.params.jobId);
-  if (!job) {
-    if (activeAnalysisTasks.has(req.params.jobId)) {
-      return res.json({
-        ok: true,
-        job: stripReusableJobPayload(normalizeAnalysisJob({
-          jobId: req.params.jobId,
-          status: "processing",
-          progress: 0.1,
-          stage: "queued",
-          message: "分析任务已提交，正在排队。",
-          createdAt: nowIso(),
-          updatedAt: nowIso(),
-        })),
-      });
-    }
-    return res.status(404).json({ error: "analysis job not found." });
-  }
-  return res.json({
-    ok: true,
-    job: await hydrateAnalysisJob(job),
-  });
-});
-
-app.get("/api/erhu/analysis/:analysisId", async (req, res) => {
-  const store = await readStudyStore();
-  const analysis = store.analyses.find((item) => item.analysisId === req.params.analysisId);
-  if (!analysis) {
-    return res.status(404).json({ error: "analysis not found." });
-  }
-  return res.json({ ok: true, analysis });
-});
-
-app.post("/api/erhu/study-record", async (req, res) => {
-  const payload = req.body || {};
-  const participantId = safeString(payload.participantId).trim();
-  if (!participantId) {
-    return res.status(400).json({ error: "participantId is required." });
-  }
-
-  const store = await readStudyStore();
-  const participant = ensureParticipantRecord(store, participantId, safeString(payload.groupId, "experimental"));
-  applyExperienceScale(participant, payload);
-  await writeStudyStore(store);
-
-  return res.json({ ok: true, participant: buildParticipantView(participant, store) });
-});
-
-app.post("/api/erhu/participant-profile", async (req, res) => {
-  const payload = req.body || {};
-  const participantId = safeString(payload.participantId).trim();
-  if (!participantId) {
-    return res.status(400).json({ error: "participantId is required." });
-  }
-
-  const store = await readStudyStore();
-  const participant = ensureParticipantRecord(store, participantId, safeString(payload.groupId, "experimental"));
-  applyParticipantProfile(participant, payload);
-  await writeStudyStore(store);
-
-  return res.json({ ok: true, participant: buildParticipantView(participant, store) });
-});
-
-app.post("/api/erhu/expert-rating", async (req, res) => {
-  const payload = req.body || {};
-  const participantId = safeString(payload.participantId).trim();
-  if (!participantId) {
-    return res.status(400).json({ error: "participantId is required." });
-  }
-
-  const store = await readStudyStore();
-  const participant = ensureParticipantRecord(store, participantId, safeString(payload.groupId, ""));
-  applyExpertRating(participant, payload);
-  await writeStudyStore(store);
-  return res.json({ ok: true, participant: buildParticipantView(participant, store) });
-});
-
-app.get("/api/erhu/study-records/:participantId", async (req, res) => {
-  const store = await readStudyStore();
-  const participant = store.participants.find((item) => item.participantId === req.params.participantId);
-  if (!participant) {
-    return res.json({ ok: true, participant: null });
-  }
-  const scoreId = safeString(req.query.scoreId);
-  const pieceId = safeString(req.query.pieceId);
-  return res.json({
-    ok: true,
-    participant: buildParticipantView(participant, store, { scoreId, pieceId }),
-  });
-});
-
-app.get("/api/erhu/research/overview", async (req, res) => {
-  const store = await readStudyStore();
-  const participants = store.participants.map((participant) => buildParticipantView(participant, store));
-  const dataQuality = buildDataQualityOverview(store);
-  const validationSummary = buildValidationSummary(store);
-  const adjudicationSummary = buildAdjudicationSummary(store);
-  const withGain = participants.filter((item) => item.pitchGain != null);
-  const withQuestionnaire = participants.filter((item) => getArray(item.questionnaires).length > 0);
-  const withExpertPost = participants.filter((item) => item.expertRatings?.posttest);
-  const withProfile = participants.filter((item) => item.profile?.updatedAt);
-  const analyzer = await fetchAnalyzerStatus();
-  const averagePitchGain = withGain.length
-    ? withGain.reduce((sum, item) => sum + safeNumber(item.pitchGain), 0) / withGain.length
-    : 0;
-  const averageRhythmGain = withGain.length
-    ? withGain.reduce((sum, item) => sum + safeNumber(item.rhythmGain), 0) / withGain.length
-    : 0;
-
-  return res.json({
-    ok: true,
-    overview: {
-      participantCount: participants.length,
-      analysisCount: store.analyses.length,
-      completedPairCount: withGain.length,
-      profileCompletedCount: withProfile.length,
-      questionnaireCount: withQuestionnaire.length,
-      questionnaireEntryCount: buildQuestionnaireExportRows(store).length,
-      taskPlanCount: buildTaskExportRows(store).length,
-      completedTaskCount: buildTaskExportRows(store).filter((item) => item.status === "completed").length,
-      interviewCount: buildInterviewExportRows(store).length,
-      expertRatedCount: withExpertPost.length,
-      averagePitchGain: Number(averagePitchGain.toFixed(2)),
-      averageRhythmGain: Number(averageRhythmGain.toFixed(2)),
-      averageUsefulness: Number(average(withQuestionnaire.map((item) => item.experienceScales?.usefulness)).toFixed(2)),
-      averageContinuance: Number(average(withQuestionnaire.map((item) => item.experienceScales?.continuance)).toFixed(2)),
-      validationReviewCount: validationSummary.reviewCount,
-      averageValidationAgreement: validationSummary.averageAgreement,
-      averageValidationNoteF1: validationSummary.averageNoteF1,
-      averageValidationMeasureF1: validationSummary.averageMeasureF1,
-      validationPathAgreementRate: validationSummary.pathAgreementRate,
-      validatedAnalysisCount: validationSummary.validatedAnalysisCount,
-      fullyValidatedAnalysisCount: validationSummary.fullyValidatedAnalysisCount,
-      requiredValidationRaters: validationSummary.requiredRaterCount,
-      pendingValidationCount: validationSummary.pendingValidationCount,
-      adjudicationResolvedCount: adjudicationSummary.adjudicationResolvedCount,
-      adjudicationPendingCount: adjudicationSummary.pendingAdjudicationCount,
-      averageAdjudicationNoteF1: adjudicationSummary.averageNoteF1,
-      averageAdjudicationMeasureF1: adjudicationSummary.averageMeasureF1,
-      adjudicationPathAgreementRate: adjudicationSummary.averagePathAgreement,
-      groups: buildGroupOverview(participants),
-      pendingRatings: buildPendingRatings(store),
-      pendingValidationReviews: buildPendingValidationReviews(store),
-      pendingAdjudications: adjudicationSummary.pendingAdjudications,
-      validationSummary,
-      adjudicationSummary,
-      dataQuality,
-      analyzer,
-    },
-  });
-});
-
-app.get("/api/erhu/research/participants", async (req, res) => {
-  const store = await readStudyStore();
-  const participants = store.participants
-    .map((participant) => buildParticipantSummary(participant, store))
-    .sort((left, right) => String(right.lastActiveAt).localeCompare(String(left.lastActiveAt)));
-  return res.json({ ok: true, participants });
-});
-
-app.get("/api/erhu/research/data-quality", async (req, res) => {
-  const store = await readStudyStore();
-  return res.json({ ok: true, dataQuality: buildDataQualityOverview(store) });
-});
-
-app.get("/api/erhu/research/tasks", async (req, res) => {
-  const store = await readStudyStore();
-  const tasks = buildTaskExportRows(store).sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt)));
-  return res.json({ ok: true, tasks });
-});
-
-app.get("/api/erhu/research/interviews", async (req, res) => {
-  const store = await readStudyStore();
-  const interviews = buildInterviewExportRows(store).sort((left, right) =>
-    String(right.submittedAt).localeCompare(String(left.submittedAt)),
-  );
-  return res.json({ ok: true, interviews });
-});
-
-app.get("/api/erhu/research/questionnaires", async (req, res) => {
-  const store = await readStudyStore();
-  const questionnaires = buildQuestionnaireExportRows(store).sort((left, right) =>
-    String(right.submittedAt).localeCompare(String(left.submittedAt)),
-  );
-  return res.json({ ok: true, questionnaires });
-});
-
-app.get("/api/erhu/research/expert-ratings", async (req, res) => {
-  const store = await readStudyStore();
-  const ratings = buildExpertRatingExportRows(store).sort((left, right) =>
-    String(right.submittedAt).localeCompare(String(left.submittedAt)),
-  );
-  return res.json({ ok: true, ratings });
-});
-
-app.get("/api/erhu/research/validation-reviews", async (req, res) => {
-  const store = await readStudyStore();
-  const reviews = buildValidationReviewRows(store).sort((left, right) =>
-    String(right.submittedAt).localeCompare(String(left.submittedAt)),
-  );
-  return res.json({ ok: true, reviews });
-});
-
-app.get("/api/erhu/research/validation-summary", async (req, res) => {
-  const store = await readStudyStore();
-  return res.json({
-    ok: true,
-    validationSummary: buildValidationSummary(store),
-    pendingValidationReviews: buildPendingValidationReviews(store),
-  });
-});
-
-app.get("/api/erhu/research/adjudications", async (req, res) => {
-  const store = await readStudyStore();
-  const adjudications = buildAdjudicationRows(store).sort((left, right) =>
-    String(right.resolvedAt).localeCompare(String(left.resolvedAt)),
-  );
-  return res.json({ ok: true, adjudications });
-});
-
-app.get("/api/erhu/research/adjudication-summary", async (req, res) => {
-  const store = await readStudyStore();
-  return res.json({
-    ok: true,
-    adjudicationSummary: buildAdjudicationSummary(store),
-  });
-});
-
-app.get("/api/erhu/research/pending-ratings", async (req, res) => {
-  const store = await readStudyStore();
-  return res.json({ ok: true, pendingRatings: buildPendingRatings(store) });
-});
-
-app.get("/api/erhu/research/templates", async (req, res) => {
-  const templates = RESEARCH_TEMPLATE_LIBRARY.map((item) => ({
-    templateId: item.templateId,
-    title: item.title,
-    filename: item.filename,
-    description: item.description,
-  }));
-  return res.json({ ok: true, templates });
-});
-
-app.get("/api/erhu/research/templates/:templateId", async (req, res) => {
-  const template = RESEARCH_TEMPLATE_LIBRARY.find((item) => item.templateId === req.params.templateId);
-  if (!template) {
-    return res.status(404).json({ error: "template not found." });
-  }
-
-  const format = safeString(req.query.format, "md").toLowerCase();
-  const fileExt = format === "txt" ? "txt" : "md";
-  res.setHeader("Content-Type", `text/${fileExt}; charset=utf-8`);
-  res.setHeader("Content-Disposition", `attachment; filename=${template.filename.replace(/\.md$/i, `.${fileExt}`)}`);
-  if (fileExt === "txt") {
-    return res.send(template.content.replace(/^#+\s?/gm, ""));
-  }
-  return res.send(template.content);
-});
-
-app.post("/api/erhu/task-plan", async (req, res) => {
-  const payload = req.body || {};
-  const participantId = safeString(payload.participantId).trim();
-  if (!participantId) {
-    return res.status(400).json({ error: "participantId is required." });
-  }
-
-  const store = await readStudyStore();
-  const participant = ensureParticipantRecord(store, participantId, safeString(payload.groupId, "experimental"));
-  applyTaskPlan(participant, payload);
-  await writeStudyStore(store);
-  return res.json({ ok: true, participant: buildParticipantView(participant, store) });
-});
-
-app.post("/api/erhu/interview-note", async (req, res) => {
-  const payload = req.body || {};
-  const participantId = safeString(payload.participantId).trim();
-  if (!participantId) {
-    return res.status(400).json({ error: "participantId is required." });
-  }
-
-  const store = await readStudyStore();
-  const participant = ensureParticipantRecord(store, participantId, safeString(payload.groupId, "experimental"));
-  applyInterviewNote(participant, payload);
-  await writeStudyStore(store);
-  return res.json({ ok: true, participant: buildParticipantView(participant, store) });
-});
-
-app.post("/api/erhu/interview-sampling", async (req, res) => {
-  const payload = req.body || {};
-  const participantId = safeString(payload.participantId).trim();
-  if (!participantId) {
-    return res.status(400).json({ error: "participantId is required." });
-  }
-
-  const store = await readStudyStore();
-  const participant = ensureParticipantRecord(store, participantId, safeString(payload.groupId, "experimental"));
-  applyInterviewSampling(participant, payload);
-  await writeStudyStore(store);
-  return res.json({ ok: true, participant: buildParticipantView(participant, store) });
-});
-
-app.post("/api/erhu/validation-review", async (req, res) => {
-  const payload = req.body || {};
-  const analysisId = safeString(payload.analysisId).trim();
-  const raterId = safeString(payload.raterId, "expert").trim();
-  if (!analysisId) {
-    return res.status(400).json({ error: "analysisId is required." });
-  }
-  if (!raterId) {
-    return res.status(400).json({ error: "raterId is required." });
-  }
-
-  const store = await readStudyStore();
-  let review = null;
-  try {
-    review = createValidationReview(store, { ...payload, raterId });
-  } catch (error) {
-    return res.status(404).json({ error: safeString(error?.message, "validation review failed.") });
-  }
-
-  const reviewIndex = getArray(store.validationReviews).findIndex(
-    (item) => item.analysisId === review.analysisId && safeString(item.raterId) === safeString(review.raterId),
-  );
-  if (reviewIndex >= 0) {
-    store.validationReviews[reviewIndex] = {
-      ...store.validationReviews[reviewIndex],
-      ...review,
-      reviewId: store.validationReviews[reviewIndex].reviewId || review.reviewId,
-    };
-  } else {
-    store.validationReviews.push(review);
-  }
-
-  await writeStudyStore(store);
-  const participant = store.participants.find((item) => item.participantId === review.participantId) || null;
-  return res.json({
-    ok: true,
-    review,
-    participant: participant ? buildParticipantView(participant, store) : null,
-    validationSummary: buildValidationSummary(store),
-  });
-});
-
-app.post("/api/erhu/adjudication", async (req, res) => {
-  const payload = req.body || {};
-  const analysisId = safeString(payload.analysisId).trim();
-  if (!analysisId) {
-    return res.status(400).json({ error: "analysisId is required." });
-  }
-
-  const store = await readStudyStore();
-  let adjudication = null;
-  try {
-    adjudication = createAdjudication(store, payload);
-  } catch (error) {
-    return res.status(400).json({ error: safeString(error?.message, "adjudication failed.") });
-  }
-
-  const adjudicationIndex = getArray(store.adjudications).findIndex((item) => item.analysisId === adjudication.analysisId);
-  if (adjudicationIndex >= 0) {
-    store.adjudications[adjudicationIndex] = {
-      ...store.adjudications[adjudicationIndex],
-      ...adjudication,
-      adjudicationId: store.adjudications[adjudicationIndex].adjudicationId || adjudication.adjudicationId,
-    };
-  } else {
-    store.adjudications.push(adjudication);
-  }
-
-  await writeStudyStore(store);
-  const participant = store.participants.find((item) => item.participantId === adjudication.participantId) || null;
-  return res.json({
-    ok: true,
-    adjudication,
-    participant: participant ? buildParticipantView(participant, store) : null,
-    adjudicationSummary: buildAdjudicationSummary(store),
-  });
-});
-
-app.post("/api/erhu/research/batch-participants", async (req, res) => {
-  const entries = getArray(req.body?.participants);
-  if (!entries.length) {
-    return res.status(400).json({ error: "participants array is required." });
-  }
-
-  const store = await readStudyStore();
-  const imported = [];
-
-  entries.forEach((entry) => {
-    const participantId = safeString(entry.participantId).trim();
-    if (!participantId) return;
-    const participant = ensureParticipantRecord(store, participantId, safeString(entry.groupId, "experimental"));
-    if (entry.profile && typeof entry.profile === "object") {
-      participant.profile = {
-        alias: safeString(entry.profile.alias, participant.profile?.alias || ""),
-        institution: safeString(entry.profile.institution, participant.profile?.institution || ""),
-        major: safeString(entry.profile.major, participant.profile?.major || ""),
-        grade: safeString(entry.profile.grade, participant.profile?.grade || ""),
-        yearsOfTraining: clamp(safeNumber(entry.profile.yearsOfTraining, participant.profile?.yearsOfTraining || 0), 0, 80),
-        weeklyPracticeMinutes: clamp(
-          safeNumber(entry.profile.weeklyPracticeMinutes, participant.profile?.weeklyPracticeMinutes || 0),
-          0,
-          10080,
-        ),
-        deviceLabel: safeString(entry.profile.deviceLabel, participant.profile?.deviceLabel || ""),
-        consentSigned: safeBoolean(entry.profile.consentSigned, participant.profile?.consentSigned || false),
-        notes: safeString(entry.profile.notes, participant.profile?.notes || ""),
-        updatedAt: nowIso(),
-      };
-      participant.lastActiveAt = participant.profile.updatedAt;
-    }
-    imported.push(buildParticipantSummary(participant, store));
-  });
-
-  await writeStudyStore(store);
-  return res.json({ ok: true, importedCount: imported.length, participants: imported });
-});
-
-app.get("/api/erhu/research/export", async (req, res) => {
-  const format = safeString(req.query.format, "json").toLowerCase();
-  const dataset = safeString(req.query.dataset, "participants");
-  const store = await readStudyStore();
-  const payload = buildExportPayload(store, dataset);
-  if (format === "csv") {
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename=erhu-study-${payload.dataset}.csv`);
-    return res.send(convertRowsToCsv(payload.headers, payload.rows));
-  }
-  return res.json({ ok: true, dataset: payload.dataset, rows: payload.rows, store });
-});
+app.use("/api/erhu", createResearchRouter({ readStudyStore, writeStudyStore, fetchAnalyzerStatus }));
+app.use("/api/erhu/teacher-validation", createTeacherValidationRouter(teacherValidationService));
 
 const noStoreStaticOptions = {
   etag: false,

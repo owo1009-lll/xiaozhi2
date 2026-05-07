@@ -58,3 +58,69 @@ The project now generates:
 - `table_inter_rater_by_piece.csv`
 - `table_inter_rater_adjudication_queue.csv`
 - `figure_inter_rater_metrics.png`
+
+## Offline Corpus Pack Workflow
+
+Use this workflow to turn radio-program PDF/audio runs into teacher-reviewed validation data without treating raw performances as ground truth.
+
+1. Build a 30-50 item review pack from completed real-corpus runs:
+
+   ```powershell
+   npm run teacher:validation-pack -- --unit section --sources real-runs --min 30 --max 50
+   ```
+
+2. Send the generated `teacher-review-template.csv` or `teacher-review-template.json` plus `system-findings.csv` to the teacher.
+
+3. The teacher marks each row as `reviewStatus=complete`, keeps `includeInBaseline=yes` only for suitable samples, and fills:
+   - `overallAgreement`
+   - `teacherPrimaryPath`
+   - `teacherIssueNoteIds`
+   - `teacherIssueMeasureIndexes`
+   - `comments`
+
+4. Dry-run the import:
+
+   ```powershell
+   npm run teacher:validation-import -- --pack-dir data\teacher-validation\packs\<pack> --reviews data\teacher-validation\packs\<pack>\teacher-review-filled.csv
+   ```
+
+5. Apply the import once the summary is correct:
+
+   ```powershell
+   npm run teacher:validation-import -- --pack-dir data\teacher-validation\packs\<pack> --reviews data\teacher-validation\packs\<pack>\teacher-review-filled.csv --apply
+   ```
+
+6. Rebuild and check the quality baseline:
+
+   ```powershell
+   npm run quality:baseline
+   npm run test:quality-baseline
+   ```
+
+The pack can optionally cut audio snippets if `ffmpeg` is available:
+
+```powershell
+npm run teacher:validation-pack -- --unit section --sources real-runs --min 30 --max 50 --extract-audio
+```
+
+## Teacher Annotation Backend
+
+Teachers should not edit the CSV/JSON files directly. After a pack is generated, open the local app and use:
+
+```text
+http://localhost:3000/?mode=teacher
+```
+
+The backend lists available packs, opens the source audio/PDF through server routes, saves each row back into `teacher-review-template.json`, and can import completed rows into `data/erhu-study-records.json`.
+
+Rows are imported only when:
+
+- `reviewStatus=complete`
+- `includeInBaseline=yes`
+
+After importing completed teacher rows, refresh the quality baseline:
+
+```powershell
+npm run quality:baseline
+npm run test:quality-baseline
+```

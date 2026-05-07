@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-05-05T18:55:47.912Z",
+  "sources": {
+    "studyStore": "data/erhu-study-records.json",
+    "corpusRuns": "data/real-tests/corpus-runs"
+  },
+  "validation": {
+    "ready": false,
+    "reviewCount": 0,
+    "adjudicationCount": 0,
+    "validatedAnalysisCount": 0,
+    "averageOverallAgreement": null,
+    "averageNotePrecision": null,
+    "averageNoteRecall": null,
+    "averageNoteF1": null,
+    "noteFalsePositiveRate": null,
+    "averageMeasurePrecision": null,
+    "averageMeasureRecall": null,
+    "averageMeasureF1": null,
+    "measureFalsePositiveRate": null,
+    "pathAgreementRate": null
+  },
+  "performance": {
+    "corpusRunCount": 128,
+    "completedResultCount": 134,
+    "analysisMsP95": 99597,
+    "firstRunSampleCount": 29,
+    "firstRunAnalysisMsP95": 251061,
+    "p0FailureCount": 3
+  }
+}

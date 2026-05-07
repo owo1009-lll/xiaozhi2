@@ -431,7 +431,9 @@ async function runScenario(backend) {
     const analysisJobId = resumedAnalysis.json.job?.jobId;
     if (!analysisJobId || resumedAnalysis.json.job?.previousJobId !== "failed-analysis") fail("analysis resume did not create a linked new job");
     const completedAnalysis = await pollAnalysisJob(baseUrl, analysisJobId);
-    if (completedAnalysis.status !== "completed" || completedAnalysis.previousJobId !== "failed-analysis") fail("resumed analysis job did not complete with previousJobId");
+    if (completedAnalysis.status !== "completed" || completedAnalysis.previousJobId !== "failed-analysis") {
+      fail(`resumed analysis job did not complete with previousJobId: ${JSON.stringify(completedAnalysis)}`);
+    }
     if (completedAnalysis.requestPayload || completedAnalysis.audioPath) fail("analysis job response leaked reusable payload internals");
 
     const resumedPiecePass = await fetchJson(`${baseUrl}/api/erhu/ops/jobs/piece-pass/failed-piece-pass/resume`, { method: "POST" });

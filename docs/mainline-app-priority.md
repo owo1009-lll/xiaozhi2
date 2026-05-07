@@ -312,3 +312,20 @@ Validation:
 - `node --no-warnings --check server.js`
 - `node --check scripts/test-ops-health-and-jobs.mjs`
 - CPU-only `npm run test:ops-health` covering score-import, analysis, and piece-pass cancel/resume paths on JSON and SQLite score-store backends.
+
+## 2026-05-07 P2 Completion Checkpoint
+
+Completed:
+
+- Kept the current P2 split boundary explicit and enforceable with `npm run test:p2-mainline`.
+- Added `python-service/analyzer_models.py` for shared analyzer note models, keeping `analyzer.py` under the tightened P2 budget.
+- Tightened P2 line budgets: `server.js <= 4700`, `python-service/analyzer.py <= 6900`, `src/StudentApp.jsx <= 1400`, and `src/ScoreIssuePage.jsx <= 950`.
+- Guarded the required split modules for analyzer audio, MusicXML, score import, score roles, server route modules, student helpers, and score-issue projection.
+- Added the P2 split guard to the mainline routine so future releases cannot silently regress into large all-in-one files.
+
+Validation:
+
+- `npm run test:p2-mainline`
+- `npm run test:frontend-split`
+- `npm run test:analyzer-audio`
+- `npm run test:analyzer-score-roles`

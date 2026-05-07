@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import json
@@ -60,6 +61,13 @@ def main() -> int:
     require(find_musicxml_part_candidate(candidates, "") is candidates[0], "candidate lookup should fall back to first candidate")
     require(is_explicit_erhu_part_candidate(candidates[1]), "English Erhu label should be explicit erhu")
     require(has_accompaniment_part_candidate(candidates), "piano candidate should mark accompaniment present")
+    require(is_explicit_erhu_part_candidate({"id": "P4", "name": "二胡", "label": ""}), "Simplified Chinese 二胡 label should be explicit erhu")
+    require(is_explicit_erhu_part_candidate({"id": "P5", "name": " 二 胡 ", "label": ""}), "Chinese 二胡 label should tolerate whitespace")
+    require(is_explicit_erhu_part_candidate({"id": "P6", "name": "Erhu II", "label": ""}), "Erhu II label should be explicit erhu")
+    require(is_explicit_erhu_part_candidate({"id": "P7", "name": "Erhu 1", "label": ""}), "Erhu 1 label should be explicit erhu")
+    require(has_accompaniment_part_candidate([{"id": "P8", "name": "钢琴", "label": ""}]), "Simplified Chinese 钢琴 should mark accompaniment present")
+    require(has_accompaniment_part_candidate([{"id": "P9", "name": "鋼 琴", "label": ""}]), "Traditional Chinese 鋼琴 should tolerate whitespace")
+    require(has_accompaniment_part_candidate([{"id": "P10", "name": "伴奏", "label": ""}]), "Chinese 伴奏 should mark accompaniment present")
     require(not is_clean_solo_part_candidate(candidates[2], candidates), "Voice should not be clean solo when piano is present")
     require(is_clean_solo_part_candidate(candidates[2], [candidates[2]]), "single monophonic Voice should be clean solo")
     require(is_ambiguous_part_candidate(candidates[0], candidates), "piano-like candidate should be ambiguous for erhu projection")

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import base64
@@ -18,7 +19,6 @@ import collections.abc
 import gc
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
 from pathlib import Path
 from statistics import median
 import time
@@ -45,6 +45,14 @@ from schemas import (
     ScoreImportRequest,
     SeparateErhuRequest,
     SeparateErhuResult,
+)
+from analyzer_audio import (
+    AudioArtifact,
+    DecodedAudioCacheItem,
+    audio_file_cache_identity,
+    decoded_cache_item,
+    is_sha1_hex,
+    mono_float32,
 )
 
 try:
@@ -108,72 +116,6 @@ except ImportError:  # pragma: no cover - optional dependency
     RNNOnsetProcessor = None
 
 
-@dataclass(slots=True)
-class AudioArtifact:
-    raw_bytes: bytes
-    duration_seconds: float | None
-    sample_rate: int | None = None
-    waveform: Any = None
-    decode_method: str = "none"
-    ffmpeg_path: str | None = None
-    audio_hash: str = ""
-    cache_key: str | None = None
-
-
-@dataclass(slots=True)
-class DecodedAudioCacheItem:
-    cache_key: str
-    waveform: Any
-    sample_rate: int
-    duration_seconds: float
-    decode_method: str
-    last_access: float
-
-
-@dataclass(slots=True)
-class SymbolicNote:
-    note_id: str
-    measure_index: int
-    beat_start: float
-    beat_duration: float
-    midi_pitch: int
-    expected_onset: float
-    expected_offset: float
-    note_position: dict[str, Any] | None = None
-    articulations: list[str] | None = None
-    notations: list[str] | None = None
-    techniques: list[str] | None = None
-    active_tempo: int | None = None
-    active_dynamic: str | None = None
-    dynamic_value: float | None = None
-
-
-@dataclass(slots=True)
-class ObservedNote:
-    onset: float
-    offset: float
-    median_frequency: float
-    median_midi: float
-    confidence: float
-    segment_point_count: int
-    stable_point_count: int
-    pitch_spread_cents: float
-    entry_cents: float
-    exit_cents: float
-    glide_like: bool
-    vibrato_like: bool
-    trill_like: bool
-    pluck_like: bool
-    tap_like: bool
-    harmonic_like: bool
-    vibrato_center_frequency: float
-    vibrato_amplitude_cents: float
-    glide_run_ms: float
-    trill_low_frequency: float
-    trill_high_frequency: float
-    trill_switch_count: int
-
-
 from analyzer_utils import (
     analysis_separation_result_fields,
     beats_per_measure,
@@ -196,6 +138,7 @@ from analyzer_utils import (
     severity_label,
     trimmed_median,
 )
+from analyzer_models import ObservedNote, SymbolicNote
 from analyzer_musicxml import (
     candidate_matches_selected_hint,
     extract_candidate_layout_profile,
@@ -493,18 +436,7 @@ class ErhuAnalyzer(ScoreImportMixin):
             return self._madmom_beat_processor, self._madmom_beat_tracker
 
     def _audio_file_cache_identity(self, audio_path: str) -> dict[str, Any] | None:
-        try:
-            path = Path(audio_path)
-            stat = path.stat()
-            return {
-                "path": str(path.resolve()).lower(),
-                "size": int(stat.st_size),
-                "mtimeNs": int(getattr(stat, "st_mtime_ns", int(stat.st_mtime * 1_000_000_000))),
-                "sampleRate": int(self.settings.target_sample_rate),
-                "version": "decoded-audio-memory-v1",
-            }
-        except Exception:
-            return None
+        return audio_file_cache_identity(audio_path, int(self.settings.target_sample_rate))
 
     def _decode_full_audio_file_for_cache(
         self,
@@ -522,9 +454,7 @@ class ErhuAnalyzer(ScoreImportMixin):
         if sf is not None:
             try:
                 samples, loaded_sr = sf.read(audio_path, always_2d=False)
-                loaded_waveform = np.asarray(samples, dtype=np.float32)
-                if loaded_waveform.ndim > 1:
-                    loaded_waveform = loaded_waveform.mean(axis=1)
+                loaded_waveform = mono_float32(samples, np)
                 sample_rate = int(loaded_sr)
                 if sample_rate != target_sample_rate and librosa is not None:
                     loaded_waveform = librosa.resample(
@@ -567,15 +497,7 @@ class ErhuAnalyzer(ScoreImportMixin):
 
         if waveform is None or not sample_rate:
             return None
-        duration_seconds = float(len(waveform) / max(int(sample_rate), 1))
-        return DecodedAudioCacheItem(
-            cache_key=cache_key,
-            waveform=waveform,
-            sample_rate=int(sample_rate),
-            duration_seconds=duration_seconds,
-            decode_method=decode_method or "file-memory-cache",
-            last_access=time.time(),
-        )
+        return decoded_cache_item(cache_key, waveform, int(sample_rate), decode_method)
 
     def _load_decoded_audio_memory_cache(self, audio_path: str, ffmpeg_path: str | None) -> DecodedAudioCacheItem | None:
         if not bool(self.settings.enable_decoded_audio_memory_cache):
@@ -2638,7 +2560,7 @@ class ErhuAnalyzer(ScoreImportMixin):
             try:
                 raw_bytes = Path(audio_path).read_bytes()
                 audio_hash = Path(audio_path).stem.strip().lower()
-                if not audio_hash or len(audio_hash) != 40 or not all(character in "0123456789abcdef" for character in audio_hash):
+                if not is_sha1_hex(audio_hash):
                     audio_hash = hashlib.sha1(raw_bytes).hexdigest() if raw_bytes else ""
             except Exception:
                 raw_bytes = b""
@@ -2706,9 +2628,7 @@ class ErhuAnalyzer(ScoreImportMixin):
         if waveform is None and audio_path and os.path.exists(audio_path) and sf is not None and np is not None:
             try:
                 samples, sample_rate = sf.read(audio_path, always_2d=False)
-                waveform = np.asarray(samples, dtype=np.float32)
-                if waveform.ndim > 1:
-                    waveform = waveform.mean(axis=1)
+                waveform = mono_float32(samples, np)
                 decode_method = "soundfile-file"
             except Exception:
                 waveform = None
@@ -2717,9 +2637,7 @@ class ErhuAnalyzer(ScoreImportMixin):
         if raw_bytes and waveform is None and sf is not None and np is not None:
             try:
                 samples, sample_rate = sf.read(io.BytesIO(raw_bytes), always_2d=False)
-                waveform = np.asarray(samples, dtype=np.float32)
-                if waveform.ndim > 1:
-                    waveform = waveform.mean(axis=1)
+                waveform = mono_float32(samples, np)
                 decode_method = "soundfile"
             except Exception:
                 waveform = None
@@ -4503,7 +4421,7 @@ class ErhuAnalyzer(ScoreImportMixin):
             if "piano" not in candidate.lower()
             and "钢琴" not in candidate
             and "鋼琴" not in candidate
-            and "閽㈢惔" not in candidate
+            and "伴奏" not in candidate
         ]
         return non_piano[0] if non_piano else detected_parts[0]
 

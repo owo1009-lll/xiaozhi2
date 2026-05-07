@@ -15,6 +15,10 @@ import {
 } from "../src/server/audioPayload.js";
 import { createAnalyzerClient } from "../src/server/analyzerClient.js";
 import { sha1 } from "../src/server/baseUtils.js";
+import {
+  hasAccompanimentPartCandidate,
+  isExplicitErhuPartCandidate,
+} from "../src/server/scoreLineRoles.js";
 
 function assert(condition, message) {
   if (!condition) {
@@ -134,11 +138,30 @@ async function testAnalyzerClientLongTimeout() {
   }
 }
 
+function testScoreLineRoleLabels() {
+  assert(isExplicitErhuPartCandidate({ name: "二胡" }), "Node score-line role helper should detect Chinese 二胡");
+  assert(isExplicitErhuPartCandidate({ name: " 二 胡 " }), "Node score-line role helper should tolerate whitespace in 二胡");
+  assert(isExplicitErhuPartCandidate({ name: "Erhu II" }), "Node score-line role helper should detect Erhu variants");
+  assert(
+    hasAccompanimentPartCandidate({ partCandidates: [{ name: "钢琴" }] }),
+    "Node score-line role helper should detect Chinese 钢琴",
+  );
+  assert(
+    hasAccompanimentPartCandidate({ partCandidates: [{ name: "鋼 琴" }] }),
+    "Node score-line role helper should tolerate whitespace in 鋼琴",
+  );
+  assert(
+    hasAccompanimentPartCandidate({ partCandidates: [{ name: "伴奏" }] }),
+    "Node score-line role helper should detect Chinese 伴奏",
+  );
+}
+
 async function main() {
   await testAudioPayload();
   await testAnalyzerClientFetchPath();
   await testAnalyzerClientLongTimeout();
-  console.log(JSON.stringify({ ok: true, checks: ["audio-payload", "analyzer-client-fetch", "analyzer-client-long-timeout"] }, null, 2));
+  testScoreLineRoleLabels();
+  console.log(JSON.stringify({ ok: true, checks: ["audio-payload", "analyzer-client-fetch", "analyzer-client-long-timeout", "score-line-role-labels"] }, null, 2));
 }
 
 main().catch((error) => {

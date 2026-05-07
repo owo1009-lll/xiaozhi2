@@ -311,7 +311,7 @@
 - Mainline mission:
   keep the student-facing `PDF score -> record/upload -> deep-learning diagnosis -> localized feedback` flow as the highest-priority product line.
 - Latest whole-piece baseline:
-  the refreshed `妗冭姳鍧瀈 whole-piece pass now reports `41/41` matched sections, `weightedPitchScore=62.82`, `weightedRhythmScore=77.84`, `weightedCombinedScore=72.14`, and `weightedStudentCombinedScore=83.47`.
+  the refreshed `桃花坞` whole-piece pass now reports `41/41` matched sections, `weightedPitchScore=62.82`, `weightedRhythmScore=77.84`, `weightedCombinedScore=72.14`, and `weightedStudentCombinedScore=83.47`.
 - Completed: `focused weak-section calibration round`
   Added section-level calibration profiles for `answer-loop`, `folk-dance-answer`, `pedal-tension-loop`, `descending-beacon`, and `con-brio-entry`, then reran a fresh whole-piece pass plus a cached verification pass.
 - Calibration outcome:

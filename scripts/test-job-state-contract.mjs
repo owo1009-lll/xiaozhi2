@@ -23,26 +23,29 @@ function expectAtLeast(text, pattern, count, label) {
   }
 }
 
-const [server, studentApp, docs] = await Promise.all([
+const [server, scoreRoutes, studentApp, studentStatus, docs] = await Promise.all([
   fs.readFile(path.join(repoRoot, "server.js"), "utf8"),
+  fs.readFile(path.join(repoRoot, "src", "server", "scoreRoutes.js"), "utf8"),
   fs.readFile(path.join(repoRoot, "src", "StudentApp.jsx"), "utf8"),
+  fs.readFile(path.join(repoRoot, "src", "student", "studentStatus.js"), "utf8"),
   fs.readFile(path.join(repoRoot, "docs", "mainline-app-priority.md"), "utf8"),
 ]);
+const scoreImportRuntime = `${server}\n${scoreRoutes}`;
 
-expectIncludes(server, "musicxmlFallbackAvailable", "server score-import fallback contract");
-expectIncludes(server, 'fallbackActions: fallbackActions.length ? fallbackActions : (musicxmlFallbackAvailable ? ["import-musicxml"] : [])', "server fallback action normalization");
-expectIncludes(server, "isMusicXmlSource", "server MusicXML source guard");
+expectIncludes(scoreImportRuntime, "musicxmlFallbackAvailable", "server score-import fallback contract");
+expectIncludes(scoreImportRuntime, 'fallbackActions: fallbackActions.length ? fallbackActions : (musicxmlFallbackAvailable ? ["import-musicxml"] : [])', "server fallback action normalization");
+expectIncludes(scoreImportRuntime, "isMusicXmlSource", "server MusicXML source guard");
 expectIncludes(server, "interruptedByRestart", "server recovery marker");
 expectIncludes(server, "retryable", "server retry marker");
 expectIncludes(server, 'recoveryReason: "node-service-restart"', "server recovery reason");
 expectIncludes(server, "recoverStaleJobsOnStartup", "server startup recovery");
-expectIncludes(server, 'musicxmlFallbackAvailable: false', "direct MusicXML failure should not self-advertise fallback");
+expectIncludes(scoreImportRuntime, 'musicxmlFallbackAvailable: false', "direct MusicXML failure should not self-advertise fallback");
 expectAtLeast(server, /recoveryReason:\s*"node-service-restart"/g, 3, "all stale job recovery paths");
-expectAtLeast(server, /fallbackActions:\s*\["import-musicxml"\]/g, 2, "PDF fallback paths");
+expectAtLeast(scoreImportRuntime, /fallbackActions:\s*\["import-musicxml"\]/g, 2, "PDF fallback paths");
 
 expectIncludes(studentApp, "hasScoreMusicXmlFallback", "student fallback helper");
 expectIncludes(studentApp, "showMusicXmlFallback", "student fallback display gate");
-expectIncludes(studentApp, 'actions.includes("import-musicxml")', "student fallback action check");
+expectIncludes(studentStatus, 'actions.includes("import-musicxml")', "student fallback action check");
 expectIncludes(studentApp, "PDF 自动识谱失败时", "student fallback copy");
 expectIncludes(studentApp, "handleImportMusicXml", "student fallback import handler");
 

@@ -4,12 +4,14 @@ const ResearchApp = lazy(() => import("./ResearchApp.jsx"));
 const ScoreIssuePage = lazy(() => import("./ScoreIssuePage.jsx"));
 const StudentApp = lazy(() => import("./StudentApp.jsx"));
 const HealthPage = lazy(() => import("./HealthPage.jsx"));
+const TeacherValidationApp = lazy(() => import("./TeacherValidationApp.jsx"));
 
 function getModeFromLocation() {
   if (typeof window === "undefined") return "student";
   const params = new URLSearchParams(window.location.search);
   if (params.get("mode") === "score-issues") return "score-issues";
   if (params.get("mode") === "health") return "health";
+  if (params.get("mode") === "teacher") return "teacher";
   return params.get("mode") === "research" ? "research" : "student";
 }
 
@@ -24,7 +26,7 @@ export default function MainApp() {
 
   function switchMode(nextMode) {
     const url = new URL(window.location.href);
-    if (nextMode === "research" || nextMode === "health") {
+    if (nextMode === "research" || nextMode === "health" || nextMode === "teacher") {
       url.searchParams.set("mode", nextMode);
     } else {
       url.searchParams.delete("mode");
@@ -45,6 +47,8 @@ export default function MainApp() {
         <ResearchApp onBackToStudent={() => switchMode("student")} />
       ) : mode === "health" ? (
         <HealthPage />
+      ) : mode === "teacher" ? (
+        <TeacherValidationApp />
       ) : mode === "score-issues" ? (
         <ScoreIssuePage />
       ) : (

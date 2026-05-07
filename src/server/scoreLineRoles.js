@@ -323,13 +323,18 @@ export function getSelectedPartCandidate(score = {}) {
 
 export function isExplicitErhuPartCandidate(candidate = {}) {
   const label = `${safeString(candidate?.id)} ${safeString(candidate?.name)} ${safeString(candidate?.label)}`;
-  return /\berhu\b|二胡/i.test(label);
+  const normalizedLabel = label.replace(/\s+/g, "").toLowerCase();
+  return /\berhu\b/i.test(label) || normalizedLabel.includes("二胡");
 }
 
 export function hasAccompanimentPartCandidate(score = {}) {
   return getArray(score?.partCandidates).some((candidate) => {
     const label = `${safeString(candidate?.id)} ${safeString(candidate?.name)} ${safeString(candidate?.label)}`;
-    return /\b(piano|pno|pianoforte|accompaniment)\b|\bpn\.|钢琴|鋼琴|伴奏|閽㈢惔|閶肩惔/i.test(label)
+    const normalizedLabel = label.replace(/\s+/g, "").toLowerCase();
+    return /\b(piano|pno|pianoforte|accompaniment)\b|\bpn\./i.test(label)
+      || normalizedLabel.includes("钢琴")
+      || normalizedLabel.includes("鋼琴")
+      || normalizedLabel.includes("伴奏")
       || safeBoolean(candidate?.isLikelyPiano, false)
       || Math.max(1, safeNumber(candidate?.staffCount, 1)) >= 2;
   });

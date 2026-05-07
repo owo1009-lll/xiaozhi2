@@ -205,6 +205,32 @@ export async function fetchValidationSummary() {
   return readJson(await fetch("/api/erhu/research/validation-summary"));
 }
 
+export async function fetchTeacherValidationPacks() {
+  return readJson(await fetch("/api/erhu/teacher-validation/packs"));
+}
+
+export async function fetchTeacherValidationPack(packId) {
+  return readJson(await fetch(`/api/erhu/teacher-validation/packs/${encodeURIComponent(packId)}`));
+}
+
+export async function saveTeacherValidationReview(packId, caseId, payload) {
+  return readJson(
+    await fetch(`/api/erhu/teacher-validation/packs/${encodeURIComponent(packId)}/reviews/${encodeURIComponent(caseId)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  );
+}
+
+export async function applyTeacherValidationPack(packId) {
+  return readJson(
+    await fetch(`/api/erhu/teacher-validation/packs/${encodeURIComponent(packId)}/apply`, {
+      method: "POST",
+    }),
+  );
+}
+
 export async function fetchAdjudications() {
   return readJson(await fetch("/api/erhu/research/adjudications"));
 }

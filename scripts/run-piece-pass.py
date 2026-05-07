@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import argparse
@@ -1228,6 +1229,8 @@ def main() -> int:
     scan_payload = json.loads(scan_json_path.read_text(encoding="utf-8"))
     sequence_path = scan_payload.get("sequenceAwarePath") or []
     audio_coverage = scan_payload.get("audioCoverage")
+    if isinstance(audio_coverage, dict) and not audio_coverage.get("scanMode"):
+        audio_coverage["scanMode"] = "analyzer-window"
     section_lookup = {section.get("sectionId"): section for section in piece.get("sections") or []}
 
     valid_items = [(item, section_lookup.get(item.get("sectionId"))) for item in sequence_path]

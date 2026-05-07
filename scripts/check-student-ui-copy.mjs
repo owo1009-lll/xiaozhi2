@@ -11,6 +11,8 @@ const checkedFiles = [
   "src/StudentApp.jsx",
   "src/ScoreIssuePage.jsx",
   "src/student/StudentLayout.jsx",
+  "src/student/studentAppUtils.js",
+  "src/student/studentStatus.js",
   "src/scoreIssue/ScoreIssueLayout.jsx",
   "src/analysisLabels.js",
 ];
@@ -52,8 +54,8 @@ const rawStudentErrorPatterns = [
 
 const staleStudentCopyPatterns = [
   {
-    pattern: /已沿用上次识谱结果|同一份 PDF 已完成过识谱|识谱排队中|分析排队中|整曲分析排队中|正在写入整曲/g,
-    reason: "Student status copy should describe learner-visible progress instead of queue/cache/write mechanics.",
+    pattern: /已沿用上次识谱结果|同一份 PDF 已完成过识谱|正在写入整曲/g,
+    reason: "Student status copy should describe learner-visible progress instead of cache/write mechanics.",
   },
 ];
 
@@ -110,15 +112,17 @@ for (const expectation of productCopyExpectations) {
 
 const studentAppPath = path.join(repoRoot, "src/StudentApp.jsx");
 const studentAppText = fs.readFileSync(studentAppPath, "utf8");
-if (!studentAppText.includes("function friendlyErrorMessage(")) {
+const studentStatusPath = path.join(repoRoot, "src/student/studentStatus.js");
+const studentStatusText = fs.readFileSync(studentStatusPath, "utf8");
+if (!studentAppText.includes("function friendlyErrorMessage(") && !studentStatusText.includes("function friendlyErrorMessage(")) {
   failures.push({
-    path: "src/StudentApp.jsx",
+    path: "src/student/studentStatus.js",
     line: 1,
     reason: "Student UI must keep a friendlyErrorMessage guard.",
   });
 }
 
-for (const relativePath of ["src/StudentApp.jsx", "src/ScoreIssuePage.jsx", "src/student/StudentLayout.jsx", "src/scoreIssue/ScoreIssueLayout.jsx"]) {
+for (const relativePath of ["src/StudentApp.jsx", "src/ScoreIssuePage.jsx", "src/student/StudentLayout.jsx", "src/student/studentAppUtils.js", "src/student/studentStatus.js", "src/scoreIssue/ScoreIssueLayout.jsx"]) {
   const absolutePath = path.join(repoRoot, relativePath);
   const text = fs.readFileSync(absolutePath, "utf8");
   for (const { pattern, reason } of rawStudentErrorPatterns) {

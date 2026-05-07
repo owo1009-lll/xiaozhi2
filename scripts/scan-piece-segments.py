@@ -516,6 +516,7 @@ def main() -> int:
         "skippedSectionIds": [s.get("sectionId") for s in skipped_beyond_audio] + [s.get("sectionId") for s in omitted_sections],
         "omittedMeasureRanges": [[start, end] for start, end in omitted_measure_ranges],
         "omittedSectionIds": [s.get("sectionId") for s in omitted_sections],
+        "scanMode": "analyzer-window",
     }
     (output_dir / f"{output_key}-segment-scan.json").write_text(
         json.dumps(

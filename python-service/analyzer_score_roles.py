@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 from typing import Any
@@ -25,22 +26,26 @@ def find_musicxml_part_candidate(candidates: list[dict[str, Any]], selected_labe
 def is_explicit_erhu_part_candidate(candidate: dict[str, Any] | None) -> bool:
     if not candidate:
         return False
-    label = " ".join(str(candidate.get(key) or "") for key in ("id", "name", "label")).lower()
-    return "erhu" in label or "浜岃儭" in label
+    raw_label = " ".join(str(candidate.get(key) or "") for key in ("id", "name", "label"))
+    label = raw_label.lower()
+    normalized_label = normalize_part_label(raw_label)
+    return "erhu" in label or "二胡" in normalized_label
 
 
 def has_accompaniment_part_candidate(candidates: list[dict[str, Any]] | None) -> bool:
     for candidate in candidates or []:
-        label = " ".join(str(candidate.get(key) or "") for key in ("id", "name", "label")).lower()
+        raw_label = " ".join(str(candidate.get(key) or "") for key in ("id", "name", "label"))
+        label = raw_label.lower()
+        normalized_label = normalize_part_label(raw_label)
         if (
             "piano" in label
             or "pianoforte" in label
             or "pno" in label
             or "pn." in label
             or "accompaniment" in label
-            or "閽㈢惔" in label
-            or "閶肩惔" in label
-            or "浼村" in label
+            or "钢琴" in normalized_label
+            or "鋼琴" in normalized_label
+            or "伴奏" in normalized_label
         ):
             return True
         if bool(candidate.get("isLikelyPiano")):
