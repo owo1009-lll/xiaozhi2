@@ -13,4 +13,5 @@ research-analysis/output/
 research-analysis/__pycache__/
 exports/
 scripts/__pycache__/
+__pycache__/
 hs_err_pid*.log

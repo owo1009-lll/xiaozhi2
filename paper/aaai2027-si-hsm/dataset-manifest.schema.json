@@ -15,6 +15,7 @@
         "required": [
           "itemId",
           "title",
+          "instrument",
           "subset",
           "mixturePath",
           "scorePath",
@@ -24,9 +25,13 @@
         "properties": {
           "itemId": { "type": "string" },
           "title": { "type": "string" },
+          "instrument": {
+            "type": "string",
+            "enum": ["erhu", "jinghu", "banhu", "gaohu"]
+          },
           "subset": {
             "type": "string",
-            "enum": ["piano", "orch_light", "orch_heavy"]
+            "enum": ["piano", "orch_light", "orch_heavy", "jinghu_transfer", "banhu_transfer", "gaohu_transfer"]
           },
           "mixturePath": { "type": "string" },
           "targetPath": { "type": "string" },
@@ -45,7 +50,20 @@
           },
           "sourceType": {
             "type": "string",
-            "enum": ["self_recorded", "authorized_multitrack", "public_domain", "copyright_restricted", "unknown"]
+            "enum": ["self_recorded", "authorized_multitrack", "authorized_synthetic", "public_domain", "copyright_restricted", "unknown"]
+          },
+          "evaluationUse": {
+            "type": "string",
+            "enum": ["objective_separation", "downstream_only", "qualitative_only"]
+          },
+          "pitchRangeMidi": {
+            "type": "array",
+            "prefixItems": [
+              { "type": "integer" },
+              { "type": "integer" }
+            ],
+            "minItems": 2,
+            "maxItems": 2
           },
           "difficulty": {
             "type": "object",
