@@ -43,17 +43,19 @@ def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--manifest", required=True)
     p.add_argument("--out-dir", required=True)
-    p.add_argument("--contains", default="良宵")
+    p.add_argument("--contains", default="")
     p.add_argument("--subset", default="piano_medium")
     p.add_argument("--score-weight", type=float, default=0.4)
     p.add_argument("--reliability-gating", action="store_true")
     p.add_argument("--reliability-alpha", type=float, default=1.0)
     p.add_argument("--score-branch-mode", choices=["always", "conditional", "none"], default="always")
+    p.add_argument("--detector-policy", choices=["posterior", "raw"], default="posterior")
+    p.add_argument("--score-admission-threshold", type=float, default=0.6)
     p.add_argument("--manual-score")
     args = p.parse_args()
     manifest = Path(args.manifest)
     data = json.loads(manifest.read_text(encoding="utf-8"))
-    item = next(x for x in data["items"] if args.contains in x["itemId"] and x["subset"] == args.subset)
+    item = next(x for x in data["items"] if (not args.contains or args.contains in x["itemId"]) and x["subset"] == args.subset)
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
     scores = {"basic_pitch": _path(manifest.parent, item, "scorePath")}
@@ -68,7 +70,7 @@ def main() -> int:
     target = _path(manifest.parent, item, "targetPath")
     accomp = _path(manifest.parent, item, "accompanimentPath")
     for label, score in scores.items():
-        est = extract_file(mix, score, out / label, item["instrument"], "full", item.get("targetPart"), Config(trace_stride=64, score_weight=args.score_weight, reliability_gating=args.reliability_gating, reliability_alpha=args.reliability_alpha, score_branch_mode=args.score_branch_mode))["outputPath"]
+        est = extract_file(mix, score, out / label, item["instrument"], "full", item.get("targetPart"), Config(trace_stride=64, score_weight=args.score_weight, reliability_gating=args.reliability_gating, reliability_alpha=args.reliability_alpha, score_branch_mode=args.score_branch_mode, detector_policy=args.detector_policy, score_admission_threshold=args.score_admission_threshold))["outputPath"]
         rows.append({"score": label, "scoreWeight": args.score_weight, **_stats(score), **evaluate(est, target, accomp, item["instrument"])})
     with (out / "score-quality-contrast.csv").open("w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, rows[0].keys())

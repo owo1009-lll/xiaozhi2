@@ -59,7 +59,16 @@ def _oracle(item, base: Path, out_dir: Path, binary: bool):
 
 def _cfg(args, item: dict) -> Config:
     alpha = ALPHA_BY_SCORE_SOURCE.get(item.get("scoreSource", "unknown"), 4.0) if args.score_source_aware else args.reliability_alpha
-    return Config(score_weight=args.score_weight, reliability_gating=args.reliability_gating or args.score_source_aware, reliability_alpha=alpha, score_branch_mode=args.score_branch_mode)
+    return Config(
+        bandwidth_cents=args.bandwidth_cents,
+        residual=args.residual,
+        score_weight=args.score_weight,
+        reliability_gating=args.reliability_gating or args.score_source_aware,
+        reliability_alpha=alpha,
+        score_branch_mode=args.score_branch_mode,
+        detector_policy=args.detector_policy,
+        score_admission_threshold=args.score_admission_threshold,
+    )
 
 
 def run_item(item: dict, base: Path, out_root: Path, methods: list[str], robustness: bool, args) -> list[dict]:
@@ -111,6 +120,10 @@ def main() -> int:
     p.add_argument("--reliability-alpha", type=float, default=1.0)
     p.add_argument("--score-source-aware", action="store_true")
     p.add_argument("--score-branch-mode", choices=["always", "conditional", "none"], default="always")
+    p.add_argument("--detector-policy", choices=["posterior", "raw"], default="posterior")
+    p.add_argument("--bandwidth-cents", type=float, default=38.0)
+    p.add_argument("--residual", type=float, default=0.05)
+    p.add_argument("--score-admission-threshold", type=float, default=0.6)
     p.add_argument("--oracle", choices=["none", "irm", "ibm", "both"], default="both")
     args = p.parse_args()
     manifest = Path(args.manifest)

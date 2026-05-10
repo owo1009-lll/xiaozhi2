@@ -12,7 +12,10 @@ def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--manifest", required=True)
     p.add_argument("--out-dir", required=True)
+    p.add_argument("--contains", default="")
     p.add_argument("--modes", default="always,conditional,none")
+    p.add_argument("--detector-policy", default="posterior", choices=["posterior", "raw"])
+    p.add_argument("--score-admission-threshold", type=float, default=0.6)
     args = p.parse_args()
     out = Path(args.out_dir)
     rows = []
@@ -22,12 +25,14 @@ def main() -> int:
             sys.executable, str(Path(__file__).with_name("run_score_quality_contrast.py")),
             "--manifest", args.manifest,
             "--out-dir", str(run_dir),
-            "--contains", "良宵",
+            "--contains", args.contains,
             "--subset", "piano_medium",
             "--score-weight", "0.4",
             "--reliability-gating",
             "--reliability-alpha", "4",
             "--score-branch-mode", mode,
+            "--detector-policy", args.detector_policy,
+            "--score-admission-threshold", str(args.score_admission_threshold),
         ])
         for row in csv.DictReader(open(run_dir / "score-quality-contrast.csv", encoding="utf-8")):
             row["scoreBranchMode"] = mode

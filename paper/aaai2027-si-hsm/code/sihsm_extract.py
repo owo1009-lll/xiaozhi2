@@ -26,6 +26,8 @@ class Config:
     reliability_gating: bool = False
     reliability_alpha: float = 1.0
     score_branch_mode: str = "always"
+    detector_policy: str = "posterior"
+    score_admission_threshold: float = 0.6
 
 
 def load_audio(path: str | Path) -> tuple[np.ndarray, int]:
@@ -110,16 +112,15 @@ def _mask(freqs, frames, f_det, c_det, score_rows, profile: str, mode: str, cfg:
     for i, sec in enumerate(frames):
         score_f, timing = score_rows[i]["freq"], score_rows[i]["timing"]
         det_f, det_c = float(f_det[i]), float(c_det[i])
-        if score_f > 0 and det_f > 0:
-            disagreement = min(abs(cents(det_f, score_f * (2.0 ** k))) for k in (-1, 0, 1))
-        else:
-            disagreement = 0.0
-        needs_score = det_c < 0.4 or disagreement > 100.0
-        if cfg.score_branch_mode == "none" or (cfg.score_branch_mode == "conditional" and not needs_score):
+        raw_score_reliability = score_reliability(score_f, det_f, det_c, profile)
+        admits_score = cfg.score_branch_mode == "always"
+        if cfg.score_branch_mode == "conditional":
+            admits_score = (det_f <= 0 or det_c < 0.4) and raw_score_reliability > cfg.score_admission_threshold
+        if cfg.score_branch_mode == "none" or not admits_score:
             score_f, timing = 0.0, 0.0
         if mode == "score_only":
             chosen = {"f_eff": score_f, "confidence": timing, "candidates": []}
-        elif mode == "pitch_only" or (mode == "full" and cfg.score_weight <= 0):
+        elif mode == "pitch_only" or (mode == "full" and (cfg.score_weight <= 0 or (score_f <= 0 and cfg.detector_policy == "raw"))):
             chosen = {"f_eff": det_f, "confidence": det_c, "candidates": []}
         else:
             reliability = score_reliability(score_f, det_f, det_c, profile) if cfg.reliability_gating else 1.0
@@ -143,7 +144,7 @@ def _mask(freqs, frames, f_det, c_det, score_rows, profile: str, mode: str, cfg:
                 sigma = max(20.0, center * bw_ratio)
                 mask[:, i] = np.maximum(mask[:, i], weight * np.exp(-0.5 * ((freqs - center) / sigma) ** 2))
         if i % max(1, cfg.trace_stride) == 0:
-            trace.append({"time": float(sec), "det": det_f, "detConfidence": det_c, "score": score_f, "scoreReliability": score_reliability(score_f, det_f, det_c, profile), "scoreBranchMode": cfg.score_branch_mode, "noteId": score_rows[i]["note_id"], "f_eff": base, "confidence": gamma, "candidates": chosen["candidates"]})
+            trace.append({"time": float(sec), "det": det_f, "detConfidence": det_c, "score": score_f, "scoreReliability": raw_score_reliability, "scoreBranchMode": cfg.score_branch_mode, "scoreAdmitted": admits_score, "noteId": score_rows[i]["note_id"], "f_eff": base, "confidence": gamma, "candidates": chosen["candidates"]})
     return mask, trace
 
 

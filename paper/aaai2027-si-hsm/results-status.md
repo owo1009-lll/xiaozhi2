@@ -198,3 +198,114 @@ Interpretation:
 - Removing the score branch entirely gives the best SI-SDR on this item, but SIR is much worse than pitch-only.
 - Therefore the remaining SIR loss is not explained only by an always-on score band. It also comes from the full-mode mask strength and fallback behavior.
 - Next method debug should separate two axes: score-branch admission versus mask aggressiveness/gamma calibration.
+
+## Liangxiao Detector Policy Diagnostic
+
+Local data paths:
+
+- `paper/aaai2027-si-hsm/runs.local/liangxiao-score-branch-mode-raw-60s`
+- `paper/aaai2027-si-hsm/runs.local/liangxiao-score-branch-mode-posterior-60s`
+
+Setup:
+
+- piece: Liangxiao
+- subset: `piano_medium`
+- score weight: 0.4
+- reliability alpha: 4
+
+| Detector policy | Mode | BasicPitch SI-SDR | BasicPitch SIR |
+|---|---|---:|---:|
+| pitch-only baseline | n/a | 6.322 | 18.253 |
+| posterior | none | 6.872 | 16.445 |
+| raw | none | 6.322 | 18.253 |
+| posterior | conditional | 6.547 | 17.300 |
+| raw | conditional | 6.333 | 17.602 |
+
+Interpretation:
+
+- `none + raw` is identical to pitch-only, proving that the current `none` mode does not retain a hidden score fallback.
+- The gap between `none + posterior` and pitch-only comes from detector-only posterior octave candidates and gamma behavior, not score leakage.
+- `conditional + raw` improves SIR over `conditional + posterior`, but does not reach the pitch-only SIR baseline.
+- Since first-layer fallback is not the remaining issue, the next scan should target mask aggressiveness: bandwidth, residual mix, and score/detector gamma calibration.
+
+## Liangxiao First-Layer Score Admission Gate
+
+Local data path:
+
+`paper/aaai2027-si-hsm/runs.local/liangxiao-score-admission-gate-60s`
+
+Setup:
+
+- piece: Liangxiao
+- subset: `piano_medium`
+- score weight: 0.4
+- reliability alpha: 4
+- detector policy: `raw`
+- first-layer score admission: only admit score when detector confidence is low and score reliability is greater than 0.6.
+
+| Mode | Score | SI-SDR | SIR | SAR | Pitch@50c |
+|---|---|---:|---:|---:|---:|
+| always | BasicPitch | 6.440 | 17.317 | 6.885 | 0.499 |
+| conditional | BasicPitch | 6.325 | 18.252 | 6.673 | 0.484 |
+| none | BasicPitch | 6.322 | 18.253 | 6.670 | 0.484 |
+| conditional | oracle target pitch | 6.331 | 18.241 | 6.681 | 0.485 |
+
+Interpretation:
+
+- The admission gate restores SIR to the pitch-only level, so the remaining accompaniment leakage from the previous run was caused by letting noisy automatic score candidates enter low-confidence frames.
+- With current BasicPitch MIDI, the reliable-score frames are too sparse to add measurable gain: conditional mode is effectively pitch-only.
+- This is a useful negative result for the paper: automatic pseudo-scores need reliability gating, but the current reliability rule is conservative and does not replace clean or aligned score data.
+
+## Liangxiao Mask Parameter Sweep After Admission Gate
+
+Local data path:
+
+`paper/aaai2027-si-hsm/runs.local/liangxiao-mask-param-sweep-admission-60s`
+
+Setup:
+
+- piece: Liangxiao
+- subset: `piano_medium`
+- score branch: `conditional`
+- detector policy: `raw`
+- score admission threshold: 0.6
+
+| Bandwidth | Residual | SI-SDR | SIR | SAR | Pitch@50c |
+|---:|---:|---:|---:|---:|---:|
+| 48 | 0.05 | 6.390 | 18.356 | 6.734 | 0.486 |
+| 38 | 0.05 | 6.325 | 18.252 | 6.673 | 0.484 |
+| 48 | 0.03 | 6.277 | 21.000 | 6.457 | 0.490 |
+| 48 | 0.01 | 6.124 | 24.821 | 6.196 | 0.500 |
+
+Interpretation:
+
+- Lower residual improves SIR but reduces SI-SDR/SAR, so it is a stricter accompaniment suppression setting rather than a better overall separator.
+- Bandwidth 48 cents and residual 0.05 is the current SI-SDR/SIR Pareto point for the automatic-score condition.
+
+## Admission-Gated 8-Piece SNR Run
+
+Local data path:
+
+`paper/aaai2027-si-hsm/runs.local/vip-snr-admission-gated-bw48-res005-60s`
+
+Setup:
+
+- 8 VIP pieces.
+- SNR levels: +6, 0, -6 dB.
+- score source: `auto_transcribed`.
+- score-source-aware gate: alpha=4.
+- score branch: `conditional`.
+- detector policy: `raw`.
+- mask parameters: bandwidth 48 cents, residual 0.05.
+
+| SNR subset | Mixture SI-SDR | Pitch-only SI-SDR | Full SI-HSM SI-SDR | Oracle IRM SI-SDR | Full - Pitch |
+|---|---:|---:|---:|---:|---:|
+| piano_easy | 5.998 | 9.777 | 9.776 | 22.816 | 0.000 |
+| piano_medium | -0.004 | 6.154 | 6.153 | 18.986 | -0.002 |
+| piano_hard | -6.015 | 1.794 | 1.789 | 14.780 | -0.005 |
+
+Interpretation:
+
+- Admission gating fixes the structural SIR regression: full SI-HSM and pitch-only now match within 0.01 dB SI-SDR and SIR across all SNR levels.
+- It also confirms that the current automatic BasicPitch pseudo-score does not provide a usable separation gain after unreliable frames are blocked.
+- The next useful data step is not another mask tweak; it is either cleaner aligned score input for a small core set, or a stronger score reliability model that admits more correct score frames without reopening wrong BasicPitch bands.

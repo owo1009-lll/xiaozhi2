@@ -106,11 +106,29 @@ python paper/aaai2027-si-hsm/code/run_manifest.py --manifest paper/aaai2027-si-h
 ## Score Branch Mode Diagnostic
 
 ```bash
-python paper/aaai2027-si-hsm/code/sweep_score_branch_mode.py --manifest paper/aaai2027-si-hsm/runs.local/vip-snr-mix-60s-v3/vip-synthetic-mix.local.manifest.json --out-dir paper/aaai2027-si-hsm/runs.local/liangxiao-score-branch-mode-60s
+python paper/aaai2027-si-hsm/code/sweep_score_branch_mode.py --manifest paper/aaai2027-si-hsm/runs.local/vip-snr-mix-60s-v3/vip-synthetic-mix.local.manifest.json --out-dir paper/aaai2027-si-hsm/runs.local/liangxiao-score-branch-mode-60s --contains 良宵
 ```
 
 Modes:
 
 - `always`: current posterior score branch.
-- `conditional`: only admits score when detector confidence is low or detector-score disagreement is large.
+- `conditional`: only admits score when detector confidence is low and score reliability is above the admission threshold.
 - `none`: removes the score branch and leaves detector-driven masking.
+
+Add `--detector-policy raw` to disable detector-only posterior octave candidates when the score branch is inactive.
+
+## Mask Parameter Sweep
+
+```bash
+python paper/aaai2027-si-hsm/code/sweep_mask_params.py --manifest paper/aaai2027-si-hsm/runs.local/vip-snr-mix-60s-v3/vip-synthetic-mix.local.manifest.json --out-dir paper/aaai2027-si-hsm/runs.local/liangxiao-mask-param-sweep-admission-60s --contains 良宵 --subset piano_medium --bandwidths 24,32,38,48 --residuals 0.01,0.03,0.05 --score-branch-mode conditional --detector-policy raw
+```
+
+This separates score-branch admission from mask aggressiveness. Lower residual raises SIR but can reduce SI-SDR.
+
+## Admission-Gated SNR Table
+
+```bash
+python paper/aaai2027-si-hsm/code/run_manifest.py --manifest paper/aaai2027-si-hsm/runs.local/vip-snr-mix-60s-v3/vip-synthetic-mix.local.manifest.json --out-dir paper/aaai2027-si-hsm/runs.local/vip-snr-admission-gated-bw48-res005-60s --methods mixture,pitch_only,full --score-weight 0.4 --score-source-aware --score-branch-mode conditional --detector-policy raw --bandwidth-cents 48 --residual 0.05 --oracle irm
+```
+
+This is the current best automatic-score configuration. It restores SIR to pitch-only level but does not yet create a separation gain over pitch-only.
