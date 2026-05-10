@@ -25,7 +25,7 @@ def validate(path: Path, strict_paths: bool = False) -> list[str]:
         if item.get("gtStatus") == "no_reference" and item.get("evaluationUse") == "objective_separation":
             errors.append(f"{label}: no_reference cannot be objective_separation")
         if strict_paths:
-            for key in ("mixturePath", "scorePath", "targetPath", "accompanimentPath"):
+            for key in ("mixturePath", "scorePath", "targetPath", "accompanimentPath", "teacherLabelsPath"):
                 if item.get(key) and not (path.parent / item[key]).exists() and not Path(item[key]).exists():
                     errors.append(f"{label}: missing path {key}={item[key]}")
     return errors

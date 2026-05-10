@@ -39,13 +39,25 @@ The paper is not submission-ready until these are complete:
 - `dataset-manifest.schema.json` - required metadata for each Erhu-PA item.
 - `code/` - independent research code for posterior SI-HSM and manifest validation.
 - `manifests/` - dataset manifest templates for Erhu-PA and cross-instrument transfer sets.
+- `RUNBOOK.md` - exact commands to validate manifests, run extraction, run experiments, and build tables.
 - `todo.md` - implementation and writing checklist.
 
-## Immediate Milestones
+## Implemented Non-Data Tooling
+
+- MusicXML/JSON score reader for target-line notes.
+- Bayesian posterior pitch selector with symmetric octave candidates.
+- Posterior-weighted harmonic mask with HPSS reconstruction.
+- Internal baselines: mixture, HPSS, score-only, pitch-only, oracle IBM, oracle IRM.
+- Batch manifest runner with robustness perturbations.
+- Separation and pitch metrics: SI-SDR, SDR/SIR/SAR approximation, pitch accuracy within 50 cents.
+- External baseline status script that records missing dependencies as `skipped`.
+- Dataset and result table generators.
+
+## Remaining Data Milestones
 
 1. Freeze the exact research claim and contribution wording.
 2. Build the Erhu-PA manifest with license and ground-truth status for every item.
-3. Implement three internal baselines: score-only mask, CREPE-only mask, and full posterior SI-HSM.
+3. Add Jinghu, Banhu, and Gaohu self-recorded or authorized transfer items.
 4. Run external baselines: HTDemucs and one modern strong separator such as BS-RoFormer or Mel-RoFormer.
 5. Generate main results, ablation table, robustness curves, and downstream diagnosis table.
 6. Draft the AAAI paper only after real metrics are available.

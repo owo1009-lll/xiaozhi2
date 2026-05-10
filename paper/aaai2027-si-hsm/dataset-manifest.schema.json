@@ -37,6 +37,8 @@
           "targetPath": { "type": "string" },
           "accompanimentPath": { "type": "string" },
           "scorePath": { "type": "string" },
+          "targetPart": { "type": "string" },
+          "teacherLabelsPath": { "type": "string" },
           "durationSeconds": { "type": "number", "minimum": 0 },
           "sampleRate": { "type": "integer", "minimum": 8000 },
           "channels": { "type": "integer", "minimum": 1 },

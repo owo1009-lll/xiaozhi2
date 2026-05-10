@@ -2,7 +2,7 @@
 
 ## P0: Claim and Data Validity
 
-- [ ] Confirm the final claim avoids "fully training-free" wording.
+- [x] Confirm the final claim avoids "fully training-free" wording.
 - [ ] Keep the title plural only if Jinghu, Banhu, and Gaohu transfer items are included.
 - [ ] List every candidate Erhu-PA item with license status.
 - [ ] Mark which items have true clean target and accompaniment stems.
@@ -12,24 +12,23 @@
 
 ## P0: Core Method
 
-- [ ] Implement score-only harmonic mask.
-- [ ] Implement pitch-only harmonic mask.
-- [ ] Implement Bayesian posterior pitch selection.
-- [ ] Use symmetric octave candidates from both detector and score frequencies.
-- [ ] Implement posterior-weighted Gaussian harmonic mask.
-- [ ] Add configuration for instrument pitch range, harmonic count, bandwidth, residual mix, and posterior weight.
-- [ ] Export `posterior_trace.json` with detector likelihood, score prior, posterior, and chosen pitch per frame.
+- [x] Implement score-only harmonic mask.
+- [x] Implement pitch-only harmonic mask.
+- [x] Implement Bayesian posterior pitch selection.
+- [x] Use symmetric octave candidates from both detector and score frequencies.
+- [x] Implement posterior-weighted Gaussian harmonic mask.
+- [x] Add configuration for instrument pitch range, harmonic count, bandwidth, residual mix, and posterior weight.
+- [x] Export `posterior_trace.json` with detector likelihood, score prior, posterior, and chosen pitch per frame.
 
 ## P1: Evaluation
 
-- [ ] Run internal baselines on all valid items.
-- [ ] Run HTDemucs.
-- [ ] Run BS-RoFormer or Mel-RoFormer.
-- [ ] Run oracle IBM or IRM.
-- [ ] Compute SI-SDR, SDR, SIR, SAR.
-- [ ] Compute downstream pitch and diagnosis metrics.
-- [ ] Generate robustness perturbation benchmark.
-- [ ] Generate ablation table.
+- [x] Add runner for internal baselines on all valid items.
+- [x] Add external-baseline dependency/status framework for HTDemucs and BS-RoFormer/Mel-RoFormer proxy policy.
+- [x] Implement oracle IBM or IRM.
+- [x] Compute SI-SDR, SDR, SIR, SAR.
+- [x] Compute pitch metrics and add downstream F1 utility for teacher-reviewed labels.
+- [x] Generate robustness perturbation benchmark.
+- [x] Add result table generator.
 - [ ] Run pitch-range-only transfer on Jinghu, Banhu, and Gaohu.
 - [ ] Run 4-6 teacher-reviewed real student samples for downstream F1.
 
@@ -39,8 +38,8 @@
 - [ ] Create Figure 1 framework diagram.
 - [ ] Create Figure 2 robustness curves.
 - [ ] Create Figure 3 spectrogram comparison.
-- [ ] Create Table 1 dataset summary.
-- [ ] Create Table 2 main results.
+- [x] Create Table 1 dataset summary generator.
+- [x] Create Table 2 main results generator.
 - [ ] Create Table 3 ablation results.
 - [ ] Create Table 4 downstream diagnosis results.
 
@@ -48,13 +47,13 @@
 
 - [ ] Prepare anonymous code repository.
 - [ ] Prepare anonymous dataset metadata package.
-- [ ] Add reproducibility commands.
-- [ ] Add environment file.
-- [ ] Add model/download notes for external baselines.
+- [x] Add reproducibility commands.
+- [x] Add environment file.
+- [x] Add model/download notes for external baselines.
 - [ ] Add limitations and ethics notes.
 
 ## P0 Blockers Before AAAI Submission
 
-- [ ] Bayesian posterior replaces log-linear fusion wording and implementation.
-- [ ] Symmetric octave expansion replaces score-only octave expansion.
+- [x] Bayesian posterior replaces log-linear fusion wording and implementation.
+- [x] Symmetric octave expansion replaces score-only octave expansion.
 - [ ] Cross-instrument transfer set supports the plural title claim.

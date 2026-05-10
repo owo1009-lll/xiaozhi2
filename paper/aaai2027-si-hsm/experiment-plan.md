@@ -11,7 +11,7 @@ Each item must include:
 - mixture audio
 - target erhu reference, if available
 - accompaniment reference, if available
-- MusicXML or MIDI target score
+- MusicXML target score, or the branch's compact JSON note format
 - license and release status
 - accompaniment type
 - difficulty metadata
@@ -67,6 +67,7 @@ Pitch target quality:
 - raw pitch accuracy within 50 cents
 - voiced-frame false positive rate
 - voiced-frame false negative rate
+The current branch computes pitch accuracy; voiced-frame FP/FN can be derived from the same frame estimates after real labels are available.
 
 Downstream diagnosis:
 
