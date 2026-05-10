@@ -94,3 +94,11 @@ To sweep the continuous soft-gating temperature:
 ```bash
 python paper/aaai2027-si-hsm/code/sweep_reliability_alpha.py --manifest paper/aaai2027-si-hsm/runs.local/vip-snr-mix-60s-v2/vip-synthetic-mix.local.manifest.json --out-dir paper/aaai2027-si-hsm/runs.local/liangxiao-reliability-alpha-60s --alphas 0,0.5,1,2,4 --score-weight 0.4
 ```
+
+## Source-Aware Main Table Smoke
+
+```bash
+python paper/aaai2027-si-hsm/code/run_manifest.py --manifest paper/aaai2027-si-hsm/runs.local/vip-snr-mix-60s-v3/vip-synthetic-mix.local.manifest.json --out-dir paper/aaai2027-si-hsm/runs.local/vip-snr-source-aware-results-60s --methods mixture,pitch_only,full --score-weight 0.4 --score-source-aware --oracle irm
+```
+
+`scoreSource=auto_transcribed` uses `alpha=4`; `manual_aligned` uses `alpha=0.5`; `oracle` uses `alpha=0`.

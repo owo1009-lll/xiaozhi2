@@ -144,3 +144,30 @@ Interpretation:
 - Continuous soft gating creates the expected tradeoff curve.
 - No single alpha in this simple reliability formulation gives both BasicPitch recovery >= +1 dB and Oracle degradation <= -0.5 dB.
 - This supports a score-source-aware policy or a richer reliability model, rather than blindly expanding the current gate to all SNR levels.
+
+## Source-Aware 8-Piece SNR Smoke Test
+
+Local data path:
+
+`paper/aaai2027-si-hsm/runs.local/vip-snr-source-aware-results-60s`
+
+Setup:
+
+- 8 VIP pieces.
+- SNR levels: +6, 0, -6 dB.
+- score source: `auto_transcribed`.
+- score-source-aware gate: alpha=4.
+- methods: mixture, pitch-only, full+gating, oracle IRM.
+
+| SNR subset | Mixture SI-SDR | Pitch-only SI-SDR | Full+gating SI-SDR | Oracle IRM SI-SDR | Full - Pitch |
+|---|---:|---:|---:|---:|---:|
+| piano_easy | 5.998 | 9.739 | 9.731 | 22.816 | -0.008 |
+| piano_medium | -0.004 | 6.108 | 6.135 | 18.986 | +0.027 |
+| piano_hard | -6.015 | 1.744 | 1.719 | 14.780 | -0.025 |
+
+Interpretation:
+
+- Full+gating is far above the mixture at all SNR levels.
+- Full+gating is essentially tied with pitch-only, but only beats it on the medium SNR subset.
+- Pitch accuracy improves slightly under full+gating in every SNR subset, while SIR is lower than pitch-only.
+- The next debug target is not global gating strength; it is the per-frame rule that improves pitch localization but lets more accompaniment leak than pitch-only.

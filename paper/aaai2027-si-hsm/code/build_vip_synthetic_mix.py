@@ -108,6 +108,7 @@ def main() -> int:
                 "targetPath": str(target),
                 "accompanimentPath": str(accomp),
                 "scorePath": str(mid),
+                "scoreSource": "auto_transcribed",
                 "durationSeconds": round(len(y) / sr, 3),
                 "sampleRate": sr,
                 "channels": 1,

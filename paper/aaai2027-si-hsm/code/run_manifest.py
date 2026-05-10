@@ -11,6 +11,7 @@ from sihsm_extract import Config, extract_file, load_audio, write_audio
 from validate_manifest import validate
 
 METHODS = ("mixture", "hpss", "score_only", "pitch_only", "full")
+ALPHA_BY_SCORE_SOURCE = {"auto_transcribed": 4.0, "manual_aligned": 0.5, "oracle": 0.0, "unknown": 4.0}
 
 
 def _path(base: Path, item: dict, key: str) -> str | None:
@@ -56,7 +57,12 @@ def _oracle(item, base: Path, out_dir: Path, binary: bool):
     return str(wav)
 
 
-def run_item(item: dict, base: Path, out_root: Path, methods: list[str], robustness: bool) -> list[dict]:
+def _cfg(args, item: dict) -> Config:
+    alpha = ALPHA_BY_SCORE_SOURCE.get(item.get("scoreSource", "unknown"), 4.0) if args.score_source_aware else args.reliability_alpha
+    return Config(score_weight=args.score_weight, reliability_gating=args.reliability_gating or args.score_source_aware, reliability_alpha=alpha)
+
+
+def run_item(item: dict, base: Path, out_root: Path, methods: list[str], robustness: bool, args) -> list[dict]:
     rows, item_dir = [], out_root / item["itemId"]
     mix, score = _path(base, item, "mixturePath"), _path(base, item, "scorePath")
     target, accomp = _path(base, item, "targetPath"), _path(base, item, "accompanimentPath")
@@ -68,23 +74,25 @@ def run_item(item: dict, base: Path, out_root: Path, methods: list[str], robustn
         if method == "mixture":
             est = mix
         else:
-            est = extract_file(mix, score, out_dir, item["instrument"], method, item.get("targetPart"))["outputPath"]
-        row = {"itemId": item["itemId"], "instrument": item["instrument"], "subset": item["subset"], "method": method, "status": "ok", "estimatePath": est}
+            est = extract_file(mix, score, out_dir, item["instrument"], method, item.get("targetPart"), _cfg(args, item))["outputPath"]
+        row = {"itemId": item["itemId"], "instrument": item["instrument"], "subset": item["subset"], "method": method, "scoreSource": item.get("scoreSource", ""), "status": "ok", "estimatePath": est}
         if objective:
             row.update(evaluate(est, target, accomp, item["instrument"]))
             row["mixtureSI_SDR"] = mixture_metrics.get("SI_SDR")
         rows.append(row)
-    if objective and accomp:
+    if objective and accomp and args.oracle != "none":
         for method, binary in (("oracle_irm", False), ("oracle_ibm", True)):
+            if args.oracle != "both" and method != f"oracle_{args.oracle}":
+                continue
             est = _oracle(item, base, item_dir / method, binary)
-            rows.append({"itemId": item["itemId"], "instrument": item["instrument"], "subset": item["subset"], "method": method, "status": "ok", "estimatePath": est, "mixtureSI_SDR": mixture_metrics.get("SI_SDR"), **evaluate(est, target, accomp, item["instrument"])})
+            rows.append({"itemId": item["itemId"], "instrument": item["instrument"], "subset": item["subset"], "method": method, "scoreSource": item.get("scoreSource", ""), "status": "ok", "estimatePath": est, "mixtureSI_SDR": mixture_metrics.get("SI_SDR"), **evaluate(est, target, accomp, item["instrument"])})
     if robustness:
         notes = read_notes(score, item.get("targetPart"))
         for kind, values in {"shift": [0, 0.5, 1, 2, 3], "missing": [10, 20], "drift": [10, 20], "octave": [10, 20]}.items():
             for value in values:
                 method = f"robust_{kind}_{value}"
-                est = extract_file(mix, score, item_dir / method, item["instrument"], "full", item.get("targetPart"), notes=_perturb(notes, kind, float(value)))["outputPath"]
-                row = {"itemId": item["itemId"], "instrument": item["instrument"], "subset": item["subset"], "method": method, "status": "ok", "estimatePath": est}
+                est = extract_file(mix, score, item_dir / method, item["instrument"], "full", item.get("targetPart"), _cfg(args, item), notes=_perturb(notes, kind, float(value)))["outputPath"]
+                row = {"itemId": item["itemId"], "instrument": item["instrument"], "subset": item["subset"], "method": method, "scoreSource": item.get("scoreSource", ""), "status": "ok", "estimatePath": est}
                 if objective:
                     row.update(evaluate(est, target, accomp, item["instrument"]))
                     row["mixtureSI_SDR"] = mixture_metrics.get("SI_SDR")
@@ -98,6 +106,11 @@ def main() -> int:
     p.add_argument("--out-dir", required=True)
     p.add_argument("--methods", default=",".join(METHODS))
     p.add_argument("--robustness", action="store_true")
+    p.add_argument("--score-weight", type=float, default=1.0)
+    p.add_argument("--reliability-gating", action="store_true")
+    p.add_argument("--reliability-alpha", type=float, default=1.0)
+    p.add_argument("--score-source-aware", action="store_true")
+    p.add_argument("--oracle", choices=["none", "irm", "ibm", "both"], default="both")
     args = p.parse_args()
     manifest = Path(args.manifest)
     errors = validate(manifest, strict_paths=True)
@@ -106,7 +119,7 @@ def main() -> int:
     data = json.loads(manifest.read_text(encoding="utf-8"))
     rows = []
     for item in data["items"]:
-        rows.extend(run_item(item, manifest.parent, Path(args.out_dir), [m for m in args.methods.split(",") if m], args.robustness))
+        rows.extend(run_item(item, manifest.parent, Path(args.out_dir), [m for m in args.methods.split(",") if m], args.robustness, args))
     keys = sorted({k for row in rows for k in row})
     Path(args.out_dir).mkdir(parents=True, exist_ok=True)
     with (Path(args.out_dir) / "results.csv").open("w", newline="", encoding="utf-8") as fh:

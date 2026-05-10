@@ -37,6 +37,10 @@
           "targetPath": { "type": "string" },
           "accompanimentPath": { "type": "string" },
           "scorePath": { "type": "string" },
+          "scoreSource": {
+            "type": "string",
+            "enum": ["auto_transcribed", "manual_aligned", "oracle", "unknown"]
+          },
           "targetPart": { "type": "string" },
           "teacherLabelsPath": { "type": "string" },
           "durationSeconds": { "type": "number", "minimum": 0 },
