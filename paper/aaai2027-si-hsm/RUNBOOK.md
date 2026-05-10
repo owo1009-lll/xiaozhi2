@@ -69,4 +69,4 @@ python paper/aaai2027-si-hsm/code/build_vip_synthetic_mix.py --dir C:\Users\Admi
 python paper/aaai2027-si-hsm/code/run_manifest.py --manifest paper/aaai2027-si-hsm/runs.local/vip-synthetic-mix/vip-synthetic-mix.local.manifest.json --out-dir paper/aaai2027-si-hsm/runs.local/vip-synthetic-results
 ```
 
-This creates internal `synthetic_mix` items with target, accompaniment, mixture, and MIDI score paths.
+This creates internal `synthetic_mix` items with target, accompaniment, mixture, MIDI score paths, and hard/medium/easy target SNR levels at -6/0/+6 dB.

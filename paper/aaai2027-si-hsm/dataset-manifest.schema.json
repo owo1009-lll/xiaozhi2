@@ -31,7 +31,7 @@
           },
           "subset": {
             "type": "string",
-            "enum": ["piano", "orch_light", "orch_heavy", "jinghu_transfer", "banhu_transfer", "gaohu_transfer"]
+            "enum": ["piano", "piano_easy", "piano_medium", "piano_hard", "orch_light", "orch_heavy", "jinghu_transfer", "banhu_transfer", "gaohu_transfer"]
           },
           "mixturePath": { "type": "string" },
           "targetPath": { "type": "string" },
@@ -73,7 +73,8 @@
               "spectralOverlapRatio": { "type": "number", "minimum": 0, "maximum": 1 },
               "accompanimentDensity": { "type": "number", "minimum": 0 },
               "stringEnergyRatio": { "type": "number", "minimum": 0, "maximum": 1 },
-              "unisonStringRatio": { "type": "number", "minimum": 0, "maximum": 1 }
+              "unisonStringRatio": { "type": "number", "minimum": 0, "maximum": 1 },
+              "targetSnrDb": { "type": "number" }
             },
             "additionalProperties": false
           },
