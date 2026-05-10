@@ -61,3 +61,30 @@ Interpretation:
 - The best SI-SDR is at score weight 0.1, but the margin over pitch-only is small: +0.012 dB.
 - Pitch accuracy improves as score weight increases, but SI-SDR and SAR fall.
 - This supports the hypothesis that BasicPitch MIDI is a noisy score prior. The next evidence step should be a clean-score contrast on one piece, not another blind formula change.
+
+## Liangxiao Score Quality Contrast
+
+Local data path:
+
+`paper/aaai2027-si-hsm/runs.local/liangxiao-score-quality-60s-v2`
+
+Setup:
+
+- piece: Liangxiao
+- subset: `piano_medium`
+- target SNR: 0 dB
+- score weight: 0.4
+- clip length: 60 seconds
+
+| Score | Notes | MIDI range | SI-SDR | SIR | SAR | Pitch@50c |
+|---|---:|---:|---:|---:|---:|---:|
+| BasicPitch | 463 | 58-94 | 5.512 | 16.625 | 5.951 | 0.510 |
+| cleaned BasicPitch | 287 | 55-82 | 5.527 | 16.398 | 5.992 | 0.512 |
+| oracle target pitch | 200 | 58-77 | 8.370 | 17.906 | 8.944 | 0.516 |
+
+Interpretation:
+
+- Simple rule-based MIDI cleanup is not enough: SI-SDR improves by only +0.015 dB and SIR decreases.
+- A clean, aligned pitch-score upper bound improves SI-SDR by +2.858 dB and SIR by +1.281 dB over BasicPitch.
+- This means score quality and alignment are real bottlenecks, but the score branch can help when the score is reliable.
+- The next practical step is to create real manual MIDI for 3-5 core pieces or add automatic score reliability gating before running cross-instrument experiments.

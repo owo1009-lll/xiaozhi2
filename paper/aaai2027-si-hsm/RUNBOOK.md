@@ -78,3 +78,11 @@ python paper/aaai2027-si-hsm/code/sweep_score_weight.py --manifest paper/aaai202
 ```
 
 `score_weight=0` is the pitch-only limit. Use this sweep before changing the default score-prior weight.
+
+## Score Quality Contrast
+
+```bash
+python paper/aaai2027-si-hsm/code/run_score_quality_contrast.py --manifest paper/aaai2027-si-hsm/runs.local/vip-snr-mix-60s-v2/vip-synthetic-mix.local.manifest.json --out-dir paper/aaai2027-si-hsm/runs.local/liangxiao-score-quality-60s-v2 --contains 良宵 --subset piano_medium --score-weight 0.4
+```
+
+This compares BasicPitch MIDI, rule-cleaned MIDI, and an oracle target-pitch score for one piece. The oracle score is diagnostic only; it must not be treated as a deployable input.
