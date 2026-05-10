@@ -102,3 +102,15 @@ python paper/aaai2027-si-hsm/code/run_manifest.py --manifest paper/aaai2027-si-h
 ```
 
 `scoreSource=auto_transcribed` uses `alpha=4`; `manual_aligned` uses `alpha=0.5`; `oracle` uses `alpha=0`.
+
+## Score Branch Mode Diagnostic
+
+```bash
+python paper/aaai2027-si-hsm/code/sweep_score_branch_mode.py --manifest paper/aaai2027-si-hsm/runs.local/vip-snr-mix-60s-v3/vip-synthetic-mix.local.manifest.json --out-dir paper/aaai2027-si-hsm/runs.local/liangxiao-score-branch-mode-60s
+```
+
+Modes:
+
+- `always`: current posterior score branch.
+- `conditional`: only admits score when detector confidence is low or detector-score disagreement is large.
+- `none`: removes the score branch and leaves detector-driven masking.

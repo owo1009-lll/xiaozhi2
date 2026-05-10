@@ -171,3 +171,30 @@ Interpretation:
 - Full+gating is essentially tied with pitch-only, but only beats it on the medium SNR subset.
 - Pitch accuracy improves slightly under full+gating in every SNR subset, while SIR is lower than pitch-only.
 - The next debug target is not global gating strength; it is the per-frame rule that improves pitch localization but lets more accompaniment leak than pitch-only.
+
+## Liangxiao Score Branch Mode Diagnostic
+
+Local data path:
+
+`paper/aaai2027-si-hsm/runs.local/liangxiao-score-branch-mode-60s`
+
+Setup:
+
+- piece: Liangxiao
+- subset: `piano_medium`
+- score weight: 0.4
+- reliability alpha: 4
+
+| Mode | BasicPitch SI-SDR | BasicPitch SIR | Oracle SI-SDR | Oracle SIR |
+|---|---:|---:|---:|---:|
+| pitch-only baseline | 6.322 | 18.253 | n/a | n/a |
+| always | 6.440 | 17.317 | 6.549 | 17.133 |
+| conditional | 6.547 | 17.300 | 6.979 | 17.211 |
+| none | 6.872 | 16.445 | 6.872 | 16.445 |
+
+Interpretation:
+
+- Conditional score branching improves over always-on branching, especially for the oracle score, but does not recover SIR.
+- Removing the score branch entirely gives the best SI-SDR on this item, but SIR is much worse than pitch-only.
+- Therefore the remaining SIR loss is not explained only by an always-on score band. It also comes from the full-mode mask strength and fallback behavior.
+- Next method debug should separate two axes: score-branch admission versus mask aggressiveness/gamma calibration.
