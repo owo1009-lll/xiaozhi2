@@ -23,6 +23,7 @@ class Config:
     tolerance: float = 2.0
     trace_stride: int = 1
     score_weight: float = 1.0
+    reliability_gating: bool = False
 
 
 def load_audio(path: str | Path) -> tuple[np.ndarray, int]:
@@ -82,6 +83,22 @@ def estimate_pitch(y: np.ndarray, sr: int, frames: np.ndarray, profile: str) -> 
     return np.asarray(out_f, np.float32), np.asarray(out_c, np.float32)
 
 
+def score_reliability(f_score: float, f_det: float, c_det: float, profile: str) -> float:
+    if f_score <= 0:
+        return 0.0
+    lo, hi = PROFILES.get(profile, PROFILES["erhu"])
+    in_range = midi_hz(lo) <= f_score <= midi_hz(hi)
+    octave_match = f_det > 0 and min(abs(cents(f_det, f_score * (2.0 ** k))) for k in (-1, 0, 1)) < 100.0
+    crepe_ok = c_det > 0.4
+    if not in_range:
+        return 0.0
+    if octave_match and crepe_ok:
+        return 1.0
+    if octave_match:
+        return 0.55
+    return 0.05 if crepe_ok else 0.0
+
+
 def _mask(freqs, frames, f_det, c_det, score_rows, profile: str, mode: str, cfg: Config):
     mask = np.full((len(freqs), len(frames)), cfg.residual, np.float32)
     bw_ratio = 2.0 ** (cfg.bandwidth_cents / 1200.0) - 1.0
@@ -93,10 +110,12 @@ def _mask(freqs, frames, f_det, c_det, score_rows, profile: str, mode: str, cfg:
         elif mode == "pitch_only" or (mode == "full" and cfg.score_weight <= 0):
             chosen = {"f_eff": float(f_det[i]), "confidence": float(c_det[i]), "candidates": []}
         else:
-            chosen = choose_pitch(float(f_det[i]), float(c_det[i]), score_f, profile, timing, cfg.score_weight)
+            reliability = score_reliability(score_f, float(f_det[i]), float(c_det[i]), profile) if cfg.reliability_gating else 1.0
+            chosen = choose_pitch(float(f_det[i]), float(c_det[i]), score_f, profile, timing, cfg.score_weight * reliability)
         base, gamma = float(chosen["f_eff"]), float(chosen["confidence"])
         if mode == "full" and base > 0:
-            gamma = max(gamma, 0.85 * float(c_det[i]), 0.45 * cfg.score_weight if score_f > 0 else 0.0)
+            reliability = score_reliability(score_f, float(f_det[i]), float(c_det[i]), profile) if cfg.reliability_gating else 1.0
+            gamma = max(gamma, 0.85 * float(c_det[i]), 0.45 * cfg.score_weight * reliability if score_f > 0 else 0.0)
         bases = [(base, gamma)]
         if mode == "full" and f_det[i] > 0 and (base <= 0 or abs(cents(float(f_det[i]), base)) > 60):
             bases.append((float(f_det[i]), 0.55 * float(c_det[i])))
@@ -110,7 +129,7 @@ def _mask(freqs, frames, f_det, c_det, score_rows, profile: str, mode: str, cfg:
                 sigma = max(20.0, center * bw_ratio)
                 mask[:, i] = np.maximum(mask[:, i], weight * np.exp(-0.5 * ((freqs - center) / sigma) ** 2))
         if i % max(1, cfg.trace_stride) == 0:
-            trace.append({"time": float(sec), "det": float(f_det[i]), "detConfidence": float(c_det[i]), "score": score_f, "noteId": score_rows[i]["note_id"], "f_eff": base, "confidence": gamma, "candidates": chosen["candidates"]})
+            trace.append({"time": float(sec), "det": float(f_det[i]), "detConfidence": float(c_det[i]), "score": score_f, "scoreReliability": score_reliability(score_f, float(f_det[i]), float(c_det[i]), profile), "noteId": score_rows[i]["note_id"], "f_eff": base, "confidence": gamma, "candidates": chosen["candidates"]})
     return mask, trace
 
 

@@ -46,6 +46,7 @@ def main() -> int:
     p.add_argument("--contains", default="良宵")
     p.add_argument("--subset", default="piano_medium")
     p.add_argument("--score-weight", type=float, default=0.4)
+    p.add_argument("--reliability-gating", action="store_true")
     p.add_argument("--manual-score")
     args = p.parse_args()
     manifest = Path(args.manifest)
@@ -65,7 +66,7 @@ def main() -> int:
     target = _path(manifest.parent, item, "targetPath")
     accomp = _path(manifest.parent, item, "accompanimentPath")
     for label, score in scores.items():
-        est = extract_file(mix, score, out / label, item["instrument"], "full", item.get("targetPart"), Config(trace_stride=64, score_weight=args.score_weight))["outputPath"]
+        est = extract_file(mix, score, out / label, item["instrument"], "full", item.get("targetPart"), Config(trace_stride=64, score_weight=args.score_weight, reliability_gating=args.reliability_gating))["outputPath"]
         rows.append({"score": label, "scoreWeight": args.score_weight, **_stats(score), **evaluate(est, target, accomp, item["instrument"])})
     with (out / "score-quality-contrast.csv").open("w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, rows[0].keys())

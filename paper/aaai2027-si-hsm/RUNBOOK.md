@@ -86,3 +86,5 @@ python paper/aaai2027-si-hsm/code/run_score_quality_contrast.py --manifest paper
 ```
 
 This compares BasicPitch MIDI, rule-cleaned MIDI, and an oracle target-pitch score for one piece. The oracle score is diagnostic only; it must not be treated as a deployable input.
+
+Add `--reliability-gating` to test the hard CREPE-score agreement gate for noisy automatic scores.

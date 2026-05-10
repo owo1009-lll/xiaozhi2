@@ -88,3 +88,32 @@ Interpretation:
 - A clean, aligned pitch-score upper bound improves SI-SDR by +2.858 dB and SIR by +1.281 dB over BasicPitch.
 - This means score quality and alignment are real bottlenecks, but the score branch can help when the score is reliable.
 - The next practical step is to create real manual MIDI for 3-5 core pieces or add automatic score reliability gating before running cross-instrument experiments.
+
+## Liangxiao Reliability Gating Diagnostic
+
+Local data path:
+
+`paper/aaai2027-si-hsm/runs.local/liangxiao-score-quality-gating-hard-60s`
+
+Setup:
+
+- piece: Liangxiao
+- subset: `piano_medium`
+- target SNR: 0 dB
+- score weight: 0.4
+- score input: BasicPitch MIDI
+- gating: hard CREPE-score octave agreement gate
+
+| Score | SI-SDR | SIR | SAR | Pitch@50c |
+|---|---:|---:|---:|---:|
+| BasicPitch, no gating | 5.512 | 16.625 | 5.951 | 0.510 |
+| BasicPitch, hard gating | 6.505 | 16.997 | 6.991 | 0.490 |
+| Oracle target pitch, no gating | 8.370 | 17.906 | 8.944 | 0.516 |
+| Oracle target pitch, hard gating | 6.484 | 16.851 | 6.986 | 0.484 |
+
+Interpretation:
+
+- Hard gating recovers +0.993 dB SI-SDR and +0.372 dB SIR for noisy BasicPitch scores.
+- The same hard gate hurts the oracle target-pitch score by -1.886 dB SI-SDR.
+- Therefore reliability gating is useful for noisy automatic scores, but it must be adaptive to score source quality. It should not be used blindly for clean manual or oracle-aligned scores.
+- The next method step is to expose score-source modes: `auto_transcribed` uses hard gating; `manual_aligned` uses weak or no gating.
