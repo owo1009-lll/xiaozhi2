@@ -61,3 +61,12 @@ python paper/aaai2027-si-hsm/code/probe_vip_dataset.py --dir C:\Users\Administra
 ```
 
 This writes a local target-only manifest, 20-second smoke-test clips, SI-HSM outputs, posterior traces, and `vip-data-test.csv`.
+
+## Build Local Synthetic Mixtures from VIP Solo Audio
+
+```bash
+python paper/aaai2027-si-hsm/code/build_vip_synthetic_mix.py --dir C:\Users\Administrator\Music\VipSongsDownload --out-dir paper/aaai2027-si-hsm/runs.local/vip-synthetic-mix
+python paper/aaai2027-si-hsm/code/run_manifest.py --manifest paper/aaai2027-si-hsm/runs.local/vip-synthetic-mix/vip-synthetic-mix.local.manifest.json --out-dir paper/aaai2027-si-hsm/runs.local/vip-synthetic-results
+```
+
+This creates internal `synthetic_mix` items with target, accompaniment, mixture, and MIDI score paths.

@@ -15,7 +15,12 @@ METHODS = ("mixture", "hpss", "score_only", "pitch_only", "full")
 
 def _path(base: Path, item: dict, key: str) -> str | None:
     value = item.get(key)
-    return str((base / value).resolve()) if value and not Path(value).is_absolute() else value
+    if not value:
+        return None
+    path = Path(value)
+    if path.is_absolute() or path.exists():
+        return str(path)
+    return str((base / path).resolve())
 
 
 def _perturb(notes: list[Note], kind: str, value: float) -> list[Note]:

@@ -10,7 +10,7 @@ from scipy import signal
 from scipy.ndimage import median_filter
 
 from score_io import Note, notes_as_dicts, read_notes, score_at_frames
-from sihsm_posterior import PROFILES, choose_pitch, midi_hz
+from sihsm_posterior import PROFILES, cents, choose_pitch, midi_hz
 
 
 @dataclass
@@ -94,13 +94,20 @@ def _mask(freqs, frames, f_det, c_det, score_rows, profile: str, mode: str, cfg:
         else:
             chosen = choose_pitch(float(f_det[i]), float(c_det[i]), score_f, profile, timing)
         base, gamma = float(chosen["f_eff"]), float(chosen["confidence"])
-        if base > 0 and gamma > 0:
+        if mode == "full" and base > 0:
+            gamma = max(gamma, 0.85 * float(c_det[i]), 0.45 if score_f > 0 else 0.0)
+        bases = [(base, gamma)]
+        if mode == "full" and f_det[i] > 0 and (base <= 0 or abs(cents(float(f_det[i]), base)) > 60):
+            bases.append((float(f_det[i]), 0.55 * float(c_det[i])))
+        for base_f, weight in bases:
+            if base_f <= 0 or weight <= 0:
+                continue
             for h in range(1, cfg.harmonics + 1):
-                center = base * h
+                center = base_f * h
                 if center > freqs[-1]:
                     break
                 sigma = max(20.0, center * bw_ratio)
-                mask[:, i] = np.maximum(mask[:, i], gamma * np.exp(-0.5 * ((freqs - center) / sigma) ** 2))
+                mask[:, i] = np.maximum(mask[:, i], weight * np.exp(-0.5 * ((freqs - center) / sigma) ** 2))
         if i % max(1, cfg.trace_stride) == 0:
             trace.append({"time": float(sec), "det": float(f_det[i]), "detConfidence": float(c_det[i]), "score": score_f, "noteId": score_rows[i]["note_id"], "f_eff": base, "confidence": gamma, "candidates": chosen["candidates"]})
     return mask, trace
