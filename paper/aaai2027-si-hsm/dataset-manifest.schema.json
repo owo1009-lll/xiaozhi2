@@ -48,7 +48,7 @@
           },
           "gtStatus": {
             "type": "string",
-            "enum": ["clean_stems", "synthetic_mix", "no_reference", "unknown"]
+            "enum": ["clean_stems", "synthetic_mix", "target_only", "no_reference", "unknown"]
           },
           "sourceType": {
             "type": "string",
@@ -56,7 +56,7 @@
           },
           "evaluationUse": {
             "type": "string",
-            "enum": ["objective_separation", "downstream_only", "qualitative_only"]
+            "enum": ["objective_separation", "objective_target", "downstream_only", "qualitative_only"]
           },
           "pitchRangeMidi": {
             "type": "array",

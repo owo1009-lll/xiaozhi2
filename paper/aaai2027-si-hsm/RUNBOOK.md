@@ -50,5 +50,14 @@ python paper/aaai2027-si-hsm/code/make_tables.py --results paper/aaai2027-si-hsm
 ## Data Rules
 
 - Clean stems are evaluation references only, never training data.
+- Target-only solo erhu files can be used for SI-SDR, pitch, and score-alignment sanity tests, but not for SIR/SAR.
 - No-reference student recordings are for downstream teacher-label F1 only.
 - Jinghu, Banhu, and Gaohu transfer rows must be self-recorded or authorized.
+
+## Local VIP Solo Data Probe
+
+```bash
+python paper/aaai2027-si-hsm/code/probe_vip_dataset.py --dir C:\Users\Administrator\Music\VipSongsDownload --out-dir paper/aaai2027-si-hsm/runs.local/vip-data-test --seconds 20
+```
+
+This writes a local target-only manifest, 20-second smoke-test clips, SI-HSM outputs, posterior traces, and `vip-data-test.csv`.

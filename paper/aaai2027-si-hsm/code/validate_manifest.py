@@ -22,6 +22,8 @@ def validate(path: Path, strict_paths: bool = False) -> list[str]:
             for key in ("targetPath", "accompanimentPath"):
                 if not item.get(key):
                     errors.append(f"{label}: {item.get('gtStatus')} requires {key}")
+        if item.get("gtStatus") == "target_only" and not item.get("targetPath"):
+            errors.append(f"{label}: target_only requires targetPath")
         if item.get("gtStatus") == "no_reference" and item.get("evaluationUse") == "objective_separation":
             errors.append(f"{label}: no_reference cannot be objective_separation")
         if strict_paths:

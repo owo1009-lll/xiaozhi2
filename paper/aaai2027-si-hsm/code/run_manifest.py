@@ -55,7 +55,7 @@ def run_item(item: dict, base: Path, out_root: Path, methods: list[str], robustn
     rows, item_dir = [], out_root / item["itemId"]
     mix, score = _path(base, item, "mixturePath"), _path(base, item, "scorePath")
     target, accomp = _path(base, item, "targetPath"), _path(base, item, "accompanimentPath")
-    objective = item.get("gtStatus") in {"clean_stems", "synthetic_mix"} and target
+    objective = item.get("gtStatus") in {"clean_stems", "synthetic_mix", "target_only"} and target
     for method in methods:
         out_dir = item_dir / method
         out_dir.mkdir(parents=True, exist_ok=True)

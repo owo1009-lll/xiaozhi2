@@ -90,6 +90,18 @@ def read_notes(path: str | Path, target_part: str | None = None) -> list[Note]:
         data = json.loads(path.read_text(encoding="utf-8"))
         rows = data.get("notes", data if isinstance(data, list) else [])
         return [Note(float(r["onset"]), float(r["duration"]), int(r["midi"]), str(r.get("noteId", i))) for i, r in enumerate(rows)]
+    if path.suffix.lower() in {".mid", ".midi"}:
+        import pretty_midi
+        midi = pretty_midi.PrettyMIDI(str(path))
+        notes = []
+        for inst in midi.instruments:
+            if inst.is_drum:
+                continue
+            if target_part and target_part.lower() not in inst.name.lower():
+                continue
+            for i, n in enumerate(inst.notes):
+                notes.append(Note(float(n.start), float(n.end - n.start), int(n.pitch), f"midi-n{i + 1}", inst.name))
+        return sorted(notes, key=lambda n: (n.onset, n.midi))
 
     root = ET.parse(path).getroot()
     tempo = _tempo(root)

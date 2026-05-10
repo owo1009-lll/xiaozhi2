@@ -25,8 +25,13 @@ class Config:
 
 
 def load_audio(path: str | Path) -> tuple[np.ndarray, int]:
-    y, sr = sf.read(path, always_2d=True)
-    return y.mean(axis=1).astype(np.float32), int(sr)
+    try:
+        y, sr = sf.read(path, always_2d=True)
+        return y.mean(axis=1).astype(np.float32), int(sr)
+    except Exception:
+        import librosa
+        y, sr = librosa.load(path, sr=None, mono=True)
+        return y.astype(np.float32), int(sr)
 
 
 def write_audio(path: str | Path, y: np.ndarray, sr: int) -> None:
