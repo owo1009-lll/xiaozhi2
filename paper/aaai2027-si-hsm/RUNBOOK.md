@@ -88,3 +88,9 @@ python paper/aaai2027-si-hsm/code/run_score_quality_contrast.py --manifest paper
 This compares BasicPitch MIDI, rule-cleaned MIDI, and an oracle target-pitch score for one piece. The oracle score is diagnostic only; it must not be treated as a deployable input.
 
 Add `--reliability-gating` to test the hard CREPE-score agreement gate for noisy automatic scores.
+
+To sweep the continuous soft-gating temperature:
+
+```bash
+python paper/aaai2027-si-hsm/code/sweep_reliability_alpha.py --manifest paper/aaai2027-si-hsm/runs.local/vip-snr-mix-60s-v2/vip-synthetic-mix.local.manifest.json --out-dir paper/aaai2027-si-hsm/runs.local/liangxiao-reliability-alpha-60s --alphas 0,0.5,1,2,4 --score-weight 0.4
+```

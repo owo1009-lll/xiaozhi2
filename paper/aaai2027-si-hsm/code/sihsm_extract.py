@@ -24,6 +24,7 @@ class Config:
     trace_stride: int = 1
     score_weight: float = 1.0
     reliability_gating: bool = False
+    reliability_alpha: float = 1.0
 
 
 def load_audio(path: str | Path) -> tuple[np.ndarray, int]:
@@ -83,7 +84,7 @@ def estimate_pitch(y: np.ndarray, sr: int, frames: np.ndarray, profile: str) -> 
     return np.asarray(out_f, np.float32), np.asarray(out_c, np.float32)
 
 
-def score_reliability(f_score: float, f_det: float, c_det: float, profile: str) -> float:
+def score_reliability(f_score: float, f_det: float, c_det: float, profile: str, mode: str = "soft") -> float:
     if f_score <= 0:
         return 0.0
     lo, hi = PROFILES.get(profile, PROFILES["erhu"])
@@ -92,6 +93,8 @@ def score_reliability(f_score: float, f_det: float, c_det: float, profile: str) 
     crepe_ok = c_det > 0.4
     if not in_range:
         return 0.0
+    if mode == "soft":
+        return max(0.0, min(1.0, 0.3 + 0.3 * octave_match + 0.2 * crepe_ok + 0.2 * in_range))
     if octave_match and crepe_ok:
         return 1.0
     if octave_match:
@@ -111,10 +114,12 @@ def _mask(freqs, frames, f_det, c_det, score_rows, profile: str, mode: str, cfg:
             chosen = {"f_eff": float(f_det[i]), "confidence": float(c_det[i]), "candidates": []}
         else:
             reliability = score_reliability(score_f, float(f_det[i]), float(c_det[i]), profile) if cfg.reliability_gating else 1.0
+            reliability = reliability ** max(0.0, cfg.reliability_alpha)
             chosen = choose_pitch(float(f_det[i]), float(c_det[i]), score_f, profile, timing, cfg.score_weight * reliability)
         base, gamma = float(chosen["f_eff"]), float(chosen["confidence"])
         if mode == "full" and base > 0:
             reliability = score_reliability(score_f, float(f_det[i]), float(c_det[i]), profile) if cfg.reliability_gating else 1.0
+            reliability = reliability ** max(0.0, cfg.reliability_alpha)
             gamma = max(gamma, 0.85 * float(c_det[i]), 0.45 * cfg.score_weight * reliability if score_f > 0 else 0.0)
         bases = [(base, gamma)]
         if mode == "full" and f_det[i] > 0 and (base <= 0 or abs(cents(float(f_det[i]), base)) > 60):

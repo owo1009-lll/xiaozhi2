@@ -117,3 +117,30 @@ Interpretation:
 - The same hard gate hurts the oracle target-pitch score by -1.886 dB SI-SDR.
 - Therefore reliability gating is useful for noisy automatic scores, but it must be adaptive to score source quality. It should not be used blindly for clean manual or oracle-aligned scores.
 - The next method step is to expose score-source modes: `auto_transcribed` uses hard gating; `manual_aligned` uses weak or no gating.
+
+## Liangxiao Soft-Gating Alpha Sweep
+
+Local data path:
+
+`paper/aaai2027-si-hsm/runs.local/liangxiao-reliability-alpha-60s`
+
+Setup:
+
+- piece: Liangxiao
+- subset: `piano_medium`
+- score weight: 0.4
+- gating: `effective_score_weight = global_score_weight * reliability^alpha`
+
+| Alpha | BasicPitch SI-SDR | Oracle SI-SDR | BasicPitch delta | Oracle delta |
+|---:|---:|---:|---:|---:|
+| 0 | 5.512 | 8.370 | 0.000 | 0.000 |
+| 0.5 | 5.628 | 8.266 | +0.116 | -0.104 |
+| 1 | 5.732 | 8.100 | +0.220 | -0.270 |
+| 2 | 5.968 | 7.681 | +0.456 | -0.689 |
+| 4 | 6.440 | 6.549 | +0.928 | -1.821 |
+
+Interpretation:
+
+- Continuous soft gating creates the expected tradeoff curve.
+- No single alpha in this simple reliability formulation gives both BasicPitch recovery >= +1 dB and Oracle degradation <= -0.5 dB.
+- This supports a score-source-aware policy or a richer reliability model, rather than blindly expanding the current gate to all SNR levels.

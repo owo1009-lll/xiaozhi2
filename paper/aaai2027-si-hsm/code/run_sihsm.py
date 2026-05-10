@@ -22,8 +22,9 @@ def main() -> int:
     p.add_argument("--tolerance", type=float, default=2.0)
     p.add_argument("--score-weight", type=float, default=1.0)
     p.add_argument("--reliability-gating", action="store_true")
+    p.add_argument("--reliability-alpha", type=float, default=1.0)
     args = p.parse_args()
-    cfg = Config(args.n_fft, args.hop, args.harmonics, args.bandwidth_cents, args.residual, args.tolerance, score_weight=args.score_weight, reliability_gating=args.reliability_gating)
+    cfg = Config(args.n_fft, args.hop, args.harmonics, args.bandwidth_cents, args.residual, args.tolerance, score_weight=args.score_weight, reliability_gating=args.reliability_gating, reliability_alpha=args.reliability_alpha)
     print(json.dumps(extract_file(args.mixture, args.score, args.out_dir, args.instrument, args.mode, args.target_part, cfg), ensure_ascii=False, indent=2))
     return 0
 
