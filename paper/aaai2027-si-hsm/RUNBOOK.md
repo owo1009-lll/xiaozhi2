@@ -70,3 +70,11 @@ python paper/aaai2027-si-hsm/code/run_manifest.py --manifest paper/aaai2027-si-h
 ```
 
 This creates internal `synthetic_mix` items with target, accompaniment, mixture, MIDI score paths, and hard/medium/easy target SNR levels at -6/0/+6 dB.
+
+## Score Weight Sweep
+
+```bash
+python paper/aaai2027-si-hsm/code/sweep_score_weight.py --manifest paper/aaai2027-si-hsm/runs.local/vip-snr-mix-60s-v2/vip-synthetic-mix.local.manifest.json --out-dir paper/aaai2027-si-hsm/runs.local/score-weight-sweep-60s-v2 --subset piano_medium --weights 0,0.1,0.2,0.4,0.6,0.8,1.0
+```
+
+`score_weight=0` is the pitch-only limit. Use this sweep before changing the default score-prior weight.

@@ -30,3 +30,34 @@ Interpretation:
 - Full SI-HSM improves clearly over the mixture at all SNR levels.
 - Pitch-only currently beats full SI-HSM on SI-SDR, while full SI-HSM is slightly better on pitch accuracy at medium and hard SNR.
 - This indicates the BasicPitch-derived score prior is still too noisy for final claims; the next method step is to improve score-prior reliability or reduce its weight when the detector evidence is strong.
+
+## Score Weight Sweep at 0 dB SNR
+
+Local data path:
+
+`paper/aaai2027-si-hsm/runs.local/score-weight-sweep-60s-v2`
+
+Setup:
+
+- subset: `piano_medium`
+- 8 VIP pieces
+- 60-second clips
+- score weights: 0, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0
+- `score_weight=0` is the pitch-only limit.
+
+| Score weight | SI-SDR | SIR | SAR | Pitch@50c |
+|---:|---:|---:|---:|---:|
+| 0 | 6.108 | 17.814 | 6.488 | 0.511 |
+| 0.1 | 6.120 | 16.948 | 6.585 | 0.521 |
+| 0.2 | 5.864 | 16.794 | 6.323 | 0.528 |
+| 0.4 | 5.519 | 16.490 | 5.982 | 0.529 |
+| 0.6 | 5.296 | 16.300 | 5.761 | 0.529 |
+| 0.8 | 5.149 | 16.332 | 5.597 | 0.533 |
+| 1.0 | 5.037 | 16.223 | 5.487 | 0.533 |
+
+Interpretation:
+
+- The curve is near-flat at 0-0.1 and declines after 0.2.
+- The best SI-SDR is at score weight 0.1, but the margin over pitch-only is small: +0.012 dB.
+- Pitch accuracy improves as score weight increases, but SI-SDR and SAR fall.
+- This supports the hypothesis that BasicPitch MIDI is a noisy score prior. The next evidence step should be a clean-score contrast on one piece, not another blind formula change.

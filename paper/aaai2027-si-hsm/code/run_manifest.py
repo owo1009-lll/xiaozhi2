@@ -61,6 +61,7 @@ def run_item(item: dict, base: Path, out_root: Path, methods: list[str], robustn
     mix, score = _path(base, item, "mixturePath"), _path(base, item, "scorePath")
     target, accomp = _path(base, item, "targetPath"), _path(base, item, "accompanimentPath")
     objective = item.get("gtStatus") in {"clean_stems", "synthetic_mix", "target_only"} and target
+    mixture_metrics = evaluate(mix, target, accomp, item["instrument"]) if objective else {}
     for method in methods:
         out_dir = item_dir / method
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -71,11 +72,12 @@ def run_item(item: dict, base: Path, out_root: Path, methods: list[str], robustn
         row = {"itemId": item["itemId"], "instrument": item["instrument"], "subset": item["subset"], "method": method, "status": "ok", "estimatePath": est}
         if objective:
             row.update(evaluate(est, target, accomp, item["instrument"]))
+            row["mixtureSI_SDR"] = mixture_metrics.get("SI_SDR")
         rows.append(row)
     if objective and accomp:
         for method, binary in (("oracle_irm", False), ("oracle_ibm", True)):
             est = _oracle(item, base, item_dir / method, binary)
-            rows.append({"itemId": item["itemId"], "instrument": item["instrument"], "subset": item["subset"], "method": method, "status": "ok", "estimatePath": est, **evaluate(est, target, accomp, item["instrument"])})
+            rows.append({"itemId": item["itemId"], "instrument": item["instrument"], "subset": item["subset"], "method": method, "status": "ok", "estimatePath": est, "mixtureSI_SDR": mixture_metrics.get("SI_SDR"), **evaluate(est, target, accomp, item["instrument"])})
     if robustness:
         notes = read_notes(score, item.get("targetPart"))
         for kind, values in {"shift": [0, 0.5, 1, 2, 3], "missing": [10, 20], "drift": [10, 20], "octave": [10, 20]}.items():
@@ -85,6 +87,7 @@ def run_item(item: dict, base: Path, out_root: Path, methods: list[str], robustn
                 row = {"itemId": item["itemId"], "instrument": item["instrument"], "subset": item["subset"], "method": method, "status": "ok", "estimatePath": est}
                 if objective:
                     row.update(evaluate(est, target, accomp, item["instrument"]))
+                    row["mixtureSI_SDR"] = mixture_metrics.get("SI_SDR")
                 rows.append(row)
     return rows
 

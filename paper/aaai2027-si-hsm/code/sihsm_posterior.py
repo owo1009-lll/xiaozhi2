@@ -68,11 +68,11 @@ def score_prior(f: float, f_score: float, profile: str = "erhu", timing: float =
     return max(1e-9, float(timing)) * max(w * _gauss(f, center, 120.0) for center, w in octave_prior if center > 0)
 
 
-def choose_pitch(f_det: float, confidence: float, f_score: float, profile: str = "erhu", timing: float = 1.0) -> dict:
+def choose_pitch(f_det: float, confidence: float, f_score: float, profile: str = "erhu", timing: float = 1.0, score_weight: float = 1.0) -> dict:
     rows = []
     for freq in candidates(f_det, f_score, profile):
         like = detector_likelihood(freq, f_det, confidence)
-        prior = score_prior(freq, f_score, profile, timing)
+        prior = score_prior(freq, f_score, profile, timing) ** max(0.0, float(score_weight))
         rows.append({"f": freq, "likelihood": like, "prior": prior, "posterior": like * prior})
     if not rows:
         return {"f_eff": 0.0, "confidence": 0.0, "candidates": []}

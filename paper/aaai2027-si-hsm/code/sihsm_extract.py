@@ -22,6 +22,7 @@ class Config:
     residual: float = 0.05
     tolerance: float = 2.0
     trace_stride: int = 1
+    score_weight: float = 1.0
 
 
 def load_audio(path: str | Path) -> tuple[np.ndarray, int]:
@@ -89,13 +90,13 @@ def _mask(freqs, frames, f_det, c_det, score_rows, profile: str, mode: str, cfg:
         score_f, timing = score_rows[i]["freq"], score_rows[i]["timing"]
         if mode == "score_only":
             chosen = {"f_eff": score_f, "confidence": timing, "candidates": []}
-        elif mode == "pitch_only":
+        elif mode == "pitch_only" or (mode == "full" and cfg.score_weight <= 0):
             chosen = {"f_eff": float(f_det[i]), "confidence": float(c_det[i]), "candidates": []}
         else:
-            chosen = choose_pitch(float(f_det[i]), float(c_det[i]), score_f, profile, timing)
+            chosen = choose_pitch(float(f_det[i]), float(c_det[i]), score_f, profile, timing, cfg.score_weight)
         base, gamma = float(chosen["f_eff"]), float(chosen["confidence"])
         if mode == "full" and base > 0:
-            gamma = max(gamma, 0.85 * float(c_det[i]), 0.45 if score_f > 0 else 0.0)
+            gamma = max(gamma, 0.85 * float(c_det[i]), 0.45 * cfg.score_weight if score_f > 0 else 0.0)
         bases = [(base, gamma)]
         if mode == "full" and f_det[i] > 0 and (base <= 0 or abs(cents(float(f_det[i]), base)) > 60):
             bases.append((float(f_det[i]), 0.55 * float(c_det[i])))
