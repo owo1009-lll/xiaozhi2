@@ -132,3 +132,19 @@ python paper/aaai2027-si-hsm/code/run_manifest.py --manifest paper/aaai2027-si-h
 ```
 
 This is the current best automatic-score configuration. It restores SIR to pitch-only level but does not yet create a separation gain over pitch-only.
+
+## Manual Score Alignment Probe
+
+Convert a hand-entered jianpu text fragment into local JSON:
+
+```bash
+python paper/aaai2027-si-hsm/code/make_jianpu_score.py --out paper/aaai2027-si-hsm/runs.local/liangxiao-manual-score/liangxiao_manual.json --key D --octave 4 --bpm 66 --text "1 1 2 3 | 5 3 2 1"
+```
+
+Align the manual score to a target audio clip:
+
+```bash
+python paper/aaai2027-si-hsm/code/align_score_to_audio.py --score paper/aaai2027-si-hsm/runs.local/liangxiao-manual-score/liangxiao_manual.json --audio paper/aaai2027-si-hsm/runs.local/vip-snr-mix-60s-v3/audio/medium/良宵/target_erhu.wav --out paper/aaai2027-si-hsm/runs.local/liangxiao-manual-score/liangxiao_manual_aligned.json
+```
+
+Then pass the aligned JSON as `--manual-score` to `run_score_quality_contrast.py`. This is only a local probe; do not commit copyrighted score transcriptions.

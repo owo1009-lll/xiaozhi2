@@ -309,3 +309,29 @@ Interpretation:
 - Admission gating fixes the structural SIR regression: full SI-HSM and pitch-only now match within 0.01 dB SI-SDR and SIR across all SNR levels.
 - It also confirms that the current automatic BasicPitch pseudo-score does not provide a usable separation gain after unreliable frames are blocked.
 - The next useful data step is not another mask tweak; it is either cleaner aligned score input for a small core set, or a stronger score reliability model that admits more correct score frames without reopening wrong BasicPitch bands.
+
+## Liangxiao Rough Manual Score Probe
+
+Local data path:
+
+`paper/aaai2027-si-hsm/runs.local/liangxiao-manual-score`
+
+Setup:
+
+- piece: Liangxiao
+- subset: `piano_medium`
+- source: local `良宵-jianpu.jpg`
+- manual score type: rough first-60-second jianpu pitch skeleton, not publication-grade MuseScore/MIDI.
+- alignment: global DTW from rough JSON score to target erhu audio.
+
+| Score | Notes | MIDI range | Best score weight | SI-SDR | SIR | SAR | Pitch@50c |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| BasicPitch | 463 | 58-94 | 0.4 | 5.512 | 16.625 | 5.951 | 0.510 |
+| rough manual + global DTW | 124 | 62-73 | 0.2 | 6.326 | 17.144 | 6.780 | 0.496 |
+| oracle target pitch | 200 | 58-77 | 0.4 | 8.370 | 17.906 | 8.944 | 0.516 |
+
+Interpretation:
+
+- The manual-alignment pipeline works and the rough score improves over BasicPitch by +0.814 dB SI-SDR.
+- It still does not reach the expected 7.5-8.3 dB band, because the rough jianpu transcription is only a pitch skeleton and loses octave, rhythm, ornament, and phrase timing details.
+- A real MuseScore/作曲大师 manual MIDI is still required before claiming the manual-score operating regime in the paper main table.
