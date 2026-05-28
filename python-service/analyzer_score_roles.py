@@ -115,6 +115,34 @@ def should_apply_erhu_range_fallback(
     )
 
 
+def apply_page_erhu_fallback(
+    ambiguous: bool,
+    line_roles: dict[tuple[int, int, int], tuple[str, float, str]],
+    page_order: dict[int, list[tuple[int, int, int]]],
+    system_order: dict[tuple[int, int], list[tuple[int, int, int]]],
+    line_metrics: Any,
+    sparse_system_lead_noise: set[tuple[int, int, int]],
+) -> None:
+    if not ambiguous:
+        return
+    pages_with_erhu = {key[0] for key, value in line_roles.items() if value[0] == "erhu"}
+    pages_needing_fallback = set(page_order.keys()) - pages_with_erhu
+    for system_key, ordered_keys in system_order.items():
+        page_number = system_key[0]
+        if page_number not in pages_needing_fallback or not ordered_keys:
+            continue
+        fallback_key = ordered_keys[0]
+        metrics = line_metrics(fallback_key)
+        if (
+            metrics["note_count"] >= 3
+            and metrics["range_ratio"] >= 0.55
+            and metrics["pitch_span"] <= 52
+            and fallback_key not in sparse_system_lead_noise
+        ):
+            _role, confidence, _source = line_roles.get(fallback_key, ("accompaniment", 0.0, "none"))
+            line_roles[fallback_key] = ("erhu", round(max(float(confidence), 0.68), 3), "erhu-pattern-fallback")
+
+
 def collapse_erhu_melody_events(note_events: list[NoteEvent]) -> list[NoteEvent]:
     if not note_events:
         return note_events

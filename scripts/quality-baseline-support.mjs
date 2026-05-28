@@ -50,6 +50,14 @@ function complement(value) {
   return number == null ? null : 1 - number;
 }
 
+function sectionCountForResult(result) {
+  return numeric(result?.checks?.structuredSectionCount ?? result?.piecePassJob?.summary?.structuredSectionCount) || 0;
+}
+
+function cacheMissCountForResult(result) {
+  return numeric(result?.checks?.sectionCacheMissCount ?? result?.piecePassJob?.summary?.sectionCacheMissCount) || 0;
+}
+
 function collectRunSummaryFiles(rootDir) {
   const files = [];
   function visit(current) {
@@ -92,6 +100,7 @@ function summarizeValidation(store = {}) {
 }
 
 function summarizePerformance(corpusRoot) {
+  const latencyBaselineMaxSections = Math.max(1, Math.round(Number(process.env.ERHU_QUALITY_MAX_BASELINE_SECTIONS || 12)));
   const summaries = collectRunSummaryFiles(corpusRoot).map((filePath) => readJson(filePath, null)).filter(Boolean);
   const completedResults = summaries.flatMap((summary) =>
     getArray(summary.results).filter((result) => String(result?.status || "") === "completed"),
@@ -99,16 +108,28 @@ function summarizePerformance(corpusRoot) {
   const analysisMs = completedResults
     .map((result) => numeric(result?.checks?.analysisMs ?? result?.analysisMs ?? result?.piecePassJob?.durationMs))
     .filter((value) => value != null);
-  const firstRunAnalysisMs = completedResults
-    .filter((result) => numeric(result?.checks?.sectionCacheMissCount) > 0 || result?.piecePassJob?.summary?.cacheHits === 0)
-    .map((result) => numeric(result?.checks?.analysisMs ?? result?.analysisMs ?? result?.piecePassJob?.durationMs))
-    .filter((value) => value != null);
+  const firstRunResults = completedResults.filter((result) => {
+    const cacheMisses = cacheMissCountForResult(result);
+    return cacheMisses > 0 || result?.piecePassJob?.summary?.cacheHits === 0;
+  });
+  const comparableFirstRunResults = firstRunResults.filter((result) =>
+    sectionCountForResult(result) <= latencyBaselineMaxSections
+  );
+  const largeFirstRunResults = firstRunResults.filter((result) =>
+    sectionCountForResult(result) > latencyBaselineMaxSections
+  );
+  const analysisTime = (result) => numeric(result?.checks?.analysisMs ?? result?.analysisMs ?? result?.piecePassJob?.durationMs);
+  const firstRunAnalysisMs = comparableFirstRunResults.map(analysisTime).filter((value) => value != null);
+  const largeFirstRunAnalysisMs = largeFirstRunResults.map(analysisTime).filter((value) => value != null);
   return {
     corpusRunCount: summaries.length,
     completedResultCount: completedResults.length,
     analysisMsP95: round(percentile(analysisMs, 95), 0),
     firstRunSampleCount: firstRunAnalysisMs.length,
     firstRunAnalysisMsP95: round(percentile(firstRunAnalysisMs, 95), 0),
+    latencyBaselineMaxSections,
+    largeFirstRunSampleCount: largeFirstRunAnalysisMs.length,
+    largeFirstRunAnalysisMsP95: round(percentile(largeFirstRunAnalysisMs, 95), 0),
     p0FailureCount: summaries.reduce((sum, summary) => sum + Math.max(0, Math.round(Number(summary.p0FailureCount) || 0)), 0),
   };
 }

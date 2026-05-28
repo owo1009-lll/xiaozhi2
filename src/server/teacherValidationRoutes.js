@@ -5,6 +5,13 @@ import { safeString } from "./baseUtils.js";
 export function createTeacherValidationRouter(service) {
   const router = express.Router();
 
+  router.use((req, res, next) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    next();
+  });
+
   router.get("/packs", async (req, res) => {
     try {
       const packs = await service.listTeacherValidationPacks();

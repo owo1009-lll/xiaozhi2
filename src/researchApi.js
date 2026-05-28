@@ -6,6 +6,8 @@ async function readJson(response) {
   return json;
 }
 
+const NO_STORE_REQUEST = { cache: "no-store" };
+
 export async function fetchPieces() {
   return readJson(await fetch("/api/erhu/pieces"));
 }
@@ -206,11 +208,11 @@ export async function fetchValidationSummary() {
 }
 
 export async function fetchTeacherValidationPacks() {
-  return readJson(await fetch("/api/erhu/teacher-validation/packs"));
+  return readJson(await fetch("/api/erhu/teacher-validation/packs", NO_STORE_REQUEST));
 }
 
 export async function fetchTeacherValidationPack(packId) {
-  return readJson(await fetch(`/api/erhu/teacher-validation/packs/${encodeURIComponent(packId)}`));
+  return readJson(await fetch(`/api/erhu/teacher-validation/packs/${encodeURIComponent(packId)}`, NO_STORE_REQUEST));
 }
 
 export async function saveTeacherValidationReview(packId, caseId, payload) {

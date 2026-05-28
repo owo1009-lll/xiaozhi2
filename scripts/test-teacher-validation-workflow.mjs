@@ -9,6 +9,7 @@ import {
   writeJson,
 } from "./teacher-validation-support.mjs";
 import { buildQualitySnapshot, compareQualitySnapshot } from "./quality-baseline-support.mjs";
+import { teacherValidationInternals } from "../src/server/teacherValidationService.js";
 
 async function seedFixture(repoRoot) {
   const runDir = path.join(repoRoot, "data", "real-tests", "corpus-runs", "fixture-run");
@@ -214,9 +215,171 @@ try {
   const comparison = compareQualitySnapshot(snapshot, snapshot);
   assert.equal(comparison.ok, true);
 
+  const scoreDir = path.join(repoRoot, "data", "score-imports", "scorejob-fixture");
+  const pdfPath = path.join(scoreDir, "source.pdf");
+  const locator = teacherValidationInternals.buildTeacherScoreLocator(
+    {
+      scoreId: "score-mixed-locator",
+      sourcePdfPath: pdfPath,
+      selectedPartId: "erhu",
+      partCandidates: [
+        { id: "erhu", name: "二胡", staffCount: 1 },
+        { id: "piano", name: "钢琴伴奏", staffCount: 2, isLikelyPiano: true },
+      ],
+      sections: [{
+        sectionId: "page-01-s01",
+        sourceSectionId: "page-01-s01",
+        title: "自动识谱第 1 页 片段 1",
+        pageImagePath: path.join(scoreDir, "page-001.png"),
+        notes: [
+          {
+            noteId: "xml-m1-n1",
+            measureIndex: 1,
+            beatStart: 0,
+            beatDuration: 1,
+            midiPitch: 72,
+            partName: "二胡",
+            notePosition: {
+              normalizedX: 0.2,
+              normalizedY: 0.25,
+              pageNumber: 1,
+              systemIndex: 1,
+              staffIndex: 1,
+              localMeasureIndex: 1,
+              localNoteId: "xml-m1-n1",
+              scoreLineRole: "erhu",
+              scoreLineConfidence: 0.9,
+            },
+          },
+          {
+            noteId: "xml-m1-n2",
+            measureIndex: 1,
+            beatStart: 0,
+            beatDuration: 1,
+            midiPitch: 48,
+            partName: "钢琴",
+            notePosition: {
+              normalizedX: 0.2,
+              normalizedY: 0.62,
+              pageNumber: 1,
+              systemIndex: 1,
+              staffIndex: 2,
+              localMeasureIndex: 1,
+              localNoteId: "xml-m1-n2",
+              scoreLineRole: "accompaniment",
+              scoreLineConfidence: 0.9,
+            },
+          },
+        ],
+        scoreLineStats: {
+          erhuNoteCount: 1,
+          accompanimentNoteCount: 1,
+        },
+      }],
+    },
+    {
+      sectionId: "page-01-s01",
+      systemIssueNoteIds: ["xml-m1-n1"],
+    },
+    {
+      sectionId: "page-01-s01",
+      noteFindings: [{ noteId: "xml-m1-n1", measureIndex: 1 }],
+    },
+    {
+      dataDir: path.join(repoRoot, "data"),
+      asciiRuntimeRoot: repoRoot,
+    },
+  );
+  assert.equal(locator.notePositions.length, 1);
+  assert.equal(locator.notePositions[0].scoreLineRole, "erhu");
+  assert(locator.notePositions[0].y < 0.4, "Teacher locator must not include piano accompaniment coordinates");
+  assert.equal(locator.focusRegions.length, 1);
+  assert(locator.focusRegions[0].yMax < 0.4, "Teacher focus region must stay on the erhu line");
+
+  const mislabeledLineRankLocator = teacherValidationInternals.buildTeacherScoreLocator(
+    {
+      scoreId: "score-line-rank-locator",
+      sourcePdfPath: pdfPath,
+      selectedPartId: "P1",
+      selectedPart: "Voice",
+      partCandidates: [
+        { id: "P1", name: "Voice", staffCount: 1 },
+        { id: "P2", name: "Piano", staffCount: 2, isLikelyPiano: true },
+      ],
+      sections: [{
+        sectionId: "page-07-s03",
+        sourceSectionId: "page-07-s03",
+        title: "自动识谱第 7 页 片段 3",
+        pageImagePath: path.join(scoreDir, "page-007.png"),
+        selectedPart: "Voice",
+        selectedPartId: "P1",
+        notes: [
+          {
+            noteId: "xml-m73-n7",
+            measureIndex: 73,
+            beatStart: 1,
+            beatDuration: 1,
+            midiPitch: 65,
+            notePosition: {
+              normalizedX: 0.7,
+              normalizedY: 0.31,
+              pageNumber: 7,
+              systemIndex: 3,
+              staffIndex: 1,
+              localMeasureIndex: 9,
+              localNoteId: "xml-m9-n7",
+              scoreLineRole: "erhu",
+              scoreLineConfidence: 0.92,
+            },
+          },
+          {
+            noteId: "xml-m74-n5",
+            measureIndex: 74,
+            beatStart: 1,
+            beatDuration: 1,
+            midiPitch: 72,
+            notePosition: {
+              normalizedX: 0.32,
+              normalizedY: 0.39,
+              pageNumber: 7,
+              systemIndex: 4,
+              staffIndex: 1,
+              localMeasureIndex: 10,
+              localNoteId: "xml-m10-n5",
+              scoreLineRole: "erhu",
+              scoreLineConfidence: 0.92,
+            },
+          },
+        ],
+        scoreLineStats: {
+          erhuNoteCount: 2,
+          accompanimentNoteCount: 0,
+        },
+      }],
+    },
+    {
+      sectionId: "page-07-s03",
+      systemIssueNoteIds: ["xml-m73-n7", "xml-m74-n5"],
+    },
+    {
+      sectionId: "page-07-s03",
+      noteFindings: [
+        { noteId: "xml-m73-n7", measureIndex: 73 },
+        { noteId: "xml-m74-n5", measureIndex: 74 },
+      ],
+    },
+    {
+      dataDir: path.join(repoRoot, "data"),
+      asciiRuntimeRoot: repoRoot,
+    },
+  );
+  assert.equal(mislabeledLineRankLocator.notePositions.length, 1);
+  assert.equal(mislabeledLineRankLocator.notePositions[0].sourceNoteId, "xml-m74-n5");
+  assert(mislabeledLineRankLocator.notePositions[0].y > 0.35, "Teacher locator must drop piano line-rank coordinates even when mislabeled erhu");
+
   console.log(JSON.stringify({
     ok: true,
-    checks: ["pack-build", "review-import", "quality-snapshot"],
+    checks: ["pack-build", "review-import", "quality-snapshot", "erhu-only-score-locator", "line-rank-piano-filter"],
     selectedCount: pack.manifest.selectedCount,
     reviewCount: snapshot.validation.reviewCount,
   }, null, 2));

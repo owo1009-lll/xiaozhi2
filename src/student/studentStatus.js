@@ -26,6 +26,17 @@ export function hasScoreMusicXmlFallback(job) {
   return Boolean(job.musicxmlFallbackAvailable || actions.includes("import-musicxml"));
 }
 
+export function getOmrQualityGate(job, score) {
+  return job?.omrQualityGate || job?.omrStats?.qualityGate || score?.omrQualityGate || score?.omrStats?.qualityGate || null;
+}
+
+export function omrGateRequiresReview(gate) {
+  const status = String(gate?.status || "").toLowerCase();
+  if (status === "block" || status === "review") return true;
+  const reasons = Array.isArray(gate?.blockingReasons) ? gate.blockingReasons : [];
+  return reasons.length > 0;
+}
+
 export function friendlyErrorMessage(errorOrMessage, fallback = "操作失败，请稍后重试。") {
   const raw = typeof errorOrMessage === "string" ? errorOrMessage : errorOrMessage?.message;
   const text = String(raw || "").trim();
@@ -73,7 +84,7 @@ export function getSelectedPartConfidence(job, score) {
       Number.isFinite(scoreConfidence) ? scoreConfidence : 0,
       Number.isFinite(jobConfidence) ? jobConfidence : 0,
     );
-    return Math.max(bestKnown, 0.82);
+    return Math.max(bestKnown, 0.88);
   }
   const numeric = Number(job?.selectedPartConfidence ?? score?.selectedPartConfidence);
   return Number.isFinite(numeric) ? numeric : 0;
@@ -108,6 +119,7 @@ export function isAccompanimentCandidate(candidate) {
 
 export function needsPartReview(job, score) {
   if ((job?.omrStatus || score?.omrStatus) !== "completed") return false;
+  if (omrGateRequiresReview(getOmrQualityGate(job, score))) return true;
   if (job?.selectedPartConfirmed || score?.selectedPartConfirmed) return false;
   if (hasReliableErhuLineSplit(score)) return false;
   const candidates = getPartCandidates(job, score);

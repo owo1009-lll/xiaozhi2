@@ -4,12 +4,34 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "setup-console-utf8.ps1")
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $candidates = @()
 $venvPython = Join-Path $repoRoot "python-service\.venv\Scripts\python.exe"
 $venvSitePackages = Join-Path $repoRoot "python-service\.venv\Lib\site-packages"
 $extraSiteRunner = Join-Path $repoRoot "scripts\run-python-extra-site.py"
+
+function Set-DefaultEnv {
+  param(
+    [string]$Name,
+    [string]$Value
+  )
+
+  $currentValue = [Environment]::GetEnvironmentVariable($Name)
+  if ([string]::IsNullOrWhiteSpace($currentValue)) {
+    Set-Item -Path "Env:$Name" -Value $Value
+  }
+}
+
+$cpuThreadLimit = if ($env:ERHU_CPU_THREAD_LIMIT) { $env:ERHU_CPU_THREAD_LIMIT } else { "1" }
+Set-DefaultEnv -Name "ERHU_CPU_THREAD_LIMIT" -Value $cpuThreadLimit
+Set-DefaultEnv -Name "OMP_NUM_THREADS" -Value $cpuThreadLimit
+Set-DefaultEnv -Name "MKL_NUM_THREADS" -Value $cpuThreadLimit
+Set-DefaultEnv -Name "OPENBLAS_NUM_THREADS" -Value $cpuThreadLimit
+Set-DefaultEnv -Name "NUMEXPR_NUM_THREADS" -Value $cpuThreadLimit
+Set-DefaultEnv -Name "PYTHONIOENCODING" -Value "utf-8"
+Set-DefaultEnv -Name "PYTHONUTF8" -Value "1"
 
 function Test-CudaPython {
   param(

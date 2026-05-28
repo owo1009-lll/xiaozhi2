@@ -208,6 +208,13 @@ def main() -> None:
                 "cpuOnly": True,
                 "runtime": runtime,
                 "dependencies": dependencies,
+                "threadEnv": {
+                    "ERHU_CPU_THREAD_LIMIT": os.getenv("ERHU_CPU_THREAD_LIMIT", ""),
+                    "OMP_NUM_THREADS": os.getenv("OMP_NUM_THREADS", ""),
+                    "MKL_NUM_THREADS": os.getenv("MKL_NUM_THREADS", ""),
+                    "OPENBLAS_NUM_THREADS": os.getenv("OPENBLAS_NUM_THREADS", ""),
+                    "NUMEXPR_NUM_THREADS": os.getenv("NUMEXPR_NUM_THREADS", ""),
+                },
                 "audioPath": str(wav_path),
                 "featureMemoryCacheEntries": len(getattr(analyzer, "_feature_cache", {})),
                 "coldRun": cold_run,

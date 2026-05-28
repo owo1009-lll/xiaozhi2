@@ -3,6 +3,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "setup-console-utf8.ps1")
 $repoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $repoRoot
 
@@ -35,6 +36,7 @@ Invoke-Step "server task queue 429" { npm run test:server-task-queue-429 }
 Invoke-Step "job state contract" { npm run test:job-state-contract }
 Invoke-Step "quality baseline guard" { npm run test:quality-baseline }
 Invoke-Step "teacher validation workflow" { npm run test:teacher-validation }
+Invoke-Step "teacher validation readiness" { npm run audit:teacher-validation-readiness }
 Invoke-Step "MusicXML fallback contract" { npm run test:musicxml-fallback-contract }
 Invoke-Step "DL analyzer dependencies" { powershell -ExecutionPolicy Bypass -File scripts\run-python.ps1 scripts\check-mainline-analyzer.py }
 Invoke-Step "analyzer CPU phase diagnostic" { npm run test:analyzer-cpu-phases }
@@ -54,6 +56,9 @@ Invoke-Step "analyzer score role helpers" { npm run test:analyzer-score-roles }
 Invoke-Step "score markings" { npm run test:score-markings }
 Invoke-Step "OMR pagewise dedupe" { npm run test:omr-pagewise-dedupe }
 Invoke-Step "OMR whole PDF skip" { npm run test:omr-whole-pdf-skip }
+Invoke-Step "OMR provider diagnostics" { npm run test:omr-provider-diagnostics }
+Invoke-Step "HOMR boundary" { npm run audit:homr-boundary }
+Invoke-Step "OMR quality gate" { npm run test:omr-quality-gate }
 Invoke-Step "score issue projection" { npm run test:score-issues }
 Invoke-Step "DTW alignment quality" { npm run test:dtw-quality }
 Invoke-Step "real corpus pairing audit" { npm run test:real-corpus -- --max-pairs $CorpusPairs }

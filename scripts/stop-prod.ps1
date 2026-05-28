@@ -1,4 +1,5 @@
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "setup-console-utf8.ps1")
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $dataDir = Join-Path $repoRoot "data"
@@ -14,7 +15,11 @@ function Stop-Pid {
   }
 
   try {
-    Stop-Process -Id $TargetPid -Force -ErrorAction Stop
+    if ($IsWindows -or $env:OS -eq "Windows_NT") {
+      & taskkill.exe /PID $TargetPid /T /F | Out-Null
+    } else {
+      Stop-Process -Id $TargetPid -Force -ErrorAction Stop
+    }
     Write-Host "Stopped process $TargetPid"
   } catch {
     Write-Host ("Unable to stop process {0}: {1}" -f $TargetPid, $_.Exception.Message)

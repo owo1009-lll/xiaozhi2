@@ -45,6 +45,7 @@ import {
 import {
   buildCachedImportPreviewPages,
   buildReusedOmrStats,
+  buildOmrQualityGate,
   calibrateOmrConfidence,
   normalizeOmrStats,
 } from "./src/server/omrStats.js";
@@ -836,6 +837,30 @@ function normalizeSearchText(value) {
     .replace(/[\s\-_（）()【】\[\]《》"“”'’.,，。:：/\\]+/g, "");
 }
 
+function normalizePartCandidates(candidates = []) {
+  return getArray(candidates).map((item, index) => ({
+    rank: Math.max(1, Math.round(safeNumber(item?.rank, index + 1))),
+    id: safeString(item?.id),
+    name: repairMojibakeText(item?.name || item?.label || `candidate-${index + 1}`),
+    label: repairMojibakeText(item?.label || item?.name || `candidate-${index + 1}`),
+    selectionKey: safeString(item?.selectionKey),
+    qualifiedLabel: repairMojibakeText(item?.qualifiedLabel || item?.label || item?.name || `candidate-${index + 1}`),
+    score: clamp(safeNumber(item?.score, 0), 0, 1),
+    selectedPartConfidence: clamp(safeNumber(item?.selectedPartConfidence, item?.score || 0), 0, 1),
+    noteCount: Math.max(0, Math.round(safeNumber(item?.noteCount, 0))),
+    measureCount: Math.max(0, Math.round(safeNumber(item?.measureCount, 0))),
+    staffCount: Math.max(0, Math.round(safeNumber(item?.staffCount, 0))),
+    pitchRange: getArray(item?.pitchRange).map((value) => Math.round(safeNumber(value))).filter((value) => Number.isFinite(value)),
+    erhuRangeRatio: clamp(safeNumber(item?.erhuRangeRatio, 0), 0, 1),
+    chordRatio: clamp(safeNumber(item?.chordRatio, 0), 0, 1),
+    isLikelyPiano: safeBoolean(item?.isLikelyPiano, false),
+    isGenericVoice: safeBoolean(item?.isGenericVoice, false),
+    isAfterExplicitPiano: safeBoolean(item?.isAfterExplicitPiano, false),
+    isLikelyAccompanimentSplit: safeBoolean(item?.isLikelyAccompanimentSplit, false),
+    safeForErhuProjection: safeBoolean(item?.safeForErhuProjection, false),
+  }));
+}
+
 function normalizeImportedSections(sections = [], scoreFallback = {}) {
   const normalizedSections = getArray(sections)
     .map((section, index) => ({
@@ -874,28 +899,7 @@ function normalizeImportedSections(sections = [], scoreFallback = {}) {
       selectedPartConfidence: clamp(safeNumber(raw?.selectedPartConfidence, 0), 0, 1),
       erhuProjectionMode: safeString(raw?.erhuProjectionMode),
       erhuProjectionReason: safeString(raw?.erhuProjectionReason),
-      partCandidates: getArray(raw?.partCandidates)
-        .map((item, candidateIndex) => ({
-          rank: Math.max(1, Math.round(safeNumber(item?.rank, candidateIndex + 1))),
-          id: safeString(item?.id),
-          name: repairMojibakeText(item?.name || item?.label || `声部 ${candidateIndex + 1}`),
-          label: repairMojibakeText(item?.label || item?.name || `声部 ${candidateIndex + 1}`),
-          selectionKey: safeString(item?.selectionKey),
-          qualifiedLabel: repairMojibakeText(item?.qualifiedLabel || item?.label || item?.name || `声部 ${candidateIndex + 1}`),
-          score: clamp(safeNumber(item?.score, 0), 0, 1),
-          selectedPartConfidence: clamp(safeNumber(item?.selectedPartConfidence, item?.score || 0), 0, 1),
-          noteCount: Math.max(0, Math.round(safeNumber(item?.noteCount, 0))),
-          measureCount: Math.max(0, Math.round(safeNumber(item?.measureCount, 0))),
-          staffCount: Math.max(0, Math.round(safeNumber(item?.staffCount, 0))),
-          pitchRange: getArray(item?.pitchRange).map((value) => Math.round(safeNumber(value))).filter((value) => Number.isFinite(value)),
-          erhuRangeRatio: clamp(safeNumber(item?.erhuRangeRatio, 0), 0, 1),
-          chordRatio: clamp(safeNumber(item?.chordRatio, 0), 0, 1),
-          isLikelyPiano: safeBoolean(item?.isLikelyPiano, false),
-          isGenericVoice: safeBoolean(item?.isGenericVoice, false),
-          isAfterExplicitPiano: safeBoolean(item?.isAfterExplicitPiano, false),
-          isLikelyAccompanimentSplit: safeBoolean(item?.isLikelyAccompanimentSplit, false),
-          safeForErhuProjection: safeBoolean(item?.safeForErhuProjection, false),
-        })),
+      partCandidates: normalizePartCandidates(raw?.partCandidates),
       scoreLineStats: raw?.scoreLineStats && typeof raw.scoreLineStats === "object" ? raw.scoreLineStats : undefined,
     }));
   return annotateImportedSectionsScoreLineRoles(normalizedSections, scoreFallback);
@@ -917,6 +921,25 @@ function normalizeImportedScoreRecord(score = {}) {
     score.scoreLineStats && typeof score.scoreLineStats === "object"
       ? { ...score.scoreLineStats, ...computedScoreLineStats }
       : computedScoreLineStats;
+  const omrConfidence = calibrateOmrConfidence(score.omrConfidence, normalizedOmrStats, {
+    omrStatus: safeString(score.omrStatus, "completed"),
+    sectionCount: sections.length,
+  });
+  const selectedPartConfidence = effectiveSelectedPartConfidence(
+    safeNumber(score.selectedPartConfidence, safeNumber(score.piecePack?.selectedPartConfidence, 0)),
+    sections,
+  );
+  const partCandidates = normalizePartCandidates(score.partCandidates || score.piecePack?.partCandidates);
+  const omrQualityGate = buildOmrQualityGate({
+    omrStatus: safeString(score.omrStatus, "completed"),
+    omrConfidence,
+    omrStats: normalizedOmrStats,
+    selectedPartConfidence,
+    scoreLineStats,
+    partCandidates,
+    sectionCount: sections.length,
+    selectedPartConfirmed: safeBoolean(score.selectedPartConfirmed, false),
+  });
   return {
     scoreId: safeString(score.scoreId),
     pieceId: safeString(score.pieceId),
@@ -926,41 +949,14 @@ function normalizeImportedScoreRecord(score = {}) {
     pdfHash: safeString(score.pdfHash),
     musicxmlPath: safeString(score.musicxmlPath),
     omrStatus: safeString(score.omrStatus, "completed"),
-    omrConfidence: calibrateOmrConfidence(score.omrConfidence, normalizedOmrStats, {
-      omrStatus: safeString(score.omrStatus, "completed"),
-      sectionCount: sections.length,
-    }),
-    omrStats: normalizedOmrStats,
+    omrConfidence,
+    omrStats: { ...normalizedOmrStats, qualityGate: omrQualityGate },
     detectedParts: getArray(score.detectedParts).map((item) => safeString(item)).filter(Boolean),
     selectedPart: safeString(score.selectedPart, "erhu"),
     selectedPartId: safeString(score.selectedPartId),
     selectedPartConfirmed: safeBoolean(score.selectedPartConfirmed, false),
-    selectedPartConfidence: effectiveSelectedPartConfidence(
-      safeNumber(score.selectedPartConfidence, safeNumber(score.piecePack?.selectedPartConfidence, 0)),
-      sections,
-    ),
-    partCandidates: getArray(score.partCandidates || score.piecePack?.partCandidates)
-      .map((item, index) => ({
-        rank: Math.max(1, Math.round(safeNumber(item?.rank, index + 1))),
-        id: safeString(item?.id),
-        name: repairMojibakeText(item?.name || item?.label || `声部 ${index + 1}`),
-        label: repairMojibakeText(item?.label || item?.name || `声部 ${index + 1}`),
-        selectionKey: safeString(item?.selectionKey),
-        qualifiedLabel: repairMojibakeText(item?.qualifiedLabel || item?.label || item?.name || `candidate-${index + 1}`),
-        score: clamp(safeNumber(item?.score, 0), 0, 1),
-        selectedPartConfidence: clamp(safeNumber(item?.selectedPartConfidence, item?.score || 0), 0, 1),
-        noteCount: Math.max(0, Math.round(safeNumber(item?.noteCount, 0))),
-        measureCount: Math.max(0, Math.round(safeNumber(item?.measureCount, 0))),
-        staffCount: Math.max(0, Math.round(safeNumber(item?.staffCount, 0))),
-        pitchRange: getArray(item?.pitchRange).map((value) => Math.round(safeNumber(value))).filter((value) => Number.isFinite(value)),
-        erhuRangeRatio: clamp(safeNumber(item?.erhuRangeRatio, 0), 0, 1),
-        chordRatio: clamp(safeNumber(item?.chordRatio, 0), 0, 1),
-        isLikelyPiano: safeBoolean(item?.isLikelyPiano, false),
-        isGenericVoice: safeBoolean(item?.isGenericVoice, false),
-        isAfterExplicitPiano: safeBoolean(item?.isAfterExplicitPiano, false),
-        isLikelyAccompanimentSplit: safeBoolean(item?.isLikelyAccompanimentSplit, false),
-        safeForErhuProjection: safeBoolean(item?.safeForErhuProjection, false),
-      })),
+    selectedPartConfidence,
+    partCandidates,
     markingStats: {
       ...buildMarkingStatsFromSections(sections),
       ...(score.markingStats && typeof score.markingStats === "object" ? score.markingStats : {}),
@@ -1155,15 +1151,36 @@ function normalizeScoreImportJob(job = {}) {
   const normalizedOmrStats = normalizeOmrStats(job.omrStats);
   const jobSections = getArray(job.sections || job.piecePack?.sections);
   const computedScoreLineStats = buildScoreLineStatsFromSections(jobSections);
+  const hasInlineSections = jobSections.length > 0;
   const scoreLineStats =
     job.scoreLineStats && typeof job.scoreLineStats === "object"
-      ? { ...job.scoreLineStats, ...computedScoreLineStats }
+      ? (hasInlineSections ? { ...job.scoreLineStats, ...computedScoreLineStats } : job.scoreLineStats)
       : computedScoreLineStats;
+  const effectiveSectionCount =
+    jobSections.length ||
+    Math.max(0, Math.round(safeNumber(job.sectionCount, 0))) ||
+    (safeNumber(scoreLineStats.noteCount, 0) > 0 ? 1 : 0);
   const omrStatus = safeString(job.omrStatus, "processing");
   const isFailedImport = omrStatus === "failed";
   const isMusicXmlSource = safeString(job.pdfHash).startsWith("musicxml:") || Boolean(safeString(job.musicxmlPath) && !safeString(job.sourcePdfPath));
   const musicxmlFallbackAvailable = safeBoolean(job.musicxmlFallbackAvailable, isFailedImport && !isMusicXmlSource);
   const fallbackActions = normalizeStringList(job.fallbackActions);
+  const omrConfidence = calibrateOmrConfidence(job.omrConfidence, normalizedOmrStats, {
+    omrStatus: safeString(job.omrStatus),
+    sectionCount: effectiveSectionCount,
+  });
+  const selectedPartConfidence = effectiveSelectedPartConfidence(job.selectedPartConfidence, jobSections);
+  const partCandidates = normalizePartCandidates(job.partCandidates);
+  const omrQualityGate = buildOmrQualityGate({
+    omrStatus,
+    omrConfidence,
+    omrStats: normalizedOmrStats,
+    selectedPartConfidence,
+    scoreLineStats,
+    partCandidates,
+    sectionCount: effectiveSectionCount,
+    selectedPartConfirmed: safeBoolean(job.selectedPartConfirmed, false),
+  });
   return {
     jobId: safeString(job.jobId),
     scoreId: safeString(job.scoreId),
@@ -1172,42 +1189,19 @@ function normalizeScoreImportJob(job = {}) {
     pdfHash: safeString(job.pdfHash),
     originalFilename: repairMojibakeText(job.originalFilename),
     omrStatus,
-    omrConfidence: calibrateOmrConfidence(job.omrConfidence, normalizedOmrStats, {
-      omrStatus: safeString(job.omrStatus),
-      sectionCount: getArray(job.piecePack?.sections).length,
-    }),
-    omrStats: normalizedOmrStats,
+    omrConfidence,
+    omrStats: { ...normalizedOmrStats, qualityGate: omrQualityGate },
     musicxmlPath: safeString(job.musicxmlPath),
     previewPages: getArray(job.previewPages),
     detectedParts: getArray(job.detectedParts).map((item) => safeString(item)).filter(Boolean),
     selectedPart: safeString(job.selectedPart, "erhu"),
     selectedPartCandidates: getArray(job.selectedPartCandidates).map((item) => safeString(item)).filter(Boolean),
     selectedPartConfirmed: safeBoolean(job.selectedPartConfirmed, false),
-    selectedPartConfidence: effectiveSelectedPartConfidence(job.selectedPartConfidence, jobSections),
-    partCandidates: getArray(job.partCandidates)
-        .map((item, index) => ({
-          rank: Math.max(1, Math.round(safeNumber(item?.rank, index + 1))),
-          id: safeString(item?.id),
-          name: repairMojibakeText(item?.name || item?.label || `声部 ${index + 1}`),
-          label: repairMojibakeText(item?.label || item?.name || `声部 ${index + 1}`),
-          selectionKey: safeString(item?.selectionKey),
-          qualifiedLabel: repairMojibakeText(item?.qualifiedLabel || item?.label || item?.name || `candidate-${index + 1}`),
-          score: clamp(safeNumber(item?.score, 0), 0, 1),
-          selectedPartConfidence: clamp(safeNumber(item?.selectedPartConfidence, item?.score || 0), 0, 1),
-          noteCount: Math.max(0, Math.round(safeNumber(item?.noteCount, 0))),
-          measureCount: Math.max(0, Math.round(safeNumber(item?.measureCount, 0))),
-          staffCount: Math.max(0, Math.round(safeNumber(item?.staffCount, 0))),
-          pitchRange: getArray(item?.pitchRange).map((value) => Math.round(safeNumber(value))).filter((value) => Number.isFinite(value)),
-          erhuRangeRatio: clamp(safeNumber(item?.erhuRangeRatio, 0), 0, 1),
-          chordRatio: clamp(safeNumber(item?.chordRatio, 0), 0, 1),
-          isLikelyPiano: safeBoolean(item?.isLikelyPiano, false),
-          isGenericVoice: safeBoolean(item?.isGenericVoice, false),
-          isAfterExplicitPiano: safeBoolean(item?.isAfterExplicitPiano, false),
-          isLikelyAccompanimentSplit: safeBoolean(item?.isLikelyAccompanimentSplit, false),
-          safeForErhuProjection: safeBoolean(item?.safeForErhuProjection, false),
-      })),
+    selectedPartConfidence,
+    partCandidates,
       markingStats: job.markingStats && typeof job.markingStats === "object" ? job.markingStats : {},
       scoreLineStats,
+      omrQualityGate,
       warnings: normalizeWarningList(job.warnings),
       cacheHit: safeBoolean(job.cacheHit),
       reusedScoreId: safeString(job.reusedScoreId),
@@ -2507,7 +2501,7 @@ function estimateSectionDurationSeconds(section = {}) {
 function isLikelyNonScoreLeadPageSection(section = {}, score = {}) {
   const pageNumber = extractPageNumberFromSectionLike(section);
   const pageCount = Math.max(0, Math.round(safeNumber(score?.omrStats?.pageCount, getArray(score?.previewPages).length)));
-  if (pageCount < 4 || pageNumber > 2) return false;
+  if (pageCount < 4 || pageNumber !== 1) return false;
   const noteCount = getArray(section?.notes).length || Math.round(safeNumber(section?.noteCount, 0));
   const descriptor = `${safeString(section?.sectionId)} ${safeString(section?.sourceSectionId)} ${safeString(section?.title)}`;
   const isAutoLeadPage = /自动识谱第\s*[12]\s*页|page[-\s]?0?[12]\b/i.test(descriptor);

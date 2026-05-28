@@ -4,6 +4,57 @@ import {
   percentStyle,
 } from "./teacherValidationUtils.js";
 
+function toLineRank(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  const rank = Math.round(numeric);
+  return rank > 0 ? rank : null;
+}
+
+function isErhuLineRank(entry = {}) {
+  const rank = toLineRank(entry.systemIndex);
+  return !rank || (rank - 1) % 3 === 0;
+}
+
+function shouldFilterThreeStaffLineRanks(locator = {}) {
+  if (locator?.lineRankFilterApplied) return true;
+  const ranks = new Set();
+  for (const entry of [
+    ...(locator?.notePositions || []),
+    ...(locator?.measurePositions || []),
+    ...(locator?.focusRegions || []),
+  ]) {
+    const rank = toLineRank(entry?.systemIndex);
+    if (rank) ranks.add(rank);
+  }
+  if (ranks.size < 2) return false;
+  return [...ranks].some((rank) => !isErhuLineRank({ systemIndex: rank }))
+    && [...ranks].some((rank) => isErhuLineRank({ systemIndex: rank }));
+}
+
+function verticalRange(entry = {}) {
+  const yMin = Number(entry.yMin ?? entry.y);
+  const yMax = Number(entry.yMax ?? entry.y);
+  if (!Number.isFinite(yMin) || !Number.isFinite(yMax)) return null;
+  return { min: Math.min(yMin, yMax), max: Math.max(yMin, yMax) };
+}
+
+function overlapsAllowedVerticalRange(entry = {}, allowedRanges = []) {
+  const range = verticalRange(entry);
+  if (!range || !allowedRanges.length) return true;
+  const center = (range.min + range.max) / 2;
+  return allowedRanges.some((allowed) => center >= allowed.min - 0.025 && center <= allowed.max + 0.025);
+}
+
+function filterThreeStaffLineRanks(locator = {}, entries = [], allowedRanges = []) {
+  if (!shouldFilterThreeStaffLineRanks(locator)) return entries;
+  return entries.filter((entry) => {
+    const rank = toLineRank(entry?.systemIndex);
+    if (rank) return isErhuLineRank(entry);
+    return overlapsAllowedVerticalRange(entry, allowedRanges);
+  });
+}
+
 export default function ScoreLocatorPanel({
   item,
   activeLocator,
@@ -17,9 +68,13 @@ export default function ScoreLocatorPanel({
   onMarkActiveNote,
 }) {
   const locator = item?.scoreLocator;
-  const notes = locator?.notePositions || [];
-  const measures = locator?.measurePositions || [];
-  const focusRegions = locator?.focusRegions || [];
+  const notes = filterThreeStaffLineRanks(locator, locator?.notePositions || []);
+  const focusRegions = filterThreeStaffLineRanks(locator, locator?.focusRegions || []);
+  const allowedMeasureRanges = [
+    ...focusRegions.map((region) => verticalRange(region)).filter(Boolean),
+    ...notes.map((note) => verticalRange(note)).filter(Boolean),
+  ];
+  const measures = filterThreeStaffLineRanks(locator, locator?.measurePositions || [], allowedMeasureRanges);
   const systemIssueNoteIdSet = new Set(parseList(item?.systemIssueNoteIds || item?.review?.systemIssueNoteIds || ""));
   const visibleNotes = notes.filter((note) => {
     const ids = [note.noteId, note.sourceNoteId].filter(Boolean);

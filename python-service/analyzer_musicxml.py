@@ -31,13 +31,14 @@ def xml_children(node: ET.Element | None, tag: str) -> list[ET.Element]:
 
 def is_piano_part_name(label: str) -> bool:
     label_lower = label.lower()
+    normalized_label = normalize_part_label(label)
     return (
         "piano" in label_lower
         or "pianoforte" in label_lower
         or "pno" in label_lower
         or "pn." in label_lower
-        or "\u94a2\u7434" in label
-        or "\u92fc\u7434" in label
+        or "\u94a2\u7434" in normalized_label
+        or "\u92fc\u7434" in normalized_label
     )
 
 
@@ -324,7 +325,18 @@ def resolve_selected_part_from_candidates(
         for candidate in candidates
         if bool(candidate.get("safeForErhuProjection")) and int(safe_float(candidate.get("noteCount"), 0)) > 0
     ]
-    best = safe_candidates[0] if safe_candidates else candidates[0]
+    non_piano_candidates = [
+        candidate
+        for candidate in candidates
+        if (
+            int(safe_float(candidate.get("noteCount"), 0)) > 0
+            and not is_piano_part_name(
+                " ".join(str(candidate.get(key) or "") for key in ("name", "label", "qualifiedLabel"))
+            )
+            and int(safe_float(candidate.get("staffCount"), 1)) <= 1
+        )
+    ]
+    best = safe_candidates[0] if safe_candidates else (non_piano_candidates[0] if non_piano_candidates else candidates[0])
     return best, float(best.get("selectedPartConfidence", best.get("score", 0.5)))
 
 

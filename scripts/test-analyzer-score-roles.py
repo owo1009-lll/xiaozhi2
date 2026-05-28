@@ -19,6 +19,7 @@ from analyzer_score_roles import (  # noqa: E402
     is_explicit_erhu_part_candidate,
     should_apply_erhu_range_fallback,
 )
+from analyzer_musicxml import is_piano_part_name  # noqa: E402
 from schemas import NoteEvent  # noqa: E402
 
 
@@ -68,6 +69,8 @@ def main() -> int:
     require(has_accompaniment_part_candidate([{"id": "P8", "name": "钢琴", "label": ""}]), "Simplified Chinese 钢琴 should mark accompaniment present")
     require(has_accompaniment_part_candidate([{"id": "P9", "name": "鋼 琴", "label": ""}]), "Traditional Chinese 鋼琴 should tolerate whitespace")
     require(has_accompaniment_part_candidate([{"id": "P10", "name": "伴奏", "label": ""}]), "Chinese 伴奏 should mark accompaniment present")
+    require(is_piano_part_name("\u94a2\u7434"), "MusicXML helper should detect simplified Chinese piano")
+    require(is_piano_part_name("\u92fc \u7434"), "MusicXML helper should tolerate whitespace in traditional Chinese piano")
     require(not is_clean_solo_part_candidate(candidates[2], candidates), "Voice should not be clean solo when piano is present")
     require(is_clean_solo_part_candidate(candidates[2], [candidates[2]]), "single monophonic Voice should be clean solo")
     require(is_ambiguous_part_candidate(candidates[0], candidates), "piano-like candidate should be ambiguous for erhu projection")

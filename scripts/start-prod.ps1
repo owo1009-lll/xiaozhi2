@@ -4,6 +4,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "setup-console-utf8.ps1")
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $dataDir = Join-Path $repoRoot "data"
@@ -18,12 +19,15 @@ $analyzerPort = 8000
 $serverAnalyzerUrl = "http://127.0.0.1:$analyzerPort"
 $analyzerUrl = "$serverAnalyzerUrl/docs"
 $isWindowsHost = ($env:OS -eq "Windows_NT") -or ($PSVersionTable.Platform -eq "Win32NT") -or ($IsWindows -eq $true)
-$defaultAnalyzerWorkers = 1
+$cpuProfile = if ($env:ERHU_CPU_PROFILE) { $env:ERHU_CPU_PROFILE.Trim().ToLowerInvariant() } else { "balanced" }
+$logicalProcessorCount = [Math]::Max(1, [Environment]::ProcessorCount)
+$defaultAnalyzerWorkers = if ($cpuProfile -eq "stable" -or $logicalProcessorCount -lt 4) { 1 } elseif ($logicalProcessorCount -ge 8) { 3 } else { 2 }
 $requestedAnalyzerWorkers = 0
 if ($env:ERHU_ANALYZER_WORKERS) {
   [int]::TryParse($env:ERHU_ANALYZER_WORKERS, [ref]$requestedAnalyzerWorkers) | Out-Null
 }
 $analyzerWorkers = [Math]::Max(1, [Math]::Min(4, $(if ($requestedAnalyzerWorkers -gt 0) { $requestedAnalyzerWorkers } else { $defaultAnalyzerWorkers })))
+$cpuThreadLimit = if ($env:ERHU_CPU_THREAD_LIMIT) { $env:ERHU_CPU_THREAD_LIMIT } else { "1" }
 $piecePassScanConcurrency = if ($env:ERHU_PIECE_PASS_SCAN_CONCURRENCY) { $env:ERHU_PIECE_PASS_SCAN_CONCURRENCY } else { [string]([Math]::Max(2, $analyzerWorkers)) }
 $piecePassAnalysisConcurrency = if ($env:ERHU_PIECE_PASS_ANALYSIS_CONCURRENCY) { $env:ERHU_PIECE_PASS_ANALYSIS_CONCURRENCY } else { [string]$analyzerWorkers }
 $scoreStoreBackend = if ($env:ERHU_SCORE_STORE_BACKEND) { $env:ERHU_SCORE_STORE_BACKEND } else { "auto" }
@@ -54,7 +58,11 @@ function Stop-ManagedListener {
 
     if ($matches) {
       try {
-        Stop-Process -Id $listener.OwningProcess -Force -ErrorAction Stop
+        if ($isWindowsHost) {
+          & taskkill.exe /PID $listener.OwningProcess /T /F | Out-Null
+        } else {
+          Stop-Process -Id $listener.OwningProcess -Force -ErrorAction Stop
+        }
       } catch {
         Write-Host "Failed to stop stale listener on port $Port ($($listener.OwningProcess)): $($_.Exception.Message)"
       }
@@ -131,7 +139,7 @@ $analyzerProcess = $null
 if (Test-Path $pythonRunner) {
   $analyzerListenerBeforeStart = @(Get-NetTCPConnection -LocalPort $analyzerPort -State Listen -ErrorAction SilentlyContinue)
   if ($analyzerListenerBeforeStart.Count -eq 0) {
-    $analyzerCommand = "& { `$env:ERHU_ENABLE_TORCHCREPE='true'; `$env:ERHU_ENABLE_MADMOM='true'; `$env:ERHU_PREFER_CUDA_PYTHON='false'; `$env:ERHU_TORCH_DEVICE='cpu'; `$env:CUDA_VISIBLE_DEVICES=''; `$env:ERHU_PORT='$analyzerPort'; & '$pythonRunner' -m uvicorn app:app --app-dir python-service --host 127.0.0.1 --port $analyzerPort --workers $analyzerWorkers --log-level warning }"
+    $analyzerCommand = "& { `$env:ERHU_ENABLE_TORCHCREPE='true'; `$env:ERHU_ENABLE_MADMOM='true'; `$env:ERHU_PREFER_CUDA_PYTHON='false'; `$env:ERHU_TORCH_DEVICE='cpu'; `$env:ERHU_CPU_THREAD_LIMIT='$cpuThreadLimit'; `$env:CUDA_VISIBLE_DEVICES=''; `$env:ERHU_PORT='$analyzerPort'; & '$pythonRunner' -m uvicorn app:app --app-dir python-service --host 127.0.0.1 --port $analyzerPort --workers $analyzerWorkers --log-level warning }"
     $startedAnalyzer = Start-Process -FilePath "powershell" `
       -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $analyzerCommand `
       -WorkingDirectory $repoRoot `
@@ -161,8 +169,10 @@ $analyzerPid = if ($analyzerListener.Count -gt 0) { $analyzerListener[0].OwningP
   analyzerUrl = $serverAnalyzerUrl
   scoreStoreBackend = $scoreStoreBackend
   cpuOnly = @{
+    profile = $cpuProfile
     preferCudaPython = "false"
     torchDevice = "cpu"
+    cpuThreadLimit = $cpuThreadLimit
     cudaVisibleDevices = ""
   }
   logs = @{
@@ -186,7 +196,7 @@ Write-Host "Analyzer URL: $analyzerUrl"
 Write-Host "Analyzer workers: $analyzerWorkers"
 Write-Host "Piece-pass concurrency: scan=$piecePassScanConcurrency analysis=$piecePassAnalysisConcurrency"
 Write-Host "Score store:  $scoreStoreBackend"
-Write-Host "CPU-only:     ERHU_TORCH_DEVICE=cpu CUDA_VISIBLE_DEVICES=<empty>"
+Write-Host "CPU-only:     profile=$cpuProfile ERHU_TORCH_DEVICE=cpu ERHU_CPU_THREAD_LIMIT=$cpuThreadLimit CUDA_VISIBLE_DEVICES=<empty>"
 Write-Host "Site ready:   $siteReady"
 Write-Host "Analyzer:     $analyzerReady"
 if (-not $siteReady) {

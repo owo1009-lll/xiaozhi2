@@ -326,10 +326,16 @@ export function getErhuStaffIndex(section, fallback = 1) {
   const explicit = Number(section?.selectedStaffIndex || section?.erhuStaffIndex);
   if (Number.isFinite(explicit) && explicit >= 1) return Math.round(explicit);
   const notes = Array.isArray(section?.notes) ? section.notes : [];
+  const erhuStaffs = new Set();
   const staffs = new Set();
   for (const note of notes) {
-    staffs.add(getNoteStaffIndex(note));
+    const staffIndex = getNoteStaffIndex(note);
+    staffs.add(staffIndex);
+    const role = String(note?.notePosition?.scoreLineRole || "").toLowerCase();
+    const confidence = Number(note?.notePosition?.scoreLineConfidence) || 0;
+    if (role === "erhu" && confidence >= 0.66) erhuStaffs.add(staffIndex);
   }
+  if (erhuStaffs.size) return Math.min(...erhuStaffs);
   if (!staffs.size) return fallback;
   // In full scores the solo erhu line is the top staff; piano accompaniment is below.
   return Math.min(...staffs);
@@ -349,27 +355,49 @@ export function getScoreIssueLineMode(score) {
   return SCORE_ISSUE_LINE_MODES.has(mode) ? mode : "auto";
 }
 
+function compactLabelText(value) {
+  return String(value || "").replace(/\s+/g, "").toLowerCase();
+}
+
+function hasErhuLabel(value) {
+  const text = String(value || "");
+  return /\berhu\b/i.test(text) || compactLabelText(text).includes("\u4e8c\u80e1");
+}
+
+function hasAccompanimentLabel(value) {
+  const text = String(value || "");
+  const compact = compactLabelText(text);
+  return /\b(piano|pno|pianoforte|accompaniment)\b|\bpn\./i.test(text)
+    || compact.includes("\u94a2\u7434")
+    || compact.includes("\u92fc\u7434")
+    || compact.includes("\u4f34\u594f");
+}
+
 export function getSelectedPartCandidate(score) {
   const candidates = Array.isArray(score?.partCandidates) ? score.partCandidates : [];
   if (!candidates.length) return null;
-  const selected = String(score?.selectedPartId || score?.selectedPart || "").trim().toLowerCase();
+  const selectedRaw = String(score?.selectedPartId || score?.selectedPart || "");
+  const selected = selectedRaw.trim().toLowerCase();
+  const selectedCompact = compactLabelText(selectedRaw);
   return candidates.find((candidate) => (
     [candidate?.id, candidate?.selectionKey, candidate?.qualifiedLabel, candidate?.name, candidate?.label]
-      .map((item) => String(item || "").trim().toLowerCase())
-      .includes(selected)
+      .some((item) => {
+        const value = String(item || "").trim().toLowerCase();
+        return value === selected || (selectedCompact && compactLabelText(value) === selectedCompact);
+      })
   )) || candidates[0] || null;
 }
 
 export function isExplicitErhuPartCandidate(candidate) {
   const label = `${candidate?.id || ""} ${candidate?.name || ""} ${candidate?.label || ""}`;
-  return /\berhu\b|二胡/i.test(label);
+  return hasErhuLabel(label);
 }
 
 export function hasAccompanimentPartCandidate(score) {
   const candidates = Array.isArray(score?.partCandidates) ? score.partCandidates : [];
   return candidates.some((candidate) => {
     const label = `${candidate?.id || ""} ${candidate?.name || ""} ${candidate?.label || ""}`;
-    return /\b(piano|pno|accompaniment)\b|钢琴|伴奏/i.test(label)
+    return hasAccompanimentLabel(label)
       || Boolean(candidate?.isLikelyPiano)
       || Math.max(1, Number(candidate?.staffCount || 1)) >= 2;
   });
@@ -439,7 +467,7 @@ export function isErhuMelodySystemIndex(systemIndex, score = null) {
 
 export function isErhuMelodyNote(note, section, score = null) {
   const descriptor = `${note?.partName || ""} ${note?.partLabel || ""} ${note?.instrument || ""} ${section?.selectedPart || ""}`;
-  if (/\b(piano|pno|accompaniment)\b|钢琴|伴奏/i.test(descriptor)) return false;
+  if (hasAccompanimentLabel(descriptor)) return false;
   if (!shouldProjectImportedFullScoreSection(section)) return true;
   if (isBlockedImportedProjection(section, score)) return false;
   const source = getImportedProjectionSource(section, score);
@@ -539,7 +567,7 @@ export function isLikelyNonScoreLeadPage(section, score) {
 
 export function isLikelyAccompanimentOnlySection(section, score = null) {
   const descriptor = `${section?.selectedPart || ""} ${section?.partName || ""} ${section?.partLabel || ""} ${section?.title || ""}`;
-  if (/\b(piano|pno|accompaniment)\b|钢琴|伴奏/i.test(descriptor)) return true;
+  if (hasAccompanimentLabel(descriptor)) return true;
   if (!shouldProjectImportedFullScoreSection(section)) return false;
   const stats = section?.scoreLineStats && typeof section.scoreLineStats === "object" ? section.scoreLineStats : null;
   if (stats) {
@@ -663,7 +691,7 @@ export function buildMeasureIssues(analysis) {
     return {
       ...item,
       ...copyIssueTimingFields(item),
-      sectionId: String(item?.sectionId || ""),
+      sectionId: String(item?.sectionId || analysis?.sectionId || ""),
       sectionTitle: repairMojibakeText(item?.sectionTitle || ""),
       sourcePageNumber: Number(item?.pageNumber) || 0,
       pageNumber: 0,
@@ -688,7 +716,7 @@ export function buildNoteIssues(analysis) {
     return {
       ...item,
       ...copyIssueTimingFields(item),
-      sectionId: String(item?.sectionId || ""),
+      sectionId: String(item?.sectionId || analysis?.sectionId || ""),
       sectionTitle: repairMojibakeText(item?.sectionTitle || ""),
       sourcePageNumber: Number(item?.pageNumber) || 0,
       pageNumber: 0,

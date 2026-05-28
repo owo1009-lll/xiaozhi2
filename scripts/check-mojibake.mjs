@@ -8,15 +8,25 @@ const MOJIBAKE_PATTERNS = [
   "\u6d7c\u6751",
   "\u5997\u51ad",
   "\u9367\u7008",
+  "\u6769\u6b10\u69f8",
+  "\u6d5c\u5c83\u512d",
+  "\u93c1\u6b0f\u7b00",
+  "\u9286",
 ];
 
 const TEXT_FILE_RE = /\.(?:js|jsx|mjs|ts|tsx|py|md|json|html|css|ps1|bat|cmd|txt|webmanifest)$/i;
 const CJK_RE = /[\u3400-\u9fff]/;
 const CODING_COOKIE_RE = /coding[:=]\s*utf-8/i;
+const SKIPPED_PREFIXES = [
+  "paper/",
+];
 
-function trackedFiles() {
-  const output = execFileSync("git", ["ls-files", "-z"], { encoding: "buffer" }).toString("utf8");
-  return output.split("\0").filter(Boolean);
+function candidateFiles() {
+  const tracked = execFileSync("git", ["ls-files", "-z"], { encoding: "buffer" }).toString("utf8");
+  const untracked = execFileSync("git", ["ls-files", "--others", "--exclude-standard", "-z"], {
+    encoding: "buffer",
+  }).toString("utf8");
+  return [...new Set(`${tracked}\0${untracked}`.split("\0").filter(Boolean))];
 }
 
 function lineForIndex(text, index) {
@@ -25,7 +35,10 @@ function lineForIndex(text, index) {
 
 const failures = [];
 
-for (const filePath of trackedFiles()) {
+const files = candidateFiles();
+
+for (const filePath of files) {
+  if (SKIPPED_PREFIXES.some((prefix) => filePath.startsWith(prefix))) continue;
   if (!TEXT_FILE_RE.test(filePath)) continue;
   const text = fs.readFileSync(filePath, "utf8");
   for (const pattern of MOJIBAKE_PATTERNS) {
@@ -56,4 +69,9 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(JSON.stringify({ ok: true, checked: trackedFiles().length, mojibakePatterns: MOJIBAKE_PATTERNS }, null, 2));
+console.log(JSON.stringify({
+  ok: true,
+  checked: files.filter((filePath) => !SKIPPED_PREFIXES.some((prefix) => filePath.startsWith(prefix))).length,
+  skippedPrefixes: SKIPPED_PREFIXES,
+  mojibakePatterns: MOJIBAKE_PATTERNS,
+}, null, 2));

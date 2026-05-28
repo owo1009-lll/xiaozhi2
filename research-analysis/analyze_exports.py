@@ -1106,20 +1106,20 @@ def build_usage_sentence(metric: str, usage_corr_table: pd.DataFrame) -> str:
 
 def build_validation_sentence(validation_summary: pd.DataFrame, validation_group_summary: pd.DataFrame) -> str:
     if validation_summary.empty:
-        return "鏁欏笀鏍囨敞楠岃瘉鏁版嵁灏氭湭瀵煎叆锛屽綋鍓嶆棤娉曟姤鍛婄郴缁熻緭鍑轰笌鏁欏笀鍒ゆ柇鐨勪竴鑷存€с€?"
+        return "教师标注验证数据尚未导入，当前无法报告系统输出与教师判断的一致性。"
 
     row = validation_summary.iloc[0].to_dict()
     review_count = int(row.get("reviewCount", 0) or 0)
     participant_count = int(row.get("participantCount", 0) or 0)
     if review_count == 0:
-        return "鏁欏笀鏍囨敞楠岃瘉鏁版嵁灏氭湭瀵煎叆锛屽綋鍓嶆棤娉曟姤鍛婄郴缁熻緭鍑轰笌鏁欏笀鍒ゆ柇鐨勪竴鑷存€с€?"
+        return "教师标注验证数据尚未导入，当前无法报告系统输出与教师判断的一致性。"
 
     sentence = (
-        f"鍦ㄦ暀甯堟爣娉ㄩ獙璇佸瓙鏍锋湰涓紝鍏辩撼鍏?{review_count} 鏉￠獙璇佽褰曪紝瑕嗙洊 {participant_count} 鍚嶅彈璇曡€咃紱"
-        f"绯荤粺涓庢暀甯堢殑鏁翠綋涓€鑷存€у潎鍊间负 {format_number(row.get('averageAgreement'))}/5锛?"
-        f"闊崇绾?F1 涓?{format_number(row.get('averageNoteF1'), 3)}锛?"
-        f"灏忚妭绾?F1 涓?{format_number(row.get('averageMeasureF1'), 3)}锛?"
-        f"缁冧範璺緞涓€鑷寸巼涓?{format_number((row.get('pathAgreementRate') or 0) * 100, 1)}%銆?"
+        f"在教师标注验证子样本中，共纳入 {review_count} 条验证记录，覆盖 {participant_count} 名受试者；"
+        f"系统与教师的整体一致性均值为 {format_number(row.get('averageAgreement'))}/5，"
+        f"音符级 F1 为 {format_number(row.get('averageNoteF1'), 3)}，"
+        f"小节级 F1 为 {format_number(row.get('averageMeasureF1'), 3)}，"
+        f"练习路径一致率为 {format_number((row.get('pathAgreementRate') or 0) * 100, 1)}%。"
     )
 
     if not validation_group_summary.empty:
@@ -1127,27 +1127,27 @@ def build_validation_sentence(validation_summary: pd.DataFrame, validation_group
         ctl = find_row(validation_group_summary, groupId="control")
         if exp and ctl:
             sentence += (
-                f"鍏朵腑瀹為獙缁勮矾寰勪竴鑷寸巼涓?{format_number((exp.get('pathAgreementRate') or 0) * 100, 1)}%锛?"
-                f"瀵圭収缁勪负 {format_number((ctl.get('pathAgreementRate') or 0) * 100, 1)}%銆?"
+                f"其中实验组路径一致率为 {format_number((exp.get('pathAgreementRate') or 0) * 100, 1)}%，"
+                f"对照组为 {format_number((ctl.get('pathAgreementRate') or 0) * 100, 1)}%。"
             )
     return sentence
 
 
 def build_inter_rater_sentence(inter_rater_summary: pd.DataFrame) -> str:
     if inter_rater_summary.empty:
-        return "褰撳墠灏氭棤鍙敤鐨勫弻璇勬暀甯堟暟鎹紝鍥犳鏃犳硶鎶ュ憡鏁欏笀闂翠竴鑷存€с€?"
+        return "当前尚无可用的双评教师数据，因此无法报告教师间一致性。"
 
     row = inter_rater_summary.iloc[0].to_dict()
     pair_count = int(row.get("pairCount", 0) or 0)
     if pair_count == 0:
-        return "褰撳墠灏氭棤鍙敤鐨勫弻璇勬暀甯堟暟鎹紝鍥犳鏃犳硶鎶ュ憡鏁欏笀闂翠竴鑷存€с€?"
+        return "当前尚无可用的双评教师数据，因此无法报告教师间一致性。"
 
     return (
-        f"鍦ㄥ弻璇勬暀甯堝瓙鏍锋湰涓紝鍏辩撼鍏?{pair_count} 瀵瑰弻璇勮褰曪紱"
-        f"缁冧範璺緞鐨?Cohen's kappa 涓?{format_number(row.get('pathCohenKappa'), 3)}锛?"
-        f"鏁翠綋涓€鑷存€ц瘎鍒嗙殑 ICC 涓?{format_number(row.get('overallAgreementICC'), 3)}锛?"
-        f"鏁欏笀闂村闂闊崇殑骞冲潎閲嶅彔 F1 涓?{format_number(row.get('meanNoteOverlapF1'), 3)}锛?"
-        f"瀵归棶棰樺皬鑺傜殑骞冲潎閲嶅彔 F1 涓?{format_number(row.get('meanMeasureOverlapF1'), 3)}銆?"
+        f"在双评教师子样本中，共纳入 {pair_count} 对双评记录；"
+        f"练习路径的 Cohen's kappa 为 {format_number(row.get('pathCohenKappa'), 3)}，"
+        f"整体一致性评分的 ICC 为 {format_number(row.get('overallAgreementICC'), 3)}，"
+        f"教师间对问题音的平均重叠 F1 为 {format_number(row.get('meanNoteOverlapF1'), 3)}，"
+        f"对问题小节的平均重叠 F1 为 {format_number(row.get('meanMeasureOverlapF1'), 3)}。"
     )
 
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import math
 import re
 import shutil
 import tempfile
@@ -21,6 +22,59 @@ except ImportError:  # pragma: no cover - optional dependency
 
 
 class ScoreImportMixin:
+    def _build_score_line_stats(self, notes: list[Any]) -> dict[str, Any]:
+        role_counts: dict[str, int] = {}
+        source_counts: dict[str, int] = {}
+        measure_keys: set[tuple[int, int]] = set()
+        erhu_measure_keys: set[tuple[int, int]] = set()
+        page_keys: set[int] = set()
+        erhu_page_keys: set[int] = set()
+
+        for note in notes or []:
+            if isinstance(note, dict):
+                position = note.get("notePosition") or {}
+                measure_index = int(safe_float(note.get("measureIndex"), 1))
+            else:
+                position = getattr(note, "notePosition", None) or getattr(note, "note_position", None) or {}
+                measure_index = int(safe_float(
+                    getattr(note, "measureIndex", getattr(note, "measure_index", 1)),
+                    1,
+                ))
+            role = str(position.get("scoreLineRole") or "missing")
+            source = str(position.get("scoreLineSource") or "missing")
+            page_number = int(safe_float(position.get("pageNumber"), 1))
+            measure_key = (max(1, page_number), max(1, measure_index))
+            role_counts[role] = role_counts.get(role, 0) + 1
+            source_counts[source] = source_counts.get(source, 0) + 1
+            measure_keys.add(measure_key)
+            page_keys.add(measure_key[0])
+            if role == "erhu":
+                erhu_measure_keys.add(measure_key)
+                erhu_page_keys.add(measure_key[0])
+
+        note_count = len(notes or [])
+        erhu_note_count = int(role_counts.get("erhu", 0))
+        accompaniment_note_count = int(role_counts.get("accompaniment", 0))
+        unknown_note_count = int(role_counts.get("unknown", 0) + role_counts.get("missing", 0))
+        measure_count = len(measure_keys)
+        page_count = len(page_keys)
+        return {
+            "noteCount": note_count,
+            "erhuNoteCount": erhu_note_count,
+            "accompanimentNoteCount": accompaniment_note_count,
+            "unknownNoteCount": unknown_note_count,
+            "erhuRatio": round(float(erhu_note_count) / max(1, note_count), 3),
+            "measureCount": measure_count,
+            "erhuMeasureCount": len(erhu_measure_keys),
+            "erhuMeasureCoverage": round(float(len(erhu_measure_keys)) / max(1, measure_count), 3),
+            "pageCount": page_count,
+            "erhuPageCount": len(erhu_page_keys),
+            "erhuPageCoverage": round(float(len(erhu_page_keys)) / max(1, page_count), 3),
+            "splitApplied": bool(erhu_note_count and accompaniment_note_count),
+            "roleCounts": role_counts,
+            "sourceCounts": source_counts,
+        }
+
     def _parse_musicxml_source_to_section(
         self,
         source_path: Path,
@@ -29,6 +83,7 @@ class ScoreImportMixin:
         section_id: str,
         section_title: str,
         sequence_index: int,
+        collapse_melody: bool = True,
     ) -> tuple[dict[str, Any] | None, list[str], str, list[dict[str, Any]], dict[str, Any]]:
         xml_text = self._read_musicxml_source(source_path)
         if not xml_text.strip():
@@ -84,7 +139,7 @@ class ScoreImportMixin:
             resolved_part_label = str((resolved_candidate or {}).get("label") or (resolved_candidate or {}).get("name") or resolved_part_label).strip() or resolved_part_label
             resolved_part_id = str((resolved_candidate or {}).get("id") or resolved_part_id).strip() or resolved_part_id
             selected_part_confidence = float((resolved_candidate or {}).get("selectedPartConfidence", selected_part_confidence or 0.0))
-        parsed_notes = self._parse_musicxml_score(xml_text, temp_request, resolved_part)
+        parsed_notes = self._parse_musicxml_score(xml_text, temp_request, resolved_part, collapse_melody=collapse_melody)
         if not parsed_notes:
             return None, detected_parts, resolved_part, part_candidates, {}
         page_number_match = re.search(r"page[-\s]?0*(\d+)", section_id, flags=re.IGNORECASE)
@@ -96,25 +151,7 @@ class ScoreImportMixin:
             page_number,
             detected_tempo,
         )
-        score_line_counts: dict[str, int] = {}
-        score_line_sources: dict[str, int] = {}
-        for note in parsed_notes:
-            note_position = getattr(note, "note_position", None) or {}
-            role = str(note_position.get("scoreLineRole") or "missing")
-            source = str(note_position.get("scoreLineSource") or "missing")
-            score_line_counts[role] = score_line_counts.get(role, 0) + 1
-            score_line_sources[source] = score_line_sources.get(source, 0) + 1
-        score_line_note_count = max(1, len(parsed_notes))
-        score_line_stats = {
-            "noteCount": len(parsed_notes),
-            "erhuNoteCount": int(score_line_counts.get("erhu", 0)),
-            "accompanimentNoteCount": int(score_line_counts.get("accompaniment", 0)),
-            "unknownNoteCount": int(score_line_counts.get("unknown", 0) + score_line_counts.get("missing", 0)),
-            "erhuRatio": round(float(score_line_counts.get("erhu", 0)) / score_line_note_count, 3),
-            "splitApplied": bool(score_line_counts.get("erhu", 0) and score_line_counts.get("accompaniment", 0)),
-            "roleCounts": score_line_counts,
-            "sourceCounts": score_line_sources,
-        }
+        score_line_stats = self._build_score_line_stats(parsed_notes)
 
         section = {
             "sectionId": section_id,
@@ -272,20 +309,26 @@ class ScoreImportMixin:
             "dynamicChangeCount": 0,
             "repeatCount": 0,
         }
-        aggregate_score_line_stats: dict[str, int] = {
-            "noteCount": 0,
-            "erhuNoteCount": 0,
-            "accompanimentNoteCount": 0,
-            "unknownNoteCount": 0,
-        }
         resolved_part = selected_part_hint or "erhu"
         resolved_part_label = selected_part_hint or "erhu"
         resolved_part_id = ""
         multiple_sources = len(musicxml_sources) > 1
         next_global_measure = 1
 
+        def is_explicit_piano_label(value: str | None) -> bool:
+            label = str(value or "").lower()
+            return (
+                "piano" in label
+                or "pianoforte" in label
+                or "pno" in label
+                or "pn." in label
+                or "\u94a2\u7434" in label
+                or "\u92fc\u7434" in label
+            )
+
         for index, source_path in enumerate(musicxml_sources, start=1):
             section_id = "section-a" if not multiple_sources and index == 1 else f"page-{index:02d}"
+            previous_resolved_part = resolved_part
             section_title = "自动识谱段落" if not multiple_sources and index == 1 else f"自动识谱第 {index} 页"
             section, parts, next_resolved_part, part_candidates, marking_stats = self._parse_musicxml_source_to_section(
                 source_path,
@@ -294,6 +337,7 @@ class ScoreImportMixin:
                 section_id,
                 section_title,
                 index,
+                collapse_melody=not multiple_sources,
             )
             for candidate in part_candidates:
                 candidate_key = str(candidate.get("selectionKey") or candidate.get("id") or candidate.get("label") or candidate.get("name") or "").strip()
@@ -307,9 +351,22 @@ class ScoreImportMixin:
             for part_name in parts:
                 if part_name and part_name not in detected_parts:
                     detected_parts.append(part_name)
-            resolved_part = next_resolved_part or resolved_part
+            candidate_resolved_part = next_resolved_part or resolved_part
+            if (
+                multiple_sources
+                and is_explicit_piano_label(candidate_resolved_part)
+                and not is_explicit_piano_label(previous_resolved_part)
+            ):
+                candidate_resolved_part = previous_resolved_part
+            resolved_part = candidate_resolved_part
             if section:
-                resolved_part_label = str(section.get("selectedPart") or resolved_part_label or resolved_part).strip() or resolved_part_label
+                section_part_label = str(section.get("selectedPart") or "").strip()
+                if not (
+                    multiple_sources
+                    and is_explicit_piano_label(section_part_label)
+                    and not is_explicit_piano_label(resolved_part_label)
+                ):
+                    resolved_part_label = section_part_label or resolved_part_label or resolved_part
                 resolved_part_id = str(section.get("selectedPartId") or resolved_part_id).strip()
                 if multiple_sources:
                     xml_text = self._read_musicxml_source(source_path)
@@ -320,9 +377,6 @@ class ScoreImportMixin:
                         next_global_measure,
                         index,
                     )
-                section_line_stats = section.get("scoreLineStats") or {}
-                for key in aggregate_score_line_stats:
-                    aggregate_score_line_stats[key] += int(safe_float(section_line_stats.get(key), 0))
                 page_image_path = ""
                 if request.outputDir:
                     candidate_image = Path(request.outputDir) / "pagewise" / f"page-{index:03d}.png"
@@ -335,6 +389,38 @@ class ScoreImportMixin:
         if not sections:
             return None, detected_parts or [selected_part_hint], resolved_part_label or resolved_part
 
+        aggregate_notes = [
+            note
+            for section in sections
+            for note in list(section.get("notes") or [])
+        ]
+        score_line_stats = self._build_score_line_stats(aggregate_notes)
+        selected_part_confidence = round(
+            float(
+                next(
+                    (
+                        item.get("selectedPartConfidence", item.get("score", 0.0))
+                        for item in all_part_candidates
+                        if (
+                            str(item.get("selectionKey") or item.get("id") or "").strip() == resolved_part
+                            or str(item.get("id") or "").strip() == resolved_part_id
+                            or str(item.get("label") or item.get("name") or "").strip() == resolved_part_label
+                        )
+                    ),
+                    0.0,
+                )
+            ),
+            3,
+        )
+        if (
+            int(safe_float(score_line_stats.get("erhuNoteCount"), 0)) >= 12
+            and (
+                bool(score_line_stats.get("splitApplied"))
+                or safe_float(score_line_stats.get("erhuRatio"), 0.0) >= 0.75
+                or safe_float(score_line_stats.get("erhuPageCoverage"), 0.0) >= 0.7
+            )
+        ):
+            selected_part_confidence = max(selected_part_confidence, 0.88)
         piece_pack = {
             "pieceId": request.jobId,
             "title": request.titleHint or request.originalFilename or request.jobId,
@@ -342,37 +428,10 @@ class ScoreImportMixin:
             "selectedPart": resolved_part_label or resolved_part,
             "selectedPartId": resolved_part_id,
             "detectedParts": detected_parts or [resolved_part_label or resolved_part],
-            "selectedPartConfidence": round(
-                float(
-                    next(
-                        (
-                            item.get("selectedPartConfidence", item.get("score", 0.0))
-                            for item in all_part_candidates
-                            if (
-                                str(item.get("selectionKey") or item.get("id") or "").strip() == resolved_part
-                                or str(item.get("id") or "").strip() == resolved_part_id
-                                or str(item.get("label") or item.get("name") or "").strip() == resolved_part_label
-                            )
-                        ),
-                        0.0,
-                    )
-                ),
-                3,
-            ),
+            "selectedPartConfidence": selected_part_confidence,
             "partCandidates": all_part_candidates,
             "markingStats": aggregate_marking_stats,
-            "scoreLineStats": {
-                **aggregate_score_line_stats,
-                "erhuRatio": round(
-                    float(aggregate_score_line_stats.get("erhuNoteCount", 0))
-                    / max(1, int(aggregate_score_line_stats.get("noteCount", 0))),
-                    3,
-                ),
-                "splitApplied": bool(
-                    aggregate_score_line_stats.get("erhuNoteCount", 0)
-                    and aggregate_score_line_stats.get("accompanimentNoteCount", 0)
-                ),
-            },
+            "scoreLineStats": score_line_stats,
             "sections": sections,
         }
         return piece_pack, list(piece_pack["detectedParts"]), resolved_part_label or resolved_part
@@ -450,11 +509,6 @@ class ScoreImportMixin:
                 }
                 for note in current_notes
             ]
-            chunk_role_counts: dict[str, int] = {}
-            for note in sanitized_notes:
-                role = str((note.get("notePosition") or {}).get("scoreLineRole") or "missing")
-                chunk_role_counts[role] = chunk_role_counts.get(role, 0) + 1
-            chunk_note_count = max(1, len(sanitized_notes))
             chunk = {
                 **section,
                 "sectionId": f"{section.get('sectionId', 'section')}-s{chunk_index:02d}",
@@ -465,15 +519,7 @@ class ScoreImportMixin:
                 "measureRange": [min(current_measures), max(current_measures)] if current_measures else [],
                 "chunkBeatRange": [round(current_beat_start, 3), round(current_beat_end, 3)] if current_notes else [],
                 "chunkedImported": True,
-                "scoreLineStats": {
-                    "noteCount": len(sanitized_notes),
-                    "erhuNoteCount": int(chunk_role_counts.get("erhu", 0)),
-                    "accompanimentNoteCount": int(chunk_role_counts.get("accompaniment", 0)),
-                    "unknownNoteCount": int(chunk_role_counts.get("unknown", 0) + chunk_role_counts.get("missing", 0)),
-                    "erhuRatio": round(float(chunk_role_counts.get("erhu", 0)) / chunk_note_count, 3),
-                    "splitApplied": bool(chunk_role_counts.get("erhu", 0) and chunk_role_counts.get("accompaniment", 0)),
-                    "roleCounts": chunk_role_counts,
-                },
+                "scoreLineStats": self._build_score_line_stats(sanitized_notes),
             }
             chunks.append(chunk)
             current_notes = []
@@ -511,20 +557,7 @@ class ScoreImportMixin:
         if len(chunks) >= 2 and len(chunks[-1]["notes"]) < 12:
             tail = chunks.pop()
             chunks[-1]["notes"].extend(tail["notes"])
-            merged_role_counts: dict[str, int] = {}
-            for note in chunks[-1]["notes"]:
-                role = str((note.get("notePosition") or {}).get("scoreLineRole") or "missing")
-                merged_role_counts[role] = merged_role_counts.get(role, 0) + 1
-            merged_note_count = max(1, len(chunks[-1]["notes"]))
-            chunks[-1]["scoreLineStats"] = {
-                "noteCount": len(chunks[-1]["notes"]),
-                "erhuNoteCount": int(merged_role_counts.get("erhu", 0)),
-                "accompanimentNoteCount": int(merged_role_counts.get("accompaniment", 0)),
-                "unknownNoteCount": int(merged_role_counts.get("unknown", 0) + merged_role_counts.get("missing", 0)),
-                "erhuRatio": round(float(merged_role_counts.get("erhu", 0)) / merged_note_count, 3),
-                "splitApplied": bool(merged_role_counts.get("erhu", 0) and merged_role_counts.get("accompaniment", 0)),
-                "roleCounts": merged_role_counts,
-            }
+            chunks[-1]["scoreLineStats"] = self._build_score_line_stats(chunks[-1]["notes"])
             measure_range = list(chunks[-1].get("measureRange") or [])
             tail_range = list(tail.get("measureRange") or [])
             if measure_range and tail_range:
@@ -535,6 +568,98 @@ class ScoreImportMixin:
                 chunks[-1]["chunkBeatRange"] = [min(beat_range[0], tail_beat_range[0]), max(beat_range[-1], tail_beat_range[-1])]
 
         return chunks or [section]
+
+    def _build_omr_provider_candidates(self) -> list[dict[str, Any]]:
+        audiveris_cli = str(getattr(self.settings, "audiveris_cli", "") or "").strip()
+        homr_cli = str(getattr(self.settings, "homr_cli", "") or "").strip()
+        return [
+            {
+                "provider": "audiveris",
+                "role": "primary",
+                "status": "available" if audiveris_cli and os.path.exists(audiveris_cli) else "not-configured",
+                "input": "pdf",
+                "output": "musicxml",
+            },
+            {
+                "provider": "homr",
+                "role": "secondary-candidate",
+                "status": "available" if homr_cli and os.path.exists(homr_cli) else "not-configured",
+                "input": "image",
+                "output": "musicxml",
+                "mainlineExecutable": False,
+                "requiresRenderedPages": True,
+                "windowsPathNote": "requires-ascii-safe-path",
+            },
+        ]
+
+    def _secondary_omr_recommendation(
+        self,
+        *,
+        omr_status: str,
+        omr_confidence: float,
+        selected_part_confidence: float,
+        piece_pack: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        reasons: list[str] = []
+        if omr_status != "completed":
+            reasons.append("primary-import-failed")
+        if float(omr_confidence or 0.0) < float(getattr(self.settings, "omr_secondary_low_confidence_threshold", 0.85)):
+            reasons.append("low-omr-confidence")
+        if float(selected_part_confidence or 0.0) < float(getattr(self.settings, "omr_secondary_low_part_confidence_threshold", 0.85)):
+            reasons.append("low-selected-part-confidence")
+
+        score_line_stats = dict((piece_pack or {}).get("scoreLineStats") or {})
+        note_count = int(safe_float(score_line_stats.get("noteCount"), 0))
+        erhu_ratio = safe_float(score_line_stats.get("erhuRatio"), 0.0)
+        erhu_page_coverage = safe_float(score_line_stats.get("erhuPageCoverage"), 0.0)
+        coverage_known = "erhuPageCoverage" in score_line_stats
+        if (
+            note_count > 0
+            and erhu_ratio < float(getattr(self.settings, "omr_secondary_low_erhu_ratio_threshold", 0.5))
+            and (not coverage_known or erhu_page_coverage < 0.72)
+        ):
+            reasons.append("low-erhu-line-ratio")
+
+        candidates = self._build_omr_provider_candidates()
+        homr_candidate = next((item for item in candidates if item.get("provider") == "homr"), {})
+        return {
+            "recommended": bool(reasons),
+            "provider": "homr",
+            "providerStatus": homr_candidate.get("status", "not-configured"),
+            "reasons": reasons,
+            "thresholds": {
+                "omrConfidence": float(getattr(self.settings, "omr_secondary_low_confidence_threshold", 0.85)),
+                "selectedPartConfidence": float(getattr(self.settings, "omr_secondary_low_part_confidence_threshold", 0.85)),
+                "erhuRatio": float(getattr(self.settings, "omr_secondary_low_erhu_ratio_threshold", 0.5)),
+                "erhuPageCoverage": 0.72,
+            },
+        }
+
+    def _with_omr_provider_diagnostics(
+        self,
+        omr_stats: dict[str, Any],
+        *,
+        omr_status: str,
+        omr_confidence: float,
+        selected_part_confidence: float,
+        piece_pack: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        candidates = self._build_omr_provider_candidates()
+        primary = next((item for item in candidates if item.get("role") == "primary"), {})
+        recommendation = self._secondary_omr_recommendation(
+            omr_status=omr_status,
+            omr_confidence=omr_confidence,
+            selected_part_confidence=selected_part_confidence,
+            piece_pack=piece_pack,
+        )
+        return {
+            **dict(omr_stats or {}),
+            "primaryProvider": primary.get("provider", "audiveris"),
+            "primaryProviderStatus": primary.get("status", "not-configured"),
+            "providerCandidates": candidates,
+            "secondaryProviderRecommended": bool(recommendation.get("recommended")),
+            "secondaryProviderRecommendation": recommendation,
+        }
 
     def import_pdf_score(self, request: ScoreImportRequest) -> ScoreImportJobResult:
         output_dir = Path(request.outputDir or (Path(self.settings.data_root) / "score-imports" / request.jobId))
@@ -634,6 +759,13 @@ class ScoreImportMixin:
         warnings = self._compact_import_warnings(warnings)
 
         if not piece_pack:
+            omr_stats = self._with_omr_provider_diagnostics(
+                omr_stats,
+                omr_status="failed",
+                omr_confidence=0.0,
+                selected_part_confidence=0.0,
+                piece_pack=None,
+            )
             return ScoreImportJobResult(
                 jobId=request.jobId,
                 omrStatus="failed",
@@ -673,6 +805,13 @@ class ScoreImportMixin:
                 "topPartCandidateScore": round(float(top_candidate.get("score", 0.0)), 3) if top_candidate else 0.0,
                 "topPartCandidateAmbiguous": bool(top_candidate.get("selectionAmbiguous")) if top_candidate else False,
             }
+            omr_stats = self._with_omr_provider_diagnostics(
+                omr_stats,
+                omr_status="completed",
+                omr_confidence=omr_confidence or (0.44 if request.fallbackPieceId else 0.58),
+                selected_part_confidence=float(selected_part_confidence or 0.0),
+                piece_pack=piece_pack if isinstance(piece_pack, dict) else None,
+            )
 
         return ScoreImportJobResult(
             jobId=request.jobId,

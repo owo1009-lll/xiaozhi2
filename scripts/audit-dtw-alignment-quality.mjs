@@ -173,14 +173,22 @@ function resolveQualitySection(score, issue) {
   return pageSections.find((section) => hasErhuMeasure(section, issue)) || pageSections[0] || null;
 }
 
+function scopeIssueToAnalysis(issue, analysis) {
+  return {
+    ...issue,
+    sectionId: issue?.sectionId || analysis?.sectionId || "",
+  };
+}
+
 function auditNoteIssue(score, analysis, issue) {
-  const section = resolveQualitySection(score, issue);
+  const scopedIssue = scopeIssueToAnalysis(issue, analysis);
+  const section = resolveQualitySection(score, scopedIssue);
   const noteId = String(issue?.noteId || "").trim();
   if (!section) {
     return { status: "review", reason: "missing-section" };
   }
   const exactNote = (section.notes || []).find((note) => (
-    noteMatchesIssue(note, issue)
+    noteMatchesIssue(note, scopedIssue)
   ));
   if (exactNote && isErhuNote(exactNote, section)) {
     return { status: "exact-note", sectionId: section.sectionId };
@@ -194,10 +202,10 @@ function auditNoteIssue(score, analysis, issue) {
       analysisId: analysis.analysisId,
     };
   }
-  if (hasProjectedErhuNote(section, issue)) {
+  if (hasProjectedErhuNote(section, scopedIssue)) {
     return { status: "exact-note", reason: "projected-to-erhu-measure-note", sectionId: section.sectionId };
   }
-  if (hasErhuMeasure(section, issue)) {
+  if (hasErhuMeasure(section, scopedIssue)) {
     return { status: "measure-only", sectionId: section.sectionId };
   }
   if (isAccompanimentOnly(section)) {
@@ -211,11 +219,12 @@ function auditNoteIssue(score, analysis, issue) {
 }
 
 function auditMeasureIssue(score, analysis, issue) {
-  const section = resolveQualitySection(score, issue);
+  const scopedIssue = scopeIssueToAnalysis(issue, analysis);
+  const section = resolveQualitySection(score, scopedIssue);
   if (!section) {
     return { status: "review", reason: "missing-section" };
   }
-  if (hasErhuMeasure(section, issue)) {
+  if (hasErhuMeasure(section, scopedIssue)) {
     return { status: "exact-measure", sectionId: section.sectionId };
   }
   if (isAccompanimentOnly(section)) {

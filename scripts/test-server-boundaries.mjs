@@ -16,6 +16,9 @@ import {
 import { createAnalyzerClient } from "../src/server/analyzerClient.js";
 import { sha1 } from "../src/server/baseUtils.js";
 import {
+  annotateImportedSectionsScoreLineRoles,
+  buildScoreLineStatsFromSections,
+  effectiveSelectedPartConfidence,
   hasAccompanimentPartCandidate,
   isExplicitErhuPartCandidate,
 } from "../src/server/scoreLineRoles.js";
@@ -156,12 +159,71 @@ function testScoreLineRoleLabels() {
   );
 }
 
+function testSingleLineMelodyProjection() {
+  const score = {
+    selectedPart: "Voice",
+    selectedPartConfidence: 0.82,
+    partCandidates: [
+      { id: "P1", name: "Voice", label: "Voice", chordRatio: 0.55, staffCount: 1 },
+      { id: "P2", name: "Piano", label: "Piano", isLikelyPiano: true, staffCount: 2 },
+    ],
+  };
+  const melodicNotes = Array.from({ length: 12 }, (_, index) => ({
+    noteId: `m${index + 1}`,
+    measureIndex: index + 1,
+    beatStart: 0,
+    midiPitch: 68 + (index % 5),
+    notePosition: {
+      pageNumber: 1,
+      systemIndex: 1,
+      staffIndex: 1,
+      normalizedX: 0.1 + index * 0.05,
+      normalizedY: 0.12,
+    },
+  }));
+  const lowLineNotes = melodicNotes.map((note, index) => ({
+    ...note,
+    noteId: `low${index + 1}`,
+    measureIndex: index + 10,
+    midiPitch: 45 + (index % 4),
+    notePosition: {
+      ...note.notePosition,
+      pageNumber: 2,
+      normalizedY: 0.64,
+    },
+  }));
+  const sections = annotateImportedSectionsScoreLineRoles([
+    { sectionId: "page-01", notes: melodicNotes },
+    { sectionId: "page-02", notes: lowLineNotes },
+  ], score);
+  const stats = buildScoreLineStatsFromSections(sections);
+  assert(
+    sections[0].notes.every((note) => note.notePosition.scoreLineRole === "erhu"),
+    "Single high monophonic imported line should project to the erhu line",
+  );
+  assert(
+    sections[1].notes.every((note) => note.notePosition.scoreLineRole === "accompaniment"),
+    "Low single imported lines should remain filtered as accompaniment",
+  );
+  assert(stats.erhuPageCoverage === 0.5, "Score-line stats should expose erhu page coverage");
+  assert(effectiveSelectedPartConfidence(score.selectedPartConfidence, sections) >= 0.88, "Reliable erhu line evidence should lift part confidence");
+
+  const legacySections = annotateImportedSectionsScoreLineRoles([
+    { sectionId: "page-03", notes: melodicNotes.map((note) => ({ ...note, notePosition: { ...note.notePosition, pageNumber: 3 } })) },
+  ], { selectedPart: "Voice", partCandidates: [] });
+  assert(
+    legacySections[0].notes.every((note) => note.notePosition.scoreLineRole === "erhu"),
+    "Legacy pagewise scores without part candidates should still get line roles",
+  );
+}
+
 async function main() {
   await testAudioPayload();
   await testAnalyzerClientFetchPath();
   await testAnalyzerClientLongTimeout();
   testScoreLineRoleLabels();
-  console.log(JSON.stringify({ ok: true, checks: ["audio-payload", "analyzer-client-fetch", "analyzer-client-long-timeout", "score-line-role-labels"] }, null, 2));
+  testSingleLineMelodyProjection();
+  console.log(JSON.stringify({ ok: true, checks: ["audio-payload", "analyzer-client-fetch", "analyzer-client-long-timeout", "score-line-role-labels", "single-line-melody-projection"] }, null, 2));
 }
 
 main().catch((error) => {

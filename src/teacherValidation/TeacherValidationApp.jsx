@@ -25,6 +25,22 @@ import {
   severityLabel,
 } from "./teacherValidationUtils.js";
 
+function formatImportStatus(summary = {}) {
+  const importedCount = Math.max(0, Math.round(Number(summary.acceptedReviewCount) || 0));
+  const validationSummary = summary.validationSummary || {};
+  const reviewCount = Math.max(0, Math.round(Number(validationSummary.reviewCount) || 0));
+  const parts = [`已导入 ${importedCount} 条完成标注`];
+  if (reviewCount > 0) {
+    parts.push(`质量基线 ${reviewCount} 条`);
+    parts.push(`音符 F1 ${formatPercent(validationSummary.averageNoteF1)}`);
+    parts.push(`小节 F1 ${formatPercent(validationSummary.averageMeasureF1)}`);
+    parts.push(`路径一致率 ${formatPercent(validationSummary.pathAgreementRate)}`);
+  } else {
+    parts.push("质量基线仍无教师标注");
+  }
+  return parts.join(" · ");
+}
+
 export default function TeacherValidationApp() {
   const [packs, setPacks] = useState([]);
   const [packId, setPackId] = useState("");
@@ -337,7 +353,7 @@ export default function TeacherValidationApp() {
     setErrorMessage("");
     try {
       const json = await applyTeacherValidationPack(packId);
-      setStatusMessage(`已导入 ${json?.summary?.acceptedReviewCount || 0} 条完成标注`);
+      setStatusMessage(formatImportStatus(json?.summary));
       await loadPack(packId);
     } catch (error) {
       setErrorMessage(error.message || "导入失败");

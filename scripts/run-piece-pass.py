@@ -7,6 +7,7 @@ import csv
 import hashlib
 import io
 import json
+import os
 import subprocess
 import sys
 import random
@@ -23,8 +24,9 @@ import soundfile as sf
 SCRIPT_ROOT = Path(__file__).resolve().parents[1]
 CWD_ROOT = Path.cwd().resolve()
 REPO_ROOT = CWD_ROOT if (CWD_ROOT / "package.json").exists() and (CWD_ROOT / "scripts").exists() else SCRIPT_ROOT
-SECTION_CACHE_KEY_VERSION = "piece-pass-section-v7-safe-erhu-page-projection"
-SECTION_CACHE_PAYLOAD_VERSION = "piece-pass-section-v11-safe-erhu-page-projection"
+SECTION_CACHE_KEY_VERSION = "piece-pass-section-v9-piecepass-pitch-hop"
+SECTION_CACHE_PAYLOAD_VERSION = "piece-pass-section-v13-piecepass-pitch-hop"
+PIECE_PASS_PITCH_HOP_MS = os.getenv("ERHU_PIECE_PASS_PITCH_HOP_MS", os.getenv("ERHU_PITCH_HOP_MS", "10"))
 
 
 def parse_args() -> argparse.Namespace:
@@ -795,9 +797,9 @@ def build_section_cache_key(
             "version": SECTION_CACHE_KEY_VERSION,
             "audioHash": audio_hash,
             "pieceId": piece_id,
-            "pieceFingerprint": piece_hash,
             "sectionId": section_id,
             "sectionFingerprint": section_hash,
+            "piecePassPitchHopMs": PIECE_PASS_PITCH_HOP_MS,
             "startSeconds": round(start_seconds, 2),
             "durationSeconds": round(duration_seconds, 2),
             "preprocessMode": preprocess_mode,
@@ -893,6 +895,7 @@ def write_cached_section_row(
                 "audioHash": audio_hash,
                 "pieceFingerprint": piece_hash,
                 "sectionFingerprint": section_hash,
+                "piecePassPitchHopMs": PIECE_PASS_PITCH_HOP_MS,
                 "pieceId": piece_id,
                 "sectionId": section_id,
                 "startSeconds": round(start_seconds, 2),
@@ -1260,8 +1263,39 @@ def main() -> int:
         raise last_exc  # type: ignore[misc]
 
     concurrency = max(1, args.analysis_concurrency)
-    if concurrency <= 1 or len(valid_items) <= 1:
-        for pair in valid_items:
+    remaining_items = list(valid_items)
+    if concurrency > 1 and len(remaining_items) > 1 and not args.reuse_scan_analyses:
+        while remaining_items:
+            pair = remaining_items.pop(0)
+            try:
+                row, hit = _run_item(pair)
+            except Exception as exc:
+                item, sec = pair
+                sys.stderr.write(f"WARNING: analysis skipped {sec.get('sectionId')} after retries: {exc}\n")
+                row, hit = build_failed_section_row(item, sec, piece, exc), False
+                failed_count += 1
+            section_rows.append(row)
+            cache_hits += hit
+            completed_count += 1
+            section_title = row.get("sectionTitle") or pair[1].get("title") or pair[1].get("sectionId") or ""
+            emit_progress(
+                0.35 + (completed_count / total_sections) * 0.5,
+                "analyzing-sections",
+                f"{'reusing section cache' if hit else 'warming analysis cache'} ({completed_count}/{total_sections})",
+                {
+                    "currentSection": completed_count,
+                    "completedSections": completed_count,
+                    "totalSections": total_sections,
+                    "failedSections": failed_count,
+                    "cacheHits": cache_hits,
+                    "currentSectionTitle": section_title,
+                },
+            )
+            if not hit:
+                break
+
+    if remaining_items and (concurrency <= 1 or len(remaining_items) <= 1):
+        for pair in remaining_items:
             try:
                 row, hit = _run_item(pair)
             except Exception as exc:
@@ -1287,9 +1321,9 @@ def main() -> int:
                     "currentSectionTitle": section_title,
                 },
             )
-    else:
+    elif remaining_items:
         with ThreadPoolExecutor(max_workers=concurrency) as executor:
-            future_map = {executor.submit(_run_item, pair): pair for pair in valid_items}
+            future_map = {executor.submit(_run_item, pair): pair for pair in remaining_items}
             for future in as_completed(future_map):
                 pair = future_map[future]
                 try:

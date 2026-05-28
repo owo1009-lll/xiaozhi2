@@ -17,6 +17,16 @@ def env_bool(name: str, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
 @dataclass(slots=True)
 class Settings:
     service_name: str = os.getenv("ERHU_SERVICE_NAME", "ai-erhu-analyzer")
@@ -81,8 +91,12 @@ class Settings:
     separation_auto_borderline_min_score_band_ratio: float = float(os.getenv("ERHU_SEPARATION_AUTO_BORDERLINE_MIN_SCORE_BAND_RATIO", "0.40"))
     separation_auto_clean_solo_min_score_band_ratio: float = float(os.getenv("ERHU_SEPARATION_AUTO_CLEAN_SOLO_MIN_SCORE_BAND_RATIO", "0.82"))
     enable_clip_feature_cache: bool = env_bool("ERHU_ENABLE_CLIP_FEATURE_CACHE", True)
-    clip_feature_cache_version: str = os.getenv("ERHU_CLIP_FEATURE_CACHE_VERSION", "v14-windowed-analysis")
+    clip_feature_cache_version: str = os.getenv("ERHU_CLIP_FEATURE_CACHE_VERSION", "v16-piece-pass-pitch-hop")
     clip_feature_memory_cache_entries: int = int(os.getenv("ERHU_CLIP_FEATURE_MEMORY_CACHE_ENTRIES", "96"))
+    enable_full_audio_feature_reuse: bool = env_bool("ERHU_ENABLE_FULL_AUDIO_FEATURE_REUSE", False)
+    full_audio_feature_max_seconds: float = float(os.getenv("ERHU_FULL_AUDIO_FEATURE_MAX_SECONDS", "180"))
+    full_audio_feature_pitch_hop_ms: int = int(os.getenv("ERHU_FULL_AUDIO_FEATURE_PITCH_HOP_MS", os.getenv("ERHU_PIECE_PASS_PITCH_HOP_MS", os.getenv("ERHU_PITCH_HOP_MS", "10"))))
+    piece_pass_pitch_hop_ms: int = int(os.getenv("ERHU_PIECE_PASS_PITCH_HOP_MS", os.getenv("ERHU_PITCH_HOP_MS", "10")))
     ranking_pitch_hop_ms: int = int(os.getenv("ERHU_RANKING_PITCH_HOP_MS", "25"))
     ranking_long_audio_seconds: float = float(os.getenv("ERHU_RANKING_LONG_AUDIO_SECONDS", "240"))
     ranking_long_pitch_hop_ms: int = int(os.getenv("ERHU_RANKING_LONG_PITCH_HOP_MS", "55"))
@@ -114,6 +128,7 @@ class Settings:
     analysis_stability_min_uncertain_pitch: int = int(os.getenv("ERHU_ANALYSIS_STABILITY_MIN_UNCERTAIN_PITCH", "5"))
     enable_torchcrepe: bool = env_bool("ERHU_ENABLE_TORCHCREPE", True)
     torch_device: str = os.getenv("ERHU_TORCH_DEVICE", "cpu").strip().lower()
+    cpu_thread_limit: int = max(1, env_int("ERHU_CPU_THREAD_LIMIT", env_int("OMP_NUM_THREADS", 1)))
     enable_madmom: bool = env_bool("ERHU_ENABLE_MADMOM", True)
     enable_librosa_decode: bool = env_bool("ERHU_ENABLE_LIBROSA_DECODE", False)
     enable_decoded_audio_memory_cache: bool = env_bool("ERHU_ENABLE_DECODED_AUDIO_MEMORY_CACHE", True)
@@ -122,6 +137,7 @@ class Settings:
     madmom_fps: int = int(os.getenv("ERHU_MADMOM_FPS", "100"))
     audiveris_cli: str = os.getenv("ERHU_AUDIVERIS_CLI", "")
     audiveris_timeout_seconds: int = int(os.getenv("ERHU_AUDIVERIS_TIMEOUT_SECONDS", "180"))
+    homr_cli: str = os.getenv("ERHU_HOMR_CLI", "")
     omr_preview_pages: int = int(os.getenv("ERHU_OMR_PREVIEW_PAGES", "3"))
     omr_page_max_pixels: int = int(os.getenv("ERHU_OMR_PAGE_MAX_PIXELS", "26000000"))
     omr_render_dpi: int = int(os.getenv("ERHU_OMR_RENDER_DPI", "300"))
@@ -130,6 +146,9 @@ class Settings:
     omr_whole_pdf_max_file_mb: float = float(os.getenv("ERHU_OMR_WHOLE_PDF_MAX_FILE_MB", "24"))
     omr_pagewise_workers: int = int(os.getenv("ERHU_OMR_PAGEWISE_WORKERS", "3"))
     omr_page_cache_version: str = os.getenv("ERHU_OMR_PAGE_CACHE_VERSION", "v1-page-cache")
+    omr_secondary_low_confidence_threshold: float = float(os.getenv("ERHU_OMR_SECONDARY_LOW_CONFIDENCE_THRESHOLD", "0.80"))
+    omr_secondary_low_part_confidence_threshold: float = float(os.getenv("ERHU_OMR_SECONDARY_LOW_PART_CONFIDENCE_THRESHOLD", "0.85"))
+    omr_secondary_low_erhu_ratio_threshold: float = float(os.getenv("ERHU_OMR_SECONDARY_LOW_ERHU_RATIO_THRESHOLD", "0.5"))
     ffmpeg_path: str = os.getenv("ERHU_FFMPEG_PATH", "")
     fallback_issue_limit: int = int(os.getenv("ERHU_FALLBACK_ISSUE_LIMIT", "4"))
     piano_onset_suppression_strength: float = float(os.getenv("ERHU_PIANO_ONSET_SUPPRESSION_STRENGTH", "0.28"))

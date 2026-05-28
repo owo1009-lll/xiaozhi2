@@ -21,6 +21,13 @@ def main():
         "preferCudaPython": os.getenv("ERHU_PREFER_CUDA_PYTHON", ""),
         "torchConfiguredDevice": os.getenv("ERHU_TORCH_DEVICE", "cpu").strip().lower() or "cpu",
         "cudaVisibleDevices": os.getenv("CUDA_VISIBLE_DEVICES", ""),
+        "cpuThreadLimit": os.getenv("ERHU_CPU_THREAD_LIMIT", ""),
+        "threadEnv": {
+            "OMP_NUM_THREADS": os.getenv("OMP_NUM_THREADS", ""),
+            "MKL_NUM_THREADS": os.getenv("MKL_NUM_THREADS", ""),
+            "OPENBLAS_NUM_THREADS": os.getenv("OPENBLAS_NUM_THREADS", ""),
+            "NUMEXPR_NUM_THREADS": os.getenv("NUMEXPR_NUM_THREADS", ""),
+        },
     }
     status["torchDevice"] = "cuda" if status["torchConfiguredDevice"] in {"cuda", "auto"} else "cpu"
 
@@ -30,6 +37,7 @@ def main():
         status["torch"] = getattr(torch, "__version__", "unknown")
         status["cudaAvailable"] = bool(torch.cuda.is_available())
         status["cudaDevice"] = torch.cuda.get_device_name(0) if torch.cuda.is_available() else ""
+        status["torchNumThreads"] = int(torch.get_num_threads())
         if status["torchDevice"] != "cpu":
             status["warnings"].append("ERHU_TORCH_DEVICE is not cpu; analysis may use CUDA if available.")
         elif status["cudaAvailable"]:

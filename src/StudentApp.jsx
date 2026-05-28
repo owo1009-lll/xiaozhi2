@@ -36,6 +36,8 @@ import {
   buildPiecePassStatusMessage,
   buildPiecePassTimingText,
   formatPartCandidateLabel,
+  friendlyErrorMessage,
+  friendlyStatusMessage,
   getPartCandidateKey,
   getPartCandidates,
   getPiecePassCompletionState,
@@ -56,6 +58,7 @@ import {
   buildStudentPracticeAdvice,
   buildTopIssueLine,
   clearIssueSessionCache,
+  describeStudentHistorySection,
   formatAnalysisTime,
   getAnalysisIssueStats,
   getAudioDuration,
@@ -527,19 +530,6 @@ export default function StudentApp({ onOpenResearch }) {
   const topIssueLine = useMemo(() => buildTopIssueLine(analysis), [analysis]);
   const analysisBusy = analyzing || analysisJob?.status === "processing";
   const wholePieceBusy = piecePassRunning || piecePassJob?.status === "processing";
-
-  function describeHistorySection(item) {
-    const knownSection = item.scoreId === score?.scoreId ? sectionMap.get(item.sectionId) : null;
-    const sectionLabel = knownSection
-      ? formatSectionDisplayName(knownSection)
-      : formatSectionDisplayName({ sectionId: item.sectionId, title: item.sectionTitle });
-    const rawPieceLabel = item.pieceTitle || item.scoreTitle || "";
-    const pieceLabel = rawPieceLabel ? formatScoreTitle(rawPieceLabel) : item.pieceId || item.scoreId || "";
-    if (pieceLabel && item.scoreId !== score?.scoreId) {
-      return `${pieceLabel} · ${sectionLabel}`;
-    }
-    return sectionLabel;
-  }
 
   async function refreshParticipantSnapshot(nextParticipantId = studentId) {
     const resolvedParticipantId = String(nextParticipantId || "").trim();
@@ -1357,7 +1347,7 @@ export default function StudentApp({ onOpenResearch }) {
               {recentHistory.map((item) => (
                 <div className="history-item" key={item.analysisId}>
                   <div>
-                    <strong>{describeHistorySection(item)}</strong>
+                    <strong>{describeStudentHistorySection(item, score, sectionMap)}</strong>
                     <p>{formatAnalysisTime(item.createdAt)}</p>
                     <p>
                       综合 {clampScore(getDisplayCombinedScore(item))} · 音准 {clampScore(getDisplayPitchScore(item))} · 节奏 {clampScore(getDisplayRhythmScore(item))}

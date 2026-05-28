@@ -213,8 +213,23 @@ export function isErhuMelodySystemIndex(systemIndex) {
 
 export function isLikelyAccompanimentOnlySection(section) {
   if (!isImportedFullScoreSection(section)) return false;
+  const stats = section?.scoreLineStats && typeof section.scoreLineStats === "object" ? section.scoreLineStats : null;
+  if (stats) {
+    const erhuCount = Number(stats.erhuNoteCount) || 0;
+    const accompanimentCount = Number(stats.accompanimentNoteCount) || 0;
+    if (erhuCount > 0) return false;
+    if (accompanimentCount > 0) return true;
+  }
   const notes = Array.isArray(section?.notes) ? section.notes : [];
   if (!notes.length) return false;
+  const roleTaggedNotes = notes.filter((note) => String(note?.notePosition?.scoreLineRole || "").trim());
+  if (roleTaggedNotes.length) {
+    return !roleTaggedNotes.some((note) => {
+      const role = String(note?.notePosition?.scoreLineRole || "").toLowerCase();
+      const confidence = Number(note?.notePosition?.scoreLineConfidence) || 0;
+      return role === "erhu" && confidence >= 0.66;
+    });
+  }
   const notesWithSystem = notes.filter((note) => Number.isFinite(Number(note?.notePosition?.systemIndex)));
   if (!notesWithSystem.length) return false;
   return !notesWithSystem.some((note) => isErhuMelodySystemIndex(note?.notePosition?.systemIndex));
@@ -265,6 +280,16 @@ export function jobMatchesScore(job, score) {
   const pieceTitle = formatScoreTitle(score);
   const jobTitle = String(job.pieceTitle || job.title || job.wholePieceAnalysis?.pieceTitle || "").trim();
   return Boolean(pieceTitle && jobTitle && pieceTitle === jobTitle);
+}
+
+export function describeStudentHistorySection(item, score, sectionMap) {
+  const knownSection = item?.scoreId === score?.scoreId ? sectionMap.get(item.sectionId) : null;
+  const sectionLabel = knownSection
+    ? formatSectionDisplayName(knownSection)
+    : formatSectionDisplayName({ sectionId: item?.sectionId, title: item?.sectionTitle });
+  const rawPieceLabel = item?.pieceTitle || item?.scoreTitle || "";
+  const pieceLabel = rawPieceLabel ? formatScoreTitle(rawPieceLabel) : item?.pieceId || item?.scoreId || "";
+  return pieceLabel && item?.scoreId !== score?.scoreId ? `${pieceLabel} · ${sectionLabel}` : sectionLabel;
 }
 
 export function shouldShowResearchEntry() {

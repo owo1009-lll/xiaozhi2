@@ -16,6 +16,11 @@ import {
   safeNumber,
   safeString,
 } from "./baseUtils.js";
+import {
+  getErhuMelodyNotes,
+  hasAccompanimentPartCandidate,
+  resolveIssueSection,
+} from "../scoreIssue/scoreIssueProjection.js";
 
 function toUniqueStringList(value) {
   if (Array.isArray(value)) {
@@ -241,6 +246,111 @@ function buildTeacherFocusRegions(notePositions = []) {
     );
 }
 
+function isTeacherPagewiseSection(section = {}) {
+  return /\bpage-\d+/i.test(`${safeString(section.sectionId)} ${safeString(section.sourceSectionId)} ${safeString(section.title)}`);
+}
+
+function hasGenericVoiceSelectedPart(section = {}, score = {}) {
+  const labels = [
+    section.selectedPart,
+    section.selectedPartId,
+    score.selectedPart,
+    score.selectedPartId,
+    ...getArray(section.partCandidates).flatMap((candidate) => [candidate?.id, candidate?.name, candidate?.label]),
+    ...getArray(score.partCandidates).flatMap((candidate) => [candidate?.id, candidate?.name, candidate?.label]),
+  ].map((value) => safeString(value)).join(" ");
+  const explicitErhu = /\berhu\b|二胡/i.test(labels);
+  return !explicitErhu && /\bvoice\b/i.test(labels);
+}
+
+function shouldUseTeacherFullScoreLineRankFilter(section = {}, score = {}) {
+  if (!isTeacherPagewiseSection(section)) return false;
+  const notes = getArray(section.notes);
+  const lineRanks = new Set();
+  let hasNonFirstStaff = false;
+  for (const note of notes) {
+    const position = note?.notePosition || {};
+    const systemIndex = nullableInteger(position.systemIndex);
+    if (systemIndex) lineRanks.add(systemIndex);
+    if ((nullableInteger(position.staffIndex) || 1) !== 1) hasNonFirstStaff = true;
+  }
+  if (lineRanks.size < 2 || hasNonFirstStaff) return false;
+  return hasAccompanimentPartCandidate(score)
+    || hasAccompanimentPartCandidate(section)
+    || hasGenericVoiceSelectedPart(section, score);
+}
+
+function isTeacherErhuLineRank(note = {}) {
+  const systemIndex = nullableInteger(note?.notePosition?.systemIndex);
+  return !systemIndex || (systemIndex - 1) % 3 === 0;
+}
+
+function filterTeacherLocatorNotesToErhuLineRank(notes = [], section = {}, score = {}) {
+  if (!shouldUseTeacherFullScoreLineRankFilter(section, score)) return notes;
+  return getArray(notes).filter((note) => isTeacherErhuLineRank(note));
+}
+
+function filterTeacherAnalysisToLocator(analysis = {}, scoreLocator = null) {
+  if (!scoreLocator || typeof scoreLocator !== "object") return analysis || {};
+  const locatorNoteIds = new Set();
+  for (const note of getArray(scoreLocator.notePositions)) {
+    if (note.noteId) locatorNoteIds.add(safeString(note.noteId));
+    if (note.sourceNoteId) locatorNoteIds.add(safeString(note.sourceNoteId));
+  }
+  const locatorMeasureIndexes = new Set();
+  for (const measure of getArray(scoreLocator.measurePositions)) {
+    for (const value of [measure.measureIndex, measure.globalMeasureIndex, measure.displayMeasureIndex]) {
+      const numeric = nullableInteger(value);
+      if (numeric) locatorMeasureIndexes.add(String(numeric));
+    }
+  }
+  return {
+    ...analysis,
+    noteFindings: getArray(analysis.noteFindings).filter((finding) => {
+      const noteId = safeString(finding.noteId);
+      return !noteId || locatorNoteIds.has(noteId);
+    }),
+    measureFindings: getArray(analysis.measureFindings).filter((finding) => {
+      const measureIndex = nullableInteger(finding.measureIndex);
+      return !measureIndex || locatorMeasureIndexes.has(String(measureIndex));
+    }),
+  };
+}
+
+function filterTeacherItemIssuesToLocator(item = {}, review = {}, scoreLocator = null) {
+  if (!scoreLocator || typeof scoreLocator !== "object") return { item, review };
+  const locatorNoteIds = new Set();
+  for (const note of getArray(scoreLocator.notePositions)) {
+    if (note.noteId) locatorNoteIds.add(safeString(note.noteId));
+    if (note.sourceNoteId) locatorNoteIds.add(safeString(note.sourceNoteId));
+  }
+  const locatorMeasureIndexes = new Set();
+  for (const measure of getArray(scoreLocator.measurePositions)) {
+    for (const value of [measure.measureIndex, measure.globalMeasureIndex, measure.displayMeasureIndex]) {
+      const numeric = nullableInteger(value);
+      if (numeric) locatorMeasureIndexes.add(String(numeric));
+    }
+  }
+  const systemIssueNoteIds = toUniqueStringList(item.systemIssueNoteIds || review.systemIssueNoteIds)
+    .filter((noteId) => locatorNoteIds.has(noteId));
+  const systemIssueMeasureIndexes = toUniqueNumberList(item.systemIssueMeasureIndexes || review.systemIssueMeasureIndexes)
+    .filter((measureIndex) => locatorMeasureIndexes.has(String(measureIndex)));
+  return {
+    item: {
+      ...item,
+      systemIssueNoteIds,
+      systemIssueMeasureIndexes,
+      noteFindingCount: systemIssueNoteIds.length,
+      measureFindingCount: systemIssueMeasureIndexes.length,
+    },
+    review: {
+      ...review,
+      systemIssueNoteIds: systemIssueNoteIds.join("|"),
+      systemIssueMeasureIndexes: systemIssueMeasureIndexes.join("|"),
+    },
+  };
+}
+
 function resolveRepoPath(value, repoRoot) {
   const text = safeString(value);
   if (!text) return "";
@@ -311,9 +421,28 @@ function readTeacherAlignmentEvidence(item = {}, analysis = {}, repoRoot) {
 
 function buildTeacherScoreLocator(score = {}, item = {}, analysis = {}, pathContext) {
   if (!score || typeof score !== "object") return null;
-  const section = findTeacherScoreSection(score, item, analysis);
+  const fallbackSection = findTeacherScoreSection(score, item, analysis);
+  const noteIds = toUniqueStringList(item.systemIssueNoteIds || item.review?.systemIssueNoteIds);
+  const measureIndexes = toUniqueNumberList(item.systemIssueMeasureIndexes || item.review?.systemIssueMeasureIndexes);
+  const firstFinding = getArray(analysis.noteFindings)[0] || getArray(analysis.measureFindings)[0] || {};
+  const firstNoteId = noteIds[0] || safeString(firstFinding.noteId);
+  const parsedNote = parseTeacherLocalNoteId(firstNoteId);
+  const issue = {
+    sectionId: safeString(item.sectionId || analysis.sectionId),
+    sourcePageNumber: parsePagewiseSectionPage(fallbackSection || {}),
+    pageNumber: parsePagewiseSectionPage(fallbackSection || {}),
+    noteId: firstNoteId,
+    measureIndex:
+      parsedNote?.measureIndex
+      || measureIndexes[0]
+      || safeNumber(firstFinding.measureIndex, 0),
+  };
+  const section = resolveIssueSection(score, fallbackSection, issue);
   if (!section) return null;
-  const sectionNotes = getArray(section.notes);
+  const lineRankFilterApplied = shouldUseTeacherFullScoreLineRankFilter(section, score);
+  const sectionNotes = lineRankFilterApplied
+    ? getArray(getErhuMelodyNotes(section, score)).filter((note) => isTeacherErhuLineRank(note))
+    : getErhuMelodyNotes(section, score);
   const perMeasureOrdinal = new Map();
   const notePositions = [];
   for (const note of sectionNotes) {
@@ -341,6 +470,9 @@ function buildTeacherScoreLocator(score = {}, item = {}, analysis = {}, pathCont
       pageNumber: Math.max(1, Math.round(safeNumber(position.pageNumber, parsePagewiseSectionPage(section) || 1))),
       systemIndex: nullableInteger(position.systemIndex),
       staffIndex: nullableInteger(position.staffIndex),
+      scoreLineRole: safeString(position.scoreLineRole),
+      scoreLineConfidence: safeNumber(position.scoreLineConfidence, null),
+      scoreLineId: safeString(position.scoreLineId),
       midiPitch: nullableInteger(note.midiPitch),
       beatStart: safeNumber(note.beatStart, null),
       beatDuration: safeNumber(note.beatDuration, null),
@@ -365,6 +497,8 @@ function buildTeacherScoreLocator(score = {}, item = {}, analysis = {}, pathCont
         ...notes.map((note) => safeNumber(note.beatStart, 0) + Math.max(0.125, safeNumber(note.beatDuration, 0.25))),
       );
       const globalMeasureIndex = notes.find((note) => safeNumber(note.globalMeasureIndex, 0) > 0)?.globalMeasureIndex || measureIndex;
+      const systemIndex = notes.find((note) => nullableInteger(note.systemIndex))?.systemIndex || null;
+      const staffIndex = notes.find((note) => nullableInteger(note.staffIndex))?.staffIndex || null;
       return {
         measureIndex,
         globalMeasureIndex,
@@ -377,6 +511,8 @@ function buildTeacherScoreLocator(score = {}, item = {}, analysis = {}, pathCont
         noteCount: notes.length,
         estimatedBeats: maxBeatEnd,
         pageNumber: notes[0]?.pageNumber || parsePagewiseSectionPage(section) || 1,
+        systemIndex,
+        staffIndex,
       };
     })
     .sort((left, right) => left.measureIndex - right.measureIndex);
@@ -391,6 +527,8 @@ function buildTeacherScoreLocator(score = {}, item = {}, analysis = {}, pathCont
     sourcePdfPath: safeString(score.sourcePdfPath || item.sourcePdfPath),
     measureCount: Math.max(0, Math.round(safeNumber(section.measureCount, measurePositions.length))),
     noteCount: notePositions.length,
+    lineRankFilterApplied,
+    lineRankFilterRule: lineRankFilterApplied ? "first-line-of-three-staff-group" : "",
     focusRegions: buildTeacherFocusRegions(notePositions),
     notePositions,
     measurePositions,
@@ -457,14 +595,17 @@ export function createTeacherValidationService({
       const analysis = analysisById.get(analysisId) || {};
       const score = scoreById.get(safeString(item.scoreId || analysis.scoreId || item.pieceId || analysis.pieceId));
       const alignmentEvidence = readTeacherAlignmentEvidence(item, analysis, repoRoot);
+      const scoreLocator = buildTeacherScoreLocator(score, item, analysis, pathContext);
+      const filteredAnalysis = filterTeacherAnalysisToLocator(analysis, scoreLocator);
+      const filtered = filterTeacherItemIssuesToLocator(item, review, scoreLocator);
       return {
-        ...item,
+        ...filtered.item,
         caseId,
         analysisId,
-        review,
-        analysis,
+        review: filtered.review,
+        analysis: filteredAnalysis,
         alignmentEvidence,
-        scoreLocator: buildTeacherScoreLocator(score, item, analysis, pathContext),
+        scoreLocator,
         audioUrl: `/api/erhu/teacher-validation/packs/${encodeURIComponent(normalizedPackId)}/items/${encodeURIComponent(caseId)}/audio`,
         pdfUrl: `/api/erhu/teacher-validation/packs/${encodeURIComponent(normalizedPackId)}/items/${encodeURIComponent(caseId)}/pdf`,
       };

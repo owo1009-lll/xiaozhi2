@@ -32,13 +32,21 @@
     "teacher:validation-pack": "node scripts\\build-teacher-validation-pack.mjs",
     "teacher:grade-pack": "node scripts\\build-teacher-grade-validation-pack.mjs",
     "teacher:validation-import": "node scripts\\import-teacher-validation-reviews.mjs",
+    "audit:teacher-validation-readiness": "node scripts\\audit-teacher-validation-readiness.mjs",
     "test:teacher-validation": "node scripts\\test-teacher-validation-workflow.mjs",
     "audit:real-corpus-trend": "node scripts\\summarize-real-corpus-trend.mjs",
     "audit:unknown-pdf-omr": "node scripts\\run-unknown-pdf-omr-baseline.mjs",
+    "audit:omr-provider-candidates": "node scripts\\audit-omr-provider-candidates.mjs",
+    "audit:homr-boundary": "node scripts\\audit-homr-boundary.mjs",
+    "audit:score-line-legacy": "node scripts\\migrate-score-line-roles.mjs",
+    "migrate:score-line-legacy": "node scripts\\migrate-score-line-roles.mjs --apply",
+    "migrate:score-line-legacy:prune": "node scripts\\migrate-score-line-roles.mjs --apply --prune-stale",
     "benchmark:complex-pdf-omr": "node scripts\\build-complex-pdf-omr-benchmark.mjs",
     "test:score-markings": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-score-markings.py",
     "test:omr-pagewise-dedupe": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-omr-pagewise-dedupe.py",
     "test:omr-whole-pdf-skip": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-omr-whole-pdf-skip.py",
+    "test:omr-provider-diagnostics": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-omr-provider-diagnostics.py",
+    "test:omr-quality-gate": "node scripts\\test-omr-quality-gate.mjs",
     "test:musicxml-import": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-musicxml-import.py",
     "test:separation-quality": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-separation-quality.py",
     "audit:separation-quality": "node scripts\\audit-separation-quality.mjs",
@@ -92,5 +100,21 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^5.0.4",
     "vite": "^7.1.7"
-  }
+  },
+  "description": "这是一个独立于 `ToDesk` 的项目目录，用于面向 SSCI 的二胡 AI 教学干预研究原型。",
+  "main": "server.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/owo1009-lll/xiaozhi2.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/owo1009-lll/xiaozhi2/issues"
+  },
+  "homepage": "https://github.com/owo1009-lll/xiaozhi2#readme"
 }

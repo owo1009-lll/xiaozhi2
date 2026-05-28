@@ -2,33 +2,67 @@ import { clamp, getArray, medianNumber, safeBoolean, safeNumber, safeString } fr
 
 export function buildScoreLineStatsFromNotes(notes = []) {
   const roleCounts = {};
+  const sourceCounts = {};
   const noteList = getArray(notes);
+  const measureKeys = new Set();
+  const erhuMeasureKeys = new Set();
+  const pageKeys = new Set();
+  const erhuPageKeys = new Set();
   for (const note of noteList) {
-    const role = safeString(note?.notePosition?.scoreLineRole, "missing") || "missing";
+    const position = note?.notePosition || {};
+    const role = safeString(position.scoreLineRole, "missing") || "missing";
+    const source = safeString(position.scoreLineSource, "missing") || "missing";
+    const measureIndex = Math.max(1, Math.round(safeNumber(note?.measureIndex, 1)));
+    const pageNumber = Math.max(1, Math.round(safeNumber(position.pageNumber, 1)));
+    const measureKey = `${pageNumber}:${measureIndex}`;
     roleCounts[role] = (roleCounts[role] || 0) + 1;
+    sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+    measureKeys.add(measureKey);
+    pageKeys.add(pageNumber);
+    if (role === "erhu") {
+      erhuMeasureKeys.add(measureKey);
+      erhuPageKeys.add(pageNumber);
+    }
   }
   const noteCount = noteList.length;
   const erhuNoteCount = Math.max(0, Math.round(safeNumber(roleCounts.erhu, 0)));
   const accompanimentNoteCount = Math.max(0, Math.round(safeNumber(roleCounts.accompaniment, 0)));
   const unknownNoteCount = Math.max(0, Math.round(safeNumber(roleCounts.unknown, 0) + safeNumber(roleCounts.missing, 0)));
+  const measureCount = measureKeys.size;
+  const pageCount = pageKeys.size;
   return {
     noteCount,
     erhuNoteCount,
     accompanimentNoteCount,
     unknownNoteCount,
     erhuRatio: noteCount ? Number((erhuNoteCount / noteCount).toFixed(3)) : 0,
+    measureCount,
+    erhuMeasureCount: erhuMeasureKeys.size,
+    erhuMeasureCoverage: measureCount ? Number((erhuMeasureKeys.size / measureCount).toFixed(3)) : 0,
+    pageCount,
+    erhuPageCount: erhuPageKeys.size,
+    erhuPageCoverage: pageCount ? Number((erhuPageKeys.size / pageCount).toFixed(3)) : 0,
     splitApplied: erhuNoteCount > 0 && accompanimentNoteCount > 0,
     roleCounts,
+    sourceCounts,
   };
 }
 
 export function buildScoreLineStatsFromSections(sections = []) {
+  const allNotes = getArray(sections).flatMap((section) => getArray(section?.notes));
+  if (allNotes.length) return buildScoreLineStatsFromNotes(allNotes);
+
   const totals = {
     noteCount: 0,
     erhuNoteCount: 0,
     accompanimentNoteCount: 0,
     unknownNoteCount: 0,
+    measureCount: 0,
+    erhuMeasureCount: 0,
+    pageCount: 0,
+    erhuPageCount: 0,
     roleCounts: {},
+    sourceCounts: {},
   };
   for (const section of getArray(sections)) {
     const stats =
@@ -39,13 +73,22 @@ export function buildScoreLineStatsFromSections(sections = []) {
     totals.erhuNoteCount += Math.max(0, Math.round(safeNumber(stats.erhuNoteCount, 0)));
     totals.accompanimentNoteCount += Math.max(0, Math.round(safeNumber(stats.accompanimentNoteCount, 0)));
     totals.unknownNoteCount += Math.max(0, Math.round(safeNumber(stats.unknownNoteCount, 0)));
+    totals.measureCount += Math.max(0, Math.round(safeNumber(stats.measureCount, 0)));
+    totals.erhuMeasureCount += Math.max(0, Math.round(safeNumber(stats.erhuMeasureCount, 0)));
+    totals.pageCount += Math.max(0, Math.round(safeNumber(stats.pageCount, 0)));
+    totals.erhuPageCount += Math.max(0, Math.round(safeNumber(stats.erhuPageCount, 0)));
     for (const [role, count] of Object.entries(stats.roleCounts || {})) {
       totals.roleCounts[role] = (totals.roleCounts[role] || 0) + Math.max(0, Math.round(safeNumber(count, 0)));
+    }
+    for (const [source, count] of Object.entries(stats.sourceCounts || {})) {
+      totals.sourceCounts[source] = (totals.sourceCounts[source] || 0) + Math.max(0, Math.round(safeNumber(count, 0)));
     }
   }
   return {
     ...totals,
     erhuRatio: totals.noteCount ? Number((totals.erhuNoteCount / totals.noteCount).toFixed(3)) : 0,
+    erhuMeasureCoverage: totals.measureCount ? Number((totals.erhuMeasureCount / totals.measureCount).toFixed(3)) : 0,
+    erhuPageCoverage: totals.pageCount ? Number((totals.erhuPageCount / totals.pageCount).toFixed(3)) : 0,
     splitApplied: totals.erhuNoteCount > 0 && totals.accompanimentNoteCount > 0,
   };
 }
@@ -53,8 +96,11 @@ export function buildScoreLineStatsFromSections(sections = []) {
 export function effectiveSelectedPartConfidence(rawConfidence, sections = []) {
   const confidence = clamp(safeNumber(rawConfidence, 0), 0, 1);
   const stats = buildScoreLineStatsFromSections(sections);
-  if (stats.erhuNoteCount >= 12 && stats.splitApplied) {
-    return Math.max(confidence, 0.82);
+  const reliableErhuLine =
+    stats.erhuNoteCount >= 12 &&
+    (stats.splitApplied || safeNumber(stats.erhuRatio, 0) >= 0.75 || safeNumber(stats.erhuPageCoverage, 0) >= 0.7);
+  if (reliableErhuLine) {
+    return Math.max(confidence, 0.88);
   }
   return confidence;
 }
@@ -65,9 +111,14 @@ export function annotateImportedSectionsScoreLineRoles(sections = [], score = {}
 
   const cleanSolo = isCleanSoloSelectedPart(score);
   const candidate = getSelectedPartCandidate(score);
+  const legacyImportedLayout =
+    !candidate &&
+    normalizedSections.some((section) => /page[-\s]?0*\d+/i.test(`${safeString(section?.sectionId)} ${safeString(section?.sourceSectionId)} ${safeString(section?.title)}`)) &&
+    normalizedSections.some((section) => getArray(section?.notes).some((note) => Number.isFinite(safeNumber(note?.notePosition?.normalizedY, NaN))));
   const ambiguous =
     !cleanSolo &&
-    (hasAccompanimentPartCandidate(score) ||
+    (legacyImportedLayout ||
+      hasAccompanimentPartCandidate(score) ||
       safeBoolean(candidate?.isLikelyPiano, false) ||
       safeNumber(candidate?.chordRatio, 0) >= 0.18 ||
       Math.max(1, safeNumber(candidate?.staffCount, 1)) >= 2);
@@ -147,15 +198,26 @@ export function annotateImportedSectionsScoreLineRoles(sections = [], score = {}
     }
     const chordExcess = [...onsetCounts.values()].reduce((sum, count) => sum + Math.max(0, count - 1), 0);
     const rangeHits = pitches.filter((pitch) => pitch >= 52 && pitch <= 96).length;
+    const yValues = group.notes
+      .map((note) => safeNumber(note?.notePosition?.normalizedY, NaN))
+      .filter((value) => Number.isFinite(value));
     const metrics = {
       noteCount: group.notes.length,
       chordRatio: chordExcess / Math.max(1, group.notes.length),
       rangeRatio: rangeHits / Math.max(1, pitches.length),
       pitchSpan: pitches.length ? Math.max(...pitches) - Math.min(...pitches) : 0,
+      medianY: medianNumber(yValues),
     };
     lineMetricCache.set(group.key, metrics);
     return metrics;
   };
+  const looksLikeSingleLineMelody = (metrics) => (
+    metrics.noteCount >= 6 &&
+    metrics.chordRatio <= 0.08 &&
+    metrics.rangeRatio >= 0.78 &&
+    metrics.pitchSpan <= 36 &&
+    metrics.medianY <= 0.52
+  );
   const sparseSystemLeadNoise = new Set();
   const sparseSystemLeadMelody = new Set();
   if (ambiguous) {
@@ -204,23 +266,22 @@ export function annotateImportedSectionsScoreLineRoles(sections = [], score = {}
         roleByLineKey.set(group.key, { role: "erhu", confidence: 0.92, source: "clean-solo-part-js" });
         continue;
       }
-      const onsetCounts = new Map();
-      const pitches = [];
-      for (const note of group.notes) {
-        const onsetKey = `${Math.max(1, Math.round(safeNumber(note?.measureIndex, 1)))}:${safeNumber(note?.beatStart, 0).toFixed(4)}`;
-        onsetCounts.set(onsetKey, (onsetCounts.get(onsetKey) || 0) + 1);
-        pitches.push(Math.round(safeNumber(note?.midiPitch, 69)));
-      }
-      const chordExcess = [...onsetCounts.values()].reduce((sum, count) => sum + Math.max(0, count - 1), 0);
-      const chordRatio = chordExcess / Math.max(1, group.notes.length);
-      const rangeHits = pitches.filter((pitch) => pitch >= 52 && pitch <= 96).length;
-      const rangeRatio = rangeHits / Math.max(1, pitches.length);
-      const pitchSpan = pitches.length ? Math.max(...pitches) - Math.min(...pitches) : 0;
+      const metrics = lineMetrics(group);
+      const chordRatio = metrics.chordRatio;
+      const rangeRatio = metrics.rangeRatio;
+      const pitchSpan = metrics.pitchSpan;
       let erhuPatternScore = 0.42;
       const systemGroups = systemOrderByKey.get(`${group.pageNumber}:${group.systemIndex}`) || [];
       const systemLineRank = systemGroups.findIndex((item) => item.key === group.key);
+      const singleLineMelody =
+        ambiguous &&
+        lineCount === 1 &&
+        systemGroups.length === 1 &&
+        looksLikeSingleLineMelody(metrics);
       if (systemGroups.length >= 2) {
         erhuPatternScore = systemLineRank === 0 ? 0.76 : 0.14;
+      } else if (singleLineMelody) {
+        erhuPatternScore = 0.72;
       } else if (safePageMelodyProjection && (lineCount >= 2 || group.notes.length >= 4)) {
         erhuPatternScore = 0.74;
       } else if (lineCount === 2) {
@@ -248,7 +309,7 @@ export function annotateImportedSectionsScoreLineRoles(sections = [], score = {}
       roleByLineKey.set(group.key, {
         role: confidence >= 0.66 ? "erhu" : "accompaniment",
         confidence,
-        source: "omr-line-split-js",
+        source: singleLineMelody ? "single-line-melody-js" : "omr-line-split-js",
       });
     }
   }

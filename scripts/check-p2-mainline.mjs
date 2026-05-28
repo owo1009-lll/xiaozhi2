@@ -6,26 +6,34 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 
 const lineBudgets = [
   { path: "server.js", maxLines: 4700 },
-  { path: "python-service/analyzer.py", maxLines: 6900 },
+  { path: "python-service/analyzer.py", maxLines: 500 },
+  { path: "python-service/analyzer_runtime.py", maxLines: 900 },
+  { path: "python-service/analyzer_omr.py", maxLines: 900 },
+  { path: "python-service/analyzer_symbolic.py", maxLines: 900 },
+  { path: "python-service/analyzer_ranking.py", maxLines: 1050 },
+  { path: "python-service/analyzer_calibration.py", maxLines: 1050 },
+  { path: "python-service/analyzer_separation.py", maxLines: 750 },
+  { path: "python-service/analyzer_tracking.py", maxLines: 800 },
+  { path: "python-service/analyzer_scoring.py", maxLines: 1250 },
   { path: "src/StudentApp.jsx", maxLines: 1400 },
   { path: "src/ScoreIssuePage.jsx", maxLines: 950 },
 ];
 
 const requiredModules = [
   {
-    path: "python-service/analyzer_models.py",
+    path: "python-service/analyzer_runtime.py",
     importedBy: "python-service/analyzer.py",
-    importText: "from analyzer_models import ObservedNote, SymbolicNote",
+    importText: "from analyzer_runtime import RuntimeMixin",
   },
   {
-    path: "python-service/analyzer_audio.py",
+    path: "python-service/analyzer_omr.py",
     importedBy: "python-service/analyzer.py",
-    importText: "from analyzer_audio import",
+    importText: "from analyzer_omr import OmrMixin",
   },
   {
-    path: "python-service/analyzer_musicxml.py",
+    path: "python-service/analyzer_symbolic.py",
     importedBy: "python-service/analyzer.py",
-    importText: "from analyzer_musicxml import",
+    importText: "from analyzer_symbolic import SymbolicScoreMixin",
   },
   {
     path: "python-service/analyzer_score_import.py",
@@ -33,9 +41,29 @@ const requiredModules = [
     importText: "from analyzer_score_import import ScoreImportMixin",
   },
   {
-    path: "python-service/analyzer_score_roles.py",
+    path: "python-service/analyzer_ranking.py",
     importedBy: "python-service/analyzer.py",
-    importText: "from analyzer_score_roles import",
+    importText: "from analyzer_ranking import RankingMixin",
+  },
+  {
+    path: "python-service/analyzer_calibration.py",
+    importedBy: "python-service/analyzer.py",
+    importText: "from analyzer_calibration import CalibrationMixin",
+  },
+  {
+    path: "python-service/analyzer_separation.py",
+    importedBy: "python-service/analyzer.py",
+    importText: "from analyzer_separation import SeparationMixin",
+  },
+  {
+    path: "python-service/analyzer_tracking.py",
+    importedBy: "python-service/analyzer.py",
+    importText: "from analyzer_tracking import TrackingMixin",
+  },
+  {
+    path: "python-service/analyzer_scoring.py",
+    importedBy: "python-service/analyzer.py",
+    importText: "from analyzer_scoring import ScoringMixin",
   },
   {
     path: "src/server/analysisRoutes.js",

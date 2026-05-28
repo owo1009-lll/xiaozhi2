@@ -17,6 +17,13 @@ class AudioArtifact:
     ffmpeg_path: str | None = None
     audio_hash: str = ""
     cache_key: str | None = None
+    source_cache_key: str | None = None
+    source_waveform: Any = None
+    source_sample_rate: int | None = None
+    source_duration_seconds: float | None = None
+    window_start_seconds: float | None = None
+    window_end_seconds: float | None = None
+    pitch_hop_ms: float | None = None
 
 
 @dataclass(slots=True)

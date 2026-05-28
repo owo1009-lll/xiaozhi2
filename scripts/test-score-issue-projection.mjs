@@ -3,10 +3,12 @@ import path from "node:path";
 import { auditScoreIssueProjection } from "./score-issue-audit.mjs";
 import {
   buildDisplayMeasureLookup,
+  getErhuStaffIndex,
   findErhuNotePosition,
   formatDisplayMeasureLabel,
   formatDisplayNoteLabel,
   getErhuMelodyNotes,
+  hasAccompanimentPartCandidate,
   isErhuMelodyNote,
   isExplicitErhuPartCandidate,
   isLikelyAccompanimentOnlySection,
@@ -101,6 +103,14 @@ function runSyntheticProjectionTests() {
     isExplicitErhuPartCandidate({ name: "二胡 1" }),
     "Numbered erhu part labels must remain explicit erhu candidates",
   );
+  assert(
+    isExplicitErhuPartCandidate({ name: " \u4e8c \u80e1 " }),
+    "Spaced Chinese erhu part labels must be explicit erhu candidates",
+  );
+  assert(
+    hasAccompanimentPartCandidate({ partCandidates: [{ name: "\u92fc \u7434" }] }),
+    "Spaced traditional Chinese piano labels must mark accompaniment present",
+  );
 
   const mixedSection = {
     sectionId: "page-07-mixed",
@@ -111,7 +121,7 @@ function runSyntheticProjectionTests() {
     selectedPart: "二胡",
     scoreLineStats: {
       erhuNoteCount: 3,
-      accompanimentNoteCount: 3,
+      accompanimentNoteCount: 4,
     },
     notes: [
       makeNote({
@@ -174,6 +184,18 @@ function runSyntheticProjectionTests() {
         role: "accompaniment",
         partName: "伴奏",
       }),
+      makeNote({
+        noteId: "piano-m9-n4",
+        measureIndex: 9,
+        beatStart: 2.0,
+        x: 0.65,
+        y: 0.64,
+        staffIndex: 2,
+        systemIndex: 2,
+        role: "",
+        confidence: 0,
+        partName: "\u92fc \u7434",
+      }),
     ],
   };
   const pianoOnlySection = {
@@ -224,6 +246,7 @@ function runSyntheticProjectionTests() {
   assert(!isErhuMelodyNote(mixedSection.notes[3], mixedSection, score), "Piano/accompaniment notes must not be projectable");
   assert(!isErhuMelodyNote(mixedSection.notes[4], mixedSection, score), "Traditional Chinese piano labels must be excluded");
   assert(!isErhuMelodyNote(mixedSection.notes[5], mixedSection, score), "Accompaniment labels must be excluded");
+  assert(!isErhuMelodyNote(mixedSection.notes[6], mixedSection, score), "Spaced traditional piano labels must be excluded");
   assert(isLikelyAccompanimentOnlySection(pianoOnlySection, score), "Piano-only sections must be filtered out");
   assert(!isLikelyAccompanimentOnlySection(mixedSection, score), "Sections with confident erhu notes must remain usable");
 
@@ -246,6 +269,45 @@ function runSyntheticProjectionTests() {
   assert(position, "Exact erhu note position should be found");
   assert(position.scoreLineRole === "erhu", "Resolved note position must be on the erhu line");
   assert(Math.abs(position.normalizedY - 0.43) < 0.0001, "Resolved note position must not use piano accompaniment coordinates");
+
+  const lowerStaffErhuSection = {
+    sectionId: "page-08-lower-erhu",
+    sourceSectionId: "page-08-lower-erhu",
+    title: "page-08 imported section 1",
+    pageNumber: 8,
+    scoreLineStats: {
+      erhuNoteCount: 1,
+      accompanimentNoteCount: 1,
+    },
+    notes: [
+      makeNote({
+        noteId: "acc-m12-n1",
+        measureIndex: 12,
+        x: 0.2,
+        y: 0.2,
+        staffIndex: 1,
+        role: "accompaniment",
+        partName: "Piano",
+      }),
+      makeNote({
+        noteId: "xml-m12-n1",
+        measureIndex: 12,
+        x: 0.22,
+        y: 0.46,
+        staffIndex: 2,
+        role: "erhu",
+        partName: "Erhu",
+      }),
+    ],
+  };
+  assert(getErhuStaffIndex(lowerStaffErhuSection) === 2, "Projection should prefer the staff explicitly tagged as erhu");
+  const lowerStaffPosition = findErhuNotePosition(
+    lowerStaffErhuSection,
+    { sectionId: lowerStaffErhuSection.sectionId, pageNumber: 8, measureIndex: 12, noteId: "xml-m12-n1" },
+    getErhuStaffIndex(lowerStaffErhuSection),
+    score,
+  );
+  assert(lowerStaffPosition?.staffIndex === 2, "Exact projection should land on the tagged erhu staff, not the top accompaniment staff");
 
   const displaySections = [];
   for (let index = 0; index < 8; index += 1) {

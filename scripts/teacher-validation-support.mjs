@@ -3,7 +3,13 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { repairMojibakeText } from "../src/analysisLabels.js";
+import { parseXmlNoteId, repairMojibakeText } from "../src/analysisLabels.js";
+import {
+  getErhuMelodyNotes,
+  hasAccompanimentPartCandidate,
+  noteIdMatchesIssue,
+  noteMeasureMatchesIssue,
+} from "../src/scoreIssue/scoreIssueProjection.js";
 
 export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const DEFAULT_PACK_ROOT = path.join("data", "teacher-validation", "packs");
@@ -153,6 +159,114 @@ function loadScoreMap(repoRoot) {
   return new Map(getArray(scoreStore.scores).map((score) => [safeString(score.scoreId), score]));
 }
 
+function findTeacherScoreSection(score = {}, sectionId = "") {
+  const sections = getArray(score.sections);
+  if (!sections.length) return null;
+  const targetSectionId = safeString(sectionId);
+  if (targetSectionId) {
+    const exact = sections.find((section) =>
+      safeString(section.sectionId) === targetSectionId || safeString(section.sourceSectionId) === targetSectionId,
+    );
+    if (exact) return exact;
+    const pageMatch = targetSectionId.match(/\bpage-(\d+)/i);
+    if (pageMatch) {
+      const pageNumber = Math.max(1, Math.round(numeric(pageMatch[1]) || 1));
+      const pageSection = sections.find((section) => {
+        const descriptor = `${safeString(section.sectionId)} ${safeString(section.sourceSectionId)}`;
+        const match = descriptor.match(/\bpage-(\d+)/i);
+        return match && Math.max(1, Math.round(numeric(match[1]) || 1)) === pageNumber;
+      });
+      if (pageSection) return pageSection;
+    }
+  }
+  return sections[0] || null;
+}
+
+function isTeacherPagewiseSection(section = {}) {
+  return /\bpage-\d+/i.test(`${safeString(section.sectionId)} ${safeString(section.sourceSectionId)} ${safeString(section.title)}`);
+}
+
+function hasGenericVoiceSelectedPart(section = {}, score = {}) {
+  const labels = [
+    section.selectedPart,
+    section.selectedPartId,
+    score.selectedPart,
+    score.selectedPartId,
+    ...getArray(section.partCandidates).flatMap((candidate) => [candidate?.id, candidate?.name, candidate?.label]),
+    ...getArray(score.partCandidates).flatMap((candidate) => [candidate?.id, candidate?.name, candidate?.label]),
+  ].map((value) => safeString(value)).join(" ");
+  const explicitErhu = /\berhu\b|二胡/i.test(labels);
+  return !explicitErhu && /\bvoice\b/i.test(labels);
+}
+
+function nullablePositiveInteger(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? Math.round(number) : null;
+}
+
+function shouldUseTeacherFullScoreLineRankFilter(section = {}, score = {}) {
+  if (!isTeacherPagewiseSection(section)) return false;
+  const notes = getArray(section.notes);
+  const lineRanks = new Set();
+  let hasNonFirstStaff = false;
+  for (const note of notes) {
+    const position = note?.notePosition || {};
+    const systemIndex = nullablePositiveInteger(position.systemIndex);
+    if (systemIndex) lineRanks.add(systemIndex);
+    if ((nullablePositiveInteger(position.staffIndex) || 1) !== 1) hasNonFirstStaff = true;
+  }
+  if (lineRanks.size < 2 || hasNonFirstStaff) return false;
+  return hasAccompanimentPartCandidate(score)
+    || hasAccompanimentPartCandidate(section)
+    || hasGenericVoiceSelectedPart(section, score);
+}
+
+function isTeacherErhuLineRank(note = {}) {
+  const systemIndex = nullablePositiveInteger(note?.notePosition?.systemIndex);
+  return !systemIndex || (systemIndex - 1) % 3 === 0;
+}
+
+function filterTeacherLocatorNotesToErhuLineRank(notes = [], section = {}, score = {}) {
+  if (!shouldUseTeacherFullScoreLineRankFilter(section, score)) return notes;
+  return getArray(notes).filter((note) => isTeacherErhuLineRank(note));
+}
+
+function findingToIssue(finding = {}) {
+  const noteId = safeString(finding.noteId);
+  const parsed = parseXmlNoteId(noteId);
+  return {
+    ...finding,
+    noteId,
+    measureIndex: numeric(finding.measureIndex) || parsed?.measureIndex || 1,
+  };
+}
+
+function filterAnalysisFindingsToProjectableErhu(score = {}, analysis = {}) {
+  const section = findTeacherScoreSection(score, analysis.sectionId);
+  const sectionNotes = getArray(section?.notes);
+  if (!section || !sectionNotes.length) return analysis;
+  const melodyNotes = filterTeacherLocatorNotesToErhuLineRank(getErhuMelodyNotes(section, score), section, score);
+  if (!melodyNotes.length) {
+    return {
+      ...analysis,
+      noteFindings: [],
+      measureFindings: [],
+    };
+  }
+  const isProjectable = (finding) => {
+    const issue = findingToIssue(finding);
+    return melodyNotes.some((note) => noteMeasureMatchesIssue(note, issue) && (!issue.noteId || noteIdMatchesIssue(note, issue)));
+  };
+  return {
+    ...analysis,
+    noteFindings: getArray(analysis.noteFindings).filter(isProjectable),
+    measureFindings: getArray(analysis.measureFindings).filter((finding) => {
+      const issue = findingToIssue(finding);
+      return melodyNotes.some((note) => noteMeasureMatchesIssue(note, issue));
+    }),
+  };
+}
+
 function stableCaseId(parts = []) {
   return parts
     .map((part) => safeString(part).replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, ""))
@@ -258,7 +372,10 @@ function normalizeAnalysisBase({ repoRoot, result = {}, job = {}, score = {}, an
 }
 
 function candidateFromAnalysis({ repoRoot, result = {}, job = {}, score = {}, analysis, sectionPass = null, sourceKind, alignmentEvidence = null }) {
-  const normalized = normalizeAnalysisBase({ repoRoot, result, job, score, analysis, sectionPass, sourceKind, alignmentEvidence });
+  const normalized = filterAnalysisFindingsToProjectableErhu(
+    score,
+    normalizeAnalysisBase({ repoRoot, result, job, score, analysis, sectionPass, sourceKind, alignmentEvidence }),
+  );
   const noteIds = getSystemNoteIds(normalized);
   const measureIndexes = getSystemMeasureIndexes(normalized);
   const caseId = stableCaseId([normalized.scoreId, normalized.audioHash, normalized.sectionId, normalized.analysisId]);
