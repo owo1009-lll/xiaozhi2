@@ -453,6 +453,41 @@ def measure_segmentation(analyzer: ErhuAnalyzer) -> dict:
     }
 
 
+def trace_observed_segments(analyzer: ErhuAnalyzer, events: list[NoteEvent], symbolic_notes) -> dict:
+    """Record the score onsets vs the observed segments the analyzer builds, so
+    the 'a long gap stretches the previous note's segment' effect is provable
+    from the audit artifact alone instead of an external trace.
+
+    Built on the clean (noise-free) signal so it is fully deterministic.
+    """
+    wav = synthesize(symbolic_notes)
+    request = make_request(events, wav)
+    audio = analyzer._decode_audio(request)
+    pitch_track, _ = analyzer._estimate_pitch_track(request, audio, symbolic_notes)
+    onset_track, onset_source = analyzer._estimate_onsets(audio, symbolic_notes)
+    observed = analyzer._build_observed_notes(audio, pitch_track, onset_track, symbolic_notes)
+
+    score = [{"noteId": n.note_id, "onset": round(n.expected_onset, 3),
+              "offset": round(n.expected_offset, 3),
+              "durMs": round((n.expected_offset - n.expected_onset) * 1000.0)}
+             for n in symbolic_notes]
+    obs = [{"onset": round(o.onset, 3), "offset": round(o.offset, 3),
+            "spanMs": round((o.offset - o.onset) * 1000.0), "midi": round(float(o.median_midi), 1)}
+           for o in observed]
+    # Flag observed segments whose span exceeds the longest score note by >50% --
+    # these are the gap-stretched segments that drive duration-long false positives.
+    longest_score_ms = max((s["durMs"] for s in score), default=0)
+    stretched = [o for o in obs if o["spanMs"] > longest_score_ms * 1.5]
+    return {
+        "onsetSource": onset_source,
+        "scoreNotes": score,
+        "observedSegments": obs,
+        "longestScoreNoteMs": longest_score_ms,
+        "stretchedSegments": stretched,
+        "hasStretchedSegment": bool(stretched),
+    }
+
+
 def aggregate(runs: list[dict], metric_keys: list[str]) -> dict:
     """Summarize each scalar metric across repeated runs as mean +/- 95% CI."""
     return {key: summarize([run.get(key) for run in runs]) for key in metric_keys}
@@ -502,6 +537,7 @@ def main() -> int:
             "injectedPitchNotes": clean_diagnosis["injectedPitchNotes"],
             "injectedPitchCents": PITCH_PERTURB_CENTS,
             "cleanRun": {key: clean_diagnosis[key] for key in diagnosis_metrics},
+            "cleanRunFalsePositiveDetail": clean_diagnosis["falsePositiveDetail"],
             "noisyAggregate": aggregate(diagnosis_runs, diagnosis_metrics),
             "perRepeat": [
                 {key: run[key] for key in (
@@ -512,6 +548,7 @@ def main() -> int:
             ],
         },
         "segmentation": measure_segmentation(analyzer),
+        "segmentTrace": trace_observed_segments(analyzer, events, symbolic_notes),
     }
 
     output_dir = ROOT / "data" / "real-tests" / "pitch-rhythm-accuracy"
