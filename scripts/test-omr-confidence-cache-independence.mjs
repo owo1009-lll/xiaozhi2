@@ -26,6 +26,14 @@ if (jsCold !== jsWarm) {
   failures.push(`JS confidence depends on cache: cold=${jsCold} warm=${jsWarm}`);
 }
 
+// A persisted record may carry an old warm-cache-inflated confidence as base.
+// Recalibration with cold stats must return the cold quality score, not the
+// stale high base -- otherwise pollution survives forever via Math.max.
+const jsPollutedBase = calibrateOmrConfidence(0.9, cold);
+if (jsPollutedBase !== jsCold) {
+  failures.push(`stale high base survives recalibration: polluted=${jsPollutedBase} cold=${jsCold}`);
+}
+
 // Python side, through the analyzer's own method, using the venv interpreter.
 const pyExe = path.join(repoRoot, "python-service", ".venv", "Scripts", "python.exe");
 const pySnippet = `

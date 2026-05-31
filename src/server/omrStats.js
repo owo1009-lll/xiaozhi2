@@ -212,7 +212,13 @@ export function calibrateOmrConfidence(rawConfidence = 0, normalizedStats = {}, 
     calibrated += 0.02;
   }
   calibrated = clamp(Number(calibrated.toFixed(3)), 0.44, 0.9);
-  return Math.max(base, calibrated);
+  // Return the calibrated quality score directly, NOT Math.max(base, calibrated).
+  // base is the persisted omrConfidence, which on historical records may carry the
+  // old warm-cache-inflated value; maxing would let that stale value survive a
+  // recalibration. The calibrated formula is now the single source of truth and
+  // matches python-service/analyzer_omr.py, so a fresh pagewise import has
+  // base === calibrated and this changes nothing for new data.
+  return calibrated;
 }
 
 export function buildCachedImportPreviewPages(score = {}, fallbackPreviewPages = [], sourcePdfPath = "") {
