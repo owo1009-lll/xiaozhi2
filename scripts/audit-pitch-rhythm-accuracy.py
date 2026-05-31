@@ -302,6 +302,31 @@ def measure_diagnosis(analyzer: ErhuAnalyzer, events: list[NoteEvent], symbolic_
     false_positive_ids = sorted(note_id for note_id in clean_ids if note_id in flagged_by_id)
     detected_injected = len(detected_ids)
     false_positives = len(false_positive_ids)
+
+    # Why was each clean note flagged? Capture the finding fields needed to tell
+    # a pitch issue from a rhythm issue without rerunning -- this is the data the
+    # next root-cause step needs to decide whether to touch rhythm scoring.
+    def fp_detail(note_id: str) -> dict:
+        f = flagged_by_id[note_id]
+        is_pitch = f.pitchLabel in {"pitch-flat", "pitch-sharp"}
+        is_rhythm = f.rhythmType not in {"rhythm-ok", ""}
+        kind = "pitch" if (is_pitch and not is_rhythm) else "rhythm" if (is_rhythm and not is_pitch) else (
+            "pitch+rhythm" if (is_pitch and is_rhythm) else "review" if f.isUncertain else "other")
+        return {
+            "noteId": note_id,
+            "kind": kind,
+            "pitchLabel": f.pitchLabel,
+            "rhythmType": f.rhythmType,
+            "centsError": int(f.centsError),
+            "pitchToleranceCents": int(f.pitchToleranceCents),
+            "onsetErrorMs": int(f.onsetErrorMs),
+            "durationErrorMs": int(f.durationErrorMs),
+            "confidence": round(float(f.confidence), 3),
+            "isUncertain": bool(f.isUncertain),
+            "evidenceLabel": f.evidenceLabel,
+        }
+
+    false_positive_detail = [fp_detail(note_id) for note_id in false_positive_ids]
     cents_report_errors: list[float] = []
     for index, injected_cents in pitch_targets.items():
         finding = flagged_by_id.get(symbolic_notes[index].note_id)
@@ -321,6 +346,7 @@ def measure_diagnosis(analyzer: ErhuAnalyzer, events: list[NoteEvent], symbolic_
         "injectedRecall": round(recall, 3),
         "cleanFalsePositiveCount": false_positives,
         "cleanFalsePositiveRate": round(fp_rate, 3),
+        "falsePositiveDetail": false_positive_detail,
         "reportedCentsMae": round(sum(cents_report_errors) / len(cents_report_errors), 2) if cents_report_errors else None,
         "totalFlagged": len(result.noteFindings),
     }
@@ -480,7 +506,8 @@ def main() -> int:
             "perRepeat": [
                 {key: run[key] for key in (
                     "seed", "injectedRecall", "detectedInjectedIds", "missedInjectedIds",
-                    "falsePositiveIds", "cleanFalsePositiveCount", "reportedCentsMae")}
+                    "falsePositiveIds", "falsePositiveDetail", "cleanFalsePositiveCount",
+                    "reportedCentsMae")}
                 for run in diagnosis_runs
             ],
         },
