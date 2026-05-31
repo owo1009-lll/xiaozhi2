@@ -71,7 +71,7 @@ import {
   shouldShowResearchEntry,
 } from "./student/studentAppUtils.js";
 
-export default function StudentApp({ onOpenResearch }) {
+export default function StudentApp({ onOpenResearch, onOpenTeacherValidation }) {
   const restoredStateRef = useRef(loadPersistedStudentState());
   const stopDemoRef = useRef(() => {});
   const scoreFileInputRef = useRef(null);
@@ -986,6 +986,11 @@ export default function StudentApp({ onOpenResearch }) {
               {analyzerStatus == null ? "检测中" : analyzerStatus.reachable ? "正常" : "离线"}
             </strong>
           </div>
+          {onOpenTeacherValidation ? (
+            <button type="button" className="secondary-button" onClick={onOpenTeacherValidation}>
+              教师 Review
+            </button>
+          ) : null}
           {showResearchEntry && onOpenResearch ? (
             <button type="button" className="secondary-button" onClick={onOpenResearch}>
               打开研究后台

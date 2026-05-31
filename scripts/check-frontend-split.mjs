@@ -90,6 +90,12 @@ if (!fs.existsSync(path.join(scoreIssueFeatureDir, "scoreIssueProjection.js"))) 
     reason: "Score issue projection module must remain grouped with the scoreIssue feature.",
   });
 }
+if (!mainAppText.includes('onOpenTeacherValidation={() => switchMode("teacher")}') || !studentAppText.includes("教师 Review")) {
+  failures.push({
+    path: "src/MainApp.jsx",
+    reason: "Teacher review must stay reachable from the student app header.",
+  });
+}
 
 const lineBudgets = [
   { path: "src/TeacherValidationApp.jsx", text: teacherEntryText, maxLines: 5 },

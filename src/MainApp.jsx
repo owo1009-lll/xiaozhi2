@@ -52,7 +52,10 @@ export default function MainApp() {
       ) : mode === "score-issues" ? (
         <ScoreIssuePage />
       ) : (
-        <StudentApp onOpenResearch={() => switchMode("research")} />
+        <StudentApp
+          onOpenResearch={() => switchMode("research")}
+          onOpenTeacherValidation={() => switchMode("teacher")}
+        />
       )}
     </Suspense>
   );
