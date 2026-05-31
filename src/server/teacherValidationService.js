@@ -364,6 +364,26 @@ function applyTeacherLocatorLineGuard(locator = null, issueNoteIds = new Set(), 
   };
 }
 
+function summarizeTeacherPackReadiness(pack = {}) {
+  const items = getArray(pack.items);
+  const totalCount = items.length;
+  const audioClipItemCount = items.filter((item) => safeString(item.audioClipPath)).length;
+  const trustedAlignmentItemCount = items.filter((item) => item.alignmentEvidence?.trusted === true).length;
+  const guardedItemCount = items.filter((item) => item.scoreLocator?.lineProjectionGuardApplied === true).length;
+  const noLocatorNoteCount = items.filter((item) => !getArray(item.scoreLocator?.notePositions).length).length;
+  const reasons = [];
+  if (totalCount > 0 && audioClipItemCount < totalCount) reasons.push("missing-audio-clips");
+  if (totalCount > 0 && trustedAlignmentItemCount < totalCount) reasons.push("untrusted-alignment");
+  return {
+    reviewReady: totalCount > 0 && reasons.length === 0,
+    reviewReadinessReasons: reasons,
+    audioClipItemCount,
+    trustedAlignmentItemCount,
+    guardedItemCount,
+    noLocatorNoteCount,
+  };
+}
+
 function isTeacherPagewiseSection(section = {}) {
   return /\bpage-\d+/i.test(`${safeString(section.sectionId)} ${safeString(section.sourceSectionId)} ${safeString(section.title)}`);
 }
@@ -753,6 +773,7 @@ export function createTeacherValidationService({
           warningCount: safeNumber(pack.manifest.warningCount, getArray(pack.manifest.warnings).length),
           updatedAt: stat.mtime.toISOString(),
           summary: pack.summary,
+          ...summarizeTeacherPackReadiness(pack),
         });
       } catch {
         // Ignore incomplete pack folders.

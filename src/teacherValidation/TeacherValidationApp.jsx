@@ -127,6 +127,10 @@ export default function TeacherValidationApp() {
       return status !== "complete" && included;
     });
   }, [filter, items]);
+  const reviewablePacks = useMemo(() => {
+    const ready = packs.filter((item) => item.reviewReady !== false);
+    return ready.length ? ready : packs;
+  }, [packs]);
 
   async function loadPacks() {
     setLoading(true);
@@ -137,7 +141,17 @@ export default function TeacherValidationApp() {
       setPacks(nextPacks);
       const params = new URLSearchParams(window.location.search);
       const requestedPack = params.get("pack");
-      const nextPackId = requestedPack || packId || nextPacks[0]?.packId || "";
+      const readyPacks = nextPacks.filter((item) => item.reviewReady !== false);
+      const selectablePacks = readyPacks.length ? readyPacks : nextPacks;
+      const requestedPackReady = selectablePacks.some((item) => item.packId === requestedPack);
+      const currentPackReady = selectablePacks.some((item) => item.packId === packId);
+      const nextPackId =
+        requestedPackReady ? requestedPack :
+        currentPackReady ? packId :
+        selectablePacks[0]?.packId || "";
+      if (requestedPack && !requestedPackReady && selectablePacks[0]?.packId) {
+        setStatusMessage("已切换到最新可审教师包，旧包缺少短音频或可信对齐证据。");
+      }
       setPackId(nextPackId);
       if (nextPackId) {
         await loadPack(nextPackId);
@@ -387,7 +401,7 @@ export default function TeacherValidationApp() {
         <label>
           <span>评审包</span>
           <select value={packId} onChange={(event) => handlePackChange(event.target.value)}>
-            {packs.map((item) => (
+            {reviewablePacks.map((item) => (
               <option key={item.packId} value={item.packId}>
                 {item.packId} · {item.summary?.completedCount || 0}/{item.summary?.totalCount || item.selectedCount}
               </option>
