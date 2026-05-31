@@ -594,17 +594,18 @@ class OmrMixin:
         page_count = max(1, int(safe_float(pagewise_stats.get("pageCount"), 0)))
         result_count = max(0, int(safe_float(pagewise_stats.get("resultCount"), source_count)))
         coverage = min(1.0, float(result_count) / float(page_count))
-        page_cache_hit_rate = max(0.0, min(1.0, safe_float(pagewise_stats.get("pageResultCacheHitRate"), 0.0)))
-        render_cache_hit_rate = max(0.0, min(1.0, safe_float(pagewise_stats.get("renderCacheHitRate"), 0.0)))
         tile_runs = max(0.0, safe_float(pagewise_stats.get("tileOmrRuns"), 0.0))
         tile_pressure = min(1.0, tile_runs / float(page_count))
         workers = max(1.0, safe_float(pagewise_stats.get("workers"), 1.0))
 
+        # OMR confidence must reflect OMR quality only. Cache hit rates are a
+        # re-import performance property, not quality; including them made the same
+        # PDF score higher on a warm re-import than on the cold first import and
+        # cross the low-confidence gate. Coverage, tile pressure, and worker bonus
+        # are the genuine quality signals. Must match src/server/omrStats.js.
         confidence = (
             0.56
             + (coverage * 0.28)
-            + (page_cache_hit_rate * 0.08)
-            + (render_cache_hit_rate * 0.04)
             - (tile_pressure * 0.06)
         )
         if workers > 1 and coverage >= 0.9:

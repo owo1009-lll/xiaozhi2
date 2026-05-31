@@ -200,11 +200,14 @@ export function calibrateOmrConfidence(rawConfidence = 0, normalizedStats = {}, 
   const pageCount = Math.max(1, Math.round(safeNumber(normalizedStats.pageCount, 1)));
   const resultCount = Math.max(0, Math.round(safeNumber(normalizedStats.resultCount, 0)));
   const coverage = clamp(resultCount / pageCount, 0, 1);
-  const pageResultCacheHitRate = clamp(safeNumber(normalizedStats.pageResultCacheHitRate, 0), 0, 1);
-  const renderCacheHitRate = clamp(safeNumber(normalizedStats.renderCacheHitRate, 0), 0, 1);
   const tilePressure = clamp(safeNumber(normalizedStats.tileOmrRuns, 0) / pageCount, 0, 1);
   const workers = Math.max(1, Math.round(safeNumber(normalizedStats.workers, 1)));
-  let calibrated = 0.56 + (coverage * 0.28) + (pageResultCacheHitRate * 0.08) + (renderCacheHitRate * 0.04) - (tilePressure * 0.06);
+  // OMR confidence must reflect OMR quality only. Cache hit rates are a
+  // re-import performance property, not quality; including them made the same PDF
+  // score higher on a warm re-import than on the cold first import and cross the
+  // low-confidence gate. Coverage, tile pressure, and worker bonus are the genuine
+  // quality signals. Must match python-service/analyzer_omr.py.
+  let calibrated = 0.56 + (coverage * 0.28) - (tilePressure * 0.06);
   if (workers > 1 && coverage >= 0.9) {
     calibrated += 0.02;
   }
