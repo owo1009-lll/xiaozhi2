@@ -600,6 +600,18 @@ class TrackingMixin:
             if not segment_points:
                 continue
 
+            # A rest before the next onset must not inflate this note's duration.
+            # If the silence after the last voiced pitch exceeds the gap threshold,
+            # cap the segment end just past that last voiced sample. Legato notes
+            # (no gap) and pitch-jump-split sub-segments (continuous audio) are
+            # unaffected because their last voiced sample sits at the boundary.
+            acoustic_end = max(float(item["time"]) for item in segment_points)
+            if (end - acoustic_end) * 1000.0 >= float(self.settings.observed_rest_gap_ms):
+                capped_end = min(end, acoustic_end + (float(self.settings.observed_segment_tail_ms) / 1000.0))
+                if capped_end - start >= 0.03:
+                    end = capped_end
+                    segment_duration = max(0.03, end - start)
+
             segment_times = [float(item["time"]) for item in segment_points]
             segment_frequencies = [float(item["frequency"]) for item in segment_points]
             rough_frequency = trimmed_median(segment_frequencies, 0.1)

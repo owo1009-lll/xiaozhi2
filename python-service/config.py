@@ -49,6 +49,13 @@ class Settings:
     onset_pitch_split_min_semitones: float = float(os.getenv("ERHU_ONSET_PITCH_SPLIT_MIN_SEMITONES", "1.5"))
     onset_pitch_split_min_dwell_ms: float = float(os.getenv("ERHU_ONSET_PITCH_SPLIT_MIN_DWELL_MS", "120"))
     onset_pitch_split_max_spread_cents: float = float(os.getenv("ERHU_ONSET_PITCH_SPLIT_MAX_SPREAD_CENTS", "60"))
+    # An observed segment runs from one onset to the next, so a long rest before the
+    # next onset used to inflate the previous note's measured duration (a 600ms note
+    # spanning a 3s gap read as 3000ms -> spurious duration-long / rush findings).
+    # When the silence after the last voiced pitch exceeds the gap threshold, cap the
+    # segment end just past the last voiced sample so the rest is not absorbed.
+    observed_rest_gap_ms: float = float(os.getenv("ERHU_OBSERVED_REST_GAP_MS", "200"))
+    observed_segment_tail_ms: float = float(os.getenv("ERHU_OBSERVED_SEGMENT_TAIL_MS", "80"))
     min_confidence: float = float(os.getenv("ERHU_MIN_CONFIDENCE", "0.6"))
     uncertain_confidence: float = float(os.getenv("ERHU_UNCERTAIN_CONFIDENCE", "0.63"))
     stable_region_start_ratio: float = float(os.getenv("ERHU_STABLE_REGION_START_RATIO", "0.2"))
