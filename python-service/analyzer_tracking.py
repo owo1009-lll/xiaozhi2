@@ -476,6 +476,78 @@ class TrackingMixin:
         return True, low_frequency, high_frequency, switch_count
 
 
+    def _insert_pitch_jump_boundaries(
+        self,
+        boundaries: list[float],
+        pitch_track: list[dict[str, float]],
+    ) -> list[float]:
+        """Add split points inside onset segments where the pitch steps to a new
+        sustained level. This recovers a second note when its onset was missed,
+        without splitting on glides or vibrato (which never settle into a stable
+        new level within the dwell window)."""
+        if len(boundaries) < 2 or not pitch_track:
+            return boundaries
+        min_dwell = max(0.02, float(self.settings.onset_pitch_split_min_dwell_ms) / 1000.0)
+        jump_cents = float(self.settings.onset_pitch_split_min_semitones) * 100.0
+        max_spread = float(self.settings.onset_pitch_split_max_spread_cents)
+        refined: list[float] = [boundaries[0]]
+        for start, end in zip(boundaries, boundaries[1:], strict=False):
+            if end - start >= (2.0 * min_dwell):
+                for split in self._find_pitch_jump_splits(start, end, pitch_track, min_dwell, jump_cents, max_spread):
+                    if split - refined[-1] >= min_dwell and end - split >= min_dwell:
+                        refined.append(split)
+            refined.append(end)
+        return sorted(set(refined))
+
+
+    def _find_pitch_jump_splits(
+        self,
+        start: float,
+        end: float,
+        pitch_track: list[dict[str, float]],
+        min_dwell: float,
+        jump_cents: float,
+        max_spread_cents: float,
+    ) -> list[float]:
+        points = [
+            (float(item["time"]), float(item["frequency"]))
+            for item in pitch_track
+            if start <= float(item["time"]) <= end
+            and float(item["frequency"]) > 0
+            and float(item.get("confidence", 0.0)) >= self.settings.min_confidence
+        ]
+        if len(points) < 6:
+            return []
+        midis = [frequency_to_midi(frequency) for _, frequency in points]
+        splits: list[float] = []
+        last_split_time = start
+        index = 1
+        while index < len(points):
+            candidate_time = points[index][0]
+            if candidate_time - last_split_time < min_dwell or end - candidate_time < min_dwell:
+                index += 1
+                continue
+            left = [midis[j] for j in range(index) if points[j][0] >= last_split_time and points[index][0] - points[j][0] <= min_dwell]
+            right = [midis[j] for j in range(index, len(points)) if points[j][0] - candidate_time <= min_dwell]
+            if len(left) < 3 or len(right) < 3:
+                index += 1
+                continue
+            left_center = trimmed_median(left, 0.1)
+            right_center = trimmed_median(right, 0.1)
+            left_spread = (percentile(left, 90) - percentile(left, 10)) * 100.0
+            right_spread = (percentile(right, 90) - percentile(right, 10)) * 100.0
+            jump = abs(right_center - left_center) * 100.0
+            if jump >= jump_cents and left_spread <= max_spread_cents and right_spread <= max_spread_cents:
+                splits.append(candidate_time)
+                last_split_time = candidate_time
+                # Skip ahead past the dwell window so one step yields one split.
+                while index < len(points) and points[index][0] - candidate_time < min_dwell:
+                    index += 1
+                continue
+            index += 1
+        return splits
+
+
     def _build_observed_notes(
         self,
         audio: AudioArtifact,
@@ -512,6 +584,8 @@ class TrackingMixin:
         track_end = max((float(item["time"]) for item in pitch_track), default=performance_duration)
         segment_end = max(performance_duration or 0.0, track_end + 0.08)
         boundaries = cleaned_onsets + [segment_end]
+        if self.settings.onset_pitch_split_enabled:
+            boundaries = self._insert_pitch_jump_boundaries(boundaries, pitch_track)
 
         observed: list[ObservedNote] = []
         for start, end in zip(boundaries, boundaries[1:], strict=False):

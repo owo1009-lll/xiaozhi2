@@ -212,6 +212,44 @@ def measure_diagnosis(analyzer: ErhuAnalyzer, events: list[NoteEvent], symbolic_
     }
 
 
+def measure_segmentation(analyzer: ErhuAnalyzer) -> dict:
+    """Expose the missed-onset failure: two distinct pitches under one onset.
+
+    Synthesize two well-separated notes (7 semitones apart), then feed
+    _build_observed_notes an onset track that only marks the first onset
+    (simulating a dropped onset in mixed audio). Without secondary
+    segmentation the two notes collapse into a single observed note whose
+    median pitch matches neither; a pitch-jump split should recover both.
+    """
+    low_midi, high_midi = 62, 69
+    events = [
+        NoteEvent(noteId="seg-low", measureIndex=1, beatStart=0.0, beatDuration=1.0, midiPitch=low_midi),
+        NoteEvent(noteId="seg-high", measureIndex=1, beatStart=1.0, beatDuration=1.0, midiPitch=high_midi),
+    ]
+    symbolic_notes, _ = analyzer._resolve_score_notes(make_request(events))
+    wav = synthesize(symbolic_notes)
+    request = make_request(events, wav)
+    audio = analyzer._decode_audio(request)
+    pitch_track, _ = analyzer._estimate_pitch_track(request, audio, symbolic_notes)
+
+    # Deficient onset track: only the first note's onset is present.
+    deficient_onsets = [{"time": float(symbolic_notes[0].expected_onset)}]
+    observed = analyzer._build_observed_notes(audio, pitch_track, deficient_onsets, symbolic_notes)
+
+    observed_midis = sorted(round(float(o.median_midi)) for o in observed)
+    captured_low = any(abs(float(o.median_midi) - low_midi) <= 1.0 for o in observed)
+    captured_high = any(abs(float(o.median_midi) - high_midi) <= 1.0 for o in observed)
+    return {
+        "scoreNotes": [low_midi, high_midi],
+        "droppedOnsetForNote": "seg-high",
+        "observedNoteCount": len(observed),
+        "observedMidis": observed_midis,
+        "capturedBothPitches": bool(captured_low and captured_high),
+        "capturedLow": bool(captured_low),
+        "capturedHigh": bool(captured_high),
+    }
+
+
 def main() -> int:
     if np is None:
         print(json.dumps({"ok": False, "error": "numpy unavailable"}))
@@ -230,6 +268,7 @@ def main() -> int:
         "highestNoteHz": round(midi_to_frequency(NOTE_MIDIS[-1]), 2),
         "tracking": measure_tracking(analyzer, events, symbolic_notes, clean_wav),
         "diagnosis": measure_diagnosis(analyzer, events, symbolic_notes),
+        "segmentation": measure_segmentation(analyzer),
     }
 
     output_dir = ROOT / "data" / "real-tests" / "pitch-rhythm-accuracy"

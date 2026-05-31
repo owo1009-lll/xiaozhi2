@@ -43,6 +43,12 @@ class Settings:
     dtw_gap_penalty: float = float(os.getenv("ERHU_DTW_GAP_PENALTY", "12"))
     dtw_band_ratio: float = float(os.getenv("ERHU_DTW_BAND_RATIO", "0.25"))
     dtw_band_min: int = int(os.getenv("ERHU_DTW_BAND_MIN", "8"))
+    # Split an onset segment when the pitch steps to a new sustained level, so a
+    # dropped onset in mixed audio does not collapse two notes into one.
+    onset_pitch_split_enabled: bool = env_bool("ERHU_ONSET_PITCH_SPLIT_ENABLED", True)
+    onset_pitch_split_min_semitones: float = float(os.getenv("ERHU_ONSET_PITCH_SPLIT_MIN_SEMITONES", "1.5"))
+    onset_pitch_split_min_dwell_ms: float = float(os.getenv("ERHU_ONSET_PITCH_SPLIT_MIN_DWELL_MS", "120"))
+    onset_pitch_split_max_spread_cents: float = float(os.getenv("ERHU_ONSET_PITCH_SPLIT_MAX_SPREAD_CENTS", "60"))
     min_confidence: float = float(os.getenv("ERHU_MIN_CONFIDENCE", "0.6"))
     uncertain_confidence: float = float(os.getenv("ERHU_UNCERTAIN_CONFIDENCE", "0.63"))
     stable_region_start_ratio: float = float(os.getenv("ERHU_STABLE_REGION_START_RATIO", "0.2"))
