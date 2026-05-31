@@ -598,9 +598,16 @@ class ScoringMixin:
 
         score_duration = max((note.expected_offset for note in score_notes), default=1.0)
         performance_duration = max((note.offset for note in observed_notes), default=1.0)
-        gap_penalty = 5.0
+        gap_penalty = float(self.settings.dtw_gap_penalty)
         rows = len(score_notes)
         cols = len(observed_notes)
+        # Sakoe-Chiba band: skip impossible cells and limit cross-section drift.
+        # Keep the band wide enough to leave a valid endpoint path.
+        band_ratio = max(0.0, float(self.settings.dtw_band_ratio))
+        if band_ratio <= 0.0:
+            half_band = max(rows, cols)
+        else:
+            half_band = max(int(self.settings.dtw_band_min), int(math.ceil(band_ratio * cols)), abs(rows - cols) + 1)
         dp = [[float("inf")] * (cols + 1) for _ in range(rows + 1)]
         back: list[list[tuple[int, int] | None]] = [[None] * (cols + 1) for _ in range(rows + 1)]
         dp[0][0] = 0.0
@@ -613,7 +620,10 @@ class ScoringMixin:
             back[0][col] = (0, col - 1)
 
         for row in range(1, rows + 1):
-            for col in range(1, cols + 1):
+            center = (row * cols) / rows
+            col_lo = max(1, int(math.floor(center)) - half_band)
+            col_hi = min(cols, int(math.ceil(center)) + half_band)
+            for col in range(col_lo, col_hi + 1):
                 match_cost = self._note_match_cost(
                     score_notes[row - 1],
                     observed_notes[col - 1],

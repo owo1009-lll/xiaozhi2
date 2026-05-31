@@ -35,7 +35,14 @@ class Settings:
     data_root: str = os.getenv("ERHU_DATA_ROOT", str((Path(__file__).resolve().parent.parent / "data").resolve()))
     target_sample_rate: int = int(os.getenv("ERHU_TARGET_SAMPLE_RATE", "16000"))
     pitch_hop_ms: int = int(os.getenv("ERHU_PITCH_HOP_MS", "10"))
+    # Keep high-position erhu notes from folding down an octave.
+    crepe_fmin: float = float(os.getenv("ERHU_CREPE_FMIN", "120"))
+    crepe_fmax: float = float(os.getenv("ERHU_CREPE_FMAX", "2000"))
     onset_hop_length: int = int(os.getenv("ERHU_ONSET_HOP_LENGTH", "256"))
+    # DTW tuning is in note-match cost units; set ratio to 0 for a full matrix.
+    dtw_gap_penalty: float = float(os.getenv("ERHU_DTW_GAP_PENALTY", "12"))
+    dtw_band_ratio: float = float(os.getenv("ERHU_DTW_BAND_RATIO", "0.25"))
+    dtw_band_min: int = int(os.getenv("ERHU_DTW_BAND_MIN", "8"))
     min_confidence: float = float(os.getenv("ERHU_MIN_CONFIDENCE", "0.6"))
     uncertain_confidence: float = float(os.getenv("ERHU_UNCERTAIN_CONFIDENCE", "0.63"))
     stable_region_start_ratio: float = float(os.getenv("ERHU_STABLE_REGION_START_RATIO", "0.2"))
