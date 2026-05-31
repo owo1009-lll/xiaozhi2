@@ -297,8 +297,26 @@ def measure_diagnosis(analyzer: ErhuAnalyzer, events: list[NoteEvent], symbolic_
                  - injected_ids
                  - {symbolic_notes[index].note_id for index in onset_targets})
 
-    detected_ids = sorted(note_id for note_id in injected_ids if note_id in flagged_by_id)
-    missed_ids = sorted(note_id for note_id in injected_ids if note_id not in flagged_by_id)
+    # Channel-pure recall: a pitch injection counts as detected ONLY when the
+    # PITCH channel confidently calls it (pitch-flat / pitch-sharp). A note that is
+    # in the findings list purely because of a rhythm finding -- or that carries
+    # only an uncertain pitch-review label -- is NOT a pitch detection. Counting
+    # mere presence inflated recall: a bogus rhythm-rush could drag an
+    # otherwise-undetected pitch error into the findings and make recall look 1.0.
+    def pitch_channel_status(note_id: str) -> str:
+        finding = flagged_by_id.get(note_id)
+        if finding is None:
+            return "absent"
+        if finding.pitchLabel in {"pitch-flat", "pitch-sharp"}:
+            return "pitch-detected"
+        if finding.pitchLabel == "pitch-review":
+            return "pitch-review"
+        return "rhythm-only"
+
+    injected_pitch_status = {note_id: pitch_channel_status(note_id) for note_id in sorted(injected_ids)}
+    detected_ids = sorted(nid for nid, st in injected_pitch_status.items() if st == "pitch-detected")
+    review_ids = sorted(nid for nid, st in injected_pitch_status.items() if st == "pitch-review")
+    missed_ids = sorted(nid for nid, st in injected_pitch_status.items() if st not in {"pitch-detected"})
     false_positive_ids = sorted(note_id for note_id in clean_ids if note_id in flagged_by_id)
     detected_injected = len(detected_ids)
     false_positives = len(false_positive_ids)
@@ -335,6 +353,18 @@ def measure_diagnosis(analyzer: ErhuAnalyzer, events: list[NoteEvent], symbolic_
 
     recall = detected_injected / len(injected_ids) if injected_ids else 0.0
     fp_rate = false_positives / len(clean_ids) if clean_ids else 0.0
+
+    # Rhythm injection (the onset-shifted last note) is judged only on the RHYTHM
+    # channel, kept separate from pitch recall so the two channels never cross-count.
+    rhythm_injected_ids = sorted(symbolic_notes[index].note_id for index in onset_targets)
+
+    def rhythm_channel_detected(note_id: str) -> bool:
+        finding = flagged_by_id.get(note_id)
+        return finding is not None and str(finding.rhythmType or "") not in {"", "rhythm-ok"}
+
+    rhythm_detected_ids = sorted(nid for nid in rhythm_injected_ids if rhythm_channel_detected(nid))
+    rhythm_recall = len(rhythm_detected_ids) / len(rhythm_injected_ids) if rhythm_injected_ids else None
+
     return {
         "seed": seed,
         "injectedPitchNotes": sorted(injected_ids),
@@ -342,8 +372,13 @@ def measure_diagnosis(analyzer: ErhuAnalyzer, events: list[NoteEvent], symbolic_
         "detectedInjectedCount": detected_injected,
         "detectedInjectedIds": detected_ids,
         "missedInjectedIds": missed_ids,
+        "injectedPitchStatus": injected_pitch_status,
+        "pitchReviewIds": review_ids,
         "falsePositiveIds": false_positive_ids,
         "injectedRecall": round(recall, 3),
+        "rhythmInjectedIds": rhythm_injected_ids,
+        "rhythmDetectedIds": rhythm_detected_ids,
+        "rhythmInjectedRecall": round(rhythm_recall, 3) if rhythm_recall is not None else None,
         "cleanFalsePositiveCount": false_positives,
         "cleanFalsePositiveRate": round(fp_rate, 3),
         "falsePositiveDetail": false_positive_detail,
