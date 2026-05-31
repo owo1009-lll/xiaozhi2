@@ -43,7 +43,7 @@ function parseArgs(argv = process.argv.slice(2)) {
     scanConcurrency: 1,
     analysisConcurrency: 1,
     analysisTimeoutSeconds: 120,
-    scanPreprocessMode: "off",
+    scanPreprocessMode: "auto",
     preprocessMode: "auto",
     reuseScanAnalyses: true,
     reuseExistingPasses: true,

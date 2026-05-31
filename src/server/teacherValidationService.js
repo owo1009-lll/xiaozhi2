@@ -209,6 +209,46 @@ function buildTeacherAudioAlignment(audioSegment = {}, measurePositions = []) {
   };
 }
 
+function buildTeacherMeasurePositions(notePositions = [], section = {}) {
+  const notesByMeasure = new Map();
+  for (const note of getArray(notePositions)) {
+    if (!notesByMeasure.has(note.measureIndex)) notesByMeasure.set(note.measureIndex, []);
+    notesByMeasure.get(note.measureIndex).push(note);
+  }
+  return Array.from(notesByMeasure.entries())
+    .map(([measureIndex, notes]) => {
+      const xs = notes.map((note) => note.x);
+      const ys = notes.map((note) => note.y);
+      const xMin = clamp(Math.min(...xs) - 0.025, 0, 1);
+      const xMax = clamp(Math.max(...xs) + 0.045, 0, 1);
+      const yMin = clamp(Math.min(...ys) - 0.035, 0, 1);
+      const yMax = clamp(Math.max(...ys) + 0.045, 0, 1);
+      const maxBeatEnd = Math.max(
+        1,
+        ...notes.map((note) => safeNumber(note.beatStart, 0) + Math.max(0.125, safeNumber(note.beatDuration, 0.25))),
+      );
+      const globalMeasureIndex = notes.find((note) => safeNumber(note.globalMeasureIndex, 0) > 0)?.globalMeasureIndex || measureIndex;
+      const systemIndex = notes.find((note) => nullableInteger(note.systemIndex))?.systemIndex || null;
+      const staffIndex = notes.find((note) => nullableInteger(note.staffIndex))?.staffIndex || null;
+      return {
+        measureIndex,
+        globalMeasureIndex,
+        displayMeasureIndex: globalMeasureIndex || measureIndex,
+        label: formatTeacherMeasureLabel(measureIndex, globalMeasureIndex),
+        xMin,
+        yMin,
+        xMax,
+        yMax,
+        noteCount: notes.length,
+        estimatedBeats: maxBeatEnd,
+        pageNumber: notes[0]?.pageNumber || parsePagewiseSectionPage(section) || 1,
+        systemIndex,
+        staffIndex,
+      };
+    })
+    .sort((left, right) => left.measureIndex - right.measureIndex);
+}
+
 function buildTeacherFocusRegions(notePositions = []) {
   const groups = new Map();
   for (const note of getArray(notePositions)) {
@@ -244,6 +284,84 @@ function buildTeacherFocusRegions(notePositions = []) {
       || safeNumber(left.systemIndex, 0) - safeNumber(right.systemIndex, 0)
       || safeNumber(left.staffIndex, 0) - safeNumber(right.staffIndex, 0),
     );
+}
+
+function teacherLineKey(entry = {}) {
+  const pageNumber = nullableInteger(entry.pageNumber) || 1;
+  const systemIndex = nullableInteger(entry.systemIndex) || 1;
+  const staffIndex = nullableInteger(entry.staffIndex) || 1;
+  return `${pageNumber}:${systemIndex}:${staffIndex}`;
+}
+
+function buildTeacherLineGroups(notePositions = []) {
+  const groups = new Map();
+  for (const note of getArray(notePositions)) {
+    const key = teacherLineKey(note);
+    if (!groups.has(key)) groups.set(key, { key, notes: [], issueHits: 0, yValues: [] });
+    const group = groups.get(key);
+    group.notes.push(note);
+    group.yValues.push(safeNumber(note.y, 0));
+  }
+  return Array.from(groups.values()).map((group) => ({
+    ...group,
+    yMin: Math.min(...group.yValues),
+    yMedian: group.yValues.slice().sort((left, right) => left - right)[Math.floor(group.yValues.length / 2)] || 0,
+  }));
+}
+
+function noteMatchesTeacherIssueId(note = {}, issueNoteIds = new Set()) {
+  return issueNoteIds.has(safeString(note.noteId)) || issueNoteIds.has(safeString(note.sourceNoteId));
+}
+
+function isTeacherPatternLineGroup(group = {}) {
+  const first = getArray(group.notes)[0] || {};
+  return isTeacherErhuLineRank({ notePosition: { systemIndex: first.systemIndex } });
+}
+
+function chooseTeacherLocatorLineGroup(notePositions = [], issueNoteIds = new Set(), lineRankFilterApplied = false) {
+  const groups = buildTeacherLineGroups(notePositions);
+  if (groups.length <= 1) return groups[0] || null;
+  for (const group of groups) {
+    group.issueHits = group.notes.filter((note) => noteMatchesTeacherIssueId(note, issueNoteIds)).length;
+  }
+  const patternGroups = lineRankFilterApplied ? groups.filter((group) => isTeacherPatternLineGroup(group)) : groups;
+  const candidates = patternGroups.length ? patternGroups : groups;
+  const issueGroups = candidates.filter((group) => group.issueHits > 0);
+  const ranked = (issueGroups.length ? issueGroups : candidates)
+    .slice()
+    .sort((left, right) =>
+      left.yMedian - right.yMedian
+      || right.issueHits - left.issueHits
+      || right.notes.length - left.notes.length,
+    );
+  return ranked[0] || null;
+}
+
+function applyTeacherLocatorLineGuard(locator = null, issueNoteIds = new Set(), section = {}) {
+  if (!locator || typeof locator !== "object") return locator;
+  const notePositions = getArray(locator.notePositions);
+  const groups = buildTeacherLineGroups(notePositions);
+  if (groups.length <= 1) return locator;
+  const selectedGroup = chooseTeacherLocatorLineGroup(notePositions, issueNoteIds, locator.lineRankFilterApplied === true);
+  if (!selectedGroup) return locator;
+  const selectedKey = selectedGroup.key;
+  const filteredNotes = notePositions.filter((note) => teacherLineKey(note) === selectedKey);
+  const measurePositions = buildTeacherMeasurePositions(filteredNotes, section);
+  return {
+    ...locator,
+    noteCount: filteredNotes.length,
+    lineProjectionGuardApplied: true,
+    lineProjectionGuard: {
+      selectedLineKey: selectedKey,
+      originalLineCount: groups.length,
+      droppedLineCount: Math.max(0, groups.length - 1),
+      droppedNoteCount: Math.max(0, notePositions.length - filteredNotes.length),
+    },
+    focusRegions: buildTeacherFocusRegions(filteredNotes),
+    notePositions: filteredNotes,
+    measurePositions,
+    audioAlignment: buildTeacherAudioAlignment(locator.audioSegment, measurePositions),
+  };
 }
 
 function isTeacherPagewiseSection(section = {}) {
@@ -355,6 +473,27 @@ function resolveRepoPath(value, repoRoot) {
   const text = safeString(value);
   if (!text) return "";
   return path.isAbsolute(text) ? text : path.resolve(repoRoot, text);
+}
+
+function effectiveTeacherAudioSegment(item = {}, review = {}) {
+  const audioClipPath = safeString(item.audioClipPath || review.audioClipPath);
+  const rawSegment = item.audioSegment || {};
+  if (!audioClipPath) return rawSegment;
+  const rawDuration = safeNumber(rawSegment.durationSeconds, NaN);
+  const startSeconds = safeNumber(rawSegment.startSeconds, NaN);
+  const endSeconds = safeNumber(rawSegment.endSeconds, NaN);
+  const durationSeconds = Number.isFinite(rawDuration)
+    ? rawDuration
+    : Number.isFinite(startSeconds) && Number.isFinite(endSeconds) && endSeconds > startSeconds
+      ? endSeconds - startSeconds
+      : 0;
+  return {
+    startSeconds: 0,
+    endSeconds: Number(durationSeconds.toFixed(2)),
+    durationSeconds: Number(durationSeconds.toFixed(2)),
+    sourceStartSeconds: Number.isFinite(startSeconds) ? startSeconds : null,
+    sourceEndSeconds: Number.isFinite(endSeconds) ? endSeconds : null,
+  };
 }
 
 function buildTeacherAlignmentEvidenceFromPassJson(passJson = {}) {
@@ -479,46 +618,11 @@ function buildTeacherScoreLocator(score = {}, item = {}, analysis = {}, pathCont
     });
   }
 
-  const notesByMeasure = new Map();
-  for (const note of notePositions) {
-    if (!notesByMeasure.has(note.measureIndex)) notesByMeasure.set(note.measureIndex, []);
-    notesByMeasure.get(note.measureIndex).push(note);
-  }
-  const measurePositions = Array.from(notesByMeasure.entries())
-    .map(([measureIndex, notes]) => {
-      const xs = notes.map((note) => note.x);
-      const ys = notes.map((note) => note.y);
-      const xMin = clamp(Math.min(...xs) - 0.025, 0, 1);
-      const xMax = clamp(Math.max(...xs) + 0.045, 0, 1);
-      const yMin = clamp(Math.min(...ys) - 0.035, 0, 1);
-      const yMax = clamp(Math.max(...ys) + 0.045, 0, 1);
-      const maxBeatEnd = Math.max(
-        1,
-        ...notes.map((note) => safeNumber(note.beatStart, 0) + Math.max(0.125, safeNumber(note.beatDuration, 0.25))),
-      );
-      const globalMeasureIndex = notes.find((note) => safeNumber(note.globalMeasureIndex, 0) > 0)?.globalMeasureIndex || measureIndex;
-      const systemIndex = notes.find((note) => nullableInteger(note.systemIndex))?.systemIndex || null;
-      const staffIndex = notes.find((note) => nullableInteger(note.staffIndex))?.staffIndex || null;
-      return {
-        measureIndex,
-        globalMeasureIndex,
-        displayMeasureIndex: globalMeasureIndex || measureIndex,
-        label: formatTeacherMeasureLabel(measureIndex, globalMeasureIndex),
-        xMin,
-        yMin,
-        xMax,
-        yMax,
-        noteCount: notes.length,
-        estimatedBeats: maxBeatEnd,
-        pageNumber: notes[0]?.pageNumber || parsePagewiseSectionPage(section) || 1,
-        systemIndex,
-        staffIndex,
-      };
-    })
-    .sort((left, right) => left.measureIndex - right.measureIndex);
+  const measurePositions = buildTeacherMeasurePositions(notePositions, section);
 
   const pageImagePath = safeString(section.pageImagePath);
-  return {
+  const audioSegment = item.audioSegment || analysis.audioSegment;
+  const locator = {
     scoreId: safeString(score.scoreId),
     sectionId: safeString(section.sectionId),
     sectionTitle: repairMojibakeText(section.title || item.sectionTitle || analysis.sectionTitle),
@@ -532,8 +636,10 @@ function buildTeacherScoreLocator(score = {}, item = {}, analysis = {}, pathCont
     focusRegions: buildTeacherFocusRegions(notePositions),
     notePositions,
     measurePositions,
-    audioAlignment: buildTeacherAudioAlignment(item.audioSegment || analysis.audioSegment, measurePositions),
+    audioSegment,
+    audioAlignment: buildTeacherAudioAlignment(audioSegment, measurePositions),
   };
+  return applyTeacherLocatorLineGuard(locator, new Set(noteIds), section);
 }
 
 export function createTeacherValidationService({
@@ -594,14 +700,22 @@ export function createTeacherValidationService({
       const review = rowByCaseId.get(caseId) || normalizeTeacherReviewRow(item);
       const analysis = analysisById.get(analysisId) || {};
       const score = scoreById.get(safeString(item.scoreId || analysis.scoreId || item.pieceId || analysis.pieceId));
+      const audioClipPath = safeString(item.audioClipPath || review.audioClipPath);
+      const effectiveItem = {
+        ...item,
+        audioClipPath,
+        audioSegment: effectiveTeacherAudioSegment(item, review),
+      };
       const alignmentEvidence = readTeacherAlignmentEvidence(item, analysis, repoRoot);
-      const scoreLocator = buildTeacherScoreLocator(score, item, analysis, pathContext);
+      const scoreLocator = buildTeacherScoreLocator(score, effectiveItem, analysis, pathContext);
       const filteredAnalysis = filterTeacherAnalysisToLocator(analysis, scoreLocator);
-      const filtered = filterTeacherItemIssuesToLocator(item, review, scoreLocator);
+      const filtered = filterTeacherItemIssuesToLocator(effectiveItem, review, scoreLocator);
       return {
         ...filtered.item,
         caseId,
         analysisId,
+        audioClipPath,
+        audioSegment: effectiveItem.audioSegment,
         review: filtered.review,
         analysis: filteredAnalysis,
         alignmentEvidence,
@@ -680,7 +794,7 @@ export function createTeacherValidationService({
     }
     const sourcePath = assetType === "pdf"
       ? safeString(item.sourcePdfPath || item.review?.sourcePdfPath)
-      : safeString(item.sourceAudioPath || item.review?.sourceAudioPath);
+      : safeString(item.audioClipPath || item.review?.audioClipPath || item.sourceAudioPath || item.review?.sourceAudioPath);
     if (!sourcePath) {
       throw new Error("asset path is missing.");
     }

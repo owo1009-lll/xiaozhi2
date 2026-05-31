@@ -17,6 +17,7 @@ function isErhuLineRank(entry = {}) {
 }
 
 function shouldFilterThreeStaffLineRanks(locator = {}) {
+  if (locator?.lineProjectionGuardApplied) return false;
   if (locator?.lineRankFilterApplied) return true;
   const ranks = new Set();
   for (const entry of [

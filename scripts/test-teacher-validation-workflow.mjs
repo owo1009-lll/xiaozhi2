@@ -377,9 +377,88 @@ try {
   assert.equal(mislabeledLineRankLocator.notePositions[0].sourceNoteId, "xml-m74-n5");
   assert(mislabeledLineRankLocator.notePositions[0].y > 0.35, "Teacher locator must drop piano line-rank coordinates even when mislabeled erhu");
 
+  const duplicateIssueLineLocator = teacherValidationInternals.buildTeacherScoreLocator(
+    {
+      scoreId: "score-duplicate-line-locator",
+      sourcePdfPath: pdfPath,
+      selectedPartId: "P1",
+      selectedPart: "Voice",
+      partCandidates: [
+        { id: "P1", name: "Voice", staffCount: 1 },
+        { id: "P2", name: "Piano", staffCount: 2, isLikelyPiano: true },
+      ],
+      sections: [{
+        sectionId: "page-02-s03",
+        sourceSectionId: "page-02-s03",
+        title: "鑷姩璇嗚氨绗?2 椤?鐗囨 3",
+        pageImagePath: path.join(scoreDir, "page-002.png"),
+        selectedPart: "Voice",
+        selectedPartId: "P1",
+        notes: [
+          {
+            noteId: "xml-m18-n7",
+            measureIndex: 18,
+            beatStart: 3,
+            beatDuration: 1,
+            midiPitch: 72,
+            notePosition: {
+              normalizedX: 0.55,
+              normalizedY: 0.32,
+              pageNumber: 2,
+              systemIndex: 4,
+              staffIndex: 1,
+              localMeasureIndex: 5,
+              localNoteId: "xml-m5-n7",
+              scoreLineRole: "erhu",
+              scoreLineConfidence: 0.92,
+            },
+          },
+          {
+            noteId: "xml-m18-n7",
+            measureIndex: 18,
+            beatStart: 4,
+            beatDuration: 1,
+            midiPitch: 69,
+            notePosition: {
+              normalizedX: 0.46,
+              normalizedY: 0.77,
+              pageNumber: 2,
+              systemIndex: 10,
+              staffIndex: 1,
+              localMeasureIndex: 5,
+              localNoteId: "xml-m5-n7",
+              scoreLineRole: "erhu",
+              scoreLineConfidence: 0.92,
+            },
+          },
+        ],
+        scoreLineStats: {
+          erhuNoteCount: 2,
+          accompanimentNoteCount: 0,
+        },
+      }],
+    },
+    {
+      sectionId: "page-02-s03",
+      systemIssueNoteIds: ["xml-m18-n7"],
+    },
+    {
+      sectionId: "page-02-s03",
+      noteFindings: [{ noteId: "xml-m18-n7", measureIndex: 18 }],
+    },
+    {
+      dataDir: path.join(repoRoot, "data"),
+      asciiRuntimeRoot: repoRoot,
+    },
+  );
+  assert.equal(duplicateIssueLineLocator.notePositions.length, 1);
+  assert.equal(duplicateIssueLineLocator.lineProjectionGuardApplied, true);
+  assert(duplicateIssueLineLocator.notePositions[0].y < 0.4, "Teacher locator must keep one score line when a note is duplicated across lines");
+  assert(duplicateIssueLineLocator.measurePositions[0].yMax < 0.4, "Teacher measure box must not span multiple score lines");
+
   console.log(JSON.stringify({
     ok: true,
-    checks: ["pack-build", "review-import", "quality-snapshot", "erhu-only-score-locator", "line-rank-piano-filter"],
+    checks: ["pack-build", "review-import", "quality-snapshot", "erhu-only-score-locator", "line-rank-piano-filter", "duplicate-line-guard"],
     selectedCount: pack.manifest.selectedCount,
     reviewCount: snapshot.validation.reviewCount,
   }, null, 2));
