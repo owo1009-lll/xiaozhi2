@@ -45,7 +45,10 @@ except Exception:  # pragma: no cover
 SAMPLE_RATE = 22050
 TEMPO = 100  # seconds_per_beat = 0.6
 ONSET_TOLERANCE_MS = 50.0
-PITCH_PERTURB_CENTS = 35.0
+# Inject clearly above the 22c base pitch tolerance plus the analyzer's own
+# measurement error (~10c) and the noise wobble, so recall measures real
+# detection capability rather than flapping on the tolerance boundary.
+PITCH_PERTURB_CENTS = 50.0
 ONSET_PERTURB_MS = 70.0
 def _resolve_repeats() -> int:
     """Repeat count: --repeats N (or --smoke for 1) overrides ERHU_AUDIT_REPEATS."""
@@ -162,8 +165,12 @@ def synthesize(
     harmonic_gains = [1.0, 0.5, 0.28, 0.16, 0.08]
     for index, note in enumerate(symbolic_notes):
         offset_seconds = onset_offsets_ms.get(index, 0.0) / 1000.0
+        # Delay the attack within the note's own slot rather than shifting the
+        # whole waveform: a late onset shortens the note but never overlaps the
+        # next one, so the neighbor's segmentation stays clean. An early onset
+        # (negative) does shift the end earlier too, which is harmless.
         start = max(0.0, note.expected_onset + offset_seconds)
-        end = note.expected_offset + offset_seconds
+        end = note.expected_offset + min(0.0, offset_seconds)
         cents = cents_offsets.get(index, 0.0)
         frequency = midi_to_frequency(note.midi_pitch) * (2.0 ** (cents / 1200.0))
         start_sample = int(start * SAMPLE_RATE)
@@ -273,9 +280,14 @@ def measure_tracking(analyzer: ErhuAnalyzer, events: list[NoteEvent], symbolic_n
 
 
 def measure_diagnosis(analyzer: ErhuAnalyzer, events: list[NoteEvent], symbolic_notes, seed: int | None) -> dict:
-    """Inject known pitch/onset errors and measure diagnosis recall and false positives."""
+    """Inject known pitch/onset errors and measure diagnosis recall and false positives.
+
+    The onset target is the last note so its (clamped) late attack has no later
+    neighbor whose segmentation it could disturb, isolating onset error from the
+    pitch-recall and false-positive measurements.
+    """
     pitch_targets = {1: PITCH_PERTURB_CENTS, 5: -PITCH_PERTURB_CENTS}
-    onset_targets = {3: ONSET_PERTURB_MS}
+    onset_targets = {len(symbolic_notes) - 1: ONSET_PERTURB_MS}
     wav_bytes = synthesize(symbolic_notes, cents_offsets=pitch_targets, onset_offsets_ms=onset_targets, seed=seed)
     result = analyzer.analyze(make_request(events, wav_bytes))
 
