@@ -367,22 +367,25 @@ function applyTeacherLocatorLineGuard(locator = null, issueNoteIds = new Set(), 
 function summarizeTeacherPackReadiness(pack = {}) {
   const items = getArray(pack.items);
   const totalCount = items.length;
+  const reviewMode = safeString(pack.manifest?.reviewMode);
   const audioClipItemCount = items.filter((item) => safeString(item.audioClipPath)).length;
   const trustedAlignmentItemCount = items.filter((item) => item.alignmentEvidence?.trusted === true).length;
-  const controlledItemCount = items.filter((item) => safeString(item.sourceKind) === "controlled-piece-pass").length;
+  const originalVerifiedItemCount = items.filter((item) => safeString(item.sourceKind) === "original-score-verified").length;
   const guardedItemCount = items.filter((item) => item.scoreLocator?.lineProjectionGuardApplied === true).length;
   const noLocatorNoteCount = items.filter((item) => !getArray(item.scoreLocator?.notePositions).length).length;
   const reasons = [];
   if (totalCount > 0 && audioClipItemCount < totalCount) reasons.push("missing-audio-clips");
   if (totalCount > 0 && trustedAlignmentItemCount < totalCount) reasons.push("untrusted-alignment");
   if (totalCount > 0 && noLocatorNoteCount > 0) reasons.push("missing-score-locators");
-  if (totalCount > 0 && controlledItemCount < totalCount) reasons.push("not-controlled-review-pack");
+  if (reviewMode !== "original-score-verified" || originalVerifiedItemCount < totalCount) {
+    reasons.push("not-original-score-verified");
+  }
   return {
     reviewReady: totalCount > 0 && reasons.length === 0,
     reviewReadinessReasons: reasons,
     audioClipItemCount,
     trustedAlignmentItemCount,
-    controlledItemCount,
+    originalVerifiedItemCount,
     guardedItemCount,
     noLocatorNoteCount,
   };

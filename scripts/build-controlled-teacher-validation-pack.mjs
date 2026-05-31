@@ -241,11 +241,11 @@ async function main() {
     };
     const alignmentEvidence = {
       trusted: true,
-      scanMode: "controlled-piece-pass",
+      scanMode: "controlled-demo-piece-pass",
       audioDurationSeconds: audioSegment.durationSeconds,
       estimatedPieceDurationSeconds: audioSegment.durationSeconds,
       durationRatio: 1,
-      reason: "controlled pack uses repository test audio, structured score notes, and melody-focus piece-pass windows",
+      reason: "controlled demo pack uses repository test audio and generated section score pages; it is not original-score teacher review data",
     };
     const analysis = {
       analysisId: `${caseId}-analysis`,
@@ -272,7 +272,7 @@ async function main() {
       practiceTargets: getArray(sectionPass.practiceTargets),
       diagnostics: sectionPass.diagnostics || {},
       sourceMetadata: {
-        sourceKind: "controlled-piece-pass",
+        sourceKind: "controlled-demo-piece-pass",
         passJsonPath: path.relative(repoRoot, passJsonPath).replace(/\\/g, "/"),
         sourcePdfPath: path.relative(repoRoot, pdfPath).replace(/\\/g, "/"),
         sourceAudioPath: path.relative(repoRoot, audioPath).replace(/\\/g, "/"),
@@ -294,7 +294,7 @@ async function main() {
       sourcePdfPath: path.relative(repoRoot, pdfPath).replace(/\\/g, "/"),
       sourceAudioPath: path.relative(repoRoot, audioPath).replace(/\\/g, "/"),
       audioClipPath: path.relative(repoRoot, audioClipPath).replace(/\\/g, "/"),
-      sourceKind: "controlled-piece-pass",
+      sourceKind: "controlled-demo-piece-pass",
       sourceType: "section",
       systemRecommendedPath: analysis.recommendedPracticePath,
       systemIssueNoteIds: issues.noteFindings.map((finding) => finding.noteId),
@@ -363,10 +363,10 @@ async function main() {
 
   const manifest = {
     schemaVersion: 1,
-    reviewMode: "controlled",
+    reviewMode: "controlled-demo",
     generatedAt: new Date().toISOString(),
     unit: "section",
-    sources: "controlled-piece-pass",
+    sources: "controlled-demo-piece-pass",
     requestedMin: candidates.length,
     requestedMax: max,
     selectedCount: items.length,

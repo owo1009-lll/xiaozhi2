@@ -129,7 +129,7 @@ export default function TeacherValidationApp() {
   }, [filter, items]);
   const reviewablePacks = useMemo(() => {
     const ready = packs.filter((item) => item.reviewReady !== false);
-    return ready.length ? ready : packs;
+    return ready;
   }, [packs]);
 
   async function loadPacks() {
@@ -142,13 +142,16 @@ export default function TeacherValidationApp() {
       const params = new URLSearchParams(window.location.search);
       const requestedPack = params.get("pack");
       const readyPacks = nextPacks.filter((item) => item.reviewReady !== false);
-      const selectablePacks = readyPacks.length ? readyPacks : nextPacks;
+      const selectablePacks = readyPacks;
       const requestedPackReady = selectablePacks.some((item) => item.packId === requestedPack);
       const currentPackReady = selectablePacks.some((item) => item.packId === packId);
       const nextPackId =
         requestedPackReady ? requestedPack :
         currentPackReady ? packId :
         selectablePacks[0]?.packId || "";
+      if (!selectablePacks.length) {
+        setStatusMessage("当前没有可审教师包。需要先生成原 PDF 谱面、真实短音频，并带有已验证对齐证据的教师包。");
+      }
       if (requestedPack && !requestedPackReady && selectablePacks[0]?.packId) {
         setStatusMessage("已切换到最新可审教师包，旧包缺少短音频或可信对齐证据。");
       }
