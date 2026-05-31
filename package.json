@@ -31,6 +31,7 @@
     "test:real-corpus:strict": "node scripts\\run-real-corpus-tests.mjs --run --smoke-review --strict --request-timeout-ms 60000",
     "teacher:validation-pack": "node scripts\\build-teacher-validation-pack.mjs",
     "teacher:grade-pack": "node scripts\\build-teacher-grade-validation-pack.mjs",
+    "teacher:controlled-pack": "node scripts\\build-controlled-teacher-validation-pack.mjs",
     "teacher:validation-import": "node scripts\\import-teacher-validation-reviews.mjs",
     "audit:teacher-validation-readiness": "node scripts\\audit-teacher-validation-readiness.mjs",
     "test:teacher-validation": "node scripts\\test-teacher-validation-workflow.mjs",

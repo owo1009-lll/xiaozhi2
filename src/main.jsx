@@ -22,7 +22,8 @@ const clearServiceWorkerState = () => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    const shouldClear = import.meta.env.DEV || new URLSearchParams(window.location.search).has("clear-sw");
+    const params = new URLSearchParams(window.location.search);
+    const shouldClear = import.meta.env.DEV || params.has("clear-sw") || params.get("mode") === "teacher";
     if (shouldClear) {
       clearServiceWorkerState();
       return;

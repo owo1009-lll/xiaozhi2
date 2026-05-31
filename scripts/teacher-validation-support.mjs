@@ -647,7 +647,9 @@ function extractAudioClip({ sourceAudioPath, outputPath, startSeconds, endSecond
   const args = ["-y"];
   if (Number.isFinite(startSeconds) && startSeconds > 0) args.push("-ss", String(startSeconds));
   args.push("-i", sourceAudioPath);
-  if (Number.isFinite(endSeconds) && endSeconds > 0) args.push("-to", String(endSeconds));
+  if (Number.isFinite(startSeconds) && Number.isFinite(endSeconds) && endSeconds > startSeconds) {
+    args.push("-t", String(endSeconds - startSeconds));
+  }
   args.push("-vn", "-acodec", "pcm_s16le", outputPath);
   const result = spawnSync("ffmpeg", args, { stdio: "ignore" });
   return result.status === 0 ? { ok: true } : { ok: false, reason: "ffmpeg-failed" };

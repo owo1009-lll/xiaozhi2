@@ -1,4 +1,4 @@
-const CACHE_NAME = "ai-erhu-shell-v1";
+const CACHE_NAME = "ai-erhu-shell-v2";
 const CORE_ASSETS = ["/", "/manifest.webmanifest"];
 const BLOCKED_PREFIXES = ["/api/", "/data/", "/exports/", "/score/"];
 const STATIC_PREFIXES = ["/assets/", "/icons/"];
@@ -27,6 +27,10 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.mode === "navigate") {
+    if (url.searchParams.get("mode") === "teacher" || url.searchParams.has("clear-sw")) {
+      event.respondWith(fetch(request));
+      return;
+    }
     event.respondWith(fetch(request).catch(() => caches.match("/")));
     return;
   }

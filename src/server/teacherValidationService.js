@@ -24,7 +24,7 @@ import {
 
 function toUniqueStringList(value) {
   if (Array.isArray(value)) {
-    return Array.from(new Set(value.map((item) => safeString(item).trim()).filter(Boolean)));
+    return Array.from(new Set(value.map((item) => (item == null ? "" : String(item)).trim()).filter(Boolean)));
   }
   return Array.from(new Set(String(value || "").split(/[\s,;|，；]+/).map((item) => item.trim()).filter(Boolean)));
 }
@@ -369,16 +369,20 @@ function summarizeTeacherPackReadiness(pack = {}) {
   const totalCount = items.length;
   const audioClipItemCount = items.filter((item) => safeString(item.audioClipPath)).length;
   const trustedAlignmentItemCount = items.filter((item) => item.alignmentEvidence?.trusted === true).length;
+  const controlledItemCount = items.filter((item) => safeString(item.sourceKind) === "controlled-piece-pass").length;
   const guardedItemCount = items.filter((item) => item.scoreLocator?.lineProjectionGuardApplied === true).length;
   const noLocatorNoteCount = items.filter((item) => !getArray(item.scoreLocator?.notePositions).length).length;
   const reasons = [];
   if (totalCount > 0 && audioClipItemCount < totalCount) reasons.push("missing-audio-clips");
   if (totalCount > 0 && trustedAlignmentItemCount < totalCount) reasons.push("untrusted-alignment");
+  if (totalCount > 0 && noLocatorNoteCount > 0) reasons.push("missing-score-locators");
+  if (totalCount > 0 && controlledItemCount < totalCount) reasons.push("not-controlled-review-pack");
   return {
     reviewReady: totalCount > 0 && reasons.length === 0,
     reviewReadinessReasons: reasons,
     audioClipItemCount,
     trustedAlignmentItemCount,
+    controlledItemCount,
     guardedItemCount,
     noLocatorNoteCount,
   };
@@ -662,6 +666,30 @@ function buildTeacherScoreLocator(score = {}, item = {}, analysis = {}, pathCont
   return applyTeacherLocatorLineGuard(locator, new Set(noteIds), section);
 }
 
+function normalizeEmbeddedTeacherScoreLocator(locator = null, audioSegment = {}) {
+  if (!locator || typeof locator !== "object") return null;
+  const notePositions = getArray(locator.notePositions);
+  if (!notePositions.length) return null;
+  const pageImagePath = safeString(locator.pageImagePath);
+  const normalizedImagePath = pageImagePath.startsWith("/data/")
+    ? pageImagePath
+    : pageImagePath.startsWith("data/")
+      ? `/${pageImagePath.replace(/\\/g, "/")}`
+      : pageImagePath;
+  const next = {
+    ...locator,
+    pageImagePath: normalizedImagePath,
+    notePositions,
+    measurePositions: getArray(locator.measurePositions),
+    focusRegions: getArray(locator.focusRegions),
+    audioSegment,
+  };
+  return {
+    ...next,
+    audioAlignment: next.audioAlignment || buildTeacherAudioAlignment(audioSegment, next.measurePositions),
+  };
+}
+
 export function createTeacherValidationService({
   packsDir,
   repoRoot,
@@ -727,7 +755,8 @@ export function createTeacherValidationService({
         audioSegment: effectiveTeacherAudioSegment(item, review),
       };
       const alignmentEvidence = readTeacherAlignmentEvidence(item, analysis, repoRoot);
-      const scoreLocator = buildTeacherScoreLocator(score, effectiveItem, analysis, pathContext);
+      const embeddedLocator = normalizeEmbeddedTeacherScoreLocator(item.scoreLocator || analysis.scoreLocator, effectiveItem.audioSegment);
+      const scoreLocator = embeddedLocator || buildTeacherScoreLocator(score, effectiveItem, analysis, pathContext);
       const filteredAnalysis = filterTeacherAnalysisToLocator(analysis, scoreLocator);
       const filtered = filterTeacherItemIssuesToLocator(effectiveItem, review, scoreLocator);
       return {

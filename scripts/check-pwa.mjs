@@ -44,8 +44,8 @@ if (!main.includes('navigator.serviceWorker.register("/sw.js")')) {
   fail("production app must register /sw.js");
 }
 
-if (!main.includes("import.meta.env.DEV") || !main.includes("clear-sw")) {
-  fail("app must keep a dev/manual stale-cache cleanup path");
+if (!main.includes("import.meta.env.DEV") || !main.includes("clear-sw") || !main.includes('"teacher"')) {
+  fail("app must keep dev/manual/teacher stale-cache cleanup paths");
 }
 
 for (const prefix of ["/api/", "/data/", "/exports/", "/score/"]) {
@@ -60,6 +60,10 @@ if (serviceWorker.includes("registration.unregister()")) {
 
 if (!serviceWorker.includes("request.mode === \"navigate\"") || !serviceWorker.includes("caches.match(\"/\")")) {
   fail("service worker must provide a navigation fallback for the app shell");
+}
+
+if (!serviceWorker.includes('url.searchParams.get("mode") === "teacher"') || !serviceWorker.includes("clear-sw")) {
+  fail("service worker must bypass teacher validation and manual cache-clear navigations");
 }
 
 if (!process.exitCode) {

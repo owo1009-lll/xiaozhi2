@@ -456,9 +456,16 @@ try {
   assert(duplicateIssueLineLocator.notePositions[0].y < 0.4, "Teacher locator must keep one score line when a note is duplicated across lines");
   assert(duplicateIssueLineLocator.measurePositions[0].yMax < 0.4, "Teacher measure box must not span multiple score lines");
 
+  const numericMeasureReview = teacherValidationInternals.normalizeTeacherReviewRow({
+    caseId: "numeric-measures",
+    analysisId: "numeric-measures-analysis",
+    teacherIssueMeasureIndexes: [1, 2],
+  });
+  assert.equal(numericMeasureReview.teacherIssueMeasureIndexes, "1|2");
+
   console.log(JSON.stringify({
     ok: true,
-    checks: ["pack-build", "review-import", "quality-snapshot", "erhu-only-score-locator", "line-rank-piano-filter", "duplicate-line-guard"],
+    checks: ["pack-build", "review-import", "quality-snapshot", "erhu-only-score-locator", "line-rank-piano-filter", "duplicate-line-guard", "numeric-measure-list"],
     selectedCount: pack.manifest.selectedCount,
     reviewCount: snapshot.validation.reviewCount,
   }, null, 2));
