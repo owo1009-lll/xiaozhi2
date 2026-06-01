@@ -150,6 +150,23 @@ pitchSpreadCents ~= 12
 
 按本规则，n6 不应该被滑音或揉弦吞掉。`12 cents` spread 的稳定音中出现短促 `glideLike` 或 `vibratoLike`，更像音高跟踪噪声，而不是真技巧。
 
+### 实施状态与已知局限（2026-06-01）
+
+已用 Phase 0 audit（channel-pure recall + inner-repeat 可复现诊断）量化 n6：
+
+- 注入 `-50 cents` 的稳定错音 n6，在部分 seed 下被 `_is_pitch_uncertain` 的 `glideLike and glideRunMs>=glide_min_duration_ms` 分支（下称 b135）吞成 `pitch-review`，使 channel-pure pitch recall 从 `1.0` 降到 `0.9`。
+- 试过在 b135 上加 `pitchSpreadCents >= 25` 的稳定音保护闸（只改这一条 if）。5×3 audit 结果：recall 未稳定回到 `1.0`，且 `maxInnerRecallSpread=0.5`（seed-3/4 在 inner-repeat 间抖动）。
+- 原因：n6 处在 madmom onset、观测分段边界、`glideRunMs`、`pitchSpreadCents` 估计几个噪声敏感点的交汇处。它的 `glideLike` 由 `_detect_glide_run`（逐帧斜率）生成，madmom run-to-run 抖动会让 spread 在 `~18–22 cents` 浮动、分段边界微变，单点阈值闸无法稳定它。
+- 结论：**不在 `_is_pitch_uncertain` 继续打补丁**。这是已记录的已知局限——`50 cents` 的 pitch 注入在低 spread / 假 glide / madmom 边界条件下可能进入 review 或抖动；当前 audit 已能量化该风险（`reproducibility.maxInnerRecallSpread`）。是否修复待真实教师标注数据后再定。
+
+推荐的正确修复路线（影响面更大，应单独冻结方案后再做）：
+
+1. 先判定"稳定音是否明显跑音"：高置信、稳定帧足够、偏差约 `50 cents`，应直接报 pitch issue。
+2. 再判定"是否真实滑音/揉弦"：技巧只能改变反馈措辞，不能轻易吞掉稳定错音。
+3. 重写 glide 生成条件（改 `_detect_glide_run` / `glideLike`，而非 `_is_pitch_uncertain`）：不能只看短时间斜率，必须同时看总 spread、持续时间、方向、入口/出口。
+4. 对低 spread 稳定音加保护：`pitchSpreadCents < 25` 默认不是滑音。
+5. 用 audit 验证稳定性：不只看一次 recall，要看 inner-repeat 是否稳定（`maxInnerRecallSpread`）。
+
 ## 资料链接
 
 - 小滑音/大滑音、小三度说法：https://www.52erhu.com/laxianyueqi/erhujiaocheng/1413/
