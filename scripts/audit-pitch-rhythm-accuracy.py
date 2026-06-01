@@ -67,6 +67,13 @@ def _resolve_repeats() -> int:
 
 REPEATS = _resolve_repeats()
 NOISE_SNR_DB = float(os.getenv("ERHU_AUDIT_NOISE_SNR_DB", "40"))
+# madmom's RNN onset/beat detection is not bit-reproducible: the SAME synthesized
+# audio re-analyzed can flip a borderline note between detected and review, so a
+# single pass per seed made recall jump 0.9<->1.0 and the gate unjudgeable. Each
+# seed is now analyzed INNER_REPEATS times on identical audio; the per-seed metric
+# is the mean over those inner passes and the run-to-run spread is reported, so
+# the measurement noise is quantified instead of masquerading as a point result.
+INNER_REPEATS = max(1, int(os.getenv("ERHU_AUDIT_INNER_REPEATS", "3")))
 
 # Include a high-position note so the audit catches octave folding above the old cap.
 NOTE_MIDIS = [62, 64, 66, 69, 74, 81, 86, 93]
@@ -528,6 +535,39 @@ def aggregate(runs: list[dict], metric_keys: list[str]) -> dict:
     return {key: summarize([run.get(key) for run in runs]) for key in metric_keys}
 
 
+def measure_diagnosis_repeated(analyzer, events, symbolic_notes, seed, inner_repeats):
+    """Run measure_diagnosis inner_repeats times on the SAME seed (identical audio)
+    and fold the madmom run-to-run variance into the per-seed result.
+
+    The per-seed injectedRecall becomes the mean over inner passes; missed/detected
+    ids are unioned across passes for visibility, and a per-pass recall list plus the
+    spread are recorded so a borderline note's instability is explicit rather than
+    hidden behind whichever pass ran. Returns a single dict shaped like
+    measure_diagnosis (so existing aggregate()/perRepeat code keeps working) with the
+    extra reproducibility fields attached.
+    """
+    passes = [measure_diagnosis(analyzer, events, symbolic_notes, seed) for _ in range(inner_repeats)]
+    recalls = [float(p["injectedRecall"]) for p in passes]
+    fp_counts = [int(p["cleanFalsePositiveCount"]) for p in passes]
+    # Status per injected note across passes: stable if identical every pass.
+    injected = passes[0]["injectedPitchNotes"]
+    status_by_note = {
+        nid: [p.get("injectedPitchStatus", {}).get(nid) for p in passes]
+        for nid in injected
+    }
+    unstable = sorted(nid for nid, sts in status_by_note.items() if len(set(sts)) > 1)
+    base = dict(passes[0])
+    base["injectedRecall"] = round(sum(recalls) / len(recalls), 3)
+    base["cleanFalsePositiveCount"] = round(sum(fp_counts) / len(fp_counts), 3)
+    base["innerRepeats"] = inner_repeats
+    base["innerRecalls"] = recalls
+    base["innerRecallSpread"] = round(max(recalls) - min(recalls), 3)
+    base["innerFpCounts"] = fp_counts
+    base["injectedStatusByNote"] = status_by_note
+    base["unstableInjectedNotes"] = unstable
+    return base
+
+
 def main() -> int:
     if np is None:
         print(json.dumps({"ok": False, "error": "numpy unavailable"}))
@@ -547,14 +587,17 @@ def main() -> int:
     for repeat in range(REPEATS):
         seed = repeat + 1
         tracking_runs.append(measure_tracking(analyzer, events, symbolic_notes, seed))
-        diagnosis_runs.append(measure_diagnosis(analyzer, events, symbolic_notes, seed))
+        diagnosis_runs.append(
+            measure_diagnosis_repeated(analyzer, events, symbolic_notes, seed, INNER_REPEATS)
+        )
 
     tracking_metrics = ["pitchMaeCents", "pitchMaxCents", "onsetPrecision", "onsetRecall", "onsetF1", "trackedNoteCount"]
     diagnosis_metrics = ["injectedRecall", "cleanFalsePositiveCount", "cleanFalsePositiveRate", "reportedCentsMae", "totalFlagged"]
 
     report = {
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "repeats": REPEATS,
+        "innerRepeats": INNER_REPEATS,
         "noiseSnrDb": NOISE_SNR_DB,
         "sampleRate": SAMPLE_RATE,
         "onsetToleranceMs": ONSET_TOLERANCE_MS,
@@ -577,10 +620,21 @@ def main() -> int:
             "perRepeat": [
                 {key: run[key] for key in (
                     "seed", "injectedRecall", "detectedInjectedIds", "missedInjectedIds",
-                    "falsePositiveIds", "falsePositiveDetail", "cleanFalsePositiveCount",
-                    "reportedCentsMae")}
+                    "pitchReviewIds", "injectedPitchStatus", "falsePositiveIds",
+                    "falsePositiveDetail", "cleanFalsePositiveCount", "reportedCentsMae",
+                    "innerRepeats", "innerRecalls", "innerRecallSpread", "innerFpCounts",
+                    "injectedStatusByNote", "unstableInjectedNotes")}
                 for run in diagnosis_runs
             ],
+            "reproducibility": {
+                "innerRepeats": INNER_REPEATS,
+                "maxInnerRecallSpread": max((float(run["innerRecallSpread"]) for run in diagnosis_runs), default=0.0),
+                "unstableSeeds": [
+                    {"seed": run["seed"], "unstableNotes": run["unstableInjectedNotes"],
+                     "innerRecalls": run["innerRecalls"]}
+                    for run in diagnosis_runs if run["unstableInjectedNotes"] or run["innerRecallSpread"] > 0
+                ],
+            },
         },
         "segmentation": measure_segmentation(analyzer),
         "segmentTrace": trace_observed_segments(analyzer, events, symbolic_notes),
