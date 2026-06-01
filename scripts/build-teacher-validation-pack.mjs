@@ -15,6 +15,7 @@ function parseArgs(argv = process.argv.slice(2)) {
     min: 30,
     minSystemFindings: 0,
     raterId: "teacher-1",
+    reviewMode: "",
     extractAudio: false,
     strictMin: false,
     requireTrustedAlignment: true,
@@ -29,6 +30,7 @@ function parseArgs(argv = process.argv.slice(2)) {
     else if (arg === "--min") parsed.min = Math.max(0, Number(argv[++index]) || parsed.min);
     else if (arg === "--min-system-findings") parsed.minSystemFindings = Math.max(0, Number(argv[++index]) || 0);
     else if (arg === "--rater-id") parsed.raterId = argv[++index] || parsed.raterId;
+    else if (arg === "--review-mode") parsed.reviewMode = argv[++index] || parsed.reviewMode;
     else if (arg === "--extract-audio") parsed.extractAudio = true;
     else if (arg === "--strict-min") parsed.strictMin = true;
     else if (arg === "--allow-untrusted-alignment") parsed.requireTrustedAlignment = false;

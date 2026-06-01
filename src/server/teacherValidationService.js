@@ -368,6 +368,7 @@ function summarizeTeacherPackReadiness(pack = {}) {
   const items = getArray(pack.items);
   const totalCount = items.length;
   const reviewMode = safeString(pack.manifest?.reviewMode);
+  const isTechniqueLabeling = reviewMode === "technique-labeling";
   const audioClipItemCount = items.filter((item) => safeString(item.audioClipPath)).length;
   const trustedAlignmentItemCount = items.filter((item) => item.alignmentEvidence?.trusted === true).length;
   const originalVerifiedItemCount = items.filter((item) => safeString(item.sourceKind) === "original-score-verified").length;
@@ -377,7 +378,7 @@ function summarizeTeacherPackReadiness(pack = {}) {
   if (totalCount > 0 && audioClipItemCount < totalCount) reasons.push("missing-audio-clips");
   if (totalCount > 0 && trustedAlignmentItemCount < totalCount) reasons.push("untrusted-alignment");
   if (totalCount > 0 && noLocatorNoteCount > 0) reasons.push("missing-score-locators");
-  if (reviewMode !== "original-score-verified" || originalVerifiedItemCount < totalCount) {
+  if (!isTechniqueLabeling && (reviewMode !== "original-score-verified" || originalVerifiedItemCount < totalCount)) {
     reasons.push("not-original-score-verified");
   }
   return {
@@ -801,6 +802,7 @@ export function createTeacherValidationService({
           generatedAt: safeString(pack.manifest.generatedAt),
           unit: safeString(pack.manifest.unit),
           sources: safeString(pack.manifest.sources),
+          reviewMode: safeString(pack.manifest.reviewMode),
           selectedCount: safeNumber(pack.manifest.selectedCount, pack.items.length),
           warningCount: safeNumber(pack.manifest.warningCount, getArray(pack.manifest.warnings).length),
           updatedAt: stat.mtime.toISOString(),
@@ -860,6 +862,9 @@ export function createTeacherValidationService({
 
   async function applyTeacherValidationPack(packId) {
     const pack = await readTeacherValidationPack(packId);
+    if (safeString(pack.manifest?.reviewMode) === "technique-labeling") {
+      throw new Error("technique-labeling packs are for teacher screening only and cannot be imported into the quality baseline.");
+    }
     const acceptedRows = pack.reviews.filter((row) => isTeacherReviewComplete(row));
     const analysisById = new Map(pack.analyses.map((analysis) => [safeString(analysis.analysisId), analysis]));
     const missingAnalysisIds = acceptedRows.map((row) => row.analysisId).filter((analysisId) => !analysisById.has(analysisId));
@@ -923,4 +928,5 @@ export const teacherValidationInternals = {
   buildTeacherFocusRegions,
   normalizeTeacherReviewRow,
   summarizeTeacherReviewRows,
+  summarizeTeacherPackReadiness,
 };

@@ -380,6 +380,7 @@ export default function TeacherValidationApp() {
   }
 
   const summary = pack?.summary || {};
+  const isTechniqueLabelingPack = pack?.manifest?.reviewMode === "technique-labeling";
 
   return (
     <main className="teacher-shell">
@@ -424,8 +425,8 @@ export default function TeacherValidationApp() {
             <option value="all">全部</option>
           </select>
         </label>
-        <button type="button" className="primary-button" onClick={applyCompletedReviews} disabled={applying || !summary.includedCompleteCount}>
-          {applying ? "导入中..." : "导入已完成标注"}
+        <button type="button" className="primary-button" onClick={applyCompletedReviews} disabled={applying || isTechniqueLabelingPack || !summary.includedCompleteCount}>
+          {isTechniqueLabelingPack ? "技巧标注只保存" : applying ? "导入中..." : "导入已完成标注"}
         </button>
       </section>
 

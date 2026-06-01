@@ -664,6 +664,7 @@ export async function buildTeacherValidationPack({
   min = 30,
   minSystemFindings = 0,
   raterId = "teacher-1",
+  reviewMode = "",
   extractAudio = false,
   strictMin = false,
   requireTrustedAlignment = true,
@@ -721,6 +722,7 @@ export async function buildTeacherValidationPack({
     selectedCount: candidates.length,
     warningCount: warnings.length,
     warnings,
+    reviewMode: safeString(reviewMode),
     files: {
       analyses: "analyses.json",
       teacherReviewJson: "teacher-review-template.json",

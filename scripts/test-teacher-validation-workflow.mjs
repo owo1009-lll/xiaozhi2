@@ -180,6 +180,28 @@ try {
   });
   assert.equal(teacherGradePack.manifest.selectedCount, 2);
   assert.equal(teacherGradePack.manifest.warnings.length, 0);
+  const techniqueReady = teacherValidationInternals.summarizeTeacherPackReadiness({
+    manifest: { reviewMode: "technique-labeling" },
+    items: [{
+      audioClipPath: "data/teacher-validation/packs/fixture/audio-clips/case.wav",
+      alignmentEvidence: { trusted: true },
+      sourceKind: "teacher-grade-run",
+      scoreLocator: { notePositions: [{ noteId: "n1" }] },
+    }],
+  });
+  assert.equal(techniqueReady.reviewReady, true);
+  assert.deepEqual(techniqueReady.reviewReadinessReasons, []);
+  const normalNotReady = teacherValidationInternals.summarizeTeacherPackReadiness({
+    manifest: {},
+    items: [{
+      audioClipPath: "data/teacher-validation/packs/fixture/audio-clips/case.wav",
+      alignmentEvidence: { trusted: true },
+      sourceKind: "teacher-grade-run",
+      scoreLocator: { notePositions: [{ noteId: "n1" }] },
+    }],
+  });
+  assert.equal(normalNotReady.reviewReady, false);
+  assert(normalNotReady.reviewReadinessReasons.includes("not-original-score-verified"));
 
   const filledReviews = {
     schemaVersion: 1,
