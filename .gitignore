@@ -15,8 +15,8 @@ exports/
 scripts/__pycache__/
 __pycache__/
 hs_err_pid*.log
-paper/aaai2027-si-hsm/manifests/*.local.manifest.json
-paper/aaai2027-si-hsm/runs.local/
+/paper/
+/paper_rewriting_outputreference_materials/
 
 # Local paper/review scratch files kept out of the AI Erhu mainline workspace.
 /文章/
