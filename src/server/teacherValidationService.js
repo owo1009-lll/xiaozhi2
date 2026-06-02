@@ -565,6 +565,15 @@ const TEACHER_READY_MAX_DURATION_RATIO = Number.isFinite(Number(process.env.ERHU
 // Only analyzer-backed scan modes are trusted. Allowlist (not "anything != fast")
 // so a future scanMode is not silently trusted.
 const TEACHER_READY_TRUSTED_SCAN_MODES = new Set(["analyzer-window", "content-aligned"]);
+// Content alignment that fails the monotonic DP scatters its windows across the
+// recording (the DP silently falls back to greedy per-slot picks). A content path
+// with too many out-of-order windows is not teacher-grade. Measured real recordings
+// scatter at 40-46%; a well-aligned piece is ~0%. Reject above this fraction.
+const TEACHER_READY_MAX_MONOTONIC_VIOLATION_RATE = Number.isFinite(
+  Number(process.env.ERHU_TEACHER_READY_MAX_MONOTONIC_VIOLATION_RATE),
+)
+  ? Number(process.env.ERHU_TEACHER_READY_MAX_MONOTONIC_VIOLATION_RATE)
+  : 0.05;
 
 // A section window pair is a SEVERE overlap (not just padding touch) when the
 // later window starts well inside the earlier one: by an absolute margin OR by a
@@ -584,6 +593,16 @@ function hasSevereWindowOverlap(windows = []) {
   return false;
 }
 
+// Strict numeric coercion that PRESERVES null/missing. safeNumber(null, null)
+// returns 0 (Number(null) === 0), which would mask a missing monotonicity field as a
+// passing 0 -- so the gate's fail-closed checks must read these fields through this
+// instead. Mirrors numeric() in scripts/teacher-validation-support.mjs.
+function finiteNumberOrNull(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
 // Single source of truth for the teacher-ready gate. Used by BOTH the pass.json
 // builder and the embedded-evidence reader, so an old pack that once stored
 // teacherReadyTrusted:true is re-judged by the current rules (scanMode allowlist +
@@ -596,6 +615,9 @@ function evaluateTeacherReadyGate({
   alignedSpanRatio,
   hasWindowOverlap,
   totalSystemFindings,
+  monotonicViolationRate,
+  greedyFallbackCount,
+  contentAlignmentMonotonic,
 } = {}) {
   const scanModeTrusted = TEACHER_READY_TRUSTED_SCAN_MODES.has(safeString(scanMode));
   const isPartialCoverage = safeString(coverageMode).startsWith("partial");
@@ -624,6 +646,34 @@ function evaluateTeacherReadyGate({
   if (hasWindowOverlap) teacherReadyReasons.push("section-windows-overlap");
   if (safeNumber(totalSystemFindings, 0) < TEACHER_READY_MIN_SYSTEM_FINDINGS) {
     teacherReadyReasons.push("no-system-findings");
+  }
+  // Monotonicity gate (Phase 1), applied ONLY to content-aligned scans. analyzer-
+  // window etc. never produce these fields, so they are untouched. For a content
+  // path we FAIL CLOSED: an old content pack written before these fields existed
+  // cannot be confirmed in-order, so it is rejected rather than skipped.
+  if (safeString(scanMode) === "content-aligned") {
+    // Use Number.isFinite (not safeNumber) -- safeNumber(null, null) returns 0 because
+    // Number(null) === 0, which would mask a missing rate as a passing 0.
+    const violationRate = Number.isFinite(monotonicViolationRate) ? monotonicViolationRate : null;
+    if (violationRate == null) {
+      // content-aligned but no monotonicity evidence -> cannot trust it
+      teacherReadyReasons.push("content-path-monotonicity-missing");
+    } else if (violationRate > TEACHER_READY_MAX_MONOTONIC_VIOLATION_RATE) {
+      teacherReadyReasons.push(`content-path-not-monotonic:${violationRate}`);
+    }
+    // The DP told us directly whether it found a full ordered path. greedyFallback >0
+    // (or monotonicFeasible === false) means it degraded to scattered greedy picks --
+    // closer to the root cause than the violation rate alone, and caught even when
+    // the resulting starts happen to look mostly ordered. Also FAIL CLOSED when this
+    // evidence is absent: a content path with neither field cannot be confirmed
+    // non-degraded. New producers write both, so good new data is unaffected.
+    const fallbackCount = Number.isFinite(greedyFallbackCount) ? greedyFallbackCount : null;
+    const hasGreedyEvidence = fallbackCount != null || typeof contentAlignmentMonotonic === "boolean";
+    if (!hasGreedyEvidence) {
+      teacherReadyReasons.push("content-path-greedy-evidence-missing");
+    } else if ((fallbackCount != null && fallbackCount > 0) || contentAlignmentMonotonic === false) {
+      teacherReadyReasons.push(`content-path-greedy-fallback:${fallbackCount != null ? fallbackCount : "unknown"}`);
+    }
   }
   return {
     scanModeTrusted,
@@ -671,6 +721,10 @@ function buildTeacherAlignmentEvidenceFromPassJson(passJson = {}) {
   const alignedSpanRatio = (alignedSpan != null && expectedAlignedSpan && expectedAlignedSpan > 0)
     ? Number((alignedSpan / expectedAlignedSpan).toFixed(3))
     : null;
+  const monotonicViolationRate = finiteNumberOrNull(coverage.monotonicViolationRate);
+  const greedyFallbackCount = finiteNumberOrNull(coverage.greedyFallbackCount);
+  const contentAlignmentMonotonic =
+    typeof coverage.contentAlignmentMonotonic === "boolean" ? coverage.contentAlignmentMonotonic : null;
   const { scanModeTrusted, teacherReadyReasons, teacherReadyTrusted } = evaluateTeacherReadyGate({
     scanMode,
     coverageMode,
@@ -678,6 +732,9 @@ function buildTeacherAlignmentEvidenceFromPassJson(passJson = {}) {
     alignedSpanRatio,
     hasWindowOverlap,
     totalSystemFindings,
+    monotonicViolationRate,
+    greedyFallbackCount,
+    contentAlignmentMonotonic,
   });
   return {
     trusted: scanModeTrusted,
@@ -694,12 +751,16 @@ function buildTeacherAlignmentEvidenceFromPassJson(passJson = {}) {
     coverageMode: coverageMode || null,
     totalSystemFindings,
     hasWindowOverlap,
+    monotonicViolationRate,
+    greedyFallbackCount,
+    contentAlignmentMonotonic,
     teacherReadyThresholds: {
       minDurationRatio: TEACHER_READY_MIN_DURATION_RATIO,
       maxDurationRatio: TEACHER_READY_MAX_DURATION_RATIO,
       overlapMinSeconds: TEACHER_READY_OVERLAP_MIN_SECONDS,
       overlapMinRatio: TEACHER_READY_OVERLAP_MIN_RATIO,
       minSystemFindings: TEACHER_READY_MIN_SYSTEM_FINDINGS,
+      maxMonotonicViolationRate: TEACHER_READY_MAX_MONOTONIC_VIOLATION_RATE,
     },
     reason: teacherAlignmentReasonText(scanMode, scanModeTrusted),
   };
@@ -718,6 +779,10 @@ function readTeacherAlignmentEvidence(item = {}, analysis = {}, repoRoot) {
     const alignedSpanRatio = safeNumber(embedded.alignedSpanRatio, null);
     const hasWindowOverlap = embedded.hasWindowOverlap === true;
     const totalSystemFindings = safeNumber(embedded.totalSystemFindings, null);
+    const monotonicViolationRate = finiteNumberOrNull(embedded.monotonicViolationRate);
+    const greedyFallbackCount = finiteNumberOrNull(embedded.greedyFallbackCount);
+    const contentAlignmentMonotonic =
+      typeof embedded.contentAlignmentMonotonic === "boolean" ? embedded.contentAlignmentMonotonic : null;
     const { scanModeTrusted, teacherReadyReasons, teacherReadyTrusted } = evaluateTeacherReadyGate({
       scanMode,
       coverageMode,
@@ -725,6 +790,9 @@ function readTeacherAlignmentEvidence(item = {}, analysis = {}, repoRoot) {
       alignedSpanRatio,
       hasWindowOverlap,
       totalSystemFindings,
+      monotonicViolationRate,
+      greedyFallbackCount,
+      contentAlignmentMonotonic,
     });
     return {
       trusted: scanModeTrusted,
@@ -741,6 +809,9 @@ function readTeacherAlignmentEvidence(item = {}, analysis = {}, repoRoot) {
       coverageMode,
       totalSystemFindings,
       hasWindowOverlap,
+      monotonicViolationRate,
+      greedyFallbackCount,
+      contentAlignmentMonotonic,
       teacherReadyThresholds: embedded.teacherReadyThresholds && typeof embedded.teacherReadyThresholds === "object"
         ? embedded.teacherReadyThresholds
         : null,
