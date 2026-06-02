@@ -44,15 +44,21 @@ from pathlib import Path
 
 import numpy as np
 
+# Import the extracted reusable core so the gold set validates the SAME code that
+# the scan pipeline will run (B2a). The inline copies that used to live here are
+# gone -- algorithm lives only in scripts/lib/content_alignment.py now.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
+import content_alignment as ca  # noqa: E402
+
 try:
-    import librosa
+    import librosa  # noqa: F401  (kept so the experiment fails fast if missing)
 except Exception as exc:  # pragma: no cover
     print(json.dumps({"ok": False, "error": f"librosa unavailable: {exc}"}))
     sys.exit(1)
 
-SR = 22050
-HOP = 2048  # ~0.093s/frame at 22050 -> ~6500 frames for a 600s piece, DTW-friendly
-TOP_K = 4
+SR = ca.DEFAULT_SR
+HOP = ca.DEFAULT_HOP
+TOP_K = ca.DEFAULT_TOP_K
 A4 = 440.0
 
 
@@ -146,146 +152,30 @@ def synth_piece(layout, *, tempo_scale=1.0, rest_after=None, with_accompaniment=
 
 
 # --------------------------------------------------------------------------- #
-# Chroma template from erhu-line notes
+# Alignment delegates to the extracted module (scripts/lib/content_alignment.py).
+# These adapters convert GoldSection/GoldNote into the minimal dict shape the
+# module expects, so the gold set exercises the real production code path.
 # --------------------------------------------------------------------------- #
-def section_template_chroma(section: GoldSection, hop_seconds: float) -> np.ndarray:
-    """12 x T template: each erhu note contributes a one-hot pitch-class column run
-    sized by its beat duration. Non-erhu roles are excluded (reviewer point 3)."""
-    erhu = [n for n in section.notes if n.role == "erhu"]
-    if not erhu:
-        return np.zeros((12, 1), dtype=np.float32)
-    spb = 60.0 / section.tempo
-    cols = []
-    for n in sorted(erhu, key=lambda x: x.beat_start):
-        n_frames = max(1, int(round((n.beat_duration * spb) / hop_seconds)))
-        col = np.zeros(12, dtype=np.float32)
-        col[int(round(n.midi)) % 12] = 1.0
-        cols.extend([col] * n_frames)
-    template = np.stack(cols, axis=1)
-    return template
-
-
-def whole_audio_chroma(audio: np.ndarray) -> np.ndarray:
-    chroma = librosa.feature.chroma_cqt(y=audio, sr=SR, hop_length=HOP)
-    # L2-normalise columns so DTW cosine-like cost is scale-free
-    norm = np.linalg.norm(chroma, axis=0, keepdims=True)
-    norm[norm == 0] = 1.0
-    return (chroma / norm).astype(np.float32)
-
-
-# --------------------------------------------------------------------------- #
-# Subsequence DTW -> top-K candidate windows per section
-# --------------------------------------------------------------------------- #
-def topk_candidates(template: np.ndarray, chroma: np.ndarray, hop_seconds: float, k: int) -> list[dict]:
-    """Run subseq DTW and return up to k non-overlapping candidate windows, each
-    {start, end, cost}. Cost lower = better. Candidates are found by taking the
-    global best path end, then suppressing that region and re-scanning the
-    accumulated cost's last row for other low-cost end points."""
-    # D: accumulated cost matrix, wp: warping path for the global best
-    D, wp = librosa.sequence.dtw(X=template, Y=chroma, subseq=True, metric="cosine")
-    last_row = D[-1, :]  # cost of matching whole template ending at each audio frame
-    finite = np.isfinite(last_row)
-    if not finite.any():
-        return []
-    template_frames = template.shape[1]
-    cands = []
-    work = last_row.copy()
-    work[~finite] = np.inf
-    for _ in range(k):
-        end_idx = int(np.argmin(work))
-        if not np.isfinite(work[end_idx]):
-            break
-        cost = float(work[end_idx])
-        start_idx = max(0, end_idx - template_frames)
-        cands.append({
-            "start": round(start_idx * hop_seconds, 3),
-            "end": round(end_idx * hop_seconds, 3),
-            "cost": round(cost, 4),
-        })
-        # suppress a window around this end so the next candidate is elsewhere
-        lo = max(0, end_idx - template_frames)
-        hi = min(len(work), end_idx + template_frames)
-        work[lo:hi] = np.inf
-    return cands
-
-
-# --------------------------------------------------------------------------- #
-# Global monotonic path over sections (DP) -- reviewer point 1
-# --------------------------------------------------------------------------- #
-def choose_monotonic_path(section_candidates: list[list[dict]]) -> list[dict]:
-    """section_candidates is ordered by sequence index; each is a list of
-    {start,end,cost}. Pick one per section minimizing total cost subject to
-    non-decreasing start (and start >= previous end - small slack), so repeats
-    cannot collapse onto an earlier occurrence."""
-    n = len(section_candidates)
-    INF = float("inf")
-    # dp[i][j] = min total cost aligning sections i..end, choosing candidate j for i
-    best = [[(INF, -1)] * len(c) for c in section_candidates]
-    for j in range(len(section_candidates[-1])):
-        best[-1][j] = (section_candidates[-1][j]["cost"], -1)
-    for i in range(n - 2, -1, -1):
-        for j, cand in enumerate(section_candidates[i]):
-            choice = (INF, -1)
-            for jn, nxt in enumerate(section_candidates[i + 1]):
-                # monotonic: next section must start at/after this one's end (slack 1 frame)
-                if nxt["start"] + 1e-6 >= cand["end"] - HOP / SR:
-                    total = section_candidates[i + 1] and best[i + 1][jn][0]
-                    if total < choice[0]:
-                        choice = (total, jn)
-            base = cand["cost"]
-            best[i][j] = (base + (choice[0] if choice[0] != INF else INF), choice[1])
-    # pick start
-    start_j = min(range(len(best[0])), key=lambda j: best[0][j][0]) if best[0] else -1
-    path = []
-    j = start_j
-    for i in range(n):
-        if j < 0 or j >= len(section_candidates[i]):
-            # monotonic chain broke; fall back to per-section best for the rest
-            j = min(range(len(section_candidates[i])), key=lambda jj: section_candidates[i][jj]["cost"])
-        chosen = section_candidates[i][j]
-        path.append({**chosen})
-        j = best[i][j][1]
-    return path
+def _section_to_dict(section: GoldSection) -> dict:
+    return {
+        "sectionId": section.section_id,
+        "sequenceIndex": section.sequence_index,
+        "tempo": section.tempo,
+        "notes": [
+            {"midiPitch": n.midi, "beatStart": n.beat_start, "beatDuration": n.beat_duration, "role": n.role}
+            for n in section.notes
+        ],
+    }
 
 
 def align(sections: list[GoldSection], audio: np.ndarray) -> tuple[list[dict], float]:
-    hop_seconds = HOP / SR
-    chroma = whole_audio_chroma(audio)
-    section_candidates = []
-    for section in sorted(sections, key=lambda s: s.sequence_index):
-        template = section_template_chroma(section, hop_seconds)
-        cands = topk_candidates(template, chroma, hop_seconds, TOP_K)
-        if not cands:
-            cands = [{"start": 0.0, "end": hop_seconds, "cost": float("inf")}]
-        section_candidates.append(cands)
-    path = choose_monotonic_path(section_candidates)
-    result = []
-    for section, chosen in zip(sorted(sections, key=lambda s: s.sequence_index), path):
-        result.append({"sectionId": section.section_id, "start": chosen["start"], "end": chosen["end"], "cost": chosen["cost"]})
-    return result, hop_seconds
+    result = ca.align_sections([_section_to_dict(s) for s in sections], audio, sr=SR, hop=HOP, top_k=TOP_K)
+    return result, HOP / SR
 
 
 def align_occurrences(play_order: list[GoldSection], audio: np.ndarray) -> tuple[list[dict], float]:
-    """Repeat-aware alignment. play_order is the section sequence AS IT OCCURS in the
-    audio (repeats expanded) -- this is exactly what run-piece-pass iterates as
-    sectionPasses. Each occurrence is a separate slot, so a recurring section gets a
-    distinct window per round. Top-K candidates per slot + a global monotonic DP
-    keep occurrences in order, so the 2nd repeat lands on the 2nd round, not the 1st."""
-    hop_seconds = HOP / SR
-    chroma = whole_audio_chroma(audio)
-    slot_candidates = []
-    for section in play_order:
-        template = section_template_chroma(section, hop_seconds)
-        cands = topk_candidates(template, chroma, hop_seconds, TOP_K)
-        if not cands:
-            cands = [{"start": 0.0, "end": hop_seconds, "cost": float("inf")}]
-        slot_candidates.append(cands)
-    path = choose_monotonic_path(slot_candidates)
-    result = [
-        {"sectionId": section.section_id, "occurrence": idx, "start": chosen["start"], "end": chosen["end"], "cost": chosen["cost"]}
-        for idx, (section, chosen) in enumerate(zip(play_order, path))
-    ]
-    return result, hop_seconds
+    result = ca.align_occurrences([_section_to_dict(s) for s in play_order], audio, sr=SR, hop=HOP, top_k=TOP_K)
+    return result, HOP / SR
 
 
 # --------------------------------------------------------------------------- #
