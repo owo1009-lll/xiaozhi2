@@ -364,7 +364,7 @@ function applyTeacherLocatorLineGuard(locator = null, issueNoteIds = new Set(), 
   };
 }
 
-function summarizeTeacherPackReadiness(pack = {}) {
+function summarizeTeacherPackReadiness(pack = {}, repoRoot = "") {
   const items = getArray(pack.items);
   const totalCount = items.length;
   const reviewMode = safeString(pack.manifest?.reviewMode);
@@ -372,7 +372,16 @@ function summarizeTeacherPackReadiness(pack = {}) {
   const audioClipItemCount = items.filter((item) => safeString(item.audioClipPath)).length;
   const trustedAlignmentItemCount = items.filter((item) => item.alignmentEvidence?.trusted === true).length;
   const teacherReadyTrustedItemCount = items.filter((item) => item.alignmentEvidence?.teacherReadyTrusted === true).length;
-  const pdfAssetItemCount = items.filter((item) => safeString(item.sourcePdfPath || item.review?.sourcePdfPath)).length;
+  // PDF readiness: require a non-empty path AND, when repoRoot is provided, that the
+  // file actually exists -- otherwise a moved/missing PDF passes readiness and only
+  // 404s when the teacher opens it. Tests call this without repoRoot and fall back to
+  // the non-empty-path check.
+  const pdfAssetItemCount = items.filter((item) => {
+    const pdfPath = safeString(item.sourcePdfPath || item.review?.sourcePdfPath);
+    if (!pdfPath) return false;
+    if (!repoRoot) return true;
+    return fsSync.existsSync(resolveRepoPath(pdfPath, repoRoot));
+  }).length;
   const originalVerifiedItemCount = items.filter((item) => safeString(item.sourceKind) === "original-score-verified").length;
   const guardedItemCount = items.filter((item) => item.scoreLocator?.lineProjectionGuardApplied === true).length;
   const noLocatorNoteCount = items.filter((item) => !getArray(item.scoreLocator?.notePositions).length).length;
@@ -888,7 +897,7 @@ export function createTeacherValidationService({
           warningCount: safeNumber(pack.manifest.warningCount, getArray(pack.manifest.warnings).length),
           updatedAt: stat.mtime.toISOString(),
           summary: pack.summary,
-          ...summarizeTeacherPackReadiness(pack),
+          ...summarizeTeacherPackReadiness(pack, repoRoot),
         });
       } catch {
         // Ignore incomplete pack folders.
