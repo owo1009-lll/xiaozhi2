@@ -265,6 +265,29 @@ def align(sections: list[GoldSection], audio: np.ndarray) -> tuple[list[dict], f
     return result, hop_seconds
 
 
+def align_occurrences(play_order: list[GoldSection], audio: np.ndarray) -> tuple[list[dict], float]:
+    """Repeat-aware alignment. play_order is the section sequence AS IT OCCURS in the
+    audio (repeats expanded) -- this is exactly what run-piece-pass iterates as
+    sectionPasses. Each occurrence is a separate slot, so a recurring section gets a
+    distinct window per round. Top-K candidates per slot + a global monotonic DP
+    keep occurrences in order, so the 2nd repeat lands on the 2nd round, not the 1st."""
+    hop_seconds = HOP / SR
+    chroma = whole_audio_chroma(audio)
+    slot_candidates = []
+    for section in play_order:
+        template = section_template_chroma(section, hop_seconds)
+        cands = topk_candidates(template, chroma, hop_seconds, TOP_K)
+        if not cands:
+            cands = [{"start": 0.0, "end": hop_seconds, "cost": float("inf")}]
+        slot_candidates.append(cands)
+    path = choose_monotonic_path(slot_candidates)
+    result = [
+        {"sectionId": section.section_id, "occurrence": idx, "start": chosen["start"], "end": chosen["end"], "cost": chosen["cost"]}
+        for idx, (section, chosen) in enumerate(zip(play_order, path))
+    ]
+    return result, hop_seconds
+
+
 # --------------------------------------------------------------------------- #
 # Metrics
 # --------------------------------------------------------------------------- #
@@ -326,6 +349,38 @@ def run_case(name: str, sections: list[GoldSection], layout: list[dict], **synth
     return {"case": name, "truth": truth, "predicted": predicted, "metrics": metrics}
 
 
+def run_occurrence_case(name: str, layout: list[dict], **synth_kwargs) -> dict:
+    """Repeat-rounds gold: align each OCCURRENCE in play order and check every
+    occurrence lands on its own round (not collapsed onto an earlier repeat)."""
+    audio, truth = synth_piece(layout, **synth_kwargs)  # truth is already per-occurrence, in order
+    play_order = [entry["section"] for entry in layout]
+    t0 = time.time()
+    predicted, hop = align_occurrences(play_order, audio)
+    runtime = time.time() - t0
+    # pair predicted[i] with truth[i] -- both are in play order
+    start_err, iou, wrong_round = [], [], 0
+    for pred, (sid, ts, te) in zip(predicted, truth):
+        ps, pe = pred["start"], pred["end"]
+        start_err.append(abs(ps - ts))
+        inter = max(0.0, min(pe, te) - max(ps, ts))
+        union = max(pe, te) - min(ps, ts)
+        iou.append(inter / union if union > 0 else 0.0)
+        if inter <= 0:
+            wrong_round += 1
+    starts = [p["start"] for p in predicted]
+    monotonic = all(starts[i] <= starts[i + 1] + 1e-6 for i in range(len(starts) - 1))
+    metrics = {
+        "startErr": {"mean": round(float(np.mean(start_err)), 3), "max": round(float(np.max(start_err)), 3)},
+        "iou": {"mean": round(float(np.mean(iou)), 3), "min": round(float(np.min(iou)), 3)},
+        "wrongRoundCount": wrong_round,
+        "occurrenceCount": len(predicted),
+        "monotonic": monotonic,
+        "runtimeSec": round(runtime, 2),
+        "audioDurationSec": round(len(audio) / SR, 1),
+    }
+    return {"case": name, "truth": truth, "predicted": predicted, "metrics": metrics}
+
+
 def main() -> int:
     secs = base_sections()
     layout_plain = [{"section": s, "gap": 0.5} for s in secs]
@@ -342,7 +397,13 @@ def main() -> int:
         run_case("repeated-section", secs, layout_repeat),
         run_case("accompaniment-mix", secs, layout_plain, with_accompaniment=True, seed=7),
     ]
-    report = {"ok": True, "sr": SR, "hop": HOP, "topK": TOP_K, "cases": cases}
+    # Repeat-ROUNDS gold (reviewer point 4): align each occurrence in play order and
+    # require every repeat to land on its own round, not collapse onto an earlier one.
+    occurrence_cases = [
+        run_occurrence_case("repeat-rounds", layout_repeat),
+        run_occurrence_case("repeat-rounds-mix", layout_repeat, with_accompaniment=True, seed=7),
+    ]
+    report = {"ok": True, "sr": SR, "hop": HOP, "topK": TOP_K, "cases": cases, "occurrenceCases": occurrence_cases}
     out_dir = Path(__file__).resolve().parents[2] / "data" / "experiments" / "content-alignment"
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "latest-alignment-gold.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -353,6 +414,11 @@ def main() -> int:
               f"iou.mean={m['iou'].get('mean')} firstOccMismatch={m['firstOccurrenceMismatchCount']} "
               f"multiOcc={m['multiOccurrenceSections']} mono={m['monotonic']} overlap={m['hasOverlap']} "
               f"{m['runtimeSec']}s/{m['audioDurationSec']}s")
+    for c in occurrence_cases:
+        m = c["metrics"]
+        print(f"{c['case']:>18}: startErr.mean={m['startErr']['mean']} max={m['startErr']['max']} "
+              f"iou.mean={m['iou']['mean']} wrongRound={m['wrongRoundCount']}/{m['occurrenceCount']} "
+              f"mono={m['monotonic']} {m['runtimeSec']}s/{m['audioDurationSec']}s")
     return 0
 
 
