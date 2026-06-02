@@ -593,6 +593,16 @@ function hasSevereWindowOverlap(windows = []) {
   return false;
 }
 
+// Strict numeric coercion that PRESERVES null/missing. safeNumber(null, null)
+// returns 0 (Number(null) === 0), which would mask a missing monotonicity field as a
+// passing 0 -- so the gate's fail-closed checks must read these fields through this
+// instead. Mirrors numeric() in scripts/teacher-validation-support.mjs.
+function finiteNumberOrNull(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
 // Single source of truth for the teacher-ready gate. Used by BOTH the pass.json
 // builder and the embedded-evidence reader, so an old pack that once stored
 // teacherReadyTrusted:true is re-judged by the current rules (scanMode allowlist +
@@ -654,9 +664,14 @@ function evaluateTeacherReadyGate({
     // The DP told us directly whether it found a full ordered path. greedyFallback >0
     // (or monotonicFeasible === false) means it degraded to scattered greedy picks --
     // closer to the root cause than the violation rate alone, and caught even when
-    // the resulting starts happen to look mostly ordered.
+    // the resulting starts happen to look mostly ordered. Also FAIL CLOSED when this
+    // evidence is absent: a content path with neither field cannot be confirmed
+    // non-degraded. New producers write both, so good new data is unaffected.
     const fallbackCount = Number.isFinite(greedyFallbackCount) ? greedyFallbackCount : null;
-    if ((fallbackCount != null && fallbackCount > 0) || contentAlignmentMonotonic === false) {
+    const hasGreedyEvidence = fallbackCount != null || typeof contentAlignmentMonotonic === "boolean";
+    if (!hasGreedyEvidence) {
+      teacherReadyReasons.push("content-path-greedy-evidence-missing");
+    } else if ((fallbackCount != null && fallbackCount > 0) || contentAlignmentMonotonic === false) {
       teacherReadyReasons.push(`content-path-greedy-fallback:${fallbackCount != null ? fallbackCount : "unknown"}`);
     }
   }
@@ -706,8 +721,8 @@ function buildTeacherAlignmentEvidenceFromPassJson(passJson = {}) {
   const alignedSpanRatio = (alignedSpan != null && expectedAlignedSpan && expectedAlignedSpan > 0)
     ? Number((alignedSpan / expectedAlignedSpan).toFixed(3))
     : null;
-  const monotonicViolationRate = safeNumber(coverage.monotonicViolationRate, null);
-  const greedyFallbackCount = safeNumber(coverage.greedyFallbackCount, null);
+  const monotonicViolationRate = finiteNumberOrNull(coverage.monotonicViolationRate);
+  const greedyFallbackCount = finiteNumberOrNull(coverage.greedyFallbackCount);
   const contentAlignmentMonotonic =
     typeof coverage.contentAlignmentMonotonic === "boolean" ? coverage.contentAlignmentMonotonic : null;
   const { scanModeTrusted, teacherReadyReasons, teacherReadyTrusted } = evaluateTeacherReadyGate({
@@ -764,8 +779,8 @@ function readTeacherAlignmentEvidence(item = {}, analysis = {}, repoRoot) {
     const alignedSpanRatio = safeNumber(embedded.alignedSpanRatio, null);
     const hasWindowOverlap = embedded.hasWindowOverlap === true;
     const totalSystemFindings = safeNumber(embedded.totalSystemFindings, null);
-    const monotonicViolationRate = safeNumber(embedded.monotonicViolationRate, null);
-    const greedyFallbackCount = safeNumber(embedded.greedyFallbackCount, null);
+    const monotonicViolationRate = finiteNumberOrNull(embedded.monotonicViolationRate);
+    const greedyFallbackCount = finiteNumberOrNull(embedded.greedyFallbackCount);
     const contentAlignmentMonotonic =
       typeof embedded.contentAlignmentMonotonic === "boolean" ? embedded.contentAlignmentMonotonic : null;
     const { scanModeTrusted, teacherReadyReasons, teacherReadyTrusted } = evaluateTeacherReadyGate({

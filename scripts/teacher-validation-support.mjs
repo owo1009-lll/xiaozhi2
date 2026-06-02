@@ -385,7 +385,10 @@ function buildAlignmentEvidence(passJson = {}) {
     } else if (monotonicViolationRate > TEACHER_READY_MAX_MONOTONIC_VIOLATION_RATE) {
       teacherReadyReasons.push(`content-path-not-monotonic:${monotonicViolationRate}`);
     }
-    if ((greedyFallbackCount != null && greedyFallbackCount > 0) || contentAlignmentMonotonic === false) {
+    const hasGreedyEvidence = greedyFallbackCount != null || typeof contentAlignmentMonotonic === "boolean";
+    if (!hasGreedyEvidence) {
+      teacherReadyReasons.push("content-path-greedy-evidence-missing");
+    } else if ((greedyFallbackCount != null && greedyFallbackCount > 0) || contentAlignmentMonotonic === false) {
       teacherReadyReasons.push(`content-path-greedy-fallback:${greedyFallbackCount != null ? greedyFallbackCount : "unknown"}`);
     }
   }

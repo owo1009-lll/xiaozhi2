@@ -363,6 +363,7 @@ try {
         scanMode: "content-aligned", audioDurationSeconds: 716,
         alignmentCoverageMode: "full-selected", wholePieceCoverageMode: "full-piece",
         estimatedPieceDurationSeconds: 700, monotonicViolationRate: rate,
+        greedyFallbackCount: 42, contentAlignmentMonotonic: false,
       } },
       sectionPasses: [{ noteFindings: [{}], startSeconds: 0, endSeconds: 50, sequenceIndex: 0 },
                       { noteFindings: [{}], startSeconds: 50, endSeconds: 100, sequenceIndex: 1 }],
@@ -370,8 +371,20 @@ try {
     assert.equal(scattered.teacherReadyTrusted, false);
     assert(scattered.teacherReadyReasons.some((r) => r.startsWith("content-path-not-monotonic")));
   }
-  // a content path that IS in order (low violation rate) still passes the gate
+  // a content path that IS in order (low violation rate + full in-order evidence) passes
   const inOrderContent = gate({
+    summary: { audioCoverage: {
+      scanMode: "content-aligned", audioDurationSeconds: 100, estimatedPieceDurationSeconds: 95,
+      alignmentCoverageMode: "full-selected", wholePieceCoverageMode: "full-piece",
+      monotonicViolationRate: 0.0, greedyFallbackCount: 0, contentAlignmentMonotonic: true,
+    } },
+    sectionPasses: [{ noteFindings: [{}], startSeconds: 0, endSeconds: 50, sequenceIndex: 0 },
+                    { noteFindings: [{}], startSeconds: 50, endSeconds: 95, sequenceIndex: 1 }],
+  });
+  assert.equal(inOrderContent.teacherReadyTrusted, true);
+  // FAIL CLOSED: content-aligned with a fine violation rate but NO greedy evidence
+  // (greedyFallbackCount + contentAlignmentMonotonic both absent) is still rejected.
+  const greedyEvidenceMissing = gate({
     summary: { audioCoverage: {
       scanMode: "content-aligned", audioDurationSeconds: 100, estimatedPieceDurationSeconds: 95,
       alignmentCoverageMode: "full-selected", wholePieceCoverageMode: "full-piece",
@@ -380,7 +393,20 @@ try {
     sectionPasses: [{ noteFindings: [{}], startSeconds: 0, endSeconds: 50, sequenceIndex: 0 },
                     { noteFindings: [{}], startSeconds: 50, endSeconds: 95, sequenceIndex: 1 }],
   });
-  assert.equal(inOrderContent.teacherReadyTrusted, true);
+  assert.equal(greedyEvidenceMissing.teacherReadyTrusted, false);
+  assert(greedyEvidenceMissing.teacherReadyReasons.includes("content-path-greedy-evidence-missing"));
+  // EXPLICIT null must NOT be coerced to a passing 0 (finiteNumberOrNull, not safeNumber).
+  const explicitNullRate = gate({
+    summary: { audioCoverage: {
+      scanMode: "content-aligned", audioDurationSeconds: 100, estimatedPieceDurationSeconds: 95,
+      wholePieceCoverageMode: "full-piece",
+      monotonicViolationRate: null, greedyFallbackCount: null, contentAlignmentMonotonic: null,
+    } },
+    sectionPasses: [{ noteFindings: [{}], startSeconds: 0, endSeconds: 95, sequenceIndex: 0 }],
+  });
+  assert.equal(explicitNullRate.teacherReadyTrusted, false);
+  assert(explicitNullRate.teacherReadyReasons.includes("content-path-monotonicity-missing"));
+  assert(explicitNullRate.teacherReadyReasons.includes("content-path-greedy-evidence-missing"));
   // analyzer-window samples (no content path -> no rate field) are NOT failed by this gate
   const analyzerWindow = gate({
     summary: { audioCoverage: {
@@ -402,6 +428,18 @@ try {
   }, {});
   assert.equal(staleScatteredMono.teacherReadyTrusted, false);
   assert(staleScatteredMono.teacherReadyReasons.some((r) => r.startsWith("content-path-not-monotonic")));
+  // embedded with EXPLICIT null monotonic fields must not be coerced to a passing 0
+  const embeddedNullMono = readEmbedded({
+    alignmentEvidence: {
+      trusted: true, teacherReadyTrusted: true,
+      scanMode: "content-aligned", coverageMode: "full-piece",
+      durationRatio: 1.0, hasWindowOverlap: false, totalSystemFindings: 5,
+      monotonicViolationRate: null, greedyFallbackCount: null, contentAlignmentMonotonic: null,
+    },
+  }, {});
+  assert.equal(embeddedNullMono.teacherReadyTrusted, false);
+  assert(embeddedNullMono.teacherReadyReasons.includes("content-path-monotonicity-missing"));
+  assert(embeddedNullMono.teacherReadyReasons.includes("content-path-greedy-evidence-missing"));
 
   const filledReviews = {
     schemaVersion: 1,
