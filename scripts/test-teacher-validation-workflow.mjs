@@ -395,18 +395,31 @@ try {
   // Trusted with NO system findings and NO automatic alignment evidence (the human is
   // the alignment guarantee). Only generated for humanMatched=yes entries.
   const manualAnchor = gate({
-    summary: { audioCoverage: { scanMode: "manual-anchor", audioDurationSeconds: 32 } },
+    summary: { audioCoverage: { scanMode: "manual-anchor", audioDurationSeconds: 32, manualAnchorConfirmed: true } },
     sectionPasses: [{ startSeconds: 84.0, endSeconds: 116.0, sequenceIndex: 0 }],
   });
   assert.equal(manualAnchor.scanModeTrusted, true);
   assert.equal(manualAnchor.teacherReadyTrusted, true);
   assert.deepEqual(manualAnchor.teacherReadyReasons, []);
-  // embedded manual-anchor re-judges trusted too (no findings/ratio fields needed)
+  // SECURITY: manual-anchor WITHOUT the explicit manualAnchorConfirmed flag must NOT
+  // pass -- editing scanMode alone cannot bypass the gate.
+  const manualAnchorUnconfirmed = gate({
+    summary: { audioCoverage: { scanMode: "manual-anchor", audioDurationSeconds: 32 } },
+    sectionPasses: [{ startSeconds: 84.0, endSeconds: 116.0, sequenceIndex: 0 }],
+  });
+  assert.equal(manualAnchorUnconfirmed.teacherReadyTrusted, false);
+  assert(manualAnchorUnconfirmed.teacherReadyReasons.includes("manual-anchor-unconfirmed"));
+  // embedded manual-anchor re-judges: confirmed -> trusted; flag absent -> rejected.
   const manualAnchorEmbedded = readEmbedded({
-    alignmentEvidence: { trusted: true, teacherReadyTrusted: true, scanMode: "manual-anchor" },
+    alignmentEvidence: { trusted: true, teacherReadyTrusted: true, scanMode: "manual-anchor", manualAnchorConfirmed: true },
   }, {});
   assert.equal(manualAnchorEmbedded.teacherReadyTrusted, true);
   assert.deepEqual(manualAnchorEmbedded.teacherReadyReasons, []);
+  const manualAnchorEmbeddedUnconfirmed = readEmbedded({
+    alignmentEvidence: { trusted: true, teacherReadyTrusted: true, scanMode: "manual-anchor" },
+  }, {});
+  assert.equal(manualAnchorEmbeddedUnconfirmed.teacherReadyTrusted, false);
+  assert(manualAnchorEmbeddedUnconfirmed.teacherReadyReasons.includes("manual-anchor-unconfirmed"));
 
   // --- monotonicity gate (Phase 1): scattered content path is rejected ---
   // Real measured violation rates: 2nd rhapsody 0.41, 4th rhapsody 0.46. Both must

@@ -380,10 +380,14 @@ function buildAlignmentEvidence(passJson = {}) {
     : null;
   // manual-anchor = human-verified audio/score window (technique-labeling from scratch);
   // the human verification IS the alignment evidence, so the automatic alignment gates
-  // and no-system-findings do not apply. Must match src/server/teacherValidationService.js.
+  // and no-system-findings do not apply -- BUT only when an explicit manualAnchorConfirmed
+  // field is present (editing scanMode alone must not bypass). Must match the server gate.
   const isManualAnchor = scanMode === "manual-anchor";
+  const manualAnchorConfirmed = coverage.manualAnchorConfirmed === true;
   const teacherReadyReasons = [];
-  if (!isManualAnchor) {
+  if (isManualAnchor) {
+    if (!manualAnchorConfirmed) teacherReadyReasons.push("manual-anchor-unconfirmed");
+  } else {
     if (isPartialCoverage) {
       if (alignedSpanRatio == null) {
         teacherReadyReasons.push("aligned-span-ratio-missing");
@@ -452,6 +456,7 @@ function buildAlignmentEvidence(passJson = {}) {
     alignedWindowCoverageRatio,
     maxInterWindowGapSeconds,
     maxInterWindowGapRatio,
+    manualAnchorConfirmed,
     teacherReadyThresholds: {
       minDurationRatio: TEACHER_READY_MIN_DURATION_RATIO,
       maxDurationRatio: TEACHER_READY_MAX_DURATION_RATIO,
@@ -462,11 +467,13 @@ function buildAlignmentEvidence(passJson = {}) {
       minCoverageRatio: TEACHER_READY_MIN_COVERAGE_RATIO,
       maxGapRatio: TEACHER_READY_MAX_GAP_RATIO,
     },
-    reason: scanModeTrusted
-      ? "segment windows came from an analyzer-backed scan"
-      : scanMode === "fast-sequence-window"
-        ? "fast sequence windows are score-order estimates, not teacher-grade audio/PDF alignment"
-        : "missing analyzer-backed alignment evidence",
+    reason: isManualAnchor
+      ? "human-confirmed manual anchor (technique-labeling sample), not an analyzer scan"
+      : scanModeTrusted
+        ? "segment windows came from an analyzer-backed scan"
+        : scanMode === "fast-sequence-window"
+          ? "fast sequence windows are score-order estimates, not teacher-grade audio/PDF alignment"
+          : "missing analyzer-backed alignment evidence",
   };
 }
 

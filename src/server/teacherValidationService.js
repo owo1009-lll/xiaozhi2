@@ -632,17 +632,22 @@ function evaluateTeacherReadyGate({
   contentAlignmentMonotonic,
   alignedWindowCoverageRatio,
   maxInterWindowGapRatio,
+  manualAnchorConfirmed,
 } = {}) {
   const scanModeTrusted = TEACHER_READY_TRUSTED_SCAN_MODES.has(safeString(scanMode));
   // manual-anchor = a human listened, marked the audio window, and confirmed it
   // matches the score. That human verification IS the alignment evidence -- stronger
   // than any automatic check -- so the automatic alignment gates (ratio, overlap,
   // content-path, and no-system-findings, since these are technique-labeling samples
-  // labelled from scratch) do not apply. Generated only for humanMatched=yes entries.
+  // labelled from scratch) do not apply. But the confirmation must be an EXPLICIT
+  // field in the evidence (manualAnchorConfirmed === true), not merely the scanMode:
+  // otherwise editing scanMode alone would bypass every check. Fail closed if absent.
   const isManualAnchor = safeString(scanMode) === "manual-anchor";
   const isPartialCoverage = safeString(coverageMode).startsWith("partial");
   const teacherReadyReasons = [];
-  if (!isManualAnchor) {
+  if (isManualAnchor) {
+    if (manualAnchorConfirmed !== true) teacherReadyReasons.push("manual-anchor-unconfirmed");
+  } else {
     if (isPartialCoverage) {
       if (alignedSpanRatio == null) {
         teacherReadyReasons.push("aligned-span-ratio-missing");
@@ -717,6 +722,9 @@ function evaluateTeacherReadyGate({
 }
 
 function teacherAlignmentReasonText(scanMode, scanModeTrusted) {
+  if (safeString(scanMode) === "manual-anchor") {
+    return "human-confirmed manual anchor (technique-labeling sample), not an analyzer scan";
+  }
   if (scanModeTrusted) return "segment windows came from an analyzer-backed scan";
   return scanMode === "fast-sequence-window"
     ? "fast sequence windows are score-order estimates, not teacher-grade audio/PDF alignment"
@@ -776,6 +784,7 @@ function buildTeacherAlignmentEvidenceFromPassJson(passJson = {}) {
   const greedyFallbackCount = finiteNumberOrNull(coverage.greedyFallbackCount);
   const contentAlignmentMonotonic =
     typeof coverage.contentAlignmentMonotonic === "boolean" ? coverage.contentAlignmentMonotonic : null;
+  const manualAnchorConfirmed = coverage.manualAnchorConfirmed === true;
   const { scanModeTrusted, teacherReadyReasons, teacherReadyTrusted } = evaluateTeacherReadyGate({
     scanMode,
     coverageMode,
@@ -788,6 +797,7 @@ function buildTeacherAlignmentEvidenceFromPassJson(passJson = {}) {
     contentAlignmentMonotonic,
     alignedWindowCoverageRatio,
     maxInterWindowGapRatio,
+    manualAnchorConfirmed,
   });
   return {
     trusted: scanModeTrusted,
@@ -810,6 +820,7 @@ function buildTeacherAlignmentEvidenceFromPassJson(passJson = {}) {
     alignedWindowCoverageRatio,
     maxInterWindowGapSeconds,
     maxInterWindowGapRatio,
+    manualAnchorConfirmed,
     teacherReadyThresholds: {
       minDurationRatio: TEACHER_READY_MIN_DURATION_RATIO,
       maxDurationRatio: TEACHER_READY_MAX_DURATION_RATIO,
@@ -844,6 +855,7 @@ function readTeacherAlignmentEvidence(item = {}, analysis = {}, repoRoot) {
     const alignedWindowCoverageRatio = finiteNumberOrNull(embedded.alignedWindowCoverageRatio);
     const maxInterWindowGapSeconds = finiteNumberOrNull(embedded.maxInterWindowGapSeconds);
     const maxInterWindowGapRatio = finiteNumberOrNull(embedded.maxInterWindowGapRatio);
+    const manualAnchorConfirmed = embedded.manualAnchorConfirmed === true;
     const { scanModeTrusted, teacherReadyReasons, teacherReadyTrusted } = evaluateTeacherReadyGate({
       scanMode,
       coverageMode,
@@ -856,6 +868,7 @@ function readTeacherAlignmentEvidence(item = {}, analysis = {}, repoRoot) {
       contentAlignmentMonotonic,
       alignedWindowCoverageRatio,
       maxInterWindowGapRatio,
+      manualAnchorConfirmed,
     });
     return {
       trusted: scanModeTrusted,
@@ -878,6 +891,7 @@ function readTeacherAlignmentEvidence(item = {}, analysis = {}, repoRoot) {
       alignedWindowCoverageRatio,
       maxInterWindowGapSeconds,
       maxInterWindowGapRatio,
+      manualAnchorConfirmed,
       teacherReadyThresholds: embedded.teacherReadyThresholds && typeof embedded.teacherReadyThresholds === "object"
         ? embedded.teacherReadyThresholds
         : null,

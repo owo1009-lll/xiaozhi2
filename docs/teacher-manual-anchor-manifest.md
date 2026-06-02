@@ -55,9 +55,15 @@ pieceTitle,sourceLongPiece,sourceAudioPath,scorePdfPath,scoreId,audioStartSecond
 automatic alignment checks (duration/span ratio, window overlap, content-path
 monotonicity/coverage) and the `no-system-findings` check (these are
 technique-labeling samples the teacher labels from scratch, not system-finding
-validations). The waiver is sound only because the generator emits `manual-anchor`
-ONLY for `humanMatched = yes` rows. Kept in sync in both
-`src/server/teacherValidationService.js` and `scripts/teacher-validation-support.mjs`.
+validations).
+
+The waiver is NOT granted on `scanMode` alone — the evidence must also carry an
+explicit `manualAnchorConfirmed: true` field (set by the generator from
+`humanMatched = yes`). Without it the gate fails closed with
+`manual-anchor-unconfirmed`, so editing `scanMode` by hand, an old pack, or a stray
+JSON cannot bypass the checks. The flag is re-judged on every read (pass.json build
+and embedded evidence) in both `src/server/teacherValidationService.js` and
+`scripts/teacher-validation-support.mjs`.
 
 ## Status
 
