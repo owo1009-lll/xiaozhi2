@@ -325,6 +325,7 @@ try {
       scanMode: "content-aligned", coverageMode: "full-piece",
       durationRatio: 0.95, hasWindowOverlap: false, totalSystemFindings: 4,
       monotonicViolationRate: 0.0, greedyFallbackCount: 0, contentAlignmentMonotonic: true,
+      alignedWindowCoverageRatio: 0.95, maxInterWindowGapRatio: 0.1,
     },
   }, {});
   assert.equal(saneEmbedded.teacherReadyTrusted, true);
@@ -353,6 +354,42 @@ try {
   });
   assert.equal(greedyFallbackLowViol.teacherReadyTrusted, false);
   assert(greedyFallbackLowViol.teacherReadyReasons.some((r) => r.startsWith("content-path-greedy-fallback")));
+  // --- coverage / gap gate: the 2nd-rhapsody counterexample. A MONOTONIC, in-order
+  // content path (passes monotonicity + greedy) that nonetheless SKIPS a 158s stretch
+  // of audio (coverage ~0.47, maxGapRatio ~2.3) must be rejected -- the failure mode
+  // the human spot-check caught that the old gate missed.
+  const orderedButGappy = gate({
+    summary: { audioCoverage: {
+      scanMode: "content-aligned", audioDurationSeconds: 716,
+      alignmentCoverageMode: "partial-selected", wholePieceCoverageMode: "partial-piece",
+      alignedSpanDurationSeconds: 662.7, expectedAlignedSpanDurationSeconds: 340.0,
+      monotonicViolationRate: 0.0, greedyFallbackCount: 0, contentAlignmentMonotonic: true,
+    } },
+    sectionPasses: [
+      { noteFindings: [{}], startSeconds: 0.0, endSeconds: 69.6, sequenceIndex: 0 },
+      { noteFindings: [{}], startSeconds: 227.3, endSeconds: 273.2, sequenceIndex: 1 },
+      { noteFindings: [{}], startSeconds: 298.1, endSeconds: 348.6, sequenceIndex: 2 },
+      { noteFindings: [{}], startSeconds: 413.3, endSeconds: 487.5, sequenceIndex: 3 },
+      { noteFindings: [{}], startSeconds: 590.7, endSeconds: 662.7, sequenceIndex: 4 },
+    ],
+  });
+  assert.equal(orderedButGappy.teacherReadyTrusted, false);
+  assert(orderedButGappy.teacherReadyReasons.some((r) => r.startsWith("content-path-coverage-too-low")));
+  assert(orderedButGappy.teacherReadyReasons.some((r) => r.startsWith("content-path-gap-too-large")));
+  // a contiguous content path (high coverage, small gaps) still passes
+  const contiguousContent = gate({
+    summary: { audioCoverage: {
+      scanMode: "content-aligned", audioDurationSeconds: 100, estimatedPieceDurationSeconds: 95,
+      alignmentCoverageMode: "full-selected", wholePieceCoverageMode: "full-piece",
+      monotonicViolationRate: 0.0, greedyFallbackCount: 0, contentAlignmentMonotonic: true,
+    } },
+    sectionPasses: [
+      { noteFindings: [{}], startSeconds: 0, endSeconds: 45, sequenceIndex: 0 },
+      { noteFindings: [{}], startSeconds: 46, endSeconds: 95, sequenceIndex: 1 },
+    ],
+  });
+  assert.equal(contiguousContent.teacherReadyTrusted, true);
+  assert.deepEqual(contiguousContent.teacherReadyReasons, []);
 
   // --- monotonicity gate (Phase 1): scattered content path is rejected ---
   // Real measured violation rates: 2nd rhapsody 0.41, 4th rhapsody 0.46. Both must

@@ -51,6 +51,11 @@ const TEACHER_READY_MAX_MONOTONIC_VIOLATION_RATE = envNumber(
   "ERHU_TEACHER_READY_MAX_MONOTONIC_VIOLATION_RATE",
   0.05,
 );
+// Coverage / largest inter-window gap: a monotonic content path can still skip large
+// stretches of audio (ordered but wrong). Conservative fail-closed bounds; must match
+// src/server/teacherValidationService.js.
+const TEACHER_READY_MIN_COVERAGE_RATIO = envNumber("ERHU_TEACHER_READY_MIN_COVERAGE_RATIO", 0.6);
+const TEACHER_READY_MAX_GAP_RATIO = envNumber("ERHU_TEACHER_READY_MAX_GAP_RATIO", 2.0);
 // Trusted scan modes allowlist (not "anything != fast") so a new mode is not
 // silently trusted. Must match src/server/teacherValidationService.js.
 const TEACHER_READY_TRUSTED_SCAN_MODES = new Set(["analyzer-window", "content-aligned"]);
@@ -345,6 +350,23 @@ function buildAlignmentEvidence(passJson = {}) {
     const ratio = shorter > 0 ? overlap / shorter : 1;
     return overlap >= TEACHER_READY_OVERLAP_MIN_SECONDS || ratio >= TEACHER_READY_OVERLAP_MIN_RATIO;
   });
+  // Coverage / largest inter-window gap (content-path "ordered but skips audio" guard).
+  let alignedWindowCoverageRatio = null;
+  let maxInterWindowGapSeconds = null;
+  let maxInterWindowGapRatio = null;
+  if (windows.length >= 1) {
+    const sumDurations = windows.reduce((total, w) => total + (w.end - w.start), 0);
+    const windowSpan = Math.max(...windows.map((w) => w.end)) - Math.min(...windows.map((w) => w.start));
+    alignedWindowCoverageRatio = windowSpan > 0 ? Number((sumDurations / windowSpan).toFixed(3)) : null;
+    let maxGap = 0;
+    for (let index = 1; index < windows.length; index += 1) {
+      maxGap = Math.max(maxGap, Math.max(0, windows[index].start - windows[index - 1].end));
+    }
+    maxInterWindowGapSeconds = Number(maxGap.toFixed(2));
+    const durations = windows.map((w) => w.end - w.start).sort((a, b) => a - b);
+    const medianDuration = durations.length ? durations[Math.floor(durations.length / 2)] : 0;
+    maxInterWindowGapRatio = medianDuration > 0 ? Number((maxGap / medianDuration).toFixed(3)) : null;
+  }
   // Coverage-aware ratio: full uses estimatedPieceDuration/audio; partial uses
   // alignedSpan/expectedAlignedSpan. Both bounded -- too-low = crammed, too-high =
   // scattered (e.g. a 13s expected span aligned across 326s). Must match
@@ -391,6 +413,16 @@ function buildAlignmentEvidence(passJson = {}) {
     } else if ((greedyFallbackCount != null && greedyFallbackCount > 0) || contentAlignmentMonotonic === false) {
       teacherReadyReasons.push(`content-path-greedy-fallback:${greedyFallbackCount != null ? greedyFallbackCount : "unknown"}`);
     }
+    // Coverage / gap: ordered windows that skip large stretches of audio. Fail closed
+    // when the evidence is absent.
+    if (alignedWindowCoverageRatio == null) {
+      teacherReadyReasons.push("content-path-coverage-missing");
+    } else if (alignedWindowCoverageRatio < TEACHER_READY_MIN_COVERAGE_RATIO) {
+      teacherReadyReasons.push(`content-path-coverage-too-low:${alignedWindowCoverageRatio}`);
+    }
+    if (maxInterWindowGapRatio != null && maxInterWindowGapRatio > TEACHER_READY_MAX_GAP_RATIO) {
+      teacherReadyReasons.push(`content-path-gap-too-large:${maxInterWindowGapRatio}`);
+    }
   }
   const teacherReadyTrusted = scanModeTrusted && teacherReadyReasons.length === 0;
   return {
@@ -411,6 +443,9 @@ function buildAlignmentEvidence(passJson = {}) {
     monotonicViolationRate,
     greedyFallbackCount,
     contentAlignmentMonotonic,
+    alignedWindowCoverageRatio,
+    maxInterWindowGapSeconds,
+    maxInterWindowGapRatio,
     teacherReadyThresholds: {
       minDurationRatio: TEACHER_READY_MIN_DURATION_RATIO,
       maxDurationRatio: TEACHER_READY_MAX_DURATION_RATIO,
@@ -418,6 +453,8 @@ function buildAlignmentEvidence(passJson = {}) {
       overlapMinRatio: TEACHER_READY_OVERLAP_MIN_RATIO,
       minSystemFindings: TEACHER_READY_MIN_SYSTEM_FINDINGS,
       maxMonotonicViolationRate: TEACHER_READY_MAX_MONOTONIC_VIOLATION_RATE,
+      minCoverageRatio: TEACHER_READY_MIN_COVERAGE_RATIO,
+      maxGapRatio: TEACHER_READY_MAX_GAP_RATIO,
     },
     reason: scanModeTrusted
       ? "segment windows came from an analyzer-backed scan"

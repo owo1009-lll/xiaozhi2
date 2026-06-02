@@ -574,6 +574,18 @@ const TEACHER_READY_MAX_MONOTONIC_VIOLATION_RATE = Number.isFinite(
 )
   ? Number(process.env.ERHU_TEACHER_READY_MAX_MONOTONIC_VIOLATION_RATE)
   : 0.05;
+// A monotonic content path can still be WRONG: ordered windows that skip large
+// stretches of audio (e.g. 2nd rhapsody coarse: windows in order but a 158s gap with
+// real erhu in it). monotonicity + span-ratio miss this. Coverage = sum(window
+// durations)/alignedSpan (1.0 = contiguous; low = big gaps). maxGapRatio = largest
+// inter-window gap / median window. Conservative fail-closed bounds (loosen once an
+// expected-gap-aware aligner exists, since real interludes legitimately lower these).
+const TEACHER_READY_MIN_COVERAGE_RATIO = Number.isFinite(Number(process.env.ERHU_TEACHER_READY_MIN_COVERAGE_RATIO))
+  ? Number(process.env.ERHU_TEACHER_READY_MIN_COVERAGE_RATIO)
+  : 0.6;
+const TEACHER_READY_MAX_GAP_RATIO = Number.isFinite(Number(process.env.ERHU_TEACHER_READY_MAX_GAP_RATIO))
+  ? Number(process.env.ERHU_TEACHER_READY_MAX_GAP_RATIO)
+  : 2.0;
 
 // A section window pair is a SEVERE overlap (not just padding touch) when the
 // later window starts well inside the earlier one: by an absolute margin OR by a
@@ -618,6 +630,8 @@ function evaluateTeacherReadyGate({
   monotonicViolationRate,
   greedyFallbackCount,
   contentAlignmentMonotonic,
+  alignedWindowCoverageRatio,
+  maxInterWindowGapRatio,
 } = {}) {
   const scanModeTrusted = TEACHER_READY_TRUSTED_SCAN_MODES.has(safeString(scanMode));
   const isPartialCoverage = safeString(coverageMode).startsWith("partial");
@@ -674,6 +688,18 @@ function evaluateTeacherReadyGate({
     } else if ((fallbackCount != null && fallbackCount > 0) || contentAlignmentMonotonic === false) {
       teacherReadyReasons.push(`content-path-greedy-fallback:${fallbackCount != null ? fallbackCount : "unknown"}`);
     }
+    // Coverage / gap: a monotonic path that skips large stretches of audio is still
+    // wrong. Fail closed when the evidence is absent (old content pack).
+    const coverageRatio = Number.isFinite(alignedWindowCoverageRatio) ? alignedWindowCoverageRatio : null;
+    const gapRatio = Number.isFinite(maxInterWindowGapRatio) ? maxInterWindowGapRatio : null;
+    if (coverageRatio == null) {
+      teacherReadyReasons.push("content-path-coverage-missing");
+    } else if (coverageRatio < TEACHER_READY_MIN_COVERAGE_RATIO) {
+      teacherReadyReasons.push(`content-path-coverage-too-low:${coverageRatio}`);
+    }
+    if (gapRatio != null && gapRatio > TEACHER_READY_MAX_GAP_RATIO) {
+      teacherReadyReasons.push(`content-path-gap-too-large:${gapRatio}`);
+    }
   }
   return {
     scanModeTrusted,
@@ -712,6 +738,23 @@ function buildTeacherAlignmentEvidenceFromPassJson(passJson = {}) {
     .filter((window) => window.start != null && window.end != null && window.end > window.start)
     .sort((left, right) => left.order - right.order);
   const hasWindowOverlap = hasSevereWindowOverlap(windows);
+  // Coverage / largest inter-window gap (content-path "ordered but skips audio" guard).
+  let alignedWindowCoverageRatio = null;
+  let maxInterWindowGapSeconds = null;
+  let maxInterWindowGapRatio = null;
+  if (windows.length >= 1) {
+    const sumDurations = windows.reduce((total, w) => total + (w.end - w.start), 0);
+    const windowSpan = Math.max(...windows.map((w) => w.end)) - Math.min(...windows.map((w) => w.start));
+    alignedWindowCoverageRatio = windowSpan > 0 ? Number((sumDurations / windowSpan).toFixed(3)) : null;
+    let maxGap = 0;
+    for (let index = 1; index < windows.length; index += 1) {
+      maxGap = Math.max(maxGap, Math.max(0, windows[index].start - windows[index - 1].end));
+    }
+    maxInterWindowGapSeconds = Number(maxGap.toFixed(2));
+    const durations = windows.map((w) => w.end - w.start).sort((a, b) => a - b);
+    const medianDuration = durations.length ? durations[Math.floor(durations.length / 2)] : 0;
+    maxInterWindowGapRatio = medianDuration > 0 ? Number((maxGap / medianDuration).toFixed(3)) : null;
+  }
   // Coverage-aware ratio: full(-piece) uses estimatedPieceDuration / audio; partial
   // uses alignedSpan / expectedAlignedSpan (a span far larger than the sections'
   // own expected length means the windows are scattered, not contiguous).
@@ -735,6 +778,8 @@ function buildTeacherAlignmentEvidenceFromPassJson(passJson = {}) {
     monotonicViolationRate,
     greedyFallbackCount,
     contentAlignmentMonotonic,
+    alignedWindowCoverageRatio,
+    maxInterWindowGapRatio,
   });
   return {
     trusted: scanModeTrusted,
@@ -754,6 +799,9 @@ function buildTeacherAlignmentEvidenceFromPassJson(passJson = {}) {
     monotonicViolationRate,
     greedyFallbackCount,
     contentAlignmentMonotonic,
+    alignedWindowCoverageRatio,
+    maxInterWindowGapSeconds,
+    maxInterWindowGapRatio,
     teacherReadyThresholds: {
       minDurationRatio: TEACHER_READY_MIN_DURATION_RATIO,
       maxDurationRatio: TEACHER_READY_MAX_DURATION_RATIO,
@@ -761,6 +809,8 @@ function buildTeacherAlignmentEvidenceFromPassJson(passJson = {}) {
       overlapMinRatio: TEACHER_READY_OVERLAP_MIN_RATIO,
       minSystemFindings: TEACHER_READY_MIN_SYSTEM_FINDINGS,
       maxMonotonicViolationRate: TEACHER_READY_MAX_MONOTONIC_VIOLATION_RATE,
+      minCoverageRatio: TEACHER_READY_MIN_COVERAGE_RATIO,
+      maxGapRatio: TEACHER_READY_MAX_GAP_RATIO,
     },
     reason: teacherAlignmentReasonText(scanMode, scanModeTrusted),
   };
@@ -783,6 +833,9 @@ function readTeacherAlignmentEvidence(item = {}, analysis = {}, repoRoot) {
     const greedyFallbackCount = finiteNumberOrNull(embedded.greedyFallbackCount);
     const contentAlignmentMonotonic =
       typeof embedded.contentAlignmentMonotonic === "boolean" ? embedded.contentAlignmentMonotonic : null;
+    const alignedWindowCoverageRatio = finiteNumberOrNull(embedded.alignedWindowCoverageRatio);
+    const maxInterWindowGapSeconds = finiteNumberOrNull(embedded.maxInterWindowGapSeconds);
+    const maxInterWindowGapRatio = finiteNumberOrNull(embedded.maxInterWindowGapRatio);
     const { scanModeTrusted, teacherReadyReasons, teacherReadyTrusted } = evaluateTeacherReadyGate({
       scanMode,
       coverageMode,
@@ -793,6 +846,8 @@ function readTeacherAlignmentEvidence(item = {}, analysis = {}, repoRoot) {
       monotonicViolationRate,
       greedyFallbackCount,
       contentAlignmentMonotonic,
+      alignedWindowCoverageRatio,
+      maxInterWindowGapRatio,
     });
     return {
       trusted: scanModeTrusted,
@@ -812,6 +867,9 @@ function readTeacherAlignmentEvidence(item = {}, analysis = {}, repoRoot) {
       monotonicViolationRate,
       greedyFallbackCount,
       contentAlignmentMonotonic,
+      alignedWindowCoverageRatio,
+      maxInterWindowGapSeconds,
+      maxInterWindowGapRatio,
       teacherReadyThresholds: embedded.teacherReadyThresholds && typeof embedded.teacherReadyThresholds === "object"
         ? embedded.teacherReadyThresholds
         : null,
