@@ -61,6 +61,11 @@ HOP = ca.DEFAULT_HOP
 TOP_K = ca.DEFAULT_TOP_K
 A4 = 440.0
 
+# Teacher-ready alignment bar (mirrors the gate in teacherValidationService.js /
+# teacher-validation-support.mjs): windows that span far more audio than the
+# sections themselves occupy are scattered, not aligned.
+MAX_SPAN_RATIO = 2.0
+
 
 # --------------------------------------------------------------------------- #
 # Synthetic score + audio (gold)
@@ -102,6 +107,39 @@ def base_sections() -> list[GoldSection]:
         notes.append(GoldNote(midi=48 + index, beat_start=0.0, beat_duration=4.0, role="piano"))
         sections.append(GoldSection(section_id=f"s{index+1}", sequence_index=index, tempo=72.0, notes=notes))
     return sections
+
+
+def similar_phrase_sections() -> list[GoldSection]:
+    """B3.0 RED case material: three SHORT 'entry' sections that share a near-identical
+    head contour, so a pure pitch-class aligner cannot tell them apart -- the real
+    long-recording failure mode. Each entry carries a LOUD sustained accompaniment
+    triad (non-erhu, pitch classes 0/4/7) that pollutes the whole-audio chroma at its
+    TRUE location. The clean decoys placed far away (clean_decoy) therefore become the
+    cheaper subsequence-DTW match for entries 2/3, pulling their windows across the
+    whole piece -- exactly the 14s/278s/336s scatter seen on the real 481s mix."""
+    heads = [
+        [62, 64, 65, 64],   # e1
+        [62, 64, 66, 64],   # e2  (one note differs from e1)
+        [62, 64, 65, 67],   # e3  (one note differs from e1)
+    ]
+    acc_triad = [48, 52, 55]  # pitch classes 0,4,7 sustained -> strong chroma pollution
+    sections = []
+    for index, pitches in enumerate(heads):
+        notes = [GoldNote(midi=p, beat_start=float(i), beat_duration=1.0) for i, p in enumerate(pitches)]
+        for chord_note in acc_triad:
+            notes.append(GoldNote(midi=chord_note, beat_start=0.0, beat_duration=float(len(pitches)), role="piano"))
+        sections.append(GoldSection(section_id=f"e{index+1}", sequence_index=index, tempo=72.0, notes=notes))
+    return sections
+
+
+def clean_decoy(section: GoldSection, decoy_id: str) -> GoldSection:
+    """A clean (erhu-only, no accompaniment) copy of section's erhu contour with a
+    DISTINCT id, so it appears in the audio as luring filler material -- not as the
+    section itself. Its chroma matches the section's erhu-only template better than the
+    accompaniment-polluted true occurrence does."""
+    erhu = [GoldNote(midi=n.midi, beat_start=n.beat_start, beat_duration=n.beat_duration)
+            for n in section.notes if n.role == "erhu"]
+    return GoldSection(section_id=decoy_id, sequence_index=99, tempo=section.tempo, notes=erhu)
 
 
 def synth_piece(layout, *, tempo_scale=1.0, rest_after=None, with_accompaniment=False, seed=0):
@@ -213,6 +251,13 @@ def evaluate(predicted: list[dict], truth: list[tuple], hop_seconds: float) -> d
     starts = [p["start"] for p in predicted]
     monotonic = all(starts[i] <= starts[i + 1] + 1e-6 for i in range(len(starts) - 1))
     overlap = any(predicted[i]["end"] > predicted[i + 1]["start"] + 1.0 for i in range(len(predicted) - 1))
+    # Span scatter (mirrors the teacher-ready gate's aligned-span-ratio): how much
+    # audio the chosen windows span vs how much the sections themselves occupy. A
+    # correct contiguous alignment is ~1x (plus gaps); scattered windows blow it up.
+    predicted_span = (max(p["end"] for p in predicted) - min(p["start"] for p in predicted)) if predicted else 0.0
+    expected_span = sum((first_occ[p["sectionId"]][1] - first_occ[p["sectionId"]][0])
+                        for p in predicted if p["sectionId"] in first_occ)
+    aligned_span_ratio = round(predicted_span / expected_span, 3) if expected_span > 0 else None
     def stat(xs):
         return {"mean": round(float(np.mean(xs)), 3), "max": round(float(np.max(xs)), 3)} if xs else {"mean": None, "max": None}
     return {
@@ -224,6 +269,9 @@ def evaluate(predicted: list[dict], truth: list[tuple], hop_seconds: float) -> d
         "multiOccurrenceSections": multi_occurrence_sections,
         "monotonic": monotonic,
         "hasOverlap": overlap,
+        "predictedSpanSec": round(predicted_span, 3),
+        "expectedSpanSec": round(expected_span, 3),
+        "alignedSpanRatio": aligned_span_ratio,
         "hopSeconds": round(hop_seconds, 4),
     }
 
@@ -271,6 +319,18 @@ def run_occurrence_case(name: str, layout: list[dict], **synth_kwargs) -> dict:
     return {"case": name, "truth": truth, "predicted": predicted, "metrics": metrics}
 
 
+def meets_alignment_bar(metrics: dict) -> bool:
+    """A case is aligned (not scattered) when no window misses its section's first
+    occurrence AND the chosen windows do not span far more audio than the sections
+    occupy. Same bar the teacher-ready gate enforces."""
+    ratio = metrics.get("alignedSpanRatio")
+    return (
+        ratio is not None
+        and ratio <= MAX_SPAN_RATIO
+        and metrics.get("firstOccurrenceMismatchCount", 0) == 0
+    )
+
+
 def main() -> int:
     secs = base_sections()
     layout_plain = [{"section": s, "gap": 0.5} for s in secs]
@@ -287,29 +347,63 @@ def main() -> int:
         run_case("repeated-section", secs, layout_repeat),
         run_case("accompaniment-mix", secs, layout_plain, with_accompaniment=True, seed=7),
     ]
+    # B3.0 RED case: similar phrases + long background + accompaniment pollution.
+    # Three similar entry sections; their true heads are accompaniment-polluted, while
+    # clean copies of entries 2 & 3 sit ~140s and ~280s later. With no span/continuity
+    # penalty in choose_monotonic_path, entries 2/3 are pulled to the far clean decoys
+    # -> windows scatter across the whole piece (the real failure). This case is
+    # EXPECTED TO FAIL the alignment bar today and is tracked as xfail; B3.1
+    # (span penalty / onset anchors / erhu-focus chroma) must flip it to pass.
+    entries = similar_phrase_sections()
+    layout_scatter = [
+        {"section": entries[0], "gap": 0.5},
+        {"section": entries[1], "gap": 0.5},
+        {"section": entries[2], "gap": 0.5},
+        {"section": clean_decoy(entries[1], "d2"), "gap": 130.0},
+        {"section": clean_decoy(entries[2], "d3"), "gap": 130.0},
+    ]
+    cases.append(run_case("similar-phrase-long-mix", entries, layout_scatter, with_accompaniment=True, seed=7))
+
+    # Expectation tracking. Green cases must meet the bar; xfail cases must currently
+    # FAIL it (the failure is reproduced and stable). An xfail case that starts meeting
+    # the bar is an XPASS -> stop and decide (promote it to green if B3.1 fixed it, or
+    # strengthen the case if it became too easy). Either deviation flips overall ok.
+    XFAIL_CASES = {"similar-phrase-long-mix"}
+    overall_ok = True
+    for c in cases:
+        passed = meets_alignment_bar(c["metrics"])
+        is_xfail = c["case"] in XFAIL_CASES
+        if is_xfail:
+            status = "xfail-reproduced" if not passed else "XPASS-promote"
+        else:
+            status = "pass" if passed else "REGRESSION"
+        if (is_xfail and passed) or (not is_xfail and not passed):
+            overall_ok = False
+        c["expectation"] = {"expected": "xfail" if is_xfail else "pass", "meetsBar": passed, "status": status}
     # Repeat-ROUNDS gold (reviewer point 4): align each occurrence in play order and
     # require every repeat to land on its own round, not collapse onto an earlier one.
     occurrence_cases = [
         run_occurrence_case("repeat-rounds", layout_repeat),
         run_occurrence_case("repeat-rounds-mix", layout_repeat, with_accompaniment=True, seed=7),
     ]
-    report = {"ok": True, "sr": SR, "hop": HOP, "topK": TOP_K, "cases": cases, "occurrenceCases": occurrence_cases}
+    report = {"ok": overall_ok, "sr": SR, "hop": HOP, "topK": TOP_K, "cases": cases, "occurrenceCases": occurrence_cases}
     out_dir = Path(__file__).resolve().parents[2] / "data" / "experiments" / "content-alignment"
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "latest-alignment-gold.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     # compact stdout summary
     for c in cases:
         m = c["metrics"]
-        print(f"{c['case']:>18}: startErr.mean={m['startErr']['mean']} max={m['startErr']['max']} "
+        print(f"{c['case']:>20}: startErr.mean={m['startErr']['mean']} max={m['startErr']['max']} "
               f"iou.mean={m['iou'].get('mean')} firstOccMismatch={m['firstOccurrenceMismatchCount']} "
-              f"multiOcc={m['multiOccurrenceSections']} mono={m['monotonic']} overlap={m['hasOverlap']} "
-              f"{m['runtimeSec']}s/{m['audioDurationSec']}s")
+              f"spanRatio={m['alignedSpanRatio']} mono={m['monotonic']} overlap={m['hasOverlap']} "
+              f"[{c['expectation']['status']}] {m['runtimeSec']}s/{m['audioDurationSec']}s")
     for c in occurrence_cases:
         m = c["metrics"]
-        print(f"{c['case']:>18}: startErr.mean={m['startErr']['mean']} max={m['startErr']['max']} "
+        print(f"{c['case']:>20}: startErr.mean={m['startErr']['mean']} max={m['startErr']['max']} "
               f"iou.mean={m['iou']['mean']} wrongRound={m['wrongRoundCount']}/{m['occurrenceCount']} "
               f"mono={m['monotonic']} {m['runtimeSec']}s/{m['audioDurationSec']}s")
-    return 0
+    print(f"overall ok={overall_ok} (green cases meet bar AND xfail cases still scatter)")
+    return 0 if overall_ok else 1
 
 
 if __name__ == "__main__":
