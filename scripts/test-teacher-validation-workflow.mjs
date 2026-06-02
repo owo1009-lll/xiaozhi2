@@ -238,6 +238,51 @@ try {
   assert.equal(normalNotReady.reviewReady, false);
   assert(normalNotReady.reviewReadinessReasons.includes("not-original-score-verified"));
 
+  // --- teacher-ready alignment gate (B2c): full/partial ratio bounds + allowlist ---
+  const gate = teacherValidationInternals.buildTeacherAlignmentEvidenceFromPassJson;
+  // scattered partial (real 326s span for a 13.3s expected -> ratio ~24): too-high
+  const scattered = gate({
+    summary: { audioCoverage: {
+      scanMode: "content-aligned", audioDurationSeconds: 481.5,
+      alignmentCoverageMode: "partial-selected", wholePieceCoverageMode: "partial-piece",
+      alignedSpanDurationSeconds: 326.0, expectedAlignedSpanDurationSeconds: 13.33,
+    } },
+    sectionPasses: [{ noteFindings: [{}], startSeconds: 0, endSeconds: 5, sequenceIndex: 0 }],
+  });
+  assert.equal(scattered.teacherReadyTrusted, false);
+  assert(scattered.teacherReadyReasons.some((r) => r.startsWith("aligned-span-ratio-too-high")));
+  // sane partial (span ~= expected): passes the span gate
+  const sanePartial = gate({
+    summary: { audioCoverage: {
+      scanMode: "content-aligned", audioDurationSeconds: 481.5,
+      alignmentCoverageMode: "partial-selected", wholePieceCoverageMode: "partial-piece",
+      alignedSpanDurationSeconds: 14.0, expectedAlignedSpanDurationSeconds: 13.33,
+    } },
+    sectionPasses: [
+      { noteFindings: [{}], startSeconds: 0, endSeconds: 6, sequenceIndex: 0 },
+      { noteFindings: [{}], startSeconds: 6.5, endSeconds: 13, sequenceIndex: 1 },
+    ],
+  });
+  assert.equal(sanePartial.teacherReadyTrusted, true);
+  assert.deepEqual(sanePartial.teacherReadyReasons, []);
+  // full coverage with sane durationRatio passes
+  const saneFull = gate({
+    summary: { audioCoverage: {
+      scanMode: "content-aligned", audioDurationSeconds: 100, estimatedPieceDurationSeconds: 95,
+      alignmentCoverageMode: "full-selected", wholePieceCoverageMode: "full-piece",
+    } },
+    sectionPasses: [{ noteFindings: [{}], startSeconds: 0, endSeconds: 50, sequenceIndex: 0 },
+                    { noteFindings: [{}], startSeconds: 50, endSeconds: 95, sequenceIndex: 1 }],
+  });
+  assert.equal(saneFull.teacherReadyTrusted, true);
+  // unknown scanMode is NOT trusted (allowlist, not "anything != fast")
+  const unknownMode = gate({
+    summary: { audioCoverage: { scanMode: "some-future-mode", audioDurationSeconds: 100, estimatedPieceDurationSeconds: 95 } },
+    sectionPasses: [{ noteFindings: [{}], startSeconds: 0, endSeconds: 95, sequenceIndex: 0 }],
+  });
+  assert.equal(unknownMode.scanModeTrusted, false);
+  assert.equal(unknownMode.teacherReadyTrusted, false);
+
   const filledReviews = {
     schemaVersion: 1,
     reviews: pack.reviewRows.map((row, index) => ({

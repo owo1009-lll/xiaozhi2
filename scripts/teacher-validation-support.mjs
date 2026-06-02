@@ -42,6 +42,12 @@ const TEACHER_READY_MIN_DURATION_RATIO = envNumber("ERHU_TEACHER_READY_MIN_DURAT
 const TEACHER_READY_OVERLAP_MIN_SECONDS = envNumber("ERHU_TEACHER_READY_OVERLAP_MIN_SECONDS", 4.0);
 const TEACHER_READY_OVERLAP_MIN_RATIO = envNumber("ERHU_TEACHER_READY_OVERLAP_MIN_RATIO", 0.25);
 const TEACHER_READY_MIN_SYSTEM_FINDINGS = Math.max(0, Math.round(envNumber("ERHU_TEACHER_READY_MIN_SYSTEM_FINDINGS", 1)));
+// Span/duration ratio upper bound: too-high = a few short sections scattered across
+// far too much audio (content-DTW spreading similar passages over the whole piece).
+const TEACHER_READY_MAX_DURATION_RATIO = envNumber("ERHU_TEACHER_READY_MAX_DURATION_RATIO", 2.0);
+// Trusted scan modes allowlist (not "anything != fast") so a new mode is not
+// silently trusted. Must match src/server/teacherValidationService.js.
+const TEACHER_READY_TRUSTED_SCAN_MODES = new Set(["analyzer-window", "content-aligned"]);
 
 export function cleanText(value, fallback = "") {
   return repairMojibakeText(value) || safeString(value, fallback) || fallback;
@@ -311,7 +317,7 @@ function buildAlignmentEvidence(passJson = {}) {
     audioDurationSeconds && estimatedPieceDurationSeconds
       ? Number((estimatedPieceDurationSeconds / audioDurationSeconds).toFixed(3))
       : null;
-  const scanModeTrusted = Boolean(scanMode) && scanMode !== "fast-sequence-window";
+  const scanModeTrusted = TEACHER_READY_TRUSTED_SCAN_MODES.has(scanMode);
   const totalSystemFindings = sectionPasses.reduce(
     (total, section) => total + getArray(section?.noteFindings).length + getArray(section?.measureFindings).length,
     0,
@@ -333,9 +339,30 @@ function buildAlignmentEvidence(passJson = {}) {
     const ratio = shorter > 0 ? overlap / shorter : 1;
     return overlap >= TEACHER_READY_OVERLAP_MIN_SECONDS || ratio >= TEACHER_READY_OVERLAP_MIN_RATIO;
   });
+  // Coverage-aware ratio: full uses estimatedPieceDuration/audio; partial uses
+  // alignedSpan/expectedAlignedSpan. Both bounded -- too-low = crammed, too-high =
+  // scattered (e.g. a 13s expected span aligned across 326s). Must match
+  // src/server/teacherValidationService.js.
+  const coverageMode = safeString(coverage.wholePieceCoverageMode || coverage.alignmentCoverageMode);
+  const isPartialCoverage = coverageMode.startsWith("partial");
+  const alignedSpanDurationSeconds = numeric(coverage.alignedSpanDurationSeconds);
+  const expectedAlignedSpanDurationSeconds = numeric(coverage.expectedAlignedSpanDurationSeconds);
+  const alignedSpanRatio = (alignedSpanDurationSeconds != null && expectedAlignedSpanDurationSeconds && expectedAlignedSpanDurationSeconds > 0)
+    ? Number((alignedSpanDurationSeconds / expectedAlignedSpanDurationSeconds).toFixed(3))
+    : null;
   const teacherReadyReasons = [];
-  if (durationRatio == null || durationRatio < TEACHER_READY_MIN_DURATION_RATIO) {
-    teacherReadyReasons.push(`duration-ratio-too-low:${durationRatio == null ? "missing" : durationRatio}`);
+  if (isPartialCoverage) {
+    if (alignedSpanRatio == null) {
+      teacherReadyReasons.push("aligned-span-ratio-missing");
+    } else {
+      if (alignedSpanRatio < TEACHER_READY_MIN_DURATION_RATIO) teacherReadyReasons.push(`aligned-span-ratio-too-low:${alignedSpanRatio}`);
+      if (alignedSpanRatio > TEACHER_READY_MAX_DURATION_RATIO) teacherReadyReasons.push(`aligned-span-ratio-too-high:${alignedSpanRatio}`);
+    }
+  } else if (durationRatio == null) {
+    teacherReadyReasons.push("duration-ratio-too-low:missing");
+  } else {
+    if (durationRatio < TEACHER_READY_MIN_DURATION_RATIO) teacherReadyReasons.push(`duration-ratio-too-low:${durationRatio}`);
+    if (durationRatio > TEACHER_READY_MAX_DURATION_RATIO) teacherReadyReasons.push(`duration-ratio-too-high:${durationRatio}`);
   }
   if (hasWindowOverlap) teacherReadyReasons.push("section-windows-overlap");
   if (totalSystemFindings < TEACHER_READY_MIN_SYSTEM_FINDINGS) teacherReadyReasons.push("no-system-findings");
@@ -349,10 +376,15 @@ function buildAlignmentEvidence(passJson = {}) {
     audioDurationSeconds,
     estimatedPieceDurationSeconds,
     durationRatio,
+    alignedSpanDurationSeconds,
+    expectedAlignedSpanDurationSeconds,
+    alignedSpanRatio,
+    coverageMode: coverageMode || null,
     totalSystemFindings,
     hasWindowOverlap,
     teacherReadyThresholds: {
       minDurationRatio: TEACHER_READY_MIN_DURATION_RATIO,
+      maxDurationRatio: TEACHER_READY_MAX_DURATION_RATIO,
       overlapMinSeconds: TEACHER_READY_OVERLAP_MIN_SECONDS,
       overlapMinRatio: TEACHER_READY_OVERLAP_MIN_RATIO,
       minSystemFindings: TEACHER_READY_MIN_SYSTEM_FINDINGS,
