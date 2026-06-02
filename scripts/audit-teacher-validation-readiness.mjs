@@ -55,6 +55,33 @@ const issueCandidates = selectTeacherValidationCandidates(allCandidates, {
   minSystemFindings: 1,
   requireTrustedAlignment: true,
 });
+// teacher-ready is the stricter gate that actually decides what a teacher can be
+// shown (scanModeTrusted AND duration-scale sane AND no severe window overlap AND
+// >=1 finding). trusted* counts above only mean "analyzer-backed scan" and can be
+// far higher than teacher-ready -- report both so the audit does not imply there
+// are usable samples when there are none.
+const teacherReadyCandidates = selectTeacherValidationCandidates(allCandidates, {
+  max: allCandidates.length,
+  minSystemFindings: 0,
+  requireTrustedAlignment: true,
+  requireTeacherReadyTrusted: true,
+});
+const teacherReadyIssueCandidates = selectTeacherValidationCandidates(allCandidates, {
+  max: allCandidates.length,
+  minSystemFindings: 1,
+  requireTrustedAlignment: true,
+  requireTeacherReadyTrusted: true,
+});
+const rejectedNotTeacherReady = trustedCandidates.filter(
+  (candidate) => candidate.alignmentEvidence?.teacherReadyTrusted !== true,
+);
+const teacherReadyReasonCounts = {};
+for (const candidate of rejectedNotTeacherReady) {
+  for (const reason of getArray(candidate.alignmentEvidence?.teacherReadyReasons)) {
+    const key = String(reason).split(":")[0];
+    teacherReadyReasonCounts[key] = (teacherReadyReasonCounts[key] || 0) + 1;
+  }
+}
 const packs = listPackDirs(repoRoot).map(summarizePack);
 const latestPack = packs[packs.length - 1] || null;
 const validation = snapshot.validation;
@@ -69,6 +96,10 @@ const payload = {
     allCandidateCount: allCandidates.length,
     trustedCandidateCount: trustedCandidates.length,
     trustedIssueCandidateCount: issueCandidates.length,
+    teacherReadyCandidateCount: teacherReadyCandidates.length,
+    teacherReadyIssueCandidateCount: teacherReadyIssueCandidates.length,
+    rejectedNotTeacherReadyCount: rejectedNotTeacherReady.length,
+    teacherReadyReasonCounts,
   },
   packs: {
     packCount: packs.length,

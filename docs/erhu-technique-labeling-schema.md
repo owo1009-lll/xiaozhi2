@@ -181,6 +181,22 @@ n6 的 glide-swallow 依赖 `pitchSpreadCents`（12c 稳定音）、`glideRunMs`
 
 3. **训练特征只有一半落盘。** 见上"训练特征分两层"：v1 已落盘特征可直接用；`pitchSpreadCents` / `glideRunMs` / `vibratoAmplitudeCents` / `stablePointCount` / `estimatedConfidence` 未进 `NoteFinding` schema，现有 corpus 取不到，属 v2（需路径 A 或 B）。
 
+## teacher-ready alignment gate（已实现）
+
+技巧标注包必须通过 **teacher-ready alignment gate** 才会进入教师后台。仅 `scanMode==analyzer-window`（即旧 `trusted`）不够——它只证明扫描是分析器产出的，不证明音频窗与谱面段内容对齐。真实长录音的谱面估时长会严重失真（如 601s 录音估出 ~10s），导致段窗挤在开头、音频与谱面错配。
+
+三道闸门（`buildAlignmentEvidence` / server `buildTeacherAlignmentEvidenceFromPassJson` 同步实现，env 可调）：
+
+| 闸门 | 默认 | 含义 |
+|---|---|---|
+| `durationRatio = estimatedPieceDuration / audioDuration >= 0.5` | 0.5 | 时间尺度合理性。**不是内容匹配证明**，但极低值（几百秒录音估出几秒）直接判不可自动给教师 |
+| 无严重段窗重叠（`>=4s` 或 `>=较短窗 25%`） | 4s / 0.25 | 轻微 padding 重叠允许；严重重叠说明段定位不可靠 |
+| 至少 1 个 system finding | 1 | 技巧标注样本需要有可判断的对象 |
+
+结果（当前真实样本）：54 个 scanMode-trusted 样本**全部** teacher-ready=false（`duration-ratio-too-low` + `section-windows-overlap`），所以 `teacher:technique-labeling-export` 默认导出 **0 行**——这是如实的"当前没有 teacher-ready 样本"，不是 bug。`audit:teacher-validation-readiness` 现在同时报 `teacherReadyCandidateCount` 与 `rejectedNotTeacherReady*`，避免误读 trusted 计数。
+
+诚实边界：`0.5` 是基于当前合成/真实数据的保守初值；真实轻滑音与正常 tempo 分布仍需教师数据校准，避免误拒。要产出真正 teacher-ready 的样本，需先解决长录音的段级音频-谱面对齐（比闸门更深的问题）。
+
 ## 仍需确认（写导出脚本时）
 
 - `teacherTechniqueLabels` 单 JSON 列在 Excel 手工编辑后另存的转义是否仍合规（程序往返已确认安全，人工经 Excel 编辑是另一回事，建议教师用提供的模板而非 Excel 重存）。
