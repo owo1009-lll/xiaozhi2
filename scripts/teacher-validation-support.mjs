@@ -58,7 +58,7 @@ const TEACHER_READY_MIN_COVERAGE_RATIO = envNumber("ERHU_TEACHER_READY_MIN_COVER
 const TEACHER_READY_MAX_GAP_RATIO = envNumber("ERHU_TEACHER_READY_MAX_GAP_RATIO", 2.0);
 // Trusted scan modes allowlist (not "anything != fast") so a new mode is not
 // silently trusted. Must match src/server/teacherValidationService.js.
-const TEACHER_READY_TRUSTED_SCAN_MODES = new Set(["analyzer-window", "content-aligned"]);
+const TEACHER_READY_TRUSTED_SCAN_MODES = new Set(["analyzer-window", "content-aligned", "manual-anchor"]);
 
 export function cleanText(value, fallback = "") {
   return repairMojibakeText(value) || safeString(value, fallback) || fallback;
@@ -378,22 +378,28 @@ function buildAlignmentEvidence(passJson = {}) {
   const alignedSpanRatio = (alignedSpanDurationSeconds != null && expectedAlignedSpanDurationSeconds && expectedAlignedSpanDurationSeconds > 0)
     ? Number((alignedSpanDurationSeconds / expectedAlignedSpanDurationSeconds).toFixed(3))
     : null;
+  // manual-anchor = human-verified audio/score window (technique-labeling from scratch);
+  // the human verification IS the alignment evidence, so the automatic alignment gates
+  // and no-system-findings do not apply. Must match src/server/teacherValidationService.js.
+  const isManualAnchor = scanMode === "manual-anchor";
   const teacherReadyReasons = [];
-  if (isPartialCoverage) {
-    if (alignedSpanRatio == null) {
-      teacherReadyReasons.push("aligned-span-ratio-missing");
+  if (!isManualAnchor) {
+    if (isPartialCoverage) {
+      if (alignedSpanRatio == null) {
+        teacherReadyReasons.push("aligned-span-ratio-missing");
+      } else {
+        if (alignedSpanRatio < TEACHER_READY_MIN_DURATION_RATIO) teacherReadyReasons.push(`aligned-span-ratio-too-low:${alignedSpanRatio}`);
+        if (alignedSpanRatio > TEACHER_READY_MAX_DURATION_RATIO) teacherReadyReasons.push(`aligned-span-ratio-too-high:${alignedSpanRatio}`);
+      }
+    } else if (durationRatio == null) {
+      teacherReadyReasons.push("duration-ratio-too-low:missing");
     } else {
-      if (alignedSpanRatio < TEACHER_READY_MIN_DURATION_RATIO) teacherReadyReasons.push(`aligned-span-ratio-too-low:${alignedSpanRatio}`);
-      if (alignedSpanRatio > TEACHER_READY_MAX_DURATION_RATIO) teacherReadyReasons.push(`aligned-span-ratio-too-high:${alignedSpanRatio}`);
+      if (durationRatio < TEACHER_READY_MIN_DURATION_RATIO) teacherReadyReasons.push(`duration-ratio-too-low:${durationRatio}`);
+      if (durationRatio > TEACHER_READY_MAX_DURATION_RATIO) teacherReadyReasons.push(`duration-ratio-too-high:${durationRatio}`);
     }
-  } else if (durationRatio == null) {
-    teacherReadyReasons.push("duration-ratio-too-low:missing");
-  } else {
-    if (durationRatio < TEACHER_READY_MIN_DURATION_RATIO) teacherReadyReasons.push(`duration-ratio-too-low:${durationRatio}`);
-    if (durationRatio > TEACHER_READY_MAX_DURATION_RATIO) teacherReadyReasons.push(`duration-ratio-too-high:${durationRatio}`);
+    if (hasWindowOverlap) teacherReadyReasons.push("section-windows-overlap");
+    if (totalSystemFindings < TEACHER_READY_MIN_SYSTEM_FINDINGS) teacherReadyReasons.push("no-system-findings");
   }
-  if (hasWindowOverlap) teacherReadyReasons.push("section-windows-overlap");
-  if (totalSystemFindings < TEACHER_READY_MIN_SYSTEM_FINDINGS) teacherReadyReasons.push("no-system-findings");
   // Monotonicity gate (Phase 1), applied ONLY to content-aligned scans. FAIL CLOSED:
   // an old content pack without these fields cannot be confirmed in-order, so it is
   // rejected rather than skipped. Must match src/server/teacherValidationService.js.

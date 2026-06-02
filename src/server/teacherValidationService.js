@@ -564,7 +564,7 @@ const TEACHER_READY_MAX_DURATION_RATIO = Number.isFinite(Number(process.env.ERHU
   : 2.0;
 // Only analyzer-backed scan modes are trusted. Allowlist (not "anything != fast")
 // so a future scanMode is not silently trusted.
-const TEACHER_READY_TRUSTED_SCAN_MODES = new Set(["analyzer-window", "content-aligned"]);
+const TEACHER_READY_TRUSTED_SCAN_MODES = new Set(["analyzer-window", "content-aligned", "manual-anchor"]);
 // Content alignment that fails the monotonic DP scatters its windows across the
 // recording (the DP silently falls back to greedy per-slot picks). A content path
 // with too many out-of-order windows is not teacher-grade. Measured real recordings
@@ -634,32 +634,40 @@ function evaluateTeacherReadyGate({
   maxInterWindowGapRatio,
 } = {}) {
   const scanModeTrusted = TEACHER_READY_TRUSTED_SCAN_MODES.has(safeString(scanMode));
+  // manual-anchor = a human listened, marked the audio window, and confirmed it
+  // matches the score. That human verification IS the alignment evidence -- stronger
+  // than any automatic check -- so the automatic alignment gates (ratio, overlap,
+  // content-path, and no-system-findings, since these are technique-labeling samples
+  // labelled from scratch) do not apply. Generated only for humanMatched=yes entries.
+  const isManualAnchor = safeString(scanMode) === "manual-anchor";
   const isPartialCoverage = safeString(coverageMode).startsWith("partial");
   const teacherReadyReasons = [];
-  if (isPartialCoverage) {
-    if (alignedSpanRatio == null) {
-      teacherReadyReasons.push("aligned-span-ratio-missing");
+  if (!isManualAnchor) {
+    if (isPartialCoverage) {
+      if (alignedSpanRatio == null) {
+        teacherReadyReasons.push("aligned-span-ratio-missing");
+      } else {
+        if (alignedSpanRatio < TEACHER_READY_MIN_DURATION_RATIO) {
+          teacherReadyReasons.push(`aligned-span-ratio-too-low:${alignedSpanRatio}`);
+        }
+        if (alignedSpanRatio > TEACHER_READY_MAX_DURATION_RATIO) {
+          teacherReadyReasons.push(`aligned-span-ratio-too-high:${alignedSpanRatio}`);
+        }
+      }
+    } else if (durationRatio == null) {
+      teacherReadyReasons.push("duration-ratio-too-low:missing");
     } else {
-      if (alignedSpanRatio < TEACHER_READY_MIN_DURATION_RATIO) {
-        teacherReadyReasons.push(`aligned-span-ratio-too-low:${alignedSpanRatio}`);
+      if (durationRatio < TEACHER_READY_MIN_DURATION_RATIO) {
+        teacherReadyReasons.push(`duration-ratio-too-low:${durationRatio}`);
       }
-      if (alignedSpanRatio > TEACHER_READY_MAX_DURATION_RATIO) {
-        teacherReadyReasons.push(`aligned-span-ratio-too-high:${alignedSpanRatio}`);
+      if (durationRatio > TEACHER_READY_MAX_DURATION_RATIO) {
+        teacherReadyReasons.push(`duration-ratio-too-high:${durationRatio}`);
       }
     }
-  } else if (durationRatio == null) {
-    teacherReadyReasons.push("duration-ratio-too-low:missing");
-  } else {
-    if (durationRatio < TEACHER_READY_MIN_DURATION_RATIO) {
-      teacherReadyReasons.push(`duration-ratio-too-low:${durationRatio}`);
+    if (hasWindowOverlap) teacherReadyReasons.push("section-windows-overlap");
+    if (safeNumber(totalSystemFindings, 0) < TEACHER_READY_MIN_SYSTEM_FINDINGS) {
+      teacherReadyReasons.push("no-system-findings");
     }
-    if (durationRatio > TEACHER_READY_MAX_DURATION_RATIO) {
-      teacherReadyReasons.push(`duration-ratio-too-high:${durationRatio}`);
-    }
-  }
-  if (hasWindowOverlap) teacherReadyReasons.push("section-windows-overlap");
-  if (safeNumber(totalSystemFindings, 0) < TEACHER_READY_MIN_SYSTEM_FINDINGS) {
-    teacherReadyReasons.push("no-system-findings");
   }
   // Monotonicity gate (Phase 1), applied ONLY to content-aligned scans. analyzer-
   // window etc. never produce these fields, so they are untouched. For a content

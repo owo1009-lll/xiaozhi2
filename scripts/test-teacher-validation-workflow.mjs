@@ -391,6 +391,23 @@ try {
   assert.equal(contiguousContent.teacherReadyTrusted, true);
   assert.deepEqual(contiguousContent.teacherReadyReasons, []);
 
+  // --- manual-anchor (Plan C): human-verified window, technique-labeling from scratch.
+  // Trusted with NO system findings and NO automatic alignment evidence (the human is
+  // the alignment guarantee). Only generated for humanMatched=yes entries.
+  const manualAnchor = gate({
+    summary: { audioCoverage: { scanMode: "manual-anchor", audioDurationSeconds: 32 } },
+    sectionPasses: [{ startSeconds: 84.0, endSeconds: 116.0, sequenceIndex: 0 }],
+  });
+  assert.equal(manualAnchor.scanModeTrusted, true);
+  assert.equal(manualAnchor.teacherReadyTrusted, true);
+  assert.deepEqual(manualAnchor.teacherReadyReasons, []);
+  // embedded manual-anchor re-judges trusted too (no findings/ratio fields needed)
+  const manualAnchorEmbedded = readEmbedded({
+    alignmentEvidence: { trusted: true, teacherReadyTrusted: true, scanMode: "manual-anchor" },
+  }, {});
+  assert.equal(manualAnchorEmbedded.teacherReadyTrusted, true);
+  assert.deepEqual(manualAnchorEmbedded.teacherReadyReasons, []);
+
   // --- monotonicity gate (Phase 1): scattered content path is rejected ---
   // Real measured violation rates: 2nd rhapsody 0.41, 4th rhapsody 0.46. Both must
   // fail as content-path-not-monotonic, so they never reach the teacher backend.
