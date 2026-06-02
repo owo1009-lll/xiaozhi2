@@ -283,6 +283,48 @@ try {
   assert.equal(unknownMode.scanModeTrusted, false);
   assert.equal(unknownMode.teacherReadyTrusted, false);
 
+  // --- embedded evidence is RE-JUDGED, not trusted blindly (server bypass fix) ---
+  const readEmbedded = teacherValidationInternals.readTeacherAlignmentEvidence;
+  // an old pack that stored teacherReadyTrusted:true but is actually scattered must fail now
+  const staleScattered = readEmbedded({
+    alignmentEvidence: {
+      trusted: true, scanModeTrusted: true, teacherReadyTrusted: true, teacherReadyReasons: [],
+      scanMode: "content-aligned", coverageMode: "partial-piece",
+      alignedSpanRatio: 24.5, hasWindowOverlap: false, totalSystemFindings: 3,
+    },
+  }, {});
+  assert.equal(staleScattered.teacherReadyTrusted, false);
+  assert(staleScattered.teacherReadyReasons.some((r) => r.startsWith("aligned-span-ratio-too-high")));
+  // an old pack with a now-untrusted scanMode but stored trusted:true must fail now
+  const staleUntrustedMode = readEmbedded({
+    alignmentEvidence: {
+      trusted: true, scanModeTrusted: true, teacherReadyTrusted: true, teacherReadyReasons: [],
+      scanMode: "fast-sequence-window", coverageMode: "full-piece",
+      durationRatio: 1.0, hasWindowOverlap: false, totalSystemFindings: 5,
+    },
+  }, {});
+  assert.equal(staleUntrustedMode.scanModeTrusted, false);
+  assert.equal(staleUntrustedMode.teacherReadyTrusted, false);
+  // an old pack missing the new fields fails closed (can't verify -> not trusted)
+  const staleMissingFields = readEmbedded({
+    alignmentEvidence: {
+      trusted: true, teacherReadyTrusted: true,
+      scanMode: "content-aligned", coverageMode: "partial-piece",
+    },
+  }, {});
+  assert.equal(staleMissingFields.teacherReadyTrusted, false);
+  assert(staleMissingFields.teacherReadyReasons.some((r) => r === "aligned-span-ratio-missing"));
+  // a genuinely sane embedded record still passes after re-judging
+  const saneEmbedded = readEmbedded({
+    alignmentEvidence: {
+      trusted: true, teacherReadyTrusted: true,
+      scanMode: "content-aligned", coverageMode: "full-piece",
+      durationRatio: 0.95, hasWindowOverlap: false, totalSystemFindings: 4,
+    },
+  }, {});
+  assert.equal(saneEmbedded.teacherReadyTrusted, true);
+  assert.deepEqual(saneEmbedded.teacherReadyReasons, []);
+
   const filledReviews = {
     schemaVersion: 1,
     reviews: pack.reviewRows.map((row, index) => ({

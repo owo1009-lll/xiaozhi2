@@ -584,6 +584,61 @@ function hasSevereWindowOverlap(windows = []) {
   return false;
 }
 
+// Single source of truth for the teacher-ready gate. Used by BOTH the pass.json
+// builder and the embedded-evidence reader, so an old pack that once stored
+// teacherReadyTrusted:true is re-judged by the current rules (scanMode allowlist +
+// coverage-aware ratio bounds) rather than trusted blindly. Inputs are the already
+// derived fields; missing fields fail closed (conservative reject).
+function evaluateTeacherReadyGate({
+  scanMode,
+  coverageMode,
+  durationRatio,
+  alignedSpanRatio,
+  hasWindowOverlap,
+  totalSystemFindings,
+} = {}) {
+  const scanModeTrusted = TEACHER_READY_TRUSTED_SCAN_MODES.has(safeString(scanMode));
+  const isPartialCoverage = safeString(coverageMode).startsWith("partial");
+  const teacherReadyReasons = [];
+  if (isPartialCoverage) {
+    if (alignedSpanRatio == null) {
+      teacherReadyReasons.push("aligned-span-ratio-missing");
+    } else {
+      if (alignedSpanRatio < TEACHER_READY_MIN_DURATION_RATIO) {
+        teacherReadyReasons.push(`aligned-span-ratio-too-low:${alignedSpanRatio}`);
+      }
+      if (alignedSpanRatio > TEACHER_READY_MAX_DURATION_RATIO) {
+        teacherReadyReasons.push(`aligned-span-ratio-too-high:${alignedSpanRatio}`);
+      }
+    }
+  } else if (durationRatio == null) {
+    teacherReadyReasons.push("duration-ratio-too-low:missing");
+  } else {
+    if (durationRatio < TEACHER_READY_MIN_DURATION_RATIO) {
+      teacherReadyReasons.push(`duration-ratio-too-low:${durationRatio}`);
+    }
+    if (durationRatio > TEACHER_READY_MAX_DURATION_RATIO) {
+      teacherReadyReasons.push(`duration-ratio-too-high:${durationRatio}`);
+    }
+  }
+  if (hasWindowOverlap) teacherReadyReasons.push("section-windows-overlap");
+  if (safeNumber(totalSystemFindings, 0) < TEACHER_READY_MIN_SYSTEM_FINDINGS) {
+    teacherReadyReasons.push("no-system-findings");
+  }
+  return {
+    scanModeTrusted,
+    teacherReadyReasons,
+    teacherReadyTrusted: scanModeTrusted && teacherReadyReasons.length === 0,
+  };
+}
+
+function teacherAlignmentReasonText(scanMode, scanModeTrusted) {
+  if (scanModeTrusted) return "segment windows came from an analyzer-backed scan";
+  return scanMode === "fast-sequence-window"
+    ? "fast sequence windows are score-order estimates, not teacher-grade audio/PDF alignment"
+    : "missing analyzer-backed alignment evidence";
+}
+
 function buildTeacherAlignmentEvidenceFromPassJson(passJson = {}) {
   const coverage = passJson?.summary?.audioCoverage || passJson?.audioCoverage || {};
   const sectionPasses = getArray(passJson?.sectionPasses);
@@ -594,7 +649,6 @@ function buildTeacherAlignmentEvidenceFromPassJson(passJson = {}) {
     audioDurationSeconds && estimatedPieceDurationSeconds
       ? Number((estimatedPieceDurationSeconds / audioDurationSeconds).toFixed(3))
       : null;
-  const scanModeTrusted = TEACHER_READY_TRUSTED_SCAN_MODES.has(scanMode);
   const totalSystemFindings = sectionPasses.reduce(
     (total, section) => total + getArray(section?.noteFindings).length + getArray(section?.measureFindings).length,
     0,
@@ -612,41 +666,19 @@ function buildTeacherAlignmentEvidenceFromPassJson(passJson = {}) {
   // uses alignedSpan / expectedAlignedSpan (a span far larger than the sections'
   // own expected length means the windows are scattered, not contiguous).
   const coverageMode = safeString(coverage.wholePieceCoverageMode || coverage.alignmentCoverageMode);
-  const isPartialCoverage = coverageMode.startsWith("partial");
   const alignedSpan = safeNumber(coverage.alignedSpanDurationSeconds, null);
   const expectedAlignedSpan = safeNumber(coverage.expectedAlignedSpanDurationSeconds, null);
   const alignedSpanRatio = (alignedSpan != null && expectedAlignedSpan && expectedAlignedSpan > 0)
     ? Number((alignedSpan / expectedAlignedSpan).toFixed(3))
     : null;
-  const teacherReadyReasons = [];
-  if (isPartialCoverage) {
-    // partial coverage: judge the aligned-span ratio (both bounds)
-    if (alignedSpanRatio == null) {
-      teacherReadyReasons.push("aligned-span-ratio-missing");
-    } else {
-      if (alignedSpanRatio < TEACHER_READY_MIN_DURATION_RATIO) {
-        teacherReadyReasons.push(`aligned-span-ratio-too-low:${alignedSpanRatio}`);
-      }
-      if (alignedSpanRatio > TEACHER_READY_MAX_DURATION_RATIO) {
-        teacherReadyReasons.push(`aligned-span-ratio-too-high:${alignedSpanRatio}`);
-      }
-    }
-  } else {
-    // full coverage (or legacy whole-piece): judge estimatedPieceDuration / audio
-    if (durationRatio == null) {
-      teacherReadyReasons.push("duration-ratio-too-low:missing");
-    } else {
-      if (durationRatio < TEACHER_READY_MIN_DURATION_RATIO) {
-        teacherReadyReasons.push(`duration-ratio-too-low:${durationRatio}`);
-      }
-      if (durationRatio > TEACHER_READY_MAX_DURATION_RATIO) {
-        teacherReadyReasons.push(`duration-ratio-too-high:${durationRatio}`);
-      }
-    }
-  }
-  if (hasWindowOverlap) teacherReadyReasons.push("section-windows-overlap");
-  if (totalSystemFindings < TEACHER_READY_MIN_SYSTEM_FINDINGS) teacherReadyReasons.push("no-system-findings");
-  const teacherReadyTrusted = scanModeTrusted && teacherReadyReasons.length === 0;
+  const { scanModeTrusted, teacherReadyReasons, teacherReadyTrusted } = evaluateTeacherReadyGate({
+    scanMode,
+    coverageMode,
+    durationRatio,
+    alignedSpanRatio,
+    hasWindowOverlap,
+    totalSystemFindings,
+  });
   return {
     trusted: scanModeTrusted,
     scanModeTrusted,
@@ -669,36 +701,50 @@ function buildTeacherAlignmentEvidenceFromPassJson(passJson = {}) {
       overlapMinRatio: TEACHER_READY_OVERLAP_MIN_RATIO,
       minSystemFindings: TEACHER_READY_MIN_SYSTEM_FINDINGS,
     },
-    reason: scanModeTrusted
-      ? "segment windows came from an analyzer-backed scan"
-      : scanMode === "fast-sequence-window"
-        ? "fast sequence windows are score-order estimates, not teacher-grade audio/PDF alignment"
-        : "missing analyzer-backed alignment evidence",
+    reason: teacherAlignmentReasonText(scanMode, scanModeTrusted),
   };
 }
 
 function readTeacherAlignmentEvidence(item = {}, analysis = {}, repoRoot) {
   const embedded = item.alignmentEvidence || analysis?.sourceMetadata?.alignmentEvidence;
   if (embedded && typeof embedded === "object") {
+    // Re-judge embedded evidence with the CURRENT gate instead of trusting a stored
+    // teacherReadyTrusted/trusted flag. An old pack written before the scanMode
+    // allowlist or the aligned-span-ratio bounds existed must not bypass them; if it
+    // lacks the fields those rules need, the gate fails closed.
+    const scanMode = safeString(embedded.scanMode, "unknown");
+    const coverageMode = safeString(embedded.coverageMode) || null;
+    const durationRatio = safeNumber(embedded.durationRatio, null);
+    const alignedSpanRatio = safeNumber(embedded.alignedSpanRatio, null);
+    const hasWindowOverlap = embedded.hasWindowOverlap === true;
+    const totalSystemFindings = safeNumber(embedded.totalSystemFindings, null);
+    const { scanModeTrusted, teacherReadyReasons, teacherReadyTrusted } = evaluateTeacherReadyGate({
+      scanMode,
+      coverageMode,
+      durationRatio,
+      alignedSpanRatio,
+      hasWindowOverlap,
+      totalSystemFindings,
+    });
     return {
-      trusted: embedded.trusted === true,
-      scanModeTrusted: embedded.scanModeTrusted === true || embedded.trusted === true,
-      teacherReadyTrusted: embedded.teacherReadyTrusted === true,
-      teacherReadyReasons: getArray(embedded.teacherReadyReasons),
-      scanMode: safeString(embedded.scanMode, "unknown"),
+      trusted: scanModeTrusted,
+      scanModeTrusted,
+      teacherReadyTrusted,
+      teacherReadyReasons,
+      scanMode,
       audioDurationSeconds: safeNumber(embedded.audioDurationSeconds, null),
       estimatedPieceDurationSeconds: safeNumber(embedded.estimatedPieceDurationSeconds, null),
-      durationRatio: safeNumber(embedded.durationRatio, null),
+      durationRatio,
       alignedSpanDurationSeconds: safeNumber(embedded.alignedSpanDurationSeconds, null),
       expectedAlignedSpanDurationSeconds: safeNumber(embedded.expectedAlignedSpanDurationSeconds, null),
-      alignedSpanRatio: safeNumber(embedded.alignedSpanRatio, null),
-      coverageMode: safeString(embedded.coverageMode) || null,
-      totalSystemFindings: safeNumber(embedded.totalSystemFindings, null),
-      hasWindowOverlap: embedded.hasWindowOverlap === true,
+      alignedSpanRatio,
+      coverageMode,
+      totalSystemFindings,
+      hasWindowOverlap,
       teacherReadyThresholds: embedded.teacherReadyThresholds && typeof embedded.teacherReadyThresholds === "object"
         ? embedded.teacherReadyThresholds
         : null,
-      reason: safeString(embedded.reason),
+      reason: teacherAlignmentReasonText(scanMode, scanModeTrusted),
     };
   }
   const passJsonPath = resolveRepoPath(analysis?.sourceMetadata?.passJsonPath || item.passJsonPath, repoRoot);
@@ -1071,4 +1117,6 @@ export const teacherValidationInternals = {
   summarizeTeacherReviewRows,
   summarizeTeacherPackReadiness,
   buildTeacherAlignmentEvidenceFromPassJson,
+  readTeacherAlignmentEvidence,
+  evaluateTeacherReadyGate,
 };
