@@ -50,12 +50,19 @@ def _require_librosa():
 
 
 def whole_audio_chroma(audio: np.ndarray, sr: int = DEFAULT_SR, hop: int = DEFAULT_HOP) -> np.ndarray:
-    """12 x T column-L2-normalised chroma for the whole recording."""
+    """12 x T column-L2-normalised chroma for the whole recording. Silent frames
+    (zero energy) are set to a uniform unit vector instead of left at zero, so the
+    cosine-metric DTW never sees a zero column (which would make its cost matrix NaN
+    and raise). A uniform column is pitch-neutral: weakly similar to everything."""
     _require_librosa()
     chroma = librosa.feature.chroma_cqt(y=audio, sr=sr, hop_length=hop)
     norm = np.linalg.norm(chroma, axis=0, keepdims=True)
+    silent = norm[0] == 0
     norm[norm == 0] = 1.0
-    return (chroma / norm).astype(np.float32)
+    chroma = chroma / norm
+    if silent.any():
+        chroma[:, silent] = 1.0 / math.sqrt(12.0)
+    return chroma.astype(np.float32)
 
 
 def section_template_chroma(section: dict, hop_seconds: float) -> np.ndarray:
@@ -79,8 +86,15 @@ def section_template_chroma(section: dict, hop_seconds: float) -> np.ndarray:
 def topk_candidates(template: np.ndarray, chroma: np.ndarray, hop_seconds: float, k: int = DEFAULT_TOP_K) -> list[dict]:
     """Subsequence DTW -> up to k non-overlapping {start,end,cost} candidate windows
     (lower cost = better), found by repeatedly taking the lowest-cost path end in the
-    accumulated last row and suppressing a template-width region around it."""
+    accumulated last row and suppressing a template-width region around it.
+
+    A section with no erhu-line notes yields an all-zero template; cosine DTW on a
+    zero column is undefined (NaN cost matrix -> librosa raises). Such a section is
+    not content-locatable, so return [] -- the caller substitutes an inf-cost
+    placeholder window, preserving the 1:1 section<->result contract."""
     _require_librosa()
+    if template.size == 0 or not np.any(template):
+        return []
     accumulated, _ = librosa.sequence.dtw(X=template, Y=chroma, subseq=True, metric="cosine")
     last_row = accumulated[-1, :]
     finite = np.isfinite(last_row)
