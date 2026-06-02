@@ -195,13 +195,37 @@ try {
     manifest: { reviewMode: "technique-labeling" },
     items: [{
       audioClipPath: "data/teacher-validation/packs/fixture/audio-clips/case.wav",
-      alignmentEvidence: { trusted: true },
+      sourcePdfPath: "data/teacher-validation/packs/fixture/case.pdf",
+      alignmentEvidence: { trusted: true, teacherReadyTrusted: true },
       sourceKind: "teacher-grade-run",
       scoreLocator: { notePositions: [{ noteId: "n1" }] },
     }],
   });
   assert.equal(techniqueReady.reviewReady, true);
   assert.deepEqual(techniqueReady.reviewReadinessReasons, []);
+  const techniqueNotReady = teacherValidationInternals.summarizeTeacherPackReadiness({
+    manifest: { reviewMode: "technique-labeling" },
+    items: [{
+      audioClipPath: "data/teacher-validation/packs/fixture/audio-clips/case.wav",
+      sourcePdfPath: "data/teacher-validation/packs/fixture/case.pdf",
+      alignmentEvidence: { trusted: true, teacherReadyTrusted: false },
+      sourceKind: "teacher-grade-run",
+      scoreLocator: { notePositions: [{ noteId: "n1" }] },
+    }],
+  });
+  assert.equal(techniqueNotReady.reviewReady, false);
+  assert(techniqueNotReady.reviewReadinessReasons.includes("not-teacher-ready-trusted"));
+  const techniqueNoPdf = teacherValidationInternals.summarizeTeacherPackReadiness({
+    manifest: { reviewMode: "technique-labeling" },
+    items: [{
+      audioClipPath: "data/teacher-validation/packs/fixture/audio-clips/case.wav",
+      alignmentEvidence: { trusted: true, teacherReadyTrusted: true },
+      sourceKind: "teacher-grade-run",
+      scoreLocator: { notePositions: [{ noteId: "n1" }] },
+    }],
+  });
+  assert.equal(techniqueNoPdf.reviewReady, false);
+  assert(techniqueNoPdf.reviewReadinessReasons.includes("missing-pdf-assets"));
   const normalNotReady = teacherValidationInternals.summarizeTeacherPackReadiness({
     manifest: {},
     items: [{

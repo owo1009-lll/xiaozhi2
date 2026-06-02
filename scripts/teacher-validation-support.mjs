@@ -29,6 +29,20 @@ export function numeric(value) {
   return Number.isFinite(number) ? number : null;
 }
 
+function envNumber(name, fallback) {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+// Teacher-ready gate thresholds. Must stay in sync with the same constants in
+// src/server/teacherValidationService.js so pack-time and server-time agree.
+const TEACHER_READY_MIN_DURATION_RATIO = envNumber("ERHU_TEACHER_READY_MIN_DURATION_RATIO", 0.5);
+// Mild padding overlap between adjacent windows is normal; only a SEVERE overlap
+// (absolute seconds OR fraction of the shorter window) signals unreliable windows.
+const TEACHER_READY_OVERLAP_MIN_SECONDS = envNumber("ERHU_TEACHER_READY_OVERLAP_MIN_SECONDS", 4.0);
+const TEACHER_READY_OVERLAP_MIN_RATIO = envNumber("ERHU_TEACHER_READY_OVERLAP_MIN_RATIO", 0.25);
+const TEACHER_READY_MIN_SYSTEM_FINDINGS = Math.max(0, Math.round(envNumber("ERHU_TEACHER_READY_MIN_SYSTEM_FINDINGS", 1)));
+
 export function cleanText(value, fallback = "") {
   return repairMojibakeText(value) || safeString(value, fallback) || fallback;
 }
@@ -289,6 +303,7 @@ function buildOriginalAudio(repoRoot, result = {}, job = {}, wholeAnalysis = {})
 
 function buildAlignmentEvidence(passJson = {}) {
   const coverage = passJson?.summary?.audioCoverage || passJson?.audioCoverage || {};
+  const sectionPasses = getArray(passJson?.sectionPasses);
   const scanMode = safeString(coverage.scanMode, "");
   const audioDurationSeconds = numeric(coverage.audioDurationSeconds);
   const estimatedPieceDurationSeconds = numeric(coverage.estimatedPieceDurationSeconds);
@@ -296,14 +311,53 @@ function buildAlignmentEvidence(passJson = {}) {
     audioDurationSeconds && estimatedPieceDurationSeconds
       ? Number((estimatedPieceDurationSeconds / audioDurationSeconds).toFixed(3))
       : null;
-  const trusted = Boolean(scanMode) && scanMode !== "fast-sequence-window";
+  const scanModeTrusted = Boolean(scanMode) && scanMode !== "fast-sequence-window";
+  const totalSystemFindings = sectionPasses.reduce(
+    (total, section) => total + getArray(section?.noteFindings).length + getArray(section?.measureFindings).length,
+    0,
+  );
+  const windows = sectionPasses
+    .map((section, index) => ({
+      order: Number.isFinite(Number(section?.sequenceIndex)) ? Number(section.sequenceIndex) : index,
+      start: numeric(section?.startSeconds),
+      end: numeric(section?.endSeconds),
+    }))
+    .filter((window) => window.start != null && window.end != null && window.end > window.start)
+    .sort((left, right) => left.order - right.order);
+  const hasWindowOverlap = windows.some((window, index) => {
+    if (index <= 0) return false;
+    const prev = windows[index - 1];
+    const overlap = prev.end - window.start;
+    if (overlap <= 0) return false;
+    const shorter = Math.min(prev.end - prev.start, window.end - window.start);
+    const ratio = shorter > 0 ? overlap / shorter : 1;
+    return overlap >= TEACHER_READY_OVERLAP_MIN_SECONDS || ratio >= TEACHER_READY_OVERLAP_MIN_RATIO;
+  });
+  const teacherReadyReasons = [];
+  if (durationRatio == null || durationRatio < TEACHER_READY_MIN_DURATION_RATIO) {
+    teacherReadyReasons.push(`duration-ratio-too-low:${durationRatio == null ? "missing" : durationRatio}`);
+  }
+  if (hasWindowOverlap) teacherReadyReasons.push("section-windows-overlap");
+  if (totalSystemFindings < TEACHER_READY_MIN_SYSTEM_FINDINGS) teacherReadyReasons.push("no-system-findings");
+  const teacherReadyTrusted = scanModeTrusted && teacherReadyReasons.length === 0;
   return {
-    trusted,
+    trusted: scanModeTrusted,
+    scanModeTrusted,
+    teacherReadyTrusted,
+    teacherReadyReasons,
     scanMode: scanMode || "unknown",
     audioDurationSeconds,
     estimatedPieceDurationSeconds,
     durationRatio,
-    reason: trusted
+    totalSystemFindings,
+    hasWindowOverlap,
+    teacherReadyThresholds: {
+      minDurationRatio: TEACHER_READY_MIN_DURATION_RATIO,
+      overlapMinSeconds: TEACHER_READY_OVERLAP_MIN_SECONDS,
+      overlapMinRatio: TEACHER_READY_OVERLAP_MIN_RATIO,
+      minSystemFindings: TEACHER_READY_MIN_SYSTEM_FINDINGS,
+    },
+    reason: scanModeTrusted
       ? "segment windows came from an analyzer-backed scan"
       : scanMode === "fast-sequence-window"
         ? "fast sequence windows are score-order estimates, not teacher-grade audio/PDF alignment"
@@ -497,10 +551,15 @@ export function collectTeacherValidationCandidates({ repoRoot = REPO_ROOT, unit 
   return Array.from(deduped.values());
 }
 
-export function selectTeacherValidationCandidates(candidates, { max = 50, minSystemFindings = 0, requireTrustedAlignment = true } = {}) {
+export function selectTeacherValidationCandidates(candidates, { max = 50, minSystemFindings = 0, requireTrustedAlignment = true, requireTeacherReadyTrusted = false } = {}) {
   const filtered = candidates
     .filter((candidate) => candidate.noteFindingCount + candidate.measureFindingCount >= minSystemFindings)
     .filter((candidate) => !requireTrustedAlignment || candidate.alignmentEvidence?.trusted === true)
+    // teacher-ready gate: only samples whose audio window is trustworthy enough to
+    // put in front of a teacher (duration scale sane, no severe window overlap,
+    // has system findings). Keeps unreliable-window samples out of the pack itself
+    // rather than letting the server hide the whole pack afterwards.
+    .filter((candidate) => !requireTeacherReadyTrusted || candidate.alignmentEvidence?.teacherReadyTrusted === true)
     .sort((left, right) => right.riskScore - left.riskScore || left.title.localeCompare(right.title, "zh-Hans-CN"));
   const byTitle = new Map();
   for (const candidate of filtered) {
@@ -683,17 +742,29 @@ export async function buildTeacherValidationPack({
   extractAudio = false,
   strictMin = false,
   requireTrustedAlignment = true,
+  requireTeacherReadyTrusted = null,
 } = {}) {
   const resolvedOutputDir = outputDir || path.join(repoRoot, DEFAULT_PACK_ROOT, new Date().toISOString().replace(/[:.]/g, "-"));
+  // technique-labeling packs go straight to teachers, so they require the stricter
+  // teacher-ready gate by default; other review modes keep the old behaviour.
+  const teacherReadyRequired = requireTeacherReadyTrusted == null
+    ? safeString(reviewMode) === "technique-labeling"
+    : Boolean(requireTeacherReadyTrusted);
   const allCandidates = filterCandidatesByTitle(collectTeacherValidationCandidates({ repoRoot, unit, sources }), titles);
   const rejectedUntrustedAlignmentCount = allCandidates.filter((candidate) => candidate.alignmentEvidence?.trusted !== true).length;
+  const rejectedNotTeacherReadyCount = teacherReadyRequired
+    ? allCandidates.filter((candidate) => candidate.alignmentEvidence?.trusted === true && candidate.alignmentEvidence?.teacherReadyTrusted !== true).length
+    : 0;
   const candidates = selectTeacherValidationCandidates(
     allCandidates,
-    { max, minSystemFindings, requireTrustedAlignment },
+    { max, minSystemFindings, requireTrustedAlignment, requireTeacherReadyTrusted: teacherReadyRequired },
   );
   const warnings = [];
   if (requireTrustedAlignment && rejectedUntrustedAlignmentCount) {
     warnings.push(`rejected ${rejectedUntrustedAlignmentCount} candidate(s) without analyzer-backed audio/PDF alignment`);
+  }
+  if (teacherReadyRequired && rejectedNotTeacherReadyCount) {
+    warnings.push(`rejected ${rejectedNotTeacherReadyCount} trusted candidate(s) that failed the teacher-ready gate (duration scale / window overlap / no findings)`);
   }
   if (candidates.length < min) {
     const message = `selected ${candidates.length} candidate(s), below requested minimum ${min}`;

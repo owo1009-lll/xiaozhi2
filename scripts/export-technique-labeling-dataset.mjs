@@ -53,6 +53,7 @@ function parseArgs(argv = process.argv.slice(2)) {
     max: 200,
     minSystemFindings: 0,
     requireTrustedAlignment: true,
+    requireTeacherReadyTrusted: true,
     outputDir: "",
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -63,6 +64,8 @@ function parseArgs(argv = process.argv.slice(2)) {
     else if (arg === "--max") parsed.max = Math.max(1, Number(argv[++index]) || parsed.max);
     else if (arg === "--min-system-findings") parsed.minSystemFindings = Math.max(0, Number(argv[++index]) || 0);
     else if (arg === "--allow-untrusted-alignment") parsed.requireTrustedAlignment = false;
+    // Escape hatch for diagnostics only; teacher-ready gate is on by default.
+    else if (arg === "--allow-not-teacher-ready") parsed.requireTeacherReadyTrusted = false;
     else if (arg === "--output-dir") parsed.outputDir = path.resolve(parsed.repoRoot, argv[++index] || "");
   }
   if (!parsed.outputDir) {
@@ -115,6 +118,7 @@ function main() {
       max: options.max,
       minSystemFindings: options.minSystemFindings,
       requireTrustedAlignment: options.requireTrustedAlignment,
+      requireTeacherReadyTrusted: options.requireTeacherReadyTrusted,
     },
   );
 
