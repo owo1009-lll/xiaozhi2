@@ -68,13 +68,46 @@ SR, HOP = ca.DEFAULT_SR, ca.DEFAULT_HOP
 HOP_SECONDS = HOP / SR
 
 
+_WHOLE_PAGE_RE = re.compile(r"^page-(\d+)$")
+_SPLIT_PAGE_RE = re.compile(r"^page-(\d+)-s\d+$")
+
+
 def load_ordered_sections(score_id: str) -> list[dict]:
+    """Canonical section selection + ordering.
+
+    A score can carry BOTH a whole-page section (id 'page-NN') and split fragments
+    of the same page (id 'page-NN-sYY'). The whole-page one then duplicates the
+    fragments' measures -- if grouped in, it pollutes a coarse template. So: when a
+    page has split fragments, drop its whole-page section (whole-page sections of
+    pages that were NOT split are kept -- they fill real gaps). Ordering is by score
+    MEASURE (the true musical order), not sequenceIndex, because whole-page sections
+    can carry a tiny sequenceIndex that would wrongly sort them to the front.
+    """
     store = json.loads((REPO_ROOT / "data" / "erhu-score-imports.json").read_text(encoding="utf-8"))
     score = next((s for s in store.get("scores", []) if s.get("scoreId") == score_id), None)
     if score is None:
         raise SystemExit(f"score not found: {score_id}")
     sections = [s for s in (score.get("sections") or []) if s.get("notes")]
-    return sorted(sections, key=lambda s: int(scan.safe_number(s.get("sequenceIndex"), 0)))
+
+    pages_with_splits = {
+        _SPLIT_PAGE_RE.match(str(s.get("sectionId", ""))).group(1)
+        for s in sections
+        if _SPLIT_PAGE_RE.match(str(s.get("sectionId", "")))
+    }
+    kept = []
+    for section in sections:
+        whole = _WHOLE_PAGE_RE.match(str(section.get("sectionId", "")))
+        if whole and whole.group(1) in pages_with_splits:
+            continue  # redundant whole-page duplicate of its split fragments
+        kept.append(section)
+
+    def order_key(section: dict):
+        rng = section_measure_range(section)
+        measure = rng[0] if rng else 10 ** 9  # sections without measures sort last
+        page = section_page(section)
+        return (measure, page if page is not None else 10 ** 9, int(scan.safe_number(section.get("sequenceIndex"), 0)))
+
+    return sorted(kept, key=order_key)
 
 
 def section_page(section: dict) -> int | None:
@@ -223,7 +256,8 @@ def main() -> int:
     parser.add_argument("--chunk-size", type=int, default=6,
                         help="Fixed number of consecutive sections per coarse unit (default 6). 0 -> adaptive.")
     parser.add_argument("--min-frames", type=int, default=600,
-                        help="Adaptive mode (chunk-size 0): merge sections until the unit template reaches this many chroma frames (~%.2fs each)." % HOP_SECONDS)
+                        help="Adaptive mode (chunk-size 0): merge sections until the unit template reaches this many chroma frames "
+                             "(each frame ~%.3fs, so the default 600 frames ~%.0fs)." % (HOP_SECONDS, 600 * HOP_SECONDS))
     parser.add_argument("--top-k", type=int, default=ca.DEFAULT_TOP_K)
     parser.add_argument("--span-penalty", type=float, default=ca.DEFAULT_SPAN_PENALTY)
     parser.add_argument("--out", default="", help="Optional explicit output JSON path.")
