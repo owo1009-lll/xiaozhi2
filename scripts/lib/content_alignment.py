@@ -122,7 +122,7 @@ def topk_candidates(template: np.ndarray, chroma: np.ndarray, hop_seconds: float
 
 
 def choose_monotonic_path(slot_candidates: list[list[dict]], hop_seconds: float,
-                          span_penalty: float = DEFAULT_SPAN_PENALTY) -> list[dict]:
+                          span_penalty: float = DEFAULT_SPAN_PENALTY) -> tuple[list[dict], dict]:
     """Pick one window per slot (section in order, or occurrence in play order)
     minimizing total cost subject to non-decreasing start, so repeats cannot
     collapse onto an earlier occurrence. A span/continuity penalty (span_penalty)

@@ -251,12 +251,14 @@ try {
   });
   assert.equal(scattered.teacherReadyTrusted, false);
   assert(scattered.teacherReadyReasons.some((r) => r.startsWith("aligned-span-ratio-too-high")));
-  // sane partial (span ~= expected): passes the span gate
+  // sane partial (span ~= expected): passes the span gate. content-aligned now also
+  // requires in-order monotonicity evidence.
   const sanePartial = gate({
     summary: { audioCoverage: {
       scanMode: "content-aligned", audioDurationSeconds: 481.5,
       alignmentCoverageMode: "partial-selected", wholePieceCoverageMode: "partial-piece",
       alignedSpanDurationSeconds: 14.0, expectedAlignedSpanDurationSeconds: 13.33,
+      monotonicViolationRate: 0.0, greedyFallbackCount: 0, contentAlignmentMonotonic: true,
     } },
     sectionPasses: [
       { noteFindings: [{}], startSeconds: 0, endSeconds: 6, sequenceIndex: 0 },
@@ -265,11 +267,12 @@ try {
   });
   assert.equal(sanePartial.teacherReadyTrusted, true);
   assert.deepEqual(sanePartial.teacherReadyReasons, []);
-  // full coverage with sane durationRatio passes
+  // full coverage with sane durationRatio + in-order content path passes
   const saneFull = gate({
     summary: { audioCoverage: {
       scanMode: "content-aligned", audioDurationSeconds: 100, estimatedPieceDurationSeconds: 95,
       alignmentCoverageMode: "full-selected", wholePieceCoverageMode: "full-piece",
+      monotonicViolationRate: 0.0, greedyFallbackCount: 0, contentAlignmentMonotonic: true,
     } },
     sectionPasses: [{ noteFindings: [{}], startSeconds: 0, endSeconds: 50, sequenceIndex: 0 },
                     { noteFindings: [{}], startSeconds: 50, endSeconds: 95, sequenceIndex: 1 }],
@@ -314,16 +317,42 @@ try {
   }, {});
   assert.equal(staleMissingFields.teacherReadyTrusted, false);
   assert(staleMissingFields.teacherReadyReasons.some((r) => r === "aligned-span-ratio-missing"));
-  // a genuinely sane embedded record still passes after re-judging
+  // a genuinely sane embedded record still passes after re-judging (content-aligned
+  // now also requires in-order monotonicity evidence)
   const saneEmbedded = readEmbedded({
+    alignmentEvidence: {
+      trusted: true, teacherReadyTrusted: true,
+      scanMode: "content-aligned", coverageMode: "full-piece",
+      durationRatio: 0.95, hasWindowOverlap: false, totalSystemFindings: 4,
+      monotonicViolationRate: 0.0, greedyFallbackCount: 0, contentAlignmentMonotonic: true,
+    },
+  }, {});
+  assert.equal(saneEmbedded.teacherReadyTrusted, true);
+  assert.deepEqual(saneEmbedded.teacherReadyReasons, []);
+  // FAIL CLOSED: a content-aligned record with sane ratios/findings but NO
+  // monotonicity evidence (old B2 content pack) must be rejected, not skipped.
+  const contentMissingMono = readEmbedded({
     alignmentEvidence: {
       trusted: true, teacherReadyTrusted: true,
       scanMode: "content-aligned", coverageMode: "full-piece",
       durationRatio: 0.95, hasWindowOverlap: false, totalSystemFindings: 4,
     },
   }, {});
-  assert.equal(saneEmbedded.teacherReadyTrusted, true);
-  assert.deepEqual(saneEmbedded.teacherReadyReasons, []);
+  assert.equal(contentMissingMono.teacherReadyTrusted, false);
+  assert(contentMissingMono.teacherReadyReasons.includes("content-path-monotonicity-missing"));
+  // greedy-fallback gate: even when the violation rate is low, a DP that fell back to
+  // greedy (greedyFallbackCount>0 / monotonicFeasible=false) is rejected.
+  const greedyFallbackLowViol = gate({
+    summary: { audioCoverage: {
+      scanMode: "content-aligned", audioDurationSeconds: 100, estimatedPieceDurationSeconds: 95,
+      alignmentCoverageMode: "full-selected", wholePieceCoverageMode: "full-piece",
+      monotonicViolationRate: 0.0, greedyFallbackCount: 2, contentAlignmentMonotonic: false,
+    } },
+    sectionPasses: [{ noteFindings: [{}], startSeconds: 0, endSeconds: 50, sequenceIndex: 0 },
+                    { noteFindings: [{}], startSeconds: 50, endSeconds: 95, sequenceIndex: 1 }],
+  });
+  assert.equal(greedyFallbackLowViol.teacherReadyTrusted, false);
+  assert(greedyFallbackLowViol.teacherReadyReasons.some((r) => r.startsWith("content-path-greedy-fallback")));
 
   // --- monotonicity gate (Phase 1): scattered content path is rejected ---
   // Real measured violation rates: 2nd rhapsody 0.41, 4th rhapsody 0.46. Both must

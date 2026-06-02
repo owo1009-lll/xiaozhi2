@@ -372,13 +372,22 @@ function buildAlignmentEvidence(passJson = {}) {
   }
   if (hasWindowOverlap) teacherReadyReasons.push("section-windows-overlap");
   if (totalSystemFindings < TEACHER_READY_MIN_SYSTEM_FINDINGS) teacherReadyReasons.push("no-system-findings");
-  // Monotonicity gate (Phase 1). Only present for content-aligned scans; absent ->
-  // skipped. Too many out-of-order windows means the DP could not align the piece
-  // and scattered the windows -> not teacher-grade. Must match the server gate.
+  // Monotonicity gate (Phase 1), applied ONLY to content-aligned scans. FAIL CLOSED:
+  // an old content pack without these fields cannot be confirmed in-order, so it is
+  // rejected rather than skipped. Must match src/server/teacherValidationService.js.
   const monotonicViolationRate = numeric(coverage.monotonicViolationRate);
   const greedyFallbackCount = numeric(coverage.greedyFallbackCount);
-  if (monotonicViolationRate != null && monotonicViolationRate > TEACHER_READY_MAX_MONOTONIC_VIOLATION_RATE) {
-    teacherReadyReasons.push(`content-path-not-monotonic:${monotonicViolationRate}`);
+  const contentAlignmentMonotonic =
+    typeof coverage.contentAlignmentMonotonic === "boolean" ? coverage.contentAlignmentMonotonic : null;
+  if (scanMode === "content-aligned") {
+    if (monotonicViolationRate == null) {
+      teacherReadyReasons.push("content-path-monotonicity-missing");
+    } else if (monotonicViolationRate > TEACHER_READY_MAX_MONOTONIC_VIOLATION_RATE) {
+      teacherReadyReasons.push(`content-path-not-monotonic:${monotonicViolationRate}`);
+    }
+    if ((greedyFallbackCount != null && greedyFallbackCount > 0) || contentAlignmentMonotonic === false) {
+      teacherReadyReasons.push(`content-path-greedy-fallback:${greedyFallbackCount != null ? greedyFallbackCount : "unknown"}`);
+    }
   }
   const teacherReadyTrusted = scanModeTrusted && teacherReadyReasons.length === 0;
   return {
@@ -398,6 +407,7 @@ function buildAlignmentEvidence(passJson = {}) {
     hasWindowOverlap,
     monotonicViolationRate,
     greedyFallbackCount,
+    contentAlignmentMonotonic,
     teacherReadyThresholds: {
       minDurationRatio: TEACHER_READY_MIN_DURATION_RATIO,
       maxDurationRatio: TEACHER_READY_MAX_DURATION_RATIO,
