@@ -190,6 +190,15 @@ function loadScoreMap(repoRoot) {
   return new Map(getArray(scoreStore.scores).map((score) => [safeString(score.scoreId), score]));
 }
 
+// Manual-anchor jobs (Plan C): human-anchored short windows written by
+// scripts/build-manual-anchor-pack.mjs. Same job shape as the piece-pass store, so
+// candidatesFromPieceJob handles them; their pass.json carries scanMode manual-anchor
+// + manualAnchorConfirmed.
+function collectManualAnchorJobs(repoRoot) {
+  const store = readJson(path.join(repoRoot, "data", "teacher-manual-anchors", "manual-anchor-jobs.json"), {});
+  return getArray(store.jobs);
+}
+
 function findTeacherScoreSection(score = {}, sectionId = "") {
   const sections = getArray(score.sections);
   if (!sections.length) return null;
@@ -647,6 +656,19 @@ export function collectTeacherValidationCandidates({ repoRoot = REPO_ROOT, unit 
         result: {},
         scoreMap,
         sourceKind: "piece-pass-store",
+        unit,
+      }));
+    }
+  }
+  if (sources === "manual-anchors" || sources === "all") {
+    for (const job of collectManualAnchorJobs(repoRoot)) {
+      if (job.status !== "completed") continue;
+      candidates.push(...candidatesFromPieceJob({
+        repoRoot,
+        job,
+        result: {},
+        scoreMap,
+        sourceKind: "manual-anchor",
         unit,
       }));
     }
