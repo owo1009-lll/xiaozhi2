@@ -16,6 +16,7 @@ function parseArgs(argv = process.argv.slice(2)) {
     minSystemFindings: 0,
     raterId: "teacher-1",
     reviewMode: "",
+    titles: [],
     extractAudio: false,
     strictMin: false,
     requireTrustedAlignment: true,
@@ -31,6 +32,7 @@ function parseArgs(argv = process.argv.slice(2)) {
     else if (arg === "--min-system-findings") parsed.minSystemFindings = Math.max(0, Number(argv[++index]) || 0);
     else if (arg === "--rater-id") parsed.raterId = argv[++index] || parsed.raterId;
     else if (arg === "--review-mode") parsed.reviewMode = argv[++index] || parsed.reviewMode;
+    else if (arg === "--title") parsed.titles.push(argv[++index] || "");
     else if (arg === "--extract-audio") parsed.extractAudio = true;
     else if (arg === "--strict-min") parsed.strictMin = true;
     else if (arg === "--allow-untrusted-alignment") parsed.requireTrustedAlignment = false;
@@ -38,6 +40,7 @@ function parseArgs(argv = process.argv.slice(2)) {
   if (!parsed.outputDir) {
     parsed.outputDir = path.join(parsed.repoRoot, DEFAULT_PACK_ROOT, new Date().toISOString().replace(/[:.]/g, "-"));
   }
+  parsed.titles = parsed.titles.map((item) => String(item || "").trim()).filter(Boolean);
   return parsed;
 }
 

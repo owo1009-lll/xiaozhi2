@@ -519,6 +519,20 @@ export function selectTeacherValidationCandidates(candidates, { max = 50, minSys
   return selected;
 }
 
+function filterCandidatesByTitle(candidates, titles = []) {
+  const filters = titles.map((item) => cleanText(item).toLowerCase()).filter(Boolean);
+  if (!filters.length) return candidates;
+  return candidates.filter((candidate) => {
+    const haystack = [
+      cleanText(candidate.title),
+      cleanText(candidate.sectionTitle),
+      cleanText(candidate.sourcePdfPath),
+      cleanText(candidate.sourceAudioPath),
+    ].join(" ").toLowerCase();
+    return filters.some((title) => haystack.includes(title));
+  });
+}
+
 function csvEscape(value) {
   const text = Array.isArray(value) ? value.join("|") : safeString(value);
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
@@ -665,12 +679,13 @@ export async function buildTeacherValidationPack({
   minSystemFindings = 0,
   raterId = "teacher-1",
   reviewMode = "",
+  titles = [],
   extractAudio = false,
   strictMin = false,
   requireTrustedAlignment = true,
 } = {}) {
   const resolvedOutputDir = outputDir || path.join(repoRoot, DEFAULT_PACK_ROOT, new Date().toISOString().replace(/[:.]/g, "-"));
-  const allCandidates = collectTeacherValidationCandidates({ repoRoot, unit, sources });
+  const allCandidates = filterCandidatesByTitle(collectTeacherValidationCandidates({ repoRoot, unit, sources }), titles);
   const rejectedUntrustedAlignmentCount = allCandidates.filter((candidate) => candidate.alignmentEvidence?.trusted !== true).length;
   const candidates = selectTeacherValidationCandidates(
     allCandidates,
@@ -723,6 +738,7 @@ export async function buildTeacherValidationPack({
     warningCount: warnings.length,
     warnings,
     reviewMode: safeString(reviewMode),
+    titleFilters: getArray(titles).map((item) => safeString(item)).filter(Boolean),
     files: {
       analyses: "analyses.json",
       teacherReviewJson: "teacher-review-template.json",

@@ -180,6 +180,17 @@ try {
   });
   assert.equal(teacherGradePack.manifest.selectedCount, 2);
   assert.equal(teacherGradePack.manifest.warnings.length, 0);
+  const filteredTeacherGradePack = await buildTeacherValidationPack({
+    repoRoot,
+    outputDir: path.join(repoRoot, "data", "teacher-validation", "packs", "teacher-grade-filtered-fixture-pack"),
+    unit: "section",
+    sources: "teacher-grade-runs",
+    titles: ["Fixture Piece"],
+    max: 2,
+    min: 2,
+  });
+  assert.equal(filteredTeacherGradePack.manifest.selectedCount, 2);
+  assert.deepEqual(filteredTeacherGradePack.manifest.titleFilters, ["Fixture Piece"]);
   const techniqueReady = teacherValidationInternals.summarizeTeacherPackReadiness({
     manifest: { reviewMode: "technique-labeling" },
     items: [{
