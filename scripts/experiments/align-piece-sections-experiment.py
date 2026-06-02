@@ -347,13 +347,13 @@ def main() -> int:
         run_case("repeated-section", secs, layout_repeat),
         run_case("accompaniment-mix", secs, layout_plain, with_accompaniment=True, seed=7),
     ]
-    # B3.0 RED case: similar phrases + long background + accompaniment pollution.
-    # Three similar entry sections; their true heads are accompaniment-polluted, while
-    # clean copies of entries 2 & 3 sit ~140s and ~280s later. With no span/continuity
-    # penalty in choose_monotonic_path, entries 2/3 are pulled to the far clean decoys
-    # -> windows scatter across the whole piece (the real failure). This case is
-    # EXPECTED TO FAIL the alignment bar today and is tracked as xfail; B3.1
-    # (span penalty / onset anchors / erhu-focus chroma) must flip it to pass.
+    # similar phrases + long background + accompaniment pollution. Three similar entry
+    # sections; their true heads are accompaniment-polluted, while clean copies of
+    # entries 2 & 3 sit ~140s and ~280s later. WITHOUT the span/continuity penalty
+    # (B3.0) entries 2/3 were pulled to the far clean decoys -> windows scattered
+    # across the whole piece (spanRatio ~28, the real failure). The B3.1 span penalty
+    # in choose_monotonic_path now keeps the path contiguous, so this case aligns to
+    # the true heads (spanRatio ~1.1) -- it is a GREEN regression guard against scatter.
     entries = similar_phrase_sections()
     layout_scatter = [
         {"section": entries[0], "gap": 0.5},
@@ -365,10 +365,12 @@ def main() -> int:
     cases.append(run_case("similar-phrase-long-mix", entries, layout_scatter, with_accompaniment=True, seed=7))
 
     # Expectation tracking. Green cases must meet the bar; xfail cases must currently
-    # FAIL it (the failure is reproduced and stable). An xfail case that starts meeting
-    # the bar is an XPASS -> stop and decide (promote it to green if B3.1 fixed it, or
-    # strengthen the case if it became too easy). Either deviation flips overall ok.
-    XFAIL_CASES = {"similar-phrase-long-mix"}
+    # FAIL it (failure reproduced and stable). An xfail case that starts meeting the bar
+    # is an XPASS -> stop and decide (promote to green if a fix landed, or strengthen the
+    # case if it became too easy). similar-phrase-long-mix was the B3.0 xfail; the B3.1
+    # span penalty fixed it, so it is now a GREEN case (kept here as a scatter regression
+    # guard). XFAIL_CASES is empty until the next not-yet-fixed failure is added.
+    XFAIL_CASES: set[str] = set()
     overall_ok = True
     for c in cases:
         passed = meets_alignment_bar(c["metrics"])

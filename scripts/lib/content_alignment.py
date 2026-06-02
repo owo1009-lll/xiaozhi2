@@ -33,6 +33,15 @@ except Exception as exc:  # pragma: no cover
 DEFAULT_SR = 22050
 DEFAULT_HOP = 2048
 DEFAULT_TOP_K = 4
+# B3.1 span/continuity penalty. The monotonic DP minimises total subsequence-DTW
+# cost; on long, accompaniment-polluted recordings the cheapest windows for similar
+# phrases sit far apart, so the path scatters across the whole piece. This penalty
+# charges each section->next-section transition for the time GAP between them,
+# normalised by the next section's own duration (so it is scale-free across pieces
+# and tempos). A real rest of a few section-lengths costs little; a jump of tens of
+# section-lengths (scatter) costs a lot, enough to overcome the cost saving of a far
+# clean decoy. 0 restores the pre-B3.1 behaviour.
+DEFAULT_SPAN_PENALTY = 0.5
 
 
 def _require_librosa():
@@ -98,10 +107,13 @@ def topk_candidates(template: np.ndarray, chroma: np.ndarray, hop_seconds: float
     return candidates
 
 
-def choose_monotonic_path(slot_candidates: list[list[dict]], hop_seconds: float) -> list[dict]:
+def choose_monotonic_path(slot_candidates: list[list[dict]], hop_seconds: float,
+                          span_penalty: float = DEFAULT_SPAN_PENALTY) -> list[dict]:
     """Pick one window per slot (section in order, or occurrence in play order)
     minimizing total cost subject to non-decreasing start, so repeats cannot
-    collapse onto an earlier occurrence."""
+    collapse onto an earlier occurrence. A span/continuity penalty (span_penalty)
+    charges each transition for the normalised time gap to the next window, so the
+    path cannot scatter similar phrases across the whole recording (B3.1)."""
     n = len(slot_candidates)
     if n == 0:
         return []
@@ -115,7 +127,10 @@ def choose_monotonic_path(slot_candidates: list[list[dict]], hop_seconds: float)
             choice = (INF, -1)
             for jn, nxt in enumerate(slot_candidates[i + 1]):
                 if nxt["start"] + 1e-6 >= cand["end"] - slack:
-                    total = best[i + 1][jn][0]
+                    gap = max(0.0, nxt["start"] - cand["end"])
+                    next_window = max(nxt["end"] - nxt["start"], hop_seconds)
+                    transition = span_penalty * (gap / next_window)
+                    total = transition + best[i + 1][jn][0]
                     if total < choice[0]:
                         choice = (total, jn)
             best[i][j] = (cand["cost"] + (choice[0] if choice[0] != INF else INF), choice[1])
@@ -131,7 +146,8 @@ def choose_monotonic_path(slot_candidates: list[list[dict]], hop_seconds: float)
 
 
 def align_sections(sections: list[dict], audio: np.ndarray, *, sr: int = DEFAULT_SR,
-                   hop: int = DEFAULT_HOP, top_k: int = DEFAULT_TOP_K, chroma: np.ndarray | None = None) -> list[dict]:
+                   hop: int = DEFAULT_HOP, top_k: int = DEFAULT_TOP_K, chroma: np.ndarray | None = None,
+                   span_penalty: float = DEFAULT_SPAN_PENALTY) -> list[dict]:
     """One window per unique section (first occurrence), in sequence-index order."""
     hop_seconds = hop / sr
     if chroma is None:
@@ -142,7 +158,7 @@ def align_sections(sections: list[dict], audio: np.ndarray, *, sr: int = DEFAULT
         template = section_template_chroma(section, hop_seconds)
         cands = topk_candidates(template, chroma, hop_seconds, top_k) or [{"start": 0.0, "end": hop_seconds, "cost": float("inf")}]
         slot_candidates.append(cands)
-    path = choose_monotonic_path(slot_candidates, hop_seconds)
+    path = choose_monotonic_path(slot_candidates, hop_seconds, span_penalty=span_penalty)
     return [
         {"sectionId": section.get("sectionId"), "start": chosen["start"], "end": chosen["end"], "cost": chosen["cost"]}
         for section, chosen in zip(ordered, path)
@@ -150,7 +166,8 @@ def align_sections(sections: list[dict], audio: np.ndarray, *, sr: int = DEFAULT
 
 
 def align_occurrences(play_order: list[dict], audio: np.ndarray, *, sr: int = DEFAULT_SR,
-                      hop: int = DEFAULT_HOP, top_k: int = DEFAULT_TOP_K, chroma: np.ndarray | None = None) -> list[dict]:
+                      hop: int = DEFAULT_HOP, top_k: int = DEFAULT_TOP_K, chroma: np.ndarray | None = None,
+                      span_penalty: float = DEFAULT_SPAN_PENALTY) -> list[dict]:
     """One window per occurrence in play order (repeats expanded), in order. This is
     the model the scan pipeline uses (each sectionPass is one occurrence)."""
     hop_seconds = hop / sr
@@ -161,7 +178,7 @@ def align_occurrences(play_order: list[dict], audio: np.ndarray, *, sr: int = DE
         template = section_template_chroma(section, hop_seconds)
         cands = topk_candidates(template, chroma, hop_seconds, top_k) or [{"start": 0.0, "end": hop_seconds, "cost": float("inf")}]
         slot_candidates.append(cands)
-    path = choose_monotonic_path(slot_candidates, hop_seconds)
+    path = choose_monotonic_path(slot_candidates, hop_seconds, span_penalty=span_penalty)
     return [
         {"sectionId": section.get("sectionId"), "occurrence": idx, "start": chosen["start"], "end": chosen["end"], "cost": chosen["cost"]}
         for idx, (section, chosen) in enumerate(zip(play_order, path))
