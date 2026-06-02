@@ -38,6 +38,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--scan-preprocess-mode", default="off", help="preprocessMode sent to the analyzer during scan windows. 'off' skips source separation for speed.")
     parser.add_argument("--concurrency", type=int, default=2, help="Number of sections to scan in parallel.")
     parser.add_argument("--retry", type=int, default=2, help="Max retries per section on connection errors.")
+    parser.add_argument(
+        "--alignment-mode",
+        choices=["hint", "content"],
+        default="hint",
+        help="hint (default): legacy sequence-index timing hints. content: locate each "
+        "section in the recording by chroma subsequence DTW before scanning.",
+    )
+    parser.add_argument("--content-hint-radius", type=float, default=1.0, help="Probe radius around content-aligned starts (content mode).")
     return parser.parse_args()
 
 
@@ -53,6 +61,14 @@ def post_json(url: str, payload: dict) -> dict:
         return json.loads(response.read().decode("utf-8"))
 
 
+def safe_number(value, fallback=0.0) -> float:
+    try:
+        result = float(value)
+        return result if result == result else float(fallback)  # reject NaN
+    except (TypeError, ValueError):
+        return float(fallback)
+
+
 def meter_beats(meter: str | None) -> float:
     if not meter:
         return 4.0
@@ -61,6 +77,66 @@ def meter_beats(meter: str | None) -> float:
         return max(1.0, float(beats))
     except ValueError:
         return 4.0
+
+
+def section_to_alignment_dict(section: dict) -> dict:
+    """Adapt a real piece section into the minimal shape content_alignment expects.
+
+    The erhu-line role lives at note.notePosition.scoreLineRole. We carry it onto a
+    flat `role` field. If ANY note in the section declares a role, we trust those
+    roles strictly (notes without an explicit "erhu" role are treated as
+    accompaniment and excluded from the template). Only when the section has no role
+    annotation at all do we fall back to treating every note as erhu (built-in
+    single-line pieces such as the taohuawu fragment have no scoreLineRole)."""
+    notes = section.get("notes") or []
+    has_role = any((note.get("notePosition") or {}).get("scoreLineRole") for note in notes)
+    adapted_notes = []
+    for note in notes:
+        role = str((note.get("notePosition") or {}).get("scoreLineRole") or "").strip().lower()
+        effective_role = role if has_role else "erhu"
+        adapted_notes.append({
+            "midiPitch": note.get("midiPitch", 0),
+            "beatStart": note.get("beatStart", 0.0),
+            "beatDuration": note.get("beatDuration", 1.0),
+            "role": effective_role or "unknown",
+        })
+    return {
+        "sectionId": section.get("sectionId"),
+        "sequenceIndex": int(safe_number(section.get("sequenceIndex"), 0)),
+        "tempo": section.get("tempo") or 72,
+        "notes": adapted_notes,
+    }
+
+
+def compute_content_alignment(audio_path: Path, ordered_sections: list[dict]) -> list[dict]:
+    """Run chroma subsequence-DTW occurrence alignment for the scanned sections.
+
+    Returns a LIST aligned 1:1 with `ordered_sections` (same order in, same order
+    out), each {start,end,duration,score}. A list (slot index), not a dict keyed
+    by sectionId, so a section that recurs keeps a distinct window per occurrence
+    -- a dict key would let the 2nd occurrence overwrite the 1st and silently drop
+    the B1 repeat-rounds guarantee. Import is local so the legacy hint path never
+    needs librosa/content_alignment."""
+    sys.path.insert(0, str(SCRIPT_ROOT / "scripts" / "lib"))
+    import content_alignment as ca  # noqa: E402
+
+    waveform, sample_rate = sf.read(str(audio_path), dtype="float32")
+    if getattr(waveform, "ndim", 1) > 1:
+        waveform = waveform.mean(axis=1)
+    if sample_rate != ca.DEFAULT_SR:
+        import librosa
+        waveform = librosa.resample(waveform, orig_sr=sample_rate, target_sr=ca.DEFAULT_SR)
+    play_order = [section_to_alignment_dict(s) for s in ordered_sections]
+    aligned = ca.align_occurrences(play_order, waveform)
+    result = []
+    for entry in aligned:
+        result.append({
+            "start": float(entry["start"]),
+            "end": float(entry["end"]),
+            "duration": round(float(entry["end"]) - float(entry["start"]), 3),
+            "score": entry.get("cost"),
+        })
+    return result
 
 
 def section_length_beats(section: dict) -> float:
@@ -260,10 +336,17 @@ def scan_section(
     window_padding: float,
     max_candidates: int,
     scan_preprocess_mode: str = "off",
+    content_duration: float | None = None,
 ) -> dict:
     hints = section.get("researchWindowHints") or [0.0]
     expected_duration = section_length_beats(section) * (60.0 / max(30.0, float(section.get("tempo") or 72)))
-    window_duration = max(expected_duration + window_padding, expected_duration * 1.6, 8.0)
+    # Content mode: trust the chroma-aligned duration for the window so a wrong
+    # tempo/rest estimate cannot truncate or overshoot. Hint mode: keep the legacy
+    # beats/tempo estimate.
+    if content_duration is not None and content_duration > 0:
+        window_duration = max(content_duration + window_padding, 4.0)
+    else:
+        window_duration = max(expected_duration + window_padding, expected_duration * 1.6, 8.0)
 
     candidates = build_candidates([float(hint) for hint in hints], hint_radius, hint_step, max_candidates)
 
@@ -310,6 +393,12 @@ def scan_section(
         "expectedDurationSeconds": round(expected_duration, 2),
         "windowDurationSeconds": round(window_duration, 2),
         "candidateCount": len(candidates),
+        # Content-alignment provenance so audits can compare the chroma-aligned
+        # window against the score-estimated one (None in legacy hint mode).
+        "contentStartSeconds": section.get("contentStartSeconds"),
+        "contentEndSeconds": section.get("contentEndSeconds"),
+        "contentDurationSeconds": section.get("contentDurationSeconds"),
+        "contentAlignmentScore": section.get("contentAlignmentScore"),
         "bestMatch": best,
         "topMatches": attempts[:3],
     }
@@ -392,50 +481,73 @@ def main() -> int:
     estimated_piece_duration = 0.0
     is_partial = False
     skipped_beyond_audio: list[dict] = []
+    use_content_alignment = args.alignment_mode == "content"
 
     try:
         audio_info = sf.info(str(audio_path))
         audio_duration = audio_info.duration
-        sections_to_scan = add_fallback_timing_hints(sections_to_scan, audio_duration)
 
-        all_hints = [float(h) for s in sections_to_scan for h in (s.get("researchWindowHints") or [])]
-        if all_hints:
-            max_hint = max(all_hints)
-            estimated_piece_duration = max_hint
+        if use_content_alignment:
+            # Content mode: locate each section in the recording by chroma DTW and
+            # write those true starts as the sole timing hints. Apply results by
+            # SLOT ORDER (not sectionId) so a recurring section keeps a distinct
+            # window per occurrence. The legacy fallback-hint generator AND the
+            # hint rescale/partial logic below are skipped entirely -- they assume
+            # sequence-index timing and would re-scale or truncate content windows
+            # (e.g. when the last section sits near the file end), destroying the
+            # alignment. Content computes its own estimatedPieceDuration from the
+            # aligned ends.
+            ordered_sections = sorted(sections_to_scan, key=lambda s: int(safe_number(s.get("sequenceIndex"), 0)))
+            aligned_list = compute_content_alignment(audio_path, ordered_sections)
+            for section, aligned in zip(ordered_sections, aligned_list):
+                section["researchWindowHints"] = [round(aligned["start"], 2)]
+                section["contentStartSeconds"] = round(aligned["start"], 3)
+                section["contentEndSeconds"] = round(aligned["end"], 3)
+                section["contentDurationSeconds"] = round(aligned["duration"], 3)
+                section["contentAlignmentScore"] = aligned["score"]
+            aligned_ends = [a["end"] for a in aligned_list]
+            estimated_piece_duration = max(aligned_ends) if aligned_ends else 0.0
+        else:
+            sections_to_scan = add_fallback_timing_hints(sections_to_scan, audio_duration)
 
-            # For imported OMR scores, section timing hints are estimated from generated
-            # score chunks and can be much longer than the real recording. Do not use
-            # those hints to declare a full recording "partial".
-            if not args.score_id and max_hint > audio_duration * 1.8:
-                is_partial = True
-                coverage_limit = audio_duration * 1.35  # generous buffer for tempo variation
-                within: list[dict] = []
-                beyond: list[dict] = []
-                for s in sections_to_scan:
-                    sec_max_hint = max(float(h) for h in (s.get("researchWindowHints") or [0.0]))
-                    (within if sec_max_hint <= coverage_limit else beyond).append(s)
-                sections_to_scan = within
-                skipped_beyond_audio = beyond
-                sys.stderr.write(
-                    f"INFO: partial audio ({audio_duration:.1f}s / ~{estimated_piece_duration:.1f}s piece). "
-                    f"Scanning {len(within)} sections, skipping {len(beyond)} beyond audio.\n"
-                )
+            all_hints = [float(h) for s in sections_to_scan for h in (s.get("researchWindowHints") or [])]
+            if all_hints:
+                max_hint = max(all_hints)
+                estimated_piece_duration = max_hint
 
-            # Rescale hints within the coverage range if they still exceed audio duration.
-            within_hints = [float(h) for s in sections_to_scan for h in (s.get("researchWindowHints") or [])]
-            if within_hints:
-                within_max = max(within_hints)
-                if within_max > audio_duration * 0.95:
-                    scale = (audio_duration * 0.88) / within_max
+                # For imported OMR scores, section timing hints are estimated from generated
+                # score chunks and can be much longer than the real recording. Do not use
+                # those hints to declare a full recording "partial".
+                if not args.score_id and max_hint > audio_duration * 1.8:
+                    is_partial = True
+                    coverage_limit = audio_duration * 1.35  # generous buffer for tempo variation
+                    within: list[dict] = []
+                    beyond: list[dict] = []
+                    for s in sections_to_scan:
+                        sec_max_hint = max(float(h) for h in (s.get("researchWindowHints") or [0.0]))
+                        (within if sec_max_hint <= coverage_limit else beyond).append(s)
+                    sections_to_scan = within
+                    skipped_beyond_audio = beyond
                     sys.stderr.write(
-                        f"INFO: hints rescaled by {scale:.3f} "
-                        f"(max_hint={within_max:.1f}s > audio={audio_duration:.1f}s)\n"
+                        f"INFO: partial audio ({audio_duration:.1f}s / ~{estimated_piece_duration:.1f}s piece). "
+                        f"Scanning {len(within)} sections, skipping {len(beyond)} beyond audio.\n"
                     )
-                    sections_to_scan = [
-                        {**s, "researchWindowHints": [round(max(0.0, float(h) * scale), 2) for h in (s.get("researchWindowHints") or [])]}
-                        if s.get("researchWindowHints") else s
-                        for s in sections_to_scan
-                    ]
+
+                # Rescale hints within the coverage range if they still exceed audio duration.
+                within_hints = [float(h) for s in sections_to_scan for h in (s.get("researchWindowHints") or [])]
+                if within_hints:
+                    within_max = max(within_hints)
+                    if within_max > audio_duration * 0.95:
+                        scale = (audio_duration * 0.88) / within_max
+                        sys.stderr.write(
+                            f"INFO: hints rescaled by {scale:.3f} "
+                            f"(max_hint={within_max:.1f}s > audio={audio_duration:.1f}s)\n"
+                        )
+                        sections_to_scan = [
+                            {**s, "researchWindowHints": [round(max(0.0, float(h) * scale), 2) for h in (s.get("researchWindowHints") or [])]}
+                            if s.get("researchWindowHints") else s
+                            for s in sections_to_scan
+                        ]
     except Exception as _hint_exc:
         sys.stderr.write(f"WARNING: coverage detection failed: {_hint_exc}\n")
 
@@ -450,11 +562,12 @@ def main() -> int:
                     audio_path,
                     piece,
                     section,
-                    args.hint_radius,
+                    args.content_hint_radius if use_content_alignment else args.hint_radius,
                     args.hint_step,
                     args.window_padding,
                     args.max_candidates_per_section,
                     args.scan_preprocess_mode,
+                    content_duration=section.get("contentDurationSeconds") if use_content_alignment else None,
                 )
             except Exception as exc:
                 last_exc = exc
@@ -516,8 +629,45 @@ def main() -> int:
         "skippedSectionIds": [s.get("sectionId") for s in skipped_beyond_audio] + [s.get("sectionId") for s in omitted_sections],
         "omittedMeasureRanges": [[start, end] for start, end in omitted_measure_ranges],
         "omittedSectionIds": [s.get("sectionId") for s in omitted_sections],
-        "scanMode": "analyzer-window",
+        "scanMode": "content-aligned" if use_content_alignment else "analyzer-window",
     }
+    if use_content_alignment:
+        # Coverage semantics relative to THIS scan's selected sections, so a small
+        # --max-sections / --section-ids / omit run is not mislabeled partial
+        # (reviewer #2 + #5). selected = sections actually scanned (post note/omit
+        # filtering), not the pre-filter count. Aligned results carry their content
+        # window in the scan_result itself (occurrence-safe; no sectionId keying).
+        structured_section_count = len(piece.get("sections") or [])
+        selected_section_count = len(sections_to_scan)
+        aligned_results = [s for s in scan_results if s.get("contentStartSeconds") is not None]
+        aligned_section_count = len(aligned_results)
+        aligned_windows = sorted(
+            ((float(s["contentStartSeconds"]), float(s["contentEndSeconds"])) for s in aligned_results),
+            key=lambda w: w[0],
+        )
+        aligned_span = round(aligned_windows[-1][1] - aligned_windows[0][0], 2) if aligned_windows else 0.0
+        # expected = sum of aligned sections' score-estimated durations (divisor for
+        # the partial alignedSpanRatio gate; full-piece uses estimatedPieceDuration).
+        # expectedDurationSeconds is already on each scan_result.
+        expected_aligned_span = round(sum(
+            float(s.get("expectedDurationSeconds") or 0.0) for s in aligned_results
+        ), 2)
+        full_selected = aligned_section_count == selected_section_count and selected_section_count > 0
+        full_piece = full_selected and selected_section_count == structured_section_count
+        # full-piece estimatedPieceDuration = last aligned END (not last start)
+        aligned_piece_end = round(max((w[1] for w in aligned_windows), default=0.0), 2)
+        audio_coverage.update({
+            "structuredSectionCount": structured_section_count,
+            "selectedSectionCount": selected_section_count,
+            "alignedSectionCount": aligned_section_count,
+            "alignmentCoverageMode": "full-selected" if full_selected else "partial-selected",
+            "wholePieceCoverageMode": "full-piece" if full_piece else "partial-piece",
+            "alignedSpanDurationSeconds": aligned_span,
+            "expectedAlignedSpanDurationSeconds": expected_aligned_span,
+            # estimatedPieceDurationSeconds only meaningful for whole-piece coverage,
+            # and is the last aligned END so durationRatio is not underestimated.
+            "estimatedPieceDurationSeconds": aligned_piece_end if full_piece else None,
+        })
     (output_dir / f"{output_key}-segment-scan.json").write_text(
         json.dumps(
             {
