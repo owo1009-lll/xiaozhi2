@@ -994,7 +994,7 @@ function buildTeacherScoreLocator(score = {}, item = {}, analysis = {}, pathCont
     sectionTitle: repairMojibakeText(section.title || item.sectionTitle || analysis.sectionTitle),
     pageNumber: parsePagewiseSectionPage(section) || notePositions[0]?.pageNumber || 1,
     pageImagePath: pageImagePath.startsWith("/data/") ? pageImagePath : toWebPathFromAbsolute(pageImagePath, pathContext),
-    sourcePdfPath: safeString(score.sourcePdfPath || item.sourcePdfPath),
+    sourcePdfPath: safeString(item.sourcePdfPath || score.sourcePdfPath),
     measureCount: Math.max(0, Math.round(safeNumber(section.measureCount, measurePositions.length))),
     noteCount: notePositions.length,
     lineRankFilterApplied,

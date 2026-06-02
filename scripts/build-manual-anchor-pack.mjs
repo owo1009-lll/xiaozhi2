@@ -15,7 +15,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import {
-  parseCsv, safeString, numeric, getArray, buildTeacherValidationPack,
+  parseCsv, safeString, numeric, getArray, readJson, buildTeacherValidationPack,
 } from "./teacher-validation-support.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -67,6 +67,49 @@ function slug(value) {
   return safeString(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "x";
 }
 
+function resolveInputPath(filePath) {
+  const text = safeString(filePath).trim();
+  if (!text) return "";
+  if (path.isAbsolute(text)) return text;
+  if (text.startsWith("/data/")) return path.resolve(REPO_ROOT, text.slice(1));
+  return path.resolve(REPO_ROOT, text);
+}
+
+function assertExistingInput(filePath, label, index) {
+  const absolute = resolveInputPath(filePath);
+  if (!absolute || !fs.existsSync(absolute)) {
+    throw new Error(`row ${index + 1}: ${label} not found: ${filePath}`);
+  }
+  return absolute;
+}
+
+function loadScoreIds() {
+  const store = readJson(path.join(REPO_ROOT, "data", "erhu-score-imports.json"), {});
+  return new Set(getArray(store.scores).map((score) => safeString(score.scoreId)).filter(Boolean));
+}
+
+function formatPageId(scorePage) {
+  const pageNumber = Number(scorePage);
+  if (!Number.isFinite(pageNumber) || pageNumber <= 0) return "";
+  return String(Math.round(pageNumber)).padStart(2, "0");
+}
+
+function validateMatchedRow(row, index, scoreIds) {
+  for (const column of REQUIRED_COLUMNS) {
+    if (!safeString(row[column]).trim()) throw new Error(`row ${index + 1}: missing required value ${column}`);
+  }
+  if (!scoreIds.has(row.scoreId)) throw new Error(`row ${index + 1}: scoreId not found in score store: ${row.scoreId}`);
+  assertExistingInput(row.sourceAudioPath, "sourceAudioPath", index);
+  assertExistingInput(row.scorePdfPath, "scorePdfPath", index);
+  const start = numeric(row.audioStartSeconds);
+  const end = numeric(row.audioEndSeconds);
+  if (start == null || end == null || end <= start) {
+    throw new Error(`row ${index + 1}: invalid audio window ${row.audioStartSeconds}..${row.audioEndSeconds}`);
+  }
+  if (!formatPageId(row.scorePage)) throw new Error(`row ${index + 1}: scorePage must be a positive page number`);
+  return { start, end };
+}
+
 function buildJobAndPass(row, index) {
   const start = numeric(row.audioStartSeconds);
   const end = numeric(row.audioEndSeconds);
@@ -74,7 +117,8 @@ function buildJobAndPass(row, index) {
     throw new Error(`row ${index + 1}: invalid audio window ${row.audioStartSeconds}..${row.audioEndSeconds}`);
   }
   const duration = Number((end - start).toFixed(3));
-  const sectionId = `manual-p${slug(row.scorePage)}-m${slug(row.measureRange)}-${index}`;
+  // Keep the page-XX token so the existing score locator resolves to the intended PDF page.
+  const sectionId = `page-${formatPageId(row.scorePage)}-manual-m${slug(row.measureRange)}-${index}`;
   const sectionTitle = `第${safeString(row.scorePage)}页 m${safeString(row.measureRange)}${row.phraseNote ? ` ${row.phraseNote}` : ""}`.trim();
   const audioHash = crypto.createHash("sha1")
     .update(`${row.sourceAudioPath}|${start}|${end}|${row.scoreId}`).digest("hex");
@@ -91,6 +135,10 @@ function buildJobAndPass(row, index) {
     sectionPasses: [{
       sectionId,
       sectionTitle,
+      scorePage: Number(row.scorePage),
+      measureRange: row.measureRange,
+      phraseNote: row.phraseNote || "",
+      manualAnchor: true,
       sequenceIndex: 0,
       startSeconds: start,
       endSeconds: end,
@@ -109,6 +157,7 @@ function buildJobAndPass(row, index) {
     pieceTitle: row.pieceTitle,
     audioHash,
     audioPath: row.sourceAudioPath,
+    pdfPath: row.scorePdfPath,
     passJsonPath: path.relative(REPO_ROOT, passJsonPath).split(path.sep).join("/"),
     summary: { audioCoverage },
     sourceLongPiece: row.sourceLongPiece,
@@ -125,6 +174,8 @@ async function main() {
   if (!matched.length) {
     throw new Error(`no rows with humanMatched=yes in ${args.manifest} (rows total: ${allRows.length})`);
   }
+  const scoreIds = loadScoreIds();
+  matched.forEach((row, index) => validateMatchedRow(row, index, scoreIds));
 
   const jobs = [];
   for (const [index, row] of matched.entries()) {
@@ -166,6 +217,11 @@ async function main() {
   }, null, 2));
   if (result.manifest.selectedCount < matched.length) {
     console.error(`WARNING: ${matched.length - result.manifest.selectedCount} matched row(s) did not become teacher-ready candidates.`);
+  }
+  const expectedSelected = Math.min(matched.length, args.max);
+  const audioSkipped = getArray(result.manifest.warnings).filter((warning) => safeString(warning).includes("audio clip skipped"));
+  if (result.manifest.selectedCount !== expectedSelected || audioSkipped.length) {
+    throw new Error(`manual-anchor pack failed readiness checks: selected=${result.manifest.selectedCount}/${expectedSelected}; audioSkipped=${audioSkipped.length}`);
   }
 }
 

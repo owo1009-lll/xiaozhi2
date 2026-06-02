@@ -538,7 +538,7 @@ function normalizeAnalysisBase({ repoRoot, result = {}, job = {}, score = {}, an
       sourceKind,
       runSummaryPath: result.runSummaryPath ? toRepoRelative(repoRoot, result.runSummaryPath) : "",
       passJsonPath: job.passJsonPath ? toRepoRelative(repoRoot, normalizePathForCurrentRepo(repoRoot, job.passJsonPath)) : "",
-      sourcePdfPath: toRepoRelative(repoRoot, normalizePathForCurrentRepo(repoRoot, result.pdfPath || score.sourcePdfPath || "")),
+      sourcePdfPath: toRepoRelative(repoRoot, normalizePathForCurrentRepo(repoRoot, result.pdfPath || job.pdfPath || job.scorePdfPath || score.sourcePdfPath || "")),
       sourceAudioPath: toRepoRelative(repoRoot, normalizePathForCurrentRepo(repoRoot, result.audioPath || job.audioPath || "")),
       sourceType: sectionPass ? "section" : "whole-piece",
       alignmentEvidence,

@@ -191,6 +191,56 @@ try {
   });
   assert.equal(filteredTeacherGradePack.manifest.selectedCount, 2);
   assert.deepEqual(filteredTeacherGradePack.manifest.titleFilters, ["Fixture Piece"]);
+  const manualPdfPath = path.join(repoRoot, "data", "score-imports", "scorejob-fixture", "manual-source.pdf");
+  const manualPdfRelative = "data/score-imports/scorejob-fixture/manual-source.pdf";
+  const manualAudioPath = path.join(repoRoot, "data", "analysis-audio-cache", "fixture.wav");
+  const manualPassDir = path.join(repoRoot, "data", "teacher-manual-anchors", "generated", "manual-fixture");
+  const manualPassJsonPath = path.join(manualPassDir, "pass.json");
+  await fs.mkdir(manualPassDir, { recursive: true });
+  await fs.writeFile(manualPdfPath, "%PDF-1.4\n%%EOF\n", "utf8");
+  await writeJson(manualPassJsonPath, {
+    summary: { audioCoverage: { scanMode: "manual-anchor", manualAnchorConfirmed: true, audioDurationSeconds: 12 } },
+    sectionPasses: [{
+      sectionId: "page-07-manual-m12-19-0",
+      sectionTitle: "第7页 m12-19 主题第一句",
+      startSeconds: 10,
+      endSeconds: 22,
+      durationSeconds: 12,
+      noteFindings: [],
+      measureFindings: [],
+    }],
+  });
+  await writeJson(path.join(repoRoot, "data", "teacher-manual-anchors", "manual-anchor-jobs.json"), {
+    schemaVersion: 1,
+    jobs: [{
+      jobId: "manual-fixture",
+      status: "completed",
+      scoreId: "score-fixture",
+      pieceId: "score-fixture",
+      pieceTitle: "Manual Fixture",
+      audioHash: "manualaudiohash",
+      audioPath: manualAudioPath,
+      pdfPath: manualPdfPath,
+      scorePdfPath: manualPdfPath,
+      passJsonPath: manualPassJsonPath,
+      summary: { audioCoverage: { scanMode: "manual-anchor", manualAnchorConfirmed: true, audioDurationSeconds: 12 } },
+    }],
+  });
+  const manualPack = await buildTeacherValidationPack({
+    repoRoot,
+    outputDir: path.join(repoRoot, "data", "teacher-validation", "packs", "manual-anchor-fixture-pack"),
+    unit: "section",
+    sources: "manual-anchors",
+    reviewMode: "technique-labeling",
+    max: 1,
+    min: 1,
+  });
+  assert.equal(manualPack.manifest.selectedCount, 1);
+  assert.equal(manualPack.manifest.items[0].sectionId, "page-07-manual-m12-19-0");
+  assert.equal(manualPack.manifest.items[0].sectionTitle, "第7页 m12-19 主题第一句");
+  assert.equal(manualPack.manifest.items[0].sourcePdfPath, manualPdfRelative);
+  assert.equal(manualPack.manifest.items[0].alignmentEvidence.manualAnchorConfirmed, true);
+  assert.equal(manualPack.reviewRows[0].sourcePdfPath, manualPdfRelative);
   const techniqueReady = teacherValidationInternals.summarizeTeacherPackReadiness({
     manifest: { reviewMode: "technique-labeling" },
     items: [{
