@@ -113,7 +113,14 @@ def choose_monotonic_path(slot_candidates: list[list[dict]], hop_seconds: float,
     minimizing total cost subject to non-decreasing start, so repeats cannot
     collapse onto an earlier occurrence. A span/continuity penalty (span_penalty)
     charges each transition for the normalised time gap to the next window, so the
-    path cannot scatter similar phrases across the whole recording (B3.1)."""
+    path cannot scatter similar phrases across the whole recording (B3.1).
+
+    Boundary: the penalty charges EVERY inter-slot gap, with no notion of an
+    expected interval, so it assumes the slots are contiguous in the performance.
+    That holds for a full play-order scan; it does NOT hold when the caller feeds a
+    non-contiguous subset (sparse section ids, or omitted middle sections) where a
+    large gap is legitimate -- there the caller should pass span_penalty=0. A future
+    refinement would penalise only the gap exceeding a score-expected interval."""
     n = len(slot_candidates)
     if n == 0:
         return []

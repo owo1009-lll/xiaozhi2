@@ -206,8 +206,9 @@ def _section_to_dict(section: GoldSection) -> dict:
     }
 
 
-def align(sections: list[GoldSection], audio: np.ndarray) -> tuple[list[dict], float]:
-    result = ca.align_sections([_section_to_dict(s) for s in sections], audio, sr=SR, hop=HOP, top_k=TOP_K)
+def align(sections: list[GoldSection], audio: np.ndarray, span_penalty: float | None = None) -> tuple[list[dict], float]:
+    kwargs = {} if span_penalty is None else {"span_penalty": span_penalty}
+    result = ca.align_sections([_section_to_dict(s) for s in sections], audio, sr=SR, hop=HOP, top_k=TOP_K, **kwargs)
     return result, HOP / SR
 
 
@@ -276,7 +277,8 @@ def evaluate(predicted: list[dict], truth: list[tuple], hop_seconds: float) -> d
     }
 
 
-def run_case(name: str, sections: list[GoldSection], layout: list[dict], **synth_kwargs) -> dict:
+def run_case(name: str, sections: list[GoldSection], layout: list[dict], *,
+             baseline_penalty: float | None = None, **synth_kwargs) -> dict:
     audio, truth = synth_piece(layout, **synth_kwargs)
     t0 = time.time()
     predicted, hop = align(sections, audio)
@@ -284,7 +286,20 @@ def run_case(name: str, sections: list[GoldSection], layout: list[dict], **synth
     metrics = evaluate(predicted, truth, hop)
     metrics["runtimeSec"] = round(runtime, 2)
     metrics["audioDurationSec"] = round(len(audio) / SR, 1)
-    return {"case": name, "truth": truth, "predicted": predicted, "metrics": metrics}
+    result = {"case": name, "truth": truth, "predicted": predicted, "metrics": metrics}
+    # Control: re-align the SAME audio with the penalty disabled (or another value),
+    # so the report records what this case looks like without the span penalty -- proof
+    # that the penalty, not the synthetic data, is what keeps it aligned (reviewer #3).
+    if baseline_penalty is not None:
+        base_pred, _ = align(sections, audio, span_penalty=baseline_penalty)
+        base = evaluate(base_pred, truth, hop)
+        result["baselineWithoutPenalty"] = {
+            "spanPenalty": baseline_penalty,
+            "alignedSpanRatio": base["alignedSpanRatio"],
+            "firstOccurrenceMismatchCount": base["firstOccurrenceMismatchCount"],
+            "startErrMean": base["startErr"]["mean"],
+        }
+    return result
 
 
 def run_occurrence_case(name: str, layout: list[dict], **synth_kwargs) -> dict:
@@ -362,7 +377,8 @@ def main() -> int:
         {"section": clean_decoy(entries[1], "d2"), "gap": 130.0},
         {"section": clean_decoy(entries[2], "d3"), "gap": 130.0},
     ]
-    cases.append(run_case("similar-phrase-long-mix", entries, layout_scatter, with_accompaniment=True, seed=7))
+    cases.append(run_case("similar-phrase-long-mix", entries, layout_scatter,
+                          baseline_penalty=0.0, with_accompaniment=True, seed=7))
 
     # Expectation tracking. Green cases must meet the bar; xfail cases must currently
     # FAIL it (failure reproduced and stable). An xfail case that starts meeting the bar
@@ -399,6 +415,11 @@ def main() -> int:
               f"iou.mean={m['iou'].get('mean')} firstOccMismatch={m['firstOccurrenceMismatchCount']} "
               f"spanRatio={m['alignedSpanRatio']} mono={m['monotonic']} overlap={m['hasOverlap']} "
               f"[{c['expectation']['status']}] {m['runtimeSec']}s/{m['audioDurationSec']}s")
+        base = c.get("baselineWithoutPenalty")
+        if base:
+            print(f"{'  (no penalty)':>20}: spanRatio={base['alignedSpanRatio']} "
+                  f"firstOccMismatch={base['firstOccurrenceMismatchCount']} startErr.mean={base['startErrMean']} "
+                  f"<- proves the span penalty (not the data) keeps this case aligned")
     for c in occurrence_cases:
         m = c["metrics"]
         print(f"{c['case']:>20}: startErr.mean={m['startErr']['mean']} max={m['startErr']['max']} "

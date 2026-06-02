@@ -4,6 +4,7 @@ import argparse
 import base64
 import io
 import json
+import os
 import random
 import sys
 import time
@@ -46,6 +47,16 @@ def parse_args() -> argparse.Namespace:
         "section in the recording by chroma subsequence DTW before scanning.",
     )
     parser.add_argument("--content-hint-radius", type=float, default=1.0, help="Probe radius around content-aligned starts (content mode).")
+    parser.add_argument(
+        "--content-span-penalty",
+        type=float,
+        default=None,
+        help="Span/continuity penalty for content-mode monotonic alignment (B3.1). Default 0.5 "
+        "(or env ERHU_CONTENT_SPAN_PENALTY); 0 disables it (pre-B3.1 behaviour) for A/B testing. "
+        "NOTE: the penalty charges every inter-section gap, so it assumes the scanned sections are "
+        "CONTIGUOUS in the performance. When scanning non-contiguous sections (sparse --section-ids "
+        "or --omit-measures dropping middle sections) a large gap is legitimate -- pass 0 there.",
+    )
     return parser.parse_args()
 
 
@@ -108,7 +119,8 @@ def section_to_alignment_dict(section: dict) -> dict:
     }
 
 
-def compute_content_alignment(audio_path: Path, ordered_sections: list[dict]) -> list[dict]:
+def compute_content_alignment(audio_path: Path, ordered_sections: list[dict],
+                              span_penalty: float | None = None) -> list[dict]:
     """Run chroma subsequence-DTW occurrence alignment for the scanned sections.
 
     Returns a LIST aligned 1:1 with `ordered_sections` (same order in, same order
@@ -127,7 +139,8 @@ def compute_content_alignment(audio_path: Path, ordered_sections: list[dict]) ->
         import librosa
         waveform = librosa.resample(waveform, orig_sr=sample_rate, target_sr=ca.DEFAULT_SR)
     play_order = [section_to_alignment_dict(s) for s in ordered_sections]
-    aligned = ca.align_occurrences(play_order, waveform)
+    penalty = ca.DEFAULT_SPAN_PENALTY if span_penalty is None else span_penalty
+    aligned = ca.align_occurrences(play_order, waveform, span_penalty=penalty)
     result = []
     for entry in aligned:
         result.append({
@@ -498,7 +511,12 @@ def main() -> int:
             # alignment. Content computes its own estimatedPieceDuration from the
             # aligned ends.
             ordered_sections = sorted(sections_to_scan, key=lambda s: int(safe_number(s.get("sequenceIndex"), 0)))
-            aligned_list = compute_content_alignment(audio_path, ordered_sections)
+            content_span_penalty = (
+                args.content_span_penalty
+                if args.content_span_penalty is not None
+                else float(os.getenv("ERHU_CONTENT_SPAN_PENALTY", "0.5"))
+            )
+            aligned_list = compute_content_alignment(audio_path, ordered_sections, span_penalty=content_span_penalty)
             for section, aligned in zip(ordered_sections, aligned_list):
                 section["researchWindowHints"] = [round(aligned["start"], 2)]
                 section["contentStartSeconds"] = round(aligned["start"], 3)
