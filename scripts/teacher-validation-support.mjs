@@ -45,6 +45,12 @@ const TEACHER_READY_MIN_SYSTEM_FINDINGS = Math.max(0, Math.round(envNumber("ERHU
 // Span/duration ratio upper bound: too-high = a few short sections scattered across
 // far too much audio (content-DTW spreading similar passages over the whole piece).
 const TEACHER_READY_MAX_DURATION_RATIO = envNumber("ERHU_TEACHER_READY_MAX_DURATION_RATIO", 2.0);
+// Content alignment that fails the monotonic DP scatters its windows; reject a
+// content path with too many out-of-order windows. Must match the server gate.
+const TEACHER_READY_MAX_MONOTONIC_VIOLATION_RATE = envNumber(
+  "ERHU_TEACHER_READY_MAX_MONOTONIC_VIOLATION_RATE",
+  0.05,
+);
 // Trusted scan modes allowlist (not "anything != fast") so a new mode is not
 // silently trusted. Must match src/server/teacherValidationService.js.
 const TEACHER_READY_TRUSTED_SCAN_MODES = new Set(["analyzer-window", "content-aligned"]);
@@ -366,6 +372,14 @@ function buildAlignmentEvidence(passJson = {}) {
   }
   if (hasWindowOverlap) teacherReadyReasons.push("section-windows-overlap");
   if (totalSystemFindings < TEACHER_READY_MIN_SYSTEM_FINDINGS) teacherReadyReasons.push("no-system-findings");
+  // Monotonicity gate (Phase 1). Only present for content-aligned scans; absent ->
+  // skipped. Too many out-of-order windows means the DP could not align the piece
+  // and scattered the windows -> not teacher-grade. Must match the server gate.
+  const monotonicViolationRate = numeric(coverage.monotonicViolationRate);
+  const greedyFallbackCount = numeric(coverage.greedyFallbackCount);
+  if (monotonicViolationRate != null && monotonicViolationRate > TEACHER_READY_MAX_MONOTONIC_VIOLATION_RATE) {
+    teacherReadyReasons.push(`content-path-not-monotonic:${monotonicViolationRate}`);
+  }
   const teacherReadyTrusted = scanModeTrusted && teacherReadyReasons.length === 0;
   return {
     trusted: scanModeTrusted,
@@ -382,12 +396,15 @@ function buildAlignmentEvidence(passJson = {}) {
     coverageMode: coverageMode || null,
     totalSystemFindings,
     hasWindowOverlap,
+    monotonicViolationRate,
+    greedyFallbackCount,
     teacherReadyThresholds: {
       minDurationRatio: TEACHER_READY_MIN_DURATION_RATIO,
       maxDurationRatio: TEACHER_READY_MAX_DURATION_RATIO,
       overlapMinSeconds: TEACHER_READY_OVERLAP_MIN_SECONDS,
       overlapMinRatio: TEACHER_READY_OVERLAP_MIN_RATIO,
       minSystemFindings: TEACHER_READY_MIN_SYSTEM_FINDINGS,
+      maxMonotonicViolationRate: TEACHER_READY_MAX_MONOTONIC_VIOLATION_RATE,
     },
     reason: scanModeTrusted
       ? "segment windows came from an analyzer-backed scan"

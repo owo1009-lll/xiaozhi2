@@ -120,15 +120,18 @@ def section_to_alignment_dict(section: dict) -> dict:
 
 
 def compute_content_alignment(audio_path: Path, ordered_sections: list[dict],
-                              span_penalty: float | None = None) -> list[dict]:
+                              span_penalty: float | None = None) -> tuple[list[dict], dict]:
     """Run chroma subsequence-DTW occurrence alignment for the scanned sections.
 
-    Returns a LIST aligned 1:1 with `ordered_sections` (same order in, same order
-    out), each {start,end,duration,score}. A list (slot index), not a dict keyed
-    by sectionId, so a section that recurs keeps a distinct window per occurrence
-    -- a dict key would let the 2nd occurrence overwrite the 1st and silently drop
-    the B1 repeat-rounds guarantee. Import is local so the legacy hint path never
-    needs librosa/content_alignment."""
+    Returns (results, diagnostics). results is a LIST aligned 1:1 with
+    `ordered_sections` (same order in, same order out), each {start,end,duration,
+    score}. A list (slot index), not a dict keyed by sectionId, so a section that
+    recurs keeps a distinct window per occurrence -- a dict key would let the 2nd
+    occurrence overwrite the 1st and silently drop the B1 repeat-rounds guarantee.
+    diagnostics carries monotonicViolationRate / greedyFallbackCount /
+    monotonicFeasible so the scan can record whether the located windows are in
+    order (Phase 1: expose DP failure instead of letting it pass silently). Import
+    is local so the legacy hint path never needs librosa/content_alignment."""
     sys.path.insert(0, str(SCRIPT_ROOT / "scripts" / "lib"))
     import content_alignment as ca  # noqa: E402
 
@@ -140,7 +143,7 @@ def compute_content_alignment(audio_path: Path, ordered_sections: list[dict],
         waveform = librosa.resample(waveform, orig_sr=sample_rate, target_sr=ca.DEFAULT_SR)
     play_order = [section_to_alignment_dict(s) for s in ordered_sections]
     penalty = ca.DEFAULT_SPAN_PENALTY if span_penalty is None else span_penalty
-    aligned = ca.align_occurrences(play_order, waveform, span_penalty=penalty)
+    aligned, diagnostics = ca.align_occurrences(play_order, waveform, span_penalty=penalty)
     result = []
     for entry in aligned:
         result.append({
@@ -149,7 +152,7 @@ def compute_content_alignment(audio_path: Path, ordered_sections: list[dict],
             "duration": round(float(entry["end"]) - float(entry["start"]), 3),
             "score": entry.get("cost"),
         })
-    return result
+    return result, diagnostics
 
 
 def section_length_beats(section: dict) -> float:
@@ -495,6 +498,7 @@ def main() -> int:
     is_partial = False
     skipped_beyond_audio: list[dict] = []
     use_content_alignment = args.alignment_mode == "content"
+    content_alignment_diag: dict | None = None
 
     try:
         audio_info = sf.info(str(audio_path))
@@ -516,7 +520,9 @@ def main() -> int:
                 if args.content_span_penalty is not None
                 else float(os.getenv("ERHU_CONTENT_SPAN_PENALTY", "0.5"))
             )
-            aligned_list = compute_content_alignment(audio_path, ordered_sections, span_penalty=content_span_penalty)
+            aligned_list, content_alignment_diag = compute_content_alignment(
+                audio_path, ordered_sections, span_penalty=content_span_penalty
+            )
             for section, aligned in zip(ordered_sections, aligned_list):
                 section["researchWindowHints"] = [round(aligned["start"], 2)]
                 section["contentStartSeconds"] = round(aligned["start"], 3)
@@ -686,6 +692,16 @@ def main() -> int:
             # and is the last aligned END so durationRatio is not underestimated.
             "estimatedPieceDurationSeconds": aligned_piece_end if full_piece else None,
         })
+        # Phase 1: surface DP alignment quality so the teacher-ready gate can reject a
+        # scattered (non-monotonic) content path instead of trusting a silent greedy
+        # fallback. monotonicViolationRate is the symptom the gate keys on.
+        if content_alignment_diag:
+            audio_coverage.update({
+                "monotonicViolationRate": content_alignment_diag.get("monotonicViolationRate"),
+                "monotonicViolations": content_alignment_diag.get("monotonicViolations"),
+                "greedyFallbackCount": content_alignment_diag.get("greedyFallbackCount"),
+                "contentAlignmentMonotonic": content_alignment_diag.get("monotonicFeasible"),
+            })
     (output_dir / f"{output_key}-segment-scan.json").write_text(
         json.dumps(
             {

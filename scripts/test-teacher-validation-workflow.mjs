@@ -325,6 +325,55 @@ try {
   assert.equal(saneEmbedded.teacherReadyTrusted, true);
   assert.deepEqual(saneEmbedded.teacherReadyReasons, []);
 
+  // --- monotonicity gate (Phase 1): scattered content path is rejected ---
+  // Real measured violation rates: 2nd rhapsody 0.41, 4th rhapsody 0.46. Both must
+  // fail as content-path-not-monotonic, so they never reach the teacher backend.
+  for (const rate of [0.41, 0.46]) {
+    const scattered = gate({
+      summary: { audioCoverage: {
+        scanMode: "content-aligned", audioDurationSeconds: 716,
+        alignmentCoverageMode: "full-selected", wholePieceCoverageMode: "full-piece",
+        estimatedPieceDurationSeconds: 700, monotonicViolationRate: rate,
+      } },
+      sectionPasses: [{ noteFindings: [{}], startSeconds: 0, endSeconds: 50, sequenceIndex: 0 },
+                      { noteFindings: [{}], startSeconds: 50, endSeconds: 100, sequenceIndex: 1 }],
+    });
+    assert.equal(scattered.teacherReadyTrusted, false);
+    assert(scattered.teacherReadyReasons.some((r) => r.startsWith("content-path-not-monotonic")));
+  }
+  // a content path that IS in order (low violation rate) still passes the gate
+  const inOrderContent = gate({
+    summary: { audioCoverage: {
+      scanMode: "content-aligned", audioDurationSeconds: 100, estimatedPieceDurationSeconds: 95,
+      alignmentCoverageMode: "full-selected", wholePieceCoverageMode: "full-piece",
+      monotonicViolationRate: 0.0,
+    } },
+    sectionPasses: [{ noteFindings: [{}], startSeconds: 0, endSeconds: 50, sequenceIndex: 0 },
+                    { noteFindings: [{}], startSeconds: 50, endSeconds: 95, sequenceIndex: 1 }],
+  });
+  assert.equal(inOrderContent.teacherReadyTrusted, true);
+  // analyzer-window samples (no content path -> no rate field) are NOT failed by this gate
+  const analyzerWindow = gate({
+    summary: { audioCoverage: {
+      scanMode: "analyzer-window", audioDurationSeconds: 100, estimatedPieceDurationSeconds: 95,
+      wholePieceCoverageMode: "full-piece",
+    } },
+    sectionPasses: [{ noteFindings: [{}], startSeconds: 0, endSeconds: 95, sequenceIndex: 0 }],
+  });
+  assert.equal(analyzerWindow.teacherReadyTrusted, true);
+  assert(!analyzerWindow.teacherReadyReasons.some((r) => r.startsWith("content-path-not-monotonic")));
+  // embedded re-judge also applies the monotonicity gate (stale stored true -> fail)
+  const staleScatteredMono = readEmbedded({
+    alignmentEvidence: {
+      trusted: true, teacherReadyTrusted: true,
+      scanMode: "content-aligned", coverageMode: "full-piece",
+      durationRatio: 1.0, hasWindowOverlap: false, totalSystemFindings: 5,
+      monotonicViolationRate: 0.46,
+    },
+  }, {});
+  assert.equal(staleScatteredMono.teacherReadyTrusted, false);
+  assert(staleScatteredMono.teacherReadyReasons.some((r) => r.startsWith("content-path-not-monotonic")));
+
   const filledReviews = {
     schemaVersion: 1,
     reviews: pack.reviewRows.map((row, index) => ({

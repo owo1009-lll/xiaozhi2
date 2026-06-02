@@ -208,12 +208,12 @@ def _section_to_dict(section: GoldSection) -> dict:
 
 def align(sections: list[GoldSection], audio: np.ndarray, span_penalty: float | None = None) -> tuple[list[dict], float]:
     kwargs = {} if span_penalty is None else {"span_penalty": span_penalty}
-    result = ca.align_sections([_section_to_dict(s) for s in sections], audio, sr=SR, hop=HOP, top_k=TOP_K, **kwargs)
+    result, _diag = ca.align_sections([_section_to_dict(s) for s in sections], audio, sr=SR, hop=HOP, top_k=TOP_K, **kwargs)
     return result, HOP / SR
 
 
 def align_occurrences(play_order: list[GoldSection], audio: np.ndarray) -> tuple[list[dict], float]:
-    result = ca.align_occurrences([_section_to_dict(s) for s in play_order], audio, sr=SR, hop=HOP, top_k=TOP_K)
+    result, _diag = ca.align_occurrences([_section_to_dict(s) for s in play_order], audio, sr=SR, hop=HOP, top_k=TOP_K)
     return result, HOP / SR
 
 

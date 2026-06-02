@@ -134,10 +134,17 @@ def choose_monotonic_path(slot_candidates: list[list[dict]], hop_seconds: float,
     That holds for a full play-order scan; it does NOT hold when the caller feeds a
     non-contiguous subset (sparse section ids, or omitted middle sections) where a
     large gap is legitimate -- there the caller should pass span_penalty=0. A future
-    refinement would penalise only the gap exceeding a score-expected interval."""
+    refinement would penalise only the gap exceeding a score-expected interval.
+
+    Returns (path, diagnostics). diagnostics carries greedyFallbackCount (how many
+    slots had NO valid monotonic continuation and fell back to per-slot min-cost,
+    ignoring order) and monotonicFeasible (whether a full ordered path existed at
+    all). On real long recordings the true windows are rarely all in the cheap
+    candidate set, so no monotonic path exists, the DP falls back, and the result
+    scatters -- these fields make that failure visible instead of silent."""
     n = len(slot_candidates)
     if n == 0:
-        return []
+        return [], {"slotCount": 0, "greedyFallbackCount": 0, "monotonicFeasible": True}
     INF = float("inf")
     slack = hop_seconds
     best = [[(INF, -1)] * len(c) for c in slot_candidates]
@@ -157,19 +164,38 @@ def choose_monotonic_path(slot_candidates: list[list[dict]], hop_seconds: float,
             best[i][j] = (cand["cost"] + (choice[0] if choice[0] != INF else INF), choice[1])
     start_j = min(range(len(best[0])), key=lambda j: best[0][j][0]) if best[0] else -1
     path = []
+    greedy_fallbacks = 0
     j = start_j
     for i in range(n):
         if j < 0 or j >= len(slot_candidates[i]):
             j = min(range(len(slot_candidates[i])), key=lambda jj: slot_candidates[i][jj]["cost"])
+            greedy_fallbacks += 1
         path.append({**slot_candidates[i][j]})
         j = best[i][j][1]
-    return path
+    diagnostics = {
+        "slotCount": n,
+        "greedyFallbackCount": greedy_fallbacks,
+        "monotonicFeasible": greedy_fallbacks == 0,
+    }
+    return path, diagnostics
+
+
+def _diagnostics_with_violation_rate(results: list[dict], diag: dict) -> dict:
+    """Add the empirical monotonicViolationRate (windows out of time order / total
+    transitions) to the DP diagnostics. This is the symptom the teacher-ready gate
+    keys on: a high rate means the located windows are scattered, not in order."""
+    starts = [r["start"] for r in results]
+    violations = sum(1 for i in range(len(starts) - 1) if starts[i] > starts[i + 1] + 1e-6)
+    denom = max(1, len(starts) - 1)
+    return {**diag, "monotonicViolations": violations,
+            "monotonicViolationRate": round(violations / denom, 4)}
 
 
 def align_sections(sections: list[dict], audio: np.ndarray, *, sr: int = DEFAULT_SR,
                    hop: int = DEFAULT_HOP, top_k: int = DEFAULT_TOP_K, chroma: np.ndarray | None = None,
-                   span_penalty: float = DEFAULT_SPAN_PENALTY) -> list[dict]:
-    """One window per unique section (first occurrence), in sequence-index order."""
+                   span_penalty: float = DEFAULT_SPAN_PENALTY) -> tuple[list[dict], dict]:
+    """One window per unique section (first occurrence), in sequence-index order.
+    Returns (results, diagnostics) -- see choose_monotonic_path for diagnostics."""
     hop_seconds = hop / sr
     if chroma is None:
         chroma = whole_audio_chroma(audio, sr=sr, hop=hop)
@@ -179,18 +205,20 @@ def align_sections(sections: list[dict], audio: np.ndarray, *, sr: int = DEFAULT
         template = section_template_chroma(section, hop_seconds)
         cands = topk_candidates(template, chroma, hop_seconds, top_k) or [{"start": 0.0, "end": hop_seconds, "cost": float("inf")}]
         slot_candidates.append(cands)
-    path = choose_monotonic_path(slot_candidates, hop_seconds, span_penalty=span_penalty)
-    return [
+    path, diag = choose_monotonic_path(slot_candidates, hop_seconds, span_penalty=span_penalty)
+    results = [
         {"sectionId": section.get("sectionId"), "start": chosen["start"], "end": chosen["end"], "cost": chosen["cost"]}
         for section, chosen in zip(ordered, path)
     ]
+    return results, _diagnostics_with_violation_rate(results, diag)
 
 
 def align_occurrences(play_order: list[dict], audio: np.ndarray, *, sr: int = DEFAULT_SR,
                       hop: int = DEFAULT_HOP, top_k: int = DEFAULT_TOP_K, chroma: np.ndarray | None = None,
-                      span_penalty: float = DEFAULT_SPAN_PENALTY) -> list[dict]:
+                      span_penalty: float = DEFAULT_SPAN_PENALTY) -> tuple[list[dict], dict]:
     """One window per occurrence in play order (repeats expanded), in order. This is
-    the model the scan pipeline uses (each sectionPass is one occurrence)."""
+    the model the scan pipeline uses (each sectionPass is one occurrence).
+    Returns (results, diagnostics) -- see choose_monotonic_path for diagnostics."""
     hop_seconds = hop / sr
     if chroma is None:
         chroma = whole_audio_chroma(audio, sr=sr, hop=hop)
@@ -199,8 +227,9 @@ def align_occurrences(play_order: list[dict], audio: np.ndarray, *, sr: int = DE
         template = section_template_chroma(section, hop_seconds)
         cands = topk_candidates(template, chroma, hop_seconds, top_k) or [{"start": 0.0, "end": hop_seconds, "cost": float("inf")}]
         slot_candidates.append(cands)
-    path = choose_monotonic_path(slot_candidates, hop_seconds, span_penalty=span_penalty)
-    return [
+    path, diag = choose_monotonic_path(slot_candidates, hop_seconds, span_penalty=span_penalty)
+    results = [
         {"sectionId": section.get("sectionId"), "occurrence": idx, "start": chosen["start"], "end": chosen["end"], "cost": chosen["cost"]}
         for idx, (section, chosen) in enumerate(zip(play_order, path))
     ]
+    return results, _diagnostics_with_violation_rate(results, diag)
