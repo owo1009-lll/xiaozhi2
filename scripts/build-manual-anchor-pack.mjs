@@ -205,6 +205,34 @@ async function main() {
     raterId: args.raterId,
   });
 
+  // Overwrite the generic teacher-validation README with a manual-anchor one: this
+  // batch is technique-labeling FROM SCRATCH, so system-findings.csv is empty and the
+  // generic "use system-findings as the checklist" wording would mislead the teacher.
+  await fsp.writeFile(path.join(result.outputDir, "README.md"), [
+    "# 人工锚点技巧标注包 (manual-anchor)",
+    "",
+    "本批样本来自**人工锚点**:有人听音频、标出干净二胡乐句的起止,并确认音频与谱面匹配。",
+    "教师**从零标注**(系统不预先报错),所以 `system-findings.csv` 为空,本批请**忽略**它。",
+    "",
+    "## 每段流程",
+    "1. 听 `audio-clips/` 里的片段;对照 `*-score.pdf` 的对应页/小节(每行 `sectionTitle` 已写明第几页 + 小节)。",
+    "2. **先判是否匹配**:音频与该谱面位置一致 -> `includeInBaseline=yes`;对不上 -> `includeInBaseline=no`(排除,后续不用)。",
+    "3. 匹配的样本再标:",
+    "   - 真错音 -> `teacherIssueNoteIds`(拿不到 noteId 就在 `comments` 用小节描述)。",
+    "   - 节奏/小节问题 -> `teacherIssueMeasureIndexes`(如 `6|7|9`)。",
+    "   - 二胡技巧(滑音/揉弦/颤音/换把/弓法)与其它说明 -> `comments`。",
+    "4. `overallAgreement`(1-5)、`teacherPrimaryPath`(pitch-first/rhythm-first/review-first)。",
+    "5. 标完把该行 `reviewStatus` 改为 `complete`。",
+    "",
+    "只读上下文已带:`sectionTitle`(页+小节)、`audioStartSeconds`/`audioEndSeconds`、`sourceAudioPath`。",
+    "",
+    "## 导入",
+    "```powershell",
+    "npm run teacher:validation-import -- --pack-dir <this-folder> --reviews <填好的-csv> --apply",
+    "```",
+    "",
+  ].join("\n"), "utf8");
+
   console.log(JSON.stringify({
     ok: true,
     manifestRows: allRows.length,
