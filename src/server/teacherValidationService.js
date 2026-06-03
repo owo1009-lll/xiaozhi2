@@ -384,7 +384,17 @@ function summarizeTeacherPackReadiness(pack = {}, repoRoot = "") {
   }).length;
   const originalVerifiedItemCount = items.filter((item) => safeString(item.sourceKind) === "original-score-verified").length;
   const guardedItemCount = items.filter((item) => item.scoreLocator?.lineProjectionGuardApplied === true).length;
-  const noLocatorNoteCount = items.filter((item) => !getArray(item.scoreLocator?.notePositions).length).length;
+  // manual-anchor items are technique-labelled from scratch: the teacher opens the
+  // audio + PDF and judges match from the section's page/measure title, so system
+  // notePositions are not required (free-rhythm/散板 sections often have none). Waive
+  // the score-locator requirement for confirmed manual-anchor items; analyzer/content
+  // items still require it.
+  const isManualAnchorItem = (item) =>
+    item.alignmentEvidence?.scanMode === "manual-anchor"
+    && item.alignmentEvidence?.manualAnchorConfirmed === true;
+  const noLocatorNoteCount = items.filter(
+    (item) => !isManualAnchorItem(item) && !getArray(item.scoreLocator?.notePositions).length,
+  ).length;
   const reasons = [];
   if (totalCount > 0 && audioClipItemCount < totalCount) reasons.push("missing-audio-clips");
   if (totalCount > 0 && trustedAlignmentItemCount < totalCount) reasons.push("untrusted-alignment");

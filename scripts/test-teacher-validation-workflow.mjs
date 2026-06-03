@@ -287,6 +287,33 @@ try {
   });
   assert.equal(normalNotReady.reviewReady, false);
   assert(normalNotReady.reviewReadinessReasons.includes("not-original-score-verified"));
+  // manual-anchor items are review-ready WITHOUT system notePositions (free-rhythm /
+  // 散板 sections have none); they only need audio + PDF + confirmed human anchor.
+  const manualAnchorReady = teacherValidationInternals.summarizeTeacherPackReadiness({
+    manifest: { reviewMode: "technique-labeling" },
+    items: [{
+      audioClipPath: "data/teacher-validation/packs/fixture/audio-clips/case.wav",
+      sourcePdfPath: "data/teacher-validation/packs/fixture/case.pdf",
+      alignmentEvidence: { trusted: true, teacherReadyTrusted: true, scanMode: "manual-anchor", manualAnchorConfirmed: true },
+      sourceKind: "manual-anchor",
+      scoreLocator: { notePositions: [] },
+    }],
+  });
+  assert.equal(manualAnchorReady.reviewReady, true);
+  assert(!manualAnchorReady.reviewReadinessReasons.includes("missing-score-locators"));
+  // but an analyzer/content item with no notePositions still fails (rule unchanged)
+  const contentNoLocator = teacherValidationInternals.summarizeTeacherPackReadiness({
+    manifest: { reviewMode: "technique-labeling" },
+    items: [{
+      audioClipPath: "data/teacher-validation/packs/fixture/audio-clips/case.wav",
+      sourcePdfPath: "data/teacher-validation/packs/fixture/case.pdf",
+      alignmentEvidence: { trusted: true, teacherReadyTrusted: true, scanMode: "content-aligned" },
+      sourceKind: "teacher-grade-run",
+      scoreLocator: { notePositions: [] },
+    }],
+  });
+  assert.equal(contentNoLocator.reviewReady, false);
+  assert(contentNoLocator.reviewReadinessReasons.includes("missing-score-locators"));
 
   // --- teacher-ready alignment gate (B2c): full/partial ratio bounds + allowlist ---
   const gate = teacherValidationInternals.buildTeacherAlignmentEvidenceFromPassJson;
