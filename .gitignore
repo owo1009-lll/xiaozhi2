@@ -4,6 +4,12 @@ dist/
 .DS_Store
 Thumbs.db
 data/
+
+# Plan C local output artifacts (reproducible review clips / teacher packs; not source)
+/erhu-anchor-clips/
+/erhu-spotcheck/
+/erhu-teacher-pack-fusheng/
+/erhu-teacher-pack-*/
 python-service/.venv/
 python-service/.venv-local/
 python-service/__pycache__/
