@@ -791,6 +791,14 @@ function reviewTemplateRow(candidate, raterId = "teacher-1") {
     teacherPrimaryPath: "",
     teacherIssueNoteIds: "",
     teacherIssueMeasureIndexes: "",
+    // Phase 2 segment-level technique-screening fields (manual-anchor). Enum/pipe-join;
+    // stored on the pack review only, never the quality baseline. teacherMatchStatus:
+    // match|mismatch|uncertain; teacherTechniqueTags: none|glide|vibrato|trill|ornament|
+    // position-shift|bowing|uncertain (pipe-join); teacherTechniqueConfidence: 1-5.
+    teacherMatchStatus: "",
+    teacherTechniqueTags: "",
+    teacherTechniqueConfidence: "",
+    teacherTechniqueUncertain: "",
     comments: "",
     title: candidate.title,
     sectionId: candidate.sectionId,

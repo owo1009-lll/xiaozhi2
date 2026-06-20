@@ -94,6 +94,27 @@ function teacherValidationReviewFile(packDir) {
   return path.join(packDir, "teacher-review-template.json");
 }
 
+// Phase 2 (manual-anchor technique screening): segment-level structured labels.
+// These live on the review row and the pack only -- they are NOT imported into the
+// quality baseline (technique-labeling stays out of noteF1). Enums are validated so
+// statistics/export stay consistent (no "滑音"/"上滑"/"glide" drift in free text).
+const TEACHER_MATCH_STATUSES = new Set(["match", "mismatch", "uncertain"]);
+const TEACHER_TECHNIQUE_TAGS = new Set([
+  "none", "glide", "vibrato", "trill", "ornament", "position-shift", "bowing", "uncertain",
+]);
+
+function normalizeTeacherMatchStatus(value) {
+  const text = safeString(value).trim().toLowerCase();
+  return TEACHER_MATCH_STATUSES.has(text) ? text : "";
+}
+
+function normalizeTeacherTechniqueTags(value) {
+  return toUniqueStringList(value)
+    .map((tag) => safeString(tag).trim().toLowerCase())
+    .filter((tag) => TEACHER_TECHNIQUE_TAGS.has(tag))
+    .join("|");
+}
+
 function normalizeTeacherReviewRow(row = {}) {
   return {
     ...row,
@@ -106,6 +127,13 @@ function normalizeTeacherReviewRow(row = {}) {
     teacherPrimaryPath: safeString(row.teacherPrimaryPath, ""),
     teacherIssueNoteIds: toUniqueStringList(row.teacherIssueNoteIds).join("|"),
     teacherIssueMeasureIndexes: toUniqueNumberList(row.teacherIssueMeasureIndexes).join("|"),
+    teacherMatchStatus: normalizeTeacherMatchStatus(row.teacherMatchStatus),
+    teacherTechniqueTags: normalizeTeacherTechniqueTags(row.teacherTechniqueTags),
+    teacherTechniqueConfidence:
+      row.teacherTechniqueConfidence === "" || row.teacherTechniqueConfidence == null
+        ? ""
+        : clamp(safeNumber(row.teacherTechniqueConfidence, 0), 1, 5),
+    teacherTechniqueUncertain: /^(yes|true|1)$/i.test(safeString(row.teacherTechniqueUncertain).trim()) ? "yes" : "",
     comments: safeString(row.comments),
   };
 }
@@ -1182,6 +1210,10 @@ export function createTeacherValidationService({
       teacherPrimaryPath: payload.teacherPrimaryPath ?? existing.teacherPrimaryPath,
       teacherIssueNoteIds: payload.teacherIssueNoteIds ?? existing.teacherIssueNoteIds,
       teacherIssueMeasureIndexes: payload.teacherIssueMeasureIndexes ?? existing.teacherIssueMeasureIndexes,
+      teacherMatchStatus: payload.teacherMatchStatus ?? existing.teacherMatchStatus,
+      teacherTechniqueTags: payload.teacherTechniqueTags ?? existing.teacherTechniqueTags,
+      teacherTechniqueConfidence: payload.teacherTechniqueConfidence ?? existing.teacherTechniqueConfidence,
+      teacherTechniqueUncertain: payload.teacherTechniqueUncertain ?? existing.teacherTechniqueUncertain,
       comments: payload.comments ?? existing.comments,
       updatedAt: nowIso(),
     });

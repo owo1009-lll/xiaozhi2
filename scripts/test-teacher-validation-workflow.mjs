@@ -867,6 +867,23 @@ try {
   });
   assert.equal(numericMeasureReview.teacherIssueMeasureIndexes, "1|2");
 
+  // Phase 2 segment-level technique fields: enums validated, unknown tags dropped.
+  const techReview = teacherValidationInternals.normalizeTeacherReviewRow({
+    caseId: "tech", analysisId: "tech-a",
+    teacherMatchStatus: "Mismatch",
+    teacherTechniqueTags: "glide|揉弦|vibrato|garbage|TRILL",
+    teacherTechniqueConfidence: 9,
+    teacherTechniqueUncertain: "true",
+  });
+  assert.equal(techReview.teacherMatchStatus, "mismatch");
+  assert.equal(techReview.teacherTechniqueTags, "glide|vibrato|trill"); // 揉弦/garbage dropped (not in enum)
+  assert.equal(techReview.teacherTechniqueConfidence, 5); // clamped to 1-5
+  assert.equal(techReview.teacherTechniqueUncertain, "yes");
+  const techEmpty = teacherValidationInternals.normalizeTeacherReviewRow({ caseId: "t2", analysisId: "t2", teacherMatchStatus: "bogus" });
+  assert.equal(techEmpty.teacherMatchStatus, ""); // invalid enum -> ""
+  assert.equal(techEmpty.teacherTechniqueTags, "");
+  assert.equal(techEmpty.teacherTechniqueConfidence, "");
+
   console.log(JSON.stringify({
     ok: true,
     checks: ["pack-build", "review-import", "quality-snapshot", "erhu-only-score-locator", "line-rank-piano-filter", "duplicate-line-guard", "numeric-measure-list"],
