@@ -883,6 +883,16 @@ try {
   assert.equal(techEmpty.teacherMatchStatus, ""); // invalid enum -> ""
   assert.equal(techEmpty.teacherTechniqueTags, "");
   assert.equal(techEmpty.teacherTechniqueConfidence, "");
+  // "none" is mutually exclusive with real techniques -> dropped when others present
+  const noneDrop = teacherValidationInternals.normalizeTeacherReviewRow({ caseId: "t3", analysisId: "t3", teacherTechniqueTags: "none|glide" });
+  assert.equal(noneDrop.teacherTechniqueTags, "glide");
+  const noneAlone = teacherValidationInternals.normalizeTeacherReviewRow({ caseId: "t4", analysisId: "t4", teacherTechniqueTags: "none" });
+  assert.equal(noneAlone.teacherTechniqueTags, "none");
+  // non-numeric confidence must NOT become a fake 1 -> empty
+  const badConf = teacherValidationInternals.normalizeTeacherReviewRow({ caseId: "t5", analysisId: "t5", teacherTechniqueConfidence: "bad" });
+  assert.equal(badConf.teacherTechniqueConfidence, "");
+  const okConf = teacherValidationInternals.normalizeTeacherReviewRow({ caseId: "t6", analysisId: "t6", teacherTechniqueConfidence: "3" });
+  assert.equal(okConf.teacherTechniqueConfidence, 3);
 
   console.log(JSON.stringify({
     ok: true,

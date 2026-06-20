@@ -109,10 +109,20 @@ function normalizeTeacherMatchStatus(value) {
 }
 
 function normalizeTeacherTechniqueTags(value) {
-  return toUniqueStringList(value)
+  const tags = toUniqueStringList(value)
     .map((tag) => safeString(tag).trim().toLowerCase())
-    .filter((tag) => TEACHER_TECHNIQUE_TAGS.has(tag))
-    .join("|");
+    .filter((tag) => TEACHER_TECHNIQUE_TAGS.has(tag));
+  // "none" means no technique present, so it is mutually exclusive with any real
+  // technique tag -- drop it when others are tagged (else stats are ambiguous).
+  const others = tags.filter((tag) => tag !== "none");
+  return (others.length ? others : tags).join("|");
+}
+
+function normalizeTeacherConfidence(value) {
+  if (value === "" || value == null) return "";
+  const num = Number(value);
+  // Non-numeric (e.g. "bad") must NOT become a fake low confidence of 1 -> keep empty.
+  return Number.isFinite(num) ? clamp(num, 1, 5) : "";
 }
 
 function normalizeTeacherReviewRow(row = {}) {
@@ -129,10 +139,7 @@ function normalizeTeacherReviewRow(row = {}) {
     teacherIssueMeasureIndexes: toUniqueNumberList(row.teacherIssueMeasureIndexes).join("|"),
     teacherMatchStatus: normalizeTeacherMatchStatus(row.teacherMatchStatus),
     teacherTechniqueTags: normalizeTeacherTechniqueTags(row.teacherTechniqueTags),
-    teacherTechniqueConfidence:
-      row.teacherTechniqueConfidence === "" || row.teacherTechniqueConfidence == null
-        ? ""
-        : clamp(safeNumber(row.teacherTechniqueConfidence, 0), 1, 5),
+    teacherTechniqueConfidence: normalizeTeacherConfidence(row.teacherTechniqueConfidence),
     teacherTechniqueUncertain: /^(yes|true|1)$/i.test(safeString(row.teacherTechniqueUncertain).trim()) ? "yes" : "",
     comments: safeString(row.comments),
   };
