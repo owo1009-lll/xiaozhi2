@@ -513,6 +513,9 @@ function normalizeAnalysisBase({ repoRoot, result = {}, job = {}, score = {}, an
     sectionId,
     pieceTitle: cleanText(job.pieceTitle || result.title || analysis.pieceTitle || score.title, "Untitled"),
     sectionTitle: cleanText(sectionPass?.sectionTitle || analysis.sectionTitle || "Whole piece", sectionId),
+    // manual-anchor segments can span a page range; carry it for the multi-page view.
+    scorePageStart: numeric(sectionPass?.scorePageStart),
+    scorePageEnd: numeric(sectionPass?.scorePageEnd),
     audioHash,
     audioSubmission: job.audioSubmission || analysis.audioSubmission || whole.audioSubmission || null,
     originalAudio: buildOriginalAudio(repoRoot, result, job, whole),
@@ -562,6 +565,8 @@ function candidateFromAnalysis({ repoRoot, result = {}, job = {}, score = {}, an
     title: normalized.pieceTitle,
     sectionId: normalized.sectionId,
     sectionTitle: normalized.sectionTitle,
+    scorePageStart: normalized.scorePageStart,
+    scorePageEnd: normalized.scorePageEnd,
     audioHash: normalized.audioHash,
     audioSegment: normalized.audioSegment,
     sourcePdfPath: normalized.sourceMetadata.sourcePdfPath,
@@ -938,7 +943,17 @@ export async function buildTeacherValidationPack({
 
   const manifestItems = candidates.map(({ analysis, ...item }) => item);
   const analyses = candidates.map((candidate) => candidate.analysis);
-  const reviewRows = candidates.map((candidate) => reviewTemplateRow(candidate, raterId));
+  // Preserve existing teacher reviews when regenerating into the same outputDir: keep
+  // the saved row for any caseId that still exists (caseIds are stable across rebuilds
+  // when sectionId/audioHash are unchanged), so a regenerate does NOT wipe teacher work.
+  // New caseIds get a fresh pending template row.
+  const existingReviews = new Map(
+    getArray(readJson(path.join(resolvedOutputDir, "teacher-review-template.json"), { reviews: [] }).reviews)
+      .map((row) => [safeString(row.caseId), row]),
+  );
+  const reviewRows = candidates.map(
+    (candidate) => existingReviews.get(candidate.caseId) || reviewTemplateRow(candidate, raterId),
+  );
   const findingRows = systemFindingRows(candidates);
   const manifest = {
     schemaVersion: 1,

@@ -89,6 +89,13 @@ export default function ScoreLocatorPanel({
   );
   const activeLabel = activeNote?.label || activeMeasure?.label || (activeMeasureIndex ? measureDisplayLabel(activeMeasureIndex) : locator?.pageNumber ? `第 ${locator.pageNumber} 页` : "未定位");
 
+  // Multi-page: a segment spanning a page range carries locator.pages; fall back to the
+  // single page. Note/measure overlays only apply to the anchor page (their coords are
+  // that page's); other pages render as plain images so a cross-page passage is visible.
+  const pageList = (locator?.pages && locator.pages.length)
+    ? locator.pages.filter((page) => page.pageImagePath)
+    : (locator?.pageImagePath ? [{ pageNumber: locator.pageNumber, pageImagePath: locator.pageImagePath }] : []);
+
   return (
     <div className="teacher-media-block teacher-score-locator">
       <div className="teacher-score-head">
@@ -109,10 +116,15 @@ export default function ScoreLocatorPanel({
         </div>
       </div>
 
-      {locator?.pageImagePath ? (
+      {pageList.length ? (
         <div className="teacher-score-page-frame">
-          <div className="teacher-score-page">
-            <img src={locator.pageImagePath} alt={`${item?.title || "谱面"} ${locator.pageNumber || ""}`} />
+          {pageList.map((pg) => {
+          const isAnchorPage = Number(pg.pageNumber) === Number(locator.pageNumber);
+          return (
+          <div className="teacher-score-page" key={pg.pageNumber}>
+            {pageList.length > 1 ? <div className="teacher-score-page-label">第 {pg.pageNumber} 页</div> : null}
+            <img src={pg.pageImagePath} alt={`${item?.title || "谱面"} 第${pg.pageNumber}页`} />
+            {isAnchorPage ? (<>
             {focusRegions.map((region, index) => (
               <div
                 key={`${region.pageNumber || 1}-${region.systemIndex || 0}-${region.staffIndex || 0}-${index}`}
@@ -167,7 +179,10 @@ export default function ScoreLocatorPanel({
                 />
               );
             })}
+            </>) : null}
           </div>
+          );
+          })}
         </div>
       ) : (
         <p className="empty-card">当前谱面没有可用的小节坐标，只能打开完整 PDF 人工核对。</p>

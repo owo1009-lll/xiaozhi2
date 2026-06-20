@@ -27,6 +27,11 @@ import {
   severityLabel,
 } from "./teacherValidationUtils.js";
 
+const FILTER_LABELS = { pending: "待标注", complete: "已完成", excluded: "已排除", all: "全部" };
+function filterLabel(value) {
+  return FILTER_LABELS[value] || value;
+}
+
 function formatImportStatus(summary = {}) {
   const importedCount = Math.max(0, Math.round(Number(summary.acceptedReviewCount) || 0));
   const validationSummary = summary.validationSummary || {};
@@ -461,6 +466,12 @@ export default function TeacherValidationApp() {
             </div>
           </div>
           <div className="teacher-case-scroll">
+            {(!loading && !filteredItems.length && items.length) ? (
+              <button type="button" className="teacher-case-button" onClick={() => setFilter("all")}>
+                <strong>当前筛选「{filterLabel(filter)}」无片段</strong>
+                <span>共 {items.length} 段；点此查看「全部」即可切换/回填</span>
+              </button>
+            ) : null}
             {filteredItems.map((item) => (
               <button
                 key={item.caseId}

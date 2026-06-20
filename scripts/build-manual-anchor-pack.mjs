@@ -94,6 +94,21 @@ function formatPageId(scorePage) {
   return String(Math.round(pageNumber)).padStart(2, "0");
 }
 
+// scorePage may be a single page ("3") or a range ("1-2") for a segment that spans
+// pages. Returns {start, end} (end>=start>0) or null. The sectionId uses start only,
+// so caseIds stay stable; the range drives the multi-page score view.
+function parsePageRange(scorePage) {
+  const text = safeString(scorePage).trim();
+  const range = text.match(/^(\d+)\s*-\s*(\d+)$/);
+  if (range) {
+    const start = parseInt(range[1], 10);
+    const end = parseInt(range[2], 10);
+    return start > 0 && end >= start ? { start, end } : null;
+  }
+  const single = Number(text);
+  return Number.isFinite(single) && single > 0 ? { start: Math.round(single), end: Math.round(single) } : null;
+}
+
 function validateMatchedRow(row, index, scoreIds) {
   for (const column of REQUIRED_COLUMNS) {
     if (!safeString(row[column]).trim()) throw new Error(`row ${index + 1}: missing required value ${column}`);
@@ -106,7 +121,7 @@ function validateMatchedRow(row, index, scoreIds) {
   if (start == null || end == null || end <= start) {
     throw new Error(`row ${index + 1}: invalid audio window ${row.audioStartSeconds}..${row.audioEndSeconds}`);
   }
-  if (!formatPageId(row.scorePage)) throw new Error(`row ${index + 1}: scorePage must be a positive page number`);
+  if (!parsePageRange(row.scorePage)) throw new Error(`row ${index + 1}: scorePage must be a positive page or range a-b`);
   return { start, end };
 }
 
@@ -117,8 +132,9 @@ function buildJobAndPass(row, index) {
     throw new Error(`row ${index + 1}: invalid audio window ${row.audioStartSeconds}..${row.audioEndSeconds}`);
   }
   const duration = Number((end - start).toFixed(3));
-  // Keep the page-XX token so the existing score locator resolves to the intended PDF page.
-  const sectionId = `page-${formatPageId(row.scorePage)}-manual-m${slug(row.measureRange)}-${index}`;
+  const pageRange = parsePageRange(row.scorePage) || { start: 1, end: 1 };
+  // sectionId uses the START page only so caseIds stay stable across regenerations.
+  const sectionId = `page-${formatPageId(pageRange.start)}-manual-m${slug(row.measureRange)}-${index}`;
   const sectionTitle = `第${safeString(row.scorePage)}页 m${safeString(row.measureRange)}${row.phraseNote ? ` ${row.phraseNote}` : ""}`.trim();
   const audioHash = crypto.createHash("sha1")
     .update(`${row.sourceAudioPath}|${start}|${end}|${row.scoreId}`).digest("hex");
@@ -135,7 +151,9 @@ function buildJobAndPass(row, index) {
     sectionPasses: [{
       sectionId,
       sectionTitle,
-      scorePage: Number(row.scorePage),
+      scorePage: pageRange.start,
+      scorePageStart: pageRange.start,
+      scorePageEnd: pageRange.end,
       measureRange: row.measureRange,
       phraseNote: row.phraseNote || "",
       manualAnchor: true,

@@ -379,6 +379,17 @@ button {
   background: color-mix(in srgb, var(--accent, #2d6cdf) 12%, transparent);
 }
 
+/* Multi-page manual-anchor score view: stacked page images with a page label */
+.teacher-score-page-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted, #667);
+  margin: 8px 0 4px;
+}
+.teacher-score-page-frame > .teacher-score-page + .teacher-score-page {
+  margin-top: 12px;
+}
+
 .teacher-toolbar input,
 .teacher-toolbar select,
 .teacher-form-grid input,

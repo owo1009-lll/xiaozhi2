@@ -1033,12 +1033,35 @@ function buildTeacherScoreLocator(score = {}, item = {}, analysis = {}, pathCont
 
   const pageImagePath = safeString(section.pageImagePath);
   const audioSegment = item.audioSegment || analysis.audioSegment;
+  // Multi-page support: a manual-anchor segment can span a page range
+  // (item.scorePageStart..scorePageEnd). Emit one rendered page image per page so the
+  // teacher can follow a cross-page passage instead of seeing only the first page.
+  const pageStart = safeNumber(item.scorePageStart, null);
+  const pageEnd = safeNumber(item.scorePageEnd, null);
+  let pages = null;
+  if (pageStart != null && pageEnd != null && pageEnd > pageStart) {
+    const imageByPage = new Map();
+    for (const candidateSection of getArray(score.sections)) {
+      const candidatePage = parsePagewiseSectionPage(candidateSection);
+      const candidateImage = safeString(candidateSection.pageImagePath);
+      if (candidatePage && candidateImage && !imageByPage.has(candidatePage)) imageByPage.set(candidatePage, candidateImage);
+    }
+    pages = [];
+    for (let page = pageStart; page <= pageEnd; page += 1) {
+      const image = imageByPage.get(page) || "";
+      pages.push({
+        pageNumber: page,
+        pageImagePath: image.startsWith("/data/") ? image : (image ? toWebPathFromAbsolute(image, pathContext) : ""),
+      });
+    }
+  }
   const locator = {
     scoreId: safeString(score.scoreId),
     sectionId: safeString(section.sectionId),
     sectionTitle: repairMojibakeText(section.title || item.sectionTitle || analysis.sectionTitle),
     pageNumber: parsePagewiseSectionPage(section) || notePositions[0]?.pageNumber || 1,
     pageImagePath: pageImagePath.startsWith("/data/") ? pageImagePath : toWebPathFromAbsolute(pageImagePath, pathContext),
+    pages,
     sourcePdfPath: safeString(item.sourcePdfPath || score.sourcePdfPath),
     measureCount: Math.max(0, Math.round(safeNumber(section.measureCount, measurePositions.length))),
     noteCount: notePositions.length,
