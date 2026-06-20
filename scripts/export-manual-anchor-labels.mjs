@@ -7,10 +7,11 @@
 // pack's teacher-review-template.json; we join them with the manifest items and emit
 // the captured segment labels.
 //
-// Enforced training-set rules (mismatched / excluded samples NEVER reach the set):
+// Enforced training-set rules (mismatched / excluded samples NEVER reach the set),
+// applied in this order (mismatch is authoritative, attributed first):
 //   - reviewStatus must be "complete"
-//   - includeInBaseline === "no"        -> excluded
 //   - teacherMatchStatus === "mismatch" -> excluded
+//   - includeInBaseline === "no"        -> excluded
 //
 // Usage:
 //   node scripts/export-manual-anchor-labels.mjs [--pack <packId>] [--output-dir DIR]
@@ -108,7 +109,7 @@ function main() {
     generatedAt: new Date().toISOString(),
     schemaDoc: "docs/erhu-technique-labeling-schema.md",
     level: "segment",
-    exclusionRules: ["reviewStatus!=complete", "includeInBaseline=no", "teacherMatchStatus=mismatch"],
+    exclusionRules: ["reviewStatus!=complete", "teacherMatchStatus=mismatch", "includeInBaseline=no"],
     packs,
     exportedRowCount: orderedRows.length,
     stats,
