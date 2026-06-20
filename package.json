@@ -91,7 +91,8 @@
     "research:paper": "powershell -ExecutionPolicy Bypass -File scripts\\run-research-analysis.ps1",
     "research:export-and-paper": "powershell -ExecutionPolicy Bypass -File scripts\\export-and-analyze.ps1",
     "test:omr-confidence-cache": "node scripts/test-omr-confidence-cache-independence.mjs",
-    "teacher:technique-labeling-export": "node scripts/export-technique-labeling-dataset.mjs"
+    "teacher:technique-labeling-export": "node scripts/export-technique-labeling-dataset.mjs",
+    "teacher:manual-anchor-export": "node scripts/export-manual-anchor-labels.mjs"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.99",
