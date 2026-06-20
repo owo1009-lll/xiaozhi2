@@ -109,6 +109,29 @@ export function makeDraft(item, raterId) {
     teacherPrimaryPath: review.teacherPrimaryPath || "",
     teacherIssueNoteIds: review.teacherIssueNoteIds || "",
     teacherIssueMeasureIndexes: review.teacherIssueMeasureIndexes || "",
+    teacherMatchStatus: review.teacherMatchStatus || "",
+    teacherTechniqueTags: review.teacherTechniqueTags || "",
+    teacherTechniqueConfidence: review.teacherTechniqueConfidence ?? "",
+    teacherTechniqueUncertain: review.teacherTechniqueUncertain === "yes" ? "yes" : "",
     comments: review.comments || "",
   };
 }
+
+// Segment-level technique-screening options (labels for the backend form). Values
+// MUST match the server enum in teacherValidationService.js normalizeTeacherReviewRow.
+export const TEACHER_MATCH_STATUS_OPTIONS = [
+  { value: "", label: "未判断" },
+  { value: "match", label: "匹配" },
+  { value: "mismatch", label: "不匹配" },
+  { value: "uncertain", label: "不确定" },
+];
+export const TEACHER_TECHNIQUE_TAG_OPTIONS = [
+  { value: "none", label: "无明显技巧" },
+  { value: "glide", label: "滑音" },
+  { value: "vibrato", label: "揉弦" },
+  { value: "trill", label: "颤音/打音" },
+  { value: "ornament", label: "装饰音" },
+  { value: "position-shift", label: "换把" },
+  { value: "bowing", label: "弓法" },
+  { value: "uncertain", label: "不确定" },
+];

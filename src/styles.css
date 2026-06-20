@@ -343,6 +343,42 @@ button {
   font-weight: 700;
 }
 
+/* Phase 2 technique-screening: inline checkbox field + multi-select tag chips */
+.teacher-form-grid label.teacher-inline-check {
+  grid-auto-flow: column;
+  align-items: center;
+  justify-content: start;
+  gap: 8px;
+}
+.teacher-form-grid label.teacher-inline-check input {
+  width: auto;
+  min-height: 0;
+}
+.teacher-technique-tags h3 {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 12px 0 8px;
+}
+.teacher-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.teacher-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 13px;
+}
+.teacher-tag-chip.is-active {
+  border-color: var(--accent, #2d6cdf);
+  background: color-mix(in srgb, var(--accent, #2d6cdf) 12%, transparent);
+}
+
 .teacher-toolbar input,
 .teacher-toolbar select,
 .teacher-form-grid input,

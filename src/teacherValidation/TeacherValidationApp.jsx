@@ -10,6 +10,8 @@ import SegmentAudioPlayer from "./SegmentAudioPlayer.jsx";
 import { FindingToggle, IssueChip, SummaryPill } from "./TeacherValidationAtoms.jsx";
 import {
   PATH_OPTIONS,
+  TEACHER_MATCH_STATUS_OPTIONS,
+  TEACHER_TECHNIQUE_TAG_OPTIONS,
   findingText,
   formatDate,
   formatPercent,
@@ -224,6 +226,17 @@ export default function TeacherValidationApp() {
 
   function updateDraft(patch) {
     setDraft((current) => ({ ...current, ...patch }));
+  }
+
+  function toggleTechniqueTag(tag) {
+    const set = new Set(parseList(draft.teacherTechniqueTags));
+    const willHave = !set.has(tag);
+    if (willHave) set.add(tag); else set.delete(tag);
+    let tags = Array.from(set);
+    // mirror the server: "none" (= no technique) is mutually exclusive
+    if (willHave && tag === "none") tags = ["none"];
+    else if (willHave && tag !== "none") tags = tags.filter((value) => value !== "none");
+    updateDraft({ teacherTechniqueTags: tags.join("|") });
   }
 
   function activateMeasureIndex(measureIndex) {
@@ -545,6 +558,51 @@ export default function TeacherValidationApp() {
                   </select>
                 </label>
               </div>
+
+              <div className="teacher-form-grid">
+                <label>
+                  <span>是否匹配</span>
+                  <select value={draft.teacherMatchStatus} onChange={(event) => updateDraft({ teacherMatchStatus: event.target.value })}>
+                    {TEACHER_MATCH_STATUS_OPTIONS.map((item) => (
+                      <option key={item.value} value={item.value}>{item.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>技巧置信度 (1-5)</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="5"
+                    step="1"
+                    value={draft.teacherTechniqueConfidence}
+                    onChange={(event) => updateDraft({ teacherTechniqueConfidence: event.target.value })}
+                  />
+                </label>
+                <label className="teacher-inline-check">
+                  <input
+                    type="checkbox"
+                    checked={draft.teacherTechniqueUncertain === "yes"}
+                    onChange={(event) => updateDraft({ teacherTechniqueUncertain: event.target.checked ? "yes" : "" })}
+                  />
+                  <span>技巧不确定</span>
+                </label>
+              </div>
+
+              <section className="teacher-technique-tags">
+                <h3>技巧标签（多选）</h3>
+                <div className="teacher-tag-row">
+                  {TEACHER_TECHNIQUE_TAG_OPTIONS.map((item) => {
+                    const checked = parseList(draft.teacherTechniqueTags).includes(item.value);
+                    return (
+                      <label key={item.value} className={`teacher-tag-chip${checked ? " is-active" : ""}`}>
+                        <input type="checkbox" checked={checked} onChange={() => toggleTechniqueTag(item.value)} />
+                        <span>{item.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </section>
 
               <div className="action-row teacher-action-row">
                 <button type="button" className="secondary-button" onClick={useSystemFindings}>
