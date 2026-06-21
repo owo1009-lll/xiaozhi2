@@ -40,13 +40,13 @@ slice-review-clips(切试听片段) → 填清单(支持页范围)
 长录音"自动"对齐经充分实验后判定**短期不可行**(散布/压缩,真实数据反复证伪)。项目据此转向 **Plan C 人工锚点**——现在真正能产出可靠教师样本的路径。长曲自动对齐的实验脚本保留为证据,**不接生产**。
 
 ## 六、当前数据状态
-- **教师后台当前保留 `manual-anchor-fusheng` 与 `manual-anchor-rhapsody-2` 两个包;旧污染包已清理并有备份**(`data/erhu-study-records.json.bak-*`)。study store 曾清理旧 corpus 占位数据;当前教师数据以 manual-anchor pack/review JSON 为准。
+- **教师后台当前保留 `manual-anchor-fusheng`、`manual-anchor-rhapsody-2`、`manual-anchor-xuandong` 三个包;旧污染包已清理并有备份**(`data/erhu-study-records.json.bak-*`)。study store 曾清理旧 corpus 占位数据;当前教师数据以 manual-anchor pack/review JSON 为准。
 - 浮生音频已入仓库 `data/real-tests/originals/fusheng-full.mp3`(gitignored)。
 - 第二号狂想曲包 `manual-anchor-rhapsody-2` 已就绪:18 段,全 `reviewReady`,多页谱面定位生效。该批为整曲顺序覆盖、相邻约 5 秒重叠、部分跨 2-3 页/几十小节,适合做"该段出现哪些技巧"的存在性标注,不适合逐音级精标。
-- 炫动试听片段已切到桌面 `erhu-anchor-clips/xuandong/`:11 段,待筛报后再生成教师包。
+- 炫动包 `manual-anchor-xuandong` 已生成:11 段,0 警告,全 `reviewReady`,支持跨页多页谱面定位,当前待教师标注。
 
 ## 七、待决 / 下一步(优先级)
-1. **扩样本(优先)**:用 Plan C 继续扩结构化技巧样本。当前顺序:先标第二号狂想曲 18 段;再筛报并生成炫动包;古巷深处 / 雪山魂塑 / 弦歌吟等需补齐音频路径或人工锚点后再做。第四号样本已删除,不作为当前下一批。
+1. **扩样本(优先)**:用 Plan C 继续扩结构化技巧样本。当前顺序:先标第二号狂想曲 18 段与炫动 11 段;古巷深处 / 雪山魂塑 / 弦歌吟等需补齐音频路径或人工锚点后再做。第四号样本已删除,不作为当前下一批。
 2. 双评 / 仲裁。
 3. 轻量技巧判定器原型。
 
