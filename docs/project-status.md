@@ -25,21 +25,21 @@ slice-review-clips(切试听片段) → 填清单(支持页范围)
 - **Plan C 全链路**:manual-anchor 模式、清单规范、生成器、切片工具、后台集成(含 manual-anchor readiness 豁免)、结构化字段(2a)、后台表单(2b)、导出(2c)、多页谱面、重建保留评审。
 - **首批数据**:浮生 8 段、第二号狂想曲 18 段、炫动 11 段均已标注并导出,合计 37 段。最新导出在 `data/teacher-validation/technique-labeling-export/2026-06-24T10-55-04-081Z/`。
 - **坎1 读谱清理**:store-vs-MXL 审计当前 0 个 `POLLUTED`;炫动、第二号、雪山魂塑、流浪者、古巷深处已按完整 MXL 重建,第二号残桩已从 store 删除(磁盘目录保留)。`guxiang_exac` 是 `mxl-empty` 后续清理项,不计作污染。
-- **完整谱对齐基线**:CREPE/fmax=1400 已在完整谱上重跑炫动和第二号。炫动 `pageHitRate=0.364, medianAbsTimeErr=32.8s`;第二号 `pageHitRate=0.0, medianAbsTimeErr=234.1s`。这说明补全谱面后 tempo/rubato 问题暴露更明显,旧残谱时代的对齐数字不再作为基准。
+- **完整谱对齐基线**:CREPE/fmax=1400 已在完整谱上重跑。炫动是干净基线(10 页谱面与锚点页码 1-10 对齐):`pageHitRate=0.364, medianAbsTimeErr=32.8s`。第二号重建后 store 为 28 页,而当前 rhapsody-2 锚点只覆盖 1-16 页,属于谱面/录音范围不匹配的 confound(`pageHitRate=0.0, medianAbsTimeErr=234.1s`不作为干净负结果)。这说明旧残谱时代的对齐数字不再作为基准,坎2 需要在谱面范围匹配的数据上评估。
 
 Plan C 主线代码已合并到 `main` 并 push;当前 bake-off / 坎1-2 后续实验在 `feature/model-bakeoff-omr-align` 上继续。
 
 ## 四、未完成 / 搁置(附原因)
 | 项 | 状态 | 原因 |
 |---|---|---|
-| 长录音**自动**细段对齐 | 搁置(已知局限) | 读谱污染已清,但完整谱 CREPE 基线仍不达 teacher-ready;纯 chroma-DTW 散布,span 惩罚仅合成有效,onset / erhu-focus / 粗粒度在真实狂想曲上不稳定 → 证伪后转人工锚点 |
+| 长录音**自动**细段对齐 | 搁置(已知局限) | 读谱污染已清,但炫动完整谱 CREPE 干净基线仍不达 teacher-ready;第二号当前评测受谱面/录音范围不匹配影响,不能作为干净负结果;纯 chroma-DTW 散布,span 惩罚仅合成有效,onset / erhu-focus / 粗粒度在真实狂想曲上不稳定 → 证伪后转人工锚点 |
 | rush/tempo_ratio、n6 滑音吞音 | 文档化局限 | 投入产出比低 |
 | 扩样本 | 已达成首轮门槛:三曲 37 段已标注并导出,无空置信度 | 论文使用前需说明这些是段级技巧存在性标注 |
 | 双评 / 仲裁 | 未做(约定缓做) | 提升标签可信度,排在样本量之后 |
 | 轻量技巧判定器 | 未做 | 37 段已足够启动段级原型;音符级判定仍依赖更可靠的细段/逐音对齐 |
 
 ## 五、最关键的诚实结论
-长录音"自动"对齐的结论已经从"完全不可行"修正为:**读谱污染可以清理,粗定位/外部基线可继续评测;但完整谱后的细段 teacher-ready 自动对齐仍未达标**。当前证据显示主要瓶颈是 tempo/rubato 与真实混音候选质量,不是单纯换一个 fmax 或补全 store 就能解决。项目据此保留自动对齐实验脚本作证据,**不接生产**;当前真正能产出可靠教师样本的路径仍是 **Plan C 人工锚点**。
+长录音"自动"对齐的结论已经从"完全不可行"修正为:**读谱污染可以清理,粗定位/外部基线可继续评测;但在谱面范围匹配的完整谱数据上,细段 teacher-ready 自动对齐仍未达标**。当前干净证据来自炫动;第二号的 0.0 结果受 28 页完整谱 vs 1-16 页锚点覆盖范围不一致影响,只作为方法警示,不作为对齐失败证据。项目据此保留自动对齐实验脚本作证据,**不接生产**;当前真正能产出可靠教师样本的路径仍是 **Plan C 人工锚点**。
 
 ## 六、当前数据状态
 - **教师后台当前保留 `manual-anchor-fusheng`、`manual-anchor-rhapsody-2`、`manual-anchor-xuandong` 三个包;旧污染包已清理并有备份**(`data/erhu-study-records.json.bak-*`)。study store 曾清理旧 corpus 占位数据;当前教师数据以 manual-anchor pack/review JSON 为准。
