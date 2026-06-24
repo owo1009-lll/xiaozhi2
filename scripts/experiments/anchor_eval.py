@@ -148,5 +148,7 @@ def print_report(tag, metrics):
     for r in m["perAnchor"]:
         pp = r["predPage"]
         flag = "HIT" if r["hit"] else ("ovl" if r.get("overlap") else "MISS")
+        time_err = r.get("timeErr")
+        time_err_label = "None" if time_err is None else f"{time_err}s"
         print(f"    {r['start']:.0f}-{r['end']:.0f}s truth=p{r['pageLo']}-{r['pageHi']} pred=p{pp} {flag} "
-              f"startErr={r['startErr']}s endErr={r['endErr']}s")
+              f"timeErr={time_err_label}")

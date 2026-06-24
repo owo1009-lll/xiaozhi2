@@ -153,6 +153,21 @@ for (const { text, reason } of requiredServerSnippets) {
   }
 }
 
+const reusableImportOffset = serverText.indexOf("function findReusableImportedScore");
+const reusableImportEnd = serverText.indexOf("const activeScoreImportTasks", reusableImportOffset);
+const reusableImportBlock = reusableImportOffset >= 0
+  ? serverText.slice(reusableImportOffset, reusableImportEnd >= 0 ? reusableImportEnd : undefined)
+  : "";
+if (!serverText.includes("function scoreSourceFileExists")) {
+  fail("Score import cache reuse must validate that stored MusicXML sources still exist.");
+}
+if (!serverText.includes("fsSync.existsSync(localPath)")) {
+  fail("Score import source-file guard must check local MusicXML source existence.");
+}
+if (!reusableImportBlock.includes("scoreSourceFileExists(score)")) {
+  fail("Reusable score-import cache hits must reject stale records whose MusicXML source is missing.", reusableImportOffset);
+}
+
 if (!serverText.includes("createTeacherValidationRouter(teacherValidationService)")) {
   fail("Teacher validation routes must be mounted through src/server/teacherValidationRoutes.js.");
 }
