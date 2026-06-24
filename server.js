@@ -1147,6 +1147,16 @@ function importedScoreHasCurrentMeasureNumbering(score = {}) {
   );
 }
 
+function scoreSourceFileExists(score = {}) {
+  const sourcePath = safeString(score?.musicxmlPath);
+  if (!sourcePath) return true;
+  if (/^https?:\/\//i.test(sourcePath)) return true;
+  const localPath = path.isAbsolute(sourcePath) && !sourcePath.startsWith("/data/")
+    ? sourcePath
+    : path.resolve(__dirname, sourcePath.replace(/^\/+/, ""));
+  return fsSync.existsSync(localPath);
+}
+
 function normalizeScoreImportJob(job = {}) {
   const normalizedOmrStats = normalizeOmrStats(job.omrStats);
   const jobSections = getArray(job.sections || job.piecePack?.sections);
@@ -1372,6 +1382,7 @@ function findReusableImportedScore(store, { pdfHash = "", selectedPart = "erhu",
         importedScoreHasExactNotePositions(score) &&
         importedScoreHasProjectionMetadata(score) &&
         importedScoreHasCurrentMeasureNumbering(score) &&
+        scoreSourceFileExists(score) &&
         getArray(score.sections).length > 0,
     ) || null
   );
