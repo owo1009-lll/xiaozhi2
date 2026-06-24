@@ -26,13 +26,15 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import precision_recall_fscore_support, roc_auc_score
 
+import argparse
+
 REPO = Path(__file__).resolve().parents[2]
-CSV = REPO / "data" / "experiments" / "technique-features" / "basic-pitch-segment-features-latest.csv"
+DEFAULT_CSV = REPO / "data" / "experiments" / "technique-features" / "basic-pitch-segment-features-latest.csv"
 LABELS = ["glide", "vibrato", "trill", "ornament", "position-shift", "bowing"]
 
 
-def load():
-    with CSV.open(encoding="utf-8-sig") as f:
+def load(csv_path):
+    with Path(csv_path).open(encoding="utf-8-sig") as f:
         rows = list(csv.DictReader(f))
     feat_cols = [c for c in rows[0].keys() if c.startswith(("audio", "basicPitch"))]
     X = np.array([[float(r[c]) if r[c] not in ("", None) else 0.0 for c in feat_cols] for r in rows])
@@ -65,8 +67,13 @@ def majority_baseline_f1(base_rate):
 
 
 def main():
-    X, Y, groups, feat_cols = load()
+    parser = argparse.ArgumentParser(description="LOPO multi-label technique baseline.")
+    parser.add_argument("--features", default=str(DEFAULT_CSV),
+                        help="segment feature CSV (mix or separated-stem); defaults to latest mix export")
+    args = parser.parse_args()
+    X, Y, groups, feat_cols = load(args.features)
     n = len(groups)
+    print(f"features-csv={args.features}")
     print(f"segments={n} features={len(feat_cols)} pieces={sorted(set(groups))}")
     models = {
         "logreg": lambda: LogisticRegression(max_iter=4000, class_weight="balanced"),
