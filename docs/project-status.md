@@ -23,33 +23,35 @@ slice-review-clips(切试听片段) → 填清单(支持页范围)
 - **teacher-ready 闸门**(server + pack 时 .mjs + embedded 重判,三处同步,测试覆盖):scanMode 白名单、span/duration 双向比、窗口重叠、单调性(violationRate / greedyFallback)、覆盖率 / 最大间隙、manual-anchor 需显式 `manualAnchorConfirmed`,缺字段一律 fail-closed。
 - **内容对齐实验**(金标 harness B1-B3 + span 惩罚 + 失败暴露诊断):含诚实负结果(见下)。
 - **Plan C 全链路**:manual-anchor 模式、清单规范、生成器、切片工具、后台集成(含 manual-anchor readiness 豁免)、结构化字段(2a)、后台表单(2b)、导出(2c)、多页谱面、重建保留评审。
-- **首批数据**:浮生 8 段、第二号狂想曲 18 段、炫动 11 段均已标注并导出,合计 37 段。最新导出在 `data/teacher-validation/technique-labeling-export/2026-06-24T08-06-04-868Z/`。
+- **首批数据**:浮生 8 段、第二号狂想曲 18 段、炫动 11 段均已标注并导出,合计 37 段。最新导出在 `data/teacher-validation/technique-labeling-export/2026-06-24T10-55-04-081Z/`。
+- **坎1 读谱清理**:store-vs-MXL 审计当前 0 个 `POLLUTED`;炫动、第二号、雪山魂塑、流浪者、古巷深处已按完整 MXL 重建,第二号残桩已从 store 删除(磁盘目录保留)。`guxiang_exac` 是 `mxl-empty` 后续清理项,不计作污染。
+- **完整谱对齐基线**:CREPE/fmax=1400 已在完整谱上重跑炫动和第二号。炫动 `pageHitRate=0.364, medianAbsTimeErr=32.8s`;第二号 `pageHitRate=0.0, medianAbsTimeErr=234.1s`。这说明补全谱面后 tempo/rubato 问题暴露更明显,旧残谱时代的对齐数字不再作为基准。
 
-代码:全部合并到 `main` 并已 push。
+Plan C 主线代码已合并到 `main` 并 push;当前 bake-off / 坎1-2 后续实验在 `feature/model-bakeoff-omr-align` 上继续。
 
 ## 四、未完成 / 搁置(附原因)
 | 项 | 状态 | 原因 |
 |---|---|---|
-| 长录音**自动**细段对齐 | 搁置(已知局限) | 纯 chroma-DTW 散布;span 惩罚仅合成有效;onset / erhu-focus / 粗粒度在两首真实狂想曲上不稳定 → 证伪后转人工锚点 |
+| 长录音**自动**细段对齐 | 搁置(已知局限) | 读谱污染已清,但完整谱 CREPE 基线仍不达 teacher-ready;纯 chroma-DTW 散布,span 惩罚仅合成有效,onset / erhu-focus / 粗粒度在真实狂想曲上不稳定 → 证伪后转人工锚点 |
 | rush/tempo_ratio、n6 滑音吞音 | 文档化局限 | 投入产出比低 |
-| 扩样本 | 已达成首轮门槛:三曲 37 段已标注并导出 | 仍需补齐 2 段空置信度,并在论文使用前说明这些是段级技巧存在性标注 |
+| 扩样本 | 已达成首轮门槛:三曲 37 段已标注并导出,无空置信度 | 论文使用前需说明这些是段级技巧存在性标注 |
 | 双评 / 仲裁 | 未做(约定缓做) | 提升标签可信度,排在样本量之后 |
-| 轻量技巧判定器 | 未做 | 等样本量够 |
+| 轻量技巧判定器 | 未做 | 37 段已足够启动段级原型;音符级判定仍依赖更可靠的细段/逐音对齐 |
 
 ## 五、最关键的诚实结论
-长录音"自动"对齐经充分实验后判定**短期不可行**(散布/压缩,真实数据反复证伪)。项目据此转向 **Plan C 人工锚点**——现在真正能产出可靠教师样本的路径。长曲自动对齐的实验脚本保留为证据,**不接生产**。
+长录音"自动"对齐的结论已经从"完全不可行"修正为:**读谱污染可以清理,粗定位/外部基线可继续评测;但完整谱后的细段 teacher-ready 自动对齐仍未达标**。当前证据显示主要瓶颈是 tempo/rubato 与真实混音候选质量,不是单纯换一个 fmax 或补全 store 就能解决。项目据此保留自动对齐实验脚本作证据,**不接生产**;当前真正能产出可靠教师样本的路径仍是 **Plan C 人工锚点**。
 
 ## 六、当前数据状态
 - **教师后台当前保留 `manual-anchor-fusheng`、`manual-anchor-rhapsody-2`、`manual-anchor-xuandong` 三个包;旧污染包已清理并有备份**(`data/erhu-study-records.json.bak-*`)。study store 曾清理旧 corpus 占位数据;当前教师数据以 manual-anchor pack/review JSON 为准。
 - 浮生音频已入仓库 `data/real-tests/originals/fusheng-full.mp3`(gitignored)。
 - 第二号狂想曲包 `manual-anchor-rhapsody-2`:18 段已标注。该批为整曲顺序覆盖、相邻约 5 秒重叠、部分跨 2-3 页/几十小节,适合做"该段出现哪些技巧"的存在性标注,不适合逐音级精标。
 - 炫动包 `manual-anchor-xuandong`:11 段已标注,支持跨页多页谱面定位。
-- 最新段级技巧标签导出: `data/teacher-validation/technique-labeling-export/2026-06-24T08-06-04-868Z/manual-anchor-labels.csv` 与 `.json`。导出统计:浮生 8、第二号 18、炫动 11;技巧标签计数为换把 36、揉弦 36、弓法 34、滑音 31、颤音 25、装饰音 14;置信度 5 分 17 段、4 分 14 段、3 分 3 段、1 分 1 段、空 2 段。
+- 最新段级技巧标签导出: `data/teacher-validation/technique-labeling-export/2026-06-24T10-55-04-081Z/manual-anchor-labels.csv` 与 `.json`。导出统计:浮生 8、第二号 18、炫动 11;技巧标签计数为换把 37、揉弦 37、弓法 35、滑音 32、颤音 25、装饰音 14;置信度 5 分 18 段、4 分 14 段、3 分 4 段、1 分 1 段、空 0 段。
 
 ## 七、待决 / 下一步(优先级)
-1. **补齐数据字段**:回后台给 2 段空置信度补 1-5 分,然后重导一版全字段齐全数据。
+1. Basic Pitch 段级特征 / 轻量分类器 bake-off(段级标签可直接用 37 段,不依赖细段自动对齐)。
 2. 双评 / 仲裁。
-3. 轻量技巧判定器原型。
+3. 轻量技巧判定器原型接入后台前的离线评估。
 4. 继续扩曲目:古巷深处 / 雪山魂塑 / 弦歌吟等需补齐音频路径或人工锚点后再做。第四号样本已删除,不作为当前下一批。
 
 待确认:浮生第 7 段(快板 m38-82)本轮从"排除"改为 `match` 并纳入——若为教师再判则保留,若为测试误改则训练前需再抽查。
