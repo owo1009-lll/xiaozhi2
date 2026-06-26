@@ -10,6 +10,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 GENERATOR = REPO / "scripts" / "experiments" / "create_western_strings_m2f_templates.py"
+SKELETON = REPO / "scripts" / "experiments" / "create_western_strings_m2f_results_skeleton.py"
 GATE = REPO / "scripts" / "experiments" / "eval_western_strings_m2f_real_recordings.py"
 
 
@@ -75,14 +76,49 @@ def main() -> int:
         assert_true(result_columns == ["recordingId", "autoPassCount", "correctWithin300ms", "unsafeTargetAutoPassCount", "notes"], "results template columns drifted")
         assert_true([row["recordingId"] for row in result_rows] == [row["recordingId"] for row in manifest_rows], "results template recording ids must mirror manifest rows")
 
+        filled_manifest = out_dir / "real-student-recordings-manifest.csv"
+        skeleton_results = out_dir / "real-student-recording-results.csv"
+        filled_manifest.write_text(manifest_template.read_text(encoding="utf-8"), encoding="utf-8")
+        subprocess.run(
+            [
+                sys.executable,
+                str(SKELETON),
+                "--manifest",
+                str(filled_manifest),
+                "--results",
+                str(skeleton_results),
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        skeleton_columns, skeleton_rows = read_rows(skeleton_results)
+        assert_true(skeleton_columns == result_columns, "results skeleton columns drifted")
+        assert_true([row["recordingId"] for row in skeleton_rows] == [row["recordingId"] for row in manifest_rows], "results skeleton recording ids must mirror the filled manifest")
+        overwrite = subprocess.run(
+            [
+                sys.executable,
+                str(SKELETON),
+                "--manifest",
+                str(filled_manifest),
+                "--results",
+                str(skeleton_results),
+            ],
+            cwd=REPO,
+            text=True,
+            capture_output=True,
+        )
+        assert_true(overwrite.returncode != 0 and "Refusing to overwrite" in (overwrite.stderr + overwrite.stdout), "results skeleton must not overwrite without --force")
+
         gate = subprocess.run(
             [
                 sys.executable,
                 str(GATE),
                 "--manifest",
-                str(default_manifest),
+                str(out_dir / "missing-manifest.csv"),
                 "--results",
-                str(default_results),
+                str(out_dir / "missing-results.csv"),
                 "--out",
                 str(out_dir / "summary.json"),
                 "--expect-negative",
@@ -94,7 +130,7 @@ def main() -> int:
         )
         assert_true("studentGateReady" in gate.stdout and "false" in gate.stdout.lower(), "templates should not make the M2f gate ready")
 
-    print(json.dumps({"ok": True, "checks": ["m2f-template-columns", "m2f-template-scenarios", "m2f-template-fail-closed"]}))
+    print(json.dumps({"ok": True, "checks": ["m2f-template-columns", "m2f-template-scenarios", "m2f-results-skeleton", "m2f-template-fail-closed"]}))
     return 0
 
 

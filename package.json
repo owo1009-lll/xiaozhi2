@@ -63,6 +63,7 @@
     "test:western-m2e-student-events": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\eval_western_strings_m2e_student_event_perturbations.py --expect-positive",
     "test:western-m2f-real-recordings": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\eval_western_strings_m2f_real_recordings.py --expect-negative",
     "western:m2f-templates": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\create_western_strings_m2f_templates.py",
+    "western:m2f-results-skeleton": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\create_western_strings_m2f_results_skeleton.py",
     "test:western-m2f-templates": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-western-m2f-templates.py",
     "test:separation-quality": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-separation-quality.py",
     "audit:separation-quality": "node scripts\\audit-separation-quality.mjs",

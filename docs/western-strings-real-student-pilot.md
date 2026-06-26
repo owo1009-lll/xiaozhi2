@@ -55,6 +55,16 @@ This writes `real-student-recordings-manifest.template.csv` and
 until copied/renamed to the default manifest/results paths. This preserves
 fail-closed behavior while giving the recorder a safe column template.
 
+After the filled manifest exists, generate a matching results skeleton:
+
+```powershell
+npm run western:m2f-results-skeleton
+```
+
+This creates `real-student-recording-results.csv` with the same `recordingId`
+values as the manifest and blank metric columns. Fill those counts only after
+running the `studentSafe=1` alignment gate on each real recording.
+
 Required columns:
 
 | column | rule |
