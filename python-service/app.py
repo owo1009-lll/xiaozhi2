@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException
 
 from analyzer import ErhuAnalyzer
 from config import settings
-from schemas import AnalyzeRequest, MusicXmlImportRequest, RankSectionsRequest, ScoreImportRequest, SeparateErhuRequest
+from schemas import AnalyzeRequest, MidiImportRequest, MusicXmlImportRequest, RankSectionsRequest, ScoreImportRequest, SeparateErhuRequest
 
 app = FastAPI(title="AI Erhu Analyzer", version="0.1.0")
 analyzer = ErhuAnalyzer(settings)
@@ -70,6 +70,12 @@ def import_pdf_score(payload: ScoreImportRequest) -> dict[str, object]:
 @app.post("/score/import-musicxml")
 def import_musicxml_score(payload: MusicXmlImportRequest) -> dict[str, object]:
     result = analyzer.import_musicxml_score(payload)
+    return {"ok": True, "job": result.model_dump()}
+
+
+@app.post("/score/import-midi")
+def import_midi_score(payload: MidiImportRequest) -> dict[str, object]:
+    result = analyzer.import_midi_score(payload)
     return {"ok": True, "job": result.model_dump()}
 
 

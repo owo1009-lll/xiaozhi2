@@ -118,6 +118,7 @@ async function testAnalyzerClientLongTimeout() {
     response.setHeader("Content-Type", "application/json");
     if (request.url === "/score/import-pdf") response.end(JSON.stringify({ job: { jobId: "pdf-long" } }));
     else if (request.url === "/score/import-musicxml") response.end(JSON.stringify({ job: { jobId: "musicxml-long" } }));
+    else if (request.url === "/score/import-midi") response.end(JSON.stringify({ job: { jobId: "midi-long" } }));
     else if (request.url === "/analyze") response.end(JSON.stringify({ analysis: { analysisId: "analysis-long" } }));
     else if (request.url === "/detect-sections") response.end(JSON.stringify({ candidates: [{ sectionId: "s1" }] }));
     else {
@@ -135,6 +136,7 @@ async function testAnalyzerClientLongTimeout() {
     });
     assert((await client.callExternalScoreImportLongTimeout({ jobId: "pdf" })).jobId === "pdf-long", "long PDF import should return job");
     assert((await client.callExternalMusicXmlImportLongTimeout({ jobId: "musicxml" })).jobId === "musicxml-long", "long MusicXML import should return job");
+    assert((await client.callExternalMidiImportLongTimeout({ jobId: "midi" })).jobId === "midi-long", "long MIDI import should return job");
     assert((await client.callExternalAnalyzerLongTimeout({ audioPath: "a.wav" }, { sectionId: "s1" })).analysisId === "analysis-long", "long analyze should return analysis");
     assert((await client.callExternalSectionRankLongTimeout({ audioPath: "a.wav" }, [{ sectionId: "s1" }], { pieceId: "p1" })).length === 1, "long section rank should return candidates");
     assert(requests.some((item) => item.body.audioPath === "alias:a.wav"), "long calls should send mapped audio path");
@@ -249,6 +251,105 @@ async function testWesternMusicXmlRouteMetadata() {
   }
 }
 
+async function testWesternMidiRouteMetadata() {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "ai-erhu-western-midi-route-"));
+  let store = { jobs: [], scores: [] };
+  let analyzerPayload = null;
+  const upload = multer({ storage: multer.memoryStorage() });
+  const app = express();
+  app.use(createScoreRouter({
+    upload,
+    repoRoot: tempDir,
+    SCORE_IMPORT_TASK_GATE: { canAccept: () => true },
+    SCORE_STORE_FILE: path.join(tempDir, "score-store.json"),
+    SCORE_IMPORTS_DIR: path.join(tempDir, "score-imports"),
+    readScoreStore: async () => store,
+    readScoreStoreUnlocked: async () => store,
+    writeScoreStoreUnlocked: async (nextStore) => {
+      store = nextStore;
+    },
+    normalizeScoreImportJob: (job) => ({ ...job }),
+    normalizeImportedScoreRecord: (score) => ({ ...score }),
+    findReusableImportedScore: () => null,
+    findKnownPieceForPdf: () => null,
+    cloneLibraryPieceForImport: () => null,
+    toWebDataPath: (...parts) => `/data/${parts.join("/")}`,
+    upsertScoreImportJob: async (job) => job,
+    launchScoreImportTask: () => {},
+    callExternalMusicXmlImportLongTimeout: async () => null,
+    callExternalMidiImportLongTimeout: async (payload) => {
+      analyzerPayload = payload;
+      return {
+        jobId: payload.jobId,
+        scoreId: payload.jobId,
+        omrStatus: "completed",
+        omrConfidence: 0.96,
+        title: payload.titleHint,
+        musicxmlPath: payload.midiPath,
+        detectedParts: ["violin"],
+        selectedPart: "violin",
+        selectedPartConfidence: 1,
+        piecePack: {
+          pieceId: payload.jobId,
+          title: payload.titleHint,
+          composer: "MIDI import",
+          instrument: payload.instrument,
+          scoreSourceType: payload.scoreSource,
+          tempoKnown: payload.tempoKnown,
+          tempoSource: payload.tempoSource,
+          selectedPart: "violin",
+          selectedPartId: "violin",
+          selectedPartConfidence: 1,
+          sections: [
+            {
+              sectionId: "section-a",
+              title: "MIDI test",
+              instrument: payload.instrument,
+              scoreSourceType: payload.scoreSource,
+              tempoKnown: payload.tempoKnown,
+              tempoSource: payload.tempoSource,
+              selectedPart: "violin",
+              notes: [],
+            },
+          ],
+        },
+        warnings: [],
+        error: "",
+      };
+    },
+    buildMarkingStatsFromSections: () => ({}),
+    getImportedScore: () => null,
+    activeScoreImportTasks: new Map(),
+  }));
+  const server = http.createServer(app);
+  const port = await listen(server);
+  try {
+    const formData = new FormData();
+    formData.set("midi", new Blob(["midi-bytes"], { type: "audio/midi" }), "violin.mid");
+    formData.set("titleHint", "Western MIDI Route Contract");
+    formData.set("selectedPartHint", "violin");
+    formData.set("instrument", "violin");
+    const response = await fetch(`http://127.0.0.1:${port}/api/erhu/scores/import-midi`, {
+      method: "POST",
+      body: formData,
+    });
+    const body = await response.json();
+    assert(response.status === 200 && body.ok === true, "western MIDI route should complete");
+    assert(analyzerPayload?.instrument === "violin", "MIDI route should forward instrument to analyzer");
+    assert(analyzerPayload?.scoreSource === "midi", "MIDI route should default scoreSource=midi");
+    assert(analyzerPayload?.tempoKnown === true, "MIDI route should default tempoKnown=true");
+    assert(analyzerPayload?.tempoSource === "midi", "MIDI route should default tempoSource=midi");
+    assert(store.scores.length === 1, "MIDI route should persist one imported score");
+    assert(store.scores[0].instrument === "violin", "persisted MIDI score should keep instrument");
+    assert(store.scores[0].scoreSource === "midi", "persisted MIDI score should keep scoreSource");
+    assert(store.scores[0].tempoKnown === true, "persisted MIDI score should keep tempoKnown=true");
+    assert(store.scores[0].tempoSource === "midi", "persisted MIDI score should keep tempoSource");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+}
+
 function testScoreLineRoleLabels() {
   assert(isExplicitErhuPartCandidate({ name: "二胡" }), "Node score-line role helper should detect Chinese 二胡");
   assert(isExplicitErhuPartCandidate({ name: " 二 胡 " }), "Node score-line role helper should tolerate whitespace in 二胡");
@@ -330,9 +431,10 @@ async function main() {
   await testAnalyzerClientFetchPath();
   await testAnalyzerClientLongTimeout();
   await testWesternMusicXmlRouteMetadata();
+  await testWesternMidiRouteMetadata();
   testScoreLineRoleLabels();
   testSingleLineMelodyProjection();
-  console.log(JSON.stringify({ ok: true, checks: ["audio-payload", "analyzer-client-fetch", "analyzer-client-long-timeout", "western-musicxml-route-metadata", "score-line-role-labels", "single-line-melody-projection"] }, null, 2));
+  console.log(JSON.stringify({ ok: true, checks: ["audio-payload", "analyzer-client-fetch", "analyzer-client-long-timeout", "western-musicxml-route-metadata", "western-midi-route-metadata", "score-line-role-labels", "single-line-melody-projection"] }, null, 2));
 }
 
 main().catch((error) => {

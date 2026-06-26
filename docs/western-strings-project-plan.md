@@ -127,6 +127,15 @@
 - **feature flag:** `strings.autoFeedback`(默认关),`strings.technique`(默认关)。
 - **不动:** 二胡现有后台/包/导出(冻结)。
 
+**canonical score metadata 约定(防字段漂移):**
+| 层级 | 字段 | 语义 |
+|---|---|---|
+| score/job 持久化 | `instrument`, `scoreSource`, `tempoKnown`, `tempoSource` | 对外/后台读取的稳定字段 |
+| piecePack/section | `instrument`, `scoreSourceType`, `tempoKnown`, `tempoSource` | analyzer 内部输入/输出字段 |
+| note finding | `autoDecision`, `confidenceScore`, `confidenceModelVersion`, `candidateSources`, `reviewRequiredReason`, `teacherOverride` | M2 之后新增,未接生产前不得影响学生端 |
+
+`scoreSource` 与 `scoreSourceType` 不再新增第三套同义字段;新增 adapter 必须在测试里同时验证持久化层和 piecePack 层。
+
 ## 7A. V2 落地细节(审查 v2 新增)
 **① 置信模型泄漏黑名单(训练禁用):** 禁用任何**真值派生**字段(`goldError`/`measureError`/与 gold 比对得到的误差量);**允许** method agreement、Parangonar cost、Basic Pitch confidence、CREPE pitch stability、onset 距离、polyphony/legato flag、score-context(前后音/密度)。评估按曲留一(LOPO),训练/测试不同曲。
 
@@ -160,11 +169,19 @@
 ---
 
 ## 8. 测试与验收标准
-- **M1:** 三数据集统一进 store;无 OMR 依赖;importer 单测。
-- **M2:** precision≥90%/coverage≥20%/按曲/留一/无泄漏;reason codes 命中正确;flag 关时学生端零自动输出。
-- **M3:** 反馈定位正确;低置信不反馈;回流可导出。
-- **M4:** 每类 AUC/PR-AUC/正负数/留一达标才放行。
-- **全程:** eval-only 脚本不写生产;数据不进仓库;`check-server-p0` 等回归通过。
+| 阶段 | 必测命令/证据 | 通过标准 | 失败处理 |
+|---|---|---|---|
+| M1 clean score | `test:western-string-config`, `test:western-musicxml-import`, `test:western-midi-import`, dataset adapter 输出样本 | MusicXML/MIDI/dataset-score 统一进入 note schema;不触发 OMR/Audiveris;metadata 持久化无漂移 | 不进入 M2 生产接入 |
+| M2 alignment gate | feature table + confidence gate LODO;按数据集/按曲报告 | `auto_pass` 对齐 precision≥90%;coverage 只报告;无真值泄漏;reason codes 命中正确 | 降级 `review_required`,不接学生端 |
+| M2b student-like pilot | 合成错音/漏音/节奏扰动 + 少量真实学生录音 | 真实输入下 precision 仍≥90%;错误样本不会被误 auto_pass | 继续后台离线,不得 release |
+| M3 diagnosis | pitch/rhythm/missing/extra note 的独立评测表 | 音准、起音、时值、漏音/多音的诊断 precision 分开达标;低置信不反馈;回流可导出 | 仅显示对齐,不显示诊断 |
+| M4 technique | 每类 AUC/PR-AUC/正负数/按曲留一 | AUC≥0.70 且 PR-AUC 明显高于基率;precision≥90% 才 auto_pass | 永久 review hint |
+| 全程 | `check-server-p0` / `test:teacher-validation` / `build` | eval-only 脚本不写生产;数据不进仓库;feature flag 关时学生端零自动输出 | 阻断发布 |
+
+**指标拆分(避免把对齐和诊断混在一起):**
+- 对齐层: `AlignmentPrecision@100ms/300ms`, `median/p90 onset error`, `coverage`, `reject/review reason counts`。
+- 诊断层: `Pitch MAE cents`, `onset error MAE`, `duration error MAE`, `missing/extra F1`, `diagnosis auto_pass precision`。
+- 产品层: auto 段是否有教学价值;若 auto 只覆盖极简单音,即使 precision 达标也只算 alpha,不算 release。
 
 ---
 
@@ -213,14 +230,14 @@
 当前进度:
 - ✅ `instrumentConfig` 已落地为 `config/western-string-instruments.json`,覆盖 violin / viola / cello;`npm run test:western-string-config` 已验证音域与 first-version flag。
 - ✅ clean MusicXML 入口已支持西洋弦乐元数据透传与落盘:`instrument` / `scoreSource` / `tempoKnown` / `tempoSource`;`npm run test:western-musicxml-import`、`npm run test:server-boundaries`、`npm run test:server-p0` 已验证。
+- ✅ clean MIDI 入口已补齐:`/api/erhu/scores/import-midi` → Python `/score/import-midi` → 统一 piecePack/score store;默认 `scoreSource=midi`, `tempoKnown=true`, `tempoSource=midi`;`npm run test:western-midi-import` 与 route boundary 已验证。运行该成功路径需要项目 Python 环境安装 `python-service/requirements-optional.txt` 中已声明的 `pretty_midi`。
 - ✅ explicit violin part 导入不会触发二胡 melody-collapse,并保留 violin notes;旧二胡 MusicXML import / score roles 回归通过。
 - ✅ M2 特征表第一版已完成:从 M0 per-note CSV 生成 note-level pivot 与 candidate-level 表;`label*` 字段显式标为 gold-derived,训练时禁用;`npm run test:western-alignment-features` 已验证。
 - ✅ M2 置信门 eval-only 探针已完成:基于 candidate-level 表做 fail-closed 规则搜索,LODO 三折 precision 均 >0.96、coverage=1.0;`npm run test:western-confidence-gate` 已验证。注意:这证明高置信子集存在,尚未接生产服务。
 
 剩余 M1 步骤:
-1. MIDI clean-score importer 路径仍需补齐(当前完成的是 MusicXML);
-2. 三个 dataset adapter 统一进 score store 或统一导出 score/audio/gold 三件套;
-3. 在西洋弦乐 UI/API 入口上显式隐藏 PDF OMR,只暴露 MusicXML/MIDI/dataset-score;
-4. M1 收口时再跑 `test:western-string-config` / `test:western-musicxml-import` / `test:server-boundaries` / `test:server-p0` / `test:musicxml-import` / `test:analyzer-score-roles` / `test:teacher-validation` / `build`。
+1. 三个 dataset adapter 统一进 score store 或统一导出 score/audio/gold 三件套;
+2. 在西洋弦乐 UI/API 入口上显式隐藏 PDF OMR,只暴露 MusicXML/MIDI/dataset-score;
+3. M1 收口时再跑 `test:western-string-config` / `test:western-musicxml-import` / `test:western-midi-import` / `test:server-boundaries` / `test:server-p0` / `test:musicxml-import` / `test:analyzer-score-roles` / `test:teacher-validation` / `build`。
 
 **完成即 M1 达标,进 M2 置信门。**

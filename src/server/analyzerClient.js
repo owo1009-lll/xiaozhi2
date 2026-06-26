@@ -133,6 +133,17 @@ export function createAnalyzerClient({ env = process.env, toAnalyzerPath = async
     return json?.job || null;
   }
 
+  async function callExternalMidiImportLongTimeout(payload) {
+    const analyzerUrl = analyzerBaseUrl(env);
+    if (!analyzerUrl) return null;
+    const json = await postJsonLongTimeout(`${analyzerUrl}/score/import-midi`, payload, {
+      timeoutMs: 5 * 60 * 1000,
+      timeoutMessage: "midi import timed out",
+      upstreamMessage: "midi import upstream failed",
+    });
+    return json?.job || null;
+  }
+
   async function callExternalAnalyzerLongTimeout(payload, section) {
     const analyzerUrl = analyzerBaseUrl(env);
     if (!analyzerUrl) return null;
@@ -197,6 +208,7 @@ export function createAnalyzerClient({ env = process.env, toAnalyzerPath = async
     callExternalScoreImport,
     callExternalScoreImportLongTimeout,
     callExternalMusicXmlImportLongTimeout,
+    callExternalMidiImportLongTimeout,
     callExternalAnalyzerLongTimeout,
     callExternalSectionRankLongTimeout,
     callPatchTempos,

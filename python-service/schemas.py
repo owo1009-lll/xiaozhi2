@@ -187,6 +187,19 @@ class MusicXmlImportRequest(BaseModel):
     outputDir: str | None = None
 
 
+class MidiImportRequest(BaseModel):
+    jobId: str
+    midiPath: str
+    originalFilename: str | None = None
+    titleHint: str | None = None
+    selectedPartHint: str | None = None
+    instrument: str | None = None
+    scoreSource: str | None = None
+    tempoKnown: bool | None = None
+    tempoSource: str | None = None
+    outputDir: str | None = None
+
+
 class ScoreImportJobResult(BaseModel):
     jobId: str
     omrStatus: str

@@ -33,6 +33,7 @@ export function createScoreRouter({
   upsertScoreImportJob,
   launchScoreImportTask,
   callExternalMusicXmlImportLongTimeout,
+  callExternalMidiImportLongTimeout,
   buildMarkingStatsFromSections,
   getImportedScore,
   activeScoreImportTasks,
@@ -288,6 +289,160 @@ export function createScoreRouter({
     } else if (serviceWarning) {
       normalizedJob.warnings = [serviceWarning];
       normalizedJob.error = "MusicXML 导入失败，Python 识谱服务不可用或解析失败。";
+    }
+
+    normalizedJob = await enqueueStoreOperation(SCORE_STORE_FILE, async () => {
+      const store = await readScoreStoreUnlocked();
+      if (scoreRecord) {
+        const existingScoreIndex = store.scores.findIndex((item) => item.scoreId === scoreRecord.scoreId);
+        if (existingScoreIndex >= 0) {
+          store.scores[existingScoreIndex] = scoreRecord;
+        } else {
+          store.scores.push(scoreRecord);
+        }
+      }
+      const existingJobIndex = store.jobs.findIndex((item) => item.jobId === normalizedJob.jobId);
+      if (existingJobIndex >= 0) {
+        store.jobs[existingJobIndex] = normalizedJob;
+      } else {
+        store.jobs.push(normalizedJob);
+      }
+      await writeScoreStoreUnlocked(store);
+      return normalizedJob;
+    });
+
+    return res.status(normalizedJob.omrStatus === "completed" ? 200 : 502).json({
+      ok: normalizedJob.omrStatus === "completed",
+      error: normalizedJob.omrStatus === "completed" ? "" : normalizedJob.error,
+      scoreImportJobId: normalizedJob.jobId,
+      job: normalizedJob,
+    });
+  });
+
+  router.post("/api/erhu/scores/import-midi", upload.single("midi"), async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "midi file is required." });
+    }
+
+    const originalName = req.file.originalname || "score.mid";
+    const originalExt = path.extname(originalName).toLowerCase();
+    const fileExt = [".mid", ".midi"].includes(originalExt) ? originalExt : ".mid";
+    const titleHint = safeString(req.body?.titleHint, path.parse(originalName).name);
+    const selectedPartHint = safeString(req.body?.selectedPartHint, req.body?.instrument || "violin") || "violin";
+    const instrument = safeString(req.body?.instrument, selectedPartHint).trim().toLowerCase() || selectedPartHint.toLowerCase();
+    const scoreSource = safeString(req.body?.scoreSource, "midi").trim().toLowerCase() || "midi";
+    const tempoKnown = safeBoolean(req.body?.tempoKnown, true);
+    const tempoSource = safeString(req.body?.tempoSource, "midi").trim().toLowerCase() || "midi";
+    const midiHash = sha1(req.file.buffer);
+    const jobId = createId("scorejob");
+    const jobDir = path.join(SCORE_IMPORTS_DIR, jobId);
+    const midiPath = path.join(jobDir, `source${fileExt}`);
+    const webMidiPath = toWebDataPath("score-imports", jobId, `source${fileExt}`);
+    await fs.mkdir(jobDir, { recursive: true });
+    await fs.writeFile(midiPath, req.file.buffer);
+
+    let jobResult = null;
+    let serviceWarning = "";
+    try {
+      jobResult = await callExternalMidiImportLongTimeout({
+        jobId,
+        midiPath,
+        originalFilename: originalName,
+        titleHint,
+        selectedPartHint,
+        instrument,
+        scoreSource,
+        tempoKnown,
+        tempoSource,
+        outputDir: jobDir,
+      });
+    } catch (error) {
+      serviceWarning = safeString(error?.message, "external MIDI import unavailable");
+    }
+
+    let normalizedJob = normalizeScoreImportJob({
+      jobId,
+      originalFilename: originalName,
+      title: titleHint,
+      instrument,
+      scoreSource,
+      tempoKnown,
+      tempoSource,
+      sourcePdfPath: "",
+      pdfHash: `midi:${midiHash}`,
+      omrStatus: "failed",
+      omrConfidence: 0,
+      musicxmlPath: webMidiPath,
+      previewPages: [],
+      detectedParts: [selectedPartHint],
+      selectedPart: selectedPartHint,
+      selectedPartCandidates: [selectedPartHint],
+      warnings: serviceWarning ? [serviceWarning] : [],
+      musicxmlFallbackAvailable: false,
+      fallbackActions: [],
+      retryable: true,
+      error: "MIDI 导入失败。",
+      progress: 1,
+      stage: "failed",
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    });
+    let scoreRecord = null;
+
+    if (jobResult?.omrStatus === "completed" && jobResult.piecePack) {
+      const upstreamScoreId = safeString(jobResult.scoreId);
+      const scoreId = upstreamScoreId.startsWith("score-") ? upstreamScoreId : createId("score");
+      const importedSections = getArray(jobResult.piecePack?.sections).length ? jobResult.piecePack.sections : [jobResult.piecePack];
+      scoreRecord = normalizeImportedScoreRecord({
+        scoreId,
+        pieceId: safeString(jobResult.piecePack?.pieceId),
+        title: safeString(jobResult.title, titleHint),
+        composer: safeString(jobResult.piecePack?.composer, "MIDI import"),
+        instrument: safeString(jobResult.piecePack?.instrument, instrument),
+        scoreSource: safeString(jobResult.piecePack?.scoreSourceType, scoreSource),
+        tempoKnown: safeBoolean(jobResult.piecePack?.tempoKnown, tempoKnown),
+        tempoSource: safeString(jobResult.piecePack?.tempoSource, tempoSource),
+        sourcePdfPath: "",
+        pdfHash: `midi:${midiHash}`,
+        musicxmlPath: webMidiPath,
+        omrStatus: "completed",
+        omrConfidence: safeNumber(jobResult.omrConfidence, 0.96),
+        omrStats: jobResult.omrStats,
+        detectedParts: getArray(jobResult.detectedParts).length ? jobResult.detectedParts : [selectedPartHint],
+        selectedPart: safeString(jobResult.selectedPart, selectedPartHint),
+        selectedPartId: safeString(jobResult.piecePack?.selectedPartId),
+        selectedPartConfidence: safeNumber(jobResult.selectedPartConfidence, safeNumber(jobResult.piecePack?.selectedPartConfidence, 0)),
+        partCandidates: getArray(jobResult.partCandidates || jobResult.piecePack?.partCandidates),
+        markingStats: jobResult.markingStats || jobResult.piecePack?.markingStats || buildMarkingStatsFromSections(importedSections),
+        previewPages: [],
+        sections: importedSections,
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+      });
+      normalizedJob = normalizeScoreImportJob({
+        ...jobResult,
+        jobId,
+        scoreId,
+        title: scoreRecord.title,
+        instrument: scoreRecord.instrument,
+        scoreSource: scoreRecord.scoreSource,
+        tempoKnown: scoreRecord.tempoKnown,
+        tempoSource: scoreRecord.tempoSource,
+        sourcePdfPath: "",
+        pdfHash: `midi:${midiHash}`,
+        musicxmlPath: webMidiPath,
+        originalFilename: originalName,
+        previewPages: [],
+        warnings: [...getArray(jobResult.warnings), ...(serviceWarning ? [serviceWarning] : [])],
+        error: jobResult.error,
+        progress: 1,
+        stage: "completed",
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+      });
+    } else if (serviceWarning) {
+      normalizedJob.warnings = [serviceWarning];
+      normalizedJob.error = "MIDI 导入失败，Python 分析服务不可用或解析失败。";
     }
 
     normalizedJob = await enqueueStoreOperation(SCORE_STORE_FILE, async () => {

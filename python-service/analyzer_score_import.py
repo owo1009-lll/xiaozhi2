@@ -13,7 +13,7 @@ from typing import Any
 from xml.etree import ElementTree as ET
 
 from analyzer_utils import beats_per_measure, parse_musicxml_measure_index, safe_float
-from schemas import AnalyzeRequest, MusicXmlImportRequest, NoteEvent, PiecePack, ScoreImportJobResult, ScoreImportRequest
+from schemas import AnalyzeRequest, MidiImportRequest, MusicXmlImportRequest, NoteEvent, PiecePack, ScoreImportJobResult, ScoreImportRequest
 
 try:
     from pypdf import PdfReader
@@ -24,7 +24,7 @@ except ImportError:  # pragma: no cover - optional dependency
 class ScoreImportMixin:
     def _score_metadata_from_request(
         self,
-        request: ScoreImportRequest | MusicXmlImportRequest,
+        request: ScoreImportRequest | MusicXmlImportRequest | MidiImportRequest,
         *,
         default_source: str,
         tempo_change_count: int = 0,
@@ -970,5 +970,155 @@ class ScoreImportMixin:
                 "wholePdfAttempted": False,
             },
             warnings=warnings,
+            error=None,
+        )
+
+    def import_midi_score(self, request: MidiImportRequest) -> ScoreImportJobResult:
+        output_dir = Path(request.outputDir or (Path(self.settings.data_root) / "score-imports" / request.jobId))
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        midi_path = Path(request.midiPath)
+        selected_part = (request.selectedPartHint or request.instrument or "midi").strip() or "midi"
+        if not midi_path.exists():
+            return ScoreImportJobResult(
+                jobId=request.jobId,
+                omrStatus="failed",
+                omrConfidence=0.0,
+                scoreId=None,
+                title=request.titleHint or request.originalFilename or request.jobId,
+                sourcePdfPath=None,
+                musicxmlPath=None,
+                detectedParts=[selected_part],
+                selectedPart=selected_part,
+                selectedPartCandidates=[selected_part],
+                warnings=["MIDI file does not exist."],
+                error="MIDI file does not exist; cannot generate a clean score.",
+            )
+
+        try:
+            midi_bytes = midi_path.read_bytes()
+        except Exception as error:
+            return ScoreImportJobResult(
+                jobId=request.jobId,
+                omrStatus="failed",
+                omrConfidence=0.0,
+                scoreId=None,
+                title=request.titleHint or request.originalFilename or request.jobId,
+                sourcePdfPath=None,
+                musicxmlPath=None,
+                detectedParts=[selected_part],
+                selectedPart=selected_part,
+                selectedPartCandidates=[selected_part],
+                warnings=[str(error)],
+                error="MIDI file could not be read.",
+            )
+
+        temp_request = AnalyzeRequest(
+            participantId="score-import",
+            pieceId=request.jobId,
+            sectionId="section-a",
+            piecePack=PiecePack(
+                pieceId=request.jobId,
+                sectionId="section-a",
+                title=request.titleHint or request.originalFilename or request.jobId,
+                instrument=request.instrument,
+                scoreSourceType=request.scoreSource or "midi",
+                tempoKnown=True if request.tempoKnown is None else bool(request.tempoKnown),
+                tempoSource=request.tempoSource or "midi",
+                meter="4/4",
+                tempo=72,
+                notes=[],
+            ),
+        )
+        parsed_notes = self._parse_midi_score(midi_bytes, temp_request)
+        if not parsed_notes:
+            return ScoreImportJobResult(
+                jobId=request.jobId,
+                omrStatus="failed",
+                omrConfidence=0.0,
+                scoreId=None,
+                title=request.titleHint or request.originalFilename or request.jobId,
+                sourcePdfPath=None,
+                musicxmlPath=None,
+                detectedParts=[selected_part],
+                selectedPart=selected_part,
+                selectedPartCandidates=[selected_part],
+                warnings=["MIDI did not produce parseable notes."],
+                error="MIDI did not produce parseable notes; check the selected track or file content.",
+            )
+
+        notes = [
+            {
+                "noteId": note.note_id,
+                "measureIndex": note.measure_index,
+                "beatStart": note.beat_start,
+                "beatDuration": note.beat_duration,
+                "midiPitch": note.midi_pitch,
+                "notePosition": dict(note.note_position or {}) if getattr(note, "note_position", None) else None,
+                "articulations": list(note.articulations or []),
+                "notations": list(note.notations or []),
+                "techniques": list(note.techniques or []),
+                "activeTempo": note.active_tempo or None,
+                "activeDynamic": note.active_dynamic or "",
+                "dynamicValue": note.dynamic_value,
+            }
+            for note in parsed_notes
+        ]
+        metadata = self._score_metadata_from_request(
+            request,
+            default_source="midi",
+            tempo_change_count=1,
+        )
+        section = {
+            "sectionId": "section-a",
+            "title": request.titleHint or request.originalFilename or request.jobId,
+            **metadata,
+            "tempo": 72,
+            "meter": "4/4",
+            "demoAudio": "",
+            "sequenceIndex": 1,
+            "notes": notes,
+            "selectedPart": selected_part,
+            "selectedPartId": selected_part,
+            "selectedPartConfidence": 1.0,
+            "scoreLineStats": self._build_score_line_stats(notes),
+        }
+        piece_pack = {
+            "pieceId": request.jobId,
+            "title": request.titleHint or request.originalFilename or request.jobId,
+            "composer": "MIDI import",
+            **metadata,
+            "selectedPart": selected_part,
+            "selectedPartId": selected_part,
+            "detectedParts": [selected_part],
+            "selectedPartConfidence": 1.0,
+            "partCandidates": [],
+            "markingStats": {"markingCount": 0, "tempoChangeCount": 0, "dynamicChangeCount": 0, "repeatCount": 0},
+            "scoreLineStats": self._build_score_line_stats(notes),
+            "sections": [section],
+        }
+        return ScoreImportJobResult(
+            jobId=request.jobId,
+            omrStatus="completed",
+            omrConfidence=0.96,
+            scoreId=request.jobId,
+            title=request.titleHint or request.originalFilename or request.jobId,
+            sourcePdfPath=None,
+            musicxmlPath=str(midi_path),
+            previewPages=[],
+            detectedParts=[selected_part],
+            selectedPart=selected_part,
+            selectedPartCandidates=[selected_part],
+            selectedPartConfidence=1.0,
+            partCandidates=[],
+            markingStats=piece_pack["markingStats"],
+            piecePack=piece_pack,
+            omrStats={
+                "mode": "midi-upload",
+                "pageCount": 0,
+                "resultCount": 1,
+                "wholePdfAttempted": False,
+            },
+            warnings=[],
             error=None,
         )
