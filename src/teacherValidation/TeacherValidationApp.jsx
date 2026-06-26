@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   applyTeacherValidationPack,
+  fetchWesternAlignmentPreview,
   fetchTeacherValidationPack,
   fetchTeacherValidationPacks,
   saveTeacherValidationReview,
+  saveWesternAlignmentPreviewReview,
 } from "../researchApi";
 import ScoreLocatorPanel from "./ScoreLocatorPanel.jsx";
 import SegmentAudioPlayer from "./SegmentAudioPlayer.jsx";
@@ -65,6 +67,8 @@ export default function TeacherValidationApp() {
   const [activeLocator, setActiveLocator] = useState({ type: "", measureIndex: 0, noteId: "" });
   const [statusMessage, setStatusMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [westernPreview, setWesternPreview] = useState(null);
+  const [westernPreviewLoading, setWesternPreviewLoading] = useState(false);
 
   const items = pack?.items || [];
   const selectedItem = items.find((item) => item.caseId === selectedCaseId) || items[0] || null;
@@ -398,6 +402,43 @@ export default function TeacherValidationApp() {
     }
   }
 
+  async function loadWesternPreview() {
+    setWesternPreviewLoading(true);
+    setErrorMessage("");
+    try {
+      const preview = await fetchWesternAlignmentPreview({ limit: 8 });
+      setWesternPreview(preview);
+      setStatusMessage(`Western strings preview loaded: ${preview?.summary?.noteCount || 0} notes.`);
+    } catch (error) {
+      setErrorMessage(error.message || "Western strings preview failed.");
+    } finally {
+      setWesternPreviewLoading(false);
+    }
+  }
+
+  async function reviewWesternDecision(decision, action) {
+    const noteKey = decision?.noteKey || decision?.noteId || "";
+    if (!noteKey) return;
+    let correctedOnsetSeconds = "";
+    if (action === "correct") {
+      const entered = window.prompt("Correct onset seconds for this note:", String(decision.predictedOnsetSeconds ?? ""));
+      if (entered == null) return;
+      correctedOnsetSeconds = entered;
+    }
+    try {
+      await saveWesternAlignmentPreviewReview({
+        noteKey,
+        action,
+        raterId,
+        predictedOnsetSeconds: decision.predictedOnsetSeconds,
+        correctedOnsetSeconds,
+      });
+      setStatusMessage(`Western preview ${action} saved for ${noteKey}.`);
+    } catch (error) {
+      setErrorMessage(error.message || "Western preview review failed.");
+    }
+  }
+
   const summary = pack?.summary || {};
   const isTechniqueLabelingPack = pack?.manifest?.reviewMode === "technique-labeling";
 
@@ -454,6 +495,53 @@ export default function TeacherValidationApp() {
         <SummaryPill label="已完成" value={summary.completedCount ?? 0} />
         <SummaryPill label="可导入" value={summary.includedCompleteCount ?? 0} />
         <SummaryPill label="生成时间" value={formatDate(pack?.manifest?.generatedAt)} />
+      </section>
+
+      <section className="panel-card">
+        <div className="section-title">
+          <span className="section-step">M2</span>
+          <div>
+            <h2>Western strings offline alignment preview</h2>
+            <p>Teacher-only evidence view. This does not publish feedback to students.</p>
+          </div>
+        </div>
+        <div className="action-row">
+          <button type="button" className="secondary-button" onClick={loadWesternPreview} disabled={westernPreviewLoading}>
+            {westernPreviewLoading ? "Loading..." : "Load preview"}
+          </button>
+        </div>
+        {westernPreview?.summary ? (
+          <div className="upload-meta">
+            <span>notes {westernPreview.summary.noteCount}</span>
+            <span>auto {westernPreview.summary.autoPassCount}</span>
+            <span>model {westernPreview.summary.confidenceModelVersion}</span>
+          </div>
+        ) : null}
+        {westernPreview?.decisions?.length ? (
+          <div className="teacher-finding-list">
+            {westernPreview.decisions.slice(0, 8).map((decision) => (
+              <div className="history-card" key={decision.noteId || decision.noteKey}>
+                <strong>{decision.noteId || decision.noteKey}</strong>
+                <p>
+                  {decision.dataset} / {decision.piece} · predicted {Number(decision.predictedOnsetSeconds || 0).toFixed(3)}s ·
+                  confidence {Number(decision.confidenceScore || 0).toFixed(2)}
+                </p>
+                <p>sources {(decision.candidateSources || []).map((item) => item.method).join(", ")}</p>
+                <div className="action-row">
+                  <button type="button" className="secondary-button" onClick={() => reviewWesternDecision(decision, "confirm")}>
+                    Confirm
+                  </button>
+                  <button type="button" className="secondary-button" onClick={() => reviewWesternDecision(decision, "correct")}>
+                    Correct
+                  </button>
+                  <button type="button" className="secondary-button" onClick={() => reviewWesternDecision(decision, "review_required")}>
+                    Needs review
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </section>
 
       <section className="teacher-layout">

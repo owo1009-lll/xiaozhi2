@@ -9,7 +9,6 @@ const stringsRoutes = fs.readFileSync("src/server/westernStringsRoutes.js", "utf
 const studentSideSources = [
   ["src/StudentApp.jsx", studentApp],
   ["src/WesternStringsApp.jsx", stringsApp],
-  ["src/researchApi.js", researchApi],
 ];
 
 for (const [sourceName, sourceText] of studentSideSources) {
@@ -19,6 +18,8 @@ for (const [sourceName, sourceText] of studentSideSources) {
 }
 
 assert(stringsRoutes.includes('router.get("/api/strings/alignment-preview"'), "server should expose only the offline preview route for M2 validation");
+assert(researchApi.includes("fetchWesternAlignmentPreview"), "teacher backend may load the offline western strings preview");
+assert(researchApi.includes("saveWesternAlignmentPreviewReview"), "teacher backend may save offline western strings preview reviews");
 assert(!stringsRoutes.includes('router.post("/api/strings/analyze"'), "student-facing western strings analyze route must remain disabled");
 assert(!stringsRoutes.includes('router.post("/api/strings/review"'), "western strings review writeback route must remain disabled");
 

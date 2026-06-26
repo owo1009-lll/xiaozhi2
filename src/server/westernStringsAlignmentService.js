@@ -197,3 +197,25 @@ export function parsePreviewQuery(query = {}) {
     includeLabels: safeBoolean(query.includeLabels, false),
   };
 }
+
+export async function recordWesternAlignmentPreviewReview({ repoRoot, payload = {} }) {
+  const noteKey = safeString(payload.noteKey || payload.noteId).trim();
+  const action = safeString(payload.action).trim();
+  if (!noteKey) throw new Error("noteKey is required.");
+  if (!["confirm", "correct", "review_required"].includes(action)) {
+    throw new Error("action must be confirm, correct, or review_required.");
+  }
+  const record = {
+    submittedAt: new Date().toISOString(),
+    noteKey,
+    action,
+    raterId: safeString(payload.raterId, "teacher-1"),
+    predictedOnsetSeconds: numberOrNull(payload.predictedOnsetSeconds),
+    correctedOnsetSeconds: numberOrNull(payload.correctedOnsetSeconds),
+    comments: safeString(payload.comments),
+  };
+  const outPath = path.join(repoRoot, "data", "experiments", "western-strings-m2", "alignment-preview-reviews.jsonl");
+  await fs.mkdir(path.dirname(outPath), { recursive: true });
+  await fs.appendFile(outPath, `${JSON.stringify(record)}\n`, "utf8");
+  return { ok: true, review: record };
+}

@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
 import http from "node:http";
+import os from "node:os";
+import path from "node:path";
 import express from "express";
 
 import { buildWesternAlignmentPreview } from "../src/server/westernStringsAlignmentService.js";
@@ -32,8 +35,15 @@ async function testServiceEvaluationSummary() {
 }
 
 async function testRoute() {
+  const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "western-preview-route-"));
+  await fs.mkdir(path.join(tempRoot, "data", "experiments", "western-strings-m2"), { recursive: true });
+  await fs.copyFile(
+    path.join(process.cwd(), "data", "experiments", "western-strings-m2", "alignment-candidate-feature-table.csv"),
+    path.join(tempRoot, "data", "experiments", "western-strings-m2", "alignment-candidate-feature-table.csv"),
+  );
   const app = express();
-  app.use(createWesternStringsRouter({ repoRoot: process.cwd() }));
+  app.use(express.json());
+  app.use(createWesternStringsRouter({ repoRoot: tempRoot }));
   const server = http.createServer(app);
   const port = await listen(server);
   try {
@@ -44,6 +54,20 @@ async function testRoute() {
     assert.equal(body.summary.noteCount, 146);
     assert.equal(body.decisions.length, 3);
     assert(body.decisions.every((item) => item.dataset === "m0b-urmp"));
+    const reviewResponse = await fetch(`http://127.0.0.1:${port}/api/strings/alignment-preview/reviews`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        noteId: body.decisions[0].noteId,
+        action: "confirm",
+        predictedOnsetSeconds: body.decisions[0].predictedOnsetSeconds,
+      }),
+    });
+    const reviewBody = await reviewResponse.json();
+    assert.equal(reviewResponse.status, 200);
+    assert.equal(reviewBody.ok, true);
+    const saved = await fs.readFile(path.join(tempRoot, "data", "experiments", "western-strings-m2", "alignment-preview-reviews.jsonl"), "utf8");
+    assert(saved.includes(body.decisions[0].noteId), "preview review route should append a jsonl record");
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

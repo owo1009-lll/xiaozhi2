@@ -257,6 +257,27 @@ export async function applyTeacherValidationPack(packId) {
   );
 }
 
+export async function fetchWesternAlignmentPreview(params = {}) {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params || {})) {
+    if (value !== undefined && value !== null && String(value).trim()) {
+      searchParams.set(key, String(value));
+    }
+  }
+  const suffix = searchParams.toString() ? `?${searchParams.toString()}` : "";
+  return readJson(await fetch(`/api/strings/alignment-preview${suffix}`, NO_STORE_REQUEST));
+}
+
+export async function saveWesternAlignmentPreviewReview(payload = {}) {
+  return readJson(
+    await fetch("/api/strings/alignment-preview/reviews", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  );
+}
+
 export async function fetchAdjudications() {
   return readJson(await fetch("/api/erhu/research/adjudications"));
 }
