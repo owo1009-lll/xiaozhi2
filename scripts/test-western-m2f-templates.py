@@ -47,6 +47,9 @@ def main() -> int:
         assert_true(readme.exists(), "template README was not created")
         assert_true(not default_manifest.exists(), "generator must not create the default manifest")
         assert_true(not default_results.exists(), "generator must not create the default results file")
+        readme_text = readme.read_text(encoding="utf-8")
+        assert_true("western-strings-m2f-recording-checklist.md" in readme_text, "template README must link the recorder checklist")
+        assert_true("correct, wrong_pitch, missing_note, rhythm_shift, weak_onset, and noisy" in readme_text, "template README must name all required gate scenarios")
 
         manifest_columns, manifest_rows = read_rows(manifest_template)
         expected_manifest_columns = [
