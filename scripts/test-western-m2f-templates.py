@@ -246,6 +246,53 @@ def main() -> int:
         )
         assert_true("recordingId-duplicate" in duplicate_manifest_gate.stdout, "duplicate manifest recording IDs must fail closed")
 
+        impossible_results = out_dir / "impossible-results.csv"
+        impossible_rows = [dict(row) for row in good_result_rows]
+        impossible_rows[0]["correctWithin300ms"] = "11"
+        write_rows(impossible_results, result_columns, impossible_rows)
+        impossible_gate = subprocess.run(
+            [
+                sys.executable,
+                str(GATE),
+                "--manifest",
+                str(filled_manifest),
+                "--results",
+                str(impossible_results),
+                "--out",
+                str(out_dir / "impossible-summary.json"),
+                "--expect-negative",
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true("correctWithin300ms-greater-than-autoPassCount" in impossible_gate.stdout, "impossible correct/auto-pass counts must fail closed")
+
+        invalid_count_results = out_dir / "invalid-count-results.csv"
+        invalid_count_rows = [dict(row) for row in good_result_rows]
+        invalid_count_rows[0]["autoPassCount"] = "10.5"
+        invalid_count_rows[1]["unsafeTargetAutoPassCount"] = "-1"
+        write_rows(invalid_count_results, result_columns, invalid_count_rows)
+        invalid_count_gate = subprocess.run(
+            [
+                sys.executable,
+                str(GATE),
+                "--manifest",
+                str(filled_manifest),
+                "--results",
+                str(invalid_count_results),
+                "--out",
+                str(out_dir / "invalid-count-summary.json"),
+                "--expect-negative",
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true("result-count-invalid" in invalid_count_gate.stdout, "non-integer or negative result counts must fail closed")
+
         gate = subprocess.run(
             [
                 sys.executable,

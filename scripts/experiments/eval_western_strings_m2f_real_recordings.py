@@ -61,6 +61,13 @@ def safe_float(value: Any) -> float | None:
     return numeric if math.isfinite(numeric) else None
 
 
+def safe_nonnegative_int(value: Any) -> int | None:
+    numeric = safe_float(value)
+    if numeric is None or numeric < 0 or not numeric.is_integer():
+        return None
+    return int(numeric)
+
+
 def validate_manifest(
     manifest_path: Path,
     *,
@@ -212,18 +219,23 @@ def evaluate_results(results_path: Path, valid_recording_ids: set[str]) -> dict[
             if valid_recording_ids and recording_id not in valid_recording_ids:
                 unknown_result_ids.add(recording_id)
                 errors.append("recordingId-not-in-manifest")
-        row_auto = safe_float(row.get("autoPassCount"))
-        row_correct = safe_float(row.get("correctWithin300ms"))
-        row_unsafe = safe_float(row.get("unsafeTargetAutoPassCount"))
+        row_auto = safe_nonnegative_int(row.get("autoPassCount"))
+        row_correct = safe_nonnegative_int(row.get("correctWithin300ms"))
+        row_unsafe = safe_nonnegative_int(row.get("unsafeTargetAutoPassCount"))
         if row_auto is None or row_correct is None or row_unsafe is None:
             errors.append("result-count-invalid")
+        else:
+            if row_correct > row_auto:
+                errors.append("correctWithin300ms-greater-than-autoPassCount")
+            if row_unsafe > row_auto:
+                errors.append("unsafeTargetAutoPassCount-greater-than-autoPassCount")
         if errors:
             invalid_rows.append({"line": index, "recordingId": recording_id, "errors": errors})
             continue
         matched_result_ids.add(recording_id)
-        auto_pass += int(round(row_auto))
-        correct += int(round(row_correct))
-        unsafe += int(round(row_unsafe))
+        auto_pass += row_auto
+        correct += row_correct
+        unsafe += row_unsafe
     if invalid_rows:
         blockers.append("results-invalid-rows")
     missing_result_ids = sorted(valid_recording_ids - matched_result_ids)
