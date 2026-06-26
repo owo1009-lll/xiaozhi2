@@ -58,6 +58,7 @@
     "test:western-alignment-preview": "node scripts\\test-western-alignment-preview.mjs",
     "test:western-feature-flags": "node scripts\\test-western-feature-flags.mjs",
     "test:western-m2b-pilot": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\eval_western_strings_m2b_student_like.py --expect-negative",
+    "test:western-m2c-audio-support": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\eval_western_strings_m2c_basic_pitch_support.py --expect-negative",
     "test:separation-quality": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-separation-quality.py",
     "audit:separation-quality": "node scripts\\audit-separation-quality.mjs",
     "audit:separation-quality:all": "node scripts\\audit-separation-quality.mjs --all",

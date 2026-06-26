@@ -241,6 +241,7 @@
 - ✅ M2 教师后台离线 preview 面板已接入:教师可加载前 8 条 note-level 预测证据并提交 confirm/correct/review_required,写入 ignored 的 `alignment-preview-reviews.jsonl`;仍不进入学生端、不进入质量基线。
 - ✅ M2b student-like feature-level pilot 已补:`npm run test:western-m2b-pilot` 用 correlated +800ms 扰动证明当前 median-consensus preview 在一致性错误上不安全,因此 **不得开放学生端自动反馈**;只能保持 teacher-only preview。
 - ✅ M2 release gate 已 fail-closed 接入 preview service:`studentSafe=1` 会读取 M2b 证据;证据缺失或 `studentGateReady=false` 时全部降为 `review_required`,测试覆盖默认 teacher preview 与 student-safe 两种模式。
+- ✅ M2c 独立音频证据探针已补:`npm run test:western-m2c-audio-support` 用 Basic Pitch 事件支持检验 correlated drift。结果:基准 precision=0.9921 / coverage=0.7864,但 +800ms 相关漂移仍有 112 个重复同音误通过(precision=0),所以学生端 release 仍不达标。
 
 剩余 M1 步骤:
 1. M1 收口时再跑 `test:western-string-config` / `test:western-musicxml-import` / `test:western-midi-import` / `test:western-dataset-index` / `test:western-strings-entry` / `test:server-boundaries` / `test:server-p0` / `test:musicxml-import` / `test:analyzer-score-roles` / `test:teacher-validation` / `build`。
@@ -248,4 +249,4 @@
 **完成即 M1 达标,进 M2 置信门。**
 
 当前 M2 剩余步骤:
-1. 若要继续冲学生端 V2,必须新增可检测 correlated onset drift 的独立音频证据或真实学生录音评测;在此之前 `studentSafe=1` 强制全量 `review_required`。
+1. 若要继续冲学生端 V2,必须新增比 Basic Pitch event support 更强的独立音频证据(如局部谱图相似/起音峰支持/真实学生录音评测);在此之前 `studentSafe=1` 强制全量 `review_required`。
