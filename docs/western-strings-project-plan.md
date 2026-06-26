@@ -212,11 +212,13 @@
 ## 立即下一步(Phase 1 / M1)
 当前进度:
 - ✅ `instrumentConfig` 已落地为 `config/western-string-instruments.json`,覆盖 violin / viola / cello;`npm run test:western-string-config` 已验证音域与 first-version flag。
+- ✅ clean MusicXML 入口已支持西洋弦乐元数据透传与落盘:`instrument` / `scoreSource` / `tempoKnown` / `tempoSource`;`npm run test:western-musicxml-import`、`npm run test:server-boundaries`、`npm run test:server-p0` 已验证。
+- ✅ explicit violin part 导入不会触发二胡 melody-collapse,并保留 violin notes;旧二胡 MusicXML import / score roles 回归通过。
 
 剩余 M1 步骤:
-1. 整理 `scoreImporter` 的 clean MusicXML/MIDI 入口,明确西洋弦乐线不走 PDF OMR;
+1. MIDI clean-score importer 路径仍需补齐(当前完成的是 MusicXML);
 2. 三个 dataset adapter 统一进 score store 或统一导出 score/audio/gold 三件套;
-3. 停用/隔离 OMR 导入路由在西洋弦乐路径中的入口;
-4. 单测 + `check-server-p0` 回归。
+3. 在西洋弦乐 UI/API 入口上显式隐藏 PDF OMR,只暴露 MusicXML/MIDI/dataset-score;
+4. M1 收口时再跑 `test:western-string-config` / `test:western-musicxml-import` / `test:server-boundaries` / `test:server-p0` / `test:musicxml-import` / `test:analyzer-score-roles` / `test:teacher-validation` / `build`。
 
 **完成即 M1 达标,进 M2 置信门。**

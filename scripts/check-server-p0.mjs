@@ -168,6 +168,54 @@ if (!reusableImportBlock.includes("scoreSourceFileExists(score)")) {
   fail("Reusable score-import cache hits must reject stale records whose MusicXML source is missing.", reusableImportOffset);
 }
 
+const westernMetadataSnippets = [
+  {
+    path: "server.js",
+    text: "instrument: safeString(score.instrument",
+    reason: "Imported score normalization must preserve western string instrument metadata.",
+    haystack: serverText,
+  },
+  {
+    path: "server.js",
+    text: "scoreSource: safeString(score.scoreSource",
+    reason: "Imported score normalization must preserve clean-score source metadata.",
+    haystack: serverText,
+  },
+  {
+    path: "server.js",
+    text: "tempoKnown: safeBoolean(score.tempoKnown",
+    reason: "Imported score normalization must preserve explicit tempo-known metadata.",
+    haystack: serverText,
+  },
+  {
+    path: "src/server/scoreRoutes.js",
+    text: "const instrument = safeString(req.body?.instrument)",
+    reason: "MusicXML upload route must accept instrument metadata.",
+    haystack: scoreRoutesText,
+  },
+  {
+    path: "src/server/scoreRoutes.js",
+    text: "const scoreSource = safeString(req.body?.scoreSource, \"musicxml\")",
+    reason: "MusicXML upload route must accept clean-score source metadata.",
+    haystack: scoreRoutesText,
+  },
+  {
+    path: "src/server/scoreRoutes.js",
+    text: "const tempoKnown = safeBoolean(req.body?.tempoKnown, false)",
+    reason: "MusicXML upload route must accept tempo-known metadata.",
+    haystack: scoreRoutesText,
+  },
+];
+for (const item of westernMetadataSnippets) {
+  if (!item.haystack.includes(item.text)) {
+    failures.push({
+      path: item.path,
+      line: 1,
+      reason: item.reason,
+    });
+  }
+}
+
 if (!serverText.includes("createTeacherValidationRouter(teacherValidationService)")) {
   fail("Teacher validation routes must be mounted through src/server/teacherValidationRoutes.js.");
 }

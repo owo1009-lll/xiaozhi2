@@ -31,6 +31,10 @@ class PiecePack(BaseModel):
     pieceId: str | None = None
     sectionId: str | None = None
     title: str | None = None
+    instrument: str | None = None
+    scoreSourceType: str | None = None
+    tempoKnown: bool | None = None
+    tempoSource: str | None = None
     meter: str | None = None
     tempo: int = 72
     demoAudio: str | None = None
@@ -176,6 +180,10 @@ class MusicXmlImportRequest(BaseModel):
     originalFilename: str | None = None
     titleHint: str | None = None
     selectedPartHint: str | None = None
+    instrument: str | None = None
+    scoreSource: str | None = None
+    tempoKnown: bool | None = None
+    tempoSource: str | None = None
     outputDir: str | None = None
 
 

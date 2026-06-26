@@ -2,6 +2,8 @@ import fs from "node:fs/promises";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
+import express from "express";
+import multer from "multer";
 
 import {
   buildAudioSubmissionFromUpload,
@@ -15,6 +17,7 @@ import {
 } from "../src/server/audioPayload.js";
 import { createAnalyzerClient } from "../src/server/analyzerClient.js";
 import { sha1 } from "../src/server/baseUtils.js";
+import { createScoreRouter } from "../src/server/scoreRoutes.js";
 import {
   annotateImportedSectionsScoreLineRoles,
   buildScoreLineStatsFromSections,
@@ -141,6 +144,111 @@ async function testAnalyzerClientLongTimeout() {
   }
 }
 
+async function testWesternMusicXmlRouteMetadata() {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "ai-erhu-western-score-route-"));
+  let store = { jobs: [], scores: [] };
+  let analyzerPayload = null;
+  const upload = multer({ storage: multer.memoryStorage() });
+  const app = express();
+  app.use(createScoreRouter({
+    upload,
+    repoRoot: tempDir,
+    SCORE_IMPORT_TASK_GATE: { canAccept: () => true },
+    SCORE_STORE_FILE: path.join(tempDir, "score-store.json"),
+    SCORE_IMPORTS_DIR: path.join(tempDir, "score-imports"),
+    readScoreStore: async () => store,
+    readScoreStoreUnlocked: async () => store,
+    writeScoreStoreUnlocked: async (nextStore) => {
+      store = nextStore;
+    },
+    normalizeScoreImportJob: (job) => ({ ...job }),
+    normalizeImportedScoreRecord: (score) => ({ ...score }),
+    findReusableImportedScore: () => null,
+    findKnownPieceForPdf: () => null,
+    cloneLibraryPieceForImport: () => null,
+    toWebDataPath: (...parts) => `/data/${parts.join("/")}`,
+    upsertScoreImportJob: async (job) => job,
+    launchScoreImportTask: () => {},
+    callExternalMusicXmlImportLongTimeout: async (payload) => {
+      analyzerPayload = payload;
+      return {
+        jobId: payload.jobId,
+        scoreId: payload.jobId,
+        omrStatus: "completed",
+        omrConfidence: 0.9,
+        title: payload.titleHint,
+        musicxmlPath: payload.musicxmlPath,
+        detectedParts: ["Violin"],
+        selectedPart: "Violin",
+        selectedPartConfidence: 0.95,
+        partCandidates: [{ id: "P1", name: "Violin", score: 0.95 }],
+        piecePack: {
+          pieceId: payload.jobId,
+          title: payload.titleHint,
+          composer: "MusicXML import",
+          instrument: payload.instrument,
+          scoreSourceType: payload.scoreSource,
+          tempoKnown: payload.tempoKnown,
+          tempoSource: payload.tempoSource,
+          selectedPart: "Violin",
+          selectedPartId: "P1",
+          selectedPartConfidence: 0.95,
+          partCandidates: [{ id: "P1", name: "Violin", score: 0.95 }],
+          sections: [
+            {
+              sectionId: "section-a",
+              title: "Violin test",
+              instrument: payload.instrument,
+              scoreSourceType: payload.scoreSource,
+              tempoKnown: payload.tempoKnown,
+              tempoSource: payload.tempoSource,
+              selectedPart: "Violin",
+              selectedPartId: "P1",
+              selectedPartConfidence: 0.95,
+              notes: [],
+            },
+          ],
+        },
+        warnings: [],
+        error: "",
+      };
+    },
+    buildMarkingStatsFromSections: () => ({}),
+    getImportedScore: () => null,
+    activeScoreImportTasks: new Map(),
+  }));
+  const server = http.createServer(app);
+  const port = await listen(server);
+  try {
+    const formData = new FormData();
+    formData.set("musicxml", new Blob(["<score-partwise version=\"3.1\"></score-partwise>"], { type: "application/vnd.recordare.musicxml+xml" }), "violin.musicxml");
+    formData.set("titleHint", "Western Route Contract");
+    formData.set("selectedPartHint", "violin");
+    formData.set("instrument", "violin");
+    formData.set("scoreSource", "musicxml");
+    formData.set("tempoKnown", "false");
+    formData.set("tempoSource", "unknown");
+    const response = await fetch(`http://127.0.0.1:${port}/api/erhu/scores/import-musicxml`, {
+      method: "POST",
+      body: formData,
+    });
+    const body = await response.json();
+    assert(response.status === 200 && body.ok === true, "western MusicXML route should complete");
+    assert(analyzerPayload?.instrument === "violin", "route should forward instrument to analyzer");
+    assert(analyzerPayload?.scoreSource === "musicxml", "route should forward scoreSource to analyzer");
+    assert(analyzerPayload?.tempoKnown === false, "route should forward tempoKnown=false to analyzer");
+    assert(analyzerPayload?.tempoSource === "unknown", "route should forward tempoSource to analyzer");
+    assert(store.scores.length === 1, "route should persist one imported score");
+    assert(store.scores[0].instrument === "violin", "persisted score should keep instrument");
+    assert(store.scores[0].scoreSource === "musicxml", "persisted score should keep scoreSource");
+    assert(store.scores[0].tempoKnown === false, "persisted score should keep tempoKnown=false");
+    assert(store.scores[0].tempoSource === "unknown", "persisted score should keep tempoSource");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+}
+
 function testScoreLineRoleLabels() {
   assert(isExplicitErhuPartCandidate({ name: "二胡" }), "Node score-line role helper should detect Chinese 二胡");
   assert(isExplicitErhuPartCandidate({ name: " 二 胡 " }), "Node score-line role helper should tolerate whitespace in 二胡");
@@ -221,9 +329,10 @@ async function main() {
   await testAudioPayload();
   await testAnalyzerClientFetchPath();
   await testAnalyzerClientLongTimeout();
+  await testWesternMusicXmlRouteMetadata();
   testScoreLineRoleLabels();
   testSingleLineMelodyProjection();
-  console.log(JSON.stringify({ ok: true, checks: ["audio-payload", "analyzer-client-fetch", "analyzer-client-long-timeout", "score-line-role-labels", "single-line-melody-projection"] }, null, 2));
+  console.log(JSON.stringify({ ok: true, checks: ["audio-payload", "analyzer-client-fetch", "analyzer-client-long-timeout", "western-musicxml-route-metadata", "score-line-role-labels", "single-line-melody-projection"] }, null, 2));
 }
 
 main().catch((error) => {

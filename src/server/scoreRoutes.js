@@ -174,6 +174,10 @@ export function createScoreRouter({
     const fileExt = [".musicxml", ".xml", ".mxl"].includes(originalExt) ? originalExt : ".musicxml";
     const titleHint = safeString(req.body?.titleHint, path.parse(originalName).name);
     const selectedPartHint = safeString(req.body?.selectedPartHint, "erhu") || "erhu";
+    const instrument = safeString(req.body?.instrument).trim().toLowerCase();
+    const scoreSource = safeString(req.body?.scoreSource, "musicxml").trim().toLowerCase() || "musicxml";
+    const tempoKnown = safeBoolean(req.body?.tempoKnown, false);
+    const tempoSource = safeString(req.body?.tempoSource, tempoKnown ? "musicxml" : "unknown").trim().toLowerCase() || (tempoKnown ? "musicxml" : "unknown");
     const musicxmlHash = sha1(req.file.buffer);
     const jobId = createId("scorejob");
     const jobDir = path.join(SCORE_IMPORTS_DIR, jobId);
@@ -191,6 +195,10 @@ export function createScoreRouter({
         originalFilename: originalName,
         titleHint,
         selectedPartHint,
+        instrument,
+        scoreSource,
+        tempoKnown,
+        tempoSource,
         outputDir: jobDir,
       });
     } catch (error) {
@@ -201,6 +209,10 @@ export function createScoreRouter({
       jobId,
       originalFilename: originalName,
       title: titleHint,
+      instrument,
+      scoreSource,
+      tempoKnown,
+      tempoSource,
       sourcePdfPath: "",
       pdfHash: `musicxml:${musicxmlHash}`,
       omrStatus: "failed",
@@ -231,6 +243,10 @@ export function createScoreRouter({
         pieceId: safeString(jobResult.piecePack?.pieceId),
         title: safeString(jobResult.title, titleHint),
         composer: safeString(jobResult.piecePack?.composer, "MusicXML import"),
+        instrument: safeString(jobResult.piecePack?.instrument, instrument),
+        scoreSource: safeString(jobResult.piecePack?.scoreSourceType, scoreSource),
+        tempoKnown: safeBoolean(jobResult.piecePack?.tempoKnown, tempoKnown),
+        tempoSource: safeString(jobResult.piecePack?.tempoSource, tempoSource),
         sourcePdfPath: "",
         pdfHash: `musicxml:${musicxmlHash}`,
         musicxmlPath: webMusicXmlPath,
@@ -253,6 +269,10 @@ export function createScoreRouter({
         jobId,
         scoreId,
         title: scoreRecord.title,
+        instrument: scoreRecord.instrument,
+        scoreSource: scoreRecord.scoreSource,
+        tempoKnown: scoreRecord.tempoKnown,
+        tempoSource: scoreRecord.tempoSource,
         sourcePdfPath: "",
         pdfHash: `musicxml:${musicxmlHash}`,
         musicxmlPath: webMusicXmlPath,

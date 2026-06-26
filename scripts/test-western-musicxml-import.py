@@ -62,6 +62,10 @@ def main() -> int:
                 originalFilename=source.name,
                 titleHint="Western Violin Import Test",
                 selectedPartHint="violin",
+                instrument="violin",
+                scoreSource="musicxml",
+                tempoKnown=False,
+                tempoSource="unknown",
                 outputDir=str(output_dir),
             )
         )
@@ -70,6 +74,10 @@ def main() -> int:
     notes = [note for section in piece_pack.get("sections", []) for note in (section.get("notes") or [])]
     require(result.omrStatus == "completed", f"western MusicXML import should complete, got {result.omrStatus!r}: {result.error}")
     require(result.selectedPart == "Violin", f"expected selectedPart Violin, got {result.selectedPart!r}")
+    require(piece_pack.get("instrument") == "violin", f"expected instrument metadata, got {piece_pack.get('instrument')!r}")
+    require(piece_pack.get("scoreSourceType") == "musicxml", f"expected MusicXML source metadata, got {piece_pack.get('scoreSourceType')!r}")
+    require(piece_pack.get("tempoKnown") is False, f"missing tempo should remain unknown, got {piece_pack.get('tempoKnown')!r}")
+    require(piece_pack.get("tempoSource") == "unknown", f"expected unknown tempo source, got {piece_pack.get('tempoSource')!r}")
     require(len(notes) == 2, f"expected 2 violin notes, got {len(notes)}")
     require([note.get("midiPitch") for note in notes] == [67, 69], f"unexpected violin pitches: {notes}")
     print(json.dumps({"ok": True, "selectedPart": result.selectedPart, "noteCount": len(notes)}, ensure_ascii=False))

@@ -22,6 +22,27 @@ except ImportError:  # pragma: no cover - optional dependency
 
 
 class ScoreImportMixin:
+    def _score_metadata_from_request(
+        self,
+        request: ScoreImportRequest | MusicXmlImportRequest,
+        *,
+        default_source: str,
+        tempo_change_count: int = 0,
+    ) -> dict[str, Any]:
+        instrument = str(getattr(request, "instrument", "") or "").strip().lower()
+        score_source = str(getattr(request, "scoreSource", "") or "").strip().lower() or default_source
+        tempo_known_value = getattr(request, "tempoKnown", None)
+        tempo_known = bool(tempo_change_count > 0) if tempo_known_value is None else bool(tempo_known_value)
+        tempo_source = str(getattr(request, "tempoSource", "") or "").strip().lower()
+        if not tempo_source:
+            tempo_source = "musicxml" if tempo_known else "unknown"
+        return {
+            "instrument": instrument,
+            "scoreSourceType": score_source,
+            "tempoKnown": tempo_known,
+            "tempoSource": tempo_source,
+        }
+
     def _build_score_line_stats(self, notes: list[Any]) -> dict[str, Any]:
         role_counts: dict[str, int] = {}
         source_counts: dict[str, int] = {}
@@ -152,10 +173,16 @@ class ScoreImportMixin:
             detected_tempo,
         )
         score_line_stats = self._build_score_line_stats(parsed_notes)
+        section_metadata = self._score_metadata_from_request(
+            request,
+            default_source="musicxml" if isinstance(request, MusicXmlImportRequest) else "pdf-omr",
+            tempo_change_count=int(safe_float(score_markings.get("markingStats", {}).get("tempoChangeCount"), 0)),
+        )
 
         section = {
             "sectionId": section_id,
             "title": section_title,
+            **section_metadata,
             "tempo": detected_tempo,
             "meter": "4/4",
             "demoAudio": "",
@@ -395,6 +422,11 @@ class ScoreImportMixin:
             for note in list(section.get("notes") or [])
         ]
         score_line_stats = self._build_score_line_stats(aggregate_notes)
+        piece_metadata = self._score_metadata_from_request(
+            request,
+            default_source="musicxml" if isinstance(request, MusicXmlImportRequest) else "pdf-omr",
+            tempo_change_count=int(safe_float(aggregate_marking_stats.get("tempoChangeCount"), 0)),
+        )
         selected_part_confidence = round(
             float(
                 next(
@@ -425,6 +457,7 @@ class ScoreImportMixin:
             "pieceId": request.jobId,
             "title": request.titleHint or request.originalFilename or request.jobId,
             "composer": "Audiveris OMR",
+            **piece_metadata,
             "selectedPart": resolved_part_label or resolved_part,
             "selectedPartId": resolved_part_id,
             "detectedParts": detected_parts or [resolved_part_label or resolved_part],
