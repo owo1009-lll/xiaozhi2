@@ -52,6 +52,7 @@
     "test:western-musicxml-import": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-western-musicxml-import.py",
     "test:western-midi-import": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-western-midi-import.py",
     "test:western-dataset-index": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-western-dataset-index.py",
+    "test:western-strings-entry": "node scripts\\test-western-strings-entry.mjs",
     "test:western-alignment-features": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-western-alignment-features.py",
     "test:western-confidence-gate": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-western-confidence-gate.py",
     "test:separation-quality": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-separation-quality.py",

@@ -75,6 +75,44 @@ button {
   color: #fff;
 }
 
+.western-strings-app .hero-card {
+  grid-template-columns: minmax(0, 1fr) 220px;
+}
+
+.western-strings-panel {
+  margin-top: 18px;
+  padding: 24px;
+}
+
+.western-strings-actions,
+.western-strings-result {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.western-strings-actions {
+  margin: 18px 0;
+}
+
+.western-strings-result {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.western-strings-result div {
+  min-width: 160px;
+  display: grid;
+  gap: 4px;
+}
+
+.western-strings-result span {
+  color: var(--text-muted);
+  word-break: break-word;
+}
+
 .hero-card,
 .panel-card,
 .status-banner,

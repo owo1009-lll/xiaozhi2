@@ -82,14 +82,38 @@ export async function importScorePdf(file, titleHint = "") {
   );
 }
 
-export async function importScoreMusicXml(file, titleHint = "") {
+export async function importScoreMusicXml(file, titleHint = "", options = {}) {
   const formData = new FormData();
   formData.append("musicxml", file);
   if (titleHint) {
     formData.append("titleHint", titleHint);
   }
+  for (const [key, value] of Object.entries(options || {})) {
+    if (value !== undefined && value !== null && String(value).trim()) {
+      formData.append(key, String(value));
+    }
+  }
   return readJson(
     await fetch("/api/erhu/scores/import-musicxml", {
+      method: "POST",
+      body: formData,
+    }),
+  );
+}
+
+export async function importScoreMidi(file, titleHint = "", options = {}) {
+  const formData = new FormData();
+  formData.append("midi", file);
+  if (titleHint) {
+    formData.append("titleHint", titleHint);
+  }
+  for (const [key, value] of Object.entries(options || {})) {
+    if (value !== undefined && value !== null && String(value).trim()) {
+      formData.append(key, String(value));
+    }
+  }
+  return readJson(
+    await fetch("/api/erhu/scores/import-midi", {
       method: "POST",
       body: formData,
     }),
