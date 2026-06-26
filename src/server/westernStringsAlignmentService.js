@@ -159,6 +159,39 @@ function summarize(decisions, { includeLabels = false } = {}) {
   return summary;
 }
 
+async function readStudentGate(repoRoot) {
+  const summaryPath = path.join(repoRoot, "data", "experiments", "western-strings-m2", "m2b-student-like-summary.json");
+  try {
+    const summary = JSON.parse(await fs.readFile(summaryPath, "utf8"));
+    const ready = summary?.studentGateReady === true;
+    return {
+      ready,
+      reason: ready ? "" : "student-gate-not-ready",
+      source: path.relative(repoRoot, summaryPath).replace(/\\/g, "/"),
+    };
+  } catch {
+    return {
+      ready: false,
+      reason: "student-gate-evidence-missing",
+      source: path.relative(repoRoot, summaryPath).replace(/\\/g, "/"),
+    };
+  }
+}
+
+function applyStudentGate(decision, gate) {
+  if (gate.ready) return decision;
+  return {
+    ...decision,
+    autoDecision: "review_required",
+    confidenceScore: 0,
+    reviewRequiredReason: gate.reason,
+    evidence: {
+      ...decision.evidence,
+      studentGateReady: false,
+    },
+  };
+}
+
 export async function buildWesternAlignmentPreview({
   repoRoot = process.cwd(),
   featuresPath = "data/experiments/western-strings-m2/alignment-candidate-feature-table.csv",
@@ -166,24 +199,28 @@ export async function buildWesternAlignmentPreview({
   piece = "",
   limit = 0,
   includeLabels = false,
+  studentSafe = false,
 } = {}) {
   const resolvedPath = path.resolve(repoRoot, featuresPath);
   const text = await fs.readFile(resolvedPath, "utf8");
   const rows = parseCsv(text)
     .filter((row) => !dataset || safeString(row.dataset) === dataset)
     .filter((row) => !piece || safeString(row.piece) === piece);
-  const decisions = groupRows(rows)
+  const rawDecisions = groupRows(rows)
     .map((group) => buildDecision(group, { includeLabels }))
     .sort((left, right) => (
       left.dataset.localeCompare(right.dataset) ||
       left.piece.localeCompare(right.piece) ||
       left.noteIndex - right.noteIndex
     ));
+  const studentGate = studentSafe ? await readStudentGate(repoRoot) : null;
+  const decisions = studentGate ? rawDecisions.map((decision) => applyStudentGate(decision, studentGate)) : rawDecisions;
   const cappedDecisions = limit > 0 ? decisions.slice(0, limit) : decisions;
   return {
     ok: true,
     source: path.relative(repoRoot, resolvedPath).replace(/\\/g, "/"),
-    filters: { dataset, piece, limit },
+    filters: { dataset, piece, limit, studentSafe },
+    releaseGate: studentGate,
     summary: summarize(decisions, { includeLabels }),
     decisions: cappedDecisions,
   };
@@ -195,6 +232,7 @@ export function parsePreviewQuery(query = {}) {
     piece: safeString(query.piece).trim(),
     limit: Math.max(0, Math.round(safeNumber(query.limit, 0))),
     includeLabels: safeBoolean(query.includeLabels, false),
+    studentSafe: safeBoolean(query.studentSafe, false),
   };
 }
 

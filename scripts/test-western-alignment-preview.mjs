@@ -34,6 +34,16 @@ async function testServiceEvaluationSummary() {
   assert.equal(preview.summary.evaluation.precisionWithin300ms, 0.9818);
 }
 
+async function testStudentSafeFailClosed() {
+  const preview = await buildWesternAlignmentPreview({ repoRoot: process.cwd(), studentSafe: true, limit: 5 });
+  assert.equal(preview.ok, true);
+  assert.equal(preview.releaseGate.ready, false);
+  assert.equal(preview.summary.autoPassCount, 0);
+  assert.equal(preview.summary.reviewRequiredCount, 2088);
+  assert(preview.decisions.every((item) => item.autoDecision === "review_required"));
+  assert(preview.decisions.every((item) => item.reviewRequiredReason === preview.releaseGate.reason));
+}
+
 async function testRoute() {
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "western-preview-route-"));
   await fs.mkdir(path.join(tempRoot, "data", "experiments", "western-strings-m2"), { recursive: true });
@@ -54,6 +64,12 @@ async function testRoute() {
     assert.equal(body.summary.noteCount, 146);
     assert.equal(body.decisions.length, 3);
     assert(body.decisions.every((item) => item.dataset === "m0b-urmp"));
+    const safeResponse = await fetch(`http://127.0.0.1:${port}/api/strings/alignment-preview?dataset=m0b-urmp&limit=3&studentSafe=1`);
+    const safeBody = await safeResponse.json();
+    assert.equal(safeResponse.status, 200);
+    assert.equal(safeBody.releaseGate.ready, false);
+    assert.equal(safeBody.summary.autoPassCount, 0);
+    assert(safeBody.decisions.every((item) => item.autoDecision === "review_required"));
     const reviewResponse = await fetch(`http://127.0.0.1:${port}/api/strings/alignment-preview/reviews`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -75,6 +91,7 @@ async function testRoute() {
 
 await testServiceDefaultNoLeakage();
 await testServiceEvaluationSummary();
+await testStudentSafeFailClosed();
 await testRoute();
 
 console.log(JSON.stringify({ ok: true, checks: ["western-alignment-preview-service", "western-alignment-preview-route"] }));
