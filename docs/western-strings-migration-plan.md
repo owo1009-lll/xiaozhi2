@@ -140,8 +140,9 @@ M5  大提琴扩展                  小提琴 V2 通过后独立 M0
 - teacher-only alignment preview 已接入。
 - M2b correlated +800ms pilot 证明 median-consensus 不安全。
 - M2c 单音 Basic Pitch support 仍有重复同音误通过。
-- M2d sequence-level Basic Pitch support 通过 synthetic release-gate:基准 precision=0.9974 / coverage=0.3716,+800ms correlated drift autoPass=0。
-- 学生端仍未开放;下一步必须用真实学生式输入复验 M2d。
+- M2d sequence-level Basic Pitch support 通过 synthetic release-gate:30ms 阈值下基准 precision=1.0000 / coverage=0.2443,+800ms correlated drift autoPass=0。
+- M2e student-like event perturbation 进一步通过:漏音、错音、延迟 800ms、弱起音目标均 0 auto-pass;额外杂散音不破坏 clean reference。
+- 学生端仍未开放;下一步必须用真实学生录音复验 M2d/M2e。
 
 ### reason codes
 `double-stop-unsupported`, `legato-onset-ambiguous`, `rubato-section`,

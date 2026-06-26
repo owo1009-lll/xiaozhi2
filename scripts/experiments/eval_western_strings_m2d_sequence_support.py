@@ -216,7 +216,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Evaluate sequence-level Basic Pitch support as a western strings student-release gate candidate.")
     parser.add_argument("--features", default=str(DEFAULT_FEATURES))
     parser.add_argument("--out", default=str(DEFAULT_OUT))
-    parser.add_argument("--support-threshold-seconds", type=float, default=0.05)
+    parser.add_argument("--support-threshold-seconds", type=float, default=0.03)
     parser.add_argument("--pitch-tolerance", type=int, default=0)
     parser.add_argument("--neighbor-radius", type=int, default=2)
     parser.add_argument("--expect-positive", action="store_true")

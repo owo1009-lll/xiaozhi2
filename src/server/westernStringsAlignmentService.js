@@ -193,7 +193,7 @@ function nearestBasicPitchSupportSeconds(events, decision, threshold, pitchToler
 }
 
 async function hasSequenceBasicPitchSupport(repoRoot, eventCache, pieceDecisions, index, supportFeature) {
-  const threshold = Math.max(0, safeNumber(supportFeature?.thresholdSeconds, 0.05));
+  const threshold = Math.max(0, safeNumber(supportFeature?.thresholdSeconds, 0.03));
   const pitchTolerance = Math.max(0, Math.round(safeNumber(supportFeature?.pitchToleranceSemitones, 0)));
   const radius = Math.max(0, Math.round(safeNumber(supportFeature?.neighborRadius, 2)));
   const start = Math.max(0, index - radius);
