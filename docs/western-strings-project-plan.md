@@ -237,6 +237,7 @@
 - ✅ M2 特征表第一版已完成:从 M0 per-note CSV 生成 note-level pivot 与 candidate-level 表;`label*` 字段显式标为 gold-derived,训练时禁用;`npm run test:western-alignment-features` 已验证。
 - ✅ M2 置信门 eval-only 探针已完成:基于 candidate-level 表做 fail-closed 规则搜索,LODO 三折 precision 均 >0.96、coverage=1.0;`npm run test:western-confidence-gate` 已验证。注意:这证明高置信子集存在。
 - ✅ M2 后台离线 preview API 已接入:`GET /api/strings/alignment-preview` 从 candidate feature table 生成 note-level `autoDecision/confidenceScore/candidateSources/evidence`;默认不返回 gold-derived label,`includeLabels=1` 仅用于离线验收;`npm run test:western-alignment-preview` 验证默认无泄漏与 precision@300ms=0.9818。
+- ✅ M2 默认关闭学生自动反馈的源契约已补:`npm run test:western-feature-flags` 验证学生端/clean-score 入口不调用 `/api/strings/*` 自动诊断,服务端仅暴露离线 preview,不暴露 analyze/review 写入路由。
 
 剩余 M1 步骤:
 1. M1 收口时再跑 `test:western-string-config` / `test:western-musicxml-import` / `test:western-midi-import` / `test:western-dataset-index` / `test:western-strings-entry` / `test:server-boundaries` / `test:server-p0` / `test:musicxml-import` / `test:analyzer-score-roles` / `test:teacher-validation` / `build`。
@@ -245,5 +246,4 @@
 
 当前 M2 剩余步骤:
 1. 把 alignment preview 接到教师后台 UI(只读证据与一键确认/改正),仍不开放学生端。
-2. 增加 feature flag 测试:flag 关闭时学生端无自动输出;后台 preview 不影响既有二胡流程。
-3. 准备 M2b student-like pilot:合成错音/漏音/节奏扰动 + 少量真实学生录音,检验真实输入下 precision。
+2. 准备 M2b student-like pilot:合成错音/漏音/节奏扰动 + 少量真实学生录音,检验真实输入下 precision。

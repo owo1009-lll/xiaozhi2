@@ -56,6 +56,7 @@
     "test:western-alignment-features": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-western-alignment-features.py",
     "test:western-confidence-gate": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-western-confidence-gate.py",
     "test:western-alignment-preview": "node scripts\\test-western-alignment-preview.mjs",
+    "test:western-feature-flags": "node scripts\\test-western-feature-flags.mjs",
     "test:separation-quality": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-separation-quality.py",
     "audit:separation-quality": "node scripts\\audit-separation-quality.mjs",
     "audit:separation-quality:all": "node scripts\\audit-separation-quality.mjs --all",
