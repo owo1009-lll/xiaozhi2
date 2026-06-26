@@ -525,8 +525,16 @@ class SymbolicScoreMixin:
                     current_beat += max(duration_beats, 0.0)
             current_measure_offset += max(0.0, safe_float(measure.attrib.get("width"), 0.0))
 
-        note_events = self._annotate_score_line_roles(note_events, selected_part_candidate, part_candidate_stats)
-        if collapse_melody:
+        explicit_non_erhu_selected_part = bool(
+            (selected_part_candidate or {}).get("selectedHintMatch")
+            and not bool((selected_part_candidate or {}).get("explicitErhuName"))
+            and not bool((selected_part_candidate or {}).get("isLikelyPiano"))
+            and int(safe_float((selected_part_candidate or {}).get("staffCount"), 1)) <= 1
+            and int(safe_float((selected_part_candidate or {}).get("noteCount"), 0)) > 0
+        )
+        if not explicit_non_erhu_selected_part:
+            note_events = self._annotate_score_line_roles(note_events, selected_part_candidate, part_candidate_stats)
+        if collapse_melody and not explicit_non_erhu_selected_part:
             note_events = collapse_erhu_melody_events(note_events)
         return self._hydrate_piece_notes(note_events, request)
 

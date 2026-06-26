@@ -210,9 +210,13 @@
 ---
 
 ## 立即下一步(Phase 1 / M1)
-1. 在弦乐分支上建 `instrumentConfig`(violin G3-A7);
-2. `scoreImporter` 支持 MusicXML/MIDI;
-3. 三个 dataset adapter 统一进 score store;
-4. 停用 OMR 导入路由;
-5. 单测 + `check-server-p0` 回归。
+当前进度:
+- ✅ `instrumentConfig` 已落地为 `config/western-string-instruments.json`,覆盖 violin / viola / cello;`npm run test:western-string-config` 已验证音域与 first-version flag。
+
+剩余 M1 步骤:
+1. 整理 `scoreImporter` 的 clean MusicXML/MIDI 入口,明确西洋弦乐线不走 PDF OMR;
+2. 三个 dataset adapter 统一进 score store 或统一导出 score/audio/gold 三件套;
+3. 停用/隔离 OMR 导入路由在西洋弦乐路径中的入口;
+4. 单测 + `check-server-p0` 回归。
+
 **完成即 M1 达标,进 M2 置信门。**

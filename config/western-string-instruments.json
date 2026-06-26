@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "instruments": {
+    "violin": {
+      "label": "Violin",
+      "family": "western-bowed-string",
+      "openStrings": ["G3", "D4", "A4", "E5"],
+      "trackingRange": {
+        "minNote": "G3",
+        "maxNote": "A7",
+        "minMidi": 55,
+        "maxMidi": 105
+      },
+      "firstVersionSupport": true
+    },
+    "viola": {
+      "label": "Viola",
+      "family": "western-bowed-string",
+      "openStrings": ["C3", "G3", "D4", "A4"],
+      "trackingRange": {
+        "minNote": "C3",
+        "maxNote": "E7",
+        "minMidi": 48,
+        "maxMidi": 100
+      },
+      "firstVersionSupport": false
+    },
+    "cello": {
+      "label": "Cello",
+      "family": "western-bowed-string",
+      "openStrings": ["C2", "G2", "D3", "A3"],
+      "trackingRange": {
+        "minNote": "C2",
+        "maxNote": "C6",
+        "minMidi": 36,
+        "maxMidi": 84
+      },
+      "firstVersionSupport": false
+    }
+  }
+}

@@ -210,14 +210,25 @@ def extract_musicxml_part_candidates(xml_text: str, selected_hint: str | None = 
             - after_piano_penalty
             + (0.18 if safe_for_erhu_projection else 0.0)
         )
-        selected_hint_match = bool(normalized_hint and normalized_hint in normalize_part_label(part_name))
+        raw_hint_lower = str(selected_hint or "").strip().lower()
+        selection_key = part_id or part_name
+        selected_hint_match = bool(
+            (
+                raw_hint_lower
+                and raw_hint_lower in {
+                    str(part_id or "").strip().lower(),
+                    str(selection_key or "").strip().lower(),
+                    str(part_name or "").strip().lower(),
+                }
+            )
+            or (normalized_hint and normalized_hint in normalize_part_label(part_name))
+        )
         if selected_hint_match:
             score += 0.12
         if note_count <= 0:
             score = 0.0
         elif note_count < 4:
             score -= 0.14
-        selection_key = part_id or part_name
         candidates.append(
             {
                 "partIndex": part_index,
