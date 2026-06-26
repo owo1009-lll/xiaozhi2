@@ -21,6 +21,13 @@ def read_rows(path: Path) -> tuple[list[str], list[dict[str, str]]]:
         return list(reader.fieldnames or []), list(reader)
 
 
+def write_rows(path: Path, columns: list[str], rows: list[dict[str, str]]) -> None:
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns, lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(rows)
+
+
 def assert_true(condition: bool, message: str) -> None:
     if not condition:
         raise AssertionError(message)
@@ -122,6 +129,122 @@ def main() -> int:
             capture_output=True,
         )
         assert_true(overwrite.returncode != 0 and "Refusing to overwrite" in (overwrite.stderr + overwrite.stdout), "results skeleton must not overwrite without --force")
+
+        private_dir = out_dir / "private"
+        private_dir.mkdir()
+        audio_path = private_dir / "student.wav"
+        score_path = private_dir / "score.musicxml"
+        audio_path.write_bytes(b"fake-audio-path-for-gate-test")
+        score_path.write_text("<score-partwise version=\"4.0\"></score-partwise>\n", encoding="utf-8")
+
+        valid_manifest_rows = []
+        for row in manifest_rows:
+            updated = dict(row)
+            updated["audioPath"] = str(audio_path)
+            updated["scorePath"] = str(score_path)
+            updated["scoreId"] = ""
+            valid_manifest_rows.append(updated)
+        write_rows(filled_manifest, manifest_columns, valid_manifest_rows)
+
+        good_results = out_dir / "good-results.csv"
+        good_result_rows = [
+            {
+                "recordingId": row["recordingId"],
+                "autoPassCount": "10",
+                "correctWithin300ms": "10",
+                "unsafeTargetAutoPassCount": "0",
+                "notes": "synthetic gate unit test row",
+            }
+            for row in valid_manifest_rows
+        ]
+        write_rows(good_results, result_columns, good_result_rows)
+        positive_gate = subprocess.run(
+            [
+                sys.executable,
+                str(GATE),
+                "--manifest",
+                str(filled_manifest),
+                "--results",
+                str(good_results),
+                "--out",
+                str(out_dir / "positive-summary.json"),
+                "--expect-positive",
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true("studentGateReady" in positive_gate.stdout and "true" in positive_gate.stdout.lower(), "valid matched M2f rows should pass the gate")
+
+        unknown_results = out_dir / "unknown-results.csv"
+        unknown_rows = [dict(row) for row in good_result_rows]
+        unknown_rows[0]["recordingId"] = "not-in-manifest"
+        write_rows(unknown_results, result_columns, unknown_rows)
+        unknown_gate = subprocess.run(
+            [
+                sys.executable,
+                str(GATE),
+                "--manifest",
+                str(filled_manifest),
+                "--results",
+                str(unknown_results),
+                "--out",
+                str(out_dir / "unknown-summary.json"),
+                "--expect-negative",
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true("results-unknown-recording-ids:not-in-manifest" in unknown_gate.stdout, "results with IDs outside the manifest must fail closed")
+
+        duplicate_results = out_dir / "duplicate-results.csv"
+        duplicate_rows = [dict(row) for row in good_result_rows]
+        duplicate_rows[1]["recordingId"] = duplicate_rows[0]["recordingId"]
+        write_rows(duplicate_results, result_columns, duplicate_rows)
+        duplicate_gate = subprocess.run(
+            [
+                sys.executable,
+                str(GATE),
+                "--manifest",
+                str(filled_manifest),
+                "--results",
+                str(duplicate_results),
+                "--out",
+                str(out_dir / "duplicate-summary.json"),
+                "--expect-negative",
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true("recordingId-duplicate" in duplicate_gate.stdout, "duplicate result recording IDs must fail closed")
+
+        duplicate_manifest = out_dir / "duplicate-manifest.csv"
+        duplicate_manifest_rows = [dict(row) for row in valid_manifest_rows]
+        duplicate_manifest_rows[1]["recordingId"] = duplicate_manifest_rows[0]["recordingId"]
+        write_rows(duplicate_manifest, manifest_columns, duplicate_manifest_rows)
+        duplicate_manifest_gate = subprocess.run(
+            [
+                sys.executable,
+                str(GATE),
+                "--manifest",
+                str(duplicate_manifest),
+                "--results",
+                str(good_results),
+                "--out",
+                str(out_dir / "duplicate-manifest-summary.json"),
+                "--expect-negative",
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true("recordingId-duplicate" in duplicate_manifest_gate.stdout, "duplicate manifest recording IDs must fail closed")
 
         gate = subprocess.run(
             [

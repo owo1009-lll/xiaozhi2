@@ -88,6 +88,7 @@ def validate_manifest(
         blockers.append("manifest-missing-columns:" + "|".join(missing_columns))
 
     invalid_rows: list[dict[str, Any]] = []
+    seen_recording_ids: set[str] = set()
     recording_ids: set[str] = set()
     student_ids: set[str] = set()
     scenario_counts: Counter[str] = Counter()
@@ -107,6 +108,10 @@ def validate_manifest(
 
         if not recording_id:
             errors.append("recordingId-missing")
+        elif recording_id in seen_recording_ids:
+            errors.append("recordingId-duplicate")
+        else:
+            seen_recording_ids.add(recording_id)
         if not student_id:
             errors.append("studentId-missing")
         if instrument != "violin":
@@ -162,13 +167,14 @@ def validate_manifest(
         "warnings": warnings,
         "rows": len(rows),
         "recordings": len(recording_ids),
+        "recordingIds": sorted(recording_ids),
         "students": len(student_ids),
         "scenarioCounts": dict(sorted(scenario_counts.items())),
         "invalidRows": invalid_rows[:20],
     }
 
 
-def evaluate_results(results_path: Path, valid_recording_count: int) -> dict[str, Any]:
+def evaluate_results(results_path: Path, valid_recording_ids: set[str]) -> dict[str, Any]:
     if not results_path.exists():
         return {
             "resultsReady": False,
@@ -191,20 +197,40 @@ def evaluate_results(results_path: Path, valid_recording_count: int) -> dict[str
     correct = 0
     unsafe = 0
     invalid_rows: list[dict[str, Any]] = []
+    seen_result_ids: set[str] = set()
+    matched_result_ids: set[str] = set()
+    unknown_result_ids: set[str] = set()
     for index, row in enumerate(rows, start=2):
+        errors: list[str] = []
+        recording_id = row.get("recordingId", "").strip()
+        if not recording_id:
+            errors.append("recordingId-missing")
+        elif recording_id in seen_result_ids:
+            errors.append("recordingId-duplicate")
+        else:
+            seen_result_ids.add(recording_id)
+            if valid_recording_ids and recording_id not in valid_recording_ids:
+                unknown_result_ids.add(recording_id)
+                errors.append("recordingId-not-in-manifest")
         row_auto = safe_float(row.get("autoPassCount"))
         row_correct = safe_float(row.get("correctWithin300ms"))
         row_unsafe = safe_float(row.get("unsafeTargetAutoPassCount"))
         if row_auto is None or row_correct is None or row_unsafe is None:
-            invalid_rows.append({"line": index, "recordingId": row.get("recordingId", ""), "errors": ["result-count-invalid"]})
+            errors.append("result-count-invalid")
+        if errors:
+            invalid_rows.append({"line": index, "recordingId": recording_id, "errors": errors})
             continue
+        matched_result_ids.add(recording_id)
         auto_pass += int(round(row_auto))
         correct += int(round(row_correct))
         unsafe += int(round(row_unsafe))
     if invalid_rows:
         blockers.append("results-invalid-rows")
-    if rows and valid_recording_count and len(rows) < valid_recording_count:
-        blockers.append(f"results-missing-recordings:{len(rows)}/{valid_recording_count}")
+    missing_result_ids = sorted(valid_recording_ids - matched_result_ids)
+    if missing_result_ids:
+        blockers.append("results-missing-recording-ids:" + "|".join(missing_result_ids[:20]))
+    if unknown_result_ids:
+        blockers.append("results-unknown-recording-ids:" + "|".join(sorted(unknown_result_ids)[:20]))
     if auto_pass <= 0:
         blockers.append("results-no-auto-pass")
 
@@ -213,6 +239,9 @@ def evaluate_results(results_path: Path, valid_recording_count: int) -> dict[str
         "resultsReady": not blockers,
         "blockingReasons": blockers,
         "rows": len(rows),
+        "recordingIds": sorted(matched_result_ids),
+        "missingRecordingIds": missing_result_ids[:20],
+        "unknownRecordingIds": sorted(unknown_result_ids)[:20],
         "autoPassCount": auto_pass,
         "correctWithin300ms": correct,
         "unsafeTargetAutoPassCount": unsafe,
@@ -236,7 +265,7 @@ def run(
         min_students=min_students,
         required_scenarios=required_scenarios,
     )
-    results = evaluate_results(results_path, int(manifest.get("recordings", 0)))
+    results = evaluate_results(results_path, set(manifest.get("recordingIds", [])))
     blockers = list(manifest["blockingReasons"]) + list(results["blockingReasons"])
     if results["precisionWithin300ms"] < min_precision:
         blockers.append(f"precision-below-min:{results['precisionWithin300ms']}/{min_precision}")
