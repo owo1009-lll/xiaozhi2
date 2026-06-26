@@ -37,6 +37,7 @@ VALID_SCENARIOS = {
 VALID_LICENSE_STATUS = {"local-only", "cleared"}
 DEFAULT_REQUIRED_SCENARIOS = ["correct", "wrong_pitch", "missing_note", "rhythm_shift", "weak_onset", "noisy"]
 SCORE_STORE = REPO / "data" / "erhu-score-imports.json"
+PRIVATE_AUDIO_ROOT = REPO / "data" / "private"
 
 
 def read_csv(path: Path) -> tuple[list[dict[str, str]], list[str]]:
@@ -48,6 +49,14 @@ def read_csv(path: Path) -> tuple[list[dict[str, str]], list[str]]:
 def repo_path(value: str) -> Path:
     path = Path(value.strip())
     return path if path.is_absolute() else REPO / path
+
+
+def path_is_within(path: Path, root: Path) -> bool:
+    try:
+        path.resolve(strict=False).relative_to(root.resolve(strict=False))
+    except ValueError:
+        return False
+    return True
 
 
 def load_score_ids(path: Path = SCORE_STORE) -> set[str]:
@@ -143,8 +152,12 @@ def validate_manifest(
             errors.append("scenario-invalid")
         if not audio_path:
             errors.append("audioPath-missing")
-        elif not repo_path(audio_path).exists():
-            errors.append("audioPath-not-found")
+        else:
+            audio_resolved = repo_path(audio_path)
+            if not audio_resolved.exists():
+                errors.append("audioPath-not-found")
+            elif path_is_within(audio_resolved, REPO) and not path_is_within(audio_resolved, PRIVATE_AUDIO_ROOT):
+                errors.append("audioPath-not-private")
         if not score_path and not score_id:
             errors.append("scorePath-or-scoreId-missing")
         elif score_path and not repo_path(score_path).exists():

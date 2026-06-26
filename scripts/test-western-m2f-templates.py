@@ -58,6 +58,8 @@ def main() -> int:
         readme_text = readme.read_text(encoding="utf-8")
         assert_true("western-strings-m2f-recording-checklist.md" in readme_text, "template README must link the recorder checklist")
         assert_true("correct, wrong_pitch, missing_note, rhythm_shift, weak_onset, and noisy" in readme_text, "template README must name all required gate scenarios")
+        assert_true("data/private/..." in readme_text, "template README must name private storage for repo-local student audio")
+        assert_true("human/gold review" in readme_text, "template README must say results counts come from review")
         assert_true("npm run western:m2f-status" in readme_text, "template README must name the non-failing M2f status command")
         assert_true("npm run western:m2f-gate" in readme_text, "template README must name the release-blocking M2f gate command")
 
@@ -272,6 +274,29 @@ def main() -> int:
             capture_output=True,
         )
         assert_true("scoreId-not-found" in missing_score_gate.stdout, "manifest rows with unresolved scoreId must fail closed")
+
+        public_audio_manifest = out_dir / "public-audio-manifest.csv"
+        public_audio_rows = [dict(row) for row in valid_manifest_rows]
+        public_audio_rows[0]["audioPath"] = "package.json"
+        write_rows(public_audio_manifest, manifest_columns, public_audio_rows)
+        public_audio_gate = subprocess.run(
+            [
+                sys.executable,
+                str(GATE),
+                "--manifest",
+                str(public_audio_manifest),
+                "--results",
+                str(good_results),
+                "--out",
+                str(out_dir / "public-audio-summary.json"),
+                "--expect-negative",
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true("audioPath-not-private" in public_audio_gate.stdout, "repo-local student audio must stay under data/private")
 
         impossible_results = out_dir / "impossible-results.csv"
         impossible_rows = [dict(row) for row in good_result_rows]

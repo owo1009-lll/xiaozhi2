@@ -76,7 +76,11 @@ Allowed storage:
 - `data/private/...`
 - another local private path outside the repo
 
-Do not commit raw student recordings or private score files.
+Do not commit raw student recordings or private score files. The M2f gate
+enforces this for `audioPath`: a repo-local audio path is valid only under
+`data/private/...`; a repo-local public/test path fails with
+`audioPath-not-private`. Absolute paths outside the repo remain allowed for
+local private storage.
 
 Required metadata:
 
@@ -111,7 +115,7 @@ Required columns:
 | `studentId` | Anonymous id only. |
 | `instrument` | `violin`. |
 | `pieceId` | Stable piece id. |
-| `audioPath` | Existing local path to the audio. |
+| `audioPath` | Existing local path to the audio; if it is repo-local it must be under `data/private/...`. |
 | `scorePath` or `scoreId` | One must point to a clean MusicXML/MIDI score. |
 | `scenario` | One of the required scenarios. |
 | `humanChecked` | `yes`. |
@@ -142,6 +146,8 @@ data/experiments/western-strings-m2/real-student-recording-results.csv
 ```
 
 Fill the results only after running the `studentSafe=1` gate on each recording.
+The evaluator does not infer these counts automatically; they come from
+teacher/gold review of the preview output.
 
 Key result columns:
 
@@ -150,6 +156,17 @@ Key result columns:
 | `autoPassCount` | Notes released by the gate. |
 | `correctWithin300ms` | Auto-pass notes matching the human/gold target within 300 ms. |
 | `unsafeTargetAutoPassCount` | Known wrong/missing/shifted target notes incorrectly auto-passed. |
+
+Recommended counting flow:
+
+1. Open the `studentSafe=1` preview for the recording.
+2. Count all notes with `auto_pass` into `autoPassCount`.
+3. Compare those notes with the human/gold target and count matches within
+   300 ms into `correctWithin300ms`.
+4. For wrong-pitch, missing-note, rhythm-shift, weak-onset, or noisy target
+   cases, count any unsafe released target into `unsafeTargetAutoPassCount`.
+5. Recheck any row that would make precision fall below 90% or make unsafe
+   auto-pass nonzero before running the release gate.
 
 ## 7. Gate Check
 

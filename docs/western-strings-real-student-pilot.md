@@ -65,7 +65,8 @@ npm run western:m2f-results-skeleton
 
 This creates `real-student-recording-results.csv` with the same `recordingId`
 values as the manifest and blank metric columns. Fill those counts only after
-running the `studentSafe=1` alignment gate on each real recording.
+running the `studentSafe=1` alignment gate on each real recording and reviewing
+the released notes against human/gold targets.
 
 Required columns:
 
@@ -75,7 +76,7 @@ Required columns:
 | `studentId` | anonymized id |
 | `instrument` | currently must be `violin` |
 | `pieceId` | score/piece id |
-| `audioPath` | repo-relative or absolute local path; file must exist |
+| `audioPath` | repo-relative or absolute local path; file must exist. If repo-local, it must be under `data/private/...` |
 | `scorePath` or `scoreId` | one must be present; `scorePath` must exist |
 | `scenario` | one of the required scenarios above, plus optional `extra_note` |
 | `humanChecked` | must be `yes` |
@@ -105,6 +106,11 @@ Required columns:
 | `autoPassCount` | number of notes released by the gate |
 | `correctWithin300ms` | auto-pass notes that match the human/gold target within 300 ms |
 | `unsafeTargetAutoPassCount` | known wrong/missing/shifted target notes incorrectly auto-passed |
+
+These counts are reviewed metrics, not automatic output from the M2f validator:
+count `autoPassCount` from the `studentSafe=1` preview, then compare those
+released notes against the human/gold target to fill `correctWithin300ms` and
+`unsafeTargetAutoPassCount`.
 
 The M2f gate passes only when:
 

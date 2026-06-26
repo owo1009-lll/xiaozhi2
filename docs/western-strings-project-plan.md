@@ -178,7 +178,7 @@
 **④ V2-alpha 产品范围(先不承诺完整教学系统):**
 - **支持:** clean MusicXML/MIDI + **单声部小提琴**音频 → 输出**音准 / 节奏 / 漏音 / 多音 / 低置信提示**。
 - **不支持:** 技巧自动判定、PDF 识谱、强 rubato / 多声部混音自动反馈、大提琴。
-- **auto_pass precision≥90% 硬门槛;coverage 作结果报告**(低也可上线,只要准)。
+- **auto_pass precision≥90% 硬门槛;coverage 作结果报告**。coverage <20% 时只能保持 teacher-only preview 或受限内部 alpha,不能命名为 V2-alpha;coverage 达到 20% 后仍以 precision 和 unsafe=0 为 release 硬门槛。
 
 **⑤ M2f 真实学生录音 release gate(学生端硬前置):**
 - 最小 manifest:`data/experiments/western-strings-m2/real-student-recordings-manifest.csv`。
@@ -188,6 +188,16 @@
 - 每条 manifest 必须有真实音频路径、scoreId 或 score path、consent、licenseStatus、humanChecked、scenario、匿名化 `studentId`。
 - 模板生成命令:`npm run western:m2f-templates`;该命令只生成 `.template.csv`,不会让 release gate 误通过。
 - 状态查看命令:`npm run western:m2f-status`;Release gate 命令:`npm run western:m2f-gate`。未提供数据时应 fail-closed,输出 `studentGateReady=false`;`western:m2f-gate` 在未 ready 时必须非零退出;真实数据 precision<90% 或 unsafe target auto-pass>0 时不得开放学生端。`npm run test:western-m2f-real-recordings` 仅作为当前无真实数据状态的 fail-closed 回归测试。
+
+**⑥ M2f results 填写 SOP(防止 manifest 有了但 results 无法落地):**
+1. 运行 `npm run western:m2f-templates`,复制模板为正式 manifest;真实学生录音放在 `data/private/...` 或仓库外私有目录。仓库内普通路径会被 gate 拒绝。
+2. 填满 manifest 后运行 `npm run western:m2f-results-skeleton`,生成与 manifest `recordingId` 一一对应的 results skeleton。
+3. 对每条录音用当前 teacher-only preview / `studentSafe=1` 证据跑离线复核。复核者按谱面或人工 gold 判断每个 auto-pass 音是否在 300ms 内命中,并统计:
+   - `autoPassCount`: gate 放行的音符数;
+   - `correctWithin300ms`: 放行且与人工/gold 目标在 300ms 内一致的音符数;
+   - `unsafeTargetAutoPassCount`: 已知错误目标(错音、漏音、明显节奏偏移、弱起音目标等)被错误 auto-pass 的数量。
+4. 第二人或同一教师复查异常行后再运行 `npm run western:m2f-status`;只有 status 干净后才运行 `npm run western:m2f-gate` 作为 release 阻断命令。
+5. `eval_western_strings_m2f_real_recordings.py` 只校验 manifest/results 完整性和统计闸门,不会自动生成上述三列计数;计数必须来自真实 preview 输出 + 人工/gold 复核。
 
 ---
 
@@ -229,7 +239,7 @@
 |---|---|
 | M0 | ✅ 已完成 |
 | M1 干净谱接入 | ✅ 已完成 |
-| M2 V2 置信门 | 1-2 周(含真值/模型/后台) |
+| M2 V2 置信门 | 代码侧已到 teacher-only preview + synthetic gate;剩余 M2f 真实录音采集/复验约 0.5-2 周(取决于录音与人工复核) |
 | M3 基础诊断 | 1-2 周 |
 | M4 技巧 pilot | 2-3 周(含教师标注) |
 | M5 大提琴 | 1-2 周(+独立 M0) |
@@ -251,7 +261,7 @@
 
 ---
 
-## 当前状态与下一步
+## 附录 A. 当前状态与下一步
 当前进度:
 - ✅ `instrumentConfig` 已落地为 `config/western-string-instruments.json`,覆盖 violin / viola / cello;`npm run test:western-string-config` 已验证音域与 first-version flag。
 - ✅ clean MusicXML 入口已支持西洋弦乐元数据透传与落盘:`instrument` / `scoreSource` / `tempoKnown` / `tempoSource`;`npm run test:western-musicxml-import`、`npm run test:server-boundaries`、`npm run test:server-p0` 已验证。
@@ -277,5 +287,5 @@
 **M1 已完成。M2 当前停在 teacher-only preview + studentSafe preview gate,尚未 release 到学生端。**
 
 当前 M2 剩余步骤:
-1. 按 `docs/western-strings-m2f-recording-checklist.md` 收集并填写 M2f 真实学生录音 manifest/results(错音、漏音、节奏偏移、弱起音、噪声/手机录音)。若 precision<90% 或出现系统性误 auto-pass,继续 teacher-only preview。
+1. 按 `docs/western-strings-m2f-recording-checklist.md` 收集并填写 M2f 真实学生录音 manifest/results(错音、漏音、节奏偏移、弱起音、噪声/手机录音)。录音必须放在 `data/private/...` 或仓库外私有路径;仓库内普通路径会被 gate 拒绝。若 precision<90% 或出现系统性误 auto-pass,继续 teacher-only preview。
 2. 真实输入 gate 通过后,再讨论 `/api/strings/analyze` 学生端最小闭环;否则 `studentSafe=1` 仍只作为离线 preview gate。
