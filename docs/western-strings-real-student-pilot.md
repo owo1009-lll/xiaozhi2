@@ -115,14 +115,16 @@ The M2f gate passes only when:
 
 ## Command
 
-Fail-closed check with current local data:
+Gate check with current local data:
 
 ```powershell
-npm run test:western-m2f-real-recordings
+npm run western:m2f-gate
 ```
 
-The command is expected to pass as a test while reporting
-`studentGateReady=false` until real manifest and results files exist.
+The command reports `studentGateReady=false` until real manifest and results
+files exist and pass the gate. The CI/regression command
+`npm run test:western-m2f-real-recordings` intentionally expects the current
+no-real-data state to fail closed.
 
 ## Product Rule
 

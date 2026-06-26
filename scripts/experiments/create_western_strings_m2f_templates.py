@@ -103,7 +103,7 @@ def write_readme(out_dir: Path, manifest_path: Path, results_path: Path) -> None
                 "4. Keep `consent=yes`, `humanChecked=yes`, and a valid `licenseStatus` only",
                 "   when the recording is actually cleared for local research use.",
                 "5. Run the studentSafe gate, then fill `real-student-recording-results.csv`.",
-                "6. Run `npm run test:western-m2f-real-recordings`.",
+                "6. Run `npm run western:m2f-gate`.",
                 "",
                 f"Manifest template: `{manifest_path.name}`",
                 f"Results template: `{results_path.name}`",

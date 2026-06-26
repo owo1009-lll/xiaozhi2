@@ -156,7 +156,7 @@ Key result columns:
 Run:
 
 ```powershell
-npm run test:western-m2f-real-recordings
+npm run western:m2f-gate
 ```
 
 The student release gate can pass only when:
@@ -168,6 +168,10 @@ The student release gate can pass only when:
 
 If the command reports `studentGateReady=false`, the system stays in
 teacher-only preview.
+
+Regression note: `npm run test:western-m2f-real-recordings` is the repository
+fail-closed test for the current no-real-data state. Use `western:m2f-gate` for
+real pilot data.
 
 ## 8. Release Rule
 

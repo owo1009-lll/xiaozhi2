@@ -12,6 +12,7 @@ REPO = Path(__file__).resolve().parents[1]
 GENERATOR = REPO / "scripts" / "experiments" / "create_western_strings_m2f_templates.py"
 SKELETON = REPO / "scripts" / "experiments" / "create_western_strings_m2f_results_skeleton.py"
 GATE = REPO / "scripts" / "experiments" / "eval_western_strings_m2f_real_recordings.py"
+PACKAGE_JSON = REPO / "package.json"
 
 
 def read_rows(path: Path) -> tuple[list[str], list[dict[str, str]]]:
@@ -50,6 +51,14 @@ def main() -> int:
         readme_text = readme.read_text(encoding="utf-8")
         assert_true("western-strings-m2f-recording-checklist.md" in readme_text, "template README must link the recorder checklist")
         assert_true("correct, wrong_pitch, missing_note, rhythm_shift, weak_onset, and noisy" in readme_text, "template README must name all required gate scenarios")
+        assert_true("npm run western:m2f-gate" in readme_text, "template README must use the neutral M2f gate command for real data")
+
+        package = json.loads(PACKAGE_JSON.read_text(encoding="utf-8"))
+        scripts = package.get("scripts", {})
+        neutral_gate = scripts.get("western:m2f-gate", "")
+        negative_test = scripts.get("test:western-m2f-real-recordings", "")
+        assert_true(neutral_gate and "--expect-negative" not in neutral_gate, "western:m2f-gate must be neutral for real pilot data")
+        assert_true("--expect-negative" in negative_test, "test:western-m2f-real-recordings should remain the fail-closed regression command")
 
         manifest_columns, manifest_rows = read_rows(manifest_template)
         expected_manifest_columns = [

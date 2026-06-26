@@ -187,7 +187,7 @@
 - 最小样本:不少于 6 条录音、3 名学生或准学生;必须覆盖 `correct`、`wrong_pitch`、`missing_note`、`rhythm_shift`、`weak_onset`、`noisy` 六类场景。
 - 每条 manifest 必须有真实音频路径、scoreId 或 score path、consent、licenseStatus、humanChecked、scenario、匿名化 `studentId`。
 - 模板生成命令:`npm run western:m2f-templates`;该命令只生成 `.template.csv`,不会让 release gate 误通过。
-- Gate 命令:`npm run test:western-m2f-real-recordings`。未提供数据时应 fail-closed,输出 `studentGateReady=false`;真实数据 precision<90% 或 unsafe target auto-pass>0 时不得开放学生端。
+- Gate 命令:`npm run western:m2f-gate`。未提供数据时应 fail-closed,输出 `studentGateReady=false`;真实数据 precision<90% 或 unsafe target auto-pass>0 时不得开放学生端。`npm run test:western-m2f-real-recordings` 仅作为当前无真实数据状态的 fail-closed 回归测试。
 
 ---
 
@@ -270,7 +270,7 @@
 - ✅ M2d 序列级 Basic Pitch 支持已补:`npm run test:western-m2d-sequence-support` 要求当前音及相邻音序列都有事件支持。release 候选阈值收紧为 30ms 后,结果:基准 precision=1.0000 / coverage=0.2443,+800ms correlated drift autoPass=0。
 - ✅ M2e 学生式事件扰动已补:`npm run test:western-m2e-student-events` 直接改 Basic Pitch 事件,覆盖漏音、错音、延迟 800ms、弱起音和额外杂散音。30ms 序列闸门下所有目标错误 `targetAutoPass=0`;这比 feature-only 扰动更强,但仍不是最终真实学生录音验证。
 - ✅ M2d 已接入 preview service 的 `studentSafe=1` 决策级闸门:证据缺失或单条序列支持不足时 fail-closed;M2d ready 时只放行通过序列支持的 note。学生端仍无 `/api/strings/analyze` / `/api/strings/review` 路由。
-- ✅ M2f 真实学生录音 release gate 已补:`npm run test:western-m2f-real-recordings` 校验真实录音 manifest/results、样本数、学生数、错误场景、授权、路径与结果安全性。当前没有真实录音数据,命令按预期 fail-closed 并输出 `studentGateReady=false`;协议见 `docs/western-strings-real-student-pilot.md`,录制执行清单见 `docs/western-strings-m2f-recording-checklist.md`。
+- ✅ M2f 真实学生录音 release gate 已补:`npm run western:m2f-gate` 校验真实录音 manifest/results、样本数、学生数、错误场景、授权、路径与结果安全性。当前没有真实录音数据,命令按预期 fail-closed 并输出 `studentGateReady=false`;`npm run test:western-m2f-real-recordings` 保留为无数据 fail-closed 回归测试;协议见 `docs/western-strings-real-student-pilot.md`,录制执行清单见 `docs/western-strings-m2f-recording-checklist.md`。
 - ✅ M2d/M2e 通过/拒绝证据已映射到教师后台:Western strings preview 默认加载 `studentSafe=1`,显示 release gate 状态、source、review reason、相邻音序列 Basic Pitch 支持、method agreement 与 candidate sources,方便教师快速复核。
 - ✅ M1 收口已完成: `test:western-string-config` / `test:western-musicxml-import` / `test:western-midi-import` / `test:western-dataset-index` / `test:western-strings-entry` / `test:server-boundaries` / `test:server-p0` / `test:musicxml-import` / `test:analyzer-score-roles` / `test:teacher-validation` / `build` 全部通过。
 
