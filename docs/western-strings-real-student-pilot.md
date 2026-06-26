@@ -43,6 +43,18 @@ Default path:
 
 `data/experiments/western-strings-m2/real-student-recordings-manifest.csv`
 
+Generate fillable templates:
+
+```powershell
+npm run western:m2f-templates
+```
+
+This writes `real-student-recordings-manifest.template.csv` and
+`real-student-recording-results.template.csv` under
+`data/experiments/western-strings-m2/`. The templates are not read by the gate
+until copied/renamed to the default manifest/results paths. This preserves
+fail-closed behavior while giving the recorder a safe column template.
+
 Required columns:
 
 | column | rule |

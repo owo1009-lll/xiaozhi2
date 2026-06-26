@@ -67,7 +67,7 @@
 **通用安全默认(写死):**
 - **数据集音频/标签一律不提交进 git**;`data/` 已 gitignore;只提交**我们的 adapter 代码 + 指标 JSON/CSV(去标识)**。
 - 任何**公开发布(论文/开源)前,逐数据集核实许可证**;不确定的只用"metadata 描述",不放原始数据。
-- **真实学生录音一律走单独授权与脱敏流程**:记录 consent、licenseStatus、studentIdHash、device/noise/scenario;原始音频只放本地 `data/` 或受控存储,不入仓库、不随论文发布。
+- **真实学生录音一律走单独授权与脱敏流程**:记录 consent、licenseStatus、匿名化 `studentId`、device/noise/scenario;原始音频只放本地 `data/` 或受控存储,不入仓库、不随论文发布。
 - 来源:[Bach10](https://labsites.rochester.edu/air/datasets/Bach10%20Dataset_v1.0.pdf)、[URMP](https://labsites.rochester.edu/air/publications/li2018creating.pdf)、[MusicNet(Zenodo)](https://zenodo.org/records/5120004)、[ASAP](https://github.com/fosfrancesco/asap-dataset)。
 
 ---
@@ -184,7 +184,8 @@
 - 最小 manifest:`data/experiments/western-strings-m2/real-student-recordings-manifest.csv`。
 - 最小 results:`data/experiments/western-strings-m2/real-student-recording-results.csv`。
 - 最小样本:不少于 6 条录音、3 名学生或准学生;必须覆盖 `correct`、`wrong_pitch`、`missing_note`、`rhythm_shift`、`weak_onset`、`noisy` 六类场景。
-- 每条 manifest 必须有真实音频路径、scoreId 或 score path、consent、licenseStatus、humanChecked、scenario、studentIdHash。
+- 每条 manifest 必须有真实音频路径、scoreId 或 score path、consent、licenseStatus、humanChecked、scenario、匿名化 `studentId`。
+- 模板生成命令:`npm run western:m2f-templates`;该命令只生成 `.template.csv`,不会让 release gate 误通过。
 - Gate 命令:`npm run test:western-m2f-real-recordings`。未提供数据时应 fail-closed,输出 `studentGateReady=false`;真实数据 precision<90% 或 unsafe target auto-pass>0 时不得开放学生端。
 
 ---

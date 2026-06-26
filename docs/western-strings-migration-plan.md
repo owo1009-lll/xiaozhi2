@@ -145,7 +145,7 @@ M5  大提琴扩展                  小提琴 V2 通过后独立 M0
 - M2f real-student recording gate 已定义为 release 硬闸门。当前没有真实学生录音 manifest/results,因此 `studentGateReady=false`,学生端仍未开放。
 - 教师后台 Western strings preview 现在默认加载 `studentSafe=1`,并显示 release gate、review reason 和 sequence Basic Pitch 支持证据,用于复核而非学生反馈。
 - 真实录音采集与 manifest 协议见 `docs/western-strings-real-student-pilot.md`。
-- M2f 最小门槛:不少于 6 条真实/准真实录音、3 名学生或准学生,覆盖 correct / wrong_pitch / missing_note / rhythm_shift / weak_onset / noisy 六类场景;precision<90% 或 unsafe target auto-pass>0 时不得开放学生端。
+- M2f 最小门槛:不少于 6 条真实/准真实录音、3 名学生或准学生,覆盖 correct / wrong_pitch / missing_note / rhythm_shift / weak_onset / noisy 六类场景;`npm run western:m2f-templates` 可生成填表模板;precision<90% 或 unsafe target auto-pass>0 时不得开放学生端。
 
 ### reason codes
 `double-stop-unsupported`, `legato-onset-ambiguous`, `rubato-section`,
