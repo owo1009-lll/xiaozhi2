@@ -332,6 +332,7 @@ def main() -> int:
     parser.add_argument("--min-precision", type=float, default=0.9)
     parser.add_argument("--expect-positive", action="store_true")
     parser.add_argument("--expect-negative", action="store_true")
+    parser.add_argument("--fail-on-not-ready", action="store_true", help="exit non-zero when studentGateReady is false")
     args = parser.parse_args()
 
     summary = run(
@@ -350,6 +351,8 @@ def main() -> int:
         raise SystemExit("Expected real-student recording gate to pass, but it failed.")
     if args.expect_negative and summary["studentGateReady"]:
         raise SystemExit("Expected real-student recording gate to fail closed, but it passed.")
+    if args.fail_on_not_ready and not summary["studentGateReady"]:
+        raise SystemExit("M2f real-student recording gate is not ready.")
     return 0
 
 

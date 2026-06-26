@@ -153,7 +153,13 @@ Key result columns:
 
 ## 7. Gate Check
 
-Run:
+Inspect current status without failing the shell:
+
+```powershell
+npm run western:m2f-status
+```
+
+Run the release gate:
 
 ```powershell
 npm run western:m2f-gate
@@ -167,7 +173,8 @@ The student release gate can pass only when:
 - `unsafeTargetAutoPassCount == 0`
 
 If the command reports `studentGateReady=false`, the system stays in
-teacher-only preview.
+teacher-only preview. `western:m2f-gate` exits non-zero in that state by design;
+`western:m2f-status` is the non-failing inspection command.
 
 Regression note: `npm run test:western-m2f-real-recordings` is the repository
 fail-closed test for the current no-real-data state. Use `western:m2f-gate` for
