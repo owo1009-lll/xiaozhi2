@@ -61,6 +61,7 @@
     "test:western-m2c-audio-support": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\eval_western_strings_m2c_basic_pitch_support.py --expect-negative",
     "test:western-m2d-sequence-support": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\eval_western_strings_m2d_sequence_support.py --expect-positive",
     "test:western-m2e-student-events": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\eval_western_strings_m2e_student_event_perturbations.py --expect-positive",
+    "test:western-m2f-real-recordings": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\eval_western_strings_m2f_real_recordings.py --expect-negative",
     "test:separation-quality": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-separation-quality.py",
     "audit:separation-quality": "node scripts\\audit-separation-quality.mjs",
     "audit:separation-quality:all": "node scripts\\audit-separation-quality.mjs --all",

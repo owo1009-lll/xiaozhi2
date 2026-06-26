@@ -1,7 +1,7 @@
 # 弓弦乐器练习诊断平台 — 完整项目开发手册
 
 > 本文是**可交付开发执行**的完整项目计划(10 章)。战略与 M0–M5 闸门详见 [western-strings-migration-plan.md](western-strings-migration-plan.md);本手册在其上补全:资产盘点、M0 SOP+结果、M1–M5 工程拆解、后台/UI/API/schema 变更、数据集许可证、版本定义、论文产出对应、时间线/人力/停止条件。
-> **状态:M1 基本完成;M2 teacher-only preview 已接入;M2d 序列级 Basic Pitch 支持是当前第一个通过 synthetic release-gate 的候选。** 二胡自动线冻结为 V1.5(人在环 + 困难案例/论文证据)。
+> **状态:M1 基本完成;M2 teacher-only preview 已接入;M2e 学生式事件扰动已通过 synthetic gate。学生端 release 的当前硬阻塞是 M2f 真实学生录音复验。** 二胡自动线冻结为 V1.5(人在环 + 困难案例/论文证据)。
 
 ---
 
@@ -175,8 +175,9 @@
 |---|---|---|---|
 | M1 clean score | `test:western-string-config`, `test:western-musicxml-import`, `test:western-midi-import`, dataset adapter 输出样本 | MusicXML/MIDI/dataset-score 统一进入 note schema;不触发 OMR/Audiveris;metadata 持久化无漂移 | 不进入 M2 生产接入 |
 | M2 alignment gate | feature table + confidence gate LODO;按数据集/按曲报告 | `auto_pass` 对齐 precision≥90%;coverage 只报告;无真值泄漏;reason codes 命中正确 | 降级 `review_required`,不接学生端 |
-| M2b student-like pilot | 合成错音/漏音/节奏扰动 + 少量真实学生录音 | 真实输入下 precision 仍≥90%;错误样本不会被误 auto_pass | 继续后台离线,不得 release |
+| M2b student-like pilot | 合成错音/漏音/节奏扰动 | 合成/特征扰动不能暴露系统性误 auto_pass | 继续后台离线,不得 release |
 | M2d/M2e sequence support gate | 当前音 + 邻近音的 Basic Pitch 事件序列支持;再用学生式事件扰动复验 | 基准 precision≥90%、coverage≥20%,且 correlated drift / 错音 / 漏音 / 弱起音目标 0 auto-pass | 未过则 `studentSafe=1` 全量 review |
+| M2f real-student recording gate | 真实/准真实学生录音 manifest + results;覆盖正确、错音、漏音、节奏偏移、弱起音、噪声/手机录音 | 真实输入 precision≥90%, unsafe target auto-pass=0,录音/授权/场景完整 | 未过则不得开放 `/api/strings/analyze` |
 | M3 diagnosis | pitch/rhythm/missing/extra note 的独立评测表 | 音准、起音、时值、漏音/多音的诊断 precision 分开达标;低置信不反馈;回流可导出 | 仅显示对齐,不显示诊断 |
 | M4 technique | 每类 AUC/PR-AUC/正负数/按曲留一 | AUC≥0.70 且 PR-AUC 明显高于基率;precision≥90% 才 auto_pass | 永久 review hint |
 | 全程 | `check-server-p0` / `test:teacher-validation` / `build` | eval-only 脚本不写生产;数据不进仓库;feature flag 关时学生端零自动输出 | 阻断发布 |
@@ -248,6 +249,7 @@
 - ✅ M2d 序列级 Basic Pitch 支持已补:`npm run test:western-m2d-sequence-support` 要求当前音及相邻音序列都有事件支持。release 候选阈值收紧为 30ms 后,结果:基准 precision=1.0000 / coverage=0.2443,+800ms correlated drift autoPass=0。
 - ✅ M2e 学生式事件扰动已补:`npm run test:western-m2e-student-events` 直接改 Basic Pitch 事件,覆盖漏音、错音、延迟 800ms、弱起音和额外杂散音。30ms 序列闸门下所有目标错误 `targetAutoPass=0`;这比 feature-only 扰动更强,但仍不是最终真实学生录音验证。
 - ✅ M2d 已接入 preview service 的 `studentSafe=1` 决策级闸门:证据缺失或单条序列支持不足时 fail-closed;M2d ready 时只放行通过序列支持的 note。学生端仍无 `/api/strings/analyze` / `/api/strings/review` 路由。
+- ✅ M2f 真实学生录音 release gate 已补:`npm run test:western-m2f-real-recordings` 校验真实录音 manifest/results、样本数、学生数、错误场景、授权、路径与结果安全性。当前没有真实录音数据,命令按预期 fail-closed 并输出 `studentGateReady=false`;协议见 `docs/western-strings-real-student-pilot.md`。
 
 剩余 M1 步骤:
 1. M1 收口时再跑 `test:western-string-config` / `test:western-musicxml-import` / `test:western-midi-import` / `test:western-dataset-index` / `test:western-strings-entry` / `test:server-boundaries` / `test:server-p0` / `test:musicxml-import` / `test:analyzer-score-roles` / `test:teacher-validation` / `build`。
@@ -255,6 +257,6 @@
 **这些收口命令通过后,M1 可标记完成。M2 当前停在 teacher-only preview + studentSafe preview gate,尚未 release 到学生端。**
 
 当前 M2 剩余步骤:
-1. 用真实学生录音复验 M2d/M2e(错音、漏音、节奏偏移、弱起音、噪声/手机录音)。若 precision<90% 或出现系统性误 auto-pass,继续 teacher-only preview。
+1. 收集并填写 M2f 真实学生录音 manifest/results(错音、漏音、节奏偏移、弱起音、噪声/手机录音)。若 precision<90% 或出现系统性误 auto-pass,继续 teacher-only preview。
 2. 把 M2d 通过/拒绝的 reason codes 映射到教师后台证据面板,确认教师能快速复核。
 3. 真实输入 gate 通过后,再讨论 `/api/strings/analyze` 学生端最小闭环;否则 `studentSafe=1` 仍只作为离线 preview gate。
