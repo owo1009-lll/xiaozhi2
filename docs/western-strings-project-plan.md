@@ -232,12 +232,12 @@
 - ✅ clean MusicXML 入口已支持西洋弦乐元数据透传与落盘:`instrument` / `scoreSource` / `tempoKnown` / `tempoSource`;`npm run test:western-musicxml-import`、`npm run test:server-boundaries`、`npm run test:server-p0` 已验证。
 - ✅ clean MIDI 入口已补齐:`/api/erhu/scores/import-midi` → Python `/score/import-midi` → 统一 piecePack/score store;默认 `scoreSource=midi`, `tempoKnown=true`, `tempoSource=midi`;`npm run test:western-midi-import` 与 route boundary 已验证。运行该成功路径需要项目 Python 环境安装 `python-service/requirements-optional.txt` 中已声明的 `pretty_midi`。
 - ✅ explicit violin part 导入不会触发二胡 melody-collapse,并保留 violin notes;旧二胡 MusicXML import / score roles 回归通过。
+- ✅ dataset adapter 选择低风险统一导出路径:从 M0 artifacts 生成 `western-strings-dataset-index.{json,csv}` 与 `western-strings-gold-notes.csv`,共 14 个 piece / 2088 个 gold notes;只索引 raw 数据路径和 availability,不复制受限音频/MIDI/标签;`npm run test:western-dataset-index` 已验证 key 映射和去重。
 - ✅ M2 特征表第一版已完成:从 M0 per-note CSV 生成 note-level pivot 与 candidate-level 表;`label*` 字段显式标为 gold-derived,训练时禁用;`npm run test:western-alignment-features` 已验证。
 - ✅ M2 置信门 eval-only 探针已完成:基于 candidate-level 表做 fail-closed 规则搜索,LODO 三折 precision 均 >0.96、coverage=1.0;`npm run test:western-confidence-gate` 已验证。注意:这证明高置信子集存在,尚未接生产服务。
 
 剩余 M1 步骤:
-1. 三个 dataset adapter 统一进 score store 或统一导出 score/audio/gold 三件套;
-2. 在西洋弦乐 UI/API 入口上显式隐藏 PDF OMR,只暴露 MusicXML/MIDI/dataset-score;
-3. M1 收口时再跑 `test:western-string-config` / `test:western-musicxml-import` / `test:western-midi-import` / `test:server-boundaries` / `test:server-p0` / `test:musicxml-import` / `test:analyzer-score-roles` / `test:teacher-validation` / `build`。
+1. 在西洋弦乐 UI/API 入口上显式隐藏 PDF OMR,只暴露 MusicXML/MIDI/dataset-score;
+2. M1 收口时再跑 `test:western-string-config` / `test:western-musicxml-import` / `test:western-midi-import` / `test:western-dataset-index` / `test:server-boundaries` / `test:server-p0` / `test:musicxml-import` / `test:analyzer-score-roles` / `test:teacher-validation` / `build`。
 
 **完成即 M1 达标,进 M2 置信门。**
