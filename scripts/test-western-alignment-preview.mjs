@@ -48,6 +48,7 @@ async function testStudentSafeFailClosed() {
   assert.equal(preview.summary.reviewRequiredCount, 2088);
   assert(preview.decisions.every((item) => item.autoDecision === "review_required"));
   assert(preview.decisions.every((item) => item.reviewRequiredReason === preview.releaseGate.reason));
+  assert(preview.decisions.every((item) => item.evidence.studentGateReady === false));
 }
 
 async function testStudentSafeSequenceSupportGate() {
@@ -100,6 +101,8 @@ async function testStudentSafeSequenceSupportGate() {
   assert.equal(supported.summary.evaluation.autoPassEvaluatedCount, 3);
   assert.equal(supported.summary.evaluation.autoPassCorrectWithin300ms, 3);
   assert(supported.decisions.every((item) => item.autoDecision === "auto_pass"));
+  assert(supported.decisions.every((item) => item.evidence.studentGateReady === true));
+  assert(supported.decisions.every((item) => item.evidence.sequenceBasicPitchSupport === true));
 
   await fs.writeFile(
     path.join(cacheRoot, "tiny-violin.basic-pitch.json"),
@@ -115,6 +118,7 @@ async function testStudentSafeSequenceSupportGate() {
   assert.equal(unsupported.summary.evaluation.autoPassPrecisionWithin300ms, 0);
   assert(unsupported.decisions.every((item) => item.autoDecision === "review_required"));
   assert(unsupported.decisions.every((item) => item.reviewRequiredReason === "sequence-basic-pitch-support-missing"));
+  assert(unsupported.decisions.every((item) => item.evidence.sequenceBasicPitchSupport === false));
 }
 
 async function testRoute() {

@@ -143,6 +143,7 @@ M5  大提琴扩展                  小提琴 V2 通过后独立 M0
 - M2d sequence-level Basic Pitch support 通过 synthetic release-gate:30ms 阈值下基准 precision=1.0000 / coverage=0.2443,+800ms correlated drift autoPass=0。
 - M2e student-like event perturbation 进一步通过:漏音、错音、延迟 800ms、弱起音目标均 0 auto-pass;额外杂散音不破坏 clean reference。
 - M2f real-student recording gate 已定义为 release 硬闸门。当前没有真实学生录音 manifest/results,因此 `studentGateReady=false`,学生端仍未开放。
+- 教师后台 Western strings preview 现在默认加载 `studentSafe=1`,并显示 release gate、review reason 和 sequence Basic Pitch 支持证据,用于复核而非学生反馈。
 - 真实录音采集与 manifest 协议见 `docs/western-strings-real-student-pilot.md`。
 
 ### reason codes

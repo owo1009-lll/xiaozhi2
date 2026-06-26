@@ -30,8 +30,34 @@ import {
 } from "./teacherValidationUtils.js";
 
 const FILTER_LABELS = { pending: "待标注", complete: "已完成", excluded: "已排除", all: "全部" };
+const WESTERN_REASON_LABELS = {
+  "student-gate-evidence-missing": "缺少学生端闸门证据",
+  "student-gate-not-ready": "学生端闸门未通过",
+  "sequence-basic-pitch-support-missing": "缺少相邻音序列的 Basic Pitch 事件支持",
+  "double-stop-unsupported": "双音/和弦暂不自动判",
+  "legato-onset-ambiguous": "连奏起音边界不清",
+  "rubato-section": "自由节奏段需复核",
+  "low-pitch-confidence": "音高置信低",
+  "polyphonic-texture": "多声部纹理需复核",
+  "score-audio-range-mismatch": "录音与谱面范围不匹配",
+  "weak-onset": "弱起音需复核",
+  "dataset-label-uncertain": "数据标签不确定",
+};
 function filterLabel(value) {
   return FILTER_LABELS[value] || value;
+}
+
+function westernReasonLabel(value) {
+  const key = String(value || "").trim();
+  return WESTERN_REASON_LABELS[key] || key || "通过";
+}
+
+function westernGateEvidenceLabel(decision) {
+  const evidence = decision?.evidence || {};
+  if (evidence.studentGateReady === false) return "学生端闸门未就绪";
+  if (evidence.sequenceBasicPitchSupport === true) return "相邻音序列支持通过";
+  if (evidence.sequenceBasicPitchSupport === false) return "相邻音序列支持缺失";
+  return "未执行学生端安全闸门";
 }
 
 function formatImportStatus(summary = {}) {
@@ -406,9 +432,9 @@ export default function TeacherValidationApp() {
     setWesternPreviewLoading(true);
     setErrorMessage("");
     try {
-      const preview = await fetchWesternAlignmentPreview({ limit: 8 });
+      const preview = await fetchWesternAlignmentPreview({ limit: 8, studentSafe: true });
       setWesternPreview(preview);
-      setStatusMessage(`Western strings preview loaded: ${preview?.summary?.noteCount || 0} notes.`);
+      setStatusMessage(`Western strings student-safe preview loaded: ${preview?.summary?.noteCount || 0} notes.`);
     } catch (error) {
       setErrorMessage(error.message || "Western strings preview failed.");
     } finally {
@@ -514,7 +540,17 @@ export default function TeacherValidationApp() {
           <div className="upload-meta">
             <span>notes {westernPreview.summary.noteCount}</span>
             <span>auto {westernPreview.summary.autoPassCount}</span>
+            <span>review {westernPreview.summary.reviewRequiredCount}</span>
+            <span>coverage {formatPercent(westernPreview.summary.coverage)}</span>
             <span>model {westernPreview.summary.confidenceModelVersion}</span>
+          </div>
+        ) : null}
+        {westernPreview?.releaseGate ? (
+          <div className="teacher-alignment-warning">
+            <strong>{westernPreview.releaseGate.ready ? "M2d student-safe gate ready" : "M2 student-safe gate fail-closed"}</strong>
+            <span>{westernPreview.releaseGate.strategy || "release gate"}</span>
+            <span>{westernPreview.releaseGate.source || "no evidence source"}</span>
+            {westernPreview.releaseGate.reason ? <span>{westernReasonLabel(westernPreview.releaseGate.reason)}</span> : null}
           </div>
         ) : null}
         {westernPreview?.decisions?.length ? (
@@ -526,7 +562,20 @@ export default function TeacherValidationApp() {
                   {decision.dataset} / {decision.piece} · predicted {Number(decision.predictedOnsetSeconds || 0).toFixed(3)}s ·
                   confidence {Number(decision.confidenceScore || 0).toFixed(2)}
                 </p>
-                <p>sources {(decision.candidateSources || []).map((item) => item.method).join(", ")}</p>
+                <p>
+                  decision <strong>{decision.autoDecision}</strong>
+                  {decision.reviewRequiredReason ? ` · ${westernReasonLabel(decision.reviewRequiredReason)}` : ""}
+                </p>
+                <p>
+                  evidence {westernGateEvidenceLabel(decision)} · selected {decision.evidence?.selectedMethod || "unknown"} ·
+                  agreement@300ms {decision.evidence?.agreementWithin300ms ?? 0}/{decision.evidence?.methodCount ?? 0}
+                  {decision.evidence?.predictionSpanSeconds != null ? ` · span ${Number(decision.evidence.predictionSpanSeconds).toFixed(3)}s` : ""}
+                </p>
+                <p>
+                  sources {(decision.candidateSources || [])
+                    .map((item) => `${item.method}${item.predTime != null ? `@${Number(item.predTime).toFixed(3)}s` : ""}`)
+                    .join(", ")}
+                </p>
                 <div className="action-row">
                   <button type="button" className="secondary-button" onClick={() => reviewWesternDecision(decision, "confirm")}>
                     Confirm
