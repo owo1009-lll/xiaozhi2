@@ -1,6 +1,6 @@
 # 弓弦乐器练习诊断平台 - v2 执行手册
 
-> 状态: v2 执行版。M0 小提琴/弦乐对齐验证已经通过,项目可以从"是否迁移"进入"如何做出 V2 alpha"阶段。
+> 状态: v2 执行版。M0 小提琴/弦乐对齐验证已经通过;M1 基本完成;M2 teacher-only preview 已接入,M2d 序列级 Basic Pitch 支持是当前第一个通过 synthetic release-gate 的候选。
 > 本手册替代旧版 M0 前计划。二胡自动化攻坚线冻结为 V1.5 人在环成果和困难案例证据;西洋弦乐线以小提琴优先,大提琴后置独立验证。
 > 完整 10 章开发手册见 `docs/western-strings-project-plan.md`;本文是战略纲要、闸门和当前执行清单。
 
@@ -133,9 +133,15 @@ M5  大提琴扩展                  小提琴 V2 通过后独立 M0
 
 ### V2 alpha 验收
 - `auto_pass precision >= 90%` 是硬门槛。
-- `coverage` 是结果指标,不是硬承诺;覆盖率低但精度高仍可作为安全 alpha。
+- `coverage >= 20%` 才能命名为 V2-alpha;超过该线后 coverage 是结果指标,不是硬承诺。
 - 按曲留一验证,不能随机切分造成同曲泄漏。
 - 每条 `review_required` 必须给 reason code。
+### 当前 M2 状态
+- teacher-only alignment preview 已接入。
+- M2b correlated +800ms pilot 证明 median-consensus 不安全。
+- M2c 单音 Basic Pitch support 仍有重复同音误通过。
+- M2d sequence-level Basic Pitch support 通过 synthetic release-gate:基准 precision=0.9974 / coverage=0.3716,+800ms correlated drift autoPass=0。
+- 学生端仍未开放;下一步必须用真实学生式输入复验 M2d。
 
 ### reason codes
 `double-stop-unsupported`, `legato-onset-ambiguous`, `rubato-section`,

@@ -138,6 +138,74 @@ function buildDecision(candidates, { includeLabels = false } = {}) {
   return decision;
 }
 
+function basicPitchCachePath(repoRoot, dataset, piece) {
+  if (dataset === "m0a-bach10") {
+    return path.join(repoRoot, "data", "experiments", "western-strings-m0", "m0a-bach10", "cache", "basic-pitch", `${piece}-violin.basic-pitch.json`);
+  }
+  if (dataset === "m0b-urmp") {
+    const track = safeString(piece).split(":").at(-1);
+    const filename = {
+      vn: "AuSep_1_vn_01_Jupiter.basic-pitch.json",
+      vc: "AuSep_2_vc_01_Jupiter.basic-pitch.json",
+    }[track];
+    return filename ? path.join(repoRoot, "data", "experiments", "western-strings-m0", "m0b-urmp", "cache", "basic-pitch", filename) : "";
+  }
+  if (dataset === "m0c-musicnet") {
+    const sampleId = safeString(piece).split(":")[0].replace("MusicNet-", "");
+    return path.join(repoRoot, "data", "experiments", "western-strings-m0", "m0c-musicnet", "cache", "basic-pitch", `${sampleId}.basic-pitch.json`);
+  }
+  return "";
+}
+
+async function readBasicPitchEvents(repoRoot, cache, dataset, piece) {
+  const key = `${dataset}\u0000${piece}`;
+  if (!cache.has(key)) {
+    const cacheFile = basicPitchCachePath(repoRoot, dataset, piece);
+    if (!cacheFile) {
+      cache.set(key, []);
+    } else {
+      try {
+        cache.set(key, JSON.parse(await fs.readFile(cacheFile, "utf8")));
+      } catch {
+        cache.set(key, []);
+      }
+    }
+  }
+  return cache.get(key);
+}
+
+function nearestBasicPitchSupportSeconds(events, decision, threshold, pitchTolerance) {
+  const predicted = numberOrNull(decision.predictedOnsetSeconds);
+  const midi = numberOrNull(decision.midi);
+  if (predicted === null || midi === null) return null;
+  const targetMidi = Math.round(midi);
+  let best = null;
+  for (const event of events) {
+    const eventStart = numberOrNull(event?.start);
+    const eventMidi = numberOrNull(event?.midi);
+    if (eventStart === null || eventMidi === null) continue;
+    if (Math.abs(Math.round(eventMidi) - targetMidi) > pitchTolerance) continue;
+    const distance = Math.abs(eventStart - predicted);
+    if (best === null || distance < best) best = distance;
+    if (best <= threshold) return best;
+  }
+  return best;
+}
+
+async function hasSequenceBasicPitchSupport(repoRoot, eventCache, pieceDecisions, index, supportFeature) {
+  const threshold = Math.max(0, safeNumber(supportFeature?.thresholdSeconds, 0.05));
+  const pitchTolerance = Math.max(0, Math.round(safeNumber(supportFeature?.pitchToleranceSemitones, 0)));
+  const radius = Math.max(0, Math.round(safeNumber(supportFeature?.neighborRadius, 2)));
+  const start = Math.max(0, index - radius);
+  const stop = Math.min(pieceDecisions.length, index + radius + 1);
+  for (const decision of pieceDecisions.slice(start, stop)) {
+    const events = await readBasicPitchEvents(repoRoot, eventCache, decision.dataset, decision.piece);
+    const support = nearestBasicPitchSupportSeconds(events, decision, threshold, pitchTolerance);
+    if (support === null || support > threshold) return false;
+  }
+  return true;
+}
+
 function summarize(decisions, { includeLabels = false } = {}) {
   const autoPassCount = decisions.filter((item) => item.autoDecision === "auto_pass").length;
   const summary = {
@@ -150,17 +218,22 @@ function summarize(decisions, { includeLabels = false } = {}) {
   if (includeLabels) {
     const evaluated = decisions.filter((item) => item.evaluation);
     const correct = evaluated.filter((item) => item.evaluation.labelCandidateWithin300ms).length;
+    const autoPassEvaluated = evaluated.filter((item) => item.autoDecision === "auto_pass");
+    const autoPassCorrect = autoPassEvaluated.filter((item) => item.evaluation.labelCandidateWithin300ms).length;
     summary.evaluation = {
       evaluatedCount: evaluated.length,
       correctWithin300ms: correct,
       precisionWithin300ms: evaluated.length ? Number((correct / evaluated.length).toFixed(4)) : 0,
+      autoPassEvaluatedCount: autoPassEvaluated.length,
+      autoPassCorrectWithin300ms: autoPassCorrect,
+      autoPassPrecisionWithin300ms: autoPassEvaluated.length ? Number((autoPassCorrect / autoPassEvaluated.length).toFixed(4)) : 0,
     };
   }
   return summary;
 }
 
 async function readStudentGate(repoRoot) {
-  const summaryPath = path.join(repoRoot, "data", "experiments", "western-strings-m2", "m2b-student-like-summary.json");
+  const summaryPath = path.join(repoRoot, "data", "experiments", "western-strings-m2", "m2d-sequence-support-summary.json");
   try {
     const summary = JSON.parse(await fs.readFile(summaryPath, "utf8"));
     const ready = summary?.studentGateReady === true;
@@ -168,6 +241,8 @@ async function readStudentGate(repoRoot) {
       ready,
       reason: ready ? "" : "student-gate-not-ready",
       source: path.relative(repoRoot, summaryPath).replace(/\\/g, "/"),
+      strategy: "sequence-basic-pitch-support",
+      supportFeature: summary?.supportFeature || {},
     };
   } catch {
     return {
@@ -178,18 +253,58 @@ async function readStudentGate(repoRoot) {
   }
 }
 
-function applyStudentGate(decision, gate) {
-  if (gate.ready) return decision;
+function reviewRequiredDecision(decision, reason, evidence = {}) {
   return {
     ...decision,
     autoDecision: "review_required",
     confidenceScore: 0,
-    reviewRequiredReason: gate.reason,
+    reviewRequiredReason: reason,
     evidence: {
       ...decision.evidence,
-      studentGateReady: false,
+      ...evidence,
     },
   };
+}
+
+async function applyStudentGate(repoRoot, decisions, gate) {
+  if (!gate.ready) {
+    return decisions.map((decision) => reviewRequiredDecision(decision, gate.reason, { studentGateReady: false }));
+  }
+  const eventCache = new Map();
+  const grouped = new Map();
+  for (const decision of decisions) {
+    const key = `${decision.dataset}\u0000${decision.piece}`;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(decision);
+  }
+  const nextDecisions = [];
+  for (const pieceDecisions of grouped.values()) {
+    pieceDecisions.sort((left, right) => left.noteIndex - right.noteIndex);
+    for (let index = 0; index < pieceDecisions.length; index += 1) {
+      const decision = pieceDecisions[index];
+      const supported = await hasSequenceBasicPitchSupport(repoRoot, eventCache, pieceDecisions, index, gate.supportFeature);
+      if (!supported) {
+        nextDecisions.push(reviewRequiredDecision(decision, "sequence-basic-pitch-support-missing", {
+          studentGateReady: true,
+          sequenceBasicPitchSupport: false,
+        }));
+      } else {
+        nextDecisions.push({
+          ...decision,
+          evidence: {
+            ...decision.evidence,
+            studentGateReady: true,
+            sequenceBasicPitchSupport: true,
+          },
+        });
+      }
+    }
+  }
+  return nextDecisions.sort((left, right) => (
+    left.dataset.localeCompare(right.dataset) ||
+    left.piece.localeCompare(right.piece) ||
+    left.noteIndex - right.noteIndex
+  ));
 }
 
 export async function buildWesternAlignmentPreview({
@@ -214,7 +329,7 @@ export async function buildWesternAlignmentPreview({
       left.noteIndex - right.noteIndex
     ));
   const studentGate = studentSafe ? await readStudentGate(repoRoot) : null;
-  const decisions = studentGate ? rawDecisions.map((decision) => applyStudentGate(decision, studentGate)) : rawDecisions;
+  const decisions = studentGate ? await applyStudentGate(repoRoot, rawDecisions, studentGate) : rawDecisions;
   const cappedDecisions = limit > 0 ? decisions.slice(0, limit) : decisions;
   return {
     ok: true,

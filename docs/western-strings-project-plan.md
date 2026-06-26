@@ -1,7 +1,7 @@
 # 弓弦乐器练习诊断平台 — 完整项目开发手册
 
 > 本文是**可交付开发执行**的完整项目计划(10 章)。战略与 M0–M5 闸门详见 [western-strings-migration-plan.md](western-strings-migration-plan.md);本手册在其上补全:资产盘点、M0 SOP+结果、M1–M5 工程拆解、后台/UI/API/schema 变更、数据集许可证、版本定义、论文产出对应、时间线/人力/停止条件。
-> **状态:M0 已通过(GREEN),进入 Phase 1。** 二胡自动线冻结为 V1.5(人在环 + 困难案例/论文证据)。
+> **状态:M1 基本完成;M2 teacher-only preview 已接入;M2d 序列级 Basic Pitch 支持是当前第一个通过 synthetic release-gate 的候选。** 二胡自动线冻结为 V1.5(人在环 + 困难案例/论文证据)。
 
 ---
 
@@ -20,7 +20,7 @@
 | (技巧 M4) | 揉弦/弓法等,达标才自动、否则 review | 达标技巧标注 | 复核 | 每类 AUC≥0.70、precision≥90% |
 | (大提琴 M5) | 弓弦家族扩展 | 同小提琴 | 同 | cello 独立 M0 + 重校准 |
 
-**硬原则**:precision 是硬门槛(≥90% 才给学生);**覆盖率是结果不是目标**(覆盖低但准也算阶段成功);fail-closed 四态。
+**硬原则**:precision 是硬门槛(≥90% 才给学生);coverage≥20% 才能命名为 V2-alpha,之后**覆盖率是结果不是目标**(覆盖低但准也算阶段成功);fail-closed 四态。
 
 ---
 
@@ -101,7 +101,8 @@
 - **schema(每 note finding):** `autoDecision`、`confidenceScore`、`confidenceModelVersion`、`candidateSources[]`、`reviewRequiredReason`、`teacherOverride`。
 - **reason codes:** `double-stop-unsupported`/`legato-onset-ambiguous`/`rubato-section`/`low-pitch-confidence`/`polyphonic-texture`/`score-audio-range-mismatch`/`weak-onset`/`dataset-label-uncertain`。
 - **frontend(后台):** 自动预测位置 + 置信 + 证据 + 一键确认/改正 + 是否采纳 + 回流开关。**默认 feature flag 关闭,先后台验证。**
-- **API:** `POST /api/strings/analyze`(audio+scoreId→note findings+decisions);`POST /api/strings/review`(override→训练集回流)。
+- **API(当前):** `GET /api/strings/alignment-preview` + `POST /api/strings/alignment-preview/reviews`,仅教师后台离线预览/复核。
+- **API(未来 release gate 通过后):** `POST /api/strings/analyze`(audio+scoreId→note findings+decisions);`POST /api/strings/review`(override→训练集回流)。
 - **验收:** auto_pass precision≥90%、coverage≥20%、按曲报告、留一曲验证、无真值泄漏。
 
 ### M3 — 基础教学诊断(先于技巧)
@@ -122,7 +123,8 @@
 
 ## 7. 后台 / UI / API / schema 变更汇总
 - **schema:** score 加 `instrument/scoreSource/tempoKnown/tempoSource`;note finding 加 `autoDecision/confidenceScore/confidenceModelVersion/candidateSources/reviewRequiredReason/teacherOverride`。
-- **API 新增:** `/api/strings/analyze`、`/api/strings/review`;score import 走 MusicXML/MIDI。
+- **API 当前新增:** `/api/strings/alignment-preview`、`/api/strings/alignment-preview/reviews`,只供教师后台离线预览。
+- **API 未来新增:** `/api/strings/analyze`、`/api/strings/review`;只有真实学生输入 release gate 通过后才允许接学生端。
 - **UI:** 教师后台加"自动预测+置信+证据+改正+回流";学生端加四态展示;乐器选择。
 - **feature flag:** `strings.autoFeedback`(默认关),`strings.technique`(默认关)。
 - **不动:** 二胡现有后台/包/导出(冻结)。
@@ -174,6 +176,7 @@
 | M1 clean score | `test:western-string-config`, `test:western-musicxml-import`, `test:western-midi-import`, dataset adapter 输出样本 | MusicXML/MIDI/dataset-score 统一进入 note schema;不触发 OMR/Audiveris;metadata 持久化无漂移 | 不进入 M2 生产接入 |
 | M2 alignment gate | feature table + confidence gate LODO;按数据集/按曲报告 | `auto_pass` 对齐 precision≥90%;coverage 只报告;无真值泄漏;reason codes 命中正确 | 降级 `review_required`,不接学生端 |
 | M2b student-like pilot | 合成错音/漏音/节奏扰动 + 少量真实学生录音 | 真实输入下 precision 仍≥90%;错误样本不会被误 auto_pass | 继续后台离线,不得 release |
+| M2d sequence support gate | 当前音 + 邻近音的 Basic Pitch 事件序列支持 | 基准 precision≥90%、coverage≥20%,且 correlated drift 0 auto-pass 或 precision≥90% | 未过则 `studentSafe=1` 全量 review |
 | M3 diagnosis | pitch/rhythm/missing/extra note 的独立评测表 | 音准、起音、时值、漏音/多音的诊断 precision 分开达标;低置信不反馈;回流可导出 | 仅显示对齐,不显示诊断 |
 | M4 technique | 每类 AUC/PR-AUC/正负数/按曲留一 | AUC≥0.70 且 PR-AUC 明显高于基率;precision≥90% 才 auto_pass | 永久 review hint |
 | 全程 | `check-server-p0` / `test:teacher-validation` / `build` | eval-only 脚本不写生产;数据不进仓库;feature flag 关时学生端零自动输出 | 阻断发布 |
@@ -240,13 +243,17 @@
 - ✅ M2 默认关闭学生自动反馈的源契约已补:`npm run test:western-feature-flags` 验证学生端/clean-score 入口不调用 `/api/strings/*` 自动诊断,服务端仅暴露离线 preview,不暴露 analyze/review 写入路由。
 - ✅ M2 教师后台离线 preview 面板已接入:教师可加载前 8 条 note-level 预测证据并提交 confirm/correct/review_required,写入 ignored 的 `alignment-preview-reviews.jsonl`;仍不进入学生端、不进入质量基线。
 - ✅ M2b student-like feature-level pilot 已补:`npm run test:western-m2b-pilot` 用 correlated +800ms 扰动证明当前 median-consensus preview 在一致性错误上不安全,因此 **不得开放学生端自动反馈**;只能保持 teacher-only preview。
-- ✅ M2 release gate 已 fail-closed 接入 preview service:`studentSafe=1` 会读取 M2b 证据;证据缺失或 `studentGateReady=false` 时全部降为 `review_required`,测试覆盖默认 teacher preview 与 student-safe 两种模式。
-- ✅ M2c 独立音频证据探针已补:`npm run test:western-m2c-audio-support` 用 Basic Pitch 事件支持检验 correlated drift。结果:基准 precision=0.9921 / coverage=0.7864,但 +800ms 相关漂移仍有 112 个重复同音误通过(precision=0),所以学生端 release 仍不达标。
+- ✅ M2 release gate 已 fail-closed 接入 preview service:`studentSafe=1` 现在读取 M2d 序列支持证据;证据缺失或 `studentGateReady=false` 时全部降为 `review_required`,测试覆盖默认 teacher preview 与 student-safe 两种模式。
+- ✅ M2c 独立音频证据探针已补:`npm run test:western-m2c-audio-support` 用 Basic Pitch 事件支持检验 correlated drift。结果:基准 precision=0.9921 / coverage=0.7864,但 +800ms 相关漂移仍有 112 个重复同音误通过(precision=0),所以单音事件支持不达标。
+- ✅ M2d 序列级 Basic Pitch 支持已补:`npm run test:western-m2d-sequence-support` 要求当前音及相邻音序列都有事件支持。结果:基准 precision=0.9974 / coverage=0.3716,+800ms correlated drift autoPass=0,是当前第一个通过 synthetic release-gate 的候选。
+- ✅ M2d 已接入 preview service 的 `studentSafe=1` 决策级闸门:证据缺失或单条序列支持不足时 fail-closed;M2d ready 时只放行通过序列支持的 note。学生端仍无 `/api/strings/analyze` / `/api/strings/review` 路由。
 
 剩余 M1 步骤:
 1. M1 收口时再跑 `test:western-string-config` / `test:western-musicxml-import` / `test:western-midi-import` / `test:western-dataset-index` / `test:western-strings-entry` / `test:server-boundaries` / `test:server-p0` / `test:musicxml-import` / `test:analyzer-score-roles` / `test:teacher-validation` / `build`。
 
-**完成即 M1 达标,进 M2 置信门。**
+**这些收口命令通过后,M1 可标记完成。M2 当前停在 teacher-only preview + studentSafe preview gate,尚未 release 到学生端。**
 
 当前 M2 剩余步骤:
-1. 若要继续冲学生端 V2,必须新增比 Basic Pitch event support 更强的独立音频证据(如局部谱图相似/起音峰支持/真实学生录音评测);在此之前 `studentSafe=1` 强制全量 `review_required`。
+1. 用真实学生式输入复验 M2d(错音、漏音、节奏偏移、弱起音、噪声/手机录音)。若 precision<90% 或出现系统性误 auto-pass,继续 teacher-only preview。
+2. 把 M2d 通过/拒绝的 reason codes 映射到教师后台证据面板,确认教师能快速复核。
+3. 真实输入 gate 通过后,再讨论 `/api/strings/analyze` 学生端最小闭环;否则 `studentSafe=1` 仍只作为离线 preview gate。
