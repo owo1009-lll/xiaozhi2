@@ -127,6 +127,36 @@
 - **feature flag:** `strings.autoFeedback`(默认关),`strings.technique`(默认关)。
 - **不动:** 二胡现有后台/包/导出(冻结)。
 
+## 7A. V2 落地细节(审查 v2 新增)
+**① 置信模型泄漏黑名单(训练禁用):** 禁用任何**真值派生**字段(`goldError`/`measureError`/与 gold 比对得到的误差量);**允许** method agreement、Parangonar cost、Basic Pitch confidence、CREPE pitch stability、onset 距离、polyphony/legato flag、score-context(前后音/密度)。评估按曲留一(LOPO),训练/测试不同曲。
+
+**② reason code → UI 文案映射:**
+| reason code | 学生看到 | 教师看到 |
+|---|---|---|
+| `low-pitch-confidence` | (不显示该音诊断) | 音高置信低,需复核 |
+| `double-stop-unsupported` | 此处双音/和弦,暂不自动判 | double-stop,自动跳过 |
+| `legato-onset-ambiguous` | (不显示起音诊断) | 连奏起音边界不清 |
+| `rubato-section` | 此段自由节奏,暂不自动判 | rubato 段,review |
+| `polyphonic-texture` | 多声部,暂不自动判 | polyphony,review |
+| `score-audio-range-mismatch` | 录音与谱面不匹配 | 范围不符,reject |
+| `weak-onset` | (不显示起音诊断) | 弱起音,review |
+| `dataset-label-uncertain` | — | 数据标签不确定(仅评估) |
+
+**③ 失败/降级操作表(触发 → 行为):**
+| 触发 | 行为 |
+|---|---|
+| 同 onset ≥2 pitch(double-stop) | `review_required` |
+| legato 起音边界不清 | `review_required` |
+| pitch confidence < 阈值 | 不给学生硬反馈 |
+| 音频与谱面长度/范围不匹配 | `reject_unsupported` |
+| 模型分歧大 / 置信模型低分 | `review_required` |
+| 系统异常 | `failed`(提示重试/人工锚点) |
+
+**④ V2-alpha 产品范围(先不承诺完整教学系统):**
+- **支持:** clean MusicXML/MIDI + **单声部小提琴**音频 → 输出**音准 / 节奏 / 漏音 / 多音 / 低置信提示**。
+- **不支持:** 技巧自动判定、PDF 识谱、强 rubato / 多声部混音自动反馈、大提琴。
+- **auto_pass precision≥90% 硬门槛;coverage 作结果报告**(低也可上线,只要准)。
+
 ---
 
 ## 8. 测试与验收标准

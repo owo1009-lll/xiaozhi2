@@ -1,7 +1,26 @@
 # 弓弦乐器练习诊断平台 — 迁移计划书(西洋弦乐线,validation-first)
 
-> 状态:计划草案 v1。本计划把"AI 二胡专用系统"扩展为"弓弦乐器练习诊断平台",**冻结二胡自动化攻坚线**(保留为 V1.5 人在环成果 + 困难案例/论文证据),新开**西洋弦乐线,以小提琴为第一验证对象**。
-> **核心纪律:不预设"西洋弦乐对齐已解决"。一切以本项目 pipeline 在 M0 的实测硬数字为准。** 不过 M0,不正式迁移。
+> **状态:v2 — M0 已通过(GREEN)。项目进入 M1(clean-score ingestion)+ M2(confidence-gated alignment alpha)准备阶段。** 本计划把"AI 二胡专用系统"扩展为"弓弦乐器练习诊断平台",**冻结二胡自动化攻坚线**(保留为 V1.5 人在环成果 + 困难案例/论文证据),新开**西洋弦乐线,小提琴为第一验证对象**。
+> **完整执行手册见 [western-strings-project-plan.md](western-strings-project-plan.md)**(10 章:资产盘点 / V2 工程规格 / 许可证治理 / M1-M5 拆解 / 论文产出 / 降级规则)。本文 = 战略纲要 + M0-M5 闸门 + 决策记录。
+> 核心纪律(已兑现):不预设"对齐已解决",以本项目 pipeline 的 M0 实测为准——**M0 已用硬数字通过**。
+
+---
+
+## M0 结论与迁移决策(v2 新增)
+| 数据集 | 最佳方法 | median onset | hit@300ms | 判定 |
+|---|---|---|---|---|
+| Bach10 | Parangonar + Basic Pitch | 35.2ms | 95.8% | 🟢 |
+| URMP | Parangonar + Basic Pitch | 19.1ms | 93.8% | 🟢 |
+| MusicNet | Basic Pitch DTW | 58.4ms | 95.3% | 🟢 |
+
+真实 CREPE-DTW 三套亦全绿。报告 `western-strings-m0-alignment-report.md`;脚本 `scripts/experiments/eval_western_strings_m0_*.py`;产物 `data/experiments/western-strings-m0/`。
+→ **对齐在西洋弦乐上可行(对比二胡:秒级/失败)。GO,进 M1/M2。** caveat:M0 为数据集 gold + 干净谱 + 精录工况;**V2 必须在真实学生录音上复验**。
+
+### Decision Record
+- 二胡自动线**冻结**(不删):保留为 V1.5 人在环 + 困难案例/论文对比证据。
+- 西洋弦乐 **M0 已通过**(上表,commit 660dce5)。
+- 第一版**只小提琴 + clean MusicXML/MIDI**;**不做 PDF OMR**(避免坎1 重现)。
+- 技巧识别**后置(M4)**,非 V2 必需;**大提琴独立 M0(M5)**,不复用小提琴阈值。
 
 ---
 
@@ -184,19 +203,16 @@ M5  大提琴扩展(独立 M0 + 重新校准)
 
 ---
 
-## 12. 立即执行(只做这个)
-**现在不写大文档、不改 UI、不碰产品。只做 M0a:**
-1. 建分支 `feature/western-strings-m0-alignment`(本计划书单独提交在 `docs/western-strings-migration-plan` 分支,二者分开);
-2. 接入 Bach10,**只取 violin/soprano part**(score + stem);
-3. 写 Bach10(violin part)→ score/audio/gold adapter;
-4. 跑 CREPE-DTW / Parangonar / Basic Pitch;
-5. 输出 median/p90 onset、hit@100ms、hit@300ms、coverage(按定义)、double-stop/legato 单独报、失败案例;
-6. **判 M0a**:全 Green → 进第 7 步;Red → 停;
-7. (仅 M0a Green)跑 URMP violin/cello 分轨 → M0b;
-8. 出**总 GO/NO-GO**。
+## 12. 当前立即执行:M1/M2 alpha(M0 已完成)
+**M0 已通过(见顶部决策记录)。下一步进入 M1 + M2 alpha(工程细节见 [western-strings-project-plan.md](western-strings-project-plan.md) §6):**
+1. 把 M0 脚本整理成**可复跑 eval harness**(一键重出 M0 指标);
+2. 建 **clean MIDI/MusicXML importer** + **violin instrument config(G3-A7)**;
+3. Bach10/URMP/MusicNet **adapter 统一进 score store**;**停用 PDF OMR 导入**;
+4. 做 **M2 V2 confidence gate**(置信模型而非投票;auto_pass precision≥90%,coverage 作结果报告;四态 + reason codes;**泄漏黑名单见手册**);
+5. **只做基础诊断(音准/节奏/漏多音),不碰技巧**(技巧 M4 后置)。
 
-- **M0 GO** → 正式把项目转为小提琴优先,按 M1→M5 推进。
-- **M0 NO-GO** → "换西洋弦乐"也非自动解,重选目标(钢琴 / 仅人在环系统),不硬迁。
+- **M2 在真实输入达标** → V2 alpha;**达不到** → 降级 review-only(见手册降级规则)。
+- (历史)M0 NO-GO 时的退路:重选目标(钢琴 / 仅人在环)——**现已不触发,M0 通过。**
 
 ---
 
