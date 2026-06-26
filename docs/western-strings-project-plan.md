@@ -1,7 +1,7 @@
 # 弓弦乐器练习诊断平台 — 完整项目开发手册
 
 > 本文是**可交付开发执行**的完整项目计划(10 章)。战略与 M0–M5 闸门详见 [western-strings-migration-plan.md](western-strings-migration-plan.md);本手册在其上补全:资产盘点、M0 SOP+结果、M1–M5 工程拆解、后台/UI/API/schema 变更、数据集许可证、版本定义、论文产出对应、时间线/人力/停止条件。
-> **状态:M1 基本完成;M2 teacher-only preview 已接入;M2e 学生式事件扰动已通过 synthetic gate。学生端 release 的当前硬阻塞是 M2f 真实学生录音复验。** 二胡自动线冻结为 V1.5(人在环 + 困难案例/论文证据)。
+> **状态:M1 已完成并通过收口回归;M2 teacher-only preview 已接入;M2e 学生式事件扰动已通过 synthetic gate。学生端 release 的当前硬阻塞是 M2f 真实学生录音复验。** 二胡自动线冻结为 V1.5(人在环 + 困难案例/论文证据)。
 
 ---
 
@@ -67,6 +67,7 @@
 **通用安全默认(写死):**
 - **数据集音频/标签一律不提交进 git**;`data/` 已 gitignore;只提交**我们的 adapter 代码 + 指标 JSON/CSV(去标识)**。
 - 任何**公开发布(论文/开源)前,逐数据集核实许可证**;不确定的只用"metadata 描述",不放原始数据。
+- **真实学生录音一律走单独授权与脱敏流程**:记录 consent、licenseStatus、studentIdHash、device/noise/scenario;原始音频只放本地 `data/` 或受控存储,不入仓库、不随论文发布。
 - 来源:[Bach10](https://labsites.rochester.edu/air/datasets/Bach10%20Dataset_v1.0.pdf)、[URMP](https://labsites.rochester.edu/air/publications/li2018creating.pdf)、[MusicNet(Zenodo)](https://zenodo.org/records/5120004)、[ASAP](https://github.com/fosfrancesco/asap-dataset)。
 
 ---
@@ -107,6 +108,11 @@
 
 ### M3 — 基础教学诊断(先于技巧)
 - 诊断:音准偏差 / 起音时序 / 音长误差 / 漏音·多音 / 音高不稳 / 低置信警告。
+- **第一版建议阈值(必须由教师样本复验后才能 release):**
+  - pitch: `abs(centsError) >= 35c` 进入 pitch issue;20-35c 默认 review hint,不直接给学生硬错。
+  - onset: `abs(onsetErrorMs) >= 120ms` 进入 rhythm issue;legato/weak-onset 只给 review reason。
+  - duration: `abs(durationRatio - 1.0) >= 0.35` 或 `abs(durationErrorMs) >= 180ms` 进入 duration issue。
+  - missing/extra: 只在 M2 `auto_pass` 或教师确认的对齐范围内判定;polyphonic/double-stop 默认 review。
 - **frontend(学生端):** 高置信音诊断 + 谱面定位;低置信"需复核";reject 段明确提示。
 - **验收:** note-level 反馈落到谱面位置;低置信不反馈;教师复核可用 + 回流。
 
@@ -138,6 +144,12 @@
 
 `scoreSource` 与 `scoreSourceType` 不再新增第三套同义字段;新增 adapter 必须在测试里同时验证持久化层和 piecePack 层。
 
+**模型产物与版本治理(防止实验结果漂移进生产):**
+- 模型/阈值产物只允许放在 `models/western-strings/<modelVersion>/`,包含 `model.json`、`metrics.json`、`feature_schema.json`、`training_manifest.json`。
+- `training_manifest.json` 必须记录数据集版本、gold CSV 路径、特征脚本 commit、禁用的 gold-derived 字段清单和按曲留一结果。
+- 只有 `metrics.json` 证明 precision 达标、M2f 真实录音 gate 通过,对应 `confidenceModelVersion` 才能被 `/api/strings/analyze` 读取。
+- 回滚策略:保留上一版 `modelVersion`;教师 preview 可显示新旧版本对照,学生端只读 release-approved 版本。
+
 ## 7A. V2 落地细节(审查 v2 新增)
 **① 置信模型泄漏黑名单(训练禁用):** 禁用任何**真值派生**字段(`goldError`/`measureError`/与 gold 比对得到的误差量);**允许** method agreement、Parangonar cost、Basic Pitch confidence、CREPE pitch stability、onset 距离、polyphony/legato flag、score-context(前后音/密度)。评估按曲留一(LOPO),训练/测试不同曲。
 
@@ -168,6 +180,13 @@
 - **不支持:** 技巧自动判定、PDF 识谱、强 rubato / 多声部混音自动反馈、大提琴。
 - **auto_pass precision≥90% 硬门槛;coverage 作结果报告**(低也可上线,只要准)。
 
+**⑤ M2f 真实学生录音 release gate(学生端硬前置):**
+- 最小 manifest:`data/experiments/western-strings-m2/real-student-recordings-manifest.csv`。
+- 最小 results:`data/experiments/western-strings-m2/real-student-recording-results.csv`。
+- 最小样本:不少于 6 条录音、3 名学生或准学生;必须覆盖 `correct`、`wrong_pitch`、`missing_note`、`rhythm_shift`、`weak_onset`、`noisy` 六类场景。
+- 每条 manifest 必须有真实音频路径、scoreId 或 score path、consent、licenseStatus、humanChecked、scenario、studentIdHash。
+- Gate 命令:`npm run test:western-m2f-real-recordings`。未提供数据时应 fail-closed,输出 `studentGateReady=false`;真实数据 precision<90% 或 unsafe target auto-pass>0 时不得开放学生端。
+
 ---
 
 ## 8. 测试与验收标准
@@ -178,7 +197,7 @@
 | M2b student-like pilot | 合成错音/漏音/节奏扰动 | 合成/特征扰动不能暴露系统性误 auto_pass | 继续后台离线,不得 release |
 | M2d/M2e sequence support gate | 当前音 + 邻近音的 Basic Pitch 事件序列支持;再用学生式事件扰动复验 | 基准 precision≥90%、coverage≥20%,且 correlated drift / 错音 / 漏音 / 弱起音目标 0 auto-pass | 未过则 `studentSafe=1` 全量 review |
 | M2f real-student recording gate | 真实/准真实学生录音 manifest + results;覆盖正确、错音、漏音、节奏偏移、弱起音、噪声/手机录音 | 真实输入 precision≥90%, unsafe target auto-pass=0,录音/授权/场景完整 | 未过则不得开放 `/api/strings/analyze` |
-| M3 diagnosis | pitch/rhythm/missing/extra note 的独立评测表 | 音准、起音、时值、漏音/多音的诊断 precision 分开达标;低置信不反馈;回流可导出 | 仅显示对齐,不显示诊断 |
+| M3 diagnosis | pitch/rhythm/missing/extra note 的独立评测表 | 音准、起音、时值、漏音/多音按类别分别 precision≥90%;阈值见 M3 第一版建议;低置信不反馈;回流可导出 | 仅显示对齐,不显示诊断 |
 | M4 technique | 每类 AUC/PR-AUC/正负数/按曲留一 | AUC≥0.70 且 PR-AUC 明显高于基率;precision≥90% 才 auto_pass | 永久 review hint |
 | 全程 | `check-server-p0` / `test:teacher-validation` / `build` | eval-only 脚本不写生产;数据不进仓库;feature flag 关时学生端零自动输出 | 阻断发布 |
 
@@ -207,7 +226,7 @@
 | 阶段 | 估时 |
 |---|---|
 | M0 | ✅ 已完成 |
-| M1 干净谱接入 | 3-5 天 |
+| M1 干净谱接入 | ✅ 已完成 |
 | M2 V2 置信门 | 1-2 周(含真值/模型/后台) |
 | M3 基础诊断 | 1-2 周 |
 | M4 技巧 pilot | 2-3 周(含教师标注) |
@@ -230,7 +249,7 @@
 
 ---
 
-## 立即下一步(Phase 1 / M1)
+## 当前状态与下一步
 当前进度:
 - ✅ `instrumentConfig` 已落地为 `config/western-string-instruments.json`,覆盖 violin / viola / cello;`npm run test:western-string-config` 已验证音域与 first-version flag。
 - ✅ clean MusicXML 入口已支持西洋弦乐元数据透传与落盘:`instrument` / `scoreSource` / `tempoKnown` / `tempoSource`;`npm run test:western-musicxml-import`、`npm run test:server-boundaries`、`npm run test:server-p0` 已验证。
@@ -239,7 +258,7 @@
 - ✅ dataset adapter 选择低风险统一导出路径:从 M0 artifacts 生成 `western-strings-dataset-index.{json,csv}` 与 `western-strings-gold-notes.csv`,共 14 个 piece / 2088 个 gold notes;只索引 raw 数据路径和 availability,不复制受限音频/MIDI/标签;`npm run test:western-dataset-index` 已验证 key 映射和去重。
 - ✅ 西洋弦乐 clean-score 入口已加 `?mode=strings`:只允许 MusicXML/MIDI,不暴露 PDF OMR 控件;`npm run test:western-strings-entry` 以 source contract 验证 clean-score-only。
 - ✅ M2 特征表第一版已完成:从 M0 per-note CSV 生成 note-level pivot 与 candidate-level 表;`label*` 字段显式标为 gold-derived,训练时禁用;`npm run test:western-alignment-features` 已验证。
-- ✅ M2 置信门 eval-only 探针已完成:基于 candidate-level 表做 fail-closed 规则搜索,LODO 三折 precision 均 >0.96、coverage=1.0;`npm run test:western-confidence-gate` 已验证。注意:这证明高置信子集存在。
+- ✅ M2 置信门 eval-only 探针已完成:基于 candidate-level 表做 fail-closed 规则搜索,LODO 三折 precision 均 >0.96、coverage=1.0;`npm run test:western-confidence-gate` 已验证。注意:这只证明公开数据集/gold 条件下存在高置信子集,不等于真实学生录音 student-safe。
 - ✅ M2 后台离线 preview API 已接入:`GET /api/strings/alignment-preview` 从 candidate feature table 生成 note-level `autoDecision/confidenceScore/candidateSources/evidence`;默认不返回 gold-derived label,`includeLabels=1` 仅用于离线验收;`npm run test:western-alignment-preview` 验证默认无泄漏与 precision@300ms=0.9818。
 - ✅ M2 默认关闭学生自动反馈的源契约已补:`npm run test:western-feature-flags` 验证学生端/clean-score 入口不调用 `/api/strings/*` 自动诊断,服务端仅暴露离线 preview,不暴露 analyze/review 写入路由。
 - ✅ M2 教师后台离线 preview 面板已接入:教师可加载前 8 条 note-level 预测证据并提交 confirm/correct/review_required,写入 ignored 的 `alignment-preview-reviews.jsonl`;仍不进入学生端、不进入质量基线。
@@ -251,11 +270,9 @@
 - ✅ M2d 已接入 preview service 的 `studentSafe=1` 决策级闸门:证据缺失或单条序列支持不足时 fail-closed;M2d ready 时只放行通过序列支持的 note。学生端仍无 `/api/strings/analyze` / `/api/strings/review` 路由。
 - ✅ M2f 真实学生录音 release gate 已补:`npm run test:western-m2f-real-recordings` 校验真实录音 manifest/results、样本数、学生数、错误场景、授权、路径与结果安全性。当前没有真实录音数据,命令按预期 fail-closed 并输出 `studentGateReady=false`;协议见 `docs/western-strings-real-student-pilot.md`。
 - ✅ M2d/M2e 通过/拒绝证据已映射到教师后台:Western strings preview 默认加载 `studentSafe=1`,显示 release gate 状态、source、review reason、相邻音序列 Basic Pitch 支持、method agreement 与 candidate sources,方便教师快速复核。
+- ✅ M1 收口已完成: `test:western-string-config` / `test:western-musicxml-import` / `test:western-midi-import` / `test:western-dataset-index` / `test:western-strings-entry` / `test:server-boundaries` / `test:server-p0` / `test:musicxml-import` / `test:analyzer-score-roles` / `test:teacher-validation` / `build` 全部通过。
 
-剩余 M1 步骤:
-1. M1 收口时再跑 `test:western-string-config` / `test:western-musicxml-import` / `test:western-midi-import` / `test:western-dataset-index` / `test:western-strings-entry` / `test:server-boundaries` / `test:server-p0` / `test:musicxml-import` / `test:analyzer-score-roles` / `test:teacher-validation` / `build`。
-
-**这些收口命令通过后,M1 可标记完成。M2 当前停在 teacher-only preview + studentSafe preview gate,尚未 release 到学生端。**
+**M1 已完成。M2 当前停在 teacher-only preview + studentSafe preview gate,尚未 release 到学生端。**
 
 当前 M2 剩余步骤:
 1. 收集并填写 M2f 真实学生录音 manifest/results(错音、漏音、节奏偏移、弱起音、噪声/手机录音)。若 precision<90% 或出现系统性误 auto-pass,继续 teacher-only preview。

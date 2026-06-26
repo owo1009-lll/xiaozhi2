@@ -1,6 +1,6 @@
 # 弓弦乐器练习诊断平台 - v2 执行手册
 
-> 状态: v2 执行版。M0 小提琴/弦乐对齐验证已经通过;M1 基本完成;M2 teacher-only preview 已接入,M2e 学生式事件扰动已通过 synthetic gate;学生端 release 仍必须等待 M2f 真实学生录音复验。
+> 状态: v2 执行版。M0 小提琴/弦乐对齐验证已经通过;M1 已完成并通过收口回归;M2 teacher-only preview 已接入,M2e 学生式事件扰动已通过 synthetic gate;学生端 release 仍必须等待 M2f 真实学生录音复验。
 > 本手册替代旧版 M0 前计划。二胡自动化攻坚线冻结为 V1.5 人在环成果和困难案例证据;西洋弦乐线以小提琴优先,大提琴后置独立验证。
 > 完整 10 章开发手册见 `docs/western-strings-project-plan.md`;本文是战略纲要、闸门和当前执行清单。
 
@@ -74,8 +74,8 @@ M0 证明的是"可进入下一阶段",不是"产品已经完成"。完整报告
 
 ```
 M0  对齐可行性验证              已完成,Green
-M1  clean score ingestion       当前立即执行
-M2  confidence-gated alignment  当前立即执行
+M1  clean score ingestion       已完成
+M2  confidence-gated alignment  teacher-only preview + studentSafe gate;等待 M2f 真实录音
 M3  基础教学诊断                M2 稳定后执行
 M4  技巧识别 pilot              后置,独立数据
 M5  大提琴扩展                  小提琴 V2 通过后独立 M0
@@ -145,6 +145,7 @@ M5  大提琴扩展                  小提琴 V2 通过后独立 M0
 - M2f real-student recording gate 已定义为 release 硬闸门。当前没有真实学生录音 manifest/results,因此 `studentGateReady=false`,学生端仍未开放。
 - 教师后台 Western strings preview 现在默认加载 `studentSafe=1`,并显示 release gate、review reason 和 sequence Basic Pitch 支持证据,用于复核而非学生反馈。
 - 真实录音采集与 manifest 协议见 `docs/western-strings-real-student-pilot.md`。
+- M2f 最小门槛:不少于 6 条真实/准真实录音、3 名学生或准学生,覆盖 correct / wrong_pitch / missing_note / rhythm_shift / weak_onset / noisy 六类场景;precision<90% 或 unsafe target auto-pass>0 时不得开放学生端。
 
 ### reason codes
 `double-stop-unsupported`, `legato-onset-ambiguous`, `rubato-section`,
@@ -217,9 +218,9 @@ M5  大提琴扩展                  小提琴 V2 通过后独立 M0
 
 ---
 
-## 10. 当前立即执行清单
+## 10. 当前状态与执行清单
 
-### Step 1: 固化 M0 结果
+### Step 1: 固化 M0 结果(已完成)
 - 把 M0 脚本整理成可复跑 eval harness。
 - 保留 M0 报告与 artifacts 路径。
 - 增加 README 或命令说明,确保能从 clean checkout 复现指标。
@@ -228,7 +229,7 @@ M5  大提琴扩展                  小提琴 V2 通过后独立 M0
 - M0a/M0b/M0c 脚本可运行或明确说明数据下载前置。
 - 报告数字与 `docs/western-strings-m0-alignment-report.md` 一致。
 
-### Step 2: 建 M1 clean score 基础
+### Step 2: M1 clean score 基础(已完成)
 - 新增 instrument config。
 - 新增或整理 clean MIDI/MusicXML importer 入口。
 - 对 Bach10/URMP/MusicNet adapter 做统一输出规范。
@@ -236,20 +237,22 @@ M5  大提琴扩展                  小提琴 V2 通过后独立 M0
 通过标准:
 - 一个小提琴样本可进入统一 note schema。
 - 不触发 OMR/Audiveris 路径。
+- 收口回归已通过: `test:western-string-config` / `test:western-musicxml-import` / `test:western-midi-import` / `test:western-dataset-index` / `test:western-strings-entry` / `test:server-boundaries` / `test:server-p0` / `test:musicxml-import` / `test:analyzer-score-roles` / `test:teacher-validation` / `build`。
 
-### Step 3: 建 M2 alpha 置信闸门原型
+### Step 3: M2 alpha 置信闸门原型(teacher-only 已完成,release 待 M2f)
 - 从 M0 per-note CSV 构造 candidate feature table。
 - 训练简单可解释模型或阈值门,先不用 Transformer。
 - 按曲留一评估 `auto_pass precision` 和 `coverage`。
 
 通过标准:
-- precision >= 90% 的高置信子集存在。
-- 不满足则保持 review-only,不接学生端。
+- 公开数据集/gold 条件下 precision >= 90% 的高置信子集已存在,但这不等于真实学生录音 student-safe。
+- 学生端 release 必须等 M2f 真实录音 gate 通过;不满足则保持 review-only,不接学生端。
 
-### Step 4: 产品接入前审查
+### Step 4: 产品接入前审查(学生端未开放)
 - 确认 reason codes 到 UI 文案。
 - 确认 teacher backend 能复核。
 - 确认低置信不会反馈给学生。
+- 在 M2f 通过前,`/api/strings/analyze` 和 `/api/strings/review` 不开放给学生端。
 
 ---
 
