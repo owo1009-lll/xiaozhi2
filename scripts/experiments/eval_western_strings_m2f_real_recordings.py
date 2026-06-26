@@ -36,6 +36,7 @@ VALID_SCENARIOS = {
 }
 VALID_LICENSE_STATUS = {"local-only", "cleared"}
 DEFAULT_REQUIRED_SCENARIOS = ["correct", "wrong_pitch", "missing_note", "rhythm_shift", "weak_onset", "noisy"]
+SCORE_STORE = REPO / "data" / "erhu-score-imports.json"
 
 
 def read_csv(path: Path) -> tuple[list[dict[str, str]], list[str]]:
@@ -47,6 +48,20 @@ def read_csv(path: Path) -> tuple[list[dict[str, str]], list[str]]:
 def repo_path(value: str) -> Path:
     path = Path(value.strip())
     return path if path.is_absolute() else REPO / path
+
+
+def load_score_ids(path: Path = SCORE_STORE) -> set[str]:
+    if not path.exists():
+        return set()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return set()
+    return {
+        str(score.get("scoreId", "")).strip()
+        for score in data.get("scores", [])
+        if isinstance(score, dict) and str(score.get("scoreId", "")).strip()
+    }
 
 
 def is_yes(value: str) -> bool:
@@ -99,6 +114,7 @@ def validate_manifest(
     recording_ids: set[str] = set()
     student_ids: set[str] = set()
     scenario_counts: Counter[str] = Counter()
+    known_score_ids = load_score_ids()
 
     for index, row in enumerate(rows, start=2):
         errors: list[str] = []
@@ -133,6 +149,8 @@ def validate_manifest(
             errors.append("scorePath-or-scoreId-missing")
         elif score_path and not repo_path(score_path).exists():
             errors.append("scorePath-not-found")
+        if score_id and score_id not in known_score_ids:
+            errors.append("scoreId-not-found")
         if not is_yes(row.get("humanChecked", "")):
             errors.append("humanChecked-not-yes")
         if not is_yes(row.get("consent", "")):

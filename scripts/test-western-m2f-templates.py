@@ -246,6 +246,30 @@ def main() -> int:
         )
         assert_true("recordingId-duplicate" in duplicate_manifest_gate.stdout, "duplicate manifest recording IDs must fail closed")
 
+        missing_score_manifest = out_dir / "missing-score-manifest.csv"
+        missing_score_rows = [dict(row) for row in valid_manifest_rows]
+        missing_score_rows[0]["scorePath"] = ""
+        missing_score_rows[0]["scoreId"] = "score-does-not-exist"
+        write_rows(missing_score_manifest, manifest_columns, missing_score_rows)
+        missing_score_gate = subprocess.run(
+            [
+                sys.executable,
+                str(GATE),
+                "--manifest",
+                str(missing_score_manifest),
+                "--results",
+                str(good_results),
+                "--out",
+                str(out_dir / "missing-score-summary.json"),
+                "--expect-negative",
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true("scoreId-not-found" in missing_score_gate.stdout, "manifest rows with unresolved scoreId must fail closed")
+
         impossible_results = out_dir / "impossible-results.csv"
         impossible_rows = [dict(row) for row in good_result_rows]
         impossible_rows[0]["correctWithin300ms"] = "11"
