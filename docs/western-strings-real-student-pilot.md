@@ -4,6 +4,8 @@
 > Passing synthetic event perturbations is not enough to open student-facing
 > automatic feedback. Real recordings must pass this pilot first.
 
+Recorder-facing checklist: [western-strings-m2f-recording-checklist.md](western-strings-m2f-recording-checklist.md).
+
 ## Scope
 
 M2f validates the current western-strings `studentSafe=1` gate on real or
