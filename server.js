@@ -75,6 +75,7 @@ import { createResearchRouter } from "./src/server/researchRoutes.js";
 import { createScoreRouter } from "./src/server/scoreRoutes.js";
 import { createTeacherValidationService } from "./src/server/teacherValidationService.js";
 import { createTeacherValidationRouter } from "./src/server/teacherValidationRoutes.js";
+import { createWesternStringsRouter } from "./src/server/westernStringsRoutes.js";
 import {
   appendAnalysisToParticipant,
   buildValidationSummary,
@@ -4565,6 +4566,7 @@ function launchAnalysisTask(task) {
 
 app.use("/api/erhu", createResearchRouter({ readStudyStore, writeStudyStore, fetchAnalyzerStatus }));
 app.use("/api/erhu/teacher-validation", createTeacherValidationRouter(teacherValidationService));
+app.use(createWesternStringsRouter({ repoRoot: __dirname }));
 
 const noStoreStaticOptions = {
   etag: false,
