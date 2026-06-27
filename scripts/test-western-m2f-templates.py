@@ -298,6 +298,76 @@ def main() -> int:
         )
         assert_true("audioPath-not-private" in public_audio_gate.stdout, "repo-local student audio must stay under data/private")
 
+        audio_directory_manifest = out_dir / "audio-directory-manifest.csv"
+        audio_directory_rows = [dict(row) for row in valid_manifest_rows]
+        audio_directory_rows[0]["audioPath"] = str(private_dir)
+        write_rows(audio_directory_manifest, manifest_columns, audio_directory_rows)
+        audio_directory_gate = subprocess.run(
+            [
+                sys.executable,
+                str(GATE),
+                "--manifest",
+                str(audio_directory_manifest),
+                "--results",
+                str(good_results),
+                "--out",
+                str(out_dir / "audio-directory-summary.json"),
+                "--expect-negative",
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true("audioPath-not-file" in audio_directory_gate.stdout, "audioPath must point to a file, not a directory")
+
+        public_score_manifest = out_dir / "public-score-manifest.csv"
+        public_score_rows = [dict(row) for row in valid_manifest_rows]
+        public_score_rows[0]["scorePath"] = "package.json"
+        public_score_rows[0]["licenseStatus"] = "local-only"
+        write_rows(public_score_manifest, manifest_columns, public_score_rows)
+        public_score_gate = subprocess.run(
+            [
+                sys.executable,
+                str(GATE),
+                "--manifest",
+                str(public_score_manifest),
+                "--results",
+                str(good_results),
+                "--out",
+                str(out_dir / "public-score-summary.json"),
+                "--expect-negative",
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true("scorePath-not-private" in public_score_gate.stdout, "repo-local local-only scorePath must stay under data/private")
+
+        score_directory_manifest = out_dir / "score-directory-manifest.csv"
+        score_directory_rows = [dict(row) for row in valid_manifest_rows]
+        score_directory_rows[0]["scorePath"] = str(private_dir)
+        write_rows(score_directory_manifest, manifest_columns, score_directory_rows)
+        score_directory_gate = subprocess.run(
+            [
+                sys.executable,
+                str(GATE),
+                "--manifest",
+                str(score_directory_manifest),
+                "--results",
+                str(good_results),
+                "--out",
+                str(out_dir / "score-directory-summary.json"),
+                "--expect-negative",
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true("scorePath-not-file" in score_directory_gate.stdout, "scorePath must point to a file, not a directory")
+
         impossible_results = out_dir / "impossible-results.csv"
         impossible_rows = [dict(row) for row in good_result_rows]
         impossible_rows[0]["correctWithin300ms"] = "11"

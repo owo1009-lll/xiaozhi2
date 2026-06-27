@@ -76,8 +76,8 @@ Required columns:
 | `studentId` | anonymized id |
 | `instrument` | currently must be `violin` |
 | `pieceId` | score/piece id |
-| `audioPath` | repo-relative or absolute local path; file must exist. If repo-local, it must be under `data/private/...` |
-| `scorePath` or `scoreId` | one must be present; `scorePath` must exist |
+| `audioPath` | repo-relative or absolute local file path; if repo-local, it must be under `data/private/...` |
+| `scorePath` or `scoreId` | one must be present; `scorePath` must exist. Local-only repo-local score files must be under `data/private/...` |
 | `scenario` | one of the required scenarios above, plus optional `extra_note` |
 | `humanChecked` | must be `yes` |
 | `consent` | must be `yes` |

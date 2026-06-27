@@ -77,10 +77,11 @@ Allowed storage:
 - another local private path outside the repo
 
 Do not commit raw student recordings or private score files. The M2f gate
-enforces this for `audioPath`: a repo-local audio path is valid only under
-`data/private/...`; a repo-local public/test path fails with
-`audioPath-not-private`. Absolute paths outside the repo remain allowed for
-local private storage.
+enforces this for `audioPath` and local-only `scorePath`: a repo-local private
+path is valid only under `data/private/...`; a repo-local public/test path fails
+with `audioPath-not-private` or `scorePath-not-private`. Paths must point to
+files, not directories. Absolute paths outside the repo remain allowed for local
+private storage.
 
 Required metadata:
 
@@ -115,8 +116,8 @@ Required columns:
 | `studentId` | Anonymous id only. |
 | `instrument` | `violin`. |
 | `pieceId` | Stable piece id. |
-| `audioPath` | Existing local path to the audio; if it is repo-local it must be under `data/private/...`. |
-| `scorePath` or `scoreId` | One must point to a clean MusicXML/MIDI score. |
+| `audioPath` | Existing local file path to the audio; if it is repo-local it must be under `data/private/...`. |
+| `scorePath` or `scoreId` | One must point to a clean MusicXML/MIDI score; local-only repo-local score files must be under `data/private/...`. |
 | `scenario` | One of the required scenarios. |
 | `humanChecked` | `yes`. |
 | `consent` | `yes`. |

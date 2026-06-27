@@ -37,7 +37,7 @@ VALID_SCENARIOS = {
 VALID_LICENSE_STATUS = {"local-only", "cleared"}
 DEFAULT_REQUIRED_SCENARIOS = ["correct", "wrong_pitch", "missing_note", "rhythm_shift", "weak_onset", "noisy"]
 SCORE_STORE = REPO / "data" / "erhu-score-imports.json"
-PRIVATE_AUDIO_ROOT = REPO / "data" / "private"
+PRIVATE_REPO_DATA_ROOT = REPO / "data" / "private"
 
 
 def read_csv(path: Path) -> tuple[list[dict[str, str]], list[str]]:
@@ -156,12 +156,24 @@ def validate_manifest(
             audio_resolved = repo_path(audio_path)
             if not audio_resolved.exists():
                 errors.append("audioPath-not-found")
-            elif path_is_within(audio_resolved, REPO) and not path_is_within(audio_resolved, PRIVATE_AUDIO_ROOT):
+            elif not audio_resolved.is_file():
+                errors.append("audioPath-not-file")
+            elif path_is_within(audio_resolved, REPO) and not path_is_within(audio_resolved, PRIVATE_REPO_DATA_ROOT):
                 errors.append("audioPath-not-private")
         if not score_path and not score_id:
             errors.append("scorePath-or-scoreId-missing")
-        elif score_path and not repo_path(score_path).exists():
-            errors.append("scorePath-not-found")
+        elif score_path:
+            score_resolved = repo_path(score_path)
+            if not score_resolved.exists():
+                errors.append("scorePath-not-found")
+            elif not score_resolved.is_file():
+                errors.append("scorePath-not-file")
+            elif (
+                license_status == "local-only"
+                and path_is_within(score_resolved, REPO)
+                and not path_is_within(score_resolved, PRIVATE_REPO_DATA_ROOT)
+            ):
+                errors.append("scorePath-not-private")
         if score_id and score_id not in known_score_ids:
             errors.append("scoreId-not-found")
         if not is_yes(row.get("humanChecked", "")):

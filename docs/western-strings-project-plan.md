@@ -190,7 +190,7 @@
 - 状态查看命令:`npm run western:m2f-status`;Release gate 命令:`npm run western:m2f-gate`。未提供数据时应 fail-closed,输出 `studentGateReady=false`;`western:m2f-gate` 在未 ready 时必须非零退出;真实数据 precision<90% 或 unsafe target auto-pass>0 时不得开放学生端。`npm run test:western-m2f-real-recordings` 仅作为当前无真实数据状态的 fail-closed 回归测试。
 
 **⑥ M2f results 填写 SOP(防止 manifest 有了但 results 无法落地):**
-1. 运行 `npm run western:m2f-templates`,复制模板为正式 manifest;真实学生录音放在 `data/private/...` 或仓库外私有目录。仓库内普通路径会被 gate 拒绝。
+1. 运行 `npm run western:m2f-templates`,复制模板为正式 manifest;真实学生录音放在 `data/private/...` 或仓库外私有目录。local-only 私有谱面若用 `scorePath` 放在仓库内,也必须在 `data/private/...`。仓库内普通路径会被 gate 拒绝。
 2. 填满 manifest 后运行 `npm run western:m2f-results-skeleton`,生成与 manifest `recordingId` 一一对应的 results skeleton。
 3. 对每条录音用当前 teacher-only preview / `studentSafe=1` 证据跑离线复核。复核者按谱面或人工 gold 判断每个 auto-pass 音是否在 300ms 内命中,并统计:
    - `autoPassCount`: gate 放行的音符数;
@@ -287,5 +287,5 @@
 **M1 已完成。M2 当前停在 teacher-only preview + studentSafe preview gate,尚未 release 到学生端。**
 
 当前 M2 剩余步骤:
-1. 按 `docs/western-strings-m2f-recording-checklist.md` 收集并填写 M2f 真实学生录音 manifest/results(错音、漏音、节奏偏移、弱起音、噪声/手机录音)。录音必须放在 `data/private/...` 或仓库外私有路径;仓库内普通路径会被 gate 拒绝。若 precision<90% 或出现系统性误 auto-pass,继续 teacher-only preview。
+1. 按 `docs/western-strings-m2f-recording-checklist.md` 收集并填写 M2f 真实学生录音 manifest/results(错音、漏音、节奏偏移、弱起音、噪声/手机录音)。录音必须放在 `data/private/...` 或仓库外私有路径;local-only 私有谱面同理。仓库内普通路径会被 gate 拒绝。若 precision<90% 或出现系统性误 auto-pass,继续 teacher-only preview。
 2. 真实输入 gate 通过后,再讨论 `/api/strings/analyze` 学生端最小闭环;否则 `studentSafe=1` 仍只作为离线 preview gate。
