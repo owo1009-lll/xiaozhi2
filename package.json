@@ -62,6 +62,7 @@
     "test:western-m2d-sequence-support": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\eval_western_strings_m2d_sequence_support.py --expect-positive",
     "test:western-m2e-student-events": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\eval_western_strings_m2e_student_event_perturbations.py --expect-positive",
     "test:western-m2f-real-recordings": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\eval_western_strings_m2f_real_recordings.py --expect-negative",
+    "western:m2f-manifest-status": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\check_western_strings_m2f_manifest.py",
     "western:m2f-status": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\eval_western_strings_m2f_real_recordings.py",
     "western:m2f-gate": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\eval_western_strings_m2f_real_recordings.py --fail-on-not-ready",
     "western:m2f-templates": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\create_western_strings_m2f_templates.py",

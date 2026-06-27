@@ -60,6 +60,14 @@ fail-closed behavior while giving the recorder a safe column template.
 After the filled manifest exists, generate a matching results skeleton:
 
 ```powershell
+npm run western:m2f-manifest-status
+```
+
+This manifest-only check should pass before result counting begins. It does not
+require a results file and is meant to catch missing scenarios, student counts,
+consent/license/path issues, and private-storage violations early.
+
+```powershell
 npm run western:m2f-results-skeleton
 ```
 

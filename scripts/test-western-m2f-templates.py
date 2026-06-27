@@ -12,6 +12,7 @@ REPO = Path(__file__).resolve().parents[1]
 GENERATOR = REPO / "scripts" / "experiments" / "create_western_strings_m2f_templates.py"
 SKELETON = REPO / "scripts" / "experiments" / "create_western_strings_m2f_results_skeleton.py"
 GATE = REPO / "scripts" / "experiments" / "eval_western_strings_m2f_real_recordings.py"
+MANIFEST_CHECK = REPO / "scripts" / "experiments" / "check_western_strings_m2f_manifest.py"
 PACKAGE_JSON = REPO / "package.json"
 
 
@@ -65,9 +66,11 @@ def main() -> int:
 
         package = json.loads(PACKAGE_JSON.read_text(encoding="utf-8"))
         scripts = package.get("scripts", {})
+        manifest_status = scripts.get("western:m2f-manifest-status", "")
         status_gate = scripts.get("western:m2f-status", "")
         release_gate = scripts.get("western:m2f-gate", "")
         negative_test = scripts.get("test:western-m2f-real-recordings", "")
+        assert_true(manifest_status and "check_western_strings_m2f_manifest.py" in manifest_status, "western:m2f-manifest-status must run the manifest-only readiness check")
         assert_true(status_gate and "--fail-on-not-ready" not in status_gate, "western:m2f-status must be non-failing for inspection")
         assert_true(release_gate and "--fail-on-not-ready" in release_gate, "western:m2f-gate must fail when real pilot data is not release-ready")
         assert_true("--expect-negative" in negative_test, "test:western-m2f-real-recordings should remain the fail-closed regression command")
@@ -150,6 +153,23 @@ def main() -> int:
             updated["scoreId"] = ""
             valid_manifest_rows.append(updated)
         write_rows(filled_manifest, manifest_columns, valid_manifest_rows)
+
+        manifest_check = subprocess.run(
+            [
+                sys.executable,
+                str(MANIFEST_CHECK),
+                "--manifest",
+                str(filled_manifest),
+                "--out",
+                str(out_dir / "manifest-ready-summary.json"),
+                "--expect-positive",
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true("manifestReady" in manifest_check.stdout and "true" in manifest_check.stdout.lower(), "valid manifest should pass the manifest-only readiness check")
 
         good_results = out_dir / "good-results.csv"
         good_result_rows = [
@@ -433,6 +453,23 @@ def main() -> int:
             capture_output=True,
         )
         assert_true("studentGateReady" in gate.stdout and "false" in gate.stdout.lower(), "templates should not make the M2f gate ready")
+
+        missing_manifest_check = subprocess.run(
+            [
+                sys.executable,
+                str(MANIFEST_CHECK),
+                "--manifest",
+                str(out_dir / "missing-manifest.csv"),
+                "--out",
+                str(out_dir / "missing-manifest-readiness.json"),
+                "--expect-negative",
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true("manifestReady" in missing_manifest_check.stdout and "false" in missing_manifest_check.stdout.lower(), "missing manifest should fail the manifest-only readiness check")
 
     print(json.dumps({"ok": True, "checks": ["m2f-template-columns", "m2f-template-scenarios", "m2f-results-skeleton", "m2f-template-fail-closed"]}))
     return 0

@@ -108,6 +108,16 @@ Default manifest path:
 data/experiments/western-strings-m2/real-student-recordings-manifest.csv
 ```
 
+Before generating the results skeleton, run the manifest-only readiness check:
+
+```powershell
+npm run western:m2f-manifest-status
+```
+
+This checks recording counts, student counts, scenario coverage, consent/license
+fields, path existence, and private storage rules. It does not require
+`real-student-recording-results.csv`.
+
 Required columns:
 
 | column | Fill rule |
