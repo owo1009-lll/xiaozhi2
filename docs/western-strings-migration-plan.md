@@ -213,6 +213,7 @@ M3+ 不做技法名称展示,也不做技法质量评价。它只解决一个产
 - 已接入 eval-only 命令 `npm run western:m3plus-pitch-modes`,用于从现有 12 条真实/准真实录音中清点稳态、滑音式连续运动、颤音式交替、装饰音候选、双音候选等 pitch-behavior 样本。
 - 全量输出:2588 个谱面音符、1269 个 pitch-behavior 候选,产物在 `data/experiments/western-strings-m3plus/m3plus-pitch-mode-inventory.csv` 和 `m3plus-pitch-mode-summary.json`。
 - 已接入 `npm run western:m3plus-review-pack`,生成 `data/experiments/western-strings-m3plus/pitch-mode-review-pack/index.html`、待填 CSV/JSON/guide 和 48 个本地短 WAV。当前抽样为 6 类各 8 条:`slide-like`、`trill-like`、`double-stop-candidate`、`ornament-candidate`、`stable`、`variable-f0`。
+- 已接入 `npm run western:m3plus-review-import` 与 `npm run western:m3plus-review-status`:标完网页下载 `m3plus-pitch-mode-review.completed.csv` 后导入,状态命令会报告每类 reviewed/scored 缺口。未导入标签时状态必须 fail-closed,不能进入模式 precision 评估。
 - 当前 gate 仍为 `studentGateReady=false`,原因=`inventory-only-no-human-mode-labels` / `human-label-collection-only`。这些候选只用于抽样复核和 M3+ 标注规划,不证明 precision,不改变学生端反馈。
 
 ---
