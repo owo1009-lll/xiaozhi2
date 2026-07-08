@@ -238,7 +238,7 @@ OMR 只解决"谱面从哪来",不改变音频诊断逻辑。未过 note-level �
 - 已接入只读 readiness 命令 `npm run western:m4-omr-readiness`。该命令检查 M2f clean-score intake 中每条图片/PDF 谱面源、gold clean MusicXML/MXL/MIDI、人工 `approved` 状态和 score-store `scoreId` 是否齐备。
 - 当前实测:12 条 intake 全部 ready,`pairReadyRows=12`,`blockedRows=0`,`m4OmrBenchmarkDatasetReady=true`;产物为 `data/experiments/western-strings-m4/omr-readiness.json` 和 `omr-readiness.csv`。
 - 该结果只是 OMR benchmark 的数据前置条件,不是 OMR 准确率通过。学生端仍固定 `studentGateReady=false`,OMR 识别结果在 note-level 精度闸门通过前不得进入 `/api/strings/analyze` 判断层。
-- 已接入 `npm run western:m4-omr-benchmark`,对 Audiveris 草稿和 gold clean score 做只读序列评测。当前 12/12 草稿可解析,但 12/12 gold clean score 与 Audiveris 草稿完全同 SHA-1,属于 self-comparison;脚本已自动排除并返回 `usableBenchmarkRows=0`,`selfComparisonRows=12`,`m4OmrDraftQualityReady=false`。M4 下一步不是调阈值,而是准备独立人工校正 gold score 或外部 gold 后重跑 benchmark。
+- 已接入 `npm run western:m4-omr-benchmark`,对 Audiveris 草稿和 gold clean score 做只读序列评测。当前 12/12 草稿可解析,但 12/12 gold clean score 与 Audiveris 草稿完全同 SHA-1,属于 self-comparison;脚本已自动排除并返回 `usableBenchmarkRows=0`,`selfComparisonRows=12`,`m4OmrDraftQualityReady=false`。已接入 `npm run western:m4-independent-gold-todo`,生成 `data/experiments/western-strings-m4/independent-gold-todo.md/.csv` 作为人工独立 gold 修正清单。M4 下一步不是调阈值,而是准备独立人工校正 gold score 或外部 gold 后重跑 benchmark。
 
 ---
 
