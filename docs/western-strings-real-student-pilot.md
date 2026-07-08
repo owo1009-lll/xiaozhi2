@@ -6,6 +6,13 @@
 
 Recorder-facing checklist: [western-strings-m2f-recording-checklist.md](western-strings-m2f-recording-checklist.md).
 
+Current result (2026-07-08): the first pilot passed. The reviewed dataset has
+12 recordings from 3 anonymous students, covers the six required scenarios twice
+each, and reports `autoPassCount=431`, `correctWithin300ms=431`,
+`unsafeTargetAutoPassCount=0`, and `precisionWithin300ms=1.0000`. This clears
+the M2f gate only; M3 basic-diagnosis validation is still required before any
+student-facing API release.
+
 ## Scope
 
 M2f validates the current western-strings `studentSafe=1` gate on real or

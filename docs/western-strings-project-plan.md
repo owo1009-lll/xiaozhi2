@@ -1,7 +1,7 @@
 # 弓弦乐器练习诊断平台 — 完整项目开发手册
 
 > 本文是**可交付开发执行**的完整项目计划(10 章)。战略与 M0–M5 闸门详见 [western-strings-migration-plan.md](western-strings-migration-plan.md);本手册在其上补全:资产盘点、M0 SOP+结果、M1–M5 工程拆解、后台/UI/API/schema 变更、数据集许可证、版本定义、论文产出对应、时间线/人力/停止条件。
-> **状态:M1 已完成并通过收口回归;M2 teacher-only preview 已接入;M2e 学生式事件扰动已通过 synthetic gate。学生端 release 的当前硬阻塞是 M2f 真实学生录音复验。** 二胡自动线冻结为 V1.5(人在环 + 困难案例/论文证据)。
+> **状态:M1 已完成并通过收口回归;M2 teacher-only preview 已接入;M2e 学生式事件扰动已通过 synthetic gate;M2f 真实学生录音 release gate 已于 2026-07-08 通过;M3 core diagnosis gate 已通过;最小 `/api/strings/analyze` / `/api/strings/review` 服务端闭环、gated preview UI、clean-score + audio 受控提交流、离线复核队列、fail-closed 批处理审计执行器已接入。** 当前 V2 只放行 pitch / onset / missing 三类核心诊断;duration 因节奏不稳定暂不可稳定量化,extra-note/多音可判断但本轮复核未出现样本,两者均暂列 review-only,不得给学生硬反馈。当前 UI 可展示已验证样本的核心诊断预览,也可接收 clean-score + audio 进入离线复核队列,支持试听、审核为批处理候选、生成批处理审计记录;普通上传音频的 batch 已可产出 review-only pYIN 线性谱面完整候选特征表 artifact(同时保留 preview),并接入 `western-offline-feature-gate-v0-review-only` student-safe gate 框架、fail-closed 二次审计和离线校准评估命令,但全部 note 仍为 review_required。它仍不是任意上传音频实时诊断器。二胡自动线冻结为 V1.5(人在环 + 困难案例/论文证据)。
 
 ---
 
@@ -14,7 +14,7 @@
 |---|---|---|---|---|
 | **V1.5(当前,二胡)** | 人在环:人工锚点→教师结构化标注→导出 | 无自动反馈 | 标注后台 + 导出 | 已达成 |
 | **V2-alpha(小提琴)** | 高置信 note 对齐自动判,后台离线 | 暂不开放 | 自动预测+置信+证据+一键改正 | M2:auto_pass precision≥90%、coverage≥20%、跨曲验证 |
-| **V2-release** | 基础诊断(音准/节奏/漏多音)对高置信开放 | 高置信音的诊断+谱面定位;低置信"需复核" | 复核+回流 | M3 完成 + 教师闭环 |
+| **V2-release** | 基础诊断 core(音准/起音/漏音)对高置信开放;时值/多音 review-only | 高置信音的诊断+谱面定位;低置信"需复核" | 复核+回流 | M3 core 完成 + 教师闭环 |
 | **V3-beta** | 覆盖率提升,多曲稳定 | 更多自动诊断 | 同上 | 500 真值/10 曲、coverage≥30%、precision≥90% |
 | **V3-release** | 大部分常规段自动,散板/复杂仍复核 | 大部分常规段自动 | 同上 | coverage≥40-60%、unsupported 稳定拒绝 |
 | (技巧 M4) | 揉弦/弓法等,达标才自动、否则 review | 达标技巧标注 | 复核 | 每类 AUC≥0.70、precision≥90% |
@@ -51,7 +51,7 @@
 ---
 
 ## 3. 西洋弦乐迁移范围(in / out)
-**In(第一版):** 小提琴;输入 = 音频 + **MusicXML/MIDI/dataset-score**;note 对齐 + 基础诊断(音准/节奏/漏多音);四态置信门;教师复核回流。
+**In(第一版):** 小提琴;输入 = 音频 + **MusicXML/MIDI/dataset-score**;note 对齐 + 基础诊断 core(音准/起音/漏音);时值/extra-note 多音 review-only;四态置信门;教师复核回流。
 **Out(后续):** PDF OMR(避免坎1)、技巧识别(M4 后置)、大提琴(M5)、用户上传任意谱面、散板/重 rubato 曲目自动判(直接 reject_unsupported)。
 
 ---
@@ -103,16 +103,19 @@
 - **reason codes:** `double-stop-unsupported`/`legato-onset-ambiguous`/`rubato-section`/`low-pitch-confidence`/`polyphonic-texture`/`score-audio-range-mismatch`/`weak-onset`/`dataset-label-uncertain`。
 - **frontend(后台):** 自动预测位置 + 置信 + 证据 + 一键确认/改正 + 是否采纳 + 回流开关。**默认 feature flag 关闭,先后台验证。**
 - **API(当前):** `GET /api/strings/alignment-preview` + `POST /api/strings/alignment-preview/reviews`,仅教师后台离线预览/复核。
-- **API(未来 release gate 通过后):** `POST /api/strings/analyze`(audio+scoreId→note findings+decisions);`POST /api/strings/review`(override→训练集回流)。
+- **API(当前最小学生闭环):** `POST /api/strings/analyze` 读取 M2d/M2f/M3 证据并 fail-closed;只暴露 core passed categories = pitch / onset / missing。该路由也接受 clean-score `scoreId` + audio 的受控提交,但只写入离线复核队列并返回 `studentReady=false`。`GET /api/strings/controlled-submissions`、`GET /api/strings/controlled-submissions/:id/audio`、`POST /api/strings/controlled-submissions/reviews` 提供离线队列读取、试听和审核。`POST /api/strings/controlled-submissions/run-batch` 只处理 `accepted_for_batch` 项并写入 batch run 审计记录,`autoDiagnosisIssued=false`;若提交携带已验证的 `dataset/piece/recordingId`,batch 可回放现有 gated pipeline 生成离线分析摘要,但仍不发学生端诊断。普通 clean-score + audio 上传现在可进入 review-only pYIN 线性谱面特征执行器,输出 `offline_feature_review_ready` 完整候选特征表 artifact、前 5 条 preview 与摘要;`western-offline-feature-gate-v0-review-only` 会给每个候选写入 gateDecision/gateReason/gateVersion,并强制全部 review_required;`npm run western:controlled-batch-candidate-audit` 会二次审计 artifact 存在、行数匹配、候选仍为 review-only、非 student-facing、无 auto-pass。`npm run western:controlled-candidate-review-export` 默认从最新 batch 按录音轮转抽样 30 条,生成本地中文复核页和待填 CSV;需要全量时加 `-- --all`。复核后用 `npm run western:controlled-candidate-review-import -- --reviews <completed.csv>` 合并到累计 labels CSV;`npm run western:controlled-candidate-gate-eval` 默认读取累计 labels CSV,按最少复核样本数、可评分 usable/wrong 样本数和 precision 门槛评估是否存在可放行规则;未 ready 前不改变运行时 gate。所有 note 仍保持 `review_required`,直到真正校准过的 student-safe 对齐 gate 通过。`POST /api/strings/review` 记录教师/学生端复核回流。当前实现是证据门控包装层,不是任意上传音频的实时分析器。
 - **验收:** auto_pass precision≥90%、coverage≥20%、按曲报告、留一曲验证、无真值泄漏。
 
 ### M3 — 基础教学诊断(先于技巧)
-- 诊断:音准偏差 / 起音时序 / 音长误差 / 漏音·多音 / 音高不稳 / 低置信警告。
+- **当前 V2 core release 范围:** 音准偏差 / 起音时序 / 漏音 / 音高不稳 / 低置信警告。
+- **当前 review-only:** 时值过短/过长、extra-note/多音。两者原因不同:本轮真实学生复核中没有 extra-note 错误,所以多音缺少 release 证据;时值错误受节奏不稳定影响,教师只能给出定性判断,不能稳定量化为学生端硬反馈。
+- **多音口径澄清:** 多音/extra-note 本身可以由人工复核判断;本轮只是复核时没有发现多音错误样本,所以当前 release gate 没有覆盖它。后续要开放自动多音反馈,应补采或构造经人工确认的 extra-note 样本,而不是把多音视为不可判定类别。
 - **第一版建议阈值(必须由教师样本复验后才能 release):**
   - pitch: `abs(centsError) >= 35c` 进入 pitch issue;20-35c 默认 review hint,不直接给学生硬错。
   - onset: `abs(onsetErrorMs) >= 120ms` 进入 rhythm issue;legato/weak-onset 只给 review reason。
-  - duration: `abs(durationRatio - 1.0) >= 0.35` 或 `abs(durationErrorMs) >= 180ms` 进入 duration issue。
-  - missing/extra: 只在 M2 `auto_pass` 或教师确认的对齐范围内判定;polyphonic/double-stop 默认 review。
+  - missing: 只在 M2 `auto_pass` 或教师确认的对齐范围内判定。
+  - extra: 可判断,但本轮没有多音样本;需后续补经人工确认的 extra-note 场景后才能进入 release gate。
+  - duration: 本版仅记录为 review-only,需后续补可稳定量化的时值样本后才能进入 release gate。
 - **frontend(学生端):** 高置信音诊断 + 谱面定位;低置信"需复核";reject 段明确提示。
 - **验收:** note-level 反馈落到谱面位置;低置信不反馈;教师复核可用 + 回流。
 
@@ -130,7 +133,7 @@
 ## 7. 后台 / UI / API / schema 变更汇总
 - **schema:** score 加 `instrument/scoreSource/tempoKnown/tempoSource`;note finding 加 `autoDecision/confidenceScore/confidenceModelVersion/candidateSources/reviewRequiredReason/teacherOverride`。
 - **API 当前新增:** `/api/strings/alignment-preview`、`/api/strings/alignment-preview/reviews`,只供教师后台离线预览。
-- **API 未来新增:** `/api/strings/analyze`、`/api/strings/review`;只有真实学生输入 release gate 通过后才允许接学生端。
+- **API 当前最小学生闭环:** `/api/strings/analyze`、`/api/strings/review`;前者同时检查 M2d sequence support、M2f real-student gate 和 M3 core diagnosis gate,缺任一证据即 `studentReady=false` 且不返回自动诊断。clean-score + audio 受控提交已接入同一路由,只登记为 offline review intake;controlled-submission 队列支持列表、缓存音频试听、审核状态回写和 fail-closed batch audit。
 - **UI:** 教师后台加"自动预测+置信+证据+改正+回流";学生端加四态展示;乐器选择。
 - **feature flag:** `strings.autoFeedback`(默认关),`strings.technique`(默认关)。
 - **不动:** 二胡现有后台/包/导出(冻结)。
@@ -176,7 +179,8 @@
 | 系统异常 | `failed`(提示重试/人工锚点) |
 
 **④ V2-alpha 产品范围(先不承诺完整教学系统):**
-- **支持:** clean MusicXML/MIDI + **单声部小提琴**音频 → 输出**音准 / 节奏 / 漏音 / 多音 / 低置信提示**。
+- **支持:** clean MusicXML/MIDI + **单声部小提琴**音频 → 输出**音准 / 起音 / 漏音 / 低置信提示**。
+- **暂不开放硬反馈:** 时值 / extra-note/多音。extra-note 可判断但当前无验证样本;时值需先解决节奏不稳定下的量化口径。两者当前只能作为 review-only 记录,不得进入学生端自动诊断。
 - **不支持:** 技巧自动判定、PDF 识谱、强 rubato / 多声部混音自动反馈、大提琴。
 - **auto_pass precision≥90% 硬门槛;coverage 作结果报告**。coverage <20% 时只能保持 teacher-only preview 或受限内部 alpha,不能命名为 V2-alpha;coverage 达到 20% 后仍以 precision 和 unsafe=0 为 release 硬门槛。
 
@@ -187,17 +191,23 @@
 - 最小样本:不少于 6 条录音、3 名学生或准学生;必须覆盖 `correct`、`wrong_pitch`、`missing_note`、`rhythm_shift`、`weak_onset`、`noisy` 六类场景。
 - 每条 manifest 必须有真实音频路径、scoreId 或 score path、consent、licenseStatus、humanChecked、scenario、匿名化 `studentId`。
 - 模板生成命令:`npm run western:m2f-templates`;该命令只生成 `.template.csv`,不会让 release gate 误通过。
-- Manifest 预检命令:`npm run western:m2f-manifest-status`;状态查看命令:`npm run western:m2f-status`;Release gate 命令:`npm run western:m2f-gate`。未提供数据时应 fail-closed,输出 `studentGateReady=false`;`western:m2f-gate` 在未 ready 时必须非零退出;真实数据 precision<90% 或 unsafe target auto-pass>0 时不得开放学生端。`npm run test:western-m2f-real-recordings` 仅作为当前无真实数据状态的 fail-closed 回归测试。
+- Manifest 预检命令:`npm run western:m2f-manifest-status`;clean-score 缺口清单命令:`npm run western:m2f-clean-score-intake`;clean-score 审核包命令:`npm run western:m2f-score-review-pack`;Audiveris 草稿命令:`npm run western:m2f-audiveris-drafts`;Audiveris 草稿预置命令:`npm run western:m2f-stage-audiveris-drafts -- --apply`;clean-score 审核状态命令:`npm run western:m2f-clean-score-review-status`;clean-score 应用命令:`npm run western:m2f-apply-clean-scores -- --apply`;状态查看命令:`npm run western:m2f-status`;Release gate 命令:`npm run western:m2f-gate`。未提供数据时应 fail-closed,输出 `studentGateReady=false`;`western:m2f-gate` 在未 ready 时必须非零退出;真实数据 precision<90% 或 unsafe target auto-pass>0 时不得开放学生端。`npm run test:western-m2f-real-recordings` 仅作为当前无真实数据状态的 fail-closed 回归测试。
 
 **⑥ M2f results 填写 SOP(防止 manifest 有了但 results 无法落地):**
 1. 运行 `npm run western:m2f-templates`,复制模板为正式 manifest;真实学生录音放在 `data/private/...` 或仓库外私有目录。local-only 私有谱面若用 `scorePath` 放在仓库内,也必须在 `data/private/...`。仓库内普通路径会被 gate 拒绝。
-2. 填满 manifest 后先运行 `npm run western:m2f-manifest-status`;该命令只检查录音清单,不要求 results 文件。通过后再运行 `npm run western:m2f-results-skeleton`,生成与 manifest `recordingId` 一一对应的 results skeleton。
-3. 对每条录音用当前 teacher-only preview / `studentSafe=1` 证据跑离线复核。复核者按谱面或人工 gold 判断每个 auto-pass 音是否在 300ms 内命中,并统计:
+2. 填满 manifest 后先运行 `npm run western:m2f-clean-score-intake`,生成 `data/experiments/western-strings-m2/clean-score-intake.csv`;该表列出每条 JPG/PNG 谱图应替换到的 clean MusicXML/MXL/MIDI 路径,或需要填写的已有 `scoreId`。
+3. 运行 `npm run western:m2f-score-review-pack`,打开 `data/experiments/western-strings-m2/score-review-pack/index.html`;该本地审核页把每条录音、JPG 谱图和目标 clean-score 路径放在一起,用于人工清谱/核谱。
+4. 可选运行 `npm run western:m2f-audiveris-drafts`,为每张谱图生成 Audiveris `.mxl` 草稿和 `audiveris-draft-musicxml-summary.json`。草稿只能作为人工校对起点,不得未经核谱直接进入 release gate。
+5. 可选运行 `npm run western:m2f-stage-audiveris-drafts -- --apply`,把可解析的 Audiveris 草稿复制到 `requiredCleanScorePath` 指向的 `.mxl` 目标并更新 intake,但不设置 `approved`。
+6. 将人工核对后的 clean MusicXML/MXL/MIDI 放到 `clean-score-intake.csv` 的 `requiredCleanScorePath`,或在该表里填写已有 clean-score `scoreId`;逐行确认后将 `cleanScoreReviewStatus` 填为 `approved`;然后运行 `npm run western:m2f-clean-score-review-status`。该命令只读报告 pending/approved 状态,可在人工核谱中途反复运行。
+7. `npm run western:m2f-clean-score-review-status` ready 后,运行 `npm run western:m2f-apply-clean-scores -- --apply`。该命令只在所有 clean score 真实存在且全部显式 `approved` 时才写回 manifest,缺任一项或未核谱则 fail-closed 且不改 manifest。
+8. 运行 `npm run western:m2f-manifest-status`。该命令只检查录音/clean-score 清单,不要求 results 文件。通过后再运行 `npm run western:m2f-results-skeleton`,生成与 manifest `recordingId` 一一对应的 results skeleton。
+9. 对每条录音用当前 teacher-only preview / `studentSafe=1` 证据跑离线复核。复核者按谱面或人工 gold 判断每个 auto-pass 音是否在 300ms 内命中,并统计:
    - `autoPassCount`: gate 放行的音符数;
    - `correctWithin300ms`: 放行且与人工/gold 目标在 300ms 内一致的音符数;
    - `unsafeTargetAutoPassCount`: 已知错误目标(错音、漏音、明显节奏偏移、弱起音目标等)被错误 auto-pass 的数量。
-4. 第二人或同一教师复查异常行后再运行 `npm run western:m2f-status`;只有 status 干净后才运行 `npm run western:m2f-gate` 作为 release 阻断命令。
-5. `eval_western_strings_m2f_real_recordings.py` 只校验 manifest/results 完整性和统计闸门,不会自动生成上述三列计数;计数必须来自真实 preview 输出 + 人工/gold 复核。
+10. 第二人或同一教师复查异常行后再运行 `npm run western:m2f-status`;只有 status 干净后才运行 `npm run western:m2f-gate` 作为 release 阻断命令。
+11. `eval_western_strings_m2f_real_recordings.py` 只校验 manifest/results 完整性和统计闸门,不会自动生成上述三列计数;计数必须来自真实 preview 输出 + 人工/gold 复核。
 
 ---
 
@@ -209,7 +219,7 @@
 | M2b student-like pilot | 合成错音/漏音/节奏扰动 | 合成/特征扰动不能暴露系统性误 auto_pass | 继续后台离线,不得 release |
 | M2d/M2e sequence support gate | 当前音 + 邻近音的 Basic Pitch 事件序列支持;再用学生式事件扰动复验 | 基准 precision≥90%、coverage≥20%,且 correlated drift / 错音 / 漏音 / 弱起音目标 0 auto-pass | 未过则 `studentSafe=1` 全量 review |
 | M2f real-student recording gate | 真实/准真实学生录音 manifest + results;覆盖正确、错音、漏音、节奏偏移、弱起音、噪声/手机录音 | 真实输入 precision≥90%, unsafe target auto-pass=0,录音/授权/场景完整 | 未过则不得开放 `/api/strings/analyze` |
-| M3 diagnosis | pitch/rhythm/missing/extra note 的独立评测表 | 音准、起音、时值、漏音/多音按类别分别 precision≥90%;阈值见 M3 第一版建议;低置信不反馈;回流可导出 | 仅显示对齐,不显示诊断 |
+| M3 diagnosis | pitch/onset/missing core 评测表;duration/extra 可选扩展 | 当前 release 只要求音准、起音、漏音分别 precision≥90% 且 unsafe=0;extra-note 需补人工确认样本;duration 需补可量化时值样本。未通过前二者保持 review-only;低置信不反馈;回流可导出 | 仅显示对齐,不显示诊断 |
 | M4 technique | 每类 AUC/PR-AUC/正负数/按曲留一 | AUC≥0.70 且 PR-AUC 明显高于基率;precision≥90% 才 auto_pass | 永久 review hint |
 | 全程 | `check-server-p0` / `test:teacher-validation` / `build` | eval-only 脚本不写生产;数据不进仓库;feature flag 关时学生端零自动输出 | 阻断发布 |
 
@@ -239,7 +249,7 @@
 |---|---|
 | M0 | ✅ 已完成 |
 | M1 干净谱接入 | ✅ 已完成 |
-| M2 V2 置信门 | 代码侧已到 teacher-only preview + synthetic gate;剩余 M2f 真实录音采集/复验约 0.5-2 周(取决于录音与人工复核) |
+| M2 V2 置信门 | teacher-only preview + synthetic gate + M2f 真实录音 gate 已通过;学生端开放前进入 M3 基础诊断与 API 审查 |
 | M3 基础诊断 | 1-2 周 |
 | M4 技巧 pilot | 2-3 周(含教师标注) |
 | M5 大提琴 | 1-2 周(+独立 M0) |
@@ -279,13 +289,27 @@
 - ✅ M2c 独立音频证据探针已补:`npm run test:western-m2c-audio-support` 用 Basic Pitch 事件支持检验 correlated drift。结果:基准 precision=0.9921 / coverage=0.7864,但 +800ms 相关漂移仍有 112 个重复同音误通过(precision=0),所以单音事件支持不达标。
 - ✅ M2d 序列级 Basic Pitch 支持已补:`npm run test:western-m2d-sequence-support` 要求当前音及相邻音序列都有事件支持。release 候选阈值收紧为 30ms 后,结果:基准 precision=1.0000 / coverage=0.2443,+800ms correlated drift autoPass=0。
 - ✅ M2e 学生式事件扰动已补:`npm run test:western-m2e-student-events` 直接改 Basic Pitch 事件,覆盖漏音、错音、延迟 800ms、弱起音和额外杂散音。30ms 序列闸门下所有目标错误 `targetAutoPass=0`;这比 feature-only 扰动更强,但仍不是最终真实学生录音验证。
-- ✅ M2d 已接入 preview service 的 `studentSafe=1` 决策级闸门:证据缺失或单条序列支持不足时 fail-closed;M2d ready 时只放行通过序列支持的 note。学生端仍无 `/api/strings/analyze` / `/api/strings/review` 路由。
-- ✅ M2f 真实学生录音 release gate 已补:`npm run western:m2f-gate` 校验真实录音 manifest/results、样本数、学生数、错误场景、授权、路径与结果安全性。当前没有真实录音数据,命令按预期 fail-closed 并输出 `studentGateReady=false`;`npm run test:western-m2f-real-recordings` 保留为无数据 fail-closed 回归测试;协议见 `docs/western-strings-real-student-pilot.md`,录制执行清单见 `docs/western-strings-m2f-recording-checklist.md`。
+- ✅ M2d 已接入 preview service 的 `studentSafe=1` 决策级闸门:证据缺失或单条序列支持不足时 fail-closed;M2d ready 时只放行通过序列支持的 note。
+- ✅ M2f 真实学生录音 release gate 已补并通过:`npm run western:m2f-gate` 校验真实录音 manifest/results、样本数、学生数、错误场景、授权、路径与结果安全性。2026-07-08 人工/gold 复核完成:12 条小提琴录音、3 个匿名学生、6 类场景各 2 条;`autoPassCount=431`,`correctWithin300ms=431`,`unsafeTargetAutoPassCount=0`,`precisionWithin300ms=1.0000`,`studentGateReady=true`。通过命令:`npm run western:m2f-status`,`npm run western:m2f-gate`,`npm run test:western-m2f-templates`。
+- ✅ PDF/JPG→MusicXML 草稿路径已实测并脚本化:`npm run western:m2f-audiveris-drafts` 使用本地 Audiveris 5.10.2 console,对 M2f 谱图做 2x 预处理并批量 OMR;练习曲 5 换用高清谱图后,12/12 可生成可解析 `.mxl` 草稿。该路径仅作为人工清谱/核谱辅助,不得未经人工确认直接作为 V2 clean score release 证据。本轮 M2f 通过依据是已核实 manifest/results 与人工/gold 复核计数。
 - ✅ M2d/M2e 通过/拒绝证据已映射到教师后台:Western strings preview 默认加载 `studentSafe=1`,显示 release gate 状态、source、review reason、相邻音序列 Basic Pitch 支持、method agreement 与 candidate sources,方便教师快速复核。
 - ✅ M1 收口已完成: `test:western-string-config` / `test:western-musicxml-import` / `test:western-midi-import` / `test:western-dataset-index` / `test:western-strings-entry` / `test:server-boundaries` / `test:server-p0` / `test:musicxml-import` / `test:analyzer-score-roles` / `test:teacher-validation` / `build` 全部通过。
 
-**M1 已完成。M2 当前停在 teacher-only preview + studentSafe preview gate,尚未 release 到学生端。**
+**M1 已完成。M2f 真实学生录音 gate 已通过;M3 core diagnosis gate 已通过;最小 `/api/strings/analyze` / `/api/strings/review` 服务端闭环已接入;Western strings UI 已支持 clean-score + audio 受控提交进入离线复核队列,并可试听/审核队列项、运行 fail-closed batch audit。学生端仍未开放任意上传音频实时自动反馈。**
 
-当前 M2 剩余步骤:
-1. 按 `docs/western-strings-m2f-recording-checklist.md` 收集并填写 M2f 真实学生录音 manifest/results(错音、漏音、节奏偏移、弱起音、噪声/手机录音)。录音必须放在 `data/private/...` 或仓库外私有路径;local-only 私有谱面同理。仓库内普通路径会被 gate 拒绝。若 precision<90% 或出现系统性误 auto-pass,继续 teacher-only preview。
-2. 真实输入 gate 通过后,再讨论 `/api/strings/analyze` 学生端最小闭环;否则 `studentSafe=1` 仍只作为离线 preview gate。
+当前下一阶段步骤:
+1. 以 M2f 通过结果作为 V2-alpha 学生端前置证据,保留 `real-student-recording-results.csv` 和 gate 输出作为审计依据。
+2. ✅ M3a 诊断复核表与 fail-closed validator 已接入:`npm run western:m3-diagnosis-skeleton` 生成 `data/experiments/western-strings-m3/real-student-diagnosis-results.csv`;`npm run western:m3-status` / `npm run western:m3-gate` 默认评估 V2 core required categories = pitch / onset / missing。duration / extra 仍可记录,但默认 `review_only`,不阻塞当前 core gate。
+3. ✅ M3b 本地复核网页已接入:`npm run western:m3-diagnosis-review-pack` 生成 `data/experiments/western-strings-m3/diagnosis-review-pack/index.html`;页面复用 M2f 音频、谱图和 auto-pass 预览,按录音聚合填写五类诊断的系统诊断数/正确数/危险误判数,支持"已填诊断全部正确"、清零、按场景预填草稿、下载 CSV。
+4. ✅ M3c 第一轮人工/gold 复核已导入:12 行结果覆盖 431 个 M2f auto-pass note;`npm run western:m3-status` 和 `npm run western:m3-gate` 已通过 core gate。pitch=2/2、onset=2/2、missing=2/2,三类 precision=1.0000 且 unsafe=0;duration 与 extra status=`review_only`。
+5. 后续若要开放 extra-note 反馈,必须另采/构造经人工确认的多音样本;若要开放 duration 反馈,必须先定义节奏不稳定下可重复的时值量化口径并采集对应样本。之后用 `--required-categories all` 或显式 required list 重跑 gate;未通过前不得给学生硬反馈。
+6. ✅ 最小 `/api/strings/analyze` / `/api/strings/review` 服务端闭环已接入,默认仍 fail-closed;当前只允许 core passed categories 进入学生端候选。`test:western-alignment-preview` 覆盖 route ready/fail-closed。
+7. ✅ Western strings 页面已接入 gated preview UI:只加载已验证样本,显示 allowed categories = pitch / onset / missing、review-only = duration / extra,并可写回 confirm/review。`test:western-strings-entry` 覆盖 UI hook;`test:western-feature-flags` 确认离线 preview 仍未被学生侧直接调用。
+8. ✅ UI 已从“已验证样本预览”升级到真实 clean-score + audio 的受控提交流:上传音频只进入 `controlled-submissions.jsonl` 离线复核队列并返回 `studentReady=false`,不会生成学生端硬诊断。
+9. ✅ 离线复核队列已接入:可列出 controlled submissions、试听缓存音频、写入 `controlled-submission-reviews.jsonl`,并把条目标为 `accepted_for_batch` / `review_required` / `reject_unsupported` / `failed`。
+10. ✅ fail-closed 批处理审计执行器已接入:`POST /api/strings/controlled-submissions/run-batch` 只处理 `accepted_for_batch` 项,写入 `controlled-submission-batch-runs.jsonl`,并明确 `autoDiagnosisIssued=false`。对携带已验证 `dataset/piece/recordingId` 的受控提交,batch 可回放现有 gated pipeline 并写出 `offline_analysis_ready` 摘要;对普通 clean-score + audio 上传,batch 已接入 review-only pYIN 线性谱面特征执行器,可写出 `offline_feature_review_ready` 完整候选特征表 artifact、前 5 条 preview 与摘要,但所有结果仍为 `review_required`。`western-offline-feature-gate-v0-review-only` 已作为普通上传的 student-safe gate 框架接入,当前版本明确阻断所有候选并写出 `ordinary-upload-student-safe-gate-not-calibrated`;`npm run western:controlled-batch-candidate-audit` 已作为二次审计命令,检查普通上传候选表 artifact 存在、行数匹配、没有 auto-pass、没有 student-facing 输出、没有 student-safe gate 绕过。`npm run western:controlled-candidate-review-export` 默认抽样 30 条最新 batch 候选,生成本地中文复核网页、CSV、JSON 和 `review-guide.md`;`-- --all` 可导出全量候选。`npm run western:controlled-candidate-review-import -- --reviews <completed.csv>` 把人工复核结果合并到累计 labels CSV;`npm run western:controlled-candidate-gate-eval` 默认读取累计 labels CSV 并生成校准报告;`npm run western:controlled-candidate-review-status` 输出当前 reviewed/scored 缺口、bestRule、下一步和 `reviewArtifacts`(复核网页/指南/completed CSV/labels CSV 路径);`uncertain` 只计入复核记录,不计入可评分样本数。下一步是积累真实普通上传复核数据,在校准报告达到 minReviewedRows/precision 闸门后再讨论替换 `western-offline-feature-gate-v0-review-only`;未完成前不得声称支持任意上传音频实时诊断。
+11. ✅ 普通上传候选复核输入预检已接入并打通:`npm run western:controlled-candidate-input-status` 只读检查 M2f manifest、clean-score intake、score store、controlled submissions 和 batch 候选行。当前实测为 12/12 音频存在、12/12 clean score 已批准且文件存在、12/12 已导入 score store 并回填 `scoreId`;12 条 controlled submissions 已审核为 `accepted_for_batch`。最新 batch run `strings-batch-mrb9twcr-ls0kkl` 生成 12 个 `offline_feature_review_ready` 项、2588 行 review-only 候选 artifact,`western:controlled-batch-candidate-audit` 默认审计最新 run 并通过。`western:controlled-candidate-review-export` 默认生成 30 条轮转抽样的本地中文复核网页/CSV/JSON 和按录音分组的 `review-guide.md`,用于第一轮最小校准;需要审全量时加 `-- --all`。下一步是人工复核候选行并用 import/status/gate-eval 累积校准证据。历史上一次缺 `candidateRowsPath` 的旧 batch 保留为数据日志,不作为当前默认审计对象;需要追溯历史时可显式跑 `western:controlled-batch-candidate-audit -- --all-runs`。
+12. ⏳ 当前人工复核口径:打开 `data/experiments/western-strings-m3/offline-feature-candidate-review/index.html`,逐条试听并看候选的预测秒/页/小节/MIDI。若候选确实对应该谱面音符且足以作为后续校准正例,标 `usable`;若候选明显错位、音高不对应、或不能作为该音符证据,标 `wrong`;若听不清、谱音位置无法确认、或只能给定性判断,标 `uncertain`。新版页面用“候选 1 / 30”作本页序号,并在卡片中写明“系统说:录音 X 秒附近可能对应第 Y 小节/MIDI Z”;原始行号只是内部编号,不用判断。导出脚本会把涉及的音频复制到复核页旁边的 `audio/` 文件夹,页面提供 `播放/暂停` 与 `跳到候选秒` 中文按钮,不必依赖浏览器原生音频小图标或后台音频接口;也提供 `一键未标=可用`、`一键未标=错误`、`一键未标=不确定` 和 `清空本页标注`。批量按钮只填未标项,不会覆盖已单独修改的候选。`usable` 与 `wrong` 才计入可评分样本;`uncertain` 只保留记录,不计入 precision/coverage 校准。第一轮至少需要 30 条 `usable/wrong` 后才能运行 import/status/gate-eval 得到有效的 student-safe gate 评估。若 gate-eval 返回 `candidate-review-no-rule-meets-precision` 且规则没有选中样本,应运行 `npm run western:controlled-candidate-review-export -- --gate-candidates` 生成第二轮可校准候选复核页。
+13. ✅ 2026-07-08 普通上传候选第二轮复核已导入:最新下载的 `controlled-candidate-review.completed.csv` 为 30 条可评分样本(16 usable / 14 wrong),合并后累计 labels 为 60 条(46 usable / 14 wrong)。`npm run western:controlled-candidate-review-status` 仍返回 `candidate-review-no-rule-meets-precision`;最新 30 条单独评估的最佳规则 precision 约 0.533,不达 0.90 学生安全闸门。新增只读诊断命令 `npm run western:controlled-candidate-label-audit` 会扫描累计 labels、候选 JSON、数值阈值和分类字段,输出 `candidate-label-audit.json`;本轮发现累计样本存在小样本/批次偏差,最新 30 条在 `--min-selected 10` 下没有任何规则达到 0.90 precision。因此普通上传音频继续保持 `review_required`,不得开放学生端自动反馈。复核页已改为每条生成约 6 秒本地短音频 `clips/`、候选秒按短音频内部时间跳转,并显示对应谱面图 `score-images/`;若页面内播放器不可用,可点“打开短音频文件”直接播放 WAV。
+14. ✅ 下一批复核导出已改为默认排除已标候选:`western:controlled-candidate-review-export` 会读取累计 `controlled-candidate-review-labels.csv`,自动跳过已有 `usable/wrong/uncertain` 的候选,避免重复复核。需要复现旧页面或回溯历史时才加 `--include-reviewed`。本轮 `--gate-candidates` 重导出显示:可校准候选 226 条,已标 60 条,排除后剩 196 条,当前页面抽取 30 条且与 labels 重叠为 0;短音频和谱图均已生成。
+15. ✅ 2026-07-09 置信模型 pilot 已接入:`npm run western:controlled-candidate-confidence-pilot` 读取累计 60 条 `usable/wrong` 标签,只做 eval-only 训练/验证,不接 runtime gate。主口径使用 deployable 特征(不使用 recordingId / recordingScenario 等会过拟合的元数据)并按 recordingId 留一验证。结果:LogReg 在阈值 0.8/0.9 处选中 30/27 条且 0 wrong,RF 在阈值 0.8/0.9 处选中 30/29 条且 0 wrong;LogReg 阈值 0.5 也达到 precision=0.9189、coverage=0.6167。说明复核数据已经从"继续凑样本"进入"训练置信模型"阶段。但这仍是 pilot positive,不是 release:下一步必须用默认排除已标候选的新 30 条 blind batch 复核来验证同一模型/阈值,通过前普通上传仍保持 `review_required`。

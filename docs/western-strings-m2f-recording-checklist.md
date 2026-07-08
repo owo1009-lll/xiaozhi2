@@ -45,8 +45,28 @@ Reject or redo:
 - The audio includes another instrument that masks the violin.
 - The piece has heavy rubato or free timing throughout.
 - The score is only a PDF with no clean MusicXML/MIDI.
+- The score is only a JPG/PNG image; the manifest validator rejects this as
+  `scorePath-not-clean-score` because V2 needs note-level MusicXML/MIDI.
 - The file path contains a real student name that should not be stored.
 - Consent or license status is unclear.
+
+Optional draft OMR:
+
+- Audiveris can be used to create a MusicXML/MXL draft from JPG/PDF score images.
+- Run `npm run western:m2f-audiveris-drafts` to generate draft `.mxl` files and
+  `audiveris-draft-musicxml-summary.json`.
+- `npm run western:m2f-score-review-pack` shows the original score image, target
+  clean-score path, available Audiveris draft path, and draft measure/note counts
+  in one local review page.
+- Run `npm run western:m2f-stage-audiveris-drafts -- --apply` to copy parseable
+  Audiveris drafts into the target clean-score paths as pending `.mxl` files.
+  This does not approve them.
+- Treat the output as a transcription draft only. It becomes a valid M2f clean
+  score only after a human checks the notes, rhythm, key, time signature, rests,
+  repeats, and measure count against the original image.
+- Audio-derived MIDI (for example Basic Pitch output from the student recording)
+  must not be used as the clean score, because it can encode the student's
+  mistakes into the target.
 
 ## 3. Scenario Guide
 
@@ -114,9 +134,43 @@ Before generating the results skeleton, run the manifest-only readiness check:
 npm run western:m2f-manifest-status
 ```
 
-This checks recording counts, student counts, scenario coverage, consent/license
-fields, path existence, and private storage rules. It does not require
-`real-student-recording-results.csv`.
+If the manifest uses JPG/PNG/PDF score images, run the clean-score intake helper:
+
+```powershell
+npm run western:m2f-clean-score-intake
+```
+
+This writes `data/experiments/western-strings-m2/clean-score-intake.csv`, one row
+per recording. Use it to replace each image score with a clean
+MusicXML/MXL/MIDI file, or to fill an existing clean-score `scoreId`. If
+Audiveris drafts exist, prefill the target `.mxl` files with:
+
+```powershell
+npm run western:m2f-stage-audiveris-drafts -- --apply
+```
+
+After a human has checked the score against the original image, set
+`cleanScoreReviewStatus` to `approved`; then run:
+
+```powershell
+npm run western:m2f-clean-score-review-status
+```
+
+This reports how many clean scores are still pending review and lists the
+blocking rows. When it reports ready, run:
+
+```powershell
+npm run western:m2f-apply-clean-scores -- --apply
+```
+
+The apply command writes the manifest only when every requested clean score
+exists and every row is explicitly marked `approved`. If any clean score is
+missing or not reviewed, it exits without changing the manifest.
+After it succeeds, rerun `npm run western:m2f-manifest-status`.
+
+Manifest status checks recording counts, student counts, scenario coverage,
+consent/license fields, clean-score availability, path existence, and private
+storage rules. It does not require `real-student-recording-results.csv`.
 
 Required columns:
 
@@ -213,3 +267,28 @@ real pilot data.
 Do not expose student-facing `/api/strings/analyze` until M2f passes on real
 recordings. A small but safe auto-pass subset is acceptable. Unsafe auto-pass is
 not acceptable.
+
+## 9. Current Pilot Result
+
+As of 2026-07-08, the first real/near-real student pilot has passed the M2f
+release gate:
+
+- recordings: 12
+- students: 3 anonymous students
+- scenarios: correct / wrong_pitch / missing_note / rhythm_shift / weak_onset /
+  noisy, two recordings each
+- auto-pass notes: 431
+- reviewed correct within 300 ms: 431
+- unsafe target auto-pass: 0
+- precision within 300 ms: 1.0000
+
+Verified commands:
+
+```powershell
+npm run western:m2f-status
+npm run western:m2f-gate
+npm run test:western-m2f-templates
+```
+
+This result clears the M2f release gate only. Student-facing release still
+requires the next M3 basic-diagnosis gate and API review.
