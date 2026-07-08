@@ -4566,7 +4566,15 @@ function launchAnalysisTask(task) {
 
 app.use("/api/erhu", createResearchRouter({ readStudyStore, writeStudyStore, fetchAnalyzerStatus }));
 app.use("/api/erhu/teacher-validation", createTeacherValidationRouter(teacherValidationService));
-app.use(createWesternStringsRouter({ repoRoot: __dirname }));
+app.use(createWesternStringsRouter({
+  repoRoot: __dirname,
+  upload,
+  audioCacheDir: AUDIO_CACHE_DIR,
+  parseIncomingPayload,
+  buildAudioSubmissionFromUpload,
+  persistUploadedAudioFile,
+  persistPayloadAudio,
+}));
 
 const noStoreStaticOptions = {
   etag: false,

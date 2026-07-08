@@ -7,10 +7,19 @@ import sys
 import tempfile
 from pathlib import Path
 
+from PIL import Image
+
 
 REPO = Path(__file__).resolve().parents[1]
 GENERATOR = REPO / "scripts" / "experiments" / "create_western_strings_m2f_templates.py"
 SKELETON = REPO / "scripts" / "experiments" / "create_western_strings_m2f_results_skeleton.py"
+RESULT_REVIEW_PACK = REPO / "scripts" / "experiments" / "create_western_strings_m2f_results_review_pack.py"
+INTAKE = REPO / "scripts" / "experiments" / "create_western_strings_m2f_clean_score_intake.py"
+APPLY_CLEAN = REPO / "scripts" / "experiments" / "apply_western_strings_m2f_clean_scores.py"
+REVIEW_PACK = REPO / "scripts" / "experiments" / "create_western_strings_m2f_score_review_pack.py"
+AUDIVERIS_DRAFTS = REPO / "scripts" / "experiments" / "create_western_strings_m2f_audiveris_drafts.py"
+STAGE_AUDIVERIS = REPO / "scripts" / "experiments" / "stage_western_strings_m2f_audiveris_drafts.py"
+REVIEW_STATUS = REPO / "scripts" / "experiments" / "check_western_strings_m2f_clean_score_review.py"
 GATE = REPO / "scripts" / "experiments" / "eval_western_strings_m2f_real_recordings.py"
 MANIFEST_CHECK = REPO / "scripts" / "experiments" / "check_western_strings_m2f_manifest.py"
 PACKAGE_JSON = REPO / "package.json"
@@ -69,10 +78,24 @@ def main() -> int:
         manifest_status = scripts.get("western:m2f-manifest-status", "")
         status_gate = scripts.get("western:m2f-status", "")
         release_gate = scripts.get("western:m2f-gate", "")
+        clean_score_intake = scripts.get("western:m2f-clean-score-intake", "")
+        result_review_pack = scripts.get("western:m2f-results-review-pack", "")
+        apply_clean_scores = scripts.get("western:m2f-apply-clean-scores", "")
+        score_review_pack = scripts.get("western:m2f-score-review-pack", "")
+        audiveris_drafts = scripts.get("western:m2f-audiveris-drafts", "")
+        stage_audiveris_drafts = scripts.get("western:m2f-stage-audiveris-drafts", "")
+        clean_score_review_status = scripts.get("western:m2f-clean-score-review-status", "")
         negative_test = scripts.get("test:western-m2f-real-recordings", "")
         assert_true(manifest_status and "check_western_strings_m2f_manifest.py" in manifest_status, "western:m2f-manifest-status must run the manifest-only readiness check")
         assert_true(status_gate and "--fail-on-not-ready" not in status_gate, "western:m2f-status must be non-failing for inspection")
         assert_true(release_gate and "--fail-on-not-ready" in release_gate, "western:m2f-gate must fail when real pilot data is not release-ready")
+        assert_true(clean_score_intake and "create_western_strings_m2f_clean_score_intake.py" in clean_score_intake, "western:m2f-clean-score-intake must create the clean-score intake checklist")
+        assert_true(result_review_pack and "create_western_strings_m2f_results_review_pack.py" in result_review_pack, "western:m2f-results-review-pack must create the real-student results review pack")
+        assert_true(apply_clean_scores and "apply_western_strings_m2f_clean_scores.py" in apply_clean_scores, "western:m2f-apply-clean-scores must apply the clean-score intake checklist")
+        assert_true(score_review_pack and "create_western_strings_m2f_score_review_pack.py" in score_review_pack, "western:m2f-score-review-pack must create the clean-score review pack")
+        assert_true(audiveris_drafts and "create_western_strings_m2f_audiveris_drafts.py" in audiveris_drafts, "western:m2f-audiveris-drafts must create Audiveris draft MusicXML/MXL files")
+        assert_true(stage_audiveris_drafts and "stage_western_strings_m2f_audiveris_drafts.py" in stage_audiveris_drafts, "western:m2f-stage-audiveris-drafts must stage draft MXL files as pending clean-score targets")
+        assert_true(clean_score_review_status and "check_western_strings_m2f_clean_score_review.py" in clean_score_review_status, "western:m2f-clean-score-review-status must report pending clean-score review rows")
         assert_true("--expect-negative" in negative_test, "test:western-m2f-real-recordings should remain the fail-closed regression command")
 
         manifest_columns, manifest_rows = read_rows(manifest_template)
@@ -170,6 +193,278 @@ def main() -> int:
             capture_output=True,
         )
         assert_true("manifestReady" in manifest_check.stdout and "true" in manifest_check.stdout.lower(), "valid manifest should pass the manifest-only readiness check")
+
+        image_score_manifest = out_dir / "image-score-manifest.csv"
+        image_score = private_dir / "score.jpg"
+        Image.new("RGB", (64, 64), "white").save(image_score)
+        image_score_rows = [dict(row) for row in valid_manifest_rows]
+        image_score_rows[0]["scorePath"] = str(image_score)
+        write_rows(image_score_manifest, manifest_columns, image_score_rows)
+        image_score_gate = subprocess.run(
+            [
+                sys.executable,
+                str(GATE),
+                "--manifest",
+                str(image_score_manifest),
+                "--results",
+                str(out_dir / "missing-results-for-image-score.csv"),
+                "--out",
+                str(out_dir / "image-score-summary.json"),
+                "--expect-negative",
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true("scorePath-not-clean-score" in image_score_gate.stdout, "M2f scorePath must be clean MusicXML/MIDI, not an image score")
+
+        clean_score_intake = out_dir / "clean-score-intake.csv"
+        intake_run = subprocess.run(
+            [
+                sys.executable,
+                str(INTAKE),
+                "--manifest",
+                str(image_score_manifest),
+                "--out",
+                str(clean_score_intake),
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true('"needsCleanScore": 1' in intake_run.stdout, "clean-score intake must count image score rows as needing clean score")
+        intake_columns, intake_rows = read_rows(clean_score_intake)
+        assert_true("requiredCleanScorePath" in intake_columns, "clean-score intake must provide the expected clean-score path")
+        assert_true("cleanScoreReviewStatus" in intake_columns, "clean-score intake must require an explicit human review status")
+        assert_true(intake_rows[0]["currentScoreType"] == "image-or-unsupported", "clean-score intake must classify JPG/PNG scores")
+        assert_true(intake_rows[0]["status"] == "needs-clean-score", "clean-score intake must block image scores")
+        assert_true(intake_rows[0]["requiredCleanScorePath"].endswith(".musicxml"), "clean-score intake must request a clean MusicXML target path")
+        assert_true(intake_rows[0]["cleanScoreReviewStatus"] == "", "clean-score intake must default review status to pending/blank")
+
+        missing_apply = subprocess.run(
+            [
+                sys.executable,
+                str(APPLY_CLEAN),
+                "--manifest",
+                str(image_score_manifest),
+                "--intake",
+                str(clean_score_intake),
+                "--expect-not-ready",
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true("clean-score-not-reviewed" in missing_apply.stdout, "apply-clean-scores must fail closed until the clean score is explicitly approved")
+
+        approved_missing_intake = out_dir / "approved-missing-clean-score-intake.csv"
+        approved_missing_rows = [dict(row) for row in intake_rows]
+        approved_missing_rows[0]["cleanScoreReviewStatus"] = "approved"
+        write_rows(approved_missing_intake, intake_columns, approved_missing_rows)
+        approved_missing_apply = subprocess.run(
+            [
+                sys.executable,
+                str(APPLY_CLEAN),
+                "--manifest",
+                str(image_score_manifest),
+                "--intake",
+                str(approved_missing_intake),
+                "--expect-not-ready",
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true("clean-score-missing" in approved_missing_apply.stdout, "apply-clean-scores must still require the approved clean score file to exist")
+
+        ready_intake = out_dir / "ready-clean-score-intake.csv"
+        ready_columns = intake_columns
+        ready_rows = [dict(row) for row in intake_rows]
+        replacement_score = private_dir / "replacement.musicxml"
+        replacement_score.write_text("<score-partwise version=\"4.0\"><part-list/></score-partwise>\n", encoding="utf-8")
+        ready_rows[0]["requiredCleanScorePath"] = str(replacement_score)
+        ready_rows[0]["cleanScoreReviewStatus"] = "approved"
+        ready_rows[0]["cleanScoreReviewedBy"] = "unit-test-reviewer"
+        write_rows(ready_intake, ready_columns, ready_rows)
+        applied_manifest = out_dir / "applied-manifest.csv"
+        ready_apply = subprocess.run(
+            [
+                sys.executable,
+                str(APPLY_CLEAN),
+                "--manifest",
+                str(image_score_manifest),
+                "--intake",
+                str(ready_intake),
+                "--out",
+                str(applied_manifest),
+                "--apply",
+                "--expect-ready",
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true('"applyReady": true' in ready_apply.stdout, "apply-clean-scores must report ready when all clean scores exist")
+        _applied_columns, applied_rows = read_rows(applied_manifest)
+        assert_true(applied_rows[0]["scorePath"] == str(replacement_score), "apply-clean-scores must replace image scorePath with the clean score")
+        assert_true(applied_rows[0]["scoreId"] == "", "apply-clean-scores must clear scoreId when using scorePath")
+
+        review_pack_dir = out_dir / "score-review-pack"
+        fake_audiveris_summary = out_dir / "audiveris-summary.json"
+        fake_audiveris_summary.write_text(
+            json.dumps(
+                [
+                    {
+                        "recordingId": image_score_rows[0]["recordingId"],
+                        "pieceId": image_score_rows[0]["pieceId"],
+                        "mxl": str(private_dir / "draft.mxl"),
+                        "parseOk": True,
+                        "measures": 4,
+                        "notes": 32,
+                    }
+                ]
+            ),
+            encoding="utf-8",
+        )
+        review_pack = subprocess.run(
+            [
+                sys.executable,
+                str(REVIEW_PACK),
+                "--manifest",
+                str(image_score_manifest),
+                "--intake",
+                str(clean_score_intake),
+                "--audiveris-summary",
+                str(fake_audiveris_summary),
+                "--out-dir",
+                str(review_pack_dir),
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true('"rows": 6' in review_pack.stdout, "score review pack must report one row per manifest entry")
+        assert_true((review_pack_dir / "index.html").exists(), "score review pack must create index.html")
+        assert_true((review_pack_dir / "score-review.csv").exists(), "score review pack must create score-review.csv")
+        assert_true((review_pack_dir / "README.md").exists(), "score review pack must create README.md")
+        review_html = (review_pack_dir / "index.html").read_text(encoding="utf-8")
+        assert_true("目标 clean score" in review_html and "score.jpg" in review_html, "score review HTML must show the image score and target clean score")
+        assert_true("Audiveris 草稿" in review_html and "draft.mxl" in review_html, "score review HTML must show the Audiveris draft file when present")
+        assert_true("小节:</b> 4" in review_html and "音符:</b> 32" in review_html, "score review HTML must show Audiveris draft parse stats")
+        assert_true("<audio " in review_html and "controls" in review_html, "score review HTML must include audio playback")
+        assert_true("判定类型" in review_html and "downloadCsvButton" in review_html, "score review HTML must include clickable review controls")
+
+        audiveris_stub = out_dir / "fake-audiveris.py"
+        audiveris_stub.write_text(
+            "\n".join(
+                [
+                    "from pathlib import Path",
+                    "import sys",
+                    "args = sys.argv",
+                    "out = Path(args[args.index('-output') + 1])",
+                    "out.mkdir(parents=True, exist_ok=True)",
+                    "(out / 'draft.mxl').write_text('<score-partwise version=\"4.0\"><part-list/></score-partwise>')",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        audiveris_manifest = out_dir / "audiveris-manifest.csv"
+        audiveris_rows = [dict(row) for row in image_score_rows[:1]]
+        write_rows(audiveris_manifest, manifest_columns, audiveris_rows)
+        audiveris_out = out_dir / "audiveris-drafts"
+        audiveris_run = subprocess.run(
+            [
+                sys.executable,
+                str(AUDIVERIS_DRAFTS),
+                "--manifest",
+                str(audiveris_manifest),
+                "--audiveris",
+                str(audiveris_stub),
+                "--out-dir",
+                str(audiveris_out),
+                "--limit",
+                "1",
+                "--expect-some",
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true('"producedMxl": 1' in audiveris_run.stdout, "Audiveris draft wrapper must report produced MXL drafts")
+        assert_true((audiveris_out / "audiveris-draft-musicxml-summary.json").exists(), "Audiveris draft wrapper must write a summary JSON")
+
+        staged_intake = out_dir / "staged-clean-score-intake.csv"
+        stage_run = subprocess.run(
+            [
+                sys.executable,
+                str(STAGE_AUDIVERIS),
+                "--intake",
+                str(clean_score_intake),
+                "--audiveris-summary",
+                str(audiveris_out / "audiveris-draft-musicxml-summary.json"),
+                "--target-dir",
+                str(private_dir),
+                "--out",
+                str(staged_intake),
+                "--apply",
+                "--expect-staged",
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true('"staged": 1' in stage_run.stdout, "stage-audiveris-drafts must stage the parseable MXL draft")
+        _staged_columns, staged_rows = read_rows(staged_intake)
+        assert_true(staged_rows[0]["requiredCleanScorePath"].endswith(".mxl"), "stage-audiveris-drafts must point requiredCleanScorePath at the staged MXL")
+        assert_true(staged_rows[0]["cleanScoreReviewStatus"] == "", "stage-audiveris-drafts must not approve unchecked OMR drafts")
+        assert_true(Path(staged_rows[0]["requiredCleanScorePath"]).exists(), "stage-audiveris-drafts must copy the MXL target file")
+        staged_pending_status = subprocess.run(
+            [
+                sys.executable,
+                str(REVIEW_STATUS),
+                "--intake",
+                str(staged_intake),
+                "--out",
+                str(out_dir / "staged-review-status.json"),
+                "--expect-not-ready",
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true('"pending": 6' in staged_pending_status.stdout, "clean-score review status must count staged but unapproved rows as pending")
+        approved_staged_intake = out_dir / "approved-staged-clean-score-intake.csv"
+        approved_staged_rows = [dict(row) for row in staged_rows]
+        for row in approved_staged_rows:
+            row["cleanScoreReviewStatus"] = "approved"
+            row["cleanScoreReviewedBy"] = "unit-test-reviewer"
+        write_rows(approved_staged_intake, _staged_columns, approved_staged_rows)
+        staged_ready_status = subprocess.run(
+            [
+                sys.executable,
+                str(REVIEW_STATUS),
+                "--intake",
+                str(approved_staged_intake),
+                "--out",
+                str(out_dir / "approved-staged-review-status.json"),
+                "--expect-ready",
+            ],
+            cwd=REPO,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        assert_true('"approved": 6' in staged_ready_status.stdout, "clean-score review status must count approved rows")
 
         good_results = out_dir / "good-results.csv"
         good_result_rows = [

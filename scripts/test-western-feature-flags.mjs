@@ -13,14 +13,14 @@ const studentSideSources = [
 
 for (const [sourceName, sourceText] of studentSideSources) {
   assert(!sourceText.includes("/api/strings/alignment-preview"), `${sourceName} must not call the offline alignment preview route`);
-  assert(!sourceText.includes("/api/strings/analyze"), `${sourceName} must not call a student-facing western strings analyze route`);
-  assert(!sourceText.includes("/api/strings/review"), `${sourceName} must not call a western strings review route`);
+  assert(!sourceText.includes("/api/strings/analyze"), `${sourceName} must not directly call the western strings analyze route before UI review`);
+  assert(!sourceText.includes("/api/strings/review"), `${sourceName} must not directly call the western strings review route before UI review`);
 }
 
-assert(stringsRoutes.includes('router.get("/api/strings/alignment-preview"'), "server should expose only the offline preview route for M2 validation");
+assert(stringsRoutes.includes('router.get("/api/strings/alignment-preview"'), "server should expose the offline preview route for teacher validation");
+assert(stringsRoutes.includes('router.post("/api/strings/analyze"'), "server should expose the M3-gated western strings analyze route");
+assert(stringsRoutes.includes('router.post("/api/strings/review"'), "server should expose the M3-gated western strings review route");
 assert(researchApi.includes("fetchWesternAlignmentPreview"), "teacher backend may load the offline western strings preview");
 assert(researchApi.includes("saveWesternAlignmentPreviewReview"), "teacher backend may save offline western strings preview reviews");
-assert(!stringsRoutes.includes('router.post("/api/strings/analyze"'), "student-facing western strings analyze route must remain disabled");
-assert(!stringsRoutes.includes('router.post("/api/strings/review"'), "western strings review writeback route must remain disabled");
 
-console.log(JSON.stringify({ ok: true, checks: ["western-strings-auto-feedback-default-off"] }));
+console.log(JSON.stringify({ ok: true, checks: ["western-strings-student-api-gated", "western-strings-ui-default-off"] }));
