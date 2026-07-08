@@ -209,6 +209,11 @@ M3+ 不做技法名称展示,也不做技法质量评价。它只解决一个产
 - precision≥90% 且 unsafe=0 才允许减少复核。
 - 未达标模式永久 review-only,不得向学生硬判。
 
+### 当前执行状态(2026-07-09)
+- 已接入 eval-only 命令 `npm run western:m3plus-pitch-modes`,用于从现有 12 条真实/准真实录音中清点稳态、滑音式连续运动、颤音式交替、装饰音候选、双音候选等 pitch-behavior 样本。
+- 全量输出:2588 个谱面音符、1269 个 pitch-behavior 候选,产物在 `data/experiments/western-strings-m3plus/m3plus-pitch-mode-inventory.csv` 和 `m3plus-pitch-mode-summary.json`。
+- 当前 gate 仍为 `studentGateReady=false`,原因=`inventory-only-no-human-mode-labels`。这些候选只用于抽样复核和 M3+ 标注规划,不证明 precision,不改变学生端反馈。
+
 ---
 
 ## 9. M4: PDF/图片谱面 OMR
