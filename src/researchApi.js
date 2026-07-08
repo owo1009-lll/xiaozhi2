@@ -278,6 +278,69 @@ export async function saveWesternAlignmentPreviewReview(payload = {}) {
   );
 }
 
+export async function fetchWesternStudentAnalysis(payload = {}) {
+  if (payload?.audioFile instanceof File) {
+    const formData = new FormData();
+    formData.append("audio", payload.audioFile);
+    const { audioFile, ...rest } = payload;
+    formData.append("payload", JSON.stringify(rest));
+    return readJson(
+      await fetch("/api/strings/analyze", {
+        method: "POST",
+        body: formData,
+      }),
+    );
+  }
+  return readJson(
+    await fetch("/api/strings/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  );
+}
+
+export async function fetchWesternControlledSubmissions(params = {}) {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params || {})) {
+    if (value !== undefined && value !== null && String(value).trim()) {
+      searchParams.set(key, String(value));
+    }
+  }
+  const suffix = searchParams.toString() ? `?${searchParams.toString()}` : "";
+  return readJson(await fetch(`/api/strings/controlled-submissions${suffix}`, NO_STORE_REQUEST));
+}
+
+export async function saveWesternControlledSubmissionReview(payload = {}) {
+  return readJson(
+    await fetch("/api/strings/controlled-submissions/reviews", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  );
+}
+
+export async function runWesternControlledSubmissionBatch(payload = {}) {
+  return readJson(
+    await fetch("/api/strings/controlled-submissions/run-batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  );
+}
+
+export async function saveWesternStudentReview(payload = {}) {
+  return readJson(
+    await fetch("/api/strings/review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  );
+}
+
 export async function fetchAdjudications() {
   return readJson(await fetch("/api/erhu/research/adjudications"));
 }
