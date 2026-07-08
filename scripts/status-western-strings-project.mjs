@@ -335,14 +335,13 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
   return actions;
 }
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
+export async function buildProjectStatus() {
   const [controlledCandidate, m3plusPitchModes, m4Omr] = await Promise.all([
     buildControlledStatus(),
     buildM3PlusStatus(),
     buildM4OmrStatus(),
   ]);
-  const status = {
+  return {
     ok: true,
     generatedAt: new Date().toISOString(),
     project: "western-strings-practice-diagnostics",
@@ -360,9 +359,19 @@ async function main() {
     },
     nextActions: summarizeNextActions(controlledCandidate, m3plusPitchModes, m4Omr),
   };
-  const outPath = path.resolve(process.cwd(), args.out);
+}
+
+export async function writeProjectStatus(status, out) {
+  const outPath = path.resolve(process.cwd(), out);
   await fs.mkdir(path.dirname(outPath), { recursive: true });
   await fs.writeFile(outPath, `${JSON.stringify(status, null, 2)}\n`, "utf8");
+  return outPath;
+}
+
+function printProjectStatus(status, outPath) {
+  const controlledCandidate = status.tracks?.controlledCandidate || {};
+  const m3plusPitchModes = status.tracks?.m3plusPitchModes || {};
+  const m4Omr = status.tracks?.m4Omr || {};
   console.log(JSON.stringify({
     ok: status.ok,
     runtimeStudentGate: status.runtimeStudentGate,
@@ -385,6 +394,13 @@ async function main() {
     nextActions: status.nextActions,
     out: path.relative(process.cwd(), outPath).replace(/\\/g, "/"),
   }, null, 2));
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  const status = await buildProjectStatus();
+  const outPath = await writeProjectStatus(status, args.out);
+  printProjectStatus(status, outPath);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
