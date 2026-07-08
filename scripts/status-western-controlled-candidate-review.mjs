@@ -25,6 +25,13 @@ const DEFAULT_CONFIDENCE_VALIDATION_COMPLETED = path.join(
   "confidence-validation-review",
   "controlled-candidate-review.completed.csv",
 );
+const DEFAULT_CONFIDENCE_VALIDATION_EVAL = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-validation-review",
+  "confidence-validation-eval.json",
+);
 
 function clampMissing(required, actual) {
   return Math.max(0, Number(required || 0) - Number(actual || 0));
@@ -38,7 +45,11 @@ async function readJson(filePath) {
   }
 }
 
-export function summarizeControlledCandidateConfidencePilot(pilot, source = DEFAULT_CONFIDENCE_PILOT) {
+export function summarizeControlledCandidateConfidencePilot(
+  pilot,
+  source = DEFAULT_CONFIDENCE_PILOT,
+  validationEval = null,
+) {
   const releaseCandidates = [];
   for (const evaluation of pilot?.evaluations || []) {
     for (const [modelName, model] of Object.entries(evaluation.models || {})) {
@@ -67,10 +78,12 @@ export function summarizeControlledCandidateConfidencePilot(pilot, source = DEFA
     sourceExists: Boolean(pilot),
     readyForStudentGate: false,
     releaseCandidateFound,
-    needsBlindValidation: releaseCandidateFound,
-    reason: pilot
-      ? "eval-only-confidence-pilot-needs-blind-validation"
-      : "confidence-pilot-missing",
+    needsBlindValidation: releaseCandidateFound && !validationEval?.blindValidationPassed,
+    reason: !pilot
+      ? "confidence-pilot-missing"
+      : validationEval?.blindValidationPassed
+        ? "confidence-validation-passed-runtime-gate-still-disabled"
+        : "eval-only-confidence-pilot-needs-blind-validation",
     reviewedRowsUsed: Number(pilot?.reviewedRowsUsed || 0),
     usableRows: Number(pilot?.usableRows || 0),
     wrongRows: Number(pilot?.wrongRows || 0),
@@ -80,6 +93,14 @@ export function summarizeControlledCandidateConfidencePilot(pilot, source = DEFA
     releaseCandidateCount: releaseCandidates.length,
     validationReviewPage: DEFAULT_CONFIDENCE_VALIDATION_REVIEW_PAGE.replace(/\\/g, "/"),
     validationCompletedCsv: DEFAULT_CONFIDENCE_VALIDATION_COMPLETED.replace(/\\/g, "/"),
+    validationEval: validationEval || {
+      source: DEFAULT_CONFIDENCE_VALIDATION_COMPLETED.replace(/\\/g, "/"),
+      sourceExists: false,
+      blindValidationPassed: false,
+      readyForRuntimeGate: false,
+      reason: "confidence-validation-eval-missing",
+      blockingReasons: ["confidence-validation-eval-missing"],
+    },
   };
 }
 
@@ -87,12 +108,20 @@ export function attachConfidencePilotStatus(status, confidencePilot) {
   if (!confidencePilot?.releaseCandidateFound) {
     return { ...status, confidencePilot };
   }
+  const validationPassed = Boolean(confidencePilot.validationEval?.blindValidationPassed);
   const nextActions = [
-    `Confidence pilot found release candidates; review ${DEFAULT_CONFIDENCE_VALIDATION_REVIEW_PAGE.replace(/\\/g, "/")} and import the completed CSV before changing the runtime gate.`,
+    validationPassed
+      ? "Confidence blind validation passed. Review metrics and wire a runtime gate in a separate release phase; current runtime remains fail-closed."
+      : `Confidence pilot found release candidates; review ${DEFAULT_CONFIDENCE_VALIDATION_REVIEW_PAGE.replace(/\\/g, "/")} and run western:controlled-candidate-confidence-validation-eval before changing the runtime gate.`,
   ];
+  const baseBlockingReasons = validationPassed
+    ? (status.blockingReasons || []).filter((reason) => reason !== "candidate-review-no-rule-meets-precision")
+    : (status.blockingReasons || []);
   const blockingReasons = [...new Set([
-    ...(status.blockingReasons || []),
-    "candidate-confidence-pilot-needs-blind-validation",
+    ...baseBlockingReasons,
+    validationPassed
+      ? "candidate-confidence-validation-not-wired"
+      : "candidate-confidence-pilot-needs-blind-validation",
   ])];
   return {
     ...status,
@@ -159,6 +188,7 @@ function parseArgs(argv) {
     reviewGuide: path.join("data", "experiments", "western-strings-m3", "offline-feature-candidate-review", "review-guide.md"),
     completedCsv: path.join("data", "experiments", "western-strings-m3", "offline-feature-candidate-review", "controlled-candidate-review.completed.csv"),
     confidencePilot: DEFAULT_CONFIDENCE_PILOT,
+    confidenceValidationEval: DEFAULT_CONFIDENCE_VALIDATION_EVAL,
     minReviewedRows: 30,
     minScoredRows: 30,
     minPrecision: 0.9,
@@ -172,6 +202,7 @@ function parseArgs(argv) {
     else if (arg === "--review-guide") args.reviewGuide = argv[++index] || args.reviewGuide;
     else if (arg === "--completed-csv") args.completedCsv = argv[++index] || args.completedCsv;
     else if (arg === "--confidence-pilot") args.confidencePilot = argv[++index] || args.confidencePilot;
+    else if (arg === "--confidence-validation-eval") args.confidenceValidationEval = argv[++index] || args.confidenceValidationEval;
     else if (arg === "--min-reviewed-rows") args.minReviewedRows = Number(argv[++index] || args.minReviewedRows);
     else if (arg === "--min-scored-rows") args.minScoredRows = Number(argv[++index] || args.minScoredRows);
     else if (arg === "--min-precision") args.minPrecision = Number(argv[++index] || args.minPrecision);
@@ -191,7 +222,11 @@ async function main() {
   let status = buildControlledCandidateReviewStatus(report);
   status = attachConfidencePilotStatus(
     status,
-    summarizeControlledCandidateConfidencePilot(await readJson(args.confidencePilot), args.confidencePilot),
+    summarizeControlledCandidateConfidencePilot(
+      await readJson(args.confidencePilot),
+      args.confidencePilot,
+      await readJson(args.confidenceValidationEval),
+    ),
   );
   status.reviewArtifacts = {
     reviewPage: path.relative(process.cwd(), path.resolve(process.cwd(), args.reviewPage)).replace(/\\/g, "/"),

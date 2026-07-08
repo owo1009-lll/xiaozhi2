@@ -19,6 +19,8 @@ assert.equal(controlled.studentSafeCandidateGateReady, false, "ordinary upload m
 assert.equal(controlled.confidencePilot?.releaseCandidateFound, true, "confidence pilot should report release candidates");
 assert.equal(controlled.confidencePilot?.needsBlindValidation, true, "confidence pilot should require blind validation");
 assert.equal(controlled.confidencePilot?.readyForStudentGate, false, "eval-only confidence pilot must not mark runtime gate ready");
+assert.equal(controlled.confidencePilot?.validationEval?.blindValidationPassed, false, "blind validation must not pass without a completed validation eval");
+assert.equal(controlled.confidencePilot?.validationEval?.readyForRuntimeGate, false, "validation eval must not enable runtime gate");
 assert(controlled.confidencePilot?.bestReleaseCandidate, "confidence pilot should report the best release candidate");
 assert.equal(controlled.confidencePilot.bestReleaseCandidate.featureSet, "deployable", "confidence pilot should report the deployable candidate");
 assert.equal(controlled.confidencePilot.bestReleaseCandidate.groupBy, "recordingId", "confidence pilot should report the strict leave-one-recording candidate");
