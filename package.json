@@ -1,5 +1,5 @@
 {
-  "name": "ai-erhu-research-prototype",
+  "name": "western-strings-practice-diagnostics",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -149,7 +149,7 @@
     "@vitejs/plugin-react": "^5.0.4",
     "vite": "^7.1.7"
   },
-  "description": "这是一个独立于 `ToDesk` 的项目目录，用于面向 SSCI 的二胡 AI 教学干预研究原型。",
+  "description": "Western bowed-string practice diagnosis prototype with clean-score alignment, review gates, and fail-closed student feedback.",
   "main": "server.js",
   "directories": {
     "doc": "docs"

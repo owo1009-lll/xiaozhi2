@@ -596,7 +596,7 @@ export function createOpsRouter({
   }
 
   router.get("/api/health", (req, res) => {
-    res.json({ ok: true, service: "ai-erhu-research-prototype", at: nowIso() });
+    res.json({ ok: true, service: "western-strings-practice-diagnostics", at: nowIso() });
   });
 
   router.get("/api/erhu/analyzer-status", async (req, res) => {

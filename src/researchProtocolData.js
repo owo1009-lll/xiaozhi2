@@ -1,12 +1,12 @@
 export const RESEARCH_PROTOCOL = {
-  title: "AI 二胡教学干预研究方案",
+  title: "AI 弓弦乐器练习诊断研究方案",
   summary:
-    "本研究面向高校二胡学习者，采用 6-8 周准实验设计，比较 AI 反馈工具与常规练习在音准、节奏与学习体验上的差异，并结合访谈解释学习机制。",
+    "本研究面向弓弦乐器学习者，采用 6-8 周准实验设计，比较 AI 反馈工具与常规练习在音准、节奏与学习体验上的差异，并结合访谈解释学习机制。",
   sections: [
     {
       title: "研究目标",
       items: [
-        "验证基于深度学习的 AI 二胡反馈原型是否能够提升学习者的音准表现。",
+        "验证基于深度学习的 AI 弓弦乐器反馈原型是否能够提升学习者的音准表现。",
         "分析 AI 反馈对节奏稳定性、错误定位效率和练习质量的影响。",
         "考察学习者对 AI 反馈工具的有用性感知、清晰度与持续使用意愿。",
       ],
@@ -61,7 +61,7 @@ export const RESEARCH_TEMPLATE_LIBRARY = [
     title: "教师评分 Rubric",
     description: "用于前测、阶段检查和后测的教师评分表模板。",
     filename: "teacher-rubric.md",
-    content: `# 二胡 AI 教学干预研究：教师评分 Rubric
+    content: `# AI 弓弦乐器练习诊断研究：教师评分 Rubric
 
 ## 基本信息
 
@@ -105,7 +105,7 @@ export const RESEARCH_TEMPLATE_LIBRARY = [
     title: "访谈提纲",
     description: "用于后测或阶段访谈的半结构访谈提纲。",
     filename: "interview-guide.md",
-    content: `# 二胡 AI 教学干预研究：访谈提纲
+    content: `# AI 弓弦乐器练习诊断研究：访谈提纲
 
 ## 基本信息
 
@@ -137,11 +137,11 @@ export const RESEARCH_TEMPLATE_LIBRARY = [
     title: "受试说明书",
     description: "用于受试招募和实验执行的简版说明书模板。",
     filename: "participant-info-sheet.md",
-    content: `# 二胡 AI 教学干预研究：受试说明书
+    content: `# AI 弓弦乐器练习诊断研究：受试说明书
 
 ## 研究目的
 
-本研究旨在探讨基于深度学习的 AI 反馈工具，是否能够帮助二胡学习者提升音准、节奏与学习体验。
+本研究旨在探讨基于深度学习的 AI 反馈工具，是否能够帮助弓弦乐器学习者提升音准、节奏与学习体验。
 
 ## 参与流程
 
@@ -179,7 +179,7 @@ export const RESEARCH_TEMPLATE_LIBRARY = [
 
 ## Scope
 
-Use this protocol for expert review of AI-generated erhu diagnostic results during pilot testing and the main intervention study.
+Use this protocol for expert review of AI-generated bowed-string diagnostic results during pilot testing and the main intervention study.
 
 ## Recommended Assignment Rule
 
@@ -279,7 +279,7 @@ Flag a pair for adjudication when any of the following is true:
 
 - confirm the participant can open the app and enter the correct id
 - confirm the target score section or whole-piece workflow
-- confirm whether the recording is solo erhu or erhu + piano
+- confirm whether the recording is solo bowed-string audio or includes accompaniment
 - if mixed audio is used, enable \`melody-focus\`
 - confirm the participant understands where to find problem notes, problem measures, and demo playback
 

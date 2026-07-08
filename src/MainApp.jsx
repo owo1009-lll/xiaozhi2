@@ -8,13 +8,13 @@ const TeacherValidationApp = lazy(() => import("./TeacherValidationApp.jsx"));
 const WesternStringsApp = lazy(() => import("./WesternStringsApp.jsx"));
 
 function getModeFromLocation() {
-  if (typeof window === "undefined") return "student";
+  if (typeof window === "undefined") return "strings";
   const params = new URLSearchParams(window.location.search);
   if (params.get("mode") === "score-issues") return "score-issues";
   if (params.get("mode") === "health") return "health";
   if (params.get("mode") === "teacher") return "teacher";
   if (params.get("mode") === "strings") return "strings";
-  return params.get("mode") === "research" ? "research" : "student";
+  return params.get("mode") === "research" ? "research" : "strings";
 }
 
 export default function MainApp() {
@@ -52,7 +52,7 @@ export default function MainApp() {
       ) : mode === "teacher" ? (
         <TeacherValidationApp />
       ) : mode === "strings" ? (
-        <WesternStringsApp onBackToStudent={() => switchMode("student")} />
+        <WesternStringsApp />
       ) : mode === "score-issues" ? (
         <ScoreIssuePage />
       ) : (

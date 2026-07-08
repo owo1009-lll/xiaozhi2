@@ -8,8 +8,10 @@ data/
 # Plan C local output artifacts (reproducible review clips / teacher packs; not source)
 /erhu-anchor-clips/
 /erhu-spotcheck/
+/erhu-system-paper/
 /erhu-teacher-pack-fusheng/
 /erhu-teacher-pack-*/
+/音频/
 python-service/.venv/
 python-service/.venv-local/
 python-service/__pycache__/
@@ -128,5 +130,10 @@ hs_err_pid*.log
 /scripts/verify_round2.py
 /scripts/verify_v10_figures.py
 /scripts/verify_v16.py
+
+# Local AI music-theory experiment outputs
+runs.local/
+models.local/
+tools.local/
 /scripts/verify_v3.py
 /scripts/verify_v5.py

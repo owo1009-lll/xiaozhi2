@@ -215,11 +215,13 @@ export default function WesternStringsApp({ onBackToStudent }) {
         </div>
       </header>
 
-      <div className="toolbar">
-        <button type="button" className="secondary-button" onClick={onBackToStudent}>
-          Back
-        </button>
-      </div>
+      {onBackToStudent ? (
+        <div className="toolbar">
+          <button type="button" className="secondary-button" onClick={onBackToStudent}>
+            Back
+          </button>
+        </div>
+      ) : null}
 
       <section className="panel-card western-strings-panel">
         <div className="panel-heading">
