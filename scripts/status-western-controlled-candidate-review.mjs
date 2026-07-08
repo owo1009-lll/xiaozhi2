@@ -4,8 +4,80 @@ import { pathToFileURL } from "node:url";
 
 import { evaluateControlledCandidateGate } from "./eval-western-controlled-candidate-gate.mjs";
 
+const DEFAULT_CONFIDENCE_PILOT = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "offline-feature-candidate-review",
+  "candidate-confidence-pilot.json",
+);
+
 function clampMissing(required, actual) {
   return Math.max(0, Number(required || 0) - Number(actual || 0));
+}
+
+async function readJson(filePath) {
+  try {
+    return JSON.parse(await fs.readFile(path.resolve(process.cwd(), filePath), "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+export function summarizeControlledCandidateConfidencePilot(pilot, source = DEFAULT_CONFIDENCE_PILOT) {
+  const releaseCandidates = [];
+  for (const evaluation of pilot?.evaluations || []) {
+    for (const [modelName, model] of Object.entries(evaluation.models || {})) {
+      if (!model?.releaseCandidate) continue;
+      releaseCandidates.push({
+        featureSet: evaluation.featureSet || "",
+        groupBy: evaluation.groupBy || "",
+        modelName,
+        ...model.releaseCandidate,
+      });
+    }
+  }
+  releaseCandidates.sort((left, right) => (
+    Number(right.precision || 0) - Number(left.precision || 0)
+    || Number(right.selected || 0) - Number(left.selected || 0)
+    || String(left.modelName).localeCompare(String(right.modelName))
+  ));
+  const releaseCandidateFound = Boolean(pilot?.recommendation?.readyForStudentGate && releaseCandidates.length);
+  return {
+    source: source.replace(/\\/g, "/"),
+    sourceExists: Boolean(pilot),
+    readyForStudentGate: false,
+    releaseCandidateFound,
+    needsBlindValidation: releaseCandidateFound,
+    reason: pilot
+      ? "eval-only-confidence-pilot-needs-blind-validation"
+      : "confidence-pilot-missing",
+    reviewedRowsUsed: Number(pilot?.reviewedRowsUsed || 0),
+    usableRows: Number(pilot?.usableRows || 0),
+    wrongRows: Number(pilot?.wrongRows || 0),
+    recommendation: pilot?.recommendation || null,
+    bestReleaseCandidate: releaseCandidates[0] || null,
+    releaseCandidateCount: releaseCandidates.length,
+  };
+}
+
+export function attachConfidencePilotStatus(status, confidencePilot) {
+  if (!confidencePilot?.releaseCandidateFound) {
+    return { ...status, confidencePilot };
+  }
+  const nextActions = [
+    "Confidence pilot found release candidates; validate the same model and threshold on a fresh blind batch before changing the runtime gate.",
+  ];
+  const blockingReasons = [...new Set([
+    ...(status.blockingReasons || []),
+    "candidate-confidence-pilot-needs-blind-validation",
+  ])];
+  return {
+    ...status,
+    confidencePilot,
+    blockingReasons,
+    nextActions,
+  };
 }
 
 export function buildControlledCandidateReviewStatus(report) {
@@ -64,6 +136,7 @@ function parseArgs(argv) {
     reviewPage: path.join("data", "experiments", "western-strings-m3", "offline-feature-candidate-review", "index.html"),
     reviewGuide: path.join("data", "experiments", "western-strings-m3", "offline-feature-candidate-review", "review-guide.md"),
     completedCsv: path.join("data", "experiments", "western-strings-m3", "offline-feature-candidate-review", "controlled-candidate-review.completed.csv"),
+    confidencePilot: DEFAULT_CONFIDENCE_PILOT,
     minReviewedRows: 30,
     minScoredRows: 30,
     minPrecision: 0.9,
@@ -76,6 +149,7 @@ function parseArgs(argv) {
     else if (arg === "--review-page") args.reviewPage = argv[++index] || args.reviewPage;
     else if (arg === "--review-guide") args.reviewGuide = argv[++index] || args.reviewGuide;
     else if (arg === "--completed-csv") args.completedCsv = argv[++index] || args.completedCsv;
+    else if (arg === "--confidence-pilot") args.confidencePilot = argv[++index] || args.confidencePilot;
     else if (arg === "--min-reviewed-rows") args.minReviewedRows = Number(argv[++index] || args.minReviewedRows);
     else if (arg === "--min-scored-rows") args.minScoredRows = Number(argv[++index] || args.minScoredRows);
     else if (arg === "--min-precision") args.minPrecision = Number(argv[++index] || args.minPrecision);
@@ -92,7 +166,11 @@ async function main() {
     minScoredRows: args.minScoredRows,
     minPrecision: args.minPrecision,
   });
-  const status = buildControlledCandidateReviewStatus(report);
+  let status = buildControlledCandidateReviewStatus(report);
+  status = attachConfidencePilotStatus(
+    status,
+    summarizeControlledCandidateConfidencePilot(await readJson(args.confidencePilot), args.confidencePilot),
+  );
   status.reviewArtifacts = {
     reviewPage: path.relative(process.cwd(), path.resolve(process.cwd(), args.reviewPage)).replace(/\\/g, "/"),
     reviewGuide: path.relative(process.cwd(), path.resolve(process.cwd(), args.reviewGuide)).replace(/\\/g, "/"),
@@ -108,6 +186,7 @@ async function main() {
     counts: status.counts,
     deficits: status.deficits,
     bestRule: status.bestRule,
+    confidencePilot: status.confidencePilot,
     blockingReasons: status.blockingReasons,
     nextActions: status.nextActions,
     reviewArtifacts: status.reviewArtifacts,

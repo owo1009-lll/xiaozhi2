@@ -14,6 +14,15 @@ assert(status.tracks?.controlledCandidate, "project status must include ordinary
 assert(status.tracks?.m3plusPitchModes, "project status must include M3+ pitch-mode track");
 assert(status.tracks?.m4Omr, "project status must include M4 OMR track");
 
+const controlled = status.tracks.controlledCandidate;
+assert.equal(controlled.studentSafeCandidateGateReady, false, "ordinary upload must still require blind validation");
+assert.equal(controlled.confidencePilot?.releaseCandidateFound, true, "confidence pilot should report release candidates");
+assert.equal(controlled.confidencePilot?.needsBlindValidation, true, "confidence pilot should require blind validation");
+assert.equal(controlled.confidencePilot?.readyForStudentGate, false, "eval-only confidence pilot must not mark runtime gate ready");
+assert(controlled.confidencePilot?.bestReleaseCandidate, "confidence pilot should report the best release candidate");
+assert(controlled.blockingReasons.includes("candidate-confidence-pilot-needs-blind-validation"), "ordinary upload should block on blind validation after pilot success");
+assert(status.nextActions[0]?.action.includes("Confidence pilot"), "project next action should route to blind validation of the confidence pilot");
+
 const m4 = status.tracks.m4Omr;
 assert.equal(m4.m4OmrBenchmarkDatasetReady, true, "M4 intake dataset should be ready for benchmarking");
 assert.equal(m4.m4OmrDraftQualityReady, false, "M4 draft quality must not be ready while gold equals draft");
@@ -37,6 +46,7 @@ console.log(JSON.stringify({
   checks: [
     "project-status-tracks-present",
     "student-runtime-fail-closed",
+    "confidence-pilot-needs-blind-validation",
     "m4-self-comparison-blocks",
     "project-gate-required-tracks-block-release",
   ],

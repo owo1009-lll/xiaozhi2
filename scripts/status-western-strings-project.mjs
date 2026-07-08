@@ -3,7 +3,11 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { evaluateControlledCandidateGate } from "./eval-western-controlled-candidate-gate.mjs";
-import { buildControlledCandidateReviewStatus } from "./status-western-controlled-candidate-review.mjs";
+import {
+  attachConfidencePilotStatus,
+  buildControlledCandidateReviewStatus,
+  summarizeControlledCandidateConfidencePilot,
+} from "./status-western-controlled-candidate-review.mjs";
 
 const DEFAULT_OUT = path.join("data", "experiments", "western-strings-project-status.json");
 
@@ -27,6 +31,13 @@ const CONTROLLED_COMPLETED = path.join(
   "western-strings-m3",
   "offline-feature-candidate-review",
   "controlled-candidate-review.completed.csv",
+);
+const CONTROLLED_CONFIDENCE_PILOT = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "offline-feature-candidate-review",
+  "candidate-confidence-pilot.json",
 );
 const M3PLUS_SOURCE = path.join(
   "data",
@@ -243,7 +254,11 @@ async function buildControlledStatus() {
     minScoredRows: 30,
     minPrecision: 0.9,
   });
-  const status = buildControlledCandidateReviewStatus(report);
+  const confidencePilot = summarizeControlledCandidateConfidencePilot(
+    await readJson(CONTROLLED_CONFIDENCE_PILOT),
+    CONTROLLED_CONFIDENCE_PILOT,
+  );
+  const status = attachConfidencePilotStatus(buildControlledCandidateReviewStatus(report), confidencePilot);
   status.reviewArtifacts = {
     reviewPage: CONTROLLED_REVIEW_PAGE.replace(/\\/g, "/"),
     completedCsv: CONTROLLED_COMPLETED.replace(/\\/g, "/"),
@@ -300,7 +315,7 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
     actions.push({
       priority: 1,
       track: "M2/M3 ordinary upload candidate gate",
-      action: "Finish the current blind review batch, import it, then rerun gate/status.",
+      action: controlled.nextActions?.[0] || "Finish the current blind review batch, import it, then rerun gate/status.",
       artifact: controlled.reviewArtifacts.reviewPage,
       reason: controlled.blockingReasons,
     });
@@ -378,6 +393,7 @@ function printProjectStatus(status, outPath) {
     controlledCandidate: {
       ready: controlledCandidate.studentSafeCandidateGateReady,
       counts: controlledCandidate.counts,
+      confidencePilot: controlledCandidate.confidencePilot,
       blockingReasons: controlledCandidate.blockingReasons,
     },
     m3plusPitchModes: {
