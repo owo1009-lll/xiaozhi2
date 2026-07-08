@@ -1,0 +1,123 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+
+import { buildProjectStatus, writeProjectStatus } from "./status-western-strings-project.mjs";
+
+const DEFAULT_OUT = path.join("data", "experiments", "western-strings-next-actions.md");
+const DEFAULT_STATUS_OUT = path.join("data", "experiments", "western-strings-project-status.json");
+
+function parseArgs(argv) {
+  const args = {
+    out: DEFAULT_OUT,
+    statusOut: DEFAULT_STATUS_OUT,
+  };
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--out") args.out = argv[++index] || args.out;
+    else if (arg === "--status-out") args.statusOut = argv[++index] || args.statusOut;
+  }
+  return args;
+}
+
+function bulletList(items) {
+  const values = (items || []).filter(Boolean);
+  return values.length ? values.map((item) => `- ${item}`).join("\n") : "- none";
+}
+
+function commandForTrack(track) {
+  if (track === "M2/M3 ordinary upload candidate gate") {
+    return [
+      "Open data/experiments/western-strings-m3/confidence-validation-review/index.html",
+      "After review, download/save controlled-candidate-review.completed.csv in that folder",
+      "Run npm run western:controlled-candidate-confidence-validation-eval",
+      "Then run npm run western:project-status",
+    ];
+  }
+  if (track === "M3+ pitch behavior modes") {
+    return [
+      "Open data/experiments/western-strings-m3plus/pitch-mode-review-pack/index.html",
+      "After review, save m3plus-pitch-mode-review.completed.csv in that folder",
+      "Run npm run western:m3plus-review-import",
+      "Then run npm run western:m3plus-review-status",
+    ];
+  }
+  if (track === "M4 OMR benchmark") {
+    return [
+      "Prepare independent human-corrected gold MusicXML/MXL files listed in data/experiments/western-strings-m4/independent-gold-todo.md",
+      "Run npm run western:m4-omr-benchmark",
+      "Then run npm run western:project-status",
+    ];
+  }
+  return ["Run npm run western:project-status after completing this item"];
+}
+
+function renderHandoff(status) {
+  const lines = [
+    "# Western Strings Next Actions",
+    "",
+    `Generated: ${status.generatedAt}`,
+    "",
+    "## Runtime Gate",
+    "",
+    `- ordinaryUploadAutoFeedbackReady: ${Boolean(status.runtimeStudentGate?.ordinaryUploadAutoFeedbackReady)}`,
+    `- m3plusAutoFeedbackReady: ${Boolean(status.runtimeStudentGate?.m3plusAutoFeedbackReady)}`,
+    `- m4OmrAutoScoreReady: ${Boolean(status.runtimeStudentGate?.m4OmrAutoScoreReady)}`,
+    `- policy: ${status.runtimeStudentGate?.policy || "unknown"}`,
+    "",
+    "## Priority Queue",
+    "",
+  ];
+  for (const action of status.nextActions || []) {
+    lines.push(
+      `### P${action.priority}: ${action.track}`,
+      "",
+      `Artifact: ${action.artifact || "none"}`,
+      "",
+      "Why blocked:",
+      bulletList(action.reason),
+      "",
+      "Do next:",
+      `- ${action.action}`,
+      "",
+      "Commands:",
+      bulletList(commandForTrack(action.track)),
+      "",
+    );
+  }
+  lines.push(
+    "## Notes",
+    "",
+    "- This file is a handoff checklist only. It does not change any runtime gate.",
+    "- Do not treat eval-only pilot results as student-safe until the fresh blind validation path passes.",
+    "- `uncertain` review rows are recorded but excluded from scored precision denominators.",
+    "",
+  );
+  return `${lines.join("\n")}\n`;
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  const status = await buildProjectStatus();
+  await writeProjectStatus(status, args.statusOut);
+  const outPath = path.resolve(process.cwd(), args.out);
+  await fs.mkdir(path.dirname(outPath), { recursive: true });
+  await fs.writeFile(outPath, renderHandoff(status), "utf8");
+  console.log(JSON.stringify({
+    ok: true,
+    out: path.relative(process.cwd(), outPath).replace(/\\/g, "/"),
+    nextActions: (status.nextActions || []).map((item) => ({
+      priority: item.priority,
+      track: item.track,
+      artifact: item.artifact,
+      reason: item.reason,
+    })),
+  }, null, 2));
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
