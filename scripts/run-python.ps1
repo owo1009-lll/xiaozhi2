@@ -1,10 +1,7 @@
-param(
-  [Parameter(ValueFromRemainingArguments = $true)]
-  [string[]]$PythonArgs
-)
-
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "setup-console-utf8.ps1")
+
+$PythonArgs = @($args)
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $candidates = @()

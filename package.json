@@ -81,7 +81,7 @@
     "western:m3-status": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\eval_western_strings_m3_diagnosis.py",
     "western:m3-gate": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\eval_western_strings_m3_diagnosis.py --fail-on-not-ready",
     "western:m3plus-pitch-modes": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\eval_western_strings_m3plus_pitch_modes.py",
-    "western:m3plus-review-pack": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 --% scripts\\experiments\\create_western_strings_m3plus_pitch_mode_review_pack.py",
+    "western:m3plus-review-pack": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\create_western_strings_m3plus_pitch_mode_review_pack.py",
     "western:m3plus-review-import": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\import_western_strings_m3plus_pitch_mode_review.py",
     "western:m3plus-review-status": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\status_western_strings_m3plus_pitch_mode_review.py",
   "western:controlled-batch-candidate-audit": "node scripts\\audit-western-controlled-batch-candidates.mjs",
