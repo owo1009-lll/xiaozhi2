@@ -56,6 +56,18 @@ const M3PLUS_REVIEW_PAGE = path.join(
   "pitch-mode-review-pack",
   "index.html",
 );
+const M4_READINESS = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "omr-readiness.json",
+);
+const M4_BENCHMARK = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "omr-benchmark.json",
+);
 
 function parseArgs(argv) {
   const args = {
@@ -124,6 +136,14 @@ async function readCsv(filePath) {
     });
     return row;
   });
+}
+
+async function readJson(filePath, fallback = null) {
+  try {
+    return JSON.parse(await fs.readFile(path.resolve(process.cwd(), filePath), "utf8"));
+  } catch {
+    return fallback;
+  }
 }
 
 function isM3PlusReviewed(row) {
@@ -226,7 +246,48 @@ async function buildControlledStatus() {
   return status;
 }
 
-function summarizeNextActions(controlled, m3plus) {
+async function buildM4OmrStatus() {
+  const readiness = await readJson(M4_READINESS);
+  const benchmark = await readJson(M4_BENCHMARK);
+  const readinessReady = Boolean(readiness?.gate?.m4OmrBenchmarkDatasetReady);
+  const benchmarkEvaluated = Boolean(benchmark?.gate?.m4OmrBenchmarkEvaluated);
+  const draftQualityReady = Boolean(benchmark?.gate?.m4OmrDraftQualityReady);
+  const blockingReasons = [];
+  if (!readiness) blockingReasons.push("m4-omr-readiness-missing");
+  else if (!readinessReady) blockingReasons.push("m4-omr-readiness-not-ready");
+  if (!benchmark) blockingReasons.push("m4-omr-benchmark-missing");
+  else {
+    if (!benchmarkEvaluated) blockingReasons.push("m4-omr-benchmark-not-evaluated");
+    if ((benchmark.counts?.usableBenchmarkRows || 0) <= 0) blockingReasons.push("m4-omr-no-independent-gold");
+    if ((benchmark.counts?.selfComparisonRows || 0) > 0) blockingReasons.push("m4-omr-self-comparison-detected");
+    if (!draftQualityReady) blockingReasons.push("m4-omr-draft-quality-not-ready");
+  }
+  return {
+    ok: true,
+    m4OmrBenchmarkDatasetReady: readinessReady,
+    m4OmrDraftQualityReady: draftQualityReady,
+    studentGateReady: false,
+    reason: "omr-status-only",
+    counts: {
+      readinessRows: readiness?.counts?.intakeRows || 0,
+      pairReadyRows: readiness?.counts?.pairReadyRows || 0,
+      benchmarkRows: benchmark?.counts?.rows || 0,
+      parseOkRows: benchmark?.counts?.parseOkRows || 0,
+      usableBenchmarkRows: benchmark?.counts?.usableBenchmarkRows || 0,
+      selfComparisonRows: benchmark?.counts?.selfComparisonRows || 0,
+      blockedRows: benchmark?.counts?.blockedRows || 0,
+    },
+    blockingReasons,
+    artifacts: {
+      readinessJson: M4_READINESS.replace(/\\/g, "/"),
+      benchmarkJson: M4_BENCHMARK.replace(/\\/g, "/"),
+      readinessCsv: String(readiness?.artifacts?.csv || "data/experiments/western-strings-m4/omr-readiness.csv").replace(/\\/g, "/"),
+      benchmarkCsv: String(benchmark?.artifacts?.csv || "data/experiments/western-strings-m4/omr-benchmark.csv").replace(/\\/g, "/"),
+    },
+  };
+}
+
+function summarizeNextActions(controlled, m3plus, m4Omr) {
   const actions = [];
   if (!controlled.studentSafeCandidateGateReady) {
     actions.push({
@@ -246,6 +307,15 @@ function summarizeNextActions(controlled, m3plus) {
       reason: m3plus.blockingReasons,
     });
   }
+  if (!m4Omr.m4OmrDraftQualityReady) {
+    actions.push({
+      priority: 3,
+      track: "M4 OMR benchmark",
+      action: "Prepare independent human-corrected gold MusicXML/MXL or external gold, then rerun `npm run western:m4-omr-benchmark`.",
+      artifact: m4Omr.artifacts.benchmarkJson,
+      reason: m4Omr.blockingReasons,
+    });
+  }
   if (!actions.length) {
     actions.push({
       priority: 1,
@@ -260,9 +330,10 @@ function summarizeNextActions(controlled, m3plus) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const [controlledCandidate, m3plusPitchModes] = await Promise.all([
+  const [controlledCandidate, m3plusPitchModes, m4Omr] = await Promise.all([
     buildControlledStatus(),
     buildM3PlusStatus(),
+    buildM4OmrStatus(),
   ]);
   const status = {
     ok: true,
@@ -272,13 +343,15 @@ async function main() {
     runtimeStudentGate: {
       ordinaryUploadAutoFeedbackReady: controlledCandidate.studentSafeCandidateGateReady,
       m3plusAutoFeedbackReady: false,
+      m4OmrAutoScoreReady: false,
       policy: "fail-closed",
     },
     tracks: {
       controlledCandidate,
       m3plusPitchModes,
+      m4Omr,
     },
-    nextActions: summarizeNextActions(controlledCandidate, m3plusPitchModes),
+    nextActions: summarizeNextActions(controlledCandidate, m3plusPitchModes, m4Omr),
   };
   const outPath = path.resolve(process.cwd(), args.out);
   await fs.mkdir(path.dirname(outPath), { recursive: true });
@@ -295,6 +368,12 @@ async function main() {
       ready: m3plusPitchModes.m3plusModeEvalReady,
       counts: m3plusPitchModes.counts,
       blockingReasons: m3plusPitchModes.blockingReasons,
+    },
+    m4Omr: {
+      datasetReady: m4Omr.m4OmrBenchmarkDatasetReady,
+      draftQualityReady: m4Omr.m4OmrDraftQualityReady,
+      counts: m4Omr.counts,
+      blockingReasons: m4Omr.blockingReasons,
     },
     nextActions: status.nextActions,
     out: path.relative(process.cwd(), outPath).replace(/\\/g, "/"),
