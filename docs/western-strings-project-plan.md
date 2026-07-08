@@ -2,12 +2,14 @@
 
 > 本文是**可交付开发执行**的完整项目计划(10 章)。战略与 M0–M5 闸门详见 [western-strings-migration-plan.md](western-strings-migration-plan.md);本手册在其上补全:资产盘点、M0 SOP+结果、M1–M5 工程拆解、后台/UI/API/schema 变更、数据集许可证、版本定义、论文产出对应、时间线/人力/停止条件。
 > **状态:M1 已完成并通过收口回归;M2 teacher-only preview 已接入;M2e 学生式事件扰动已通过 synthetic gate;M2f 真实学生录音 release gate 已于 2026-07-08 通过;M3 core diagnosis gate 已通过;最小 `/api/strings/analyze` / `/api/strings/review` 服务端闭环、gated preview UI、clean-score + audio 受控提交流、离线复核队列、fail-closed 批处理审计执行器已接入。** 当前 V2 只放行 pitch / onset / missing 三类核心诊断;duration 因节奏不稳定暂不可稳定量化,extra-note/多音可判断但本轮复核未出现样本,两者均暂列 review-only,不得给学生硬反馈。当前 UI 可展示已验证样本的核心诊断预览,也可接收 clean-score + audio 进入离线复核队列,支持试听、审核为批处理候选、生成批处理审计记录;普通上传音频的 batch 已可产出 review-only pYIN 线性谱面完整候选特征表 artifact(同时保留 preview),并接入 `western-offline-feature-gate-v0-review-only` student-safe gate 框架、fail-closed 二次审计和离线校准评估命令,但全部 note 仍为 review_required。它仍不是任意上传音频实时诊断器。二胡自动线冻结为 V1.5(人在环 + 困难案例/论文证据)。
+>
+> **范围变更(2026-07-09):** PDF/图片谱面 **OMR 识别**由原"Out(避免坎1)"上调为**主线路线内里程碑 M6**(详见第 3、6 章)。**判断层不变**(音高/节奏诊断仍是音频侧 M2/M3);OMR 只解决"谱面从哪来",且必须先过**note-level 精度闸门**才被信任,不达标的识别谱一律 fail-closed 退人工核对,**绝不直接进判断**——这是从二胡坎1吸取的纪律。
 
 ---
 
 ## 1. 项目目标与版本定义
 
-**目标**:一个**乐器无关**的练习自动诊断系统——上传音频(+干净谱面),系统在**高置信片段**自动给诊断,其余进复核;**绝不低置信硬判给学生**。先以**小提琴**验证打通,架构覆盖弓弦家族。
+**目标**:一个**乐器无关**的练习自动诊断系统——上传音频 + 谱面(**PDF/图片经 OMR 识别,或干净 MusicXML/MIDI**),系统在**高置信片段**自动给诊断,其余进复核;**绝不低置信硬判给学生**。先以**小提琴**验证打通,架构覆盖弓弦家族。**谱面侧同样 fail-closed**:OMR 识别结果必须先过精度闸门(M6),不达标的谱不得直接进判断,退人工核对。
 
 **版本定义(每级"用户能看到什么"):**
 | 版本 | 能力 | 学生看到 | 教师看到 | 达成条件 |
@@ -19,6 +21,7 @@
 | **V3-release** | 大部分常规段自动,散板/复杂仍复核 | 大部分常规段自动 | 同上 | coverage≥40-60%、unsupported 稳定拒绝 |
 | (技巧 M4) | 揉弦/弓法等,达标才自动、否则 review | 达标技巧标注 | 复核 | 每类 AUC≥0.70、precision≥90% |
 | (大提琴 M5) | 弓弦家族扩展 | 同小提琴 | 同 | cello 独立 M0 + 重校准 |
+| (谱面 M6) | PDF/图片谱 OMR 识别入口 | 上传 PDF/拍照谱→自动识别成可判断谱 | 识别草稿+置信+人工核对 | note-level OMR 准确率达标(见 M6);不达标退人工核谱 |
 
 **硬原则**:precision 是硬门槛(≥90% 才给学生);coverage≥20% 才能命名为 V2-alpha,之后**覆盖率是结果不是目标**(覆盖低但准也算阶段成功);fail-closed 四态。
 
@@ -32,7 +35,7 @@
 | `teacherValidationService.js` / `teacherValidationRoutes.js` | ✅ 复用(teacher-ready gate、结构化字段、四态基础) |
 | `scoreStoreSqlite.js` / `scoreStoreSupport.js` / `scoreRoutes.js` | ✅ 复用(改喂干净 MIDI/MusicXML;**停用 OMR 导入路径**) |
 | `analyzerClient.js` / `analysisRoutes.js` / `taskQueue.js` / `jsonStore.js` / `baseUtils.js` | ✅ 复用 |
-| `scoreLineRoles.js` / `omrStats.js` | ⚠️ 二胡/OMR 相关,弦乐第一版**不接** |
+| `scoreLineRoles.js` / `omrStats.js` | ⚠️ 二胡/OMR 相关,弦乐第一版**不接**;**M6 谱面识别时再评估复用** |
 | `researchService.js` / `researchRoutes.js` / `opsRoutes.js` | ✅ 复用(研究/运维) |
 
 **前端(✅ 复用,改文案/乐器配置):** `TeacherValidationApp.jsx` + `src/teacherValidation/*`(ScoreLocatorPanel/SegmentAudioPlayer/atoms/utils)、`StudentApp.jsx`、`MainApp.jsx`、`PdfScoreHelper.jsx`。
@@ -42,7 +45,7 @@
 
 **数据资产:** 教师包 `manual-anchor-{fusheng,rhapsody-2,xuandong}`(二胡,冻结保留为困难案例);导出 `technique-labeling-export/2026-06-24T10-55-04-081Z`(37 段,论文负结果证据)。
 
-**冻结(不删、不接生产):** 二胡 OMR/Audiveris 链路、`scan-piece-segments`、长曲自动对齐实验脚本(`align-*`、`anchor_eval`、`eval_*` 二胡系列)、二胡 score store 条目。**保留为 V1.5 成果 + 论文能力边界证据。**
+**冻结(不删、不接生产):** 二胡 OMR/Audiveris 链路(**M6 谱面识别将重新评估复用 Audiveris,但须过 M6 精度闸门方可进判断**)、`scan-piece-segments`、长曲自动对齐实验脚本(`align-*`、`anchor_eval`、`eval_*` 二胡系列)、二胡 score store 条目。**保留为 V1.5 成果 + 论文能力边界证据。**
 
 **纯实验(`scripts/experiments/*.py`,121 个 .py):** 标记为 eval-only,不进生产;弦乐线新增的 M0 脚本(`eval_western_strings_m0_{bach10,urmp,musicnet}.py`)同此类。
 
@@ -51,8 +54,9 @@
 ---
 
 ## 3. 西洋弦乐迁移范围(in / out)
-**In(第一版):** 小提琴;输入 = 音频 + **MusicXML/MIDI/dataset-score**;note 对齐 + 基础诊断 core(音准/起音/漏音);时值/extra-note 多音 review-only;四态置信门;教师复核回流。
-**Out(后续):** PDF OMR(避免坎1)、技巧识别(M4 后置)、大提琴(M5)、用户上传任意谱面、散板/重 rubato 曲目自动判(直接 reject_unsupported)。
+**In(第一版,谱面侧先用干净谱):** 小提琴;输入 = 音频 + **MusicXML/MIDI/dataset-score**;note 对齐 + 基础诊断 core(音准/起音/漏音);时值/extra-note 多音 review-only;四态置信门;教师复核回流。
+**In(路线内,M6 谱面侧):** PDF/图片谱面 **OMR 识别**为主入口——但**带精度闸门**:OMR→MusicXML 草稿先在带 gold 谱的数据集上验 note-level 准确率,达标才可直接喂判断;不达标退 Audiveris 草稿 + 人工核对(复用现有 m2f clean-score 流程)。**绝不让未过闸门的 OMR 谱直接进判断(坎1纪律)。**
+**Out(后续):** 技巧识别(M4 后置)、大提琴(M5)、散板/重 rubato 曲目自动判(直接 reject_unsupported)。
 
 ---
 
@@ -127,6 +131,14 @@
 ### M5 — 大提琴扩展
 - cello pitch range + onset/pitch 参数 + **专属误差分析** + **重新校准阈值(不复用小提琴)** + **独立 cello M0**。
 - 表述:架构"配置层预留",非"同时支持"。
+
+### M6 — PDF/图片谱面识别(OMR,带精度闸门)
+- **动机:** 让学生/教师直接传 PDF 或拍照谱,不必先有干净电子谱。**这是主线诉求,但也正是二胡翻车的坎1**,因此按 M0 同样的纪律:先在数据集上验准确率,再谈信任。
+- **pipeline:** PDF/图片 → Audiveris OMR → MusicXML 草稿 → **note-level 精度评测**(对齐 gold MusicXML,报 pitch 识别正确率 / onset 正确率 / 小节级错误率 / 漏识别率)→ 达标进 score store(`scoreSource=omr`),不达标进人工核对队列(复用 m2f clean-score 流程)。
+- **精度闸门(release 前必过):** 在有 gold MusicXML 的曲目上,note pitch 识别准确率 ≥**[待定,建议 ≥98%]**、漏/多音率 ≤**[待定]**;未达标的谱**一律 fail-closed 退人工**,不得直接进音高/节奏判断。阈值必须先在真实曲目上定标,不得凭空写死。
+- **schema:** score 记录加 `scoreSource=omr`、`omrEngine`、`omrConfidence`、`omrReviewStatus`(draft/human-approved);低置信小节单独标记,判断时该小节降级 review。
+- **与判断层的关系:** OMR 只解决"谱面从哪来";判断仍是音频侧 M2/M3。**谱面错 → 判断全错**,所以 OMR 闸门必须比音频闸门更严,且学生端要明示"此谱由识别得到、是否经人工核对"。
+- **验收:** OMR note 准确率达标闸门通过;不达标谱 100% 走人工;`scoreSource=omr` 全链路可追溯;判断层不读取 `omrReviewStatus≠human-approved` 且未过闸门的谱。
 
 ---
 
@@ -253,11 +265,13 @@
 | M3 基础诊断 | 1-2 周 |
 | M4 技巧 pilot | 2-3 周(含教师标注) |
 | M5 大提琴 | 1-2 周(+独立 M0) |
+| M6 PDF 谱面 OMR | 2-4 周(Audiveris 接入 + 精度评测闸门 + 人工核对闭环) |
 
 **停止条件(kill criteria):**
 - M2 在真实输入上 auto_pass precision <90% 且补数据/调特征仍上不去 → 降级 review-only,不给学生自动反馈。
 - M4 某类 AUC<0.65 → 该类永久 review-only。
 - M5 cello 独立 M0 不过 → cello 暂缓。
+- M6 OMR note 准确率在数据集上达不到闸门且调参/换引擎仍上不去 → OMR 只作草稿、永久走人工核谱,不自动进判断(退回坎1前的干净谱路线)。
 - 任何阶段:数据许可证不清 → 不公开、不进仓库。
 
 **风险表:**
@@ -265,7 +279,7 @@
 |---|---|
 | 真实学生录音比数据集难 | M2 必须在学生样本上验证,不止数据集 gold |
 | 置信门覆盖率过低无产品价值 | 定"最低可上线覆盖率";auto 段须有教学价值,非只覆盖简单音 |
-| 重引 OMR → 坎1 重现 | 第一版只 MusicXML/MIDI |
+| 重引 OMR → 坎1 重现 | OMR 独立精度闸门(M6);未过闸门/未人工核对的谱 fail-closed 退人工;判断层只读达标或 human-approved 的谱 |
 | 数据许可证 | 不进仓库、公开前核实 |
 | 技巧被高估 | 后置 + 单独数据 + 降承诺 |
 

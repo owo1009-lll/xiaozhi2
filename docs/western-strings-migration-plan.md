@@ -38,7 +38,7 @@ M0 证明的是"可进入下一阶段",不是"产品已经完成"。完整报告
 - 输出状态: `auto_pass` / `review_required` / `reject_unsupported` / `failed`。
 
 ### 明确不做
-- 不做 PDF OMR。
+- PDF OMR **不进 v2 alpha/release**(避免坎1);但 **2026-07-09 起列为路线内里程碑 M6**,单独开支线、带 note-level 精度闸门,未过闸门/未人工核对的谱不得进判断,不污染 clean-score 主线。详见 project-plan 第 3、6 章。
 - 不承诺技巧自动识别。
 - 不把大提琴当作"改音域参数"直接上线。
 - 不把低置信结果反馈给学生。
