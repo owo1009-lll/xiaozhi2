@@ -11,6 +11,20 @@ const DEFAULT_CONFIDENCE_PILOT = path.join(
   "offline-feature-candidate-review",
   "candidate-confidence-pilot.json",
 );
+const DEFAULT_CONFIDENCE_VALIDATION_REVIEW_PAGE = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-validation-review",
+  "index.html",
+);
+const DEFAULT_CONFIDENCE_VALIDATION_COMPLETED = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-validation-review",
+  "controlled-candidate-review.completed.csv",
+);
 
 function clampMissing(required, actual) {
   return Math.max(0, Number(required || 0) - Number(actual || 0));
@@ -43,6 +57,11 @@ export function summarizeControlledCandidateConfidencePilot(pilot, source = DEFA
     || String(left.modelName).localeCompare(String(right.modelName))
   ));
   const releaseCandidateFound = Boolean(pilot?.recommendation?.readyForStudentGate && releaseCandidates.length);
+  const releaseFloor = pilot?.recommendation?.releaseFloor || {};
+  const recommendedCandidates = releaseCandidates.filter((candidate) => (
+    (!releaseFloor.featureSet || candidate.featureSet === releaseFloor.featureSet)
+    && (!releaseFloor.groupBy || candidate.groupBy === releaseFloor.groupBy)
+  ));
   return {
     source: source.replace(/\\/g, "/"),
     sourceExists: Boolean(pilot),
@@ -56,8 +75,11 @@ export function summarizeControlledCandidateConfidencePilot(pilot, source = DEFA
     usableRows: Number(pilot?.usableRows || 0),
     wrongRows: Number(pilot?.wrongRows || 0),
     recommendation: pilot?.recommendation || null,
-    bestReleaseCandidate: releaseCandidates[0] || null,
+    recommendedReleaseCandidate: recommendedCandidates[0] || null,
+    bestReleaseCandidate: recommendedCandidates[0] || releaseCandidates[0] || null,
     releaseCandidateCount: releaseCandidates.length,
+    validationReviewPage: DEFAULT_CONFIDENCE_VALIDATION_REVIEW_PAGE.replace(/\\/g, "/"),
+    validationCompletedCsv: DEFAULT_CONFIDENCE_VALIDATION_COMPLETED.replace(/\\/g, "/"),
   };
 }
 
@@ -66,7 +88,7 @@ export function attachConfidencePilotStatus(status, confidencePilot) {
     return { ...status, confidencePilot };
   }
   const nextActions = [
-    "Confidence pilot found release candidates; validate the same model and threshold on a fresh blind batch before changing the runtime gate.",
+    `Confidence pilot found release candidates; review ${DEFAULT_CONFIDENCE_VALIDATION_REVIEW_PAGE.replace(/\\/g, "/")} and import the completed CSV before changing the runtime gate.`,
   ];
   const blockingReasons = [...new Set([
     ...(status.blockingReasons || []),

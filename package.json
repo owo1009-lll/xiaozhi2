@@ -93,6 +93,8 @@
     "western:controlled-candidate-gate-eval": "node scripts\\eval-western-controlled-candidate-gate.mjs",
     "western:controlled-candidate-label-audit": "node scripts\\audit-western-controlled-candidate-labels.mjs",
     "western:controlled-candidate-confidence-pilot": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\eval_western_controlled_candidate_confidence.py",
+    "western:controlled-candidate-confidence-validation-export": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\export_western_controlled_confidence_validation_batch.py",
+    "western:controlled-candidate-confidence-validation-review-pack": "node scripts\\export-western-controlled-candidate-review.mjs --selection-json data\\experiments\\western-strings-m3\\offline-feature-candidate-review\\candidate-confidence-validation-selection.json --out-dir data\\experiments\\western-strings-m3\\confidence-validation-review --all",
     "western:controlled-candidate-review-status": "node scripts\\status-western-controlled-candidate-review.mjs",
     "western:controlled-candidate-input-status": "node scripts\\status-western-controlled-candidate-inputs.mjs",
     "western:project-status": "node scripts\\status-western-strings-project.mjs",

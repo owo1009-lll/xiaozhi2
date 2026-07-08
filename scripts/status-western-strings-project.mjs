@@ -316,7 +316,7 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
       priority: 1,
       track: "M2/M3 ordinary upload candidate gate",
       action: controlled.nextActions?.[0] || "Finish the current blind review batch, import it, then rerun gate/status.",
-      artifact: controlled.reviewArtifacts.reviewPage,
+      artifact: controlled.confidencePilot?.validationReviewPage || controlled.reviewArtifacts.reviewPage,
       reason: controlled.blockingReasons,
     });
   }

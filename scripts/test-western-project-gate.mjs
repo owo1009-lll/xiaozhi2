@@ -20,8 +20,11 @@ assert.equal(controlled.confidencePilot?.releaseCandidateFound, true, "confidenc
 assert.equal(controlled.confidencePilot?.needsBlindValidation, true, "confidence pilot should require blind validation");
 assert.equal(controlled.confidencePilot?.readyForStudentGate, false, "eval-only confidence pilot must not mark runtime gate ready");
 assert(controlled.confidencePilot?.bestReleaseCandidate, "confidence pilot should report the best release candidate");
+assert.equal(controlled.confidencePilot.bestReleaseCandidate.featureSet, "deployable", "confidence pilot should report the deployable candidate");
+assert.equal(controlled.confidencePilot.bestReleaseCandidate.groupBy, "recordingId", "confidence pilot should report the strict leave-one-recording candidate");
 assert(controlled.blockingReasons.includes("candidate-confidence-pilot-needs-blind-validation"), "ordinary upload should block on blind validation after pilot success");
-assert(status.nextActions[0]?.action.includes("Confidence pilot"), "project next action should route to blind validation of the confidence pilot");
+assert(status.nextActions[0]?.action.includes("confidence-validation-review/index.html"), "project next action should route to the confidence validation review page");
+assert.equal(status.nextActions[0]?.artifact, "data/experiments/western-strings-m3/confidence-validation-review/index.html", "project artifact should point to the confidence validation review page");
 
 const m4 = status.tracks.m4Omr;
 assert.equal(m4.m4OmrBenchmarkDatasetReady, true, "M4 intake dataset should be ready for benchmarking");
@@ -38,6 +41,11 @@ assert.deepEqual(noRequiredGate.failures, [], "empty required track set should h
 const fullGate = evaluateProjectGate(status, new Set(["ordinary", "m3plus", "m4"]));
 assert.equal(fullGate.projectReleaseReady, false, "full project gate must block until all required tracks are ready");
 assert(fullGate.failures.some((failure) => failure.track === "M2/M3 ordinary upload candidate gate"), "ordinary track failure should be reported");
+assert.equal(
+  fullGate.failures.find((failure) => failure.track === "M2/M3 ordinary upload candidate gate")?.artifact,
+  "data/experiments/western-strings-m3/confidence-validation-review/index.html",
+  "ordinary gate failure should point to the confidence validation review page",
+);
 assert(fullGate.failures.some((failure) => failure.track === "M3+ pitch behavior modes"), "M3+ track failure should be reported");
 assert(fullGate.failures.some((failure) => failure.track === "M4 OMR benchmark"), "M4 track failure should be reported");
 

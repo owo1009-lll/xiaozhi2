@@ -99,6 +99,16 @@ async function readCandidateArtifact(repoRoot, candidateRowsPath) {
   };
 }
 
+async function readSelectionArtifact(repoRoot, selectionPath) {
+  const resolved = path.resolve(repoRoot, selectionPath);
+  const artifact = JSON.parse(await fs.readFile(resolved, "utf8"));
+  return {
+    artifactPath: path.relative(repoRoot, resolved).replace(/\\/g, "/"),
+    rows: asArray(artifact.rows),
+    metadata: artifact,
+  };
+}
+
 async function fileExists(filePath) {
   try {
     await fs.access(filePath);
@@ -345,6 +355,11 @@ export const CONTROLLED_CANDIDATE_REVIEW_HEADERS = [
   "gateReason",
   "gateVersion",
   "studentFacing",
+  "confidenceProbability",
+  "confidenceModelName",
+  "confidenceThreshold",
+  "confidenceFeatureSet",
+  "confidenceGroupBy",
   "teacherCandidateStatus",
   "teacherCorrectOnsetSeconds",
   "teacherCorrectMeasureIndex",
@@ -658,6 +673,7 @@ function parseArgs(argv) {
     gateCandidatesOnly: false,
     excludeReviewed: true,
     labelsPath: path.join("data", "experiments", "western-strings-m3", "offline-feature-candidate-review", "controlled-candidate-review-labels.csv"),
+    selectionJson: "",
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -671,17 +687,29 @@ function parseArgs(argv) {
     else if (arg === "--include-reviewed") args.excludeReviewed = false;
     else if (arg === "--exclude-reviewed") args.excludeReviewed = true;
     else if (arg === "--labels") args.labelsPath = argv[++index] || args.labelsPath;
+    else if (arg === "--selection-json") args.selectionJson = argv[++index] || args.selectionJson;
   }
   return args;
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const exportRows = await collectControlledCandidateReviewRows({
-    repoRoot: process.cwd(),
-    source: args.source,
-    latestOnly: args.latestOnly,
-  });
+  const selectionRows = args.selectionJson
+    ? await readSelectionArtifact(process.cwd(), args.selectionJson)
+    : null;
+  const exportRows = selectionRows
+    ? {
+      source: selectionRows.artifactPath,
+      runMode: "confidence-validation-selection",
+      rows: selectionRows.rows,
+      skipped: [],
+      selectionMetadata: selectionRows.metadata,
+    }
+    : await collectControlledCandidateReviewRows({
+      repoRoot: process.cwd(),
+      source: args.source,
+      latestOnly: args.latestOnly,
+    });
   const candidatePool = args.gateCandidatesOnly ? exportRows.rows.filter(isGateCandidateReviewRow) : exportRows.rows;
   const reviewedKeys = args.excludeReviewed
     ? await readReviewedCandidateKeys({ repoRoot: process.cwd(), labelsPath: args.labelsPath })
@@ -693,6 +721,7 @@ async function main() {
   await fs.mkdir(outDir, { recursive: true });
   const rows = selectCandidateReviewSample(reviewPool, { limit: args.limit });
   await attachLocalAudioFiles(rows, { repoRoot: process.cwd(), outDir });
+  const displayTotalRowCount = exportRows.selectionMetadata?.candidateCount || exportRows.rows.length;
   const csvPath = path.join(outDir, "controlled-candidate-review.csv");
   const jsonPath = path.join(outDir, "controlled-candidate-review.json");
   const htmlPath = path.join(outDir, "index.html");
@@ -701,7 +730,13 @@ async function main() {
   await fs.writeFile(jsonPath, `${JSON.stringify({
     source: exportRows.source,
     runMode: exportRows.runMode,
-    totalRowCount: exportRows.rows.length,
+    totalRowCount: displayTotalRowCount,
+    selection: exportRows.selectionMetadata ? {
+      modelName: exportRows.selectionMetadata.modelName,
+      threshold: exportRows.selectionMetadata.threshold,
+      selectedAboveThresholdCount: exportRows.selectionMetadata.selectedAboveThresholdCount,
+      selectionJson: args.selectionJson.replace(/\\/g, "/"),
+    } : null,
     gateCandidatesOnly: args.gateCandidatesOnly,
     excludeReviewed: args.excludeReviewed,
     reviewedLabelCount: reviewedKeys.size,
@@ -715,16 +750,20 @@ async function main() {
   }, null, 2)}\n`, "utf8");
   await fs.writeFile(htmlPath, renderClearControlledCandidateReviewHtml(rows, {
     serverOrigin: args.serverOrigin,
-    totalRowCount: exportRows.rows.length,
+    totalRowCount: displayTotalRowCount,
   }), "utf8");
   await fs.writeFile(guidePath, buildClearReviewGuideMarkdown(rows, {
-    totalRowCount: exportRows.rows.length,
+    totalRowCount: displayTotalRowCount,
   }), "utf8");
   console.log(JSON.stringify({
     ok: true,
     source: exportRows.source,
     runMode: exportRows.runMode,
-    totalRowCount: exportRows.rows.length,
+    totalRowCount: displayTotalRowCount,
+    selectionJson: args.selectionJson.replace(/\\/g, "/"),
+    confidenceModelName: exportRows.selectionMetadata?.modelName || "",
+    confidenceThreshold: exportRows.selectionMetadata?.threshold ?? "",
+    selectedAboveThresholdCount: exportRows.selectionMetadata?.selectedAboveThresholdCount ?? "",
     gateCandidatesOnly: args.gateCandidatesOnly,
     excludeReviewed: args.excludeReviewed,
     reviewedLabelCount: reviewedKeys.size,
@@ -996,6 +1035,7 @@ export function renderClearControlledCandidateReviewHtml(rows = [], {
               <div><span class="label">音高是否接近</span>\${escapeHtml(row.pitchSupportWithin80Cents)}</div>
               <div><span class="label">音分误差</span>\${escapeHtml(row.centsError)}</div>
               <div><span class="label">有效音高帧</span>\${escapeHtml(row.voicedFrameCount)}</div>
+              <div><span class="label">confidence pilot</span>\${escapeHtml(row.confidenceModelName || "")} \${escapeHtml(row.confidenceProbability ?? "")} / threshold \${escapeHtml(row.confidenceThreshold ?? "")}</div>
               <div><span class="label">原始行号(不用判断)</span>\${escapeHtml(row.reviewRowNumber)}</div>
               <div><span class="label">短音频路径</span>\${escapeHtml(row.localClipPath || "未生成")}</div>
               <div><span class="label">短音频起点 / 候选点</span>\${escapeHtml(row.localClipStartSeconds ?? "")} / \${escapeHtml(row.localClipCueSeconds ?? "")}</div>
