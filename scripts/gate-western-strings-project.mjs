@@ -17,7 +17,7 @@ function parseArgs(argv) {
   return args;
 }
 
-function evaluateProjectGate(status, requiredTracks) {
+export function evaluateProjectGate(status, requiredTracks) {
   const failures = [];
   const controlled = status.tracks?.controlledCandidate || {};
   const m3plus = status.tracks?.m3plusPitchModes || {};

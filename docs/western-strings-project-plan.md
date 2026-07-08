@@ -248,7 +248,7 @@
 | M3 diagnosis | pitch/onset/missing core 评测表;duration/extra 可选扩展 | 当前 release 只要求音准、起音、漏音分别 precision≥90% 且 unsafe=0;extra-note 需补人工确认样本;duration 需补可量化时值样本。未通过前二者保持 review-only;低置信不反馈;回流可导出 | 仅显示对齐,不显示诊断 |
 | M3+ pitch-behavior modes | 揉弦/滑音/颤音/装饰音/双音/泛音分模式音准评测 | 各模式 note-level 音准 precision≥90%、unsafe=0;技法区 review 率下降但音准误判不上升 | 未达标模式保持 `review_required`,不展示技法名 |
 | M4 OMR gate | OMR 草稿 vs gold MusicXML note-level 评测;人工核谱状态审计 | pitch/onset/measure/漏识别达到 M4 闸门;未过闸门 100% 退人工核谱 | OMR 只作草稿,不得进入判断层 |
-| 全程 | `check-server-p0` / `test:teacher-validation` / `build` | eval-only 脚本不写生产;数据不进仓库;feature flag 关时学生端零自动输出 | 阻断发布 |
+| 全程 | `check-server-p0` / `test:teacher-validation` / `test:western-project-gate` / `build` | eval-only 脚本不写生产;数据不进仓库;feature flag 关时学生端零自动输出;项目级 gate 必须保持 fail-closed,且 M4 自比样本不得误判为独立 gold | 阻断发布 |
 
 **指标拆分(避免把对齐和诊断混在一起):**
 - 对齐层: `AlignmentPrecision@100ms/300ms`, `median/p90 onset error`, `coverage`, `reject/review reason counts`。
