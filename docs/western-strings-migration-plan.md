@@ -234,6 +234,11 @@ OMR 只解决"谱面从哪来",不改变音频诊断逻辑。未过 note-level �
 - 100% 可追溯 `scoreSource=omr`、`omrReviewStatus`、识别版本与人工核对状态。
 - 判断层拒绝未达标或未核对 OMR 谱。
 
+### 当前执行状态(2026-07-09)
+- 已接入只读 readiness 命令 `npm run western:m4-omr-readiness`。该命令检查 M2f clean-score intake 中每条图片/PDF 谱面源、gold clean MusicXML/MXL/MIDI、人工 `approved` 状态和 score-store `scoreId` 是否齐备。
+- 当前实测:12 条 intake 全部 ready,`pairReadyRows=12`,`blockedRows=0`,`m4OmrBenchmarkDatasetReady=true`;产物为 `data/experiments/western-strings-m4/omr-readiness.json` 和 `omr-readiness.csv`。
+- 该结果只是 OMR benchmark 的数据前置条件,不是 OMR 准确率通过。学生端仍固定 `studentGateReady=false`,OMR 识别结果在 note-level 精度闸门通过前不得进入 `/api/strings/analyze` 判断层。
+
 ---
 
 ## 10. M5: 大提琴扩展
