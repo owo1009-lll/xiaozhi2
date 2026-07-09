@@ -58,7 +58,7 @@ function buildTodoRows(report, readinessReport = {}) {
         pieceId: row.pieceId || "",
         scoreId: readiness.scoreId || "",
         issue: row.blockingReason || "benchmark-row-not-usable",
-        action: "Open sourceScorePath, verify/correct the score, save a new independent gold MXL/MusicXML, update goldPath, then rerun npm run western:m4-omr-benchmark.",
+        action: "Create independent human-corrected gold MusicXML/MXL from the source score image; do not reuse the Audiveris draft as gold.",
         sourceScorePath: readiness.sourceScorePath || "",
         goldPath: row.goldPath || "",
         draftPath: row.draftPath || "",
@@ -72,33 +72,34 @@ function buildTodoRows(report, readinessReport = {}) {
 
 function buildMarkdown(report, todoRows) {
   const lines = [
-    "# M4 独立 gold score 校正清单",
+    "# M4 independent gold score 校正清单",
     "",
     "本文件由 `npm run western:m4-independent-gold-todo` 生成。",
     "",
-    "目的：M4 OMR 准确率只能用**独立人工校正的 gold score**评估。",
-    "如果 approved clean score 与 Audiveris 草稿完全同 SHA-1，系统会判为自比 self-comparison，并阻止把 100% 当作 OMR 证据。",
+    "目的：M4 OMR 准确率只能用 **独立人工校正的 gold score** 评估。",
+    "如果 clean score 与 Audiveris draft 完全同 SHA-1，系统会判定为 self-comparison，并阻止把 100% 自比结果当作 OMR 证据。",
     "",
-    "当 `goldEqualsDraftHash=yes` 时，当前 draft-vs-gold 的 100% 匹配不是模型准确率证据。",
+    "这不是教师音频诊断复核。人工任务只是在谱面编辑器里对照原谱图片/PDF 校正 MusicXML/MXL。",
     "",
     "## 当前摘要",
     "",
     `- benchmark 行数：${report.counts?.rows ?? 0}`,
     `- 可解析草稿：${report.counts?.parseOkRows ?? 0}`,
     `- 可用于 OMR 准确率评估的行：${report.counts?.usableBenchmarkRows ?? 0}`,
-    `- 被判为自比的行：${report.counts?.selfComparisonRows ?? 0}`,
+    `- 被判为 self-comparison 的行：${report.counts?.selfComparisonRows ?? 0}`,
     `- M4 draft quality ready：${report.gate?.m4OmrDraftQualityReady ? "yes" : "no"}`,
     "",
-    "## 人工需要做什么",
+    "## 谱面编辑人员需要做什么",
     "",
     "对下面每一行：",
     "",
     "1. 打开 `sourceScorePath` 的原始谱面图片/PDF。",
-    "2. 对照原谱人工检查当前 `goldPath` 或 `draftPath`。可以用 draft 当起点，但必须逐小节核对。",
-    "3. 将人工确认后的谱保存成**新的独立 gold MusicXML/MXL**，不要直接覆盖 Audiveris draft。",
-    "4. 更新 `goldPath` 或 clean-score intake，让它指向这个独立 gold 文件。",
-    "5. 重新运行 `npm run western:m4-omr-benchmark`。",
-    "6. 只有 `usableBenchmarkRows > 0` 且指标过线，M4 才能继续讨论 release gate；学生端默认仍 fail-closed。",
+    "2. 对照原谱检查当前 `goldPath` 或 `draftPath`。可以用 draft 当起点，但必须逐小节核对。",
+    "3. 保存新的独立 gold MusicXML/MXL，不要直接复制 Audiveris draft。",
+    "4. 运行 `npm run western:m4-independent-gold-workspace-audit`，确认 changed/approved 状态。",
+    "5. 确认无误后，只把该行 `reviewStatus` 改为 `approved`。",
+    "6. 先运行 `npm run western:m4-apply-independent-gold-workspace -- --dry-run`。",
+    "7. dry-run 只显示预期行会 apply 后，再正式运行 apply 和 `npm run western:m4-omr-benchmark`。",
     "",
     "## 待处理行",
     "",
@@ -134,7 +135,7 @@ function htmlEscape(value) {
 
 function renderPathLink(outDir, filePath) {
   const text = String(filePath || "");
-  if (!text) return "<span class=\"muted\">空</span>";
+  if (!text) return '<span class="muted">空</span>';
   const href = relativeLink(outDir, text);
   return `<a href="${htmlEscape(href)}" target="_blank" rel="noreferrer">${htmlEscape(text)}</a>`;
 }
@@ -157,11 +158,14 @@ function buildHtml(report, todoRows, outDir) {
         <div class="grid">
           <div class="score">${image}</div>
           <div class="meta">
-            <h3>人工校正动作</h3>
+            <h3>谱面编辑动作</h3>
             <ol>
-              <li>打开左侧原谱图片,逐小节核对当前 gold 或 Audiveris draft。</li>
-              <li>保存一个新的独立 gold MusicXML/MXL,不要直接覆盖 Audiveris draft。</li>
-              <li>更新 clean-score intake 的 goldPath 后重跑 <code>npm run western:m4-omr-benchmark</code>。</li>
+              <li>只做谱面 gold 校正，不做教师音频诊断。</li>
+              <li>打开左侧原谱图片，逐小节核对当前 gold 或 Audiveris draft。</li>
+              <li>保存新的独立 gold MusicXML/MXL，不要直接复制 Audiveris draft。</li>
+              <li>运行 <code>npm run western:m4-independent-gold-workspace-audit</code> 检查状态。</li>
+              <li>确认无误后，把 workspace CSV 中该行 <code>reviewStatus</code> 改为 <code>approved</code>。</li>
+              <li>正式应用前必须先 dry-run。</li>
             </ol>
             <dl>
               <dt>sourceScorePath</dt><dd>${renderPathLink(outDir, row.sourceScorePath)}</dd>
@@ -179,7 +183,7 @@ function buildHtml(report, todoRows, outDir) {
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>M4 独立 gold score 校正清单</title>
+  <title>M4 independent gold score 校正清单</title>
   <style>
     body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f6f7f9; color: #1f2933; }
     header { position: sticky; top: 0; z-index: 2; background: #fff; border-bottom: 1px solid #d7dde5; padding: 16px 24px; }
@@ -205,8 +209,8 @@ function buildHtml(report, todoRows, outDir) {
 </head>
 <body>
   <header>
-    <h1>M4 独立 gold score 校正清单</h1>
-    <p class="muted">用途: 防止把 Audiveris draft 与自身比较得到的 100% 误当成 OMR 准确率。只有人工独立校正 gold 后,M4 才能评估。</p>
+    <h1>M4 independent gold score 校正清单</h1>
+    <p class="muted">用途：防止把 Audiveris draft 与自身比较得到的 100% 误当成 OMR 准确率。只有人工独立校正的 gold score 才能用于 M4 评估。本页不是教师音频诊断复核。</p>
     <div class="summary">
       <span class="pill">benchmark 行数: ${htmlEscape(report.counts?.rows ?? 0)}</span>
       <span class="pill">可解析草稿: ${htmlEscape(report.counts?.parseOkRows ?? 0)}</span>
