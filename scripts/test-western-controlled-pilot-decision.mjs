@@ -4,12 +4,34 @@ import path from "node:path";
 
 import { writeApprovalTemplate } from "./create-western-controlled-pilot-approval-template.mjs";
 import { buildControlledPilotDecision } from "./create-western-controlled-pilot-decision.mjs";
+import { renderHandoff } from "./create-western-strings-next-action-handoff.mjs";
 import { buildControlledPilotStartPreflight } from "./run-western-controlled-pilot-start-preflight.mjs";
+import { buildProjectStatus } from "./status-western-strings-project.mjs";
 
 const TEST_DIR = path.join("data", "experiments", "western-strings-controlled-pilot-test");
 const TEMPLATE_PATH = path.join(TEST_DIR, "approval.template.json");
 const DEFERRED_APPROVAL_PATH = path.join(TEST_DIR, "approval.deferred.json");
 const VALID_APPROVAL_PATH = path.join(TEST_DIR, "approval.valid.json");
+const DEFAULT_APPROVAL_PATH = path.join("data", "experiments", "western-strings-controlled-pilot-approval.json");
+const DEFAULT_DECISION_PATH = path.join("data", "experiments", "western-strings-controlled-pilot-decision.json");
+
+async function readTextOrNull(filePath) {
+  try {
+    return await fs.readFile(filePath, "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+async function restoreText(filePath, text) {
+  if (text == null) {
+    await fs.rm(filePath, { force: true });
+    return;
+  }
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, text, "utf8");
+}
 
 await fs.mkdir(TEST_DIR, { recursive: true });
 
@@ -91,6 +113,45 @@ assert.equal(preflightWithApproval.okToStartControlledPilot, true, "start prefli
 assert.deepEqual(preflightWithApproval.blockingReasons, [], "passing start preflight should have no blocking reasons");
 assert.equal(preflightWithApproval.decision.runtimeFailClosed, true, "passing start preflight must keep default runtime fail-closed");
 
+const originalApproval = await readTextOrNull(DEFAULT_APPROVAL_PATH);
+const originalDecision = await readTextOrNull(DEFAULT_DECISION_PATH);
+try {
+  await fs.mkdir(path.dirname(DEFAULT_APPROVAL_PATH), { recursive: true });
+  await fs.writeFile(DEFAULT_APPROVAL_PATH, `${JSON.stringify({
+    pilotApproved: false,
+    approvedBy: "test-owner",
+    approvedAt: "2026-07-10T00:00:00+08:00",
+    scope: "defer controlled pilot",
+    notes: "Test-only default-path explicit no-go. Runtime remains fail-closed.",
+  }, null, 2)}\n`, "utf8");
+  const defaultDeferredDecision = await buildControlledPilotDecision();
+  await fs.writeFile(DEFAULT_DECISION_PATH, `${JSON.stringify(defaultDeferredDecision, null, 2)}\n`, "utf8");
+
+  const statusWithDeferredPilot = await buildProjectStatus();
+  assert.equal(
+    statusWithDeferredPilot.controlledPilotDecision?.approvalDeferred,
+    true,
+    "project status should expose explicit controlled-pilot deferral from the default approval path",
+  );
+  assert.equal(
+    statusWithDeferredPilot.nextActions?.[0]?.track,
+    "Controlled pilot deferred",
+    "project status should not ask for more review after an explicit controlled-pilot no-go",
+  );
+  const handoff = renderHandoff(statusWithDeferredPilot);
+  assert(
+    handoff.includes("Controlled pilot deferred"),
+    "handoff should route explicit no-go to the deferred state",
+  );
+  assert(
+    handoff.includes("No teacher/professional review is needed"),
+    "handoff should say no teacher/professional review is needed after explicit no-go",
+  );
+} finally {
+  await restoreText(DEFAULT_APPROVAL_PATH, originalApproval);
+  await restoreText(DEFAULT_DECISION_PATH, originalDecision);
+}
+
 console.log(JSON.stringify({
   ok: true,
   checks: [
@@ -99,6 +160,8 @@ console.log(JSON.stringify({
     "preflight-blocks-without-approval",
     "decision-recognizes-explicit-no-go",
     "preflight-blocks-explicit-no-go",
+    "project-status-defers-explicit-no-go-without-review",
+    "handoff-defers-explicit-no-go-without-review",
     "decision-passes-with-valid-temp-approval",
     "preflight-passes-with-valid-temp-approval",
     "default-runtime-remains-fail-closed",
