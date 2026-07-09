@@ -85,7 +85,7 @@ const m3plusPilotAuditPassed = m3plus.monitoredPilotAudit?.readyForMonitoredPilo
 if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
   assert(
     status.releaseReview?.readyForControlledPilot
-      ? ["Controlled pilot decision", "Controlled pilot approval", "Controlled pilot deferred", "Start monitored pilot"].includes(status.nextActions[0]?.track)
+      ? ["Controlled pilot decision", "Controlled pilot approval", "Controlled pilot deferred", "Start monitored pilot", "Controlled pilot completed"].includes(status.nextActions[0]?.track)
       : status.nextActions[0]?.track === "Release review",
     "after ordinary, M3+, and M4 machine checks pass, handoff should move to release review or controlled pilot decision while runtime stays fail-closed",
   );
@@ -124,12 +124,15 @@ const expectedOrdinaryArtifact = status.tracks.controlledCandidate.blockingReaso
   ? "data/experiments/western-strings-m3/confidence-threshold-pool-review/confidence-threshold-pool-diagnosis.json"
   : "data/experiments/western-strings-m3/confidence-validation-review/ordinary-confidence-release-audit.json";
 if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
+  const nextArtifact = status.nextActions[0]?.artifact || "";
   assert(
     [
       "data/experiments/western-strings-release-review.md",
       "data/experiments/western-strings-controlled-pilot-decision.md",
-    ].includes(status.nextActions[0]?.artifact),
-    "after ordinary, M3+, and M4 checks pass, handoff artifact should point to the release-review report",
+    ].includes(nextArtifact)
+      || (nextArtifact.startsWith("data/experiments/western-strings-controlled-pilot-sessions/")
+        && nextArtifact.endsWith("/session.md")),
+    "after machine checks pass, handoff should point to release/decision evidence or the completed pilot session",
   );
 } else if (ordinaryPilotAuditPassed) {
   assert.equal(
@@ -201,7 +204,7 @@ assert.equal(
 if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
   assert(
     status.releaseReview?.readyForControlledPilot
-      ? ["Controlled pilot decision", "Controlled pilot approval", "Controlled pilot deferred", "Start monitored pilot"].includes(status.nextActions[0]?.track)
+      ? ["Controlled pilot decision", "Controlled pilot approval", "Controlled pilot deferred", "Start monitored pilot", "Controlled pilot completed"].includes(status.nextActions[0]?.track)
       : status.nextActions[0]?.track === "Release review",
     "M4 should no longer produce a human-task next action after clean-score approval is recognized",
   );
@@ -289,7 +292,8 @@ if (m4.m4OmrDraftQualityReady) {
       || handoff.includes("npm run western:controlled-pilot-start-preflight")
       || handoff.includes("Controlled pilot approval")
       || handoff.includes("Controlled pilot deferred")
-      || handoff.includes("Start monitored pilot"),
+      || handoff.includes("Start monitored pilot")
+      || handoff.includes("Controlled pilot completed"),
     "handoff must route through release-review or the controlled-pilot decision after M4 clears",
   );
   for (const [label, text] of [["project plan", projectPlan], ["migration plan", migrationPlan]]) {

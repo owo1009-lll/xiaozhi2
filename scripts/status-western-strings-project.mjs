@@ -359,6 +359,11 @@ const CONTROLLED_PILOT_DECISION_MD = path.join(
   "experiments",
   "western-strings-controlled-pilot-decision.md",
 );
+const CONTROLLED_PILOT_SESSIONS_ROOT = path.join(
+  "data",
+  "experiments",
+  "western-strings-controlled-pilot-sessions",
+);
 
 function parseArgs(argv) {
   const args = {
@@ -435,6 +440,31 @@ async function readJson(filePath, fallback = null) {
   } catch {
     return fallback;
   }
+}
+
+async function readLatestControlledPilotSession(root = CONTROLLED_PILOT_SESSIONS_ROOT) {
+  const absoluteRoot = path.resolve(process.cwd(), root);
+  let entries = [];
+  try {
+    entries = await fs.readdir(absoluteRoot, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+  const sessions = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const sessionPath = path.join(absoluteRoot, entry.name, "session.json");
+    const session = await readJson(sessionPath);
+    if (!session) continue;
+    sessions.push({
+      ...session,
+      source: path.relative(process.cwd(), sessionPath).replace(/\\/g, "/"),
+    });
+  }
+  sessions.sort((left, right) => (
+    Date.parse(right.generatedAt || "") - Date.parse(left.generatedAt || "")
+  ));
+  return sessions[0] || null;
 }
 
 function bestDeployableReleaseCandidate(pilot) {
@@ -900,7 +930,7 @@ async function buildM4OmrStatus() {
   };
 }
 
-function summarizeNextActions(controlled, m3plus, m4Omr, releaseReview, controlledPilotDecision) {
+function summarizeNextActions(controlled, m3plus, m4Omr, releaseReview, controlledPilotDecision, controlledPilotSession) {
   const actions = [];
   const ordinaryBlockers = controlled.blockingReasons || [];
   const ordinaryPilotAudit = controlled.confidencePilot?.monitoredPilotAudit || {};
@@ -998,6 +1028,20 @@ function summarizeNextActions(controlled, m3plus, m4Omr, releaseReview, controll
           artifact: CONTROLLED_PILOT_DECISION_MD.replace(/\\/g, "/"),
           reason: ["decision-packet-missing", "default-runtime-fail-closed"],
         });
+      } else if (controlledPilotSession?.sessionStatus === "completed_safe"
+        && controlledPilotSession?.executionPerformed === true
+        && controlledPilotSession?.pilotRunAccepted === true
+        && controlledPilotSession?.defaultRuntimeFailClosedAfter === true
+        && controlledPilotSession?.processEnvironmentRestored === true
+        && controlledPilotSession?.studentFeedbackPublished === false
+        && (controlledPilotSession?.blockingReasons || []).length === 0) {
+        actions.push({
+          priority: 1,
+          track: "Controlled pilot completed",
+          action: "The approved one-shot controlled pilot completed safely. Keep the default student runtime fail-closed; do not rerun the same recording. Broader pilot evidence must use a new independently accepted submission before any release decision.",
+          artifact: controlledPilotSession.artifacts?.sessionMd || controlledPilotSession.source,
+          reason: ["controlled-pilot-completed-safe", "default-runtime-fail-closed"],
+        });
       } else if (controlledPilotDecision.readyToStartControlledPilot === true) {
         actions.push({
           priority: 1,
@@ -1036,13 +1080,14 @@ function summarizeNextActions(controlled, m3plus, m4Omr, releaseReview, controll
   return actions;
 }
 
-export async function buildProjectStatus() {
-  const [controlledCandidate, m3plusPitchModes, m4Omr, releaseReview, controlledPilotDecision] = await Promise.all([
+export async function buildProjectStatus(args = {}) {
+  const [controlledCandidate, m3plusPitchModes, m4Omr, releaseReview, controlledPilotDecision, controlledPilotSession] = await Promise.all([
     buildControlledStatus(),
     buildM3PlusStatus(),
     buildM4OmrStatus(),
     readJson(RELEASE_REVIEW),
     readJson(CONTROLLED_PILOT_DECISION),
+    readLatestControlledPilotSession(args.controlledPilotSessionsRoot),
   ]);
   return {
     ok: true,
@@ -1090,12 +1135,39 @@ export async function buildProjectStatus() {
           summary: CONTROLLED_PILOT_DECISION_MD.replace(/\\/g, "/"),
           missing: true,
         },
+    controlledPilotSession: controlledPilotSession
+      ? {
+          source: controlledPilotSession.source,
+          sessionId: controlledPilotSession.sessionId || "",
+          generatedAt: controlledPilotSession.generatedAt || "",
+          sessionStatus: controlledPilotSession.sessionStatus || "",
+          executionPerformed: controlledPilotSession.executionPerformed === true,
+          pilotRunAccepted: controlledPilotSession.pilotRunAccepted === true,
+          approvedBy: controlledPilotSession.approvedBy || "",
+          monitoring: controlledPilotSession.monitoring || {},
+          defaultRuntimeFailClosedAfter: controlledPilotSession.defaultRuntimeFailClosedAfter === true,
+          processEnvironmentRestored: controlledPilotSession.processEnvironmentRestored === true,
+          studentFeedbackPublished: controlledPilotSession.studentFeedbackPublished === true,
+          blockingReasons: controlledPilotSession.blockingReasons || [],
+          artifacts: controlledPilotSession.artifacts || {},
+        }
+      : {
+          source: CONTROLLED_PILOT_SESSIONS_ROOT.replace(/\\/g, "/"),
+          missing: true,
+        },
     tracks: {
       controlledCandidate,
       m3plusPitchModes,
       m4Omr,
     },
-    nextActions: summarizeNextActions(controlledCandidate, m3plusPitchModes, m4Omr, releaseReview, controlledPilotDecision),
+    nextActions: summarizeNextActions(
+      controlledCandidate,
+      m3plusPitchModes,
+      m4Omr,
+      releaseReview,
+      controlledPilotDecision,
+      controlledPilotSession,
+    ),
   };
 }
 
@@ -1115,6 +1187,7 @@ function printProjectStatus(status, outPath) {
     reviewPolicy: status.reviewPolicy,
     runtimeStudentGate: status.runtimeStudentGate,
     releaseReview: status.releaseReview,
+    controlledPilotSession: status.controlledPilotSession,
     controlledCandidate: {
       ready: controlledCandidate.studentSafeCandidateGateReady,
       counts: controlledCandidate.counts,

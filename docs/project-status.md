@@ -153,10 +153,18 @@ npm run western:controlled-pilot-run
 - `teacherReviewNeeded=false`
 - `runtimeFailClosed=true`
 - `readyForControlledPilotDecision=true`
-- `readyToStartControlledPilot=false`
-- `approvalPresent=false`
+- `readyToStartControlledPilot=true`
+- `approvalPresent=true`
+- `controlledPilotSessionStatus=completed_safe`
+- `selectedSubmissionCount=1`
+- `totalCandidateCount=60`
+- `autoPassCandidateCount=8`
+- `knownUsableAutoPassCandidateCount=3`
+- `knownWrongAutoPassCandidateCount=0`
+- `unknownAutoPassCandidateCount=0`
+- `defaultRuntimeFailClosedAfter=true`
 
-这表示:机器自测已经完成, 目前不需要继续找教师复核。下一步只剩产品负责人是否批准一个单独受控 pilot;默认学生端仍保持关闭。如果不批准 pilot, 项目应停在安全 review-only 默认态。
+这表示:首批受控 pilot 已安全完成,当前不需要继续找教师复核。该结果只证明一个受控录音批次可安全运行,不授权默认学生端开放。不得重复同一录音凑证据;扩大 pilot 前必须使用新的独立受控提交并重新跑 release review。默认学生端继续保持 review-only / fail-closed。
 
 ## 5. 当前不可声称
 

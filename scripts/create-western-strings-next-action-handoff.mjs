@@ -244,6 +244,15 @@ function commandForAction(action) {
       "After pilot wiring, rerun npm run western:release-review, npm run western:controlled-pilot-decision, npm run test:western-project-gate, and npm run build.",
     ];
   }
+  if (track === "Controlled pilot completed") {
+    return [
+      "Open the completed controlled-pilot session report listed above.",
+      "Do not rerun the same recording as new evidence.",
+      "Keep production/default student runtime fail-closed; this one-shot result does not authorize default release.",
+      "Before expanding the pilot, add or select a new independently accepted submission and rerun the release review.",
+      "Teacher/professional review is needed only if a future session reports unknown or known-wrong auto-pass rows.",
+    ];
+  }
   return ["Run npm run western:project-status after completing this item"];
 }
 

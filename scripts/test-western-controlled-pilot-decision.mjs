@@ -189,7 +189,9 @@ try {
   const defaultDeferredDecision = await buildControlledPilotDecision();
   await fs.writeFile(DEFAULT_DECISION_PATH, `${JSON.stringify(defaultDeferredDecision, null, 2)}\n`, "utf8");
 
-  const statusWithDeferredPilot = await buildProjectStatus();
+  const statusWithDeferredPilot = await buildProjectStatus({
+    controlledPilotSessionsRoot: path.join(TEST_DIR, "no-sessions"),
+  });
   assert.equal(
     statusWithDeferredPilot.controlledPilotDecision?.approvalDeferred,
     true,
@@ -219,13 +221,49 @@ try {
   }, null, 2)}\n`, "utf8");
   const defaultApprovedDecision = await buildControlledPilotDecision();
   await fs.writeFile(DEFAULT_DECISION_PATH, `${JSON.stringify(defaultApprovedDecision, null, 2)}\n`, "utf8");
-  const statusWithApprovedPilot = await buildProjectStatus();
+  const statusWithApprovedPilot = await buildProjectStatus({
+    controlledPilotSessionsRoot: path.join(TEST_DIR, "no-sessions"),
+  });
   assert.equal(statusWithApprovedPilot.nextActions?.[0]?.track, "Start monitored pilot");
   const approvedHandoff = renderHandoff(statusWithApprovedPilot);
   assert(
     approvedHandoff.includes("npm run western:controlled-pilot-run -- --execute --limit 1"),
     "approved handoff must point to the one-shot controlled-pilot runner",
   );
+
+  const completedSessionRoot = path.join(TEST_DIR, "completed-sessions");
+  await fs.rm(completedSessionRoot, { recursive: true, force: true });
+  const completedSessionDir = path.join(completedSessionRoot, "pilot-completed");
+  await fs.mkdir(completedSessionDir, { recursive: true });
+  await fs.writeFile(path.join(completedSessionDir, "session.json"), `${JSON.stringify({
+    ok: true,
+    generatedAt: "2026-07-10T01:00:00+08:00",
+    sessionId: "pilot-completed",
+    sessionStatus: "completed_safe",
+    executionPerformed: true,
+    pilotRunAccepted: true,
+    approvedBy: "test-owner",
+    monitoring: {
+      selectedSubmissionCount: 1,
+      totalCandidateCount: 60,
+      autoPassCandidateCount: 8,
+      knownUsableAutoPassCandidateCount: 3,
+      knownWrongAutoPassCandidateCount: 0,
+      unknownAutoPassCandidateCount: 0,
+    },
+    defaultRuntimeFailClosedAfter: true,
+    processEnvironmentRestored: true,
+    studentFeedbackPublished: false,
+    blockingReasons: [],
+    artifacts: { sessionMd: "data/experiments/test/session.md" },
+  }, null, 2)}\n`, "utf8");
+  const statusWithCompletedPilot = await buildProjectStatus({
+    controlledPilotSessionsRoot: completedSessionRoot,
+  });
+  assert.equal(statusWithCompletedPilot.nextActions?.[0]?.track, "Controlled pilot completed");
+  const completedHandoff = renderHandoff(statusWithCompletedPilot);
+  assert(completedHandoff.includes("Do not rerun the same recording"));
+  assert(!completedHandoff.includes("western:controlled-pilot-run -- --execute"));
 } finally {
   await restoreText(DEFAULT_APPROVAL_PATH, originalApproval);
   await restoreText(DEFAULT_DECISION_PATH, originalDecision);
@@ -249,6 +287,7 @@ console.log(JSON.stringify({
     "preflight-passes-with-valid-temp-approval",
     "default-runtime-remains-fail-closed",
     "approved-handoff-points-to-one-shot-pilot-runner",
+    "completed-session-prevents-duplicate-pilot-run",
   ],
   artifacts: {
     template: TEMPLATE_PATH.replace(/\\/g, "/"),
