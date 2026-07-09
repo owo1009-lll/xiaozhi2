@@ -24,7 +24,13 @@ export function evaluateProjectGate(status, requiredTracks) {
   const m4 = status.tracks?.m4Omr || {};
 
   if (requiredTracks.has("ordinary") && !controlled.studentSafeCandidateGateReady) {
-    const ordinaryArtifact = (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-validation-needed")
+    const ordinaryArtifact = (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-context-validation-needed")
+      ? (controlled.reviewArtifacts?.recalibrationContextValidationReviewPage || controlled.confidenceRecalibration?.contextValidation?.reviewPage)
+      : (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-context-validation-failed")
+      ? (controlled.reviewArtifacts?.recalibrationContextValidationEvalJson || controlled.confidenceRecalibration?.contextValidation?.evalJson)
+      : (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-context-runtime-not-wired")
+      ? (controlled.reviewArtifacts?.recalibrationContextValidationEvalJson || controlled.confidenceRecalibration?.contextValidation?.evalJson)
+      : (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-validation-needed")
       ? (controlled.reviewArtifacts?.recalibrationValidationReviewPage || controlled.confidenceRecalibration?.validationReviewPage)
       : (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-validation-failed")
       ? (controlled.reviewArtifacts?.recalibrationFailureDiagnosisJson || controlled.reviewArtifacts?.recalibrationValidationEvalJson || controlled.confidenceRecalibration?.validationEvalJson)

@@ -32,6 +32,31 @@ function hasReason(action, reason) {
 function commandForAction(action) {
   const track = action?.track || "";
   if (track === "M2/M3 ordinary upload candidate gate") {
+    if (hasReason(action, "ordinary-confidence-recalibration-context-validation-needed")) {
+      return [
+        "Keep production/default runtime fail-closed.",
+        "Open data/experiments/western-strings-m3/confidence-recalibration-context-validation-review/index.html and review the 30-row context-feature recalibration blind-validation pack.",
+        "Either save the downloaded CSV as data/experiments/western-strings-m3/confidence-recalibration-context-validation-review/controlled-candidate-review.completed.csv, or leave it in Downloads and run npm run western:ingest-review-downloads -- --apply.",
+        "Run npm run western:controlled-candidate-confidence-recalibration-context-validation-eval.",
+        "Then run npm run western:project-status and npm run test:western-project-gate.",
+        "Only if the context validation passes should runtime wiring be considered; do not enable the student gate by default.",
+      ];
+    }
+    if (hasReason(action, "ordinary-confidence-recalibration-context-validation-failed")) {
+      return [
+        "Keep production/default runtime fail-closed.",
+        "Inspect data/experiments/western-strings-m3/confidence-recalibration-context-validation-review/confidence-recalibration-context-validation-eval-rows.csv.",
+        "The context-feature recalibration blind-validation pack failed; do not ask for the same review again.",
+        "Improve candidate/localization quality or collect stronger calibration evidence before exporting another blind-validation pack.",
+      ];
+    }
+    if (hasReason(action, "ordinary-confidence-recalibration-context-runtime-not-wired")) {
+      return [
+        "Keep production/default runtime fail-closed until a monitored release integration exists.",
+        "Inspect data/experiments/western-strings-m3/confidence-recalibration-context-validation-review/confidence-recalibration-context-validation-eval.json.",
+        "Create a disabled-by-default runtime release manifest and smoke test before considering any student-facing flag.",
+      ];
+    }
     if (hasReason(action, "ordinary-confidence-recalibration-validation-needed")) {
       return [
         "Keep production/default runtime fail-closed.",

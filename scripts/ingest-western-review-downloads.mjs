@@ -5,6 +5,25 @@ import { pathToFileURL } from "node:url";
 
 const TARGETS = [
   {
+    name: "ordinary-recalibration-context-validation",
+    source: path.join(
+      "data",
+      "experiments",
+      "western-strings-m3",
+      "confidence-recalibration-context-validation-review",
+      "controlled-candidate-review.csv",
+    ),
+    dest: path.join(
+      "data",
+      "experiments",
+      "western-strings-m3",
+      "confidence-recalibration-context-validation-review",
+      "controlled-candidate-review.completed.csv",
+    ),
+    filePattern: /^controlled-candidate-review.*\.csv$/i,
+    keyColumns: ["reviewRowNumber", "candidateId"],
+  },
+  {
     name: "ordinary-recalibration-validation",
     source: path.join(
       "data",

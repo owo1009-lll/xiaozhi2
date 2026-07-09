@@ -47,10 +47,17 @@ if (controlled.confidencePilot?.validationEval?.blindValidationPassed) {
       2,
       "failed recalibration validation should expose the selected false-positive count",
     );
-    assert(
-      controlled.blockingReasons.includes("ordinary-confidence-recalibration-validation-failed"),
-      "ordinary upload should block on the failed recalibration blind-validation result",
-    );
+    if (controlled.confidenceRecalibration?.contextValidation?.needsBlindValidation) {
+      assert(
+        controlled.blockingReasons.includes("ordinary-confidence-recalibration-context-validation-needed"),
+        "ordinary upload should route to the fresh context recalibration blind-validation pack when it exists",
+      );
+    } else {
+      assert(
+        controlled.blockingReasons.includes("ordinary-confidence-recalibration-validation-failed"),
+        "ordinary upload should block on the failed recalibration blind-validation result",
+      );
+    }
   } else {
     assert(
       controlled.blockingReasons.includes("candidate-confidence-pilot-needs-blind-validation"),
@@ -65,11 +72,18 @@ assert(
   status.nextActions[0]?.action.includes("confidence-threshold-pool-review/index.html")
   || status.nextActions[0]?.action.includes("threshold-pool review failed")
   || status.nextActions[0]?.action.includes("recalibration blind-validation pack")
+  || status.nextActions[0]?.action.includes("context-feature confidence recalibration pack")
   || status.nextActions[0]?.action.includes("wire a runtime gate")
   || status.nextActions[0]?.action.includes("runtime gate is wired"),
   "project next action should route to threshold-pool review, recalibration, runtime wiring, or explicit release-flag gating",
 );
-const expectedOrdinaryArtifact = status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-recalibration-validation-needed")
+const expectedOrdinaryArtifact = status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-recalibration-context-validation-needed")
+  ? "data/experiments/western-strings-m3/confidence-recalibration-context-validation-review/index.html"
+  : status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-recalibration-context-validation-failed")
+  ? "data/experiments/western-strings-m3/confidence-recalibration-context-validation-review/confidence-recalibration-context-validation-eval.json"
+  : status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-recalibration-context-runtime-not-wired")
+  ? "data/experiments/western-strings-m3/confidence-recalibration-context-validation-review/confidence-recalibration-context-validation-eval.json"
+  : status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-recalibration-validation-needed")
   ? "data/experiments/western-strings-m3/confidence-recalibration-validation-review/index.html"
   : status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-recalibration-validation-failed")
   ? "data/experiments/western-strings-m3/confidence-recalibration-validation-review/confidence-recalibration-failure-diagnosis.json"

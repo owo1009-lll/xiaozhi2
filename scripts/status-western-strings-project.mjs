@@ -143,6 +143,34 @@ const CONTROLLED_CONFIDENCE_RECALIBRATION_FAILURE_GROUPS = path.join(
   "confidence-recalibration-validation-review",
   "confidence-recalibration-failure-diagnosis-groups.csv",
 );
+const CONTROLLED_CONFIDENCE_RECALIBRATION_CONTEXT_VALIDATION_REVIEW_PAGE = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-recalibration-context-validation-review",
+  "index.html",
+);
+const CONTROLLED_CONFIDENCE_RECALIBRATION_CONTEXT_VALIDATION_COMPLETED = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-recalibration-context-validation-review",
+  "controlled-candidate-review.completed.csv",
+);
+const CONTROLLED_CONFIDENCE_RECALIBRATION_CONTEXT_VALIDATION_EVAL = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-recalibration-context-validation-review",
+  "confidence-recalibration-context-validation-eval.json",
+);
+const CONTROLLED_CONFIDENCE_RECALIBRATION_CONTEXT_VALIDATION_ROWS = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-recalibration-context-validation-review",
+  "confidence-recalibration-context-validation-eval-rows.csv",
+);
 const M3PLUS_SOURCE = path.join(
   "data",
   "experiments",
@@ -514,9 +542,12 @@ async function buildControlledStatus() {
   const status = attachConfidencePilotStatus(buildControlledCandidateReviewStatus(report), confidencePilot);
   const recalibrationPilot = await readJson(CONTROLLED_CONFIDENCE_RECALIBRATION_PILOT);
   const recalibrationEval = await readJson(CONTROLLED_CONFIDENCE_RECALIBRATION_VALIDATION_EVAL);
+  const recalibrationContextEval = await readJson(CONTROLLED_CONFIDENCE_RECALIBRATION_CONTEXT_VALIDATION_EVAL);
   const recalibrationFailureDiagnosis = await readJson(CONTROLLED_CONFIDENCE_RECALIBRATION_FAILURE_DIAGNOSIS);
   const recalibrationReleaseCandidate = bestDeployableReleaseCandidate(recalibrationPilot);
   const recalibrationEvalExists = Boolean(recalibrationEval);
+  const recalibrationContextReviewExists = await exists(CONTROLLED_CONFIDENCE_RECALIBRATION_CONTEXT_VALIDATION_REVIEW_PAGE);
+  const recalibrationContextEvalExists = Boolean(recalibrationContextEval);
   const recalibrationNeedsBlindValidation = Boolean(
     recalibrationReleaseCandidate
     && !recalibrationEvalExists
@@ -525,6 +556,19 @@ async function buildControlledStatus() {
     recalibrationReleaseCandidate
     && recalibrationEvalExists
     && !recalibrationEval?.blindValidationPassed
+  );
+  const recalibrationContextNeedsBlindValidation = Boolean(
+    recalibrationValidationFailed
+    && recalibrationContextReviewExists
+    && !recalibrationContextEvalExists
+  );
+  const recalibrationContextValidationFailed = Boolean(
+    recalibrationContextEvalExists
+    && !recalibrationContextEval?.blindValidationPassed
+  );
+  const recalibrationContextValidationPassed = Boolean(
+    recalibrationContextEvalExists
+    && recalibrationContextEval?.blindValidationPassed
   );
   status.confidenceRecalibration = {
     labelsCsv: CONTROLLED_CONFIDENCE_RECALIBRATION_LABELS.replace(/\\/g, "/"),
@@ -544,10 +588,56 @@ async function buildControlledStatus() {
       sourceExists: Boolean(recalibrationFailureDiagnosis),
       summary: recalibrationFailureDiagnosis?.summary || {},
     },
+    contextValidation: {
+      reviewPage: CONTROLLED_CONFIDENCE_RECALIBRATION_CONTEXT_VALIDATION_REVIEW_PAGE.replace(/\\/g, "/"),
+      completedCsv: CONTROLLED_CONFIDENCE_RECALIBRATION_CONTEXT_VALIDATION_COMPLETED.replace(/\\/g, "/"),
+      evalJson: CONTROLLED_CONFIDENCE_RECALIBRATION_CONTEXT_VALIDATION_EVAL.replace(/\\/g, "/"),
+      rowsCsv: CONTROLLED_CONFIDENCE_RECALIBRATION_CONTEXT_VALIDATION_ROWS.replace(/\\/g, "/"),
+      reviewPageExists: recalibrationContextReviewExists,
+      validationEval: recalibrationContextEval || {
+        sourceExists: false,
+        blindValidationPassed: false,
+        blockingReasons: ["confidence-recalibration-context-validation-eval-missing"],
+      },
+      needsBlindValidation: recalibrationContextNeedsBlindValidation,
+      validationFailed: recalibrationContextValidationFailed,
+      validationPassed: recalibrationContextValidationPassed,
+    },
     needsBlindValidation: recalibrationNeedsBlindValidation,
     validationFailed: recalibrationValidationFailed,
   };
-  if (recalibrationNeedsBlindValidation) {
+  if (recalibrationContextNeedsBlindValidation) {
+    status.blockingReasons = [
+      ...new Set([
+        ...(status.blockingReasons || []),
+        "ordinary-confidence-recalibration-context-validation-needed",
+      ]),
+    ];
+    status.nextActions = [
+      "Review the 30-row context-feature confidence recalibration pack; if the CSV downloads to Downloads, run `npm run western:ingest-review-downloads -- --apply`, then run western:controlled-candidate-confidence-recalibration-context-validation-eval.",
+    ];
+  } else if (recalibrationContextValidationFailed) {
+    const precision = recalibrationContextEval?.metrics?.precision;
+    status.blockingReasons = [
+      ...new Set([
+        ...(status.blockingReasons || []),
+        "ordinary-confidence-recalibration-context-validation-failed",
+      ]),
+    ];
+    status.nextActions = [
+      `The context-feature confidence recalibration blind-validation pack failed${Number.isFinite(precision) ? ` (precision=${precision})` : ""}; keep the ordinary-upload auto gate fail-closed and inspect the context validation rows before another recalibration attempt.`,
+    ];
+  } else if (recalibrationContextValidationPassed) {
+    status.blockingReasons = [
+      ...new Set([
+        ...(status.blockingReasons || []),
+        "ordinary-confidence-recalibration-context-runtime-not-wired",
+      ]),
+    ];
+    status.nextActions = [
+      "The context-feature confidence recalibration validation passed, but the runtime gate is not wired or enabled. Review the release manifest and add a monitored, disabled-by-default runtime integration before any student-facing use.",
+    ];
+  } else if (recalibrationNeedsBlindValidation) {
     status.blockingReasons = [
       ...new Set([
         ...(status.blockingReasons || []),
@@ -586,6 +676,10 @@ async function buildControlledStatus() {
     recalibrationFailureDiagnosisJson: CONTROLLED_CONFIDENCE_RECALIBRATION_FAILURE_DIAGNOSIS.replace(/\\/g, "/"),
     recalibrationFailureDiagnosisRowsCsv: CONTROLLED_CONFIDENCE_RECALIBRATION_FAILURE_ROWS.replace(/\\/g, "/"),
     recalibrationFailureDiagnosisGroupsCsv: CONTROLLED_CONFIDENCE_RECALIBRATION_FAILURE_GROUPS.replace(/\\/g, "/"),
+    recalibrationContextValidationReviewPage: CONTROLLED_CONFIDENCE_RECALIBRATION_CONTEXT_VALIDATION_REVIEW_PAGE.replace(/\\/g, "/"),
+    recalibrationContextValidationCompletedCsv: CONTROLLED_CONFIDENCE_RECALIBRATION_CONTEXT_VALIDATION_COMPLETED.replace(/\\/g, "/"),
+    recalibrationContextValidationEvalJson: CONTROLLED_CONFIDENCE_RECALIBRATION_CONTEXT_VALIDATION_EVAL.replace(/\\/g, "/"),
+    recalibrationContextValidationRowsCsv: CONTROLLED_CONFIDENCE_RECALIBRATION_CONTEXT_VALIDATION_ROWS.replace(/\\/g, "/"),
   };
   return status;
 }
@@ -636,7 +730,13 @@ async function buildM4OmrStatus() {
 function summarizeNextActions(controlled, m3plus, m4Omr) {
   const actions = [];
   if (!controlled.studentSafeCandidateGateReady) {
-    const ordinaryArtifact = (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-validation-needed")
+    const ordinaryArtifact = (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-context-validation-needed")
+      ? (controlled.reviewArtifacts.recalibrationContextValidationReviewPage || controlled.confidenceRecalibration?.contextValidation?.reviewPage)
+      : (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-context-validation-failed")
+      ? (controlled.reviewArtifacts.recalibrationContextValidationEvalJson || controlled.confidenceRecalibration?.contextValidation?.evalJson)
+      : (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-context-runtime-not-wired")
+      ? (controlled.reviewArtifacts.recalibrationContextValidationEvalJson || controlled.confidenceRecalibration?.contextValidation?.evalJson)
+      : (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-validation-needed")
       ? (controlled.reviewArtifacts.recalibrationValidationReviewPage || controlled.confidenceRecalibration?.validationReviewPage)
       : (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-validation-failed")
       ? (controlled.reviewArtifacts.recalibrationFailureDiagnosisJson || controlled.reviewArtifacts.recalibrationValidationEvalJson || controlled.confidenceRecalibration?.validationEvalJson)

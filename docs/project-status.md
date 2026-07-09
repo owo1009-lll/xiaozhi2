@@ -79,3 +79,9 @@
 - **P1 普通上传 confidence 重校准盲测已完成但未通过**:10 行盲测包已导入并评估,结果为 8 usable / 2 wrong,precision=0.80,低于 0.90 release floor。普通上传自动 gate 继续 fail-closed;下一步不是重复复核同一 10 行,而是查看 `data/experiments/western-strings-m3/confidence-recalibration-validation-review/confidence-recalibration-failure-diagnosis.json` 与 rows/groups CSV。当前诊断显示 10 个 selected 行全都缺 pitch support,abs cents error 为 2685–3680c,2 个 false positive 集中在 `stu02-ex05-weak_onset`;因此不要只调高阈值,应改候选/定位质量特征或补更强校准证据后再导出新的盲测包。
 - **M3+ 第二轮已完成,但定位/候选质量是 blocker**:累计 84 reviewed / 60 scored;per-mode eval 仍无任何非 control release-ready 模式。新增 `npm run western:m3plus-localization-diagnosis`,当前诊断为 60 match / 19 mismatch / 5 uncertain,即 24/84 non-match(28.57%)。最高风险组是 `stu02-ex05-weak_onset`(9/9 mismatch)。下一步先看 `data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-localization-diagnosis-groups.csv` 和 rows CSV,修谱面-录音定位/候选生成,不要继续复用同一复核包。
 - **当前优先级**:1) P1 失败行分析与 confidence 特征/模型重校准;2) M3+ 定位/候选质量修复;3) M4 独立 gold。学生端仍全部 fail-closed。
+# 2026-07-09 P1.1 context validation update
+
+- P1 10-row confidence recalibration blind validation is complete and failed: 8 usable / 2 wrong, precision=0.80, below the 0.90 release floor. Keep ordinary-upload auto feedback fail-closed.
+- The failure is preserved as evidence at `data/experiments/western-strings-m3/confidence-recalibration-validation-review/confidence-recalibration-failure-diagnosis.json`.
+- A new P1.1 context-feature validation pack has been generated at `data/experiments/western-strings-m3/confidence-recalibration-context-validation-review/index.html` (30 rows, RF threshold 0.8). Current next action is to review this P1.1 pack, then run `npm run western:controlled-candidate-confidence-recalibration-context-validation-eval`.
+- Do not review the old 10-row P1 pack again; it is a failed baseline, not the current action.

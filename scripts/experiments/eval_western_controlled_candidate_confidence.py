@@ -84,6 +84,12 @@ NUMERIC_FEATURES = [
     "pitchSupportNumeric",
     "midiPitchClass",
     "noteIndexInMeasureApprox",
+    "artifactCandidateCount",
+    "artifactPitchSupportRate",
+    "artifactNoPitchSupportRate",
+    "localPitchSupportRate",
+    "sameMeasurePitchSupportRate",
+    "localMedianAbsCentsError",
 ]
 DEPLOYABLE_CATEGORICAL_FEATURES = [
     "method",
@@ -111,6 +117,10 @@ def safe_float(value: Any) -> float | None:
 
 def safe_string(value: Any) -> str:
     return value if isinstance(value, str) else ""
+
+
+def clean_value(value: Any) -> str:
+    return str(value if value is not None else "").strip()
 
 
 def read_csv_rows(path: Path) -> list[dict[str, str]]:
@@ -150,12 +160,55 @@ def enrich_from_candidate_artifact(row: dict[str, str]) -> dict[str, Any]:
     artifact = read_json(artifact_path)
     if not artifact:
         return enriched
-    for candidate in artifact.get("candidateRows") or []:
+    candidates = artifact.get("candidateRows") or []
+    matched_index = None
+    for index, candidate in enumerate(candidates):
         if safe_string(candidate.get("candidateId")) == candidate_id:
             for key, value in candidate.items():
                 enriched.setdefault(key, value)
+            matched_index = index
             break
+    add_candidate_context_features(enriched, candidates, matched_index)
     return enriched
+
+
+def boolish(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return clean_value(value).lower() in {"yes", "true", "1"}
+
+
+def add_candidate_context_features(row: dict[str, Any], candidates: list[dict[str, Any]], matched_index: int | None) -> None:
+    support = [boolish(candidate.get("pitchSupportWithin80Cents")) for candidate in candidates]
+    abs_cents = []
+    for candidate in candidates:
+        cents = safe_float(candidate.get("centsError"))
+        abs_cents.append(abs(cents) if cents is not None else None)
+    total = len(candidates)
+    row["artifactCandidateCount"] = total
+    row["artifactPitchSupportRate"] = (sum(support) / total) if total else 0.0
+    row["artifactNoPitchSupportRate"] = 1.0 - row["artifactPitchSupportRate"] if total else 1.0
+
+    if matched_index is None or matched_index < 0 or matched_index >= total:
+        row["localPitchSupportRate"] = 0.0
+        row["localMedianAbsCentsError"] = None
+    else:
+        local_indices = range(max(0, matched_index - 3), min(total, matched_index + 4))
+        local_support = [support[index] for index in local_indices]
+        local_cents = [abs_cents[index] for index in local_indices if abs_cents[index] is not None]
+        row["localPitchSupportRate"] = (sum(local_support) / len(local_support)) if local_support else 0.0
+        row["localMedianAbsCentsError"] = float(np.median(local_cents)) if local_cents else None
+
+    measure = clean_value(row.get("measureIndex"))
+    same_measure_indices = [
+        index for index, candidate in enumerate(candidates)
+        if clean_value(candidate.get("measureIndex")) == measure
+    ]
+    same_measure_support = [support[index] for index in same_measure_indices]
+    row["sameMeasurePitchSupportRate"] = (
+        sum(same_measure_support) / len(same_measure_support)
+        if same_measure_support else 0.0
+    )
 
 
 def build_feature_row(row: dict[str, Any]) -> dict[str, Any]:
@@ -180,6 +233,12 @@ def build_feature_row(row: dict[str, Any]) -> dict[str, Any]:
         "measureIndex": row.get("measureIndex"),
         "pageNumber": row.get("pageNumber"),
         "confidenceScore": row.get("confidenceScore"),
+        "artifactCandidateCount": row.get("artifactCandidateCount"),
+        "artifactPitchSupportRate": row.get("artifactPitchSupportRate"),
+        "artifactNoPitchSupportRate": row.get("artifactNoPitchSupportRate"),
+        "localPitchSupportRate": row.get("localPitchSupportRate"),
+        "sameMeasurePitchSupportRate": row.get("sameMeasurePitchSupportRate"),
+        "localMedianAbsCentsError": row.get("localMedianAbsCentsError"),
     }
     for key, value in raw_numeric.items():
         item[key] = safe_float(value)
@@ -189,7 +248,7 @@ def build_feature_row(row: dict[str, Any]) -> dict[str, Any]:
     item["absMidiDelta"] = abs(item["midiDelta"]) if item["midiDelta"] is not None else None
     item["midiPitchClass"] = int(midi) % 12 if midi is not None else None
     item["noteIndexInMeasureApprox"] = int(note_index) % 16 if note_index is not None else None
-    item["pitchSupportNumeric"] = 1.0 if safe_string(row.get("pitchSupportWithin80Cents")).lower() in {"yes", "true", "1"} else 0.0
+    item["pitchSupportNumeric"] = 1.0 if boolish(row.get("pitchSupportWithin80Cents")) else 0.0
 
     for key in DEPLOYABLE_CATEGORICAL_FEATURES:
         item[key] = safe_string(row.get(key))

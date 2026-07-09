@@ -354,3 +354,8 @@
 - P1 confidence 重校准 blind validation 已完成且失败:10/10 reviewed,8 usable / 2 wrong,precision=0.80。失败诊断见 `data/experiments/western-strings-m3/confidence-recalibration-validation-review/confidence-recalibration-failure-diagnosis.json`:10 个 selected 行全都缺 pitch support,abs cents error 为 2685–3680c,2 个 false positive 集中在 `stu02-ex05-weak_onset`。普通上传自动 gate 不得开启;下一步不是重复复核,而是重做候选/定位质量特征、confidence 特征/模型或补强校准证据。
 - M3+ 第二轮复核已完成并导入:84 reviewed / 60 scored。per-mode eval 无非 control release-ready;新增定位诊断显示 24/84 non-match(19 mismatch + 5 uncertain),其中 `stu02-ex05-weak_onset` 为 9/9 mismatch。M3+ 当前不是继续标同一包,而是先修谱面-录音定位/候选质量。
 - 以上补充覆盖下文较早的“待复核 P1 / 继续补 M3+”描述;runtime 仍 fail-closed。
+# 2026-07-09 P1.1 context validation update
+
+- P1 10-row confidence recalibration blind validation is complete and failed: 8 usable / 2 wrong, precision=0.80. It remains evidence only.
+- P1.1 adds deployable context/candidate-quality features and generates a fresh 30-row blind validation pack at `data/experiments/western-strings-m3/confidence-recalibration-context-validation-review/index.html`.
+- Review P1.1 and evaluate it with `npm run western:controlled-candidate-confidence-recalibration-context-validation-eval` before considering any runtime integration. Student-facing ordinary-upload auto feedback remains fail-closed.
