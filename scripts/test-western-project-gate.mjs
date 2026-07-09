@@ -42,8 +42,8 @@ if (controlled.confidencePilot?.validationEval?.blindValidationPassed) {
 assert(controlled.confidencePilot?.bestReleaseCandidate, "confidence pilot should report the best release candidate");
 assert.equal(controlled.confidencePilot.bestReleaseCandidate.featureSet, "deployable", "confidence pilot should report the deployable candidate");
 assert.equal(controlled.confidencePilot.bestReleaseCandidate.groupBy, "recordingId", "confidence pilot should report the strict leave-one-recording candidate");
-assert(status.nextActions[0]?.action.includes("confidence-validation-review/index.html") || status.nextActions[0]?.action.includes("wire a runtime gate") || status.nextActions[0]?.action.includes("runtime gate is wired"), "project next action should route to validation review, runtime wiring, or explicit release-flag gating");
-assert.equal(status.nextActions[0]?.artifact, "data/experiments/western-strings-m3/confidence-validation-review/index.html", "project artifact should point to the confidence validation review page");
+assert(status.nextActions[0]?.action.includes("confidence-threshold-pool-review/index.html") || status.nextActions[0]?.action.includes("wire a runtime gate") || status.nextActions[0]?.action.includes("runtime gate is wired"), "project next action should route to threshold-pool review, runtime wiring, or explicit release-flag gating");
+assert.equal(status.nextActions[0]?.artifact, "data/experiments/western-strings-m3/confidence-threshold-pool-review/index.html", "project artifact should point to the threshold-pool review page");
 
 const m4 = status.tracks.m4Omr;
 assert.equal(m4.m4OmrBenchmarkDatasetReady, true, "M4 intake dataset should be ready for benchmarking");
@@ -62,8 +62,8 @@ assert.equal(fullGate.projectReleaseReady, false, "full project gate must block 
 assert(fullGate.failures.some((failure) => failure.track === "M2/M3 ordinary upload candidate gate"), "ordinary track failure should be reported");
 assert.equal(
   fullGate.failures.find((failure) => failure.track === "M2/M3 ordinary upload candidate gate")?.artifact,
-  "data/experiments/western-strings-m3/confidence-validation-review/index.html",
-  "ordinary gate failure should point to the confidence validation review page",
+  "data/experiments/western-strings-m3/confidence-threshold-pool-review/index.html",
+  "ordinary gate failure should point to the threshold-pool review page",
 );
 const m3plusFailure = fullGate.failures.find((failure) => failure.track === "M3+ pitch behavior modes");
 assert(m3plusFailure, "M3+ track failure should be reported until a non-control mode is release-ready");

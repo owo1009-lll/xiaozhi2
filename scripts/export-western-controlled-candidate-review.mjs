@@ -360,6 +360,7 @@ export const CONTROLLED_CANDIDATE_REVIEW_HEADERS = [
   "confidenceThreshold",
   "confidenceFeatureSet",
   "confidenceGroupBy",
+  "confidenceStratum",
   "teacherCandidateStatus",
   "teacherCorrectOnsetSeconds",
   "teacherCorrectMeasureIndex",

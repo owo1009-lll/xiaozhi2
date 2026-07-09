@@ -45,6 +45,27 @@ const DEFAULT_CONFIDENCE_RELEASE_AUDIT = path.join(
   "confidence-validation-review",
   "ordinary-confidence-release-audit.json",
 );
+const DEFAULT_CONFIDENCE_THRESHOLD_POOL_REVIEW_PAGE = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-threshold-pool-review",
+  "index.html",
+);
+const DEFAULT_CONFIDENCE_THRESHOLD_POOL_COMPLETED = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-threshold-pool-review",
+  "controlled-candidate-review.completed.csv",
+);
+const DEFAULT_CONFIDENCE_THRESHOLD_POOL_EVAL = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-threshold-pool-review",
+  "confidence-threshold-pool-eval.json",
+);
 
 function clampMissing(required, actual) {
   return Math.max(0, Number(required || 0) - Number(actual || 0));
@@ -121,6 +142,9 @@ export function summarizeControlledCandidateConfidencePilot(
     releaseCandidateCount: releaseCandidates.length,
     validationReviewPage: DEFAULT_CONFIDENCE_VALIDATION_REVIEW_PAGE.replace(/\\/g, "/"),
     validationCompletedCsv: DEFAULT_CONFIDENCE_VALIDATION_COMPLETED.replace(/\\/g, "/"),
+    thresholdPoolReviewPage: DEFAULT_CONFIDENCE_THRESHOLD_POOL_REVIEW_PAGE.replace(/\\/g, "/"),
+    thresholdPoolCompletedCsv: DEFAULT_CONFIDENCE_THRESHOLD_POOL_COMPLETED.replace(/\\/g, "/"),
+    thresholdPoolEvalJson: DEFAULT_CONFIDENCE_THRESHOLD_POOL_EVAL.replace(/\\/g, "/"),
     validationEval: validationEval || {
       source: DEFAULT_CONFIDENCE_VALIDATION_COMPLETED.replace(/\\/g, "/"),
       sourceExists: false,
@@ -155,7 +179,7 @@ export function attachConfidencePilotStatus(status, confidencePilot) {
   const nextActions = [
     validationPassed
       ? (runtimeGateWired
-        ? "Confidence runtime gate is wired but disabled by default. Runtime scoring smoke is covered; release audit shows the fresh validation batch was prefiltered above threshold, so full threshold-pool precision remains unmeasured. Keep default fail-closed; only run WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 in a monitored pilot after stratified review of the full threshold pool."
+        ? `Confidence runtime gate is wired but disabled by default. Runtime scoring smoke is covered; release audit shows the fresh validation batch was prefiltered above threshold, so full threshold-pool precision remains unmeasured. Review ${DEFAULT_CONFIDENCE_THRESHOLD_POOL_REVIEW_PAGE.replace(/\\/g, "/")} and run western:controlled-candidate-confidence-stratified-eval before any monitored pilot.`
         : "Confidence blind validation passed. Review metrics and wire a runtime gate in a separate release phase; current runtime remains fail-closed.")
       : `Confidence pilot found release candidates; review ${DEFAULT_CONFIDENCE_VALIDATION_REVIEW_PAGE.replace(/\\/g, "/")} and run western:controlled-candidate-confidence-validation-eval before changing the runtime gate.`,
   ];

@@ -59,6 +59,27 @@ const CONTROLLED_CONFIDENCE_RELEASE_AUDIT = path.join(
   "confidence-validation-review",
   "ordinary-confidence-release-audit.json",
 );
+const CONTROLLED_CONFIDENCE_THRESHOLD_POOL_REVIEW_PAGE = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-threshold-pool-review",
+  "index.html",
+);
+const CONTROLLED_CONFIDENCE_THRESHOLD_POOL_COMPLETED = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-threshold-pool-review",
+  "controlled-candidate-review.completed.csv",
+);
+const CONTROLLED_CONFIDENCE_THRESHOLD_POOL_EVAL = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-threshold-pool-review",
+  "confidence-threshold-pool-eval.json",
+);
 const M3PLUS_SOURCE = path.join(
   "data",
   "experiments",
@@ -317,6 +338,9 @@ async function buildControlledStatus() {
     completedCsv: CONTROLLED_COMPLETED.replace(/\\/g, "/"),
     labelsCsv: CONTROLLED_LABELS.replace(/\\/g, "/"),
     releaseAuditJson: CONTROLLED_CONFIDENCE_RELEASE_AUDIT.replace(/\\/g, "/"),
+    thresholdPoolReviewPage: CONTROLLED_CONFIDENCE_THRESHOLD_POOL_REVIEW_PAGE.replace(/\\/g, "/"),
+    thresholdPoolCompletedCsv: CONTROLLED_CONFIDENCE_THRESHOLD_POOL_COMPLETED.replace(/\\/g, "/"),
+    thresholdPoolEvalJson: CONTROLLED_CONFIDENCE_THRESHOLD_POOL_EVAL.replace(/\\/g, "/"),
   };
   return status;
 }
@@ -370,7 +394,7 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
       priority: 1,
       track: "M2/M3 ordinary upload candidate gate",
       action: controlled.nextActions?.[0] || "Finish the current blind review batch, import it, then rerun gate/status.",
-      artifact: controlled.confidencePilot?.validationReviewPage || controlled.reviewArtifacts.reviewPage,
+      artifact: controlled.confidencePilot?.thresholdPoolReviewPage || controlled.reviewArtifacts.thresholdPoolReviewPage || controlled.confidencePilot?.validationReviewPage || controlled.reviewArtifacts.reviewPage,
       reason: controlled.blockingReasons,
     });
   }

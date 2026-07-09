@@ -3,7 +3,8 @@
 
 This is eval-only. It trains the selected confidence model on already reviewed
 ``usable``/``wrong`` labels, scores unreviewed candidates from the latest offline
-feature batch, and writes a selection file that the HTML review exporter can use.
+feature batch that actually contains candidate rows, and writes a selection file
+that the HTML review exporter can use.
 It does not wire or alter any runtime student gate.
 """
 from __future__ import annotations
@@ -139,9 +140,24 @@ def reviewed_keys(labels_path: Path) -> set[str]:
     return keys
 
 
+def has_candidate_rows(run: dict[str, Any]) -> bool:
+    for item in run.get("items") or []:
+        if item.get("analysisStatus") != "offline_feature_review_ready":
+            continue
+        candidate_rows_path = safe_string(item.get("candidateRowsPath"))
+        if not candidate_rows_path:
+            continue
+        if (REPO / candidate_rows_path).resolve().exists():
+            return True
+    return False
+
+
 def latest_valid_run(batch_runs_path: Path) -> dict[str, Any] | None:
     valid = [row for row in read_jsonl(batch_runs_path) if not row.get("_invalidJsonLine")]
-    return valid[-1] if valid else None
+    for row in reversed(valid):
+        if has_candidate_rows(row):
+            return row
+    return None
 
 
 def collect_unreviewed_candidates(batch_runs_path: Path, labels_path: Path) -> list[dict[str, Any]]:
@@ -157,6 +173,8 @@ def collect_unreviewed_candidates(batch_runs_path: Path, labels_path: Path) -> l
         if not candidate_rows_path:
             continue
         artifact_path = (REPO / candidate_rows_path).resolve()
+        if not artifact_path.exists():
+            continue
         artifact = read_json(artifact_path)
         for candidate in artifact.get("candidateRows") or []:
             row = {

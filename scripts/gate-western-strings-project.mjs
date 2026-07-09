@@ -27,7 +27,7 @@ export function evaluateProjectGate(status, requiredTracks) {
     failures.push({
       track: "M2/M3 ordinary upload candidate gate",
       reason: controlled.blockingReasons || ["ordinary-upload-gate-not-ready"],
-      artifact: controlled.confidencePilot?.validationReviewPage || controlled.reviewArtifacts?.reviewPage || "",
+      artifact: controlled.confidencePilot?.thresholdPoolReviewPage || controlled.reviewArtifacts?.thresholdPoolReviewPage || controlled.confidencePilot?.validationReviewPage || controlled.reviewArtifacts?.reviewPage || "",
     });
   }
   if (requiredTracks.has("m3plus") && !m3plus.m3plusModeReleaseReady) {
