@@ -566,11 +566,12 @@ async function buildControlledStatus() {
     minScoredRows: 30,
     minPrecision: 0.9,
   });
+  const runtimeRelease = await readJson(CONTROLLED_CONFIDENCE_RELEASE);
   const confidencePilot = summarizeControlledCandidateConfidencePilot(
     await readJson(CONTROLLED_CONFIDENCE_PILOT),
     CONTROLLED_CONFIDENCE_PILOT,
     await readJson(CONTROLLED_CONFIDENCE_VALIDATION_EVAL),
-    await readJson(CONTROLLED_CONFIDENCE_RELEASE),
+    runtimeRelease,
     await readJson(CONTROLLED_CONFIDENCE_RELEASE_AUDIT),
   );
   const status = attachConfidencePilotStatus(buildControlledCandidateReviewStatus(report), confidencePilot);
@@ -604,6 +605,13 @@ async function buildControlledStatus() {
     recalibrationContextEvalExists
     && recalibrationContextEval?.blindValidationPassed
   );
+  const normalizedReleaseValidationSource = String(runtimeRelease?.blindValidation?.source || "").replace(/\\/g, "/");
+  const normalizedReleaseLabelsSource = String(runtimeRelease?.trainingLabels?.source || runtimeRelease?.labels?.source || "").replace(/\\/g, "/");
+  const recalibrationContextRuntimeWired = Boolean(
+    recalibrationContextValidationPassed
+    && normalizedReleaseValidationSource === CONTROLLED_CONFIDENCE_RECALIBRATION_CONTEXT_VALIDATION_EVAL.replace(/\\/g, "/")
+    && normalizedReleaseLabelsSource === CONTROLLED_CONFIDENCE_RECALIBRATION_LABELS.replace(/\\/g, "/")
+  );
   status.confidenceRecalibration = {
     labelsCsv: CONTROLLED_CONFIDENCE_RECALIBRATION_LABELS.replace(/\\/g, "/"),
     pilotJson: CONTROLLED_CONFIDENCE_RECALIBRATION_PILOT.replace(/\\/g, "/"),
@@ -636,6 +644,8 @@ async function buildControlledStatus() {
       needsBlindValidation: recalibrationContextNeedsBlindValidation,
       validationFailed: recalibrationContextValidationFailed,
       validationPassed: recalibrationContextValidationPassed,
+      runtimeWired: recalibrationContextRuntimeWired,
+      runtimeReleaseSource: CONTROLLED_CONFIDENCE_RELEASE.replace(/\\/g, "/"),
     },
     needsBlindValidation: recalibrationNeedsBlindValidation,
     validationFailed: recalibrationValidationFailed,
@@ -661,7 +671,7 @@ async function buildControlledStatus() {
     status.nextActions = [
       `The context-feature confidence recalibration blind-validation pack failed${Number.isFinite(precision) ? ` (precision=${precision})` : ""}; keep the ordinary-upload auto gate fail-closed and inspect the context validation rows before another recalibration attempt.`,
     ];
-  } else if (recalibrationContextValidationPassed) {
+  } else if (recalibrationContextValidationPassed && !recalibrationContextRuntimeWired) {
     status.blockingReasons = [
       ...new Set([
         ...(status.blockingReasons || []),
@@ -671,6 +681,9 @@ async function buildControlledStatus() {
     status.nextActions = [
       "The context-feature confidence recalibration validation passed, but the runtime gate is not wired or enabled. Review the release manifest and add a monitored, disabled-by-default runtime integration before any student-facing use.",
     ];
+  } else if (recalibrationContextValidationPassed && recalibrationContextRuntimeWired) {
+    // The context-feature recalibration is the current evidence source and supersedes
+    // the earlier 10-row recalibration validation failure.
   } else if (recalibrationNeedsBlindValidation) {
     status.blockingReasons = [
       ...new Set([

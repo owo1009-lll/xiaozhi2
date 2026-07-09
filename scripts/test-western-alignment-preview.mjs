@@ -1015,8 +1015,16 @@ async function testControlledSubmissionOfflineFeatureConfidenceGateEnabled() {
       path.join(m3Root, "offline-feature-candidate-review", "candidate-confidence-pilot.json"),
     ],
     [
+      path.join(process.cwd(), "data", "experiments", "western-strings-m3", "confidence-recalibration", "combined-controlled-candidate-review-labels.csv"),
+      path.join(m3Root, "confidence-recalibration", "combined-controlled-candidate-review-labels.csv"),
+    ],
+    [
       path.join(process.cwd(), "data", "experiments", "western-strings-m3", "confidence-validation-review", "confidence-validation-eval.json"),
       path.join(m3Root, "confidence-validation-review", "confidence-validation-eval.json"),
+    ],
+    [
+      path.join(process.cwd(), "data", "experiments", "western-strings-m3", "confidence-recalibration-context-validation-review", "confidence-recalibration-context-validation-eval.json"),
+      path.join(m3Root, "confidence-recalibration-context-validation-review", "confidence-recalibration-context-validation-eval.json"),
     ],
   ];
   for (const [from, to] of fixtureCopies) {

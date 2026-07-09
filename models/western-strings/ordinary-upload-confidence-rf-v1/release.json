@@ -7,6 +7,10 @@
   "threshold": 0.7,
   "featureSet": "deployable",
   "groupBy": "recordingId",
+  "trainingLabels": {
+    "source": "data/experiments/western-strings-m3/confidence-recalibration/combined-controlled-candidate-review-labels.csv",
+    "note": "Combined reviewed labels used by the P1.1 context-feature recalibration validation."
+  },
   "pilot": {
     "source": "data/experiments/western-strings-m3/offline-feature-candidate-review/candidate-confidence-pilot.json",
     "precision": 0.9375,
@@ -15,11 +19,26 @@
     "wrongSelected": 2
   },
   "blindValidation": {
-    "source": "data/experiments/western-strings-m3/confidence-validation-review/confidence-validation-eval.json",
-    "precision": 0.9,
+    "source": "data/experiments/western-strings-m3/confidence-recalibration-context-validation-review/confidence-recalibration-context-validation-eval.json",
+    "precision": 1.0,
     "coverage": 1.0,
     "selected": 30,
-    "wrongSelected": 3
+    "wrongSelected": 0,
+    "reviewedRows": 30,
+    "scoredRows": 30,
+    "excludedKnownBadSources": [
+      {
+        "recordingId": "stu02-ex05-weak_onset",
+        "reason": "score-audio mismatch in the validation source material"
+      }
+    ],
+    "previousValidation": {
+      "source": "data/experiments/western-strings-m3/confidence-validation-review/confidence-validation-eval.json",
+      "precision": 0.9,
+      "coverage": 1.0,
+      "selected": 30,
+      "wrongSelected": 3
+    }
   },
   "runtimePolicy": {
     "default": "review_required",

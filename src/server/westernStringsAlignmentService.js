@@ -381,7 +381,8 @@ async function scoreOfflineFeatureCandidateRows(repoRoot, candidateRows, submiss
   });
   const scriptPath = path.join(SOURCE_ROOT, "scripts", "experiments", "score_western_controlled_candidate_confidence.py");
   const runnerPath = path.join(SOURCE_ROOT, "scripts", "run-python.ps1");
-  const labelsPath = path.join(repoRoot, "data", "experiments", "western-strings-m3", "offline-feature-candidate-review", "controlled-candidate-review-labels.csv");
+  const labelsPath = resolveRepoPath(repoRoot, release?.trainingLabels?.source || release?.labels?.source)
+    || path.join(repoRoot, "data", "experiments", "western-strings-m3", "offline-feature-candidate-review", "controlled-candidate-review-labels.csv");
   const pilotPath = resolveRepoPath(repoRoot, release?.pilot?.source)
     || path.join(repoRoot, "data", "experiments", "western-strings-m3", "offline-feature-candidate-review", "candidate-confidence-pilot.json");
   const validationPath = resolveRepoPath(repoRoot, release?.blindValidation?.source)
