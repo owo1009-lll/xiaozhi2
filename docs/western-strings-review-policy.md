@@ -40,6 +40,8 @@ Use these before asking for any review:
 - `npm run test:western-project-gate`
 - `npm run western:ordinary-monitored-pilot-audit`
 - `npm run western:m3plus-monitored-pilot-audit`
+- `npm run western:m4-gold-provenance-audit`
+- `npm run western:m4-independent-gold-workspace-audit`
 
 ## Current Decisions
 
@@ -82,6 +84,13 @@ Independent gold application has two safety gates:
 Rows left as `needs-human-edit` must not be applied, even if the file timestamp
 or bytes changed. Use `npm run western:m4-apply-independent-gold-workspace --
 --dry-run` before applying changes.
+
+Before asking anyone to edit score files, run
+`npm run western:m4-gold-provenance-audit`. It reports whether the current
+gold/editable files are still byte-identical to the Audiveris draft and whether
+any independent clean-score candidates already exist in the repository. If it
+reports `manualGoldRequiredRows`, the remaining task is score-editor gold
+correction, not teacher audio diagnosis.
 
 Before any apply attempt, run
 `npm run western:m4-independent-gold-workspace-audit`. It reports:

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 
 import { evaluateProjectGate } from "./gate-western-strings-project.mjs";
+import { renderHandoff } from "./create-western-strings-next-action-handoff.mjs";
 import { buildProjectStatus } from "./status-western-strings-project.mjs";
 
 const status = await buildProjectStatus();
@@ -199,6 +200,18 @@ if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
 
 const m4ChecklistHtml = await fs.readFile("data/experiments/western-strings-m4/independent-gold-todo.html", "utf8");
 const m4ChecklistMd = await fs.readFile("data/experiments/western-strings-m4/independent-gold-todo.md", "utf8");
+const reviewPolicy = await fs.readFile("docs/western-strings-review-policy.md", "utf8");
+const handoff = renderHandoff(status);
+for (const [label, text] of [["review policy", reviewPolicy], ["next-action handoff", handoff]]) {
+  assert(
+    text.includes("npm run western:m4-gold-provenance-audit"),
+    `M4 ${label} must require provenance self-test before manual score editing`,
+  );
+  assert(
+    text.includes("npm run western:m4-independent-gold-workspace-audit"),
+    `M4 ${label} must require workspace audit before apply`,
+  );
+}
 for (const [label, text] of [["html", m4ChecklistHtml], ["markdown", m4ChecklistMd]]) {
   assert(
     text.includes("不是教师音频诊断复核"),
