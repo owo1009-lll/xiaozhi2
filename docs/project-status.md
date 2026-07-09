@@ -110,6 +110,7 @@
 npm run western:release-review
 npm run western:controlled-pilot-decision
 npm run western:controlled-pilot-approval-template
+npm run western:controlled-pilot-start-preflight
 ```
 
 `western:release-review` 会串联:
@@ -127,6 +128,8 @@ npm run western:controlled-pilot-approval-template
 
 `western:controlled-pilot-approval-template` 只生成不批准的模板文件,不会解锁 pilot。只有负责人明确批准后,才可把模板复制/填写为 `data/experiments/western-strings-controlled-pilot-approval.json`。
 
+`western:controlled-pilot-start-preflight` 是批准后的最后机器预检。当前没有 approval 文件时它必须失败;通过前不得启动 pilot。
+
 产物:
 
 - `data/experiments/western-strings-release-review.json`
@@ -134,6 +137,8 @@ npm run western:controlled-pilot-approval-template
 - `data/experiments/western-strings-controlled-pilot-decision.json`
 - `data/experiments/western-strings-controlled-pilot-decision.md`
 - `data/experiments/western-strings-controlled-pilot-approval.template.json`
+- `data/experiments/western-strings-controlled-pilot-start-preflight.json`
+- `data/experiments/western-strings-controlled-pilot-start-preflight.md`
 
 当前实测:
 

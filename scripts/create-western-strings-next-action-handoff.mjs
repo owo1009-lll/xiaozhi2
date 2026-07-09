@@ -228,6 +228,7 @@ function commandForAction(action) {
   if (track === "Start monitored pilot") {
     return [
       "Open data/experiments/western-strings-controlled-pilot-decision.md.",
+      "Run npm run western:controlled-pilot-start-preflight immediately before starting the pilot.",
       "Start only the approved separate monitored pilot process.",
       "Keep production/default runtime fail-closed.",
       "After pilot wiring, rerun npm run western:release-review, npm run western:controlled-pilot-decision, npm run test:western-project-gate, and npm run build.",

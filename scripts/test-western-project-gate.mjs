@@ -232,6 +232,10 @@ assert(
   packageJson.scripts?.["western:controlled-pilot-approval-template"],
   "package.json must expose a non-approving controlled-pilot approval template command",
 );
+assert(
+  packageJson.scripts?.["western:controlled-pilot-start-preflight"],
+  "package.json must expose the controlled-pilot start preflight command",
+);
 for (const [label, text] of [["review policy", reviewPolicy]]) {
   assert(
     text.includes("npm run western:m4-preflight"),
@@ -259,6 +263,7 @@ if (m4.m4OmrDraftQualityReady) {
     handoff.includes("npm run western:release-review")
       || handoff.includes("npm run western:controlled-pilot-decision")
       || handoff.includes("npm run western:controlled-pilot-approval-template")
+      || handoff.includes("npm run western:controlled-pilot-start-preflight")
       || handoff.includes("Controlled pilot approval")
       || handoff.includes("Start monitored pilot"),
     "handoff must route through release-review or the controlled-pilot decision after M4 clears",
