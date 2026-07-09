@@ -36,7 +36,7 @@ export function evaluateProjectGate(status, requiredTracks) {
       ? (controlled.reviewArtifacts?.recalibrationFailureDiagnosisJson || controlled.reviewArtifacts?.recalibrationValidationEvalJson || controlled.confidenceRecalibration?.validationEvalJson)
       : (controlled.blockingReasons || []).includes("ordinary-confidence-threshold-pool-precision-too-low")
       ? (controlled.reviewArtifacts?.thresholdPoolDiagnosisJson || controlled.confidencePilot?.thresholdPoolEvalJson)
-      : (controlled.confidencePilot?.thresholdPoolReviewPage || controlled.reviewArtifacts?.thresholdPoolReviewPage || controlled.confidencePilot?.validationReviewPage || controlled.reviewArtifacts?.reviewPage);
+      : (controlled.reviewArtifacts?.releaseAuditJson || controlled.confidencePilot?.thresholdPoolEvalJson || controlled.confidencePilot?.thresholdPoolReviewPage || controlled.reviewArtifacts?.thresholdPoolReviewPage || controlled.confidencePilot?.validationReviewPage || controlled.reviewArtifacts?.reviewPage);
     failures.push({
       track: "M2/M3 ordinary upload candidate gate",
       reason: controlled.blockingReasons || ["ordinary-upload-gate-not-ready"],

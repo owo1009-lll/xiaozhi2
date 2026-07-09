@@ -1053,7 +1053,7 @@ async function testControlledSubmissionOfflineFeatureConfidenceGateEnabled() {
     assert.equal(item.candidateGate.mode, "confidence_rf");
     assert.equal(item.candidateGate.gateVersion, "western-offline-feature-gate-v1-confidence-rf");
     assert.equal(item.candidateGate.modelVersion, "ordinary-upload-confidence-rf-v1");
-    assert.equal(item.candidateGate.threshold, 0.7);
+    assert.equal(item.candidateGate.threshold, 0.8);
     assert.equal(item.candidateGate.evaluatedCandidateCount, 3);
     assert.equal(item.candidateGate.autoPassCandidateCount + item.candidateGate.reviewRequiredCandidateCount, 3);
     assert.equal(item.candidatePreview.length, 3);

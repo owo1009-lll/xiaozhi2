@@ -71,6 +71,8 @@ assert.equal(controlled.confidencePilot.bestReleaseCandidate.groupBy, "recording
 assert(
   status.nextActions[0]?.action.includes("confidence-threshold-pool-review/index.html")
   || status.nextActions[0]?.action.includes("threshold-pool review failed")
+  || status.nextActions[0]?.action.includes("Threshold-pool precision passed")
+  || status.nextActions[0]?.action.includes("separate monitored pilot plan")
   || status.nextActions[0]?.action.includes("recalibration blind-validation pack")
   || status.nextActions[0]?.action.includes("context-feature confidence recalibration pack")
   || status.nextActions[0]?.action.includes("wire a runtime gate")
@@ -89,7 +91,7 @@ const expectedOrdinaryArtifact = status.tracks.controlledCandidate.blockingReaso
   ? "data/experiments/western-strings-m3/confidence-recalibration-validation-review/confidence-recalibration-failure-diagnosis.json"
   : status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-threshold-pool-precision-too-low")
   ? "data/experiments/western-strings-m3/confidence-threshold-pool-review/confidence-threshold-pool-diagnosis.json"
-  : "data/experiments/western-strings-m3/confidence-threshold-pool-review/index.html";
+  : "data/experiments/western-strings-m3/confidence-validation-review/ordinary-confidence-release-audit.json";
 assert.equal(status.nextActions[0]?.artifact, expectedOrdinaryArtifact, "project artifact should point to the current ordinary-gate evidence artifact");
 
 const m4 = status.tracks.m4Omr;

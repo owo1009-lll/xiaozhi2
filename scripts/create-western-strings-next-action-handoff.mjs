@@ -90,12 +90,9 @@ function commandForAction(action) {
     if (hasReason(action, "ordinary-auto-gate-disabled-by-default")) {
       return [
         "Keep production/default runtime fail-closed.",
-        "Runtime smoke now verifies that an explicit WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 process calls the frozen RF scorer and writes confidence probabilities.",
-        "Use npm run western:controlled-candidate-confidence-release-audit to inspect the coverage semantics: fresh validation was prefiltered above threshold, so full threshold-pool precision is still unmeasured.",
-        "Open data/experiments/western-strings-m3/confidence-threshold-pool-review/index.html and review the 60-row stratified threshold-pool sample.",
-        "Save the downloaded CSV as data/experiments/western-strings-m3/confidence-threshold-pool-review/controlled-candidate-review.completed.csv.",
-        "Run npm run western:controlled-candidate-confidence-stratified-eval.",
-        "Only if that full threshold-pool review passes, consider WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 in a monitored controlled pilot process.",
+        "P1.1 context validation and threshold-pool precision have passed for the frozen RF scorer at threshold 0.8, after excluding the documented score-audio mismatch source.",
+        "Use npm run western:controlled-candidate-confidence-release-audit to inspect the frozen evidence before any pilot.",
+        "Only consider WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 inside a separate monitored controlled-pilot process.",
         "Do not commit an enabled env value or turn the gate on by default.",
         "After any smoke/release check, run npm run test:western-project-gate",
         "Then run npm run western:project-status",

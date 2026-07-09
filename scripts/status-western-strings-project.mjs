@@ -789,7 +789,7 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
       ? (controlled.reviewArtifacts.recalibrationFailureDiagnosisJson || controlled.reviewArtifacts.recalibrationValidationEvalJson || controlled.confidenceRecalibration?.validationEvalJson)
       : (controlled.blockingReasons || []).includes("ordinary-confidence-threshold-pool-precision-too-low")
       ? (controlled.reviewArtifacts.thresholdPoolDiagnosisJson || controlled.confidencePilot?.thresholdPoolEvalJson)
-      : (controlled.confidencePilot?.thresholdPoolReviewPage || controlled.reviewArtifacts.thresholdPoolReviewPage || controlled.confidencePilot?.validationReviewPage || controlled.reviewArtifacts.reviewPage);
+      : (controlled.reviewArtifacts.releaseAuditJson || controlled.confidencePilot?.thresholdPoolEvalJson || controlled.confidencePilot?.thresholdPoolReviewPage || controlled.reviewArtifacts.thresholdPoolReviewPage || controlled.confidencePilot?.validationReviewPage || controlled.reviewArtifacts.reviewPage);
     actions.push({
       priority: 1,
       track: "M2/M3 ordinary upload candidate gate",

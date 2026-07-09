@@ -94,6 +94,25 @@ def count_statuses(rows: list[dict[str, Any]]) -> dict[str, int]:
     return counts
 
 
+def exclude_known_bad_sources(
+    rows: list[dict[str, Any]],
+    recording_ids: set[str],
+    pieces: set[str],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    if not recording_ids and not pieces:
+        return rows, []
+    kept: list[dict[str, Any]] = []
+    excluded: list[dict[str, Any]] = []
+    for row in rows:
+        recording_id = safe_string(row.get("recordingId")).strip()
+        piece = safe_string(row.get("piece")).strip()
+        if recording_id in recording_ids or piece in pieces:
+            excluded.append(row)
+        else:
+            kept.append(row)
+    return kept, excluded
+
+
 def write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -168,7 +187,10 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             "confidence-validation-completed-csv-missing",
             ["confidence-validation-completed-csv-missing"],
         )
-    rows = read_csv_rows(reviews_path)
+    raw_rows = read_csv_rows(reviews_path)
+    exclude_recording_ids = {value.strip() for value in (args.exclude_recording_id or []) if value.strip()}
+    exclude_pieces = {value.strip() for value in (args.exclude_piece or []) if value.strip()}
+    rows, excluded_rows = exclude_known_bad_sources(raw_rows, exclude_recording_ids, exclude_pieces)
     status_counts = count_statuses(rows)
     reviewed_rows = [row for row in rows if status_value(row) in {"usable", "wrong", "uncertain"}]
     scored_rows = [row for row in rows if status_value(row) in LABEL_MAP]
@@ -256,6 +278,8 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             "minPrecision": args.min_precision,
         },
         "counts": {
+            "rawReviewedRows": len(raw_rows),
+            "excludedRows": len(excluded_rows),
             "reviewedRows": len(reviewed_rows),
             "scoredRows": len(scored_rows),
             "usableRows": int(labels_numeric.sum()) if len(labels_numeric) else 0,
@@ -273,6 +297,11 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             "precision": round(float(precision), 4) if precision is not None else None,
             "coverage": round(float(coverage), 4),
         },
+        "excludedKnownBadSources": {
+            "recordingIds": sorted(exclude_recording_ids),
+            "pieces": sorted(exclude_pieces),
+            "rows": len(excluded_rows),
+        },
     }
     return report
 
@@ -286,6 +315,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rows-out", default="")
     parser.add_argument("--model", default="")
     parser.add_argument("--threshold", type=float, default=None)
+    parser.add_argument("--exclude-recording-id", action="append", default=[])
+    parser.add_argument("--exclude-piece", action="append", default=[])
     parser.add_argument("--min-scored-rows", type=int, default=30)
     parser.add_argument("--min-selected-rows", type=int, default=10)
     parser.add_argument("--min-precision", type=float, default=0.9)
