@@ -76,6 +76,15 @@ function commandForAction(action) {
   }
   if (track === "M3+ pitch behavior modes") {
     if (hasReason(action, "m3plus-no-mode-specific-release-ready")) {
+      if (String(action.action || "").includes("round-2 is imported")) {
+        return [
+          "Keep all M3+ pitch-behavior modes review-only in student/runtime output.",
+          "Inspect data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-pitch-mode-eval.csv.",
+          "Treat the current high mismatch/uncertain rate as a localization/candidate-quality blocker before any M3+ release attempt.",
+          "Improve score-audio localization or candidate generation, then create a fresh targeted eval pack instead of reusing the current round-2 pack.",
+          "After any candidate-generation change, rerun npm run western:m3plus-pitch-modes, create a new review pack, import labels, and rerun npm run western:m3plus-mode-eval.",
+        ];
+      }
       return [
         "Keep all M3+ pitch-behavior modes review-only in student/runtime output.",
         "Inspect data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-pitch-mode-eval.csv for per-mode evidence.",

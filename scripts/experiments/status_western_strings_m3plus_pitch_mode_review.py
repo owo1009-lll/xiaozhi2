@@ -53,6 +53,19 @@ def is_scored(row: dict[str, str]) -> bool:
     )
 
 
+def label_key(row: dict[str, Any]) -> tuple[str, ...]:
+    # rowId is scoped to a generated review pack, not globally unique.
+    return (
+        str(row.get("recordingId", "")).strip(),
+        str(row.get("scenario", "")).strip(),
+        str(row.get("noteIndex", "")).strip(),
+        str(row.get("noteId", "")).strip(),
+        str(row.get("candidateMode", "")).strip(),
+        str(row.get("flags", "")).strip(),
+        str(row.get("predictedOnsetSeconds", "")).strip(),
+    )
+
+
 def build_status(
     source_path: Path,
     labels_path: Path,
@@ -63,15 +76,15 @@ def build_status(
 ) -> dict[str, Any]:
     source_rows = read_csv(source_path)
     label_rows = read_csv(labels_path)
-    source_ids = {row.get("rowId", "") for row in source_rows}
+    source_keys = {label_key(row) for row in source_rows if any(label_key(row))}
     for row in label_rows:
-        row_id = row.get("rowId", "")
-        if row_id and row_id not in source_ids:
+        key = label_key(row)
+        if any(key) and key not in source_keys:
             source_rows.append(row)
-            source_ids.add(row_id)
-    labels_by_id = {row.get("rowId", ""): row for row in label_rows if row.get("rowId", "")}
+            source_keys.add(key)
+    labels_by_key = {label_key(row): row for row in label_rows if any(label_key(row))}
 
-    reviewed_rows = [row for row in label_rows if row.get("rowId", "") in source_ids and is_reviewed(row)]
+    reviewed_rows = [row for row in label_rows if label_key(row) in source_keys and is_reviewed(row)]
     scored_rows = [row for row in reviewed_rows if is_scored(row)]
 
     mode_totals = Counter(row.get("candidateMode", "") for row in source_rows)
@@ -124,7 +137,7 @@ def build_status(
             "labelRows": len(label_rows),
             "reviewedRows": len(reviewed_rows),
             "scoredRows": len(scored_rows),
-            "missingLabelRows": max(0, len(source_rows) - len(labels_by_id)),
+            "missingLabelRows": max(0, len(source_rows) - len(labels_by_key)),
         },
         "perMode": per_mode,
         "matchCounts": dict(sorted(match_counts.items())),

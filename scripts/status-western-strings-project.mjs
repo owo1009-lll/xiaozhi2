@@ -178,6 +178,13 @@ const M3PLUS_MODE_EVAL = path.join(
   "pitch-mode-review-pack",
   "m3plus-pitch-mode-eval.json",
 );
+const M3PLUS_MODE_EVAL_CSV = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3plus",
+  "pitch-mode-review-pack",
+  "m3plus-pitch-mode-eval.csv",
+);
 const M4_READINESS = path.join(
   "data",
   "experiments",
@@ -322,6 +329,18 @@ function isM3PlusScored(row) {
   );
 }
 
+function m3plusLabelKey(row = {}) {
+  return [
+    "recordingId",
+    "scenario",
+    "noteIndex",
+    "noteId",
+    "candidateMode",
+    "flags",
+    "predictedOnsetSeconds",
+  ].map((field) => String(row[field] || "").trim()).join("::");
+}
+
 function countBy(rows, field) {
   const counts = {};
   for (const row of rows) {
@@ -335,10 +354,19 @@ async function buildM3PlusStatus() {
   const sourceRows = await readCsv(M3PLUS_SOURCE);
   const labelRows = await readCsv(M3PLUS_LABELS);
   const modeEval = await readJson(M3PLUS_MODE_EVAL);
-  const sourceIds = new Set(sourceRows.map((row) => row.rowId).filter(Boolean));
-  const reviewedRows = labelRows.filter((row) => sourceIds.has(row.rowId) && isM3PlusReviewed(row));
+  const allSourceRows = [...sourceRows];
+  const sourceKeys = new Set(sourceRows.map(m3plusLabelKey).filter(Boolean));
+  for (const row of labelRows) {
+    const key = m3plusLabelKey(row);
+    if (key && !sourceKeys.has(key)) {
+      allSourceRows.push(row);
+      sourceKeys.add(key);
+    }
+  }
+  const labelKeys = new Set(labelRows.map(m3plusLabelKey).filter(Boolean));
+  const reviewedRows = labelRows.filter((row) => sourceKeys.has(m3plusLabelKey(row)) && isM3PlusReviewed(row));
   const scoredRows = reviewedRows.filter(isM3PlusScored);
-  const sourceModeCounts = countBy(sourceRows, "candidateMode");
+  const sourceModeCounts = countBy(allSourceRows, "candidateMode");
   const reviewedModeCounts = countBy(reviewedRows, "candidateMode");
   const scoredModeCounts = countBy(scoredRows, "candidateMode");
   const minReviewedPerMode = 5;
@@ -383,10 +411,11 @@ async function buildM3PlusStatus() {
     reason: modeReleaseReady ? "mode-specific-offline-eval-ready" : "mode-specific-review-only",
     counts: {
       rowCount: sourceRows.length,
+      cumulativeRowCount: allSourceRows.length,
       labelRows: labelRows.length,
       reviewedRows: reviewedRows.length,
       scoredRows: scoredRows.length,
-      missingLabelRows: Math.max(0, sourceRows.length - labelRows.length),
+      missingLabelRows: Math.max(0, allSourceRows.length - labelKeys.size),
     },
     perMode,
     modeEval: {
@@ -405,6 +434,7 @@ async function buildM3PlusStatus() {
       completedCsv: M3PLUS_COMPLETED.replace(/\\/g, "/"),
       labelsCsv: M3PLUS_LABELS.replace(/\\/g, "/"),
       modeEvalJson: M3PLUS_MODE_EVAL.replace(/\\/g, "/"),
+      modeEvalCsv: M3PLUS_MODE_EVAL_CSV.replace(/\\/g, "/"),
       round2ReviewPage: M3PLUS_ROUND2_REVIEW_PAGE.replace(/\\/g, "/"),
       round2SourceCsv: M3PLUS_ROUND2_SOURCE.replace(/\\/g, "/"),
       round2CompletedCsv: M3PLUS_ROUND2_COMPLETED.replace(/\\/g, "/"),
@@ -546,11 +576,15 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
       reason: m3plus.blockingReasons,
     });
   } else if (!m3plus.m3plusModeReleaseReady) {
+    const counts = m3plus.modeEval?.counts || {};
+    const mismatchText = counts.rows
+      ? ` Current eval has ${counts.match || 0} match, ${counts.mismatch || 0} mismatch, and ${Math.max(0, (counts.rows || 0) - (counts.match || 0) - (counts.mismatch || 0))} uncertain/other rows out of ${counts.rows}; fix score-audio localization/candidate quality before another release attempt.`
+      : "";
     actions.push({
       priority: 2,
       track: "M3+ pitch behavior modes",
-      action: "M3+ labels are sufficient, but no non-control pitch-behavior mode is release-ready. Review the round-2 non-control sample pack, run `npm run western:ingest-review-downloads -- --apply` if the CSV is in Downloads, import it into the cumulative labels, then rerun western:m3plus-mode-eval.",
-      artifact: m3plus.reviewArtifacts.round2ReviewPage || m3plus.reviewArtifacts.modeEvalJson,
+      action: `M3+ labels are sufficient and round-2 is imported, but no non-control pitch-behavior mode is release-ready.${mismatchText} Keep M3+ review-only and inspect the per-mode eval before changing candidate generation.`,
+      artifact: m3plus.reviewArtifacts.modeEvalCsv || m3plus.reviewArtifacts.modeEvalJson,
       reason: m3plus.blockingReasons,
     });
   }

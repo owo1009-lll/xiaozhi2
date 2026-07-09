@@ -118,6 +118,20 @@ def normalize_row(row: dict[str, Any], source_row: dict[str, str]) -> dict[str, 
     return merged
 
 
+def label_key(row: dict[str, Any]) -> tuple[str, ...]:
+    # rowId is local to each generated review pack (m3plus-001, ...), so round-2
+    # packs can reuse the same IDs. Use stable candidate identity instead.
+    return (
+        str(row.get("recordingId", "")).strip(),
+        str(row.get("scenario", "")).strip(),
+        str(row.get("noteIndex", "")).strip(),
+        str(row.get("noteId", "")).strip(),
+        str(row.get("candidateMode", "")).strip(),
+        str(row.get("flags", "")).strip(),
+        str(row.get("predictedOnsetSeconds", "")).strip(),
+    )
+
+
 def merge_labels(source_path: Path, completed_path: Path, labels_path: Path) -> dict[str, Any]:
     if not source_path.exists():
         raise SystemExit(f"Missing source review CSV: {source_path}")
@@ -126,23 +140,23 @@ def merge_labels(source_path: Path, completed_path: Path, labels_path: Path) -> 
     source_rows = read_csv(source_path)
     completed_rows = read_csv(completed_path)
     existing_rows = read_csv(labels_path)
-    source_by_id = {row.get("rowId", ""): row for row in source_rows if row.get("rowId", "")}
-    merged_by_id = {row.get("rowId", ""): row for row in existing_rows if row.get("rowId", "")}
+    source_by_key = {label_key(row): row for row in source_rows if any(label_key(row))}
+    merged_by_key = {label_key(row): row for row in existing_rows if any(label_key(row))}
     imported = 0
     skipped_unknown = 0
     for row in completed_rows:
-        row_id = str(row.get("rowId", "")).strip()
-        if not row_id or row_id not in source_by_id:
+        key = label_key(row)
+        if not any(key) or key not in source_by_key:
             skipped_unknown += 1
             continue
-        merged_by_id[row_id] = normalize_row(row, source_by_id[row_id])
+        merged_by_key[key] = normalize_row(row, source_by_key[key])
         imported += 1
-    ordered_rows = [merged_by_id[row.get("rowId", "")] for row in source_rows if row.get("rowId", "") in merged_by_id]
-    source_ids = {row.get("rowId", "") for row in source_rows if row.get("rowId", "")}
+    ordered_rows = [merged_by_key[label_key(row)] for row in source_rows if label_key(row) in merged_by_key]
+    source_keys = {label_key(row) for row in source_rows if any(label_key(row))}
     for row in existing_rows:
-        row_id = row.get("rowId", "")
-        if row_id and row_id not in source_ids and row_id in merged_by_id:
-            ordered_rows.append(merged_by_id[row_id])
+        key = label_key(row)
+        if any(key) and key not in source_keys and key in merged_by_key:
+            ordered_rows.append(merged_by_key[key])
     write_csv(labels_path, ordered_rows)
     return {
         "importedRows": imported,

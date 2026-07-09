@@ -88,6 +88,11 @@ assert(
   (m3plusFailure.reason || []).includes("m3plus-no-mode-specific-release-ready"),
   "M3+ track should block on lack of non-control mode-specific release evidence",
 );
+assert.equal(
+  m3plusFailure.artifact,
+  "data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-pitch-mode-eval.csv",
+  "M3+ gate failure should point to the per-mode eval after labels are sufficient",
+);
 assert(fullGate.failures.some((failure) => failure.track === "M4 OMR benchmark"), "M4 track failure should be reported");
 assert.equal(
   fullGate.failures.find((failure) => failure.track === "M4 OMR benchmark")?.artifact,
