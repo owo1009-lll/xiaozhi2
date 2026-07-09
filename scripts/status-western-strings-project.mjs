@@ -792,6 +792,9 @@ async function buildM4OmrStatus() {
     m4OmrBenchmarkDatasetReady: readinessReady,
     m4OmrDraftQualityReady: draftQualityReady,
     studentGateReady: false,
+    teacherReviewNeeded: false,
+    humanTask: "score-editor-independent-gold-correction",
+    humanTaskScope: "Correct MusicXML/MXL against source score images only; do not ask for audio diagnosis review.",
     reason: "omr-status-only",
     counts: {
       readinessRows: readiness?.counts?.intakeRows || 0,
@@ -893,8 +896,10 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
     actions.push({
       priority: 3,
       track: "M4 OMR benchmark",
-      action: "Open the M4 visual checklist, generate the independent-gold workspace, correct the workspace MXL files against the source scores, apply the changed files, then rerun `npm run western:m4-omr-benchmark`.",
+      action: "Machine checks found only self-comparison OMR rows. Do not request teacher audio diagnosis; prepare independent score-editor gold by correcting workspace MXL files against the source score images, then rerun `npm run western:m4-omr-benchmark`.",
       artifact: m4Omr.artifacts.independentGoldTodoHtml || m4Omr.artifacts.independentGoldTodo,
+      humanTask: m4Omr.humanTask,
+      teacherReviewNeeded: m4Omr.teacherReviewNeeded,
       reason: m4Omr.blockingReasons,
     });
   }
@@ -973,6 +978,8 @@ function printProjectStatus(status, outPath) {
     m4Omr: {
       datasetReady: m4Omr.m4OmrBenchmarkDatasetReady,
       draftQualityReady: m4Omr.m4OmrDraftQualityReady,
+      teacherReviewNeeded: m4Omr.teacherReviewNeeded,
+      humanTask: m4Omr.humanTask,
       counts: m4Omr.counts,
       blockingReasons: m4Omr.blockingReasons,
     },

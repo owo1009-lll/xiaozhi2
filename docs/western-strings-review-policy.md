@@ -69,6 +69,11 @@ M4 still requires independent gold correction. Do not ask for broad model or
 teacher review until the independent-gold workspace is corrected and the OMR
 benchmark is rerun.
 
+This M4 task is a score-editor task, not an audio-diagnosis task: compare each
+source score image/PDF against the editable MusicXML/MXL gold file. A music
+teacher is only needed if they are acting as a score editor; they should not be
+asked to judge intonation, rhythm, or student performance for this gate.
+
 Independent gold application has two safety gates:
 
 - the editable MXL/MusicXML file must differ from the Audiveris draft; and

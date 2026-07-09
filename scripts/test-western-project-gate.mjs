@@ -139,6 +139,12 @@ if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
 const m4 = status.tracks.m4Omr;
 assert.equal(m4.m4OmrBenchmarkDatasetReady, true, "M4 intake dataset should be ready for benchmarking");
 assert.equal(m4.m4OmrDraftQualityReady, false, "M4 draft quality must not be ready while gold equals draft");
+assert.equal(m4.teacherReviewNeeded, false, "M4 independent-gold correction must not be reported as teacher audio review");
+assert.equal(
+  m4.humanTask,
+  "score-editor-independent-gold-correction",
+  "M4 should identify the remaining human task as score-editor gold correction",
+);
 assert.equal(m4.counts.usableBenchmarkRows, 0, "self-comparison rows must not count as usable independent gold");
 assert.equal(m4.counts.selfComparisonRows, 12, "current M4 fixture should expose all self-comparison rows");
 assert(m4.blockingReasons.includes("m4-omr-self-comparison-detected"), "M4 must block on self-comparison");
@@ -148,6 +154,14 @@ assert.equal(
   "data/experiments/western-strings-m4/independent-gold-todo.html",
   "M4 handoff should expose the visual independent-gold checklist",
 );
+if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
+  assert.equal(status.nextActions[0]?.teacherReviewNeeded, false, "M4 next action must not request teacher audio review");
+  assert.equal(
+    status.nextActions[0]?.humanTask,
+    "score-editor-independent-gold-correction",
+    "M4 next action should carry the score-editor task type",
+  );
+}
 
 const noRequiredGate = evaluateProjectGate(status, new Set());
 assert.equal(noRequiredGate.projectReleaseReady, true, "empty required track set should not block");

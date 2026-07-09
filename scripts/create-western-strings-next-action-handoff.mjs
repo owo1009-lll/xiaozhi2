@@ -177,6 +177,7 @@ function commandForAction(action) {
   if (track === "M4 OMR benchmark") {
     return [
       "Open data/experiments/western-strings-m4/independent-gold-todo.html",
+      "This is NOT a teacher audio-diagnosis review. It is a score-editor independent-gold correction task.",
       "For each row, compare the source score image/PDF with the current goldPath and Audiveris draftPath",
       "Run npm run western:m4-independent-gold-workspace to create editable copies under data/private/western-strings-m4-independent-gold/",
       "Edit those workspace MXL files against the source score until they are independent human-corrected gold, not copies of the Audiveris draft",
@@ -212,6 +213,9 @@ export function renderHandoff(status) {
       "",
       `Artifact: ${action.artifact || "none"}`,
       "",
+      action.humanTask ? `Human task: ${action.humanTask}` : "",
+      action.teacherReviewNeeded === false ? "Teacher audio review needed: false" : "",
+      action.humanTask || action.teacherReviewNeeded === false ? "" : "",
       "Why blocked:",
       bulletList(action.reason),
       "",
@@ -249,6 +253,8 @@ async function main() {
       track: item.track,
       action: item.action,
       artifact: item.artifact,
+      humanTask: item.humanTask,
+      teacherReviewNeeded: item.teacherReviewNeeded,
       reason: item.reason,
     })),
   }, null, 2));
