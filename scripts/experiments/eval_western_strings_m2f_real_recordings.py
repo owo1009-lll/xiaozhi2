@@ -4,6 +4,7 @@ import argparse
 import csv
 import json
 import math
+import sqlite3
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -37,6 +38,7 @@ VALID_SCENARIOS = {
 VALID_LICENSE_STATUS = {"local-only", "cleared"}
 DEFAULT_REQUIRED_SCENARIOS = ["correct", "wrong_pitch", "missing_note", "rhythm_shift", "weak_onset", "noisy"]
 SCORE_STORE = REPO / "data" / "erhu-score-imports.json"
+SCORE_STORE_SQLITE = REPO / "data" / "erhu-score-imports.sqlite"
 PRIVATE_REPO_DATA_ROOT = REPO / "data" / "private"
 CLEAN_SCORE_EXTENSIONS = {".musicxml", ".xml", ".mxl", ".mid", ".midi"}
 
@@ -61,17 +63,33 @@ def path_is_within(path: Path, root: Path) -> bool:
 
 
 def load_score_ids(path: Path = SCORE_STORE) -> set[str]:
+    score_ids: set[str] = set()
     if not path.exists():
-        return set()
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return set()
-    return {
+        data = {"scores": []}
+    else:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            data = {"scores": []}
+    score_ids.update(
         str(score.get("scoreId", "")).strip()
         for score in data.get("scores", [])
         if isinstance(score, dict) and str(score.get("scoreId", "")).strip()
-    }
+    )
+    sqlite_path = path.with_suffix(".sqlite")
+    if path == SCORE_STORE:
+        sqlite_path = SCORE_STORE_SQLITE
+    if sqlite_path.exists():
+        try:
+            with sqlite3.connect(sqlite_path) as connection:
+                for (score_id,) in connection.execute(
+                    "SELECT score_id FROM imported_scores WHERE archived = 0 AND score_id <> ''"
+                ):
+                    if str(score_id).strip():
+                        score_ids.add(str(score_id).strip())
+        except sqlite3.Error:
+            pass
+    return score_ids
 
 
 def is_yes(value: str) -> bool:
