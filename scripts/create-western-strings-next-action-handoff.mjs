@@ -34,8 +34,10 @@ function commandForAction(action) {
   if (track === "M2/M3 ordinary upload candidate gate") {
     if (hasReason(action, "ordinary-auto-gate-disabled-by-default")) {
       return [
-        "Make an explicit release decision; default remains fail-closed.",
-        "For a controlled local smoke only, set WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 in the process environment.",
+        "Keep production/default runtime fail-closed.",
+        "Before any pilot, verify ordinary-upload feature extraction and the frozen RF scorer on the same runtime path.",
+        "Investigate the operating-point drift: pilot selected coverage 0.5333 / precision 0.9375, while fresh validation selected coverage 1.0 / precision 0.90.",
+        "Only for a monitored controlled pilot, set WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 in that process environment.",
         "Do not commit an enabled env value or turn the gate on by default.",
         "After any smoke/release check, run npm run test:western-project-gate",
         "Then run npm run western:project-status",

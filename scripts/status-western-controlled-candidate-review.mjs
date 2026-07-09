@@ -133,7 +133,7 @@ export function attachConfidencePilotStatus(status, confidencePilot) {
   const nextActions = [
     validationPassed
       ? (runtimeGateWired
-        ? "Confidence runtime gate is wired but disabled by default. Keep default fail-closed, and enable only with WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 after an explicit release decision."
+        ? "Confidence runtime gate is wired but disabled by default. Keep default fail-closed; before any controlled pilot, verify ordinary-upload feature extraction/scoring on the runtime path, investigate the pilot-vs-validation operating-point drift, then enable only in a monitored process with WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1."
         : "Confidence blind validation passed. Review metrics and wire a runtime gate in a separate release phase; current runtime remains fail-closed.")
       : `Confidence pilot found release candidates; review ${DEFAULT_CONFIDENCE_VALIDATION_REVIEW_PAGE.replace(/\\/g, "/")} and run western:controlled-candidate-confidence-validation-eval before changing the runtime gate.`,
   ];

@@ -11,7 +11,7 @@
 ## 二、当前可用成果
 
 - **M2/M3 core 诊断链路**:clean score + audio 的受控上传、离线 batch、候选特征生成、人工复核、置信模型 pilot、fresh blind validation 与 runtime scorer 已接入。
-- **普通上传置信 gate**:RF threshold=0.7 的 release artifact 已冻结在 `models/western-strings/ordinary-upload-confidence-rf-v1/release.json`;fresh validation 30 条通过当前 floor(precision=0.90, coverage=1.0)。运行时默认仍关闭,只有显式设置 `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1` 才允许候选级 auto-pass。
+- **普通上传置信 gate**:RF threshold=0.7 的 release artifact 已冻结在 `models/western-strings/ordinary-upload-confidence-rf-v1/release.json`;fresh validation 30 条通过当前 floor(precision=0.90, coverage=1.0)。运行时默认仍关闭,保持当前安全态。若后续要验证,先确认普通上传特征提取与冻结 RF scorer 走同一 runtime 路径,并排查 pilot(coverage=0.5333 / precision=0.9375)与 fresh validation(coverage=1.0 / precision=0.90)的操作点漂移;只允许在受控 pilot 进程里显式设置 `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1`。
 - **M3+ 音高行为复核包**:已生成 48 条本地复核页,6 类各 8 条,用于判断揉弦/滑音/颤音/装饰音/双音/不稳定音高等区域是否能安全判音准。页面已中文化并带快捷按钮,但尚未完成标签导入。
 - **M4 OMR benchmark 前置**:12 条图片谱面 + clean score pair 已齐备,Audiveris 草稿均可解析;但当前 clean score 与草稿完全同 SHA-1,属于 self-comparison,所以 OMR 准确率仍不能声明。独立 gold 校正清单已生成。
 
@@ -28,7 +28,7 @@
 
 | 轨道 | 当前状态 | 阻塞原因 | 入口 |
 |---|---|---|---|
-| M2/M3 ordinary upload candidate gate | 模型与 runtime scorer 已接线,默认关闭 | `ordinary-auto-gate-disabled-by-default`;需要负责人明确 release 开关决定 | `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1` |
+| M2/M3 ordinary upload candidate gate | 模型与 runtime scorer 已接线,默认关闭 | `ordinary-auto-gate-disabled-by-default`;保持默认关闭,先做受控 pilot 前置检查与操作点漂移排查 | `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1` 仅限受控 pilot |
 | M3+ pitch behavior modes | 48 条复核包已生成 | 缺人工标签、缺 completed CSV、每类 reviewed/scored 不足 | `data/experiments/western-strings-m3plus/pitch-mode-review-pack/index.html` |
 | M4 OMR benchmark | 数据集前置齐备,草稿可解析 | 缺独立 gold;当前 12/12 为 self-comparison | `data/experiments/western-strings-m4/independent-gold-todo.md` |
 
@@ -62,7 +62,7 @@
 
 ## 六、下一步优先级
 
-1. **负责人 release 决策**:普通上传 confidence gate 已满足当前 validation floor,但默认关闭。若要进入受控 release,需明确设置 `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1`,并重新跑项目 gate / build / 相关 route smoke;若不 release,继续保持 fail-closed。
+1. **普通上传受控 pilot 前置**:普通上传 confidence gate 已满足当前 validation floor,但默认继续关闭。若要验证,先确认特征提取与冻结 RF scorer 已接在同一 runtime 路径,并解释 pilot 53% 覆盖/93.75% precision 与 fresh validation 100% 覆盖/90% precision 的操作点差异;然后只在受控 pilot 进程中设置 `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1`,并重新跑项目 gate / build / 相关 route smoke。未完成前继续 fail-closed。
 2. **M3+ 人工复核**:打开 `data/experiments/western-strings-m3plus/pitch-mode-review-pack/index.html`,完成 48 条标签,下载 `m3plus-pitch-mode-review.completed.csv`,然后运行 `npm run western:m3plus-review-import -- --reviews <completed.csv>` 和 `npm run western:m3plus-review-status`。
 3. **M4 独立 gold**:按 `data/experiments/western-strings-m4/independent-gold-todo.md` 逐条对照原谱生成独立 gold MusicXML/MXL,更新 clean-score intake 后重跑 `npm run western:m4-omr-benchmark`。
 4. **后续扩展**:extra-note/多音和 duration 若要开放学生端硬反馈,必须补专门样本并通过独立 gate;大提琴作为 M5 独立验证,不得复用小提琴阈值。
