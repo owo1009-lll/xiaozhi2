@@ -1,66 +1,75 @@
-# 项目状态(AI 二胡教学分析原型)
+# 项目状态(西洋弦乐练习诊断主线)
 
-> 快照,非自动更新。文中"测试通过/全绿"指**该次入库实验或回归当时**的结果,除非汇报时重新运行,否则不代表此刻重跑必然全绿。
+> 快照,非自动更新。这里记录当前产品主线状态;二胡线已冻结为论文证据/困难案例,不再作为默认产品入口。每次发布判断仍以 `npm run western:project-status`、`npm run western:project-gate` 和对应子 gate 的实时输出为准。
 
-## 一、目标
-提升二胡演奏的识谱(OMR)+ 音频识别,做可靠教学诊断,并让教师标注闭环转起来产出研究数据。
+## 一、当前目标
 
-## 二、最终成品(当前可用)
-一条已验证的 **"人工锚点 → 教师结构化技巧标注 → 段级训练集导出"** 流水线(Plan C),配一套多层 teacher-ready 防御闸门,保证错配样本进不了教师后台/数据集。
+构建一个以小提琴为优先对象的西洋弓弦乐练习诊断系统:输入 clean score + 音频,在高置信片段自动给出音准 / 起音 / 漏音等基础诊断,低置信或未验证类别全部进入复核。PDF/图片谱面 OMR 已纳入路线,但必须先通过 M4 独立 gold 精度闸门,不得直接进入判断层。
 
-```
-slice-review-clips(切试听片段) → 填清单(支持页范围)
-  → build-manual-anchor-pack(生成 teacher-ready 包)
-  → 教师后台结构化标注(是否匹配 / 技巧多选 / 置信度;跨页段多页谱面)
-  → export-manual-anchor-labels(段级训练集,自动排除 mismatch / 未纳入)
-```
-首批实证:浮生(为二胡与钢琴而作)8 段全部标完——全 match、技巧标签齐全(滑音/揉弦/颤音/装饰音/换把/弓法)、置信度 4-5,导出 8 行 0 排除。随后第二号狂想曲与炫动也完成教师标注,当前三包合计导出 37 段、0 跳过 / 0 mismatch / 0 排除。
+核心原则不变:validation-first、fail-closed、人工复核回流、任何未过 gate 的能力不得对学生硬反馈。
 
-论文侧当前能直接取用的是教师结构化标注数据、实验日志、对齐/闸门失败证据和导出数据集;最终论文表格与统计口径在论文整理环节另行定稿。
+## 二、当前可用成果
 
-## 三、已完成
-- **分析核心**:Tier1(crepe fmax / banded DTW / gap penalty)、Phase0 测量基准、OMR 缓存置信度修复、休止符 rest-cap 分段。
-- **teacher-ready 闸门**(server + pack 时 .mjs + embedded 重判,三处同步,测试覆盖):scanMode 白名单、span/duration 双向比、窗口重叠、单调性(violationRate / greedyFallback)、覆盖率 / 最大间隙、manual-anchor 需显式 `manualAnchorConfirmed`,缺字段一律 fail-closed。
-- **内容对齐实验**(金标 harness B1-B3 + span 惩罚 + 失败暴露诊断):含诚实负结果(见下)。
-- **Plan C 全链路**:manual-anchor 模式、清单规范、生成器、切片工具、后台集成(含 manual-anchor readiness 豁免)、结构化字段(2a)、后台表单(2b)、导出(2c)、多页谱面、重建保留评审。
-- **首批数据**:浮生 8 段、第二号狂想曲 18 段、炫动 11 段均已标注并导出,合计 37 段。最新导出在 `data/teacher-validation/technique-labeling-export/2026-06-24T10-55-04-081Z/`。
-- **坎1 读谱清理**:store-vs-MXL 审计当前 0 个 `POLLUTED`;炫动、第二号、雪山魂塑、流浪者、古巷深处已按完整 MXL 重建,第二号残桩已从 store 删除(磁盘目录保留)。`guxiang_exac` 是 `mxl-empty` 后续清理项,不计作污染。
-- **完整谱对齐基线**:CREPE/fmax=1400 已在完整谱上重跑。炫动是干净基线(10 页谱面与锚点页码 1-10 对齐):`pageHitRate=0.364, medianAbsTimeErr=32.8s`。第二号重建后 store 为 28 页,而当前 rhapsody-2 锚点只覆盖 1-16 页,属于谱面/录音范围不匹配的 confound(`pageHitRate=0.0, medianAbsTimeErr=234.1s`不作为干净负结果)。这说明旧残谱时代的对齐数字不再作为基准,坎2 需要在谱面范围匹配的数据上评估。
+- **M2/M3 core 诊断链路**:clean score + audio 的受控上传、离线 batch、候选特征生成、人工复核、置信模型 pilot、fresh blind validation 与 runtime scorer 已接入。
+- **普通上传置信 gate**:RF threshold=0.7 的 release artifact 已冻结在 `models/western-strings/ordinary-upload-confidence-rf-v1/release.json`;fresh validation 30 条通过当前 floor(precision=0.90, coverage=1.0)。运行时默认仍关闭,只有显式设置 `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1` 才允许候选级 auto-pass。
+- **M3+ 音高行为复核包**:已生成 48 条本地复核页,6 类各 8 条,用于判断揉弦/滑音/颤音/装饰音/双音/不稳定音高等区域是否能安全判音准。页面已中文化并带快捷按钮,但尚未完成标签导入。
+- **M4 OMR benchmark 前置**:12 条图片谱面 + clean score pair 已齐备,Audiveris 草稿均可解析;但当前 clean score 与草稿完全同 SHA-1,属于 self-comparison,所以 OMR 准确率仍不能声明。独立 gold 校正清单已生成。
 
-Plan C 主线代码已合并到 `main` 并 push;当前 bake-off / 坎1-2 后续实验在 `feature/model-bakeoff-omr-align` 上继续。
+## 三、当前实时状态(2026-07-09)
 
-## 四、未完成 / 搁置(附原因)
-| 项 | 状态 | 原因 |
-|---|---|---|
-| 长录音**自动**细段对齐 | 局部可行,卡自动粗定位 | M1 细真值(炫动 11 点)证明:**给对页块时**局部 rubato 中位秒级误差 3.8s(全局 27.9s)、≤5s 占 54.5%,可达 teacher-ready 级;但这是 **oracle 上限**(人工锚点供页块),自动链路 A0 仍=全局(usable@20s 0.273),**新瓶颈是独立粗定位器**;散板段(m2)即使 oracle 仍错 35s。已从"硬墙"修正,但**尚未自动达标,不接生产** |
-| rush/tempo_ratio、n6 滑音吞音 | 文档化局限 | 投入产出比低 |
-| 扩样本 | 已达成首轮门槛:三曲 37 段已标注并导出,无空置信度 | 论文使用前需说明这些是段级技巧存在性标注 |
-| 双评 / 仲裁 | 未做(约定缓做) | 提升标签可信度,排在样本量之后 |
-| 轻量技巧判定器 | 45s 段级原型已证伪 | Basic Pitch 段级特征 + LOPO 评估显示标签近常数/信号不足;音符级判定仍依赖更可靠的细段/逐音对齐 |
+实时命令 `npm run western:project-status` 当前应显示:
 
-## 五、最关键的诚实结论
-长录音"自动"对齐的结论再次更新——从"硬墙"修正为 **"局部可行,卡自动粗定位"**,但**不等于"坎2 已解决"**。三点必须诚实区分:
-- **正结果**:M1 细真值(炫动 11 个独立音符级点)显示,**给对页范围时**,局部 rubato 对齐中位秒级误差 **3.8s**(全局 DTW 27.9s)、≤5s 占 54.5%,即**局部对齐本身可达 teacher-ready 级**。
-- **还没证明的**:M1 用人工锚点提供页块,是 **oracle 上限,不是生产能力**;端到端自动链路 A0(自动粗定位 + 局部)仍 = 全局(`usable@20s=0.273`),**自动粗定位是新瓶颈**;散板/自由段即使 oracle 仍难(开头 m2 误差 35s)。
-- **评估教训**:页级锚点指标会**低估**秒级改善(A1-LOAO 页级 0.364 vs M1 细真值 3.8s),后续坎2 评估须**页级 + 细真值秒级并行**。
+- `ordinaryUploadAutoFeedbackReady=false`
+- `m3plusAutoFeedbackReady=false`
+- `m4OmrAutoScoreReady=false`
+- `policy=fail-closed`
 
-项目据此保留自动对齐实验脚本作证据,**仍不接生产**;当前真正能产出可靠教师样本的路径仍是 **Plan C 人工锚点**。下一步是攻独立粗定位器,把 oracle 上限转成自动链路。
+主要阻塞:
 
-技巧识别的段级路线也出现明确边界:37 段、45 秒级"技巧存在性"标签在二胡狂想曲语境下高度共现,揉弦/换把为 37/37 正例,弓法 35/37,滑音 32/37。Basic Pitch 段级特征 + 留一曲评估中,高 F1 主要来自 base rate;较有区分度的装饰音反而 `AUC=0.32`、RF `F1=0.00`。因此 45 秒段级二元技巧分类不适合作为可靠自动判定任务;若要继续提升,需要 5-10 秒短窗重标或改为强度/密度标注。
+| 轨道 | 当前状态 | 阻塞原因 | 入口 |
+|---|---|---|---|
+| M2/M3 ordinary upload candidate gate | 模型与 runtime scorer 已接线,默认关闭 | `ordinary-auto-gate-disabled-by-default`;需要负责人明确 release 开关决定 | `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1` |
+| M3+ pitch behavior modes | 48 条复核包已生成 | 缺人工标签、缺 completed CSV、每类 reviewed/scored 不足 | `data/experiments/western-strings-m3plus/pitch-mode-review-pack/index.html` |
+| M4 OMR benchmark | 数据集前置齐备,草稿可解析 | 缺独立 gold;当前 12/12 为 self-comparison | `data/experiments/western-strings-m4/independent-gold-todo.md` |
 
-此外,**分离轨重测已证伪"钢琴污染是主因"**:用 SI-HSM 把二胡分离出来后重提 Basic Pitch 段级特征 + LOPO,技巧分类**没有改善**(ornament AUC 0.32→0.33,trill 0.76→0.67 反而略降)。即坎3 的瓶颈是**标签退化(45s 近常数)+ 均衡类样本/特征不足**,不是杂音;分离不接技巧管线主路,仅留 eval-only 对照。
+## 四、已完成且有验证的事项
 
-## 六、当前数据状态
-- **教师后台当前保留 `manual-anchor-fusheng`、`manual-anchor-rhapsody-2`、`manual-anchor-xuandong` 三个包;旧污染包已清理并有备份**(`data/erhu-study-records.json.bak-*`)。study store 曾清理旧 corpus 占位数据;当前教师数据以 manual-anchor pack/review JSON 为准。
-- 浮生音频已入仓库 `data/real-tests/originals/fusheng-full.mp3`(gitignored)。
-- 第二号狂想曲包 `manual-anchor-rhapsody-2`:18 段已标注。该批为整曲顺序覆盖、相邻约 5 秒重叠、部分跨 2-3 页/几十小节,适合做"该段出现哪些技巧"的存在性标注,不适合逐音级精标。
-- 炫动包 `manual-anchor-xuandong`:11 段已标注,支持跨页多页谱面定位。
-- 最新段级技巧标签导出: `data/teacher-validation/technique-labeling-export/2026-06-24T10-55-04-081Z/manual-anchor-labels.csv` 与 `.json`。导出统计:浮生 8、第二号 18、炫动 11;技巧标签计数为换把 37、揉弦 37、弓法 35、滑音 32、颤音 25、装饰音 14;置信度 5 分 18 段、4 分 14 段、3 分 4 段、1 分 1 段、空 0 段。
+- M0/M1:小提琴数据接入、clean score/MIDI/MusicXML 入口、基础 dataset adapter。
+- M2f/M3 core:真实学生式录音 core gate 已通过;当前硬反馈范围只包括 pitch / onset / missing。duration 与 extra-note/多音仍 review-only。
+- 普通上传候选复核:累计 60 条 usable/wrong 标签;初始规则不足以 release,随后训练置信模型并通过 30 条 fresh blind validation。
+- runtime scorer:普通上传候选可通过 `western:controlled-candidate-confidence-score` 打分;无 release flag 时仍 review-only。
+- M3+ pack:`npm run western:m3plus-review-pack` 可生成 48 条人工复核包;`npm run western:m3plus-review-status` 可报告标签缺口。
+- M4 handoff:`npm run western:m4-independent-gold-todo` 生成中文独立 gold 校正清单,列出 `sourceScorePath`、当前 `goldPath`、Audiveris `draftPath`、`scoreId` 与音符数。
+- 项目级 gate:`npm run western:project-gate` 仍应非零退出,防止在 ordinary/M3+/M4 任一轨未 ready 时误发布。
 
-## 七、待决 / 下一步(优先级)
-1. **攻坎2 独立粗定位器(趁热,最优先)**:做不依赖全局 DTW 页曲线的页/段定位器(输入 CREPE/Basic Pitch/score template,输出候选页块 top-k + confidence)→ 喂局部 rubato → 用 M1 细真值测端到端秒级误差。新 kill criteria:top-1+local 仍≈A0 → 粗定位失败保持 review-only;top-k oracle 能接近 M1 → 排序是瓶颈,做 reranker;自动 top-1 local 中位 <10s → 进 V2-alpha;<5s 且覆盖够 → 才考虑 teacher-ready 自动候选。并在第二首干净曲复验 M1 降噪。
-2. 决定技巧路线:接受 45s 段级负结果并作为能力边界写入论文,或投入教师工作量做 5-10s 短窗重标(pilot 先做 ornament/trill、每类 ≥50 正负且跨 ≥3 首)。
-3. 双评 / 仲裁。
-4. 继续扩曲目:古巷深处 / 雪山魂塑 / 弦歌吟等需补齐音频路径或人工锚点后再做。第四号样本已删除,不作为当前下一批。
+已复核命令:
 
-待确认:浮生第 7 段(快板 m38-82)本轮从"排除"改为 `match` 并纳入——若为教师再判则保留,若为测试误改则训练前需再抽查。
+- `npm run test:western-project-gate`
+- `npm run western:project-status`
+- `npm run western:m3plus-review-pack`
+- `npm run western:m3plus-review-status`
+- `npm run western:m4-independent-gold-todo`
+
+## 五、二胡线当前定位
+
+二胡项目不再作为当前产品入口。保留内容仅限:
+
+- 论文证据和能力边界材料;
+- manual-anchor 教师标注数据;
+- 西洋弦乐主线仍依赖的共享模块、脚本、数据结构。
+
+不要把二胡长曲自动对齐、二胡技巧分类或二胡 teacher pack 当作当前西洋弦乐 release 证据。
+
+## 六、下一步优先级
+
+1. **负责人 release 决策**:普通上传 confidence gate 已满足当前 validation floor,但默认关闭。若要进入受控 release,需明确设置 `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1`,并重新跑项目 gate / build / 相关 route smoke;若不 release,继续保持 fail-closed。
+2. **M3+ 人工复核**:打开 `data/experiments/western-strings-m3plus/pitch-mode-review-pack/index.html`,完成 48 条标签,下载 `m3plus-pitch-mode-review.completed.csv`,然后运行 `npm run western:m3plus-review-import -- --reviews <completed.csv>` 和 `npm run western:m3plus-review-status`。
+3. **M4 独立 gold**:按 `data/experiments/western-strings-m4/independent-gold-todo.md` 逐条对照原谱生成独立 gold MusicXML/MXL,更新 clean-score intake 后重跑 `npm run western:m4-omr-benchmark`。
+4. **后续扩展**:extra-note/多音和 duration 若要开放学生端硬反馈,必须补专门样本并通过独立 gate;大提琴作为 M5 独立验证,不得复用小提琴阈值。
+
+## 七、当前不可声称
+
+- 不可声称任意普通上传音频已经默认实时自动诊断;默认仍 fail-closed。
+- 不可声称 M3+ 技法区音准已达标;目前只是复核包准备好。
+- 不可声称 OMR 准确率已通过;当前 benchmark 仍是 self-comparison,usable rows 为 0。
+- 不可声称支持大提琴;架构预留,但未独立 M0/M5 验证。
