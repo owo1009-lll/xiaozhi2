@@ -32,6 +32,16 @@ function hasReason(action, reason) {
 function commandForAction(action) {
   const track = action?.track || "";
   if (track === "M2/M3 ordinary upload candidate gate") {
+    if (hasReason(action, "ordinary-confidence-threshold-pool-precision-too-low")) {
+      return [
+        "Keep production/default runtime fail-closed.",
+        "Inspect data/experiments/western-strings-m3/confidence-threshold-pool-review/confidence-threshold-pool-eval.json and confidence-threshold-pool-eval-rows.csv.",
+        "Do not enable WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE for students; the stratified threshold-pool precision is below the release floor.",
+        "Recalibrate the confidence model/features or collect stronger candidate evidence before another monitored pilot attempt.",
+        "After any recalibration, rerun npm run western:controlled-candidate-confidence-pilot",
+        "Then generate a new blind/stratified review pack and rerun npm run western:project-status",
+      ];
+    }
     if (hasReason(action, "ordinary-auto-gate-disabled-by-default")) {
       return [
         "Keep production/default runtime fail-closed.",

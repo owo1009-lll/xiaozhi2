@@ -32,6 +32,14 @@ DEFAULT_VALIDATION_EVAL = (
     / "confidence-validation-review"
     / "confidence-validation-eval.json"
 )
+DEFAULT_THRESHOLD_POOL_EVAL = (
+    REPO
+    / "data"
+    / "experiments"
+    / "western-strings-m3"
+    / "confidence-threshold-pool-review"
+    / "confidence-threshold-pool-eval.json"
+)
 DEFAULT_OUT = (
     REPO
     / "data"
@@ -106,6 +114,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
     pilot_rows = read_csv(repo_path(args.pilot_predictions))
     selection = read_json(repo_path(args.validation_selection))
     validation = read_json(repo_path(args.validation_eval))
+    threshold_pool_eval = read_json(repo_path(args.threshold_pool_eval))
     validation_eval_rows = read_csv(
         repo_path(validation.get("rowsOut") or DEFAULT_VALIDATION_EVAL.with_name("confidence-validation-eval-rows.csv"))
     )
@@ -117,6 +126,34 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
     validation_rows = summarize_reviewed_predictions(validation_eval_rows, threshold)
     validation_counts = validation.get("counts") or {}
     validation_metrics = validation.get("metrics") or {}
+    threshold_pool_counts = threshold_pool_eval.get("counts") or {}
+    threshold_pool_metrics = threshold_pool_eval.get("metrics") or {}
+    blocking_reasons = ["ordinary-auto-gate-disabled-by-default"]
+    if threshold_pool_eval:
+        if not threshold_pool_eval.get("blindValidationPassed"):
+            if "confidence-validation-precision-too-low" in (threshold_pool_eval.get("blockingReasons") or []):
+                blocking_reasons.append("ordinary-confidence-threshold-pool-precision-too-low")
+            else:
+                blocking_reasons.append("ordinary-confidence-threshold-pool-not-ready")
+    else:
+        blocking_reasons.append("ordinary-confidence-full-threshold-pool-precision-unmeasured")
+
+    if threshold_pool_eval and not threshold_pool_eval.get("blindValidationPassed"):
+        recommended_next_step = (
+            "Keep the default fail-closed. The stratified threshold-pool review failed the precision floor; "
+            "recalibrate the confidence model/features or collect stronger evidence before any monitored pilot."
+        )
+    elif threshold_pool_eval and threshold_pool_eval.get("blindValidationPassed"):
+        recommended_next_step = (
+            "Threshold-pool precision passed. Keep default fail-closed until a separate monitored pilot plan "
+            "sets WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 in that process only."
+        )
+    else:
+        recommended_next_step = (
+            "Keep the default fail-closed. For a monitored pilot, review a stratified sample from the full "
+            "threshold pool (including around-threshold and below-threshold rows) before enabling the gate for students."
+        )
+
     report = {
         "ok": True,
         "threshold": threshold,
@@ -124,6 +161,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             "pilotPredictions": repo_relative(repo_path(args.pilot_predictions)),
             "validationSelection": repo_relative(repo_path(args.validation_selection)),
             "validationEval": repo_relative(repo_path(args.validation_eval)),
+            "thresholdPoolEval": repo_relative(repo_path(args.threshold_pool_eval)),
         },
         "pilotOutOfFold": pilot,
         "validationExport": {
@@ -144,19 +182,25 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             "precision": validation_metrics.get("precision"),
             "coverageWithinReviewedSample": validation_metrics.get("coverage"),
         },
+        "thresholdPoolReviewedSample": {
+            "sourceExists": bool(threshold_pool_eval),
+            "blindValidationPassed": bool(threshold_pool_eval.get("blindValidationPassed")),
+            "blockingReasons": threshold_pool_eval.get("blockingReasons") or [],
+            "rowCount": int(threshold_pool_counts.get("reviewedRows") or 0),
+            "scoredRows": int(threshold_pool_counts.get("scoredRows") or 0),
+            "selectedRows": int(threshold_pool_counts.get("selectedRows") or 0),
+            "selectedUsableRows": int(threshold_pool_counts.get("selectedUsableRows") or 0),
+            "selectedWrongRows": int(threshold_pool_counts.get("selectedWrongRows") or 0),
+            "precision": threshold_pool_metrics.get("precision"),
+            "coverageWithinReviewedSample": threshold_pool_metrics.get("coverage"),
+        },
         "releaseReadiness": {
             "runtimeScorerWired": True,
             "defaultEnabled": False,
             "readyForDefaultEnable": False,
-            "blockingReasons": [
-                "ordinary-auto-gate-disabled-by-default",
-                "ordinary-confidence-full-threshold-pool-precision-unmeasured",
-            ],
+            "blockingReasons": blocking_reasons,
         },
-        "recommendedNextStep": (
-            "Keep the default fail-closed. For a monitored pilot, review a stratified sample from the full "
-            "threshold pool (including around-threshold and below-threshold rows) before enabling the gate for students."
-        ),
+        "recommendedNextStep": recommended_next_step,
     }
     return report
 
@@ -166,6 +210,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pilot-predictions", default=str(DEFAULT_PILOT_PREDICTIONS))
     parser.add_argument("--validation-selection", default=str(DEFAULT_VALIDATION_SELECTION))
     parser.add_argument("--validation-eval", default=str(DEFAULT_VALIDATION_EVAL))
+    parser.add_argument("--threshold-pool-eval", default=str(DEFAULT_THRESHOLD_POOL_EVAL))
     parser.add_argument("--threshold", type=float, default=0.7)
     parser.add_argument("--out", default=str(DEFAULT_OUT))
     return parser.parse_args()
@@ -184,6 +229,7 @@ def main() -> None:
         "pilotCoverage": report["pilotOutOfFold"]["coverageWithinRows"],
         "thresholdPoolCoverage": report["validationExport"]["thresholdPoolCoverage"],
         "validationPrecision": report["validationReviewedSample"]["precision"],
+        "thresholdPoolPrecision": report["thresholdPoolReviewedSample"]["precision"],
         "readyForDefaultEnable": report["releaseReadiness"]["readyForDefaultEnable"],
         "blockingReasons": report["releaseReadiness"]["blockingReasons"],
     }, ensure_ascii=False, indent=2))

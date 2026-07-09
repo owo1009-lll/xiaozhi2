@@ -11,7 +11,7 @@
 ## 二、当前可用成果
 
 - **M2/M3 core 诊断链路**:clean score + audio 的受控上传、离线 batch、候选特征生成、人工复核、置信模型 pilot、fresh blind validation 与 runtime scorer 已接入。
-- **普通上传置信 gate**:RF threshold=0.7 的 release artifact 已冻结在 `models/western-strings/ordinary-upload-confidence-rf-v1/release.json`;fresh validation 30 条通过当前 floor(precision=0.90)。运行时默认仍关闭,保持当前安全态。runtime smoke 已证明受控进程显式设置 `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1` 时会调用冻结 RF scorer并写出 confidence probability;release audit 也已解释 coverage 差异:validation batch 是从阈值以上候选预筛后抽样,其 1.0 coverage 不等同于全量普通上传候选覆盖率。完整阈值池 precision 仍未测;60 行分层复核包已生成在 `data/experiments/western-strings-m3/confidence-threshold-pool-review/index.html`,复核并运行 `npm run western:controlled-candidate-confidence-stratified-eval` 前只允许在受控 pilot 进程里显式开启。
+- **普通上传置信 gate**:RF threshold=0.7 的 release artifact 已冻结在 `models/western-strings/ordinary-upload-confidence-rf-v1/release.json`;fresh validation 30 条通过当前 floor(precision=0.90),但完整阈值池 60 条分层复核已失败:threshold-pool selected precision=0.5556(20 usable / 16 wrong),低于 0.90 release floor。运行时默认仍关闭,保持当前安全态。runtime smoke 已证明受控进程显式设置 `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1` 时会调用冻结 RF scorer并写出 confidence probability,但当前结果禁止进入受控 pilot;下一步是重校准 confidence 模型/特征或收集更强证据。
 - **M3+ 音高行为复核包**:48 条本地复核页已完成并导入,6 类各 8 条,用于判断揉弦/滑音/颤音/装饰音/双音/不稳定音高等区域是否能安全判音准。标签状态已满足 offline mode-eval 门槛:48 reviewed / 43 scored,每类 reviewed/scored 缺口均为 0。离线 per-mode 评估已运行:只有 `stable` control 模式证据通过;非 control 的 pitch-behavior 模式没有任何 release-ready 项,因此**学生端 M3+ 自动反馈仍保持关闭**。
 - **M4 OMR benchmark 前置**:12 条图片谱面 + clean score pair 已齐备,Audiveris 草稿均可解析;但当前 clean score 与草稿完全同 SHA-1,属于 self-comparison,所以 OMR 准确率仍不能声明。独立 gold 校正清单已生成。
 
@@ -28,7 +28,7 @@
 
 | 轨道 | 当前状态 | 阻塞原因 | 入口 |
 |---|---|---|---|
-| M2/M3 ordinary upload candidate gate | 模型与 runtime scorer 已接线,默认关闭;runtime smoke 已覆盖;60 行 threshold-pool 分层复核包已生成 | `ordinary-auto-gate-disabled-by-default`,`ordinary-confidence-full-threshold-pool-precision-unmeasured`;保持默认关闭,先复核 `confidence-threshold-pool-review/index.html` 并跑 stratified eval | `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1` 仅限受控 pilot |
+| M2/M3 ordinary upload candidate gate | 模型与 runtime scorer 已接线,默认关闭;runtime smoke 已覆盖;threshold-pool 分层复核已完成但 precision=0.5556 不达标 | `ordinary-auto-gate-disabled-by-default`,`ordinary-confidence-threshold-pool-precision-too-low`;保持默认关闭,改做模型/特征重校准 | `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1` 不得用于学生端 |
 | M3+ pitch behavior modes | 48 条复核已导入并完成 per-mode eval | `m3plus-no-mode-specific-release-ready`;stable 仅为 control,非 control 模式继续 review-only | `data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-pitch-mode-eval.json` |
 | M4 OMR benchmark | 数据集前置齐备,草稿可解析 | 缺独立 gold;当前 12/12 为 self-comparison | `data/experiments/western-strings-m4/independent-gold-todo.md` |
 
@@ -62,7 +62,7 @@
 
 ## 六、下一步优先级
 
-1. **普通上传受控 pilot 前置**:普通上传 confidence gate 已满足当前 validation precision floor,且 runtime scorer 接线 smoke 已过,但默认继续关闭。release audit 显示 pilot 53% 覆盖与 fresh validation 100% 覆盖不可直接比较:后者是阈值以上候选预筛后的 30 条抽样,完整阈值池 precision 仍未测。60 行 threshold-pool 分层复核包已生成:打开 `data/experiments/western-strings-m3/confidence-threshold-pool-review/index.html`,复核后保存 completed CSV 并运行 `npm run western:controlled-candidate-confidence-stratified-eval`。通过前继续 fail-closed;通过后才可只在受控进程中设置 `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1`,并重新跑项目 gate / build / route smoke。
+1. **普通上传 confidence 重校准**:普通上传 confidence gate 的 30 条预筛 validation 通过,但完整阈值池分层复核失败(selected precision=0.5556,coverage=0.6102)。当前 release candidate 不能进入受控 pilot。下一步先检查 `data/experiments/western-strings-m3/confidence-threshold-pool-review/confidence-threshold-pool-eval-rows.csv`,分析 high / above-threshold 中的 wrong 样本,再重校准特征或模型;完成前继续 fail-closed。
 2. **M3+ 数据补强或保持 review-only**:当前 per-mode eval 显示 stable control 通过,但 slide/trill/ornament/double-stop/variable-f0 等非 control 模式没有 release-ready 证据。若要继续减少复核,需要补更多真实对应模式样本后重跑 `npm run western:m3plus-mode-eval`;否则保持 M3+ 全部 `review_required`。
 3. **M4 独立 gold**:按 `data/experiments/western-strings-m4/independent-gold-todo.md` 逐条对照原谱生成独立 gold MusicXML/MXL,更新 clean-score intake 后重跑 `npm run western:m4-omr-benchmark`。
 4. **后续扩展**:extra-note/多音和 duration 若要开放学生端硬反馈,必须补专门样本并通过独立 gate;大提琴作为 M5 独立验证,不得复用小提琴阈值。

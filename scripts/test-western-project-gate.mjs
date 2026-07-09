@@ -42,7 +42,13 @@ if (controlled.confidencePilot?.validationEval?.blindValidationPassed) {
 assert(controlled.confidencePilot?.bestReleaseCandidate, "confidence pilot should report the best release candidate");
 assert.equal(controlled.confidencePilot.bestReleaseCandidate.featureSet, "deployable", "confidence pilot should report the deployable candidate");
 assert.equal(controlled.confidencePilot.bestReleaseCandidate.groupBy, "recordingId", "confidence pilot should report the strict leave-one-recording candidate");
-assert(status.nextActions[0]?.action.includes("confidence-threshold-pool-review/index.html") || status.nextActions[0]?.action.includes("wire a runtime gate") || status.nextActions[0]?.action.includes("runtime gate is wired"), "project next action should route to threshold-pool review, runtime wiring, or explicit release-flag gating");
+assert(
+  status.nextActions[0]?.action.includes("confidence-threshold-pool-review/index.html")
+  || status.nextActions[0]?.action.includes("threshold-pool review failed")
+  || status.nextActions[0]?.action.includes("wire a runtime gate")
+  || status.nextActions[0]?.action.includes("runtime gate is wired"),
+  "project next action should route to threshold-pool review, recalibration, runtime wiring, or explicit release-flag gating",
+);
 assert.equal(status.nextActions[0]?.artifact, "data/experiments/western-strings-m3/confidence-threshold-pool-review/index.html", "project artifact should point to the threshold-pool review page");
 
 const m4 = status.tracks.m4Omr;

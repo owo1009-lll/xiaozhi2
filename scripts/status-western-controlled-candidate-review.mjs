@@ -159,6 +159,10 @@ export function summarizeControlledCandidateConfidencePilot(
       pilotCoverage: releaseAudit?.pilotOutOfFold?.coverageWithinRows ?? null,
       thresholdPoolCoverage: releaseAudit?.validationExport?.thresholdPoolCoverage ?? null,
       validationPrecision: releaseAudit?.validationReviewedSample?.precision ?? null,
+      thresholdPoolPrecision: releaseAudit?.thresholdPoolReviewedSample?.precision ?? null,
+      thresholdPoolReviewedRows: releaseAudit?.thresholdPoolReviewedSample?.rowCount ?? null,
+      thresholdPoolSelectedRows: releaseAudit?.thresholdPoolReviewedSample?.selectedRows ?? null,
+      thresholdPoolPassed: releaseAudit?.thresholdPoolReviewedSample?.blindValidationPassed === true,
       readyForDefaultEnable: releaseAudit?.releaseReadiness?.readyForDefaultEnable === true,
       blockingReasons: releaseAudit?.releaseReadiness?.blockingReasons || [],
       caveat: releaseAudit?.validationExport?.importantCaveat || "",
@@ -176,10 +180,11 @@ export function attachConfidencePilotStatus(status, confidencePilot) {
   }
   const validationPassed = Boolean(confidencePilot.validationEval?.blindValidationPassed);
   const runtimeGateWired = Boolean(confidencePilot.runtimeGateWired);
+  const releaseAuditNextStep = confidencePilot.releaseAudit?.recommendedNextStep || "";
   const nextActions = [
     validationPassed
       ? (runtimeGateWired
-        ? `Confidence runtime gate is wired but disabled by default. Runtime scoring smoke is covered; release audit shows the fresh validation batch was prefiltered above threshold, so full threshold-pool precision remains unmeasured. Review ${DEFAULT_CONFIDENCE_THRESHOLD_POOL_REVIEW_PAGE.replace(/\\/g, "/")} and run western:controlled-candidate-confidence-stratified-eval before any monitored pilot.`
+        ? (releaseAuditNextStep || `Confidence runtime gate is wired but disabled by default. Runtime scoring smoke is covered; review ${DEFAULT_CONFIDENCE_THRESHOLD_POOL_REVIEW_PAGE.replace(/\\/g, "/")} and run western:controlled-candidate-confidence-stratified-eval before any monitored pilot.`)
         : "Confidence blind validation passed. Review metrics and wire a runtime gate in a separate release phase; current runtime remains fail-closed.")
       : `Confidence pilot found release candidates; review ${DEFAULT_CONFIDENCE_VALIDATION_REVIEW_PAGE.replace(/\\/g, "/")} and run western:controlled-candidate-confidence-validation-eval before changing the runtime gate.`,
   ];
