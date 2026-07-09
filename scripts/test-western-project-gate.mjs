@@ -74,7 +74,8 @@ assert(
   || status.nextActions[0]?.action.includes("context-feature confidence recalibration pack")
   || status.nextActions[0]?.action.includes("improve candidate/pitch-support evidence")
   || status.nextActions[0]?.action.includes("wire a runtime gate")
-  || status.nextActions[0]?.action.includes("runtime gate is wired"),
+  || status.nextActions[0]?.action.includes("runtime gate is wired")
+  || status.nextActions[0]?.action.includes("ordinary-monitored-pilot-audit"),
   "project next action should route to threshold-pool review, recalibration, runtime wiring, pitch-support improvement, or explicit release-flag gating",
 );
 const expectedOrdinaryArtifact = status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-recalibration-context-validation-needed")

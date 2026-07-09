@@ -109,6 +109,7 @@
 入口:
 
 - evidence: `data/experiments/western-strings-m3/confidence-validation-review/ordinary-confidence-release-audit.json`
+- audit: `npm run western:ordinary-monitored-pilot-audit`
 - plan: `npm run western:ordinary-monitored-pilot-plan`
 - smoke: `npm run western:ordinary-monitored-pilot-smoke`
 - auto-pass precision precheck: `npm run western:ordinary-auto-pass-precision-review-pack`
@@ -122,6 +123,7 @@
 - 自检先复用历史已知标签:3 条均为 `knownUsableAutoPassCandidateCount`,0 条已知错误,0 条未知待复核。
 - 当前不生成教师复核包,不再要求教师复核这批候选。只有出现 unknown auto-pass rows 或 known-wrong rows 时,才进入人工复核。
 - `npm run western:ordinary-monitored-pilot-plan` 现在把该 precision precheck 作为硬闸门:缺预检、预检失败、已知错误或未知待复核均会 fail-closed。
+- `npm run western:ordinary-monitored-pilot-audit` 已把真实受控队列 precision precheck、临时 release-flag smoke 与 pilot plan 串成一个总控检查。2026-07-10 实测 `readyForMonitoredPilot=true`,`teacherReviewNeeded=false`,默认学生端仍保持关闭。
 
 要求:
 

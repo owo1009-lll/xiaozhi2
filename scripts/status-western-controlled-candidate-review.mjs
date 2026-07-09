@@ -187,10 +187,14 @@ export function attachConfidencePilotStatus(status, confidencePilot) {
   const validationPassed = Boolean(confidencePilot.validationEval?.blindValidationPassed);
   const runtimeGateWired = Boolean(confidencePilot.runtimeGateWired);
   const releaseAuditNextStep = confidencePilot.releaseAudit?.recommendedNextStep || "";
+  const releaseAuditBlockingReasons = confidencePilot.releaseAudit?.blockingReasons || [];
+  const monitoredPilotNextStep = releaseAuditBlockingReasons.includes("ordinary-auto-gate-disabled-by-default")
+    ? "Run `npm run western:ordinary-monitored-pilot-audit`; it performs the real-submission precision precheck, temporary release-flag smoke, and pilot plan in one command. Keep the default runtime fail-closed; only unknown auto-pass rows require teacher review."
+    : releaseAuditNextStep;
   const nextActions = [
     validationPassed
       ? (runtimeGateWired
-        ? (releaseAuditNextStep || `Confidence runtime gate is wired but disabled by default. Runtime scoring smoke is covered; review ${DEFAULT_CONFIDENCE_THRESHOLD_POOL_REVIEW_PAGE.replace(/\\/g, "/")} and run western:controlled-candidate-confidence-stratified-eval before any monitored pilot.`)
+        ? (monitoredPilotNextStep || `Confidence runtime gate is wired but disabled by default. Runtime scoring smoke is covered; review ${DEFAULT_CONFIDENCE_THRESHOLD_POOL_REVIEW_PAGE.replace(/\\/g, "/")} and run western:controlled-candidate-confidence-stratified-eval before any monitored pilot.`)
         : "Confidence blind validation passed. Review metrics and wire a runtime gate in a separate release phase; current runtime remains fail-closed.")
       : `Confidence pilot found release candidates; review ${DEFAULT_CONFIDENCE_VALIDATION_REVIEW_PAGE.replace(/\\/g, "/")} and run western:controlled-candidate-confidence-validation-eval before changing the runtime gate.`,
   ];

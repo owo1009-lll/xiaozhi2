@@ -574,6 +574,20 @@ function renderMarkdown(summary) {
 }
 
 export async function runOrdinaryMonitoredPilotReviewPack(args = {}) {
+  args = {
+    batchLimit: 1,
+    analysisLimit: 60,
+    reviewLimit: 12,
+    minConfidence: 0.95,
+    minVoicedFrames: 2,
+    requirePitchSupport: false,
+    knownLabels: DEFAULT_KNOWN_LABELS,
+    outDir: DEFAULT_OUT_DIR,
+    selectionJson: DEFAULT_SELECTION,
+    summary: DEFAULT_SUMMARY,
+    keepTemp: false,
+    ...args,
+  };
   const realRepoRoot = process.cwd();
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "western-ordinary-real-pilot-"));
   const statusBefore = await buildProjectStatus();
