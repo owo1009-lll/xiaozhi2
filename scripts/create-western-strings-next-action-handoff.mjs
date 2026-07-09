@@ -205,12 +205,31 @@ function commandForAction(action) {
   }
   if (track === "Controlled pilot decision") {
     return [
-      "Open data/experiments/western-strings-release-review.md.",
+      "Run npm run western:controlled-pilot-decision.",
+      "Open data/experiments/western-strings-controlled-pilot-decision.md.",
+      "Do not ask for more teacher/professional review unless the decision packet reports unknown or unsafe auto-pass rows.",
       "Confirm the pilot scope in writing before starting any runtime process: ordinary candidate-evidence auto_pass only, plus the documented M3+ safe subset if needed.",
       "Keep production/default runtime fail-closed.",
       "Do not commit WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 or enable it globally.",
       "If a pilot is approved, start it as a separate monitored process and rerun npm run western:release-review after any code or runtime wiring change.",
       "If no pilot is approved, stop here; the system has completed machine self-tests and remains safely review-only by default.",
+    ];
+  }
+  if (track === "Controlled pilot approval") {
+    return [
+      "Open data/experiments/western-strings-controlled-pilot-decision.md.",
+      "No teacher/professional review is needed at this step; the machine checks are already complete.",
+      "Either create data/experiments/western-strings-controlled-pilot-approval.json with explicit owner approval, or stop safely in review-only mode.",
+      "Keep production/default runtime fail-closed.",
+      "Do not commit WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 or enable it globally.",
+    ];
+  }
+  if (track === "Start monitored pilot") {
+    return [
+      "Open data/experiments/western-strings-controlled-pilot-decision.md.",
+      "Start only the approved separate monitored pilot process.",
+      "Keep production/default runtime fail-closed.",
+      "After pilot wiring, rerun npm run western:release-review, npm run western:controlled-pilot-decision, npm run test:western-project-gate, and npm run build.",
     ];
   }
   return ["Run npm run western:project-status after completing this item"];

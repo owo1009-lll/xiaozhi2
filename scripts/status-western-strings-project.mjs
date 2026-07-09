@@ -349,6 +349,16 @@ const RELEASE_REVIEW_MD = path.join(
   "experiments",
   "western-strings-release-review.md",
 );
+const CONTROLLED_PILOT_DECISION = path.join(
+  "data",
+  "experiments",
+  "western-strings-controlled-pilot-decision.json",
+);
+const CONTROLLED_PILOT_DECISION_MD = path.join(
+  "data",
+  "experiments",
+  "western-strings-controlled-pilot-decision.md",
+);
 
 function parseArgs(argv) {
   const args = {
@@ -890,7 +900,7 @@ async function buildM4OmrStatus() {
   };
 }
 
-function summarizeNextActions(controlled, m3plus, m4Omr, releaseReview) {
+function summarizeNextActions(controlled, m3plus, m4Omr, releaseReview, controlledPilotDecision) {
   const actions = [];
   const ordinaryBlockers = controlled.blockingReasons || [];
   const ordinaryPilotAudit = controlled.confidencePilot?.monitoredPilotAudit || {};
@@ -980,13 +990,31 @@ function summarizeNextActions(controlled, m3plus, m4Omr, releaseReview) {
     if (releaseReview?.readyForControlledPilot === true
       && releaseReview?.teacherReviewNeeded !== true
       && releaseReview?.runtimeFailClosed === true) {
-      actions.push({
-        priority: 1,
-        track: "Controlled pilot decision",
-        action: "Release review passed for a separate monitored pilot. Decide the pilot scope/process explicitly; keep default student runtime fail-closed unless that separate pilot is started.",
-        artifact: RELEASE_REVIEW_MD.replace(/\\/g, "/"),
-        reason: ["default-runtime-fail-closed"],
-      });
+      if (!controlledPilotDecision) {
+        actions.push({
+          priority: 1,
+          track: "Controlled pilot decision",
+          action: "Release review passed. Run `npm run western:controlled-pilot-decision` to produce the explicit machine-tested decision packet before asking for any more human/teacher review.",
+          artifact: CONTROLLED_PILOT_DECISION_MD.replace(/\\/g, "/"),
+          reason: ["decision-packet-missing", "default-runtime-fail-closed"],
+        });
+      } else if (controlledPilotDecision.readyToStartControlledPilot === true) {
+        actions.push({
+          priority: 1,
+          track: "Start monitored pilot",
+          action: "Controlled-pilot approval is present and machine checks are green. Start only the separate monitored pilot process described in the decision packet; keep default student runtime fail-closed.",
+          artifact: CONTROLLED_PILOT_DECISION_MD.replace(/\\/g, "/"),
+          reason: ["approved-monitored-pilot-only"],
+        });
+      } else {
+        actions.push({
+          priority: 1,
+          track: "Controlled pilot approval",
+          action: "Machine self-tests are complete and no teacher review is needed now. The only remaining action is product-owner approval of the separate monitored pilot, or stop safely in review-only mode.",
+          artifact: CONTROLLED_PILOT_DECISION_MD.replace(/\\/g, "/"),
+          reason: controlledPilotDecision.blockingReasons || ["controlled-pilot-approval-missing"],
+        });
+      }
     } else {
       actions.push({
         priority: 1,
@@ -1001,11 +1029,12 @@ function summarizeNextActions(controlled, m3plus, m4Omr, releaseReview) {
 }
 
 export async function buildProjectStatus() {
-  const [controlledCandidate, m3plusPitchModes, m4Omr, releaseReview] = await Promise.all([
+  const [controlledCandidate, m3plusPitchModes, m4Omr, releaseReview, controlledPilotDecision] = await Promise.all([
     buildControlledStatus(),
     buildM3PlusStatus(),
     buildM4OmrStatus(),
     readJson(RELEASE_REVIEW),
+    readJson(CONTROLLED_PILOT_DECISION),
   ]);
   return {
     ok: true,
@@ -1036,12 +1065,28 @@ export async function buildProjectStatus() {
           summary: RELEASE_REVIEW_MD.replace(/\\/g, "/"),
           missing: true,
         },
+    controlledPilotDecision: controlledPilotDecision
+      ? {
+          source: CONTROLLED_PILOT_DECISION.replace(/\\/g, "/"),
+          summary: CONTROLLED_PILOT_DECISION_MD.replace(/\\/g, "/"),
+          readyForControlledPilotDecision: controlledPilotDecision.readyForControlledPilotDecision === true,
+          readyToStartControlledPilot: controlledPilotDecision.readyToStartControlledPilot === true,
+          approvalRequired: controlledPilotDecision.approvalRequired === true,
+          approvalPresent: controlledPilotDecision.approvalPresent === true,
+          runtimeFailClosed: controlledPilotDecision.runtimeFailClosed === true,
+          blockingReasons: controlledPilotDecision.blockingReasons || [],
+        }
+      : {
+          source: CONTROLLED_PILOT_DECISION.replace(/\\/g, "/"),
+          summary: CONTROLLED_PILOT_DECISION_MD.replace(/\\/g, "/"),
+          missing: true,
+        },
     tracks: {
       controlledCandidate,
       m3plusPitchModes,
       m4Omr,
     },
-    nextActions: summarizeNextActions(controlledCandidate, m3plusPitchModes, m4Omr, releaseReview),
+    nextActions: summarizeNextActions(controlledCandidate, m3plusPitchModes, m4Omr, releaseReview, controlledPilotDecision),
   };
 }
 

@@ -102,25 +102,34 @@
 
 ## 4. 当前唯一下一步
 
-### P1: 受控 pilot 决策
+### P1: 受控 pilot 批准
 
-发布前汇总审查已经可以由机器完成:
+发布前汇总审查和 pilot 决策包都已经可以由机器完成:
 
 ```bash
 npm run western:release-review
+npm run western:controlled-pilot-decision
 ```
 
-它会串联:
+`western:release-review` 会串联:
 
 - `western:ordinary-monitored-pilot-audit`
 - `western:m3plus-monitored-pilot-audit`
 - `western:m4-preflight`
 - `western:project-status`
 
+`western:controlled-pilot-decision` 会把机器证据转成明确决策包:
+
+- 不再默认要求教师/专业人员复核。
+- 只有机器预检发现 unknown auto-pass 或 unsafe auto-pass 时,才进入定向人工复核。
+- 没有负责人显式批准时,系统保持 review-only / fail-closed。
+
 产物:
 
 - `data/experiments/western-strings-release-review.json`
 - `data/experiments/western-strings-release-review.md`
+- `data/experiments/western-strings-controlled-pilot-decision.json`
+- `data/experiments/western-strings-controlled-pilot-decision.md`
 
 当前实测:
 
@@ -128,8 +137,11 @@ npm run western:release-review
 - `readyForDefaultStudentRelease=false`
 - `teacherReviewNeeded=false`
 - `runtimeFailClosed=true`
+- `readyForControlledPilotDecision=true`
+- `readyToStartControlledPilot=false`
+- `approvalPresent=false`
 
-这表示:证据足够讨论单独受控 pilot, 但默认学生端仍保持关闭。下一步不是继续复核, 也不是默认上线;而是决定是否启动一个单独受控进程。如果不启动 pilot,项目应停在安全 review-only 默认态。
+这表示:机器自测已经完成, 目前不需要继续找教师复核。下一步只剩产品负责人是否批准一个单独受控 pilot;默认学生端仍保持关闭。如果不批准 pilot, 项目应停在安全 review-only 默认态。
 
 ## 5. 当前不可声称
 

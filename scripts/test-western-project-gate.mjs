@@ -83,9 +83,10 @@ const m3plusPilotAuditPassed = m3plus.monitoredPilotAudit?.readyForMonitoredPilo
   && m3plus.monitoredPilotAudit?.teacherReviewNeeded === false
   && m3plus.monitoredPilotAudit?.defaultM3PlusReadyAfter === false;
 if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
-  assert.equal(
-    status.nextActions[0]?.track,
-    status.releaseReview?.readyForControlledPilot ? "Controlled pilot decision" : "Release review",
+  assert(
+    status.releaseReview?.readyForControlledPilot
+      ? ["Controlled pilot decision", "Controlled pilot approval", "Start monitored pilot"].includes(status.nextActions[0]?.track)
+      : status.nextActions[0]?.track === "Release review",
     "after ordinary, M3+, and M4 machine checks pass, handoff should move to release review or controlled pilot decision while runtime stays fail-closed",
   );
 } else if (ordinaryPilotAuditPassed) {
@@ -123,9 +124,11 @@ const expectedOrdinaryArtifact = status.tracks.controlledCandidate.blockingReaso
   ? "data/experiments/western-strings-m3/confidence-threshold-pool-review/confidence-threshold-pool-diagnosis.json"
   : "data/experiments/western-strings-m3/confidence-validation-review/ordinary-confidence-release-audit.json";
 if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
-  assert.equal(
-    status.nextActions[0]?.artifact,
-    "data/experiments/western-strings-release-review.md",
+  assert(
+    [
+      "data/experiments/western-strings-release-review.md",
+      "data/experiments/western-strings-controlled-pilot-decision.md",
+    ].includes(status.nextActions[0]?.artifact),
     "after ordinary, M3+, and M4 checks pass, handoff artifact should point to the release-review report",
   );
 } else if (ordinaryPilotAuditPassed) {
@@ -196,9 +199,10 @@ assert.equal(
   "M4 handoff should expose the visual independent-gold checklist",
 );
 if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
-  assert.equal(
-    status.nextActions[0]?.track,
-    status.releaseReview?.readyForControlledPilot ? "Controlled pilot decision" : "Release review",
+  assert(
+    status.releaseReview?.readyForControlledPilot
+      ? ["Controlled pilot decision", "Controlled pilot approval", "Start monitored pilot"].includes(status.nextActions[0]?.track)
+      : status.nextActions[0]?.track === "Release review",
     "M4 should no longer produce a human-task next action after clean-score approval is recognized",
   );
 }
@@ -219,6 +223,10 @@ assert(
 assert(
   packageJson.scripts?.["western:release-review"],
   "package.json must expose the aggregate release-review command",
+);
+assert(
+  packageJson.scripts?.["western:controlled-pilot-decision"],
+  "package.json must expose the controlled-pilot decision command",
 );
 for (const [label, text] of [["review policy", reviewPolicy]]) {
   assert(
@@ -244,7 +252,10 @@ if (m4.m4OmrDraftQualityReady) {
     "current handoff must not keep stale M4 score-editor instructions after M4 clears",
   );
   assert(
-    handoff.includes("npm run western:release-review") || handoff.includes("Controlled pilot decision"),
+    handoff.includes("npm run western:release-review")
+      || handoff.includes("npm run western:controlled-pilot-decision")
+      || handoff.includes("Controlled pilot approval")
+      || handoff.includes("Start monitored pilot"),
     "handoff must route through release-review or the controlled-pilot decision after M4 clears",
   );
 } else {

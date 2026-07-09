@@ -321,6 +321,14 @@ OMR 只解决"谱面从哪来",不改变音频诊断逻辑。未过 note-level �
 ## 12. 一句话路线
 
 **小提琴优先,clean score 输入,先把 note-level 对齐和基础诊断做到 fail-closed V2 alpha;再做 M3+ 少退复核延伸和 M4 OMR,大提琴最后独立验证。**
+
+## 13. 2026-07-10 受控 pilot 决策包
+
+- `npm run western:release-review` 聚合 ordinary / M3+ / M4 机器检查。
+- `npm run western:controlled-pilot-decision` 把机器证据转成明确 pilot 决策包。
+- 当前状态:`readyForControlledPilotDecision=true`,`readyToStartControlledPilot=false`,`approvalPresent=false`,`runtimeFailClosed=true`。
+- 这表示机器自测已完成,当前不需要继续教师/专业人员复核;只剩产品负责人是否批准单独受控 pilot。
+- 无批准文件时保持 review-only / fail-closed;只有机器预检发现 unknown/unsafe auto-pass 时才进入定向人工复核。
 # 2026-07-09 最新闸门状态补充
 
 - P1 confidence 重校准旧 10-row blind validation 曾失败,但后续 P1.1 context-feature validation 已补强并通过当前精度闸。普通上传自动 gate 仍默认 fail-closed;下一步不是重复旧 10-row 复核,而是在单独受控进程中做 monitored pilot,且不得提交默认开启的 env。
