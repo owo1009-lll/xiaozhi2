@@ -110,6 +110,7 @@
 npm run western:release-review
 npm run western:controlled-pilot-decision
 npm run western:controlled-pilot-approval-template
+npm run western:controlled-pilot-record-decision
 npm run western:controlled-pilot-start-preflight
 ```
 
@@ -126,9 +127,9 @@ npm run western:controlled-pilot-start-preflight
 - 只有机器预检发现 unknown auto-pass 或 unsafe auto-pass 时,才进入定向人工复核。
 - 没有负责人显式批准时,系统保持 review-only / fail-closed。
 
-`western:controlled-pilot-approval-template` 只生成不批准的模板文件,不会解锁 pilot。只有负责人明确批准后,才可把模板复制/填写为 `data/experiments/western-strings-controlled-pilot-approval.json`。
+`western:controlled-pilot-approval-template` 只生成不批准的模板文件,不会解锁 pilot。现在建议用 `western:controlled-pilot-record-decision` 记录负责人决策,避免手工复制/编辑 JSON。
 
-如果负责人明确决定暂缓/不启动 pilot,也可以把模板复制为同一路径,保持 `pilotApproved=false` 并填写 `approvedBy/approvedAt`;系统会记录为 explicit no-go,继续安全停在 review-only。
+如果负责人明确决定暂缓/不启动 pilot,运行 `npm run western:controlled-pilot-record-decision -- --decision defer --by <负责人>`;系统会记录为 explicit no-go,继续安全停在 review-only。只有负责人明确批准时,才运行 `npm run western:controlled-pilot-record-decision -- --decision approve --by <负责人> --confirm-separate-monitored-pilot --confirm-default-runtime-fail-closed`。
 
 `western:controlled-pilot-start-preflight` 是批准后的最后机器预检。当前没有 approval 文件时它必须失败;通过前不得启动 pilot。
 
