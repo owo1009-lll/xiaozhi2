@@ -16,15 +16,12 @@ assert(status.tracks?.m4Omr, "project status must include M4 OMR track");
 
 const m3plus = status.tracks.m3plusPitchModes;
 assert.equal(m3plus.m3plusModeEvalReady, true, "M3+ review labels should be sufficient for offline mode evaluation");
-assert.equal(m3plus.m3plusModeReleaseReady, false, "M3+ must remain review-only until a non-control mode passes precision/unsafe evaluation");
+assert.equal(m3plus.m3plusModeReleaseReady, true, "M3+ should report mode-specific release evidence after the first-measure candidate-quality review passes");
 assert(m3plus.modeEval?.controlReadyModes?.includes("stable"), "stable should be reported as a control-ready mode");
-assert.deepEqual(m3plus.modeEval?.releaseReadyModes || [], [], "no non-control M3+ mode should be release-ready yet");
+assert.deepEqual(m3plus.modeEval?.releaseReadyModes || [], ["slide-like", "trill-like"], "slide-like and trill-like should be reported as release-ready offline modes");
 assert.equal(m3plus.localizationDiagnosis?.sourceExists, true, "M3+ localization diagnosis should be generated after round-2 import");
 assert.equal(m3plus.localizationDiagnosis?.summary?.nonMatch, 24, "M3+ localization diagnosis should expose the current non-match row count");
-assert(
-  m3plus.blockingReasons.includes("m3plus-localization-candidate-quality-blocker"),
-  "M3+ should block on localization/candidate quality before another mode release attempt",
-);
+assert.deepEqual(m3plus.blockingReasons || [], [], "M3+ offline mode evidence should no longer ask for more review after the safe first-measure pack is imported");
 
 const controlled = status.tracks.controlledCandidate;
 assert.equal(controlled.studentSafeCandidateGateReady, false, "ordinary upload must still require blind validation");
@@ -120,19 +117,7 @@ assert.equal(
   "ordinary gate failure should point to the current ordinary-gate evidence artifact",
 );
 const m3plusFailure = fullGate.failures.find((failure) => failure.track === "M3+ pitch behavior modes");
-assert(m3plusFailure, "M3+ track failure should be reported until a non-control mode is release-ready");
-assert(
-  (m3plusFailure.reason || []).includes("m3plus-no-mode-specific-release-ready"),
-  "M3+ track should block on lack of non-control mode-specific release evidence",
-);
-const expectedM3PlusArtifact = m3plus.candidateQualityReview?.needsReview
-  ? "data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/index.html"
-  : "data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-localization-diagnosis-groups.csv";
-assert.equal(
-  m3plusFailure.artifact,
-  expectedM3PlusArtifact,
-  "M3+ gate failure should point to the active candidate-quality review or localization diagnosis",
-);
+assert.equal(m3plusFailure, undefined, "M3+ should not be a project-gate failure after mode-specific offline evidence passes");
 assert(fullGate.failures.some((failure) => failure.track === "M4 OMR benchmark"), "M4 track failure should be reported");
 assert.equal(
   fullGate.failures.find((failure) => failure.track === "M4 OMR benchmark")?.artifact,
@@ -146,6 +131,7 @@ console.log(JSON.stringify({
     "project-status-tracks-present",
     "student-runtime-fail-closed",
     "confidence-pilot-validation-state-covered",
+    "m3plus-first-measure-mode-evidence-covered",
     "m4-self-comparison-blocks",
     "project-gate-required-tracks-block-release",
   ],
