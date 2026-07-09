@@ -222,6 +222,14 @@ for (const [label, text] of [["html", m4ChecklistHtml], ["markdown", m4Checklist
     `M4 ${label} checklist must require the independent-gold workspace audit`,
   );
   assert(
+    text.includes("npm run western:m4-gold-provenance-audit"),
+    `M4 ${label} checklist must require provenance self-test before score editing`,
+  );
+  assert(
+    text.includes("editableGoldPath"),
+    `M4 ${label} checklist must point score editors at the editable gold path`,
+  );
+  assert(
     text.includes("reviewStatus"),
     `M4 ${label} checklist must explain the approved reviewStatus gate`,
   );

@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 const DEFAULT_BENCHMARK = path.join("data", "experiments", "western-strings-m4", "omr-benchmark.json");
 const DEFAULT_READINESS = path.join("data", "experiments", "western-strings-m4", "omr-readiness.json");
 const DEFAULT_OUT_DIR = path.join("data", "experiments", "western-strings-m4");
+const DEFAULT_EDITABLE_GOLD_DIR = path.join("data", "private", "western-strings-m4-independent-gold");
 
 function parseArgs(argv) {
   const args = {
@@ -47,6 +48,11 @@ function buildReadinessMap(readinessReport) {
   return map;
 }
 
+function editableGoldPathFor(row) {
+  const pieceId = String(row.pieceId || "piece").replace(/[^a-zA-Z0-9_-]+/g, "-");
+  return path.join(DEFAULT_EDITABLE_GOLD_DIR, `${pieceId}.independent-gold.mxl`).replace(/\\/g, "/");
+}
+
 function buildTodoRows(report, readinessReport = {}) {
   const readinessRows = buildReadinessMap(readinessReport);
   return (report.rows || [])
@@ -60,6 +66,7 @@ function buildTodoRows(report, readinessReport = {}) {
         issue: row.blockingReason || "benchmark-row-not-usable",
         action: "Create independent human-corrected gold MusicXML/MXL from the source score image; do not reuse the Audiveris draft as gold.",
         sourceScorePath: readiness.sourceScorePath || "",
+        editableGoldPath: editableGoldPathFor(row),
         goldPath: row.goldPath || "",
         draftPath: row.draftPath || "",
         goldEqualsDraftHash: row.goldEqualsDraftHash || "",
@@ -76,8 +83,8 @@ function buildMarkdown(report, todoRows) {
     "",
     "本文件由 `npm run western:m4-independent-gold-todo` 生成。",
     "",
-    "目的：M4 OMR 准确率只能用 **独立人工校正的 gold score** 评估。",
-    "如果 clean score 与 Audiveris draft 完全同 SHA-1，系统会判定为 self-comparison，并阻止把 100% 自比结果当作 OMR 证据。",
+    "目的：M4 OMR 准确率只能用独立人工校正的 gold score 评估。",
+    "如果 clean score 与 Audiveris draft 完全相同，系统会判定为 self-comparison，并阻止把 100% 自比结果当作 OMR 证据。",
     "",
     "这不是教师音频诊断复核。人工任务只是在谱面编辑器里对照原谱图片/PDF 校正 MusicXML/MXL。",
     "",
@@ -94,21 +101,23 @@ function buildMarkdown(report, todoRows) {
     "对下面每一行：",
     "",
     "1. 打开 `sourceScorePath` 的原始谱面图片/PDF。",
-    "2. 对照原谱检查当前 `goldPath` 或 `draftPath`。可以用 draft 当起点，但必须逐小节核对。",
-    "3. 保存新的独立 gold MusicXML/MXL，不要直接复制 Audiveris draft。",
-    "4. 运行 `npm run western:m4-independent-gold-workspace-audit`，确认 changed/approved 状态。",
-    "5. 确认无误后，只把该行 `reviewStatus` 改为 `approved`。",
-    "6. 先运行 `npm run western:m4-apply-independent-gold-workspace -- --dry-run`。",
-    "7. dry-run 只显示预期行会 apply 后，再正式运行 apply 和 `npm run western:m4-omr-benchmark`。",
+    "2. 先运行 `npm run western:m4-gold-provenance-audit`，确认没有可自动复用的独立 gold。",
+    "3. 运行 `npm run western:m4-independent-gold-workspace`，生成 `editableGoldPath` 指向的可编辑 MXL。",
+    "4. 对照原谱逐小节检查 `editableGoldPath`。可以用 `draftPath` 当起点，但必须逐小节校对。",
+    "5. 保存新的独立 gold MusicXML/MXL，不要直接复制 Audiveris draft。",
+    "6. 运行 `npm run western:m4-independent-gold-workspace-audit`，确认 changed/approved 状态。",
+    "7. 确认无误后，只把该行 `reviewStatus` 改为 `approved`。",
+    "8. 先运行 `npm run western:m4-apply-independent-gold-workspace -- --dry-run`。",
+    "9. dry-run 只显示预期行会 apply 后，再正式运行 apply 和 `npm run western:m4-omr-benchmark`。",
     "",
     "## 待处理行",
     "",
-    "| # | recordingId | pieceId | scoreId | issue | sourceScorePath | current goldPath | draftPath | notes |",
-    "|---:|---|---|---|---|---|---|---|---|",
+    "| # | recordingId | pieceId | scoreId | issue | sourceScorePath | editableGoldPath | current goldPath | draftPath | notes |",
+    "|---:|---|---|---|---|---|---|---|---|---|",
   ];
   todoRows.forEach((row, index) => {
     lines.push(
-      `| ${index + 1} | ${row.recordingId} | ${row.pieceId} | ${row.scoreId} | ${row.issue} | \`${row.sourceScorePath}\` | \`${row.goldPath}\` | \`${row.draftPath}\` | goldNotes=${row.goldNotes}; draftNotes=${row.draftNotes}; parseOk=${row.parseOk} |`,
+      `| ${index + 1} | ${row.recordingId} | ${row.pieceId} | ${row.scoreId} | ${row.issue} | \`${row.sourceScorePath}\` | \`${row.editableGoldPath}\` | \`${row.goldPath}\` | \`${row.draftPath}\` | goldNotes=${row.goldNotes}; draftNotes=${row.draftNotes}; parseOk=${row.parseOk} |`,
     );
   });
   lines.push("");
@@ -161,7 +170,9 @@ function buildHtml(report, todoRows, outDir) {
             <h3>谱面编辑动作</h3>
             <ol>
               <li>只做谱面 gold 校正，不做教师音频诊断。</li>
-              <li>打开左侧原谱图片，逐小节核对当前 gold 或 Audiveris draft。</li>
+              <li>先运行 <code>npm run western:m4-gold-provenance-audit</code>，确认没有可自动复用的独立 gold。</li>
+              <li>运行 <code>npm run western:m4-independent-gold-workspace</code> 生成 <code>editableGoldPath</code>。</li>
+              <li>打开左侧原谱图片，逐小节校对 <code>editableGoldPath</code>。</li>
               <li>保存新的独立 gold MusicXML/MXL，不要直接复制 Audiveris draft。</li>
               <li>运行 <code>npm run western:m4-independent-gold-workspace-audit</code> 检查状态。</li>
               <li>确认无误后，把 workspace CSV 中该行 <code>reviewStatus</code> 改为 <code>approved</code>。</li>
@@ -169,6 +180,7 @@ function buildHtml(report, todoRows, outDir) {
             </ol>
             <dl>
               <dt>sourceScorePath</dt><dd>${renderPathLink(outDir, row.sourceScorePath)}</dd>
+              <dt>editableGoldPath</dt><dd>${renderPathLink(outDir, row.editableGoldPath)}</dd>
               <dt>current goldPath</dt><dd>${renderPathLink(outDir, row.goldPath)}</dd>
               <dt>Audiveris draftPath</dt><dd>${renderPathLink(outDir, row.draftPath)}</dd>
               <dt>当前状态</dt><dd>goldEqualsDraftHash=${htmlEscape(row.goldEqualsDraftHash || "no")} · parseOk=${htmlEscape(row.parseOk || "")}</dd>
@@ -245,6 +257,7 @@ async function main() {
     "issue",
     "action",
     "sourceScorePath",
+    "editableGoldPath",
     "goldPath",
     "draftPath",
     "goldEqualsDraftHash",
