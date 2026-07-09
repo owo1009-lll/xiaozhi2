@@ -152,6 +152,29 @@ assert.equal(
   "M4 should expose the independent-gold workspace audit artifact",
 );
 assert.equal(
+  m4.goldProvenanceAudit?.source,
+  "data/experiments/western-strings-m4/gold-provenance-audit.json",
+  "M4 should expose the gold provenance audit artifact",
+);
+if (!m4.goldProvenanceAudit?.missing) {
+  assert.equal(m4.goldProvenanceAudit.teacherReviewNeeded, false, "M4 provenance audit must not ask for teacher audio review");
+  assert.equal(
+    m4.goldProvenanceAudit.humanTask,
+    "score-editor-independent-gold-correction",
+    "M4 provenance audit should route remaining work to score-editor gold correction",
+  );
+  assert.equal(
+    m4.goldProvenanceAudit.counts?.manualGoldRequiredRows,
+    12,
+    "current M4 fixture should prove all rows require independent score-editor gold",
+  );
+  assert.equal(
+    m4.goldProvenanceAudit.counts?.independentCandidateRows,
+    0,
+    "current M4 fixture should not pretend there are independent clean-score candidates",
+  );
+}
+assert.equal(
   m4.independentGoldWorkspaceAudit?.readyForApply,
   false,
   "M4 independent-gold workspace must not be apply-ready before checked score edits",

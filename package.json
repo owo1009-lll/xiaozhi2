@@ -93,6 +93,7 @@
     "western:m4-independent-gold-todo": "node scripts\\create-western-strings-m4-independent-gold-todo.mjs",
     "western:m4-independent-gold-workspace": "node scripts\\prepare-western-strings-m4-independent-gold-workspace.mjs",
     "western:m4-independent-gold-workspace-audit": "node scripts\\audit-western-strings-m4-independent-gold-workspace.mjs",
+    "western:m4-gold-provenance-audit": "node scripts\\audit-western-strings-m4-gold-provenance.mjs",
     "western:m4-apply-independent-gold-workspace": "node scripts\\apply-western-strings-m4-independent-gold-workspace.mjs",
     "western:controlled-batch-candidate-audit": "node scripts\\audit-western-controlled-batch-candidates.mjs",
     "western:controlled-candidate-review-export": "node scripts\\export-western-controlled-candidate-review.mjs",

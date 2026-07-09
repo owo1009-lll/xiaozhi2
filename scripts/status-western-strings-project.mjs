@@ -327,6 +327,18 @@ const M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT_CSV = path.join(
   "western-strings-m4",
   "independent-gold-workspace-audit.csv",
 );
+const M4_GOLD_PROVENANCE_AUDIT = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "gold-provenance-audit.json",
+);
+const M4_GOLD_PROVENANCE_AUDIT_CSV = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "gold-provenance-audit.csv",
+);
 
 function parseArgs(argv) {
   const args = {
@@ -787,6 +799,7 @@ async function buildM4OmrStatus() {
   const readiness = await readJson(M4_READINESS);
   const benchmark = await readJson(M4_BENCHMARK);
   const workspaceAudit = await readJson(M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT);
+  const provenanceAudit = await readJson(M4_GOLD_PROVENANCE_AUDIT);
   const readinessReady = Boolean(readiness?.gate?.m4OmrBenchmarkDatasetReady);
   const benchmarkEvaluated = Boolean(benchmark?.gate?.m4OmrBenchmarkEvaluated);
   const draftQualityReady = Boolean(benchmark?.gate?.m4OmrDraftQualityReady);
@@ -826,6 +839,8 @@ async function buildM4OmrStatus() {
       independentGoldTodoHtml: M4_INDEPENDENT_GOLD_TODO_HTML.replace(/\\/g, "/"),
       independentGoldWorkspaceAuditJson: M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT.replace(/\\/g, "/"),
       independentGoldWorkspaceAuditCsv: M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT_CSV.replace(/\\/g, "/"),
+      goldProvenanceAuditJson: M4_GOLD_PROVENANCE_AUDIT.replace(/\\/g, "/"),
+      goldProvenanceAuditCsv: M4_GOLD_PROVENANCE_AUDIT_CSV.replace(/\\/g, "/"),
       readinessCsv: String(readiness?.artifacts?.csv || "data/experiments/western-strings-m4/omr-readiness.csv").replace(/\\/g, "/"),
       benchmarkCsv: String(benchmark?.artifacts?.csv || "data/experiments/western-strings-m4/omr-benchmark.csv").replace(/\\/g, "/"),
     },
@@ -838,6 +853,19 @@ async function buildM4OmrStatus() {
       : {
           source: M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT.replace(/\\/g, "/"),
           readyForApply: false,
+          counts: {},
+          missing: true,
+        },
+    goldProvenanceAudit: provenanceAudit
+      ? {
+          source: M4_GOLD_PROVENANCE_AUDIT.replace(/\\/g, "/"),
+          counts: provenanceAudit.counts || {},
+          teacherReviewNeeded: Boolean(provenanceAudit.teacherReviewNeeded),
+          humanTask: provenanceAudit.humanTask || "",
+          conclusion: provenanceAudit.conclusion || "",
+        }
+      : {
+          source: M4_GOLD_PROVENANCE_AUDIT.replace(/\\/g, "/"),
           counts: {},
           missing: true,
         },
@@ -1008,6 +1036,7 @@ function printProjectStatus(status, outPath) {
       teacherReviewNeeded: m4Omr.teacherReviewNeeded,
       humanTask: m4Omr.humanTask,
       independentGoldWorkspaceAudit: m4Omr.independentGoldWorkspaceAudit,
+      goldProvenanceAudit: m4Omr.goldProvenanceAudit,
       counts: m4Omr.counts,
       blockingReasons: m4Omr.blockingReasons,
     },
