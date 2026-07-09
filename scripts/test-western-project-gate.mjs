@@ -207,10 +207,18 @@ assert(
   packageJson.scripts?.["western:m4-preflight"],
   "package.json must expose the aggregate M4 machine self-test command",
 );
+assert(
+  packageJson.scripts?.["western:m4-independent-gold-note-summary"],
+  "package.json must expose the M4 editable-gold note summary command",
+);
 for (const [label, text] of [["review policy", reviewPolicy], ["next-action handoff", handoff]]) {
   assert(
     text.includes("npm run western:m4-preflight"),
     `M4 ${label} must route through the aggregate machine self-test before manual score editing`,
+  );
+  assert(
+    text.includes("note summary") || text.includes("note-summary"),
+    `M4 ${label} must mention the machine note summary before manual score editing`,
   );
   assert(
     text.includes("npm run western:m4-gold-provenance-audit"),

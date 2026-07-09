@@ -89,10 +89,12 @@ or bytes changed. Use `npm run western:m4-apply-independent-gold-workspace --
 Before asking anyone to edit score files, run
 `npm run western:m4-preflight`. It runs the M4 readiness, benchmark,
 independent-gold todo/workspace, provenance, workspace audit, project status,
-and next-action handoff commands in one machine self-test pass. If this still
-reports `humanTask=score-editor-independent-gold-correction`, then the project
-has already exhausted the current automatic checks and the remaining human work
-is score-editor correction only.
+independent-gold note summary, and next-action handoff commands in one machine
+self-test pass. The note summary is only a machine-readable preview of the
+current editable MXL files; it does not replace score-editor correction. If this
+still reports `humanTask=score-editor-independent-gold-correction`, then the
+project has already exhausted the current automatic checks and the remaining
+human work is score-editor correction only.
 
 For the lower-level provenance detail, run
 `npm run western:m4-gold-provenance-audit`. It reports whether the current

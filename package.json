@@ -95,6 +95,7 @@
     "western:m4-independent-gold-workspace-audit": "node scripts\\audit-western-strings-m4-independent-gold-workspace.mjs",
     "western:m4-gold-provenance-audit": "node scripts\\audit-western-strings-m4-gold-provenance.mjs",
     "western:m4-apply-independent-gold-workspace": "node scripts\\apply-western-strings-m4-independent-gold-workspace.mjs",
+    "western:m4-independent-gold-note-summary": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\summarize_western_strings_m4_independent_gold.py",
     "western:m4-preflight": "node scripts\\run-western-strings-m4-preflight.mjs",
     "western:controlled-batch-candidate-audit": "node scripts\\audit-western-controlled-batch-candidates.mjs",
     "western:controlled-candidate-review-export": "node scripts\\export-western-controlled-candidate-review.mjs",
