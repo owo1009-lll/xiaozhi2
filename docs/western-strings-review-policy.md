@@ -69,3 +69,11 @@ M4 still requires independent gold correction. Do not ask for broad model or
 teacher review until the independent-gold workspace is corrected and the OMR
 benchmark is rerun.
 
+Independent gold application has two safety gates:
+
+- the editable MXL/MusicXML file must differ from the Audiveris draft; and
+- the workspace row must explicitly set `reviewStatus=approved`.
+
+Rows left as `needs-human-edit` must not be applied, even if the file timestamp
+or bytes changed. Use `npm run western:m4-apply-independent-gold-workspace --
+--dry-run` before applying changes.

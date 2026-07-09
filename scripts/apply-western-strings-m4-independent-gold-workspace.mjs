@@ -123,6 +123,10 @@ async function main() {
   for (const row of manifestRows) {
     const editablePath = repoPath(row.editableGoldPath);
     const draftPath = repoPath(row.draftPath);
+    if (String(row.reviewStatus || "").trim().toLowerCase() !== "approved") {
+      skipped.push({ ...row, reason: "review-status-not-approved" });
+      continue;
+    }
     if (!(await exists(editablePath))) {
       skipped.push({ ...row, reason: "editable-gold-missing" });
       continue;
@@ -178,7 +182,7 @@ async function main() {
     })),
     next: applied.length
       ? "Run npm run western:m4-omr-benchmark and npm run western:project-status."
-      : "No independent gold was applied. Edit the workspace MXL files so their SHA differs from the draft, then rerun this command.",
+      : "No independent gold was applied. Edit the workspace MXL files so their SHA differs from the draft, set reviewStatus=approved for checked rows, then rerun this command.",
   }, null, 2));
 }
 

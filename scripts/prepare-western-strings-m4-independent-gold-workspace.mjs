@@ -137,7 +137,7 @@ async function main() {
       draftPath: row.draftPath || "",
       editableGoldPath: repoRelative(editablePath),
       reviewStatus: draftExists ? "needs-human-edit" : "draft-missing",
-      action: "Edit editableGoldPath against sourceScorePath. After edits, run npm run western:m4-apply-independent-gold-workspace.",
+      action: "Edit editableGoldPath against sourceScorePath. Set reviewStatus=approved only after checking the score. Then run npm run western:m4-apply-independent-gold-workspace.",
     });
   }
 
@@ -161,7 +161,7 @@ async function main() {
     missingDraft,
     outDir: repoRelative(outDir),
     manifest: repoRelative(manifestPath),
-    next: "Open each editableGoldPath in a MusicXML/MXL editor, correct it against sourceScorePath, then run npm run western:m4-apply-independent-gold-workspace.",
+    next: "Open each editableGoldPath in a MusicXML/MXL editor, correct it against sourceScorePath, set reviewStatus=approved, then run npm run western:m4-apply-independent-gold-workspace.",
   }, null, 2));
 }
 
