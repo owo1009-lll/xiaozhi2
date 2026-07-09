@@ -51,6 +51,12 @@ function approvalIsValid(approval) {
     && String(approval?.approvedAt || "").trim() !== "";
 }
 
+function approvalIsExplicitNoGo(approval) {
+  return approval?.pilotApproved === false
+    && String(approval?.approvedBy || "").trim() !== ""
+    && String(approval?.approvedAt || "").trim() !== "";
+}
+
 function buildBlockingReasons({ status, releaseReview, approval }) {
   const reasons = [];
   if (!releaseReview) reasons.push("release-review-missing");
@@ -62,7 +68,8 @@ function buildBlockingReasons({ status, releaseReview, approval }) {
   if (status.runtimeStudentGate?.ordinaryUploadAutoFeedbackReady !== false) reasons.push("ordinary-default-runtime-enabled");
   if (status.runtimeStudentGate?.m3plusAutoFeedbackReady !== false) reasons.push("m3plus-default-runtime-enabled");
   if (status.runtimeStudentGate?.m4OmrAutoScoreReady !== false) reasons.push("m4-default-runtime-enabled");
-  if (!approvalIsValid(approval)) reasons.push("controlled-pilot-approval-missing");
+  if (approvalIsExplicitNoGo(approval)) reasons.push("controlled-pilot-explicitly-deferred");
+  else if (!approvalIsValid(approval)) reasons.push("controlled-pilot-approval-missing");
   return reasons;
 }
 
@@ -111,7 +118,9 @@ function renderMarkdown(decision) {
     "npm run western:controlled-pilot-approval-template",
     "```",
     "",
-    "Only if the owner explicitly approves the monitored pilot, copy/fill the template as the expected approval file. Example approval file:",
+    "If the owner decides not to start the monitored pilot now, copy/fill the template as the expected approval file with `pilotApproved=false`, `approvedBy`, and `approvedAt`; this records an explicit safe hold.",
+    "",
+    "Only if the owner explicitly approves the monitored pilot, copy/fill the template as the expected approval file with `pilotApproved=true`. Example approval file:",
     "",
     "```json",
     JSON.stringify({
@@ -141,6 +150,7 @@ export async function buildControlledPilotDecision(args = {}) {
   const approval = await readJsonOrNull(approvalPath);
   const blockingReasons = buildBlockingReasons({ status, releaseReview, approval });
   const approvalPresent = approvalIsValid(approval);
+  const approvalDeferred = approvalIsExplicitNoGo(approval);
   const releaseReady = releaseReview?.readyForControlledPilot === true
     && releaseReview.teacherReviewNeeded !== true
     && releaseReview.runtimeFailClosed === true;
@@ -155,6 +165,7 @@ export async function buildControlledPilotDecision(args = {}) {
     readyToStartControlledPilot: blockingReasons.length === 0,
     approvalRequired: true,
     approvalPresent,
+    approvalDeferred,
     runtimeFailClosed,
     allowedScope: [
       "ordinary upload candidate-evidence auto_pass only inside a separate monitored pilot process",
@@ -192,7 +203,7 @@ export async function buildControlledPilotDecision(args = {}) {
       teacherReviewNeeded: releaseReview?.teacherReviewNeeded === true,
       runtimeFailClosed: releaseReview?.runtimeFailClosed === true,
     },
-    approval: approvalPresent ? approval : null,
+    approval: approvalPresent || approvalDeferred ? approval : null,
     artifacts: {
       out: rel(args.out || DEFAULT_OUT),
       summary: rel(args.summary || DEFAULT_SUMMARY),

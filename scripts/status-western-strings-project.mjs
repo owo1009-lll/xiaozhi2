@@ -1006,6 +1006,14 @@ function summarizeNextActions(controlled, m3plus, m4Omr, releaseReview, controll
           artifact: CONTROLLED_PILOT_DECISION_MD.replace(/\\/g, "/"),
           reason: ["approved-monitored-pilot-only"],
         });
+      } else if (controlledPilotDecision.approvalDeferred === true) {
+        actions.push({
+          priority: 1,
+          track: "Controlled pilot deferred",
+          action: "The product owner explicitly deferred the monitored pilot. Keep the system safely review-only/fail-closed and do not ask for more teacher review for this release decision.",
+          artifact: CONTROLLED_PILOT_DECISION_MD.replace(/\\/g, "/"),
+          reason: controlledPilotDecision.blockingReasons || ["controlled-pilot-explicitly-deferred"],
+        });
       } else {
         actions.push({
           priority: 1,
@@ -1073,6 +1081,7 @@ export async function buildProjectStatus() {
           readyToStartControlledPilot: controlledPilotDecision.readyToStartControlledPilot === true,
           approvalRequired: controlledPilotDecision.approvalRequired === true,
           approvalPresent: controlledPilotDecision.approvalPresent === true,
+          approvalDeferred: controlledPilotDecision.approvalDeferred === true,
           runtimeFailClosed: controlledPilotDecision.runtimeFailClosed === true,
           blockingReasons: controlledPilotDecision.blockingReasons || [],
         }

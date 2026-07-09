@@ -82,7 +82,7 @@ export async function buildControlledPilotStartPreflight(args = {}) {
     blockingReasons.push("runtime-not-fail-closed");
   }
   if (decision.approvalPresent !== true) {
-    blockingReasons.push("approval-not-present");
+    blockingReasons.push(decision.approvalDeferred === true ? "approval-explicitly-deferred" : "approval-not-present");
   }
   const uniqueBlockingReasons = [...new Set(blockingReasons)];
   return {

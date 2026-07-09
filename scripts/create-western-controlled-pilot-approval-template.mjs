@@ -33,6 +33,7 @@ function buildTemplate() {
     approvedAt: "",
     scope: "ordinary candidate-evidence auto_pass only; optional first-measure slide/trill M3+ subset",
     notes: "Template only. Copy this to data/experiments/western-strings-controlled-pilot-approval.json and set pilotApproved=true only if the product owner explicitly approves a separate monitored pilot. Default runtime must remain fail-closed.",
+    noGoUsage: "To explicitly defer or reject the pilot, keep pilotApproved=false and fill approvedBy/approvedAt. This records a safe hold and will not start the pilot.",
     safetyRules: [
       "Do not enable default production/student runtime.",
       "Do not commit WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1.",

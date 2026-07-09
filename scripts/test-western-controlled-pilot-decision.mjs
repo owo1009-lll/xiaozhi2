@@ -8,6 +8,7 @@ import { buildControlledPilotStartPreflight } from "./run-western-controlled-pil
 
 const TEST_DIR = path.join("data", "experiments", "western-strings-controlled-pilot-test");
 const TEMPLATE_PATH = path.join(TEST_DIR, "approval.template.json");
+const DEFERRED_APPROVAL_PATH = path.join(TEST_DIR, "approval.deferred.json");
 const VALID_APPROVAL_PATH = path.join(TEST_DIR, "approval.valid.json");
 
 await fs.mkdir(TEST_DIR, { recursive: true });
@@ -39,6 +40,34 @@ assert(
   "start preflight must explicitly report missing approval",
 );
 
+await fs.writeFile(DEFERRED_APPROVAL_PATH, `${JSON.stringify({
+  pilotApproved: false,
+  approvedBy: "test-owner",
+  approvedAt: "2026-07-10T00:00:00+08:00",
+  scope: "defer controlled pilot",
+  notes: "Test-only explicit no-go file. Runtime remains fail-closed.",
+}, null, 2)}\n`, "utf8");
+
+const decisionDeferred = await buildControlledPilotDecision({
+  approval: DEFERRED_APPROVAL_PATH,
+});
+assert.equal(decisionDeferred.approvalPresent, false, "explicit no-go must not count as pilot approval");
+assert.equal(decisionDeferred.approvalDeferred, true, "explicit no-go should be recognized as a deferral");
+assert.equal(decisionDeferred.readyToStartControlledPilot, false, "explicit no-go must not allow pilot start");
+assert(
+  decisionDeferred.blockingReasons.includes("controlled-pilot-explicitly-deferred"),
+  "explicit no-go should report a deferral reason, not look like a missing approval",
+);
+
+const preflightDeferred = await buildControlledPilotStartPreflight({
+  approval: DEFERRED_APPROVAL_PATH,
+});
+assert.equal(preflightDeferred.okToStartControlledPilot, false, "start preflight must fail for explicit no-go");
+assert(
+  preflightDeferred.blockingReasons.includes("approval-explicitly-deferred"),
+  "start preflight should report explicit deferral",
+);
+
 await fs.writeFile(VALID_APPROVAL_PATH, `${JSON.stringify({
   pilotApproved: true,
   approvedBy: "test-owner",
@@ -68,12 +97,15 @@ console.log(JSON.stringify({
     "template-does-not-approve",
     "decision-blocks-without-approval",
     "preflight-blocks-without-approval",
+    "decision-recognizes-explicit-no-go",
+    "preflight-blocks-explicit-no-go",
     "decision-passes-with-valid-temp-approval",
     "preflight-passes-with-valid-temp-approval",
     "default-runtime-remains-fail-closed",
   ],
   artifacts: {
     template: TEMPLATE_PATH.replace(/\\/g, "/"),
+    deferredApproval: DEFERRED_APPROVAL_PATH.replace(/\\/g, "/"),
     validApproval: VALID_APPROVAL_PATH.replace(/\\/g, "/"),
   },
 }, null, 2));

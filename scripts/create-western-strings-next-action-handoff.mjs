@@ -225,6 +225,14 @@ function commandForAction(action) {
       "Do not commit WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 or enable it globally.",
     ];
   }
+  if (track === "Controlled pilot deferred") {
+    return [
+      "Open data/experiments/western-strings-controlled-pilot-decision.md.",
+      "No teacher/professional review is needed for this release decision.",
+      "Keep production/default runtime fail-closed and review-only.",
+      "To revisit later, remove or update data/experiments/western-strings-controlled-pilot-approval.json and rerun npm run western:controlled-pilot-decision.",
+    ];
+  }
   if (track === "Start monitored pilot") {
     return [
       "Open data/experiments/western-strings-controlled-pilot-decision.md.",

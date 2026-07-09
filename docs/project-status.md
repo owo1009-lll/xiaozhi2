@@ -128,6 +128,8 @@ npm run western:controlled-pilot-start-preflight
 
 `western:controlled-pilot-approval-template` 只生成不批准的模板文件,不会解锁 pilot。只有负责人明确批准后,才可把模板复制/填写为 `data/experiments/western-strings-controlled-pilot-approval.json`。
 
+如果负责人明确决定暂缓/不启动 pilot,也可以把模板复制为同一路径,保持 `pilotApproved=false` 并填写 `approvedBy/approvedAt`;系统会记录为 explicit no-go,继续安全停在 review-only。
+
 `western:controlled-pilot-start-preflight` 是批准后的最后机器预检。当前没有 approval 文件时它必须失败;通过前不得启动 pilot。
 
 产物:
