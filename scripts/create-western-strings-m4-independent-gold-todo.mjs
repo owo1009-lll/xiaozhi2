@@ -165,7 +165,7 @@ function buildHtml(report, todoRows, outDir) {
               <li>保存新的独立 gold MusicXML/MXL，不要直接复制 Audiveris draft。</li>
               <li>运行 <code>npm run western:m4-independent-gold-workspace-audit</code> 检查状态。</li>
               <li>确认无误后，把 workspace CSV 中该行 <code>reviewStatus</code> 改为 <code>approved</code>。</li>
-              <li>正式应用前必须先 dry-run。</li>
+              <li>正式应用前必须先运行 <code>npm run western:m4-apply-independent-gold-workspace -- --dry-run</code>。</li>
             </ol>
             <dl>
               <dt>sourceScorePath</dt><dd>${renderPathLink(outDir, row.sourceScorePath)}</dd>

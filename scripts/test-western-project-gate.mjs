@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
 
 import { evaluateProjectGate } from "./gate-western-strings-project.mjs";
 import { buildProjectStatus } from "./status-western-strings-project.mjs";
@@ -173,6 +174,31 @@ if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
   );
 }
 
+const m4ChecklistHtml = await fs.readFile("data/experiments/western-strings-m4/independent-gold-todo.html", "utf8");
+const m4ChecklistMd = await fs.readFile("data/experiments/western-strings-m4/independent-gold-todo.md", "utf8");
+for (const [label, text] of [["html", m4ChecklistHtml], ["markdown", m4ChecklistMd]]) {
+  assert(
+    text.includes("不是教师音频诊断复核"),
+    `M4 ${label} checklist must make clear this is not teacher audio review`,
+  );
+  assert(
+    text.includes("npm run western:m4-independent-gold-workspace-audit"),
+    `M4 ${label} checklist must require the independent-gold workspace audit`,
+  );
+  assert(
+    text.includes("reviewStatus"),
+    `M4 ${label} checklist must explain the approved reviewStatus gate`,
+  );
+  assert(
+    text.includes("--dry-run"),
+    `M4 ${label} checklist must require dry-run before apply`,
+  );
+  assert(
+    !/[鐙鎵绌锛涓]/.test(text),
+    `M4 ${label} checklist should not contain common mojibake characters`,
+  );
+}
+
 const noRequiredGate = evaluateProjectGate(status, new Set());
 assert.equal(noRequiredGate.projectReleaseReady, true, "empty required track set should not block");
 assert.deepEqual(noRequiredGate.failures, [], "empty required track set should have no failures");
@@ -202,6 +228,7 @@ console.log(JSON.stringify({
     "confidence-pilot-validation-state-covered",
     "m3plus-first-measure-mode-evidence-covered",
     "m4-self-comparison-blocks",
+    "m4-checklist-human-readable",
     "project-gate-required-tracks-block-release",
   ],
 }, null, 2));
