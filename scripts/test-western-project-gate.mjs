@@ -201,8 +201,17 @@ if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
 const m4ChecklistHtml = await fs.readFile("data/experiments/western-strings-m4/independent-gold-todo.html", "utf8");
 const m4ChecklistMd = await fs.readFile("data/experiments/western-strings-m4/independent-gold-todo.md", "utf8");
 const reviewPolicy = await fs.readFile("docs/western-strings-review-policy.md", "utf8");
+const packageJson = JSON.parse(await fs.readFile("package.json", "utf8"));
 const handoff = renderHandoff(status);
+assert(
+  packageJson.scripts?.["western:m4-preflight"],
+  "package.json must expose the aggregate M4 machine self-test command",
+);
 for (const [label, text] of [["review policy", reviewPolicy], ["next-action handoff", handoff]]) {
+  assert(
+    text.includes("npm run western:m4-preflight"),
+    `M4 ${label} must route through the aggregate machine self-test before manual score editing`,
+  );
   assert(
     text.includes("npm run western:m4-gold-provenance-audit"),
     `M4 ${label} must require provenance self-test before manual score editing`,

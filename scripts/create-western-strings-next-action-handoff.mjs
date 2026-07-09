@@ -178,6 +178,7 @@ function commandForAction(action) {
     return [
       "Open data/experiments/western-strings-m4/independent-gold-todo.html",
       "This is NOT a teacher audio-diagnosis review. It is a score-editor independent-gold correction task.",
+      "Run npm run western:m4-preflight first. It reruns all current M4 machine self-tests and writes data/experiments/western-strings-m4/m4-preflight.md.",
       "For each row, compare the source score image/PDF with the current goldPath and Audiveris draftPath",
       "Run npm run western:m4-gold-provenance-audit first to prove whether current gold/editable files are still Audiveris self-comparisons and whether any independent clean-score candidate already exists",
       "Run npm run western:m4-independent-gold-workspace to create editable copies under data/private/western-strings-m4-independent-gold/",
