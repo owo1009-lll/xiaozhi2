@@ -136,6 +136,8 @@ npm run western:controlled-pilot-run
 
 `western:controlled-pilot-run` 默认只做状态检查,不会运行候选。只有负责人批准且 preflight 通过后,才可执行 `npm run western:controlled-pilot-run -- --execute --limit 1`:它只跑一个离线受控批次,结束后立即退出并恢复进程环境,不会启动公开学生服务器。未知 auto-pass 会暂停到定向复核,已知错误 auto-pass 会中止。
 
+runner 会读取 `western-strings-controlled-pilot-sessions/` 自动排除所有历史已执行录音。机器预检已拒绝但尚未形成 session 的录音,用可重复参数 `--exclude-recording-id <recordingId>` 排除;成功执行后该排除项会写入 session,以后自动继承。重复录音即使被底层错误返回也会触发 `pilot-reused-recording` 并中止。
+
 产物:
 
 - `data/experiments/western-strings-release-review.json`

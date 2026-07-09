@@ -37,11 +37,12 @@ function blockedPreflight() {
   };
 }
 
-function precisionResult({ knownWrong = 0, unknown = 0, ok = true } = {}) {
+function precisionResult({ knownWrong = 0, unknown = 0, ok = true, recordingId = "recording-new" } = {}) {
   return {
     summary: {
       ok,
       selectedSubmissionCount: 1,
+      selectedSubmissions: [{ submissionId: `submission-${recordingId}`, recordingId }],
       totalCandidateCount: 8,
       autoPassCandidateCount: 3,
       selfCheckedAutoPassCandidateCount: 3,
@@ -63,6 +64,7 @@ try {
     outRoot: tempRoot,
     refreshReleaseReview: async () => ({ ok: true }),
     buildStatus: async () => statusFailClosed(),
+    loadHistoricalRecordingIds: async () => [],
   };
 
   const dryRun = await runControlledPilotSession({ sessionId: "dry-run", outRoot: tempRoot }, {
@@ -106,6 +108,51 @@ try {
   assert.equal(safe.defaultRuntimeFailClosedAfter, true);
   assert.equal(safe.processEnvironmentRestored, true);
   assert.equal(process.env[ENABLE_ENV], undefined);
+
+  let historyAwareArgs = null;
+  const historyAware = await runControlledPilotSession({ execute: true, sessionId: "history-aware", outRoot: tempRoot }, {
+    ...common,
+    loadHistoricalRecordingIds: async () => ["recording-old"],
+    buildPreflight: async () => approvedPreflight(),
+    runPrecisionSession: async (args) => {
+      historyAwareArgs = args;
+      return precisionResult({ recordingId: "recording-new" });
+    },
+  });
+  assert.deepEqual(historyAwareArgs.excludeRecordingIds, ["recording-old"]);
+  assert.deepEqual(historyAware.historyExcludedRecordingIds, ["recording-old"]);
+  assert.equal(historyAware.selectedSubmissions[0].recordingId, "recording-new");
+
+  let additionalExclusionArgs = null;
+  const additionalExclusion = await runControlledPilotSession({
+    execute: true,
+    sessionId: "additional-exclusion",
+    outRoot: tempRoot,
+    excludeRecordingIds: ["recording-precheck-rejected"],
+  }, {
+    ...common,
+    loadHistoricalRecordingIds: async () => ["recording-old"],
+    buildPreflight: async () => approvedPreflight(),
+    runPrecisionSession: async (args) => {
+      additionalExclusionArgs = args;
+      return precisionResult({ recordingId: "recording-new" });
+    },
+  });
+  assert.deepEqual(
+    additionalExclusionArgs.excludeRecordingIds,
+    ["recording-old", "recording-precheck-rejected"],
+  );
+  assert.deepEqual(additionalExclusion.additionalExcludedRecordingIds, ["recording-precheck-rejected"]);
+
+  const repeated = await runControlledPilotSession({ execute: true, sessionId: "repeated", outRoot: tempRoot }, {
+    ...common,
+    loadHistoricalRecordingIds: async () => ["recording-old"],
+    buildPreflight: async () => approvedPreflight(),
+    runPrecisionSession: async () => precisionResult({ recordingId: "recording-old" }),
+  });
+  assert.equal(repeated.sessionStatus, "aborted");
+  assert.equal(repeated.pilotRunAccepted, false);
+  assert(repeated.blockingReasons.includes("pilot-reused-recording:recording-old"));
 
   const unknown = await runControlledPilotSession({ execute: true, sessionId: "unknown", outRoot: tempRoot }, {
     ...common,
@@ -153,6 +200,9 @@ console.log(JSON.stringify({
     "missing-approval-blocks",
     "parent-enabled-env-blocks",
     "safe-session-completes",
+    "historical-recordings-are-excluded",
+    "precheck-rejections-are-persisted-as-exclusions",
+    "repeated-recording-aborts",
     "unknown-auto-pass-pauses-for-targeted-review",
     "known-wrong-auto-pass-aborts",
     "failure-restores-environment",

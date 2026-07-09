@@ -257,10 +257,22 @@ try {
     blockingReasons: [],
     artifacts: { sessionMd: "data/experiments/test/session.md" },
   }, null, 2)}\n`, "utf8");
+  const laterStatusOnlyDir = path.join(completedSessionRoot, "pilot-status-only");
+  await fs.mkdir(laterStatusOnlyDir, { recursive: true });
+  await fs.writeFile(path.join(laterStatusOnlyDir, "session.json"), `${JSON.stringify({
+    ok: true,
+    generatedAt: "2026-07-10T02:00:00+08:00",
+    sessionId: "pilot-status-only",
+    sessionStatus: "ready_not_executed",
+    executionPerformed: false,
+    pilotRunAccepted: false,
+    blockingReasons: [],
+  }, null, 2)}\n`, "utf8");
   const statusWithCompletedPilot = await buildProjectStatus({
     controlledPilotSessionsRoot: completedSessionRoot,
   });
   assert.equal(statusWithCompletedPilot.nextActions?.[0]?.track, "Controlled pilot completed");
+  assert.equal(statusWithCompletedPilot.controlledPilotSession?.sessionId, "pilot-completed");
   const completedHandoff = renderHandoff(statusWithCompletedPilot);
   assert(completedHandoff.includes("Do not rerun the same recording"));
   assert(!completedHandoff.includes("western:controlled-pilot-run -- --execute"));
@@ -288,6 +300,7 @@ console.log(JSON.stringify({
     "default-runtime-remains-fail-closed",
     "approved-handoff-points-to-one-shot-pilot-runner",
     "completed-session-prevents-duplicate-pilot-run",
+    "status-only-session-does-not-hide-executed-pilot",
   ],
   artifacts: {
     template: TEMPLATE_PATH.replace(/\\/g, "/"),

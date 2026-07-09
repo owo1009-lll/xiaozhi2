@@ -464,7 +464,7 @@ async function readLatestControlledPilotSession(root = CONTROLLED_PILOT_SESSIONS
   sessions.sort((left, right) => (
     Date.parse(right.generatedAt || "") - Date.parse(left.generatedAt || "")
   ));
-  return sessions[0] || null;
+  return sessions.find((session) => session.executionPerformed === true) || sessions[0] || null;
 }
 
 function bestDeployableReleaseCandidate(pilot) {
@@ -1144,6 +1144,10 @@ export async function buildProjectStatus(args = {}) {
           executionPerformed: controlledPilotSession.executionPerformed === true,
           pilotRunAccepted: controlledPilotSession.pilotRunAccepted === true,
           approvedBy: controlledPilotSession.approvedBy || "",
+          selectedSubmissions: controlledPilotSession.selectedSubmissions || [],
+          historyExcludedRecordingIds: controlledPilotSession.historyExcludedRecordingIds || [],
+          additionalExcludedRecordingIds: controlledPilotSession.additionalExcludedRecordingIds || [],
+          effectiveExcludedRecordingIds: controlledPilotSession.effectiveExcludedRecordingIds || [],
           monitoring: controlledPilotSession.monitoring || {},
           defaultRuntimeFailClosedAfter: controlledPilotSession.defaultRuntimeFailClosedAfter === true,
           processEnvironmentRestored: controlledPilotSession.processEnvironmentRestored === true,

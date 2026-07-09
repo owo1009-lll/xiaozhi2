@@ -29,6 +29,7 @@ function parseArgs(argv) {
     selectionJson: DEFAULT_SELECTION,
     summary: DEFAULT_SUMMARY,
     keepTemp: false,
+    excludeRecordingIds: [],
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -43,6 +44,7 @@ function parseArgs(argv) {
     else if (arg === "--out-dir") args.outDir = argv[++index] || args.outDir;
     else if (arg === "--selection-json") args.selectionJson = argv[++index] || args.selectionJson;
     else if (arg === "--summary") args.summary = argv[++index] || args.summary;
+    else if (arg === "--exclude-recording-id") args.excludeRecordingIds.push(argv[++index] || "");
     else if (arg === "--keep-temp") args.keepTemp = true;
   }
   return args;
@@ -242,11 +244,16 @@ function excludedRecordingIdsFromRelease(release) {
 async function selectAcceptedSubmissions({
   batchLimit,
   analysisLimit,
+  excludeRecordingIds: requestedExcludedRecordingIds = [],
 }) {
   const submissionsPath = path.join(process.cwd(), "data", "experiments", "western-strings-m3", "controlled-submissions.jsonl");
   const reviewsPath = path.join(process.cwd(), "data", "experiments", "western-strings-m3", "controlled-submission-reviews.jsonl");
   const release = await readJson(path.resolve(RELEASE_REL));
   const excludedRecordingIds = excludedRecordingIdsFromRelease(release);
+  for (const recordingId of requestedExcludedRecordingIds) {
+    const normalized = safeString(recordingId).trim();
+    if (normalized) excludedRecordingIds.add(normalized);
+  }
   const submissions = await readJsonl(submissionsPath);
   const acceptedReviews = await readJsonl(reviewsPath);
   const acceptedIds = new Set(
@@ -586,8 +593,14 @@ export async function runOrdinaryMonitoredPilotReviewPack(args = {}) {
     selectionJson: DEFAULT_SELECTION,
     summary: DEFAULT_SUMMARY,
     keepTemp: false,
+    excludeRecordingIds: [],
     ...args,
   };
+  args.excludeRecordingIds = [...new Set(
+    (Array.isArray(args.excludeRecordingIds) ? args.excludeRecordingIds : [])
+      .map((recordingId) => safeString(recordingId).trim())
+      .filter(Boolean),
+  )];
   const realRepoRoot = process.cwd();
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "western-ordinary-real-pilot-"));
   const statusBefore = await buildProjectStatus();
@@ -599,6 +612,7 @@ export async function runOrdinaryMonitoredPilotReviewPack(args = {}) {
     const { release, excludedRecordingIds, selected } = await selectAcceptedSubmissions({
       batchLimit: args.batchLimit,
       analysisLimit: args.analysisLimit,
+      excludeRecordingIds: args.excludeRecordingIds,
     });
     if (!selected.length) {
       throw new Error("No accepted controlled submissions are available after excluding known bad recording IDs.");
@@ -641,6 +655,7 @@ export async function runOrdinaryMonitoredPilotReviewPack(args = {}) {
       candidateCount: selection.totalCandidateCount,
       selectedSubmissionCount: selected.length,
       excludedRecordingIds,
+      requestedExcludedRecordingIds: args.excludeRecordingIds,
       knownUsableRows: selection.knownUsableRows,
       knownWrongRows: selection.knownWrongRows,
       rows: selection.rows,
@@ -667,6 +682,7 @@ export async function runOrdinaryMonitoredPilotReviewPack(args = {}) {
         analysisLimit: submission.limit,
       })),
       excludedRecordingIds,
+      requestedExcludedRecordingIds: args.excludeRecordingIds,
       tempRunOnly: true,
       tempRoot: args.keepTemp ? tempRoot : "",
       tempRootDeleted: false,

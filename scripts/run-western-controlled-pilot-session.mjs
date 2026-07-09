@@ -15,6 +15,7 @@ function parseArgs(argv) {
     execute: false,
     limit: 1,
     outRoot: DEFAULT_OUT_ROOT,
+    excludeRecordingIds: [],
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -24,6 +25,7 @@ function parseArgs(argv) {
     else if (arg === "--session-id") args.sessionId = argv[++index] || args.sessionId;
     else if (arg === "--approval") args.approval = argv[++index] || args.approval;
     else if (arg === "--release-review") args.releaseReview = argv[++index] || args.releaseReview;
+    else if (arg === "--exclude-recording-id") args.excludeRecordingIds.push(argv[++index] || "");
   }
   return args;
 }
@@ -62,6 +64,49 @@ function runNpmScript(script) {
   };
 }
 
+async function readJsonOrNull(filePath) {
+  try {
+    return JSON.parse(await fs.readFile(filePath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+async function loadHistoricalRecordingIds(outRoot = DEFAULT_OUT_ROOT) {
+  const absoluteRoot = path.resolve(outRoot);
+  let entries = [];
+  try {
+    entries = await fs.readdir(absoluteRoot, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const recordingIds = new Set();
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const session = await readJsonOrNull(path.join(absoluteRoot, entry.name, "session.json"));
+    if (session?.executionPerformed !== true) continue;
+    for (const recordingId of Array.isArray(session.additionalExcludedRecordingIds)
+      ? session.additionalExcludedRecordingIds
+      : []) {
+      const normalized = String(recordingId || "").trim();
+      if (normalized) recordingIds.add(normalized);
+    }
+    let selectedSubmissions = Array.isArray(session.selectedSubmissions) ? session.selectedSubmissions : [];
+    if (!selectedSubmissions.length && session.artifacts?.precisionSummary) {
+      const precisionPath = path.isAbsolute(session.artifacts.precisionSummary)
+        ? session.artifacts.precisionSummary
+        : path.resolve(process.cwd(), session.artifacts.precisionSummary);
+      const precision = await readJsonOrNull(precisionPath);
+      selectedSubmissions = Array.isArray(precision?.selectedSubmissions) ? precision.selectedSubmissions : [];
+    }
+    for (const submission of selectedSubmissions) {
+      const recordingId = String(submission?.recordingId || "").trim();
+      if (recordingId) recordingIds.add(recordingId);
+    }
+  }
+  return [...recordingIds].sort();
+}
+
 function renderMarkdown(report) {
   return [
     "# Western Strings Controlled Pilot Session",
@@ -75,6 +120,8 @@ function renderMarkdown(report) {
     `- executionPerformed: ${report.executionPerformed}`,
     `- pilotRunAccepted: ${report.pilotRunAccepted}`,
     `- approvedBy: ${report.approvedBy || ""}`,
+    `- historicalRecordingIdsExcluded: ${report.historyExcludedRecordingIds.join(", ") || "none"}`,
+    `- additionalRecordingIdsExcluded: ${report.additionalExcludedRecordingIds.join(", ") || "none"}`,
     `- defaultRuntimeFailClosedAfter: ${report.defaultRuntimeFailClosedAfter}`,
     `- processEnvironmentRestored: ${report.processEnvironmentRestored}`,
     "",
@@ -87,6 +134,7 @@ function renderMarkdown(report) {
     `- knownUsableAutoPassCandidateCount: ${report.monitoring.knownUsableAutoPassCandidateCount}`,
     `- knownWrongAutoPassCandidateCount: ${report.monitoring.knownWrongAutoPassCandidateCount}`,
     `- unknownAutoPassCandidateCount: ${report.monitoring.unknownAutoPassCandidateCount}`,
+    `- selectedRecordingIds: ${report.selectedSubmissions.map((item) => item.recordingId).filter(Boolean).join(", ") || "none"}`,
     "",
     "## Safety Meaning",
     "",
@@ -136,6 +184,12 @@ export async function runControlledPilotSession(args = {}, dependencies = {}) {
   const runPrecisionSession = dependencies.runPrecisionSession || runOrdinaryMonitoredPilotReviewPack;
   const buildStatus = dependencies.buildStatus || buildProjectStatus;
   const refreshReleaseReview = dependencies.refreshReleaseReview || (() => runNpmScript("western:release-review"));
+  const loadHistory = dependencies.loadHistoricalRecordingIds || loadHistoricalRecordingIds;
+  const additionalExcludedRecordingIds = [...new Set(
+    (Array.isArray(args.excludeRecordingIds) ? args.excludeRecordingIds : [])
+      .map((recordingId) => String(recordingId || "").trim())
+      .filter(Boolean),
+  )];
   const oldEnable = process.env[ENABLE_ENV];
   const parentEnvEnabled = envEnabled(oldEnable);
   const blockingReasons = [];
@@ -143,6 +197,11 @@ export async function runControlledPilotSession(args = {}, dependencies = {}) {
   let precision = null;
   let runtimeStatusAfter = null;
   let caughtError = "";
+  const historyExcludedRecordingIds = await loadHistory(args.outRoot || DEFAULT_OUT_ROOT);
+  const effectiveExcludedRecordingIds = [...new Set([
+    ...historyExcludedRecordingIds,
+    ...additionalExcludedRecordingIds,
+  ])].sort();
 
   if (execute && parentEnvEnabled) {
     blockingReasons.push("pilot-run-parent-env-enabled");
@@ -168,6 +227,7 @@ export async function runControlledPilotSession(args = {}, dependencies = {}) {
         outDir: reviewDir,
         selectionJson,
         summary: precisionSummary,
+        excludeRecordingIds: effectiveExcludedRecordingIds,
       });
     }
   } catch (error) {
@@ -180,11 +240,18 @@ export async function runControlledPilotSession(args = {}, dependencies = {}) {
   }
 
   const summary = precision?.summary || {};
+  const selectedSubmissions = Array.isArray(summary.selectedSubmissions) ? summary.selectedSubmissions : [];
+  const repeatedRecordingIds = selectedSubmissions
+    .map((submission) => String(submission?.recordingId || "").trim())
+    .filter((recordingId) => recordingId && effectiveExcludedRecordingIds.includes(recordingId));
   const knownWrong = Number(summary.knownWrongAutoPassCandidateCount || 0);
   const unknown = Number(summary.unknownReviewCandidateCount || 0);
   if (summary.ok === false) blockingReasons.push(...(summary.blockingReasons || []).map((reason) => `pilot:${reason}`));
   if (knownWrong > 0) blockingReasons.push(`pilot-known-wrong-auto-pass:${knownWrong}`);
   if (unknown > 0) blockingReasons.push(`pilot-unknown-auto-pass-needs-targeted-review:${unknown}`);
+  if (repeatedRecordingIds.length > 0) {
+    blockingReasons.push(`pilot-reused-recording:${[...new Set(repeatedRecordingIds)].join(",")}`);
+  }
   const processEnvironmentRestored = process.env[ENABLE_ENV] === oldEnable;
   if (!processEnvironmentRestored) blockingReasons.push("pilot-run-process-environment-not-restored");
   const defaultRuntimeFailClosedAfter = runtimeStatusAfter?.runtimeStudentGate?.policy === "fail-closed"
@@ -223,6 +290,10 @@ export async function runControlledPilotSession(args = {}, dependencies = {}) {
     pilotRunAccepted,
     approvedBy: preflight.decision?.approval?.approvedBy || "",
     approvalPresent: preflight.decision?.approvalPresent === true,
+    historyExcludedRecordingIds,
+    additionalExcludedRecordingIds,
+    effectiveExcludedRecordingIds,
+    selectedSubmissions,
     refreshedReleaseReview: refresh,
     preflight: {
       okToStartControlledPilot: preflight.okToStartControlledPilot === true,
@@ -266,6 +337,10 @@ async function main() {
     defaultRuntimeFailClosedAfter: report.defaultRuntimeFailClosedAfter,
     blockingReasons: report.blockingReasons,
     monitoring: report.monitoring,
+    historyExcludedRecordingIds: report.historyExcludedRecordingIds,
+    additionalExcludedRecordingIds: report.additionalExcludedRecordingIds,
+    effectiveExcludedRecordingIds: report.effectiveExcludedRecordingIds,
+    selectedSubmissions: report.selectedSubmissions,
     out: report.artifacts,
   }, null, 2));
   if (report.executionRequested && !report.pilotRunAccepted) process.exitCode = 1;
