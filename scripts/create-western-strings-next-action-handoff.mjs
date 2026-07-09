@@ -93,6 +93,7 @@ function commandForAction(action) {
         "P1.1 context validation and threshold-pool precision have passed for the frozen RF scorer at threshold 0.8, after excluding the documented score-audio mismatch source.",
         "Use npm run western:controlled-candidate-confidence-release-audit to inspect the frozen evidence before any pilot.",
         "Run npm run western:ordinary-monitored-pilot-plan to generate the disabled-by-default pilot plan artifact.",
+        "Run npm run western:ordinary-monitored-pilot-smoke to verify the frozen RF scorer under the release flag inside a temporary repo root.",
         "Only consider WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 inside a separate monitored controlled-pilot process.",
         "Do not commit an enabled env value or turn the gate on by default.",
         "After any smoke/release check, run npm run test:western-project-gate",

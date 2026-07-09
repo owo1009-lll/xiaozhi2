@@ -110,6 +110,7 @@
 
 - evidence: `data/experiments/western-strings-m3/confidence-validation-review/ordinary-confidence-release-audit.json`
 - plan: `npm run western:ordinary-monitored-pilot-plan`
+- smoke: `npm run western:ordinary-monitored-pilot-smoke`
 - status: `npm run western:project-status`
 - guard: `npm run test:western-project-gate`
 
