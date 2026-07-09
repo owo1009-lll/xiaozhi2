@@ -203,6 +203,16 @@ function commandForAction(action) {
       "After any runtime/pilot wiring change, rerun npm run western:release-review, npm run test:western-project-gate, and npm run build.",
     ];
   }
+  if (track === "Controlled pilot decision") {
+    return [
+      "Open data/experiments/western-strings-release-review.md.",
+      "Confirm the pilot scope in writing before starting any runtime process: ordinary candidate-evidence auto_pass only, plus the documented M3+ safe subset if needed.",
+      "Keep production/default runtime fail-closed.",
+      "Do not commit WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 or enable it globally.",
+      "If a pilot is approved, start it as a separate monitored process and rerun npm run western:release-review after any code or runtime wiring change.",
+      "If no pilot is approved, stop here; the system has completed machine self-tests and remains safely review-only by default.",
+    ];
+  }
   return ["Run npm run western:project-status after completing this item"];
 }
 

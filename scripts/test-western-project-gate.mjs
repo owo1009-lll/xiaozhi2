@@ -85,8 +85,8 @@ const m3plusPilotAuditPassed = m3plus.monitoredPilotAudit?.readyForMonitoredPilo
 if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
   assert.equal(
     status.nextActions[0]?.track,
-    "Release review",
-    "after ordinary, M3+, and M4 machine checks pass, handoff should move to release review while runtime stays fail-closed",
+    status.releaseReview?.readyForControlledPilot ? "Controlled pilot decision" : "Release review",
+    "after ordinary, M3+, and M4 machine checks pass, handoff should move to release review or controlled pilot decision while runtime stays fail-closed",
   );
 } else if (ordinaryPilotAuditPassed) {
   assert.equal(
@@ -198,7 +198,7 @@ assert.equal(
 if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
   assert.equal(
     status.nextActions[0]?.track,
-    "Release review",
+    status.releaseReview?.readyForControlledPilot ? "Controlled pilot decision" : "Release review",
     "M4 should no longer produce a human-task next action after clean-score approval is recognized",
   );
 }
@@ -244,8 +244,8 @@ if (m4.m4OmrDraftQualityReady) {
     "current handoff must not keep stale M4 score-editor instructions after M4 clears",
   );
   assert(
-    handoff.includes("npm run western:release-review"),
-    "release-review handoff must route through the aggregate release-review command",
+    handoff.includes("npm run western:release-review") || handoff.includes("Controlled pilot decision"),
+    "handoff must route through release-review or the controlled-pilot decision after M4 clears",
   );
 } else {
   assert(

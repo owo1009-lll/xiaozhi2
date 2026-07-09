@@ -339,6 +339,16 @@ const M4_GOLD_PROVENANCE_AUDIT_CSV = path.join(
   "western-strings-m4",
   "gold-provenance-audit.csv",
 );
+const RELEASE_REVIEW = path.join(
+  "data",
+  "experiments",
+  "western-strings-release-review.json",
+);
+const RELEASE_REVIEW_MD = path.join(
+  "data",
+  "experiments",
+  "western-strings-release-review.md",
+);
 
 function parseArgs(argv) {
   const args = {
@@ -880,7 +890,7 @@ async function buildM4OmrStatus() {
   };
 }
 
-function summarizeNextActions(controlled, m3plus, m4Omr) {
+function summarizeNextActions(controlled, m3plus, m4Omr, releaseReview) {
   const actions = [];
   const ordinaryBlockers = controlled.blockingReasons || [];
   const ordinaryPilotAudit = controlled.confidencePilot?.monitoredPilotAudit || {};
@@ -967,22 +977,35 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
     });
   }
   if (!actions.length) {
-    actions.push({
-      priority: 1,
-      track: "Release review",
-      action: "Both label gates have enough data for offline evaluation. Run `npm run western:release-review` to aggregate ordinary, M3+, and M4 machine checks before touching any runtime gate.",
-      artifact: "data/experiments/western-strings-release-review.md",
-      reason: [],
-    });
+    if (releaseReview?.readyForControlledPilot === true
+      && releaseReview?.teacherReviewNeeded !== true
+      && releaseReview?.runtimeFailClosed === true) {
+      actions.push({
+        priority: 1,
+        track: "Controlled pilot decision",
+        action: "Release review passed for a separate monitored pilot. Decide the pilot scope/process explicitly; keep default student runtime fail-closed unless that separate pilot is started.",
+        artifact: RELEASE_REVIEW_MD.replace(/\\/g, "/"),
+        reason: ["default-runtime-fail-closed"],
+      });
+    } else {
+      actions.push({
+        priority: 1,
+        track: "Release review",
+        action: "Both label gates have enough data for offline evaluation. Run `npm run western:release-review` to aggregate ordinary, M3+, and M4 machine checks before touching any runtime gate.",
+        artifact: RELEASE_REVIEW_MD.replace(/\\/g, "/"),
+        reason: [],
+      });
+    }
   }
   return actions;
 }
 
 export async function buildProjectStatus() {
-  const [controlledCandidate, m3plusPitchModes, m4Omr] = await Promise.all([
+  const [controlledCandidate, m3plusPitchModes, m4Omr, releaseReview] = await Promise.all([
     buildControlledStatus(),
     buildM3PlusStatus(),
     buildM4OmrStatus(),
+    readJson(RELEASE_REVIEW),
   ]);
   return {
     ok: true,
@@ -999,12 +1022,26 @@ export async function buildProjectStatus() {
       m4OmrAutoScoreReady: false,
       policy: "fail-closed",
     },
+    releaseReview: releaseReview
+      ? {
+          source: RELEASE_REVIEW.replace(/\\/g, "/"),
+          summary: RELEASE_REVIEW_MD.replace(/\\/g, "/"),
+          readyForControlledPilot: releaseReview.readyForControlledPilot === true,
+          readyForDefaultStudentRelease: releaseReview.readyForDefaultStudentRelease === true,
+          teacherReviewNeeded: releaseReview.teacherReviewNeeded === true,
+          runtimeFailClosed: releaseReview.runtimeFailClosed === true,
+        }
+      : {
+          source: RELEASE_REVIEW.replace(/\\/g, "/"),
+          summary: RELEASE_REVIEW_MD.replace(/\\/g, "/"),
+          missing: true,
+        },
     tracks: {
       controlledCandidate,
       m3plusPitchModes,
       m4Omr,
     },
-    nextActions: summarizeNextActions(controlledCandidate, m3plusPitchModes, m4Omr),
+    nextActions: summarizeNextActions(controlledCandidate, m3plusPitchModes, m4Omr, releaseReview),
   };
 }
 
@@ -1023,6 +1060,7 @@ function printProjectStatus(status, outPath) {
     ok: status.ok,
     reviewPolicy: status.reviewPolicy,
     runtimeStudentGate: status.runtimeStudentGate,
+    releaseReview: status.releaseReview,
     controlledCandidate: {
       ready: controlledCandidate.studentSafeCandidateGateReady,
       counts: controlledCandidate.counts,

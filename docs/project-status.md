@@ -102,9 +102,9 @@
 
 ## 4. 当前唯一下一步
 
-### P1: Release review
+### P1: 受控 pilot 决策
 
-现在不是继续复核旧包, 而是做发布前汇总审查:
+发布前汇总审查已经可以由机器完成:
 
 ```bash
 npm run western:release-review
@@ -122,14 +122,14 @@ npm run western:release-review
 - `data/experiments/western-strings-release-review.json`
 - `data/experiments/western-strings-release-review.md`
 
-当前预期:
+当前实测:
 
 - `readyForControlledPilot=true`
 - `readyForDefaultStudentRelease=false`
 - `teacherReviewNeeded=false`
 - `runtimeFailClosed=true`
 
-这表示:证据足够讨论单独受控 pilot, 但默认学生端仍保持关闭。
+这表示:证据足够讨论单独受控 pilot, 但默认学生端仍保持关闭。下一步不是继续复核, 也不是默认上线;而是决定是否启动一个单独受控进程。如果不启动 pilot,项目应停在安全 review-only 默认态。
 
 ## 5. 当前不可声称
 
