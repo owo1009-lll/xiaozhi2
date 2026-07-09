@@ -59,7 +59,12 @@ assert.equal(
   "data/experiments/western-strings-m3/confidence-validation-review/index.html",
   "ordinary gate failure should point to the confidence validation review page",
 );
-assert(fullGate.failures.some((failure) => failure.track === "M3+ pitch behavior modes"), "M3+ track failure should be reported");
+const m3plusFailure = fullGate.failures.some((failure) => failure.track === "M3+ pitch behavior modes");
+if (status.tracks.m3plusPitchModes.m3plusModeEvalReady) {
+  assert.equal(m3plusFailure, false, "M3+ track should not fail once review labels meet the offline eval threshold");
+} else {
+  assert.equal(m3plusFailure, true, "M3+ track failure should be reported until review labels meet the offline eval threshold");
+}
 assert(fullGate.failures.some((failure) => failure.track === "M4 OMR benchmark"), "M4 track failure should be reported");
 
 console.log(JSON.stringify({
