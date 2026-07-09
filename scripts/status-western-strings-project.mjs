@@ -827,6 +827,14 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
         : (m3plus.reviewArtifacts.localizationDiagnosisGroupsCsv || m3plus.reviewArtifacts.modeEvalCsv || m3plus.reviewArtifacts.modeEvalJson),
       reason: m3plus.blockingReasons,
     });
+  } else if (!m3plus.studentGateReady) {
+    actions.push({
+      priority: 2,
+      track: "M3+ pitch behavior modes",
+      action: `M3+ first-measure offline evidence now passes for ${(m3plus.modeEval?.releaseReadyModes || []).join(", ") || "mode-specific"} pitch-judgement modes. Keep default runtime fail-closed; if productizing, create a separate monitored pilot scoped to first-measure, trusted-recording slide/trill rows only. Do not request more M3+ review for the current pack.`,
+      artifact: m3plus.reviewArtifacts.modeEvalJson || m3plus.reviewArtifacts.modeEvalCsv,
+      reason: ["m3plus-runtime-disabled-by-default", "m3plus-first-measure-scope-only"],
+    });
   }
   if (!m4Omr.m4OmrDraftQualityReady) {
     actions.push({
