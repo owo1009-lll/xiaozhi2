@@ -6,6 +6,8 @@ import { buildProjectStatus } from "./status-western-strings-project.mjs";
 const status = await buildProjectStatus();
 
 assert.equal(status.runtimeStudentGate.policy, "fail-closed", "student runtime gate must remain fail-closed");
+assert.equal(status.reviewPolicy?.rule, "machine-self-test-before-human-review", "project status must expose the review policy");
+assert.equal(status.reviewPolicy?.source, "docs/western-strings-review-policy.md", "project status must point to the review policy document");
 assert.equal(status.runtimeStudentGate.ordinaryUploadAutoFeedbackReady, false, "ordinary upload must not auto-feedback before release gate");
 assert.equal(status.runtimeStudentGate.m3plusAutoFeedbackReady, false, "M3+ mode feedback must stay disabled before labels are ready");
 assert.equal(status.runtimeStudentGate.m4OmrAutoScoreReady, false, "M4 OMR auto score must stay disabled before independent gold");
@@ -22,6 +24,13 @@ assert.deepEqual(m3plus.modeEval?.releaseReadyModes || [], ["slide-like", "trill
 assert.equal(m3plus.localizationDiagnosis?.sourceExists, true, "M3+ localization diagnosis should be generated after round-2 import");
 assert.equal(m3plus.localizationDiagnosis?.summary?.nonMatch, 24, "M3+ localization diagnosis should expose the current non-match row count");
 assert.deepEqual(m3plus.blockingReasons || [], [], "M3+ offline mode evidence should no longer ask for more review after the safe first-measure pack is imported");
+if (m3plus.monitoredPilotAudit?.sourceExists) {
+  assert.equal(m3plus.monitoredPilotAudit.readyForMonitoredPilot, true, "M3+ monitored pilot audit should pass before the handoff moves on");
+  assert.equal(m3plus.monitoredPilotAudit.teacherReviewNeeded, false, "M3+ monitored pilot audit must not ask for more review when all auto-pass evidence is already known");
+  assert.equal(m3plus.monitoredPilotAudit.defaultM3PlusReadyAfter, false, "M3+ monitored pilot audit must keep default runtime disabled");
+  assert.deepEqual(Object.keys(m3plus.monitoredPilotAudit.releaseModes || {}), ["slide-like", "trill-like"], "M3+ pilot audit should only expose slide/trill release modes");
+  assert((m3plus.monitoredPilotAudit.blockedModes || []).includes("variable-f0"), "unsafe variable-f0 must remain blocked by the M3+ audit");
+}
 
 const controlled = status.tracks.controlledCandidate;
 assert.equal(controlled.studentSafeCandidateGateReady, false, "ordinary upload must still require blind validation");
@@ -68,7 +77,16 @@ assert.equal(controlled.confidencePilot.bestReleaseCandidate.groupBy, "recording
 const ordinaryPilotAuditPassed = controlled.confidencePilot?.monitoredPilotAudit?.readyForMonitoredPilot === true
   && controlled.confidencePilot?.monitoredPilotAudit?.teacherReviewNeeded === false
   && controlled.confidencePilot?.monitoredPilotAudit?.defaultOrdinaryReadyAfter === false;
-if (ordinaryPilotAuditPassed) {
+const m3plusPilotAuditPassed = m3plus.monitoredPilotAudit?.readyForMonitoredPilot === true
+  && m3plus.monitoredPilotAudit?.teacherReviewNeeded === false
+  && m3plus.monitoredPilotAudit?.defaultM3PlusReadyAfter === false;
+if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
+  assert.equal(
+    status.nextActions[0]?.track,
+    "M4 OMR benchmark",
+    "after ordinary and M3+ pilot audits pass, handoff should move to M4 while release stays fail-closed",
+  );
+} else if (ordinaryPilotAuditPassed) {
   assert.equal(
     status.nextActions[0]?.track,
     "M3+ pitch behavior modes",
@@ -102,7 +120,13 @@ const expectedOrdinaryArtifact = status.tracks.controlledCandidate.blockingReaso
   : status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-threshold-pool-precision-too-low")
   ? "data/experiments/western-strings-m3/confidence-threshold-pool-review/confidence-threshold-pool-diagnosis.json"
   : "data/experiments/western-strings-m3/confidence-validation-review/ordinary-confidence-release-audit.json";
-if (ordinaryPilotAuditPassed) {
+if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
+  assert.equal(
+    status.nextActions[0]?.artifact,
+    "data/experiments/western-strings-m4/independent-gold-todo.html",
+    "after ordinary and M3+ pilot audits pass, handoff artifact should point to the M4 independent-gold checklist",
+  );
+} else if (ordinaryPilotAuditPassed) {
   assert.equal(
     status.nextActions[0]?.artifact,
     "data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-pitch-mode-eval.json",

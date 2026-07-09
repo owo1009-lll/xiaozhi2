@@ -10,6 +10,7 @@ import {
 } from "./status-western-controlled-candidate-review.mjs";
 
 const DEFAULT_OUT = path.join("data", "experiments", "western-strings-project-status.json");
+const REVIEW_POLICY_DOC = path.join("docs", "western-strings-review-policy.md");
 
 const CONTROLLED_LABELS = path.join(
   "data",
@@ -255,6 +256,13 @@ const M3PLUS_MODE_EVAL = path.join(
   "pitch-mode-review-pack",
   "m3plus-pitch-mode-eval.json",
 );
+const M3PLUS_MONITORED_PILOT_AUDIT = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3plus",
+  "monitored-pilot",
+  "m3plus-monitored-pilot-audit.json",
+);
 const M3PLUS_MODE_EVAL_CSV = path.join(
   "data",
   "experiments",
@@ -452,6 +460,7 @@ async function buildM3PlusStatus() {
   const sourceRows = await readCsv(M3PLUS_SOURCE);
   const labelRows = await readCsv(M3PLUS_LABELS);
   const modeEval = await readJson(M3PLUS_MODE_EVAL);
+  const monitoredPilotAudit = await readJson(M3PLUS_MONITORED_PILOT_AUDIT);
   const localizationDiagnosis = await readJson(M3PLUS_LOCALIZATION_DIAGNOSIS);
   const candidateQualityReviewPageExists = await exists(M3PLUS_CANDIDATE_QUALITY_REVIEW_PAGE);
   const candidateQualityCompletedExists = await exists(M3PLUS_CANDIDATE_QUALITY_COMPLETED);
@@ -531,6 +540,27 @@ async function buildM3PlusStatus() {
       counts: modeEval?.counts || {},
       blockingReasons: modeEval?.blockingReasons || modeEvalBlockingReasons,
     },
+    monitoredPilotAudit: monitoredPilotAudit ? {
+      source: M3PLUS_MONITORED_PILOT_AUDIT.replace(/\\/g, "/"),
+      sourceExists: true,
+      ok: monitoredPilotAudit.ok === true,
+      readyForMonitoredPilot: monitoredPilotAudit.readyForMonitoredPilot === true,
+      teacherReviewNeeded: monitoredPilotAudit.teacherReviewNeeded === true,
+      defaultM3PlusReadyAfter: monitoredPilotAudit.defaultM3PlusReadyAfter === true,
+      releaseModes: monitoredPilotAudit.releaseModes || {},
+      blockedModes: monitoredPilotAudit.blockedModes || [],
+      blockingReasons: monitoredPilotAudit.blockingReasons || [],
+    } : {
+      source: M3PLUS_MONITORED_PILOT_AUDIT.replace(/\\/g, "/"),
+      sourceExists: false,
+      ok: false,
+      readyForMonitoredPilot: false,
+      teacherReviewNeeded: false,
+      defaultM3PlusReadyAfter: false,
+      releaseModes: {},
+      blockedModes: [],
+      blockingReasons: ["m3plus-monitored-pilot-audit-missing"],
+    },
     localizationDiagnosis: {
       source: M3PLUS_LOCALIZATION_DIAGNOSIS.replace(/\\/g, "/"),
       sourceExists: Boolean(localizationDiagnosis),
@@ -552,6 +582,7 @@ async function buildM3PlusStatus() {
       completedCsv: M3PLUS_COMPLETED.replace(/\\/g, "/"),
       labelsCsv: M3PLUS_LABELS.replace(/\\/g, "/"),
       modeEvalJson: M3PLUS_MODE_EVAL.replace(/\\/g, "/"),
+      monitoredPilotAuditJson: M3PLUS_MONITORED_PILOT_AUDIT.replace(/\\/g, "/"),
       modeEvalCsv: M3PLUS_MODE_EVAL_CSV.replace(/\\/g, "/"),
       localizationDiagnosisJson: M3PLUS_LOCALIZATION_DIAGNOSIS.replace(/\\/g, "/"),
       localizationDiagnosisGroupsCsv: M3PLUS_LOCALIZATION_GROUPS_CSV.replace(/\\/g, "/"),
@@ -793,6 +824,11 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
     && (ordinaryPilotAudit.blockingReasons || []).length === 0;
   const ordinaryOnlyDefaultDisabled = ordinaryBlockers.length > 0
     && ordinaryBlockers.every((reason) => reason === "ordinary-auto-gate-disabled-by-default");
+  const m3plusAudit = m3plus.monitoredPilotAudit || {};
+  const m3plusPilotEvidencePassed = m3plusAudit.readyForMonitoredPilot === true
+    && m3plusAudit.teacherReviewNeeded !== true
+    && m3plusAudit.defaultM3PlusReadyAfter !== true
+    && (m3plusAudit.blockingReasons || []).length === 0;
   if (!controlled.studentSafeCandidateGateReady && !(ordinaryPilotEvidencePassed && ordinaryOnlyDefaultDisabled)) {
     const ordinaryArtifact = (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-context-validation-needed")
       ? (controlled.reviewArtifacts.recalibrationContextValidationReviewPage || controlled.confidenceRecalibration?.contextValidation?.reviewPage)
@@ -844,12 +880,12 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
         : (m3plus.reviewArtifacts.localizationDiagnosisGroupsCsv || m3plus.reviewArtifacts.modeEvalCsv || m3plus.reviewArtifacts.modeEvalJson),
       reason: m3plus.blockingReasons,
     });
-  } else if (!m3plus.studentGateReady) {
+  } else if (!m3plus.studentGateReady && !m3plusPilotEvidencePassed) {
     actions.push({
       priority: 2,
       track: "M3+ pitch behavior modes",
-      action: `M3+ first-measure offline evidence now passes for ${(m3plus.modeEval?.releaseReadyModes || []).join(", ") || "mode-specific"} pitch-judgement modes. Keep default runtime fail-closed; if productizing, create a separate monitored pilot scoped to first-measure, trusted-recording slide/trill rows only. Do not request more M3+ review for the current pack.`,
-      artifact: m3plus.reviewArtifacts.modeEvalJson || m3plus.reviewArtifacts.modeEvalCsv,
+      action: `M3+ first-measure offline evidence now passes for ${(m3plus.modeEval?.releaseReadyModes || []).join(", ") || "mode-specific"} pitch-judgement modes. Run npm run western:m3plus-monitored-pilot-audit before any product pilot; keep default runtime fail-closed and do not request more M3+ review for the current pack unless the audit reports unknown or unsafe rows.`,
+      artifact: m3plus.reviewArtifacts.monitoredPilotAuditJson || m3plus.reviewArtifacts.modeEvalJson || m3plus.reviewArtifacts.modeEvalCsv,
       reason: ["m3plus-runtime-disabled-by-default", "m3plus-first-measure-scope-only"],
     });
   }
@@ -885,6 +921,10 @@ export async function buildProjectStatus() {
     generatedAt: new Date().toISOString(),
     project: "western-strings-practice-diagnostics",
     branchGoal: "advance handbook batches without changing student runtime gates before evidence is ready",
+    reviewPolicy: {
+      source: REVIEW_POLICY_DOC.replace(/\\/g, "/"),
+      rule: "machine-self-test-before-human-review",
+    },
     runtimeStudentGate: {
       ordinaryUploadAutoFeedbackReady: controlledCandidate.studentSafeCandidateGateReady,
       m3plusAutoFeedbackReady: false,
@@ -913,6 +953,7 @@ function printProjectStatus(status, outPath) {
   const m4Omr = status.tracks?.m4Omr || {};
   console.log(JSON.stringify({
     ok: status.ok,
+    reviewPolicy: status.reviewPolicy,
     runtimeStudentGate: status.runtimeStudentGate,
     controlledCandidate: {
       ready: controlledCandidate.studentSafeCandidateGateReady,
@@ -925,6 +966,7 @@ function printProjectStatus(status, outPath) {
       labelReady: m3plusPitchModes.m3plusModeEvalReady,
       releaseReadyModes: m3plusPitchModes.modeEval?.releaseReadyModes || [],
       controlReadyModes: m3plusPitchModes.modeEval?.controlReadyModes || [],
+      monitoredPilotAudit: m3plusPitchModes.monitoredPilotAudit,
       counts: m3plusPitchModes.counts,
       blockingReasons: m3plusPitchModes.blockingReasons,
     },
