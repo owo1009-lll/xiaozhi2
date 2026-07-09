@@ -139,6 +139,7 @@
     "western:next-actions": "node scripts\\create-western-strings-next-action-handoff.mjs",
     "western:open-next-action": "node scripts\\open-western-strings-next-action.mjs",
     "test:western-project-gate": "node scripts\\test-western-project-gate.mjs",
+    "test:western-controlled-pilot-decision": "node scripts\\test-western-controlled-pilot-decision.mjs",
     "western:controlled-submissions-seed-m2f": "node scripts\\seed-western-controlled-submissions-from-m2f.mjs",
     "test:western-m3-diagnosis": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-western-m3-diagnosis.py",
     "test:separation-quality": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-separation-quality.py",

@@ -236,6 +236,10 @@ assert(
   packageJson.scripts?.["western:controlled-pilot-start-preflight"],
   "package.json must expose the controlled-pilot start preflight command",
 );
+assert(
+  packageJson.scripts?.["test:western-controlled-pilot-decision"],
+  "package.json must expose controlled-pilot decision/preflight tests",
+);
 for (const [label, text] of [["review policy", reviewPolicy]]) {
   assert(
     text.includes("npm run western:m4-preflight"),
