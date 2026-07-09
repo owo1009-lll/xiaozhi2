@@ -5,6 +5,7 @@ import path from "node:path";
 import { writeApprovalTemplate } from "./create-western-controlled-pilot-approval-template.mjs";
 import { buildControlledPilotDecision } from "./create-western-controlled-pilot-decision.mjs";
 import { renderHandoff } from "./create-western-strings-next-action-handoff.mjs";
+import { writeControlledPilotApprovalDecision } from "./record-western-controlled-pilot-decision.mjs";
 import { buildControlledPilotStartPreflight } from "./run-western-controlled-pilot-start-preflight.mjs";
 import { buildProjectStatus } from "./status-western-strings-project.mjs";
 
@@ -12,6 +13,8 @@ const TEST_DIR = path.join("data", "experiments", "western-strings-controlled-pi
 const TEMPLATE_PATH = path.join(TEST_DIR, "approval.template.json");
 const DEFERRED_APPROVAL_PATH = path.join(TEST_DIR, "approval.deferred.json");
 const VALID_APPROVAL_PATH = path.join(TEST_DIR, "approval.valid.json");
+const RECORDED_DEFERRED_APPROVAL_PATH = path.join(TEST_DIR, "approval.recorded-deferred.json");
+const RECORDED_VALID_APPROVAL_PATH = path.join(TEST_DIR, "approval.recorded-valid.json");
 const DEFAULT_APPROVAL_PATH = path.join("data", "experiments", "western-strings-controlled-pilot-approval.json");
 const DEFAULT_DECISION_PATH = path.join("data", "experiments", "western-strings-controlled-pilot-decision.json");
 
@@ -90,6 +93,60 @@ assert(
   "start preflight should report explicit deferral",
 );
 
+const invalidRecordedDecision = await writeControlledPilotApprovalDecision({
+  out: path.join(TEST_DIR, "approval.invalid.json"),
+});
+assert.equal(invalidRecordedDecision.ok, false, "record-decision should fail without an explicit decision and owner");
+assert(
+  invalidRecordedDecision.errors.includes("decision-must-be-approve-or-defer"),
+  "record-decision should require approve/defer",
+);
+assert(
+  invalidRecordedDecision.errors.includes("approved-by-required"),
+  "record-decision should require an owner name",
+);
+
+const recordedDeferred = await writeControlledPilotApprovalDecision({
+  out: RECORDED_DEFERRED_APPROVAL_PATH,
+  decision: "defer",
+  by: "test-owner",
+  at: "2026-07-10T00:00:00+08:00",
+});
+assert.equal(recordedDeferred.ok, true, "record-decision should write an explicit defer file");
+assert.equal(recordedDeferred.pilotApproved, false, "defer file must not approve the pilot");
+const decisionRecordedDeferred = await buildControlledPilotDecision({
+  approval: RECORDED_DEFERRED_APPROVAL_PATH,
+});
+assert.equal(decisionRecordedDeferred.approvalDeferred, true, "recorded defer file should be read as explicit no-go");
+assert.equal(decisionRecordedDeferred.readyToStartControlledPilot, false, "recorded defer file must not start the pilot");
+
+const approveWithoutConfirm = await writeControlledPilotApprovalDecision({
+  out: path.join(TEST_DIR, "approval.approve-without-confirm.json"),
+  decision: "approve",
+  by: "test-owner",
+  at: "2026-07-10T00:00:00+08:00",
+});
+assert.equal(approveWithoutConfirm.ok, false, "approve must require explicit safety confirmations");
+assert(
+  approveWithoutConfirm.errors.includes("approve-requires-confirm-separate-monitored-pilot"),
+  "approve should require separate monitored pilot confirmation",
+);
+assert(
+  approveWithoutConfirm.errors.includes("approve-requires-confirm-default-runtime-fail-closed"),
+  "approve should require default runtime fail-closed confirmation",
+);
+
+const recordedApproval = await writeControlledPilotApprovalDecision({
+  out: RECORDED_VALID_APPROVAL_PATH,
+  decision: "approve",
+  by: "test-owner",
+  at: "2026-07-10T00:00:00+08:00",
+  confirmSeparateMonitoredPilot: true,
+  confirmDefaultRuntimeFailClosed: true,
+});
+assert.equal(recordedApproval.ok, true, "record-decision should write an approval file when safety confirmations are present");
+assert.equal(recordedApproval.pilotApproved, true, "recorded approval should approve the monitored pilot");
+
 await fs.writeFile(VALID_APPROVAL_PATH, `${JSON.stringify({
   pilotApproved: true,
   approvedBy: "test-owner",
@@ -112,6 +169,11 @@ const preflightWithApproval = await buildControlledPilotStartPreflight({
 assert.equal(preflightWithApproval.okToStartControlledPilot, true, "start preflight should pass with valid owner approval");
 assert.deepEqual(preflightWithApproval.blockingReasons, [], "passing start preflight should have no blocking reasons");
 assert.equal(preflightWithApproval.decision.runtimeFailClosed, true, "passing start preflight must keep default runtime fail-closed");
+const preflightWithRecordedApproval = await buildControlledPilotStartPreflight({
+  approval: RECORDED_VALID_APPROVAL_PATH,
+});
+assert.equal(preflightWithRecordedApproval.okToStartControlledPilot, true, "recorded approval should pass start preflight");
+assert.equal(preflightWithRecordedApproval.decision.runtimeFailClosed, true, "recorded approval must keep default runtime fail-closed");
 
 const originalApproval = await readTextOrNull(DEFAULT_APPROVAL_PATH);
 const originalDecision = await readTextOrNull(DEFAULT_DECISION_PATH);
@@ -160,6 +222,10 @@ console.log(JSON.stringify({
     "preflight-blocks-without-approval",
     "decision-recognizes-explicit-no-go",
     "preflight-blocks-explicit-no-go",
+    "record-decision-requires-decision-and-owner",
+    "record-decision-defer-does-not-start",
+    "record-decision-approve-requires-safety-confirmations",
+    "record-decision-approve-passes-preflight-with-runtime-fail-closed",
     "project-status-defers-explicit-no-go-without-review",
     "handoff-defers-explicit-no-go-without-review",
     "decision-passes-with-valid-temp-approval",

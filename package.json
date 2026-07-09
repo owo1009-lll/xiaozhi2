@@ -126,6 +126,7 @@
     "western:release-review": "node scripts\\run-western-strings-release-review.mjs",
     "western:controlled-pilot-decision": "node scripts\\create-western-controlled-pilot-decision.mjs",
     "western:controlled-pilot-approval-template": "node scripts\\create-western-controlled-pilot-approval-template.mjs",
+    "western:controlled-pilot-record-decision": "node scripts\\record-western-controlled-pilot-decision.mjs",
     "western:controlled-pilot-start-preflight": "node scripts\\run-western-controlled-pilot-start-preflight.mjs",
     "western:m3plus-monitored-pilot-audit": "node scripts\\run-western-m3plus-monitored-pilot-audit.mjs",
     "western:ordinary-auto-pass-precision-review-pack": "node scripts\\run-western-ordinary-monitored-pilot-review-pack.mjs",

@@ -233,6 +233,10 @@ assert(
   "package.json must expose a non-approving controlled-pilot approval template command",
 );
 assert(
+  packageJson.scripts?.["western:controlled-pilot-record-decision"],
+  "package.json must expose a controlled-pilot owner decision recorder command",
+);
+assert(
   packageJson.scripts?.["western:controlled-pilot-start-preflight"],
   "package.json must expose the controlled-pilot start preflight command",
 );
