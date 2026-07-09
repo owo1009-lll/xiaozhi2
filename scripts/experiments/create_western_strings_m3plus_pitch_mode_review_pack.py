@@ -5,6 +5,7 @@ import csv
 import html
 import json
 import math
+import shutil
 import wave
 from collections import defaultdict
 from pathlib import Path
@@ -228,6 +229,23 @@ def write_wav_clip(path: Path, audio: np.ndarray, sr: int, start: float, end: fl
         handle.writeframes(pcm16.tobytes())
 
 
+def attach_score_image(source: dict[str, str], out_dir: Path, warnings: list[str]) -> str:
+    piece_id = str(source.get("pieceId", "")).strip()
+    if not piece_id:
+        warnings.append("missing-piece-id")
+        return ""
+    source_path = REPO / "data" / "private" / "western-strings-m2" / f"{piece_id}-score.jpg"
+    if not source_path.exists():
+        warnings.append(f"missing-score-image:{piece_id}")
+        return ""
+    target_rel = f"score-images/{piece_id}-score.jpg"
+    target_path = out_dir / target_rel
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    if not target_path.exists():
+        shutil.copyfile(source_path, target_path)
+    return target_rel
+
+
 def build_review_rows(
     selected: list[dict[str, str]],
     audio_paths: dict[str, Path],
@@ -254,10 +272,13 @@ def build_review_rows(
         else:
             y, sr = load_audio(audio_path, audio_cache)
             write_wav_clip(out_dir / clip_rel, y, sr, clip_start, clip_end)
+        score_image_rel = attach_score_image(source, out_dir, warnings)
         rows.append({
             "rowId": row_id,
             "recordingId": recording_id,
             "scenario": source.get("scenario", ""),
+            "scoreId": source.get("scoreId", ""),
+            "pieceId": source.get("pieceId", ""),
             "noteIndex": source.get("noteIndex", ""),
             "noteId": source.get("noteId", ""),
             "measureIndex": source.get("measureIndex", ""),
@@ -285,6 +306,7 @@ def build_review_rows(
             },
             "clipStartSeconds": round(clip_start, 3),
             "clipEndSeconds": round(clip_end, 3),
+            "scoreImage": score_image_rel,
         })
     return rows, sorted(set(warnings))
 
@@ -319,6 +341,18 @@ def render_html(pack: dict[str, Any]) -> str:
             if row.get("audioClip")
             else '<p class="warn">没有找到音频片段。请把本条标为不确定，并在备注里说明。</p>'
         )
+        score_html = (
+            f"""
+            <figure class="score-panel">
+              <figcaption>对应五线谱: 第 {h(row.get("pageNumber"))} 页 / 第 {h(row.get("measureIndex"))} 小节 / note {h(row.get("noteId"))}</figcaption>
+              <a href="{h(row.get("scoreImage"))}" target="_blank" rel="noreferrer">
+                <img src="{h(row.get("scoreImage"))}" alt="对应五线谱: {h(row.get("pieceId"))}" loading="lazy" />
+              </a>
+            </figure>
+            """
+            if row.get("scoreImage")
+            else '<p class="warn">没有找到对应五线谱图片。请按小节/MIDI 文本辅助判断,并在备注说明。</p>'
+        )
         cards.append(f"""
         <section class="card" data-index="{index}">
           <header>
@@ -329,8 +363,10 @@ def render_html(pack: dict[str, Any]) -> str:
             <span class="badge">{h(row["scenario"])}</span>
           </header>
           {audio_html}
+          {score_html}
           <div class="meta">
             <span>音频片段: {h(row.get("clipStartSeconds"))}s - {h(row.get("clipEndSeconds"))}s</span>
+            <span>谱面: {h(row.get("pieceId"))} / 第 {h(row.get("pageNumber"))} 页 / 第 {h(row.get("measureIndex"))} 小节</span>
             <span>候选标记: {h(row.get("flags"))}</span>
             {metrics_html}
           </div>
@@ -411,6 +447,9 @@ def render_html(pack: dict[str, Any]) -> str:
     h2 {{ margin: 0 0 4px; font-size: 20px; }}
     p {{ margin: 4px 0; }}
     audio {{ width: 100%; margin: 12px 0; }}
+    .score-panel {{ margin: 12px 0; padding: 10px; border: 1px solid #d8dee8; border-radius: 8px; background: #fbfcfe; }}
+    .score-panel figcaption {{ margin-bottom: 8px; font-weight: 700; color: #344054; }}
+    .score-panel img {{ display: block; width: 100%; max-height: 520px; object-fit: contain; background: white; border: 1px solid #e5e7eb; border-radius: 6px; }}
     .badge {{ background: #edf7ed; color: #1f6b2d; padding: 5px 8px; border-radius: 999px; white-space: nowrap; }}
     .meta {{ display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }}
     .meta span {{ background: #f0f3f8; border-radius: 999px; padding: 4px 8px; font-size: 13px; }}
@@ -579,11 +618,12 @@ def write_guide(path: Path, rows: list[dict[str, Any]], stats: dict[str, Any]) -
             "这不是技巧名称展示,也不是技巧质量评价。目标是确认某些音高行为区域能否安全判音准,从而在将来减少 review_required。",
             "",
             "标注顺序:",
-            "1. 先听短音频,判断音频是否匹配这一行的谱面音。",
+            "1. 先听短音频,对照页面里的对应五线谱图片,判断音频是否匹配这一行的谱面音。",
             "2. 不匹配就标 `mismatch`,后面的音准字段可设为不可判。",
             "3. 匹配时,再标实际音高行为、应采用的音准判法、是否可判音准、音准结论和置信度。",
             "4. 拿不准就标 `uncertain`;不要为了凑样本硬判。",
             "5. 页面里的快捷按钮只填未标项。若要全局快速处理,先确认大部分样本确实符合该判断。",
+            "6. 五线谱图片按 `pieceId/page/measure/note` 定位;若图片缺失或看不清,在备注说明并标为不确定。",
             "",
             "## 本包规模",
             "",
