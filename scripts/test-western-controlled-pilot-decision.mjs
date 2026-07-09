@@ -243,6 +243,7 @@ try {
     executionPerformed: true,
     pilotRunAccepted: true,
     approvedBy: "test-owner",
+    selectedSubmissions: [{ submissionId: "submission-completed", recordingId: "recording-completed" }],
     monitoring: {
       selectedSubmissionCount: 1,
       totalCandidateCount: 60,
@@ -273,6 +274,8 @@ try {
   });
   assert.equal(statusWithCompletedPilot.nextActions?.[0]?.track, "Controlled pilot completed");
   assert.equal(statusWithCompletedPilot.controlledPilotSession?.sessionId, "pilot-completed");
+  assert.equal(statusWithCompletedPilot.controlledPilotEvidence?.completedSafeSessionCount, 1);
+  assert.equal(statusWithCompletedPilot.controlledPilotEvidence?.safeDistinctRecordingCount, 1);
   const completedHandoff = renderHandoff(statusWithCompletedPilot);
   assert(completedHandoff.includes("Do not rerun the same recording"));
   assert(!completedHandoff.includes("western:controlled-pilot-run -- --execute"));

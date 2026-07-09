@@ -442,13 +442,13 @@ async function readJson(filePath, fallback = null) {
   }
 }
 
-async function readLatestControlledPilotSession(root = CONTROLLED_PILOT_SESSIONS_ROOT) {
+async function readControlledPilotSessions(root = CONTROLLED_PILOT_SESSIONS_ROOT) {
   const absoluteRoot = path.resolve(process.cwd(), root);
   let entries = [];
   try {
     entries = await fs.readdir(absoluteRoot, { withFileTypes: true });
   } catch {
-    return null;
+    return [];
   }
   const sessions = [];
   for (const entry of entries) {
@@ -456,15 +456,64 @@ async function readLatestControlledPilotSession(root = CONTROLLED_PILOT_SESSIONS
     const sessionPath = path.join(absoluteRoot, entry.name, "session.json");
     const session = await readJson(sessionPath);
     if (!session) continue;
+    let selectedSubmissions = Array.isArray(session.selectedSubmissions) ? session.selectedSubmissions : [];
+    if (!selectedSubmissions.length && session.artifacts?.precisionSummary) {
+      const precision = await readJson(session.artifacts.precisionSummary);
+      selectedSubmissions = Array.isArray(precision?.selectedSubmissions) ? precision.selectedSubmissions : [];
+    }
     sessions.push({
       ...session,
+      selectedSubmissions,
       source: path.relative(process.cwd(), sessionPath).replace(/\\/g, "/"),
     });
   }
   sessions.sort((left, right) => (
     Date.parse(right.generatedAt || "") - Date.parse(left.generatedAt || "")
   ));
-  return sessions.find((session) => session.executionPerformed === true) || sessions[0] || null;
+  return sessions;
+}
+
+function summarizeControlledPilotEvidence(sessions = []) {
+  const executed = sessions.filter((session) => session.executionPerformed === true);
+  const completedSafe = executed.filter((session) => session.sessionStatus === "completed_safe"
+    && session.pilotRunAccepted === true
+    && session.defaultRuntimeFailClosedAfter === true
+    && session.processEnvironmentRestored === true
+    && session.studentFeedbackPublished === false
+    && (session.blockingReasons || []).length === 0);
+  const recordingIds = new Set();
+  const safeRecordingIds = new Set();
+  const precheckRejectedRecordingIds = new Set();
+  for (const session of executed) {
+    for (const submission of session.selectedSubmissions || []) {
+      const recordingId = String(submission?.recordingId || "").trim();
+      if (recordingId) recordingIds.add(recordingId);
+      if (recordingId && completedSafe.includes(session)) safeRecordingIds.add(recordingId);
+    }
+    for (const recordingId of session.additionalExcludedRecordingIds || []) {
+      const normalized = String(recordingId || "").trim();
+      if (normalized) precheckRejectedRecordingIds.add(normalized);
+    }
+  }
+  const sumMonitoring = (field) => executed.reduce(
+    (total, session) => total + Number(session.monitoring?.[field] || 0),
+    0,
+  );
+  return {
+    sessionCount: sessions.length,
+    executedSessionCount: executed.length,
+    completedSafeSessionCount: completedSafe.length,
+    distinctRecordingCount: recordingIds.size,
+    safeDistinctRecordingCount: safeRecordingIds.size,
+    recordingIds: [...recordingIds].sort(),
+    safeRecordingIds: [...safeRecordingIds].sort(),
+    precheckRejectedRecordingIds: [...precheckRejectedRecordingIds].sort(),
+    totalCandidateCount: sumMonitoring("totalCandidateCount"),
+    autoPassCandidateCount: sumMonitoring("autoPassCandidateCount"),
+    knownUsableAutoPassCandidateCount: sumMonitoring("knownUsableAutoPassCandidateCount"),
+    knownWrongAutoPassCandidateCount: sumMonitoring("knownWrongAutoPassCandidateCount"),
+    unknownAutoPassCandidateCount: sumMonitoring("unknownAutoPassCandidateCount"),
+  };
 }
 
 function bestDeployableReleaseCandidate(pilot) {
@@ -930,7 +979,7 @@ async function buildM4OmrStatus() {
   };
 }
 
-function summarizeNextActions(controlled, m3plus, m4Omr, releaseReview, controlledPilotDecision, controlledPilotSession) {
+function summarizeNextActions(controlled, m3plus, m4Omr, releaseReview, controlledPilotDecision, controlledPilotSession, controlledPilotEvidence) {
   const actions = [];
   const ordinaryBlockers = controlled.blockingReasons || [];
   const ordinaryPilotAudit = controlled.confidencePilot?.monitoredPilotAudit || {};
@@ -1038,7 +1087,7 @@ function summarizeNextActions(controlled, m3plus, m4Omr, releaseReview, controll
         actions.push({
           priority: 1,
           track: "Controlled pilot completed",
-          action: "The approved one-shot controlled pilot completed safely. Keep the default student runtime fail-closed; do not rerun the same recording. Broader pilot evidence must use a new independently accepted submission before any release decision.",
+          action: `Controlled pilot evidence now has ${controlledPilotEvidence?.completedSafeSessionCount || 0} safe session(s) across ${controlledPilotEvidence?.safeDistinctRecordingCount || 0} independent recording(s). Keep the default student runtime fail-closed; do not rerun prior or precheck-rejected recordings. Broader evidence must use a new independently accepted submission before any release decision.`,
           artifact: controlledPilotSession.artifacts?.sessionMd || controlledPilotSession.source,
           reason: ["controlled-pilot-completed-safe", "default-runtime-fail-closed"],
         });
@@ -1081,14 +1130,18 @@ function summarizeNextActions(controlled, m3plus, m4Omr, releaseReview, controll
 }
 
 export async function buildProjectStatus(args = {}) {
-  const [controlledCandidate, m3plusPitchModes, m4Omr, releaseReview, controlledPilotDecision, controlledPilotSession] = await Promise.all([
+  const [controlledCandidate, m3plusPitchModes, m4Omr, releaseReview, controlledPilotDecision, controlledPilotSessions] = await Promise.all([
     buildControlledStatus(),
     buildM3PlusStatus(),
     buildM4OmrStatus(),
     readJson(RELEASE_REVIEW),
     readJson(CONTROLLED_PILOT_DECISION),
-    readLatestControlledPilotSession(args.controlledPilotSessionsRoot),
+    readControlledPilotSessions(args.controlledPilotSessionsRoot),
   ]);
+  const controlledPilotSession = controlledPilotSessions.find((session) => session.executionPerformed === true)
+    || controlledPilotSessions[0]
+    || null;
+  const controlledPilotEvidence = summarizeControlledPilotEvidence(controlledPilotSessions);
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -1159,6 +1212,7 @@ export async function buildProjectStatus(args = {}) {
           source: CONTROLLED_PILOT_SESSIONS_ROOT.replace(/\\/g, "/"),
           missing: true,
         },
+    controlledPilotEvidence,
     tracks: {
       controlledCandidate,
       m3plusPitchModes,
@@ -1171,6 +1225,7 @@ export async function buildProjectStatus(args = {}) {
       releaseReview,
       controlledPilotDecision,
       controlledPilotSession,
+      controlledPilotEvidence,
     ),
   };
 }
@@ -1192,6 +1247,7 @@ function printProjectStatus(status, outPath) {
     runtimeStudentGate: status.runtimeStudentGate,
     releaseReview: status.releaseReview,
     controlledPilotSession: status.controlledPilotSession,
+    controlledPilotEvidence: status.controlledPilotEvidence,
     controlledCandidate: {
       ready: controlledCandidate.studentSafeCandidateGateReady,
       counts: controlledCandidate.counts,

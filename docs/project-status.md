@@ -158,15 +158,17 @@ runner 会读取 `western-strings-controlled-pilot-sessions/` 自动排除所有
 - `readyToStartControlledPilot=true`
 - `approvalPresent=true`
 - `controlledPilotSessionStatus=completed_safe`
-- `selectedSubmissionCount=1`
-- `totalCandidateCount=60`
-- `autoPassCandidateCount=8`
-- `knownUsableAutoPassCandidateCount=3`
+- `completedSafeSessionCount=2`
+- `safeDistinctRecordingCount=2`
+- `totalCandidateCount=120`
+- `autoPassCandidateCount=19`
+- `knownUsableAutoPassCandidateCount=5`
 - `knownWrongAutoPassCandidateCount=0`
 - `unknownAutoPassCandidateCount=0`
+- `precheckRejectedRecordingIds=stu02-ex02-wrong_pitch`
 - `defaultRuntimeFailClosedAfter=true`
 
-这表示:首批受控 pilot 已安全完成,当前不需要继续找教师复核。该结果只证明一个受控录音批次可安全运行,不授权默认学生端开放。不得重复同一录音凑证据;扩大 pilot 前必须使用新的独立受控提交并重新跑 release review。默认学生端继续保持 review-only / fail-closed。
+这表示:两批独立受控 pilot 已安全完成,当前不需要继续找教师复核。该结果仍不授权默认学生端开放。不得重复历史录音或机器预检淘汰录音凑证据;扩大 pilot 前必须使用新的独立受控提交并重新跑 release review。默认学生端继续保持 review-only / fail-closed。
 
 ## 5. 当前不可声称
 
