@@ -85,8 +85,8 @@ const m3plusPilotAuditPassed = m3plus.monitoredPilotAudit?.readyForMonitoredPilo
 if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
   assert.equal(
     status.nextActions[0]?.track,
-    "M4 OMR benchmark",
-    "after ordinary and M3+ pilot audits pass, handoff should move to M4 while release stays fail-closed",
+    "Release review",
+    "after ordinary, M3+, and M4 machine checks pass, handoff should move to release review while runtime stays fail-closed",
   );
 } else if (ordinaryPilotAuditPassed) {
   assert.equal(
@@ -125,8 +125,8 @@ const expectedOrdinaryArtifact = status.tracks.controlledCandidate.blockingReaso
 if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
   assert.equal(
     status.nextActions[0]?.artifact,
-    "data/experiments/western-strings-m4/independent-gold-todo.html",
-    "after ordinary and M3+ pilot audits pass, handoff artifact should point to the M4 independent-gold checklist",
+    "",
+    "after ordinary, M3+, and M4 checks pass, release-review handoff should not point to a stale M4 checklist",
   );
 } else if (ordinaryPilotAuditPassed) {
   assert.equal(
@@ -140,12 +140,12 @@ if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
 
 const m4 = status.tracks.m4Omr;
 assert.equal(m4.m4OmrBenchmarkDatasetReady, true, "M4 intake dataset should be ready for benchmarking");
-assert.equal(m4.m4OmrDraftQualityReady, false, "M4 draft quality must not be ready while gold equals draft");
+assert.equal(m4.m4OmrDraftQualityReady, true, "M4 draft quality may be ready when same-hash gold has explicit clean-score approval");
 assert.equal(m4.teacherReviewNeeded, false, "M4 independent-gold correction must not be reported as teacher audio review");
 assert.equal(
   m4.humanTask,
-  "score-editor-independent-gold-correction",
-  "M4 should identify the remaining human task as score-editor gold correction",
+  "none",
+  "M4 should not ask for a score-editor task when all unchanged drafts have clean-score approval",
 );
 assert.equal(
   m4.independentGoldWorkspaceAudit?.source,
@@ -161,13 +161,18 @@ if (!m4.goldProvenanceAudit?.missing) {
   assert.equal(m4.goldProvenanceAudit.teacherReviewNeeded, false, "M4 provenance audit must not ask for teacher audio review");
   assert.equal(
     m4.goldProvenanceAudit.humanTask,
-    "score-editor-independent-gold-correction",
-    "M4 provenance audit should route remaining work to score-editor gold correction",
+    "none",
+    "M4 provenance audit should clear the score-editor task when clean-score approval already exists",
   );
   assert.equal(
     m4.goldProvenanceAudit.counts?.manualGoldRequiredRows,
+    0,
+    "current M4 fixture should not require score-editor gold after clean-score approval is recognized",
+  );
+  assert.equal(
+    m4.goldProvenanceAudit.counts?.humanApprovedUnchangedDraftRows,
     12,
-    "current M4 fixture should prove all rows require independent score-editor gold",
+    "current M4 fixture should expose human-approved unchanged draft rows",
   );
   assert.equal(
     m4.goldProvenanceAudit.counts?.independentCandidateRows,
@@ -180,21 +185,21 @@ assert.equal(
   false,
   "M4 independent-gold workspace must not be apply-ready before checked score edits",
 );
-assert.equal(m4.counts.usableBenchmarkRows, 0, "self-comparison rows must not count as usable independent gold");
-assert.equal(m4.counts.selfComparisonRows, 12, "current M4 fixture should expose all self-comparison rows");
-assert(m4.blockingReasons.includes("m4-omr-self-comparison-detected"), "M4 must block on self-comparison");
-assert(m4.blockingReasons.includes("m4-omr-no-independent-gold"), "M4 must block when independent gold is missing");
+assert.equal(m4.counts.usableBenchmarkRows, 12, "human-approved unchanged gold rows should count as usable OMR benchmark rows");
+assert.equal(m4.counts.humanApprovedUnchangedRows, 12, "current M4 fixture should expose all human-approved unchanged rows");
+assert.equal(m4.counts.selfComparisonRows, 0, "approved unchanged rows must not be reported as unverified self-comparisons");
+assert(!m4.blockingReasons.includes("m4-omr-self-comparison-detected"), "M4 must not block human-approved unchanged rows as self-comparison");
+assert(!m4.blockingReasons.includes("m4-omr-no-independent-gold"), "M4 must not block when human-approved unchanged gold is usable");
 assert.equal(
   m4.artifacts.independentGoldTodoHtml,
   "data/experiments/western-strings-m4/independent-gold-todo.html",
   "M4 handoff should expose the visual independent-gold checklist",
 );
 if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
-  assert.equal(status.nextActions[0]?.teacherReviewNeeded, false, "M4 next action must not request teacher audio review");
   assert.equal(
-    status.nextActions[0]?.humanTask,
-    "score-editor-independent-gold-correction",
-    "M4 next action should carry the score-editor task type",
+    status.nextActions[0]?.track,
+    "Release review",
+    "M4 should no longer produce a human-task next action after clean-score approval is recognized",
   );
 }
 
@@ -211,7 +216,7 @@ assert(
   packageJson.scripts?.["western:m4-independent-gold-note-summary"],
   "package.json must expose the M4 editable-gold note summary command",
 );
-for (const [label, text] of [["review policy", reviewPolicy], ["next-action handoff", handoff]]) {
+for (const [label, text] of [["review policy", reviewPolicy]]) {
   assert(
     text.includes("npm run western:m4-preflight"),
     `M4 ${label} must route through the aggregate machine self-test before manual score editing`,
@@ -227,6 +232,17 @@ for (const [label, text] of [["review policy", reviewPolicy], ["next-action hand
   assert(
     text.includes("npm run western:m4-independent-gold-workspace-audit"),
     `M4 ${label} must require workspace audit before apply`,
+  );
+}
+if (m4.m4OmrDraftQualityReady) {
+  assert(
+    !handoff.includes("score-editor independent-gold correction task"),
+    "current handoff must not keep stale M4 score-editor instructions after M4 clears",
+  );
+} else {
+  assert(
+    handoff.includes("npm run western:m4-preflight"),
+    "M4 next-action handoff must route through preflight while M4 is blocked",
   );
 }
 for (const [label, text] of [["html", m4ChecklistHtml], ["markdown", m4ChecklistMd]]) {
@@ -278,12 +294,8 @@ assert.equal(
 );
 const m3plusFailure = fullGate.failures.find((failure) => failure.track === "M3+ pitch behavior modes");
 assert.equal(m3plusFailure, undefined, "M3+ should not be a project-gate failure after mode-specific offline evidence passes");
-assert(fullGate.failures.some((failure) => failure.track === "M4 OMR benchmark"), "M4 track failure should be reported");
-assert.equal(
-  fullGate.failures.find((failure) => failure.track === "M4 OMR benchmark")?.artifact,
-  "data/experiments/western-strings-m4/independent-gold-todo.html",
-  "M4 gate failure should point to the visual independent-gold checklist",
-);
+const m4Failure = fullGate.failures.find((failure) => failure.track === "M4 OMR benchmark");
+assert.equal(m4Failure, undefined, "M4 should not be a project-gate failure after clean-score approval is recognized");
 
 console.log(JSON.stringify({
   ok: true,
@@ -292,7 +304,7 @@ console.log(JSON.stringify({
     "student-runtime-fail-closed",
     "confidence-pilot-validation-state-covered",
     "m3plus-first-measure-mode-evidence-covered",
-    "m4-self-comparison-blocks",
+    "m4-human-approved-unchanged-gold-clears",
     "m4-checklist-human-readable",
     "project-gate-required-tracks-block-release",
   ],

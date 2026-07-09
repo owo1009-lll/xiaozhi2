@@ -159,6 +159,11 @@ function hasAudiverisStagingEvidence(intakeRow) {
   return notes.includes("audiveris draft staged") || notes.includes("audiveris");
 }
 
+function hasHumanCleanScoreApproval(intakeRow) {
+  return String(intakeRow.cleanScoreReviewStatus || "").trim().toLowerCase() === "approved"
+    && String(intakeRow.cleanScoreReviewedBy || "").trim() !== "";
+}
+
 function filterAlternativeCandidates(pieceId, candidates, knownPaths) {
   const known = new Set([...knownPaths].filter(Boolean).map((item) => repoRelative(repoPath(item)).toLowerCase()));
   return (candidates.get(pieceId) || [])
@@ -198,13 +203,19 @@ async function auditRows(intakeRows, workspaceRows) {
     ]);
     const sourceScoreType = intakeRow.currentScoreType || (isCleanScoreFile(sourceScorePath) ? "clean-score" : "image-or-unsupported");
     const audiverisStaged = hasAudiverisStagingEvidence(intakeRow);
-    const manualGoldRequired = currentGoldEqualsDraft && editableEqualsDraft && alternativeCandidates.length === 0;
+    const humanApprovedCleanScore = hasHumanCleanScoreApproval(intakeRow);
+    const humanApprovedUnchangedDraft = currentGoldEqualsDraft && humanApprovedCleanScore;
+    const manualGoldRequired = currentGoldEqualsDraft
+      && editableEqualsDraft
+      && alternativeCandidates.length === 0
+      && !humanApprovedUnchangedDraft;
     const issues = [];
     if (sourceScoreType !== "clean-score") issues.push("source-score-is-image");
     if (currentGoldEqualsDraft) issues.push("current-gold-equals-draft");
     if (editableEqualsDraft) issues.push("editable-gold-equals-draft");
     if (editableEqualsCurrentGold) issues.push("editable-gold-equals-current-gold");
     if (audiverisStaged) issues.push("intake-notes-mention-audiveris-staging");
+    if (humanApprovedUnchangedDraft) issues.push("human-approved-unchanged-draft");
     if (alternativeCandidates.length === 0) issues.push("no-independent-clean-score-found");
     if (manualGoldRequired) issues.push("manual-score-editor-gold-required");
     rows.push({
@@ -212,6 +223,8 @@ async function auditRows(intakeRows, workspaceRows) {
       pieceId: workspaceRow.pieceId || "",
       sourceScoreType,
       cleanScoreReviewStatus: intakeRow.cleanScoreReviewStatus || "",
+      cleanScoreReviewedBy: intakeRow.cleanScoreReviewedBy || "",
+      humanApprovedCleanScore: humanApprovedCleanScore ? "yes" : "no",
       sourceScorePath,
       currentGoldPath,
       draftPath,
@@ -220,6 +233,7 @@ async function auditRows(intakeRows, workspaceRows) {
       editableEqualsDraft: editableEqualsDraft ? "yes" : "no",
       editableEqualsCurrentGold: editableEqualsCurrentGold ? "yes" : "no",
       intakeNotesMentionAudiveris: audiverisStaged ? "yes" : "no",
+      humanApprovedUnchangedDraft: humanApprovedUnchangedDraft ? "yes" : "no",
       independentCandidateCount: String(alternativeCandidates.length),
       independentCandidates: alternativeCandidates.join("|"),
       manualGoldRequired: manualGoldRequired ? "yes" : "no",
@@ -248,6 +262,8 @@ async function main() {
     currentGoldEqualsDraftRows: count(rows, (row) => row.currentGoldEqualsDraft === "yes"),
     editableEqualsDraftRows: count(rows, (row) => row.editableEqualsDraft === "yes"),
     audiverisStagingEvidenceRows: count(rows, (row) => row.intakeNotesMentionAudiveris === "yes"),
+    humanApprovedCleanScoreRows: count(rows, (row) => row.humanApprovedCleanScore === "yes"),
+    humanApprovedUnchangedDraftRows: count(rows, (row) => row.humanApprovedUnchangedDraft === "yes"),
     independentCandidateRows: count(rows, (row) => Number(row.independentCandidateCount || 0) > 0),
     manualGoldRequiredRows: count(rows, (row) => row.manualGoldRequired === "yes"),
   };
@@ -261,7 +277,9 @@ async function main() {
     humanTask: counts.manualGoldRequiredRows > 0 ? "score-editor-independent-gold-correction" : "none",
     conclusion: counts.manualGoldRequiredRows > 0
       ? "Current gold is not independent enough for OMR benchmarking; use score-editor correction against source score images before asking for any teacher review."
-      : "Independent clean-score candidates were found; inspect the candidate list before asking for manual correction.",
+      : counts.humanApprovedUnchangedDraftRows > 0
+        ? "Current gold matches the Audiveris draft byte-for-byte, but each row already has explicit human clean-score approval. Treat these rows as human-approved unchanged gold, not unverified self-comparison."
+        : "Independent clean-score candidates were found; inspect the candidate list before asking for manual correction.",
     rows,
   };
   await fs.mkdir(path.dirname(outPath), { recursive: true });
@@ -271,10 +289,13 @@ async function main() {
     "pieceId",
     "sourceScoreType",
     "cleanScoreReviewStatus",
+    "cleanScoreReviewedBy",
+    "humanApprovedCleanScore",
     "currentGoldEqualsDraft",
     "editableEqualsDraft",
     "editableEqualsCurrentGold",
     "intakeNotesMentionAudiveris",
+    "humanApprovedUnchangedDraft",
     "independentCandidateCount",
     "manualGoldRequired",
     "issues",

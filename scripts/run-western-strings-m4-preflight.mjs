@@ -85,8 +85,10 @@ function buildSummary(report) {
     "",
     `- readiness pairReadyRows: ${report.counts.pairReadyRows}`,
     `- benchmark usableBenchmarkRows: ${report.counts.usableBenchmarkRows}`,
+    `- benchmark humanApprovedUnchangedRows: ${report.counts.humanApprovedUnchangedRows}`,
     `- benchmark selfComparisonRows: ${report.counts.selfComparisonRows}`,
     `- provenance manualGoldRequiredRows: ${report.counts.manualGoldRequiredRows}`,
+    `- provenance humanApprovedUnchangedDraftRows: ${report.counts.humanApprovedUnchangedDraftRows}`,
     `- provenance independentCandidateRows: ${report.counts.independentCandidateRows}`,
     `- workspace readyToApplyRows: ${report.counts.readyToApplyRows}`,
     `- workspace pendingRows: ${report.counts.pendingRows}`,
@@ -95,7 +97,7 @@ function buildSummary(report) {
     "",
     report.humanTask === "score-editor-independent-gold-correction"
       ? "- Machine checks already proved this is not a teacher audio-diagnosis review. The remaining task is score-editor correction of independent gold MXL files against source score images."
-      : "- No score-editor task is currently required by M4 preflight.",
+      : "- No score-editor task is currently required by M4 preflight. Same-hash rows are usable here only because the prior clean-score review explicitly approved them; report them as human-approved unchanged gold, not independent edited gold.",
     "",
     "## Artifacts",
     "",
@@ -132,16 +134,20 @@ async function main() {
   const counts = {
     pairReadyRows: readiness?.counts?.pairReadyRows ?? 0,
     usableBenchmarkRows: benchmark?.counts?.usableBenchmarkRows ?? 0,
+    humanApprovedUnchangedRows: benchmark?.counts?.humanApprovedUnchangedRows ?? 0,
     selfComparisonRows: benchmark?.counts?.selfComparisonRows ?? 0,
     manualGoldRequiredRows: provenance?.counts?.manualGoldRequiredRows ?? 0,
+    humanApprovedUnchangedDraftRows: provenance?.counts?.humanApprovedUnchangedDraftRows ?? 0,
     independentCandidateRows: provenance?.counts?.independentCandidateRows ?? 0,
     readyToApplyRows: workspace?.counts?.readyToApplyRows ?? 0,
     pendingRows: workspace?.counts?.pendingRows ?? 0,
   };
 
   const teacherReviewNeeded = Boolean(m4Status.teacherReviewNeeded || provenance?.teacherReviewNeeded || workspace?.teacherReviewNeeded);
-  const humanTask = m4Status.humanTask || provenance?.humanTask || workspace?.humanTask || "unknown";
   const readyForOmrAccuracyClaim = Boolean(commandOk && benchmark?.gate?.m4OmrDraftQualityReady && counts.usableBenchmarkRows > 0);
+  const humanTask = readyForOmrAccuracyClaim || counts.manualGoldRequiredRows === 0
+    ? "none"
+    : m4Status.humanTask || provenance?.humanTask || workspace?.humanTask || "unknown";
 
   const report = {
     ok: commandOk,

@@ -246,6 +246,9 @@ def evaluate_pair(
     recording_id = row.get("recordingId", "").strip()
     gold_path = repo_path(row.get("requiredCleanScorePath", ""))
     draft_path = find_draft_path(piece_id, summary_by_piece, draft_root)
+    clean_score_review_status = row.get("cleanScoreReviewStatus", "").strip().lower()
+    clean_score_reviewed_by = row.get("cleanScoreReviewedBy", "").strip()
+    human_verified_clean_score = clean_score_review_status == "approved" and bool(clean_score_reviewed_by)
     result: dict[str, Any] = {
         "recordingId": recording_id,
         "pieceId": piece_id,
@@ -254,6 +257,10 @@ def evaluate_pair(
         "parseOk": False,
         "benchmarkUsable": False,
         "goldEqualsDraftHash": "",
+        "goldProvenance": "",
+        "cleanScoreReviewStatus": row.get("cleanScoreReviewStatus", "").strip(),
+        "cleanScoreReviewedBy": clean_score_reviewed_by,
+        "humanVerifiedCleanScore": "yes" if human_verified_clean_score else "",
         "blockingReason": "",
     }
     if not gold_path.exists():
@@ -265,6 +272,14 @@ def evaluate_pair(
     gold_hash = sha1(gold_path)
     draft_hash = sha1(draft_path)
     gold_equals_draft = gold_hash == draft_hash
+    gold_provenance = (
+        "human-approved-unchanged-draft"
+        if gold_equals_draft and human_verified_clean_score
+        else "self-comparison-unverified"
+        if gold_equals_draft
+        else "independent-edited-gold"
+    )
+    benchmark_usable = (not gold_equals_draft) or human_verified_clean_score
     try:
         gold_notes = parse_notes(gold_path)
         draft_notes = parse_notes(draft_path)
@@ -301,9 +316,12 @@ def evaluate_pair(
     result.update(
         {
             "parseOk": True,
-            "benchmarkUsable": not gold_equals_draft,
+            "benchmarkUsable": benchmark_usable,
             "goldEqualsDraftHash": "yes" if gold_equals_draft else "",
-            "blockingReason": "gold-clean-score-identical-to-audiveris-draft" if gold_equals_draft else "",
+            "goldProvenance": gold_provenance,
+            "blockingReason": ""
+            if benchmark_usable
+            else "gold-clean-score-identical-to-audiveris-draft-without-human-review",
             "goldNotes": gold_count,
             "draftNotes": draft_count,
             "pairedNotes": len(paired),
@@ -369,7 +387,13 @@ def summarize(rows: list[dict[str, Any]], thresholds: dict[str, float]) -> dict[
         "rows": len(rows),
         "parseOkRows": len(parsed),
         "usableBenchmarkRows": len(usable),
-        "selfComparisonRows": len([row for row in parsed if row.get("goldEqualsDraftHash")]),
+        "sameHashRows": len([row for row in parsed if row.get("goldEqualsDraftHash")]),
+        "humanApprovedUnchangedRows": len(
+            [row for row in parsed if row.get("goldProvenance") == "human-approved-unchanged-draft"]
+        ),
+        "selfComparisonRows": len(
+            [row for row in parsed if row.get("goldProvenance") == "self-comparison-unverified"]
+        ),
         "blockedRows": len(rows) - len(usable),
         **totals,
         **aggregate,
@@ -439,7 +463,8 @@ def main() -> int:
         "notes": [
             "This is an eval-only OMR draft-vs-gold benchmark. It does not approve OMR output for runtime diagnosis.",
             "Pitch/onset/measure metrics are sequence-alignment proxies; release thresholds must be calibrated before any student-facing use.",
-            "Rows where the gold clean score is byte-identical to the Audiveris draft are excluded as self-comparisons.",
+            "Byte-identical rows are usable only when cleanScoreReviewStatus=approved and cleanScoreReviewedBy is present; otherwise they remain self-comparison-unverified and blocked.",
+            "human-approved-unchanged-draft rows must be reported separately from independent-edited-gold rows.",
         ],
         "rows": rows,
     }
@@ -456,6 +481,10 @@ def main() -> int:
             "parseOk",
             "benchmarkUsable",
             "goldEqualsDraftHash",
+            "goldProvenance",
+            "cleanScoreReviewStatus",
+            "cleanScoreReviewedBy",
+            "humanVerifiedCleanScore",
             "goldNotes",
             "draftNotes",
             "pairedNotes",

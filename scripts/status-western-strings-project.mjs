@@ -803,6 +803,12 @@ async function buildM4OmrStatus() {
   const readinessReady = Boolean(readiness?.gate?.m4OmrBenchmarkDatasetReady);
   const benchmarkEvaluated = Boolean(benchmark?.gate?.m4OmrBenchmarkEvaluated);
   const draftQualityReady = Boolean(benchmark?.gate?.m4OmrDraftQualityReady);
+  const provenanceCounts = provenanceAudit?.counts || {};
+  const manualGoldRequiredRows = Number(provenanceCounts.manualGoldRequiredRows || 0);
+  const humanTask = manualGoldRequiredRows > 0 ? "score-editor-independent-gold-correction" : "none";
+  const humanTaskScope = manualGoldRequiredRows > 0
+    ? "Correct MusicXML/MXL against source score images only; do not ask for audio diagnosis review."
+    : "No score-editor correction is currently required; unchanged drafts are usable only because prior clean-score review approved them.";
   const blockingReasons = [];
   if (!readiness) blockingReasons.push("m4-omr-readiness-missing");
   else if (!readinessReady) blockingReasons.push("m4-omr-readiness-not-ready");
@@ -819,8 +825,8 @@ async function buildM4OmrStatus() {
     m4OmrDraftQualityReady: draftQualityReady,
     studentGateReady: false,
     teacherReviewNeeded: false,
-    humanTask: "score-editor-independent-gold-correction",
-    humanTaskScope: "Correct MusicXML/MXL against source score images only; do not ask for audio diagnosis review.",
+    humanTask,
+    humanTaskScope,
     reason: "omr-status-only",
     counts: {
       readinessRows: readiness?.counts?.intakeRows || 0,
@@ -828,6 +834,8 @@ async function buildM4OmrStatus() {
       benchmarkRows: benchmark?.counts?.rows || 0,
       parseOkRows: benchmark?.counts?.parseOkRows || 0,
       usableBenchmarkRows: benchmark?.counts?.usableBenchmarkRows || 0,
+      sameHashRows: benchmark?.counts?.sameHashRows || 0,
+      humanApprovedUnchangedRows: benchmark?.counts?.humanApprovedUnchangedRows || 0,
       selfComparisonRows: benchmark?.counts?.selfComparisonRows || 0,
       blockedRows: benchmark?.counts?.blockedRows || 0,
     },
