@@ -11,9 +11,10 @@ const STEPS = [
   "western:m4-omr-benchmark",
   "western:m4-independent-gold-todo",
   "western:m4-independent-gold-workspace",
+  "western:m4-independent-gold-note-summary",
+  "western:m4-independent-gold-todo",
   "western:m4-gold-provenance-audit",
   "western:m4-independent-gold-workspace-audit",
-  "western:m4-independent-gold-note-summary",
   "western:project-status",
   "western:next-actions",
 ];

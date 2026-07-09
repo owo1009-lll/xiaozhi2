@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 
 const DEFAULT_BENCHMARK = path.join("data", "experiments", "western-strings-m4", "omr-benchmark.json");
 const DEFAULT_READINESS = path.join("data", "experiments", "western-strings-m4", "omr-readiness.json");
+const DEFAULT_NOTE_SUMMARY = path.join("data", "experiments", "western-strings-m4", "independent-gold-note-summary.json");
 const DEFAULT_OUT_DIR = path.join("data", "experiments", "western-strings-m4");
 const DEFAULT_EDITABLE_GOLD_DIR = path.join("data", "private", "western-strings-m4-independent-gold");
 
@@ -11,12 +12,14 @@ function parseArgs(argv) {
   const args = {
     benchmark: DEFAULT_BENCHMARK,
     readiness: DEFAULT_READINESS,
+    noteSummary: DEFAULT_NOTE_SUMMARY,
     outDir: DEFAULT_OUT_DIR,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--benchmark") args.benchmark = argv[++index] || args.benchmark;
     else if (arg === "--readiness") args.readiness = argv[++index] || args.readiness;
+    else if (arg === "--note-summary") args.noteSummary = argv[++index] || args.noteSummary;
     else if (arg === "--out-dir") args.outDir = argv[++index] || args.outDir;
   }
   return args;
@@ -36,6 +39,14 @@ async function writeCsv(filePath, rows, columns) {
   await fs.writeFile(filePath, text, "utf8");
 }
 
+async function readJsonOptional(filePath) {
+  try {
+    return JSON.parse(await fs.readFile(filePath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
 function readinessKey(row = {}) {
   return `${row.recordingId || ""}::${row.pieceId || ""}`;
 }
@@ -48,18 +59,27 @@ function buildReadinessMap(readinessReport) {
   return map;
 }
 
+function buildNoteSummaryMap(noteSummaryReport) {
+  const map = new Map();
+  for (const row of noteSummaryReport?.rows || []) {
+    map.set(readinessKey(row), row);
+  }
+  return map;
+}
+
 function editableGoldPathFor(row) {
   const pieceId = String(row.pieceId || "piece").replace(/[^a-zA-Z0-9_-]+/g, "-");
   return path.join(DEFAULT_EDITABLE_GOLD_DIR, `${pieceId}.independent-gold.mxl`).replace(/\\/g, "/");
 }
 
-function buildTodoRows(report, readinessReport = {}) {
+function buildTodoRows(report, readinessReport = {}, noteSummaryReport = {}) {
   const readinessRows = buildReadinessMap(readinessReport);
+  const noteSummaryRows = buildNoteSummaryMap(noteSummaryReport);
   return (report.rows || [])
     .filter((row) => row.goldEqualsDraftHash || row.benchmarkUsable === false)
     .map((row) => {
       const readiness = readinessRows.get(readinessKey(row)) || {};
-      return {
+      const base = {
         recordingId: row.recordingId || "",
         pieceId: row.pieceId || "",
         scoreId: readiness.scoreId || "",
@@ -73,6 +93,15 @@ function buildTodoRows(report, readinessReport = {}) {
         parseOk: row.parseOk ? "yes" : "",
         goldNotes: row.goldNotes ?? "",
         draftNotes: row.draftNotes ?? "",
+      };
+      const summary = noteSummaryRows.get(readinessKey(base)) || {};
+      return {
+        ...base,
+        noteSummaryParseOk: summary.parseOk || "",
+        noteSummaryMeasures: summary.measureCount ?? "",
+        noteSummaryNotes: summary.noteCount ?? "",
+        noteSummaryPitchRange: summary.pitchRange || "",
+        noteSummaryFirstNotes: summary.firstNotes || "",
       };
     });
 }
@@ -101,23 +130,25 @@ function buildMarkdown(report, todoRows) {
     "对下面每一行：",
     "",
     "1. 打开 `sourceScorePath` 的原始谱面图片/PDF。",
-    "2. 先运行 `npm run western:m4-gold-provenance-audit`，确认没有可自动复用的独立 gold。",
-    "3. 运行 `npm run western:m4-independent-gold-workspace`，生成 `editableGoldPath` 指向的可编辑 MXL。",
-    "4. 对照原谱逐小节检查 `editableGoldPath`。可以用 `draftPath` 当起点，但必须逐小节校对。",
-    "5. 保存新的独立 gold MusicXML/MXL，不要直接复制 Audiveris draft。",
-    "6. 运行 `npm run western:m4-independent-gold-workspace-audit`，确认 changed/approved 状态。",
-    "7. 确认无误后，只把该行 `reviewStatus` 改为 `approved`。",
-    "8. 先运行 `npm run western:m4-apply-independent-gold-workspace -- --dry-run`。",
-    "9. dry-run 只显示预期行会 apply 后，再正式运行 apply 和 `npm run western:m4-omr-benchmark`。",
+    "2. 先运行 `npm run western:m4-preflight`，让机器完成全部可自测项。",
+    "3. 如需查看来源细节，运行 `npm run western:m4-gold-provenance-audit`。",
+    "4. 查看机器音符摘要（小节数、音符数、音域、前几个音），先识别明显异常。",
+    "5. 在谱面编辑器中打开 `editableGoldPath`，对照原谱逐小节校正。",
+    "6. 保存新的独立 gold MusicXML/MXL，不要直接复制 Audiveris draft。",
+    "7. 运行 `npm run western:m4-independent-gold-workspace-audit`，确认 changed/approved 状态。",
+    "8. 确认无误后，只把该行 `reviewStatus` 改为 `approved`。",
+    "9. 先运行 `npm run western:m4-apply-independent-gold-workspace -- --dry-run`。",
+    "10. dry-run 只显示预期行会 apply 后，再正式运行 apply 和 `npm run western:m4-omr-benchmark`。",
     "",
     "## 待处理行",
     "",
-    "| # | recordingId | pieceId | scoreId | issue | sourceScorePath | editableGoldPath | current goldPath | draftPath | notes |",
-    "|---:|---|---|---|---|---|---|---|---|---|",
+    "| # | recordingId | pieceId | scoreId | sourceScorePath | editableGoldPath | machine summary | notes |",
+    "|---:|---|---|---|---|---|---|---|",
   ];
   todoRows.forEach((row, index) => {
+    const summary = `parse=${row.noteSummaryParseOk}; measures=${row.noteSummaryMeasures}; notes=${row.noteSummaryNotes}; range=${row.noteSummaryPitchRange}; first=${row.noteSummaryFirstNotes}`;
     lines.push(
-      `| ${index + 1} | ${row.recordingId} | ${row.pieceId} | ${row.scoreId} | ${row.issue} | \`${row.sourceScorePath}\` | \`${row.editableGoldPath}\` | \`${row.goldPath}\` | \`${row.draftPath}\` | goldNotes=${row.goldNotes}; draftNotes=${row.draftNotes}; parseOk=${row.parseOk} |`,
+      `| ${index + 1} | ${row.recordingId} | ${row.pieceId} | ${row.scoreId} | \`${row.sourceScorePath}\` | \`${row.editableGoldPath}\` | ${summary} | goldNotes=${row.goldNotes}; draftNotes=${row.draftNotes}; parseOk=${row.parseOk} |`,
     );
   });
   lines.push("");
@@ -149,6 +180,25 @@ function renderPathLink(outDir, filePath) {
   return `<a href="${htmlEscape(href)}" target="_blank" rel="noreferrer">${htmlEscape(text)}</a>`;
 }
 
+function renderMachineSummary(row) {
+  if (!row.noteSummaryParseOk) {
+    return '<p class="muted">尚未生成机器音符摘要。运行 <code>npm run western:m4-preflight</code>。</p>';
+  }
+  return `
+    <div class="machine-summary">
+      <h3>机器音符摘要</h3>
+      <div class="summary-grid">
+        <span>parse: <strong>${htmlEscape(row.noteSummaryParseOk)}</strong></span>
+        <span>measures: <strong>${htmlEscape(row.noteSummaryMeasures)}</strong></span>
+        <span>notes: <strong>${htmlEscape(row.noteSummaryNotes)}</strong></span>
+        <span>range: <strong>${htmlEscape(row.noteSummaryPitchRange)}</strong></span>
+      </div>
+      <p class="first-notes">${htmlEscape(row.noteSummaryFirstNotes)}</p>
+      <p class="muted">这只是机器预览，用来减少盲审；最终仍要对照原谱校正。</p>
+    </div>
+  `;
+}
+
 function buildHtml(report, todoRows, outDir) {
   const cards = todoRows.map((row, index) => {
     const sourceHref = relativeLink(outDir, row.sourceScorePath);
@@ -167,11 +217,12 @@ function buildHtml(report, todoRows, outDir) {
         <div class="grid">
           <div class="score">${image}</div>
           <div class="meta">
+            ${renderMachineSummary(row)}
             <h3>谱面编辑动作</h3>
             <ol>
               <li>只做谱面 gold 校正，不做教师音频诊断。</li>
-              <li>先运行 <code>npm run western:m4-gold-provenance-audit</code>，确认没有可自动复用的独立 gold。</li>
-              <li>运行 <code>npm run western:m4-independent-gold-workspace</code> 生成 <code>editableGoldPath</code>。</li>
+              <li>先运行 <code>npm run western:m4-preflight</code>，完成机器自测。</li>
+              <li>如需查看来源细节，运行 <code>npm run western:m4-gold-provenance-audit</code>。</li>
               <li>打开左侧原谱图片，逐小节校对 <code>editableGoldPath</code>。</li>
               <li>保存新的独立 gold MusicXML/MXL，不要直接复制 Audiveris draft。</li>
               <li>运行 <code>npm run western:m4-independent-gold-workspace-audit</code> 检查状态。</li>
@@ -213,6 +264,9 @@ function buildHtml(report, todoRows, outDir) {
     .score { background: #f9fafb; padding: 12px; border-right: 1px solid #e4e9f0; }
     .score img { width: 100%; max-height: 720px; object-fit: contain; background: white; border: 1px solid #e4e9f0; }
     .meta { padding: 14px 16px; }
+    .machine-summary { border: 1px solid #d7dde5; background: #f8fafc; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; }
+    .summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 10px; font-size: 13px; }
+    .first-notes { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; line-height: 1.45; background: #fff; border: 1px solid #e4e9f0; border-radius: 6px; padding: 8px; overflow-wrap: anywhere; }
     dt { margin-top: 10px; font-weight: 700; font-size: 13px; color: #374151; }
     dd { margin: 3px 0 0; overflow-wrap: anywhere; }
     a { color: #0f5e9c; }
@@ -222,7 +276,7 @@ function buildHtml(report, todoRows, outDir) {
 <body>
   <header>
     <h1>M4 independent gold score 校正清单</h1>
-    <p class="muted">用途：防止把 Audiveris draft 与自身比较得到的 100% 误当成 OMR 准确率。只有人工独立校正的 gold score 才能用于 M4 评估。本页不是教师音频诊断复核。</p>
+    <p class="muted">用途：防止把 Audiveris draft 与自身比较得到的 100% 误当作 OMR 准确率。只有人工独立校正的 gold score 才能用于 M4 评估。本页不是教师音频诊断复核。</p>
     <div class="summary">
       <span class="pill">benchmark 行数: ${htmlEscape(report.counts?.rows ?? 0)}</span>
       <span class="pill">可解析草稿: ${htmlEscape(report.counts?.parseOkRows ?? 0)}</span>
@@ -243,10 +297,12 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   const benchmarkPath = path.resolve(process.cwd(), args.benchmark);
   const readinessPath = path.resolve(process.cwd(), args.readiness);
+  const noteSummaryPath = path.resolve(process.cwd(), args.noteSummary);
   const outDir = path.resolve(process.cwd(), args.outDir);
   const report = JSON.parse(await fs.readFile(benchmarkPath, "utf8"));
   const readinessReport = JSON.parse(await fs.readFile(readinessPath, "utf8"));
-  const todoRows = buildTodoRows(report, readinessReport);
+  const noteSummaryReport = await readJsonOptional(noteSummaryPath);
+  const todoRows = buildTodoRows(report, readinessReport, noteSummaryReport || {});
   const csvPath = path.join(outDir, "independent-gold-todo.csv");
   const mdPath = path.join(outDir, "independent-gold-todo.md");
   const htmlPath = path.join(outDir, "independent-gold-todo.html");
@@ -264,6 +320,11 @@ async function main() {
     "parseOk",
     "goldNotes",
     "draftNotes",
+    "noteSummaryParseOk",
+    "noteSummaryMeasures",
+    "noteSummaryNotes",
+    "noteSummaryPitchRange",
+    "noteSummaryFirstNotes",
   ]);
   await fs.writeFile(mdPath, buildMarkdown(report, todoRows), "utf8");
   await fs.writeFile(htmlPath, buildHtml(report, todoRows, outDir), "utf8");
@@ -272,6 +333,7 @@ async function main() {
     todoRows: todoRows.length,
     benchmark: args.benchmark,
     readiness: args.readiness,
+    noteSummary: args.noteSummary,
     csv: path.relative(process.cwd(), csvPath).replace(/\\/g, "/"),
     markdown: path.relative(process.cwd(), mdPath).replace(/\\/g, "/"),
     html: path.relative(process.cwd(), htmlPath).replace(/\\/g, "/"),

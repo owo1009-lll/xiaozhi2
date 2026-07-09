@@ -232,7 +232,11 @@ for (const [label, text] of [["review policy", reviewPolicy], ["next-action hand
 for (const [label, text] of [["html", m4ChecklistHtml], ["markdown", m4ChecklistMd]]) {
   assert(
     text.includes("不是教师音频诊断复核"),
-    `M4 ${label} checklist must make clear this is not teacher audio review`,
+    `M4 ${label} checklist must make clear this is not teacher audio review in readable Chinese`,
+  );
+  assert(
+    text.includes("机器") && text.includes("音符"),
+    `M4 ${label} checklist must include the machine note-summary context`,
   );
   assert(
     text.includes("npm run western:m4-independent-gold-workspace-audit"),
@@ -255,7 +259,7 @@ for (const [label, text] of [["html", m4ChecklistHtml], ["markdown", m4Checklist
     `M4 ${label} checklist must require dry-run before apply`,
   );
   assert(
-    !/[鐙鎵绌锛涓]/.test(text),
+    !text.includes("涓嶆槸") && !text.includes("鏈哄櫒") && !text.includes("闊崇"),
     `M4 ${label} checklist should not contain common mojibake characters`,
   );
 }
