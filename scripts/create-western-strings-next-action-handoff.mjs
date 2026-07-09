@@ -35,9 +35,9 @@ function commandForAction(action) {
     if (hasReason(action, "ordinary-confidence-threshold-pool-precision-too-low")) {
       return [
         "Keep production/default runtime fail-closed.",
-        "Inspect data/experiments/western-strings-m3/confidence-threshold-pool-review/confidence-threshold-pool-eval.json and confidence-threshold-pool-eval-rows.csv.",
+        "Inspect data/experiments/western-strings-m3/confidence-threshold-pool-review/confidence-threshold-pool-diagnosis.json and confidence-threshold-pool-eval-rows.csv.",
         "Do not enable WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE for students; the stratified threshold-pool precision is below the release floor.",
-        "Recalibrate the confidence model/features or collect stronger candidate evidence before another monitored pilot attempt.",
+        "The current diagnosis found no simple selected>=10 rule meeting 0.90 precision; recalibrate confidence features/model or collect stronger candidate evidence before another monitored pilot attempt.",
         "After any recalibration, rerun npm run western:controlled-candidate-confidence-pilot",
         "Then generate a new blind/stratified review pack and rerun npm run western:project-status",
       ];

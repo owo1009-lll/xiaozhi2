@@ -80,6 +80,13 @@ const CONTROLLED_CONFIDENCE_THRESHOLD_POOL_EVAL = path.join(
   "confidence-threshold-pool-review",
   "confidence-threshold-pool-eval.json",
 );
+const CONTROLLED_CONFIDENCE_THRESHOLD_POOL_DIAGNOSIS = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-threshold-pool-review",
+  "confidence-threshold-pool-diagnosis.json",
+);
 const M3PLUS_SOURCE = path.join(
   "data",
   "experiments",
@@ -341,6 +348,7 @@ async function buildControlledStatus() {
     thresholdPoolReviewPage: CONTROLLED_CONFIDENCE_THRESHOLD_POOL_REVIEW_PAGE.replace(/\\/g, "/"),
     thresholdPoolCompletedCsv: CONTROLLED_CONFIDENCE_THRESHOLD_POOL_COMPLETED.replace(/\\/g, "/"),
     thresholdPoolEvalJson: CONTROLLED_CONFIDENCE_THRESHOLD_POOL_EVAL.replace(/\\/g, "/"),
+    thresholdPoolDiagnosisJson: CONTROLLED_CONFIDENCE_THRESHOLD_POOL_DIAGNOSIS.replace(/\\/g, "/"),
   };
   return status;
 }
@@ -390,11 +398,14 @@ async function buildM4OmrStatus() {
 function summarizeNextActions(controlled, m3plus, m4Omr) {
   const actions = [];
   if (!controlled.studentSafeCandidateGateReady) {
+    const ordinaryArtifact = (controlled.blockingReasons || []).includes("ordinary-confidence-threshold-pool-precision-too-low")
+      ? (controlled.reviewArtifacts.thresholdPoolDiagnosisJson || controlled.confidencePilot?.thresholdPoolEvalJson)
+      : (controlled.confidencePilot?.thresholdPoolReviewPage || controlled.reviewArtifacts.thresholdPoolReviewPage || controlled.confidencePilot?.validationReviewPage || controlled.reviewArtifacts.reviewPage);
     actions.push({
       priority: 1,
       track: "M2/M3 ordinary upload candidate gate",
       action: controlled.nextActions?.[0] || "Finish the current blind review batch, import it, then rerun gate/status.",
-      artifact: controlled.confidencePilot?.thresholdPoolReviewPage || controlled.reviewArtifacts.thresholdPoolReviewPage || controlled.confidencePilot?.validationReviewPage || controlled.reviewArtifacts.reviewPage,
+      artifact: ordinaryArtifact,
       reason: controlled.blockingReasons,
     });
   }

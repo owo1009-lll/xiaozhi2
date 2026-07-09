@@ -24,10 +24,13 @@ export function evaluateProjectGate(status, requiredTracks) {
   const m4 = status.tracks?.m4Omr || {};
 
   if (requiredTracks.has("ordinary") && !controlled.studentSafeCandidateGateReady) {
+    const ordinaryArtifact = (controlled.blockingReasons || []).includes("ordinary-confidence-threshold-pool-precision-too-low")
+      ? (controlled.reviewArtifacts?.thresholdPoolDiagnosisJson || controlled.confidencePilot?.thresholdPoolEvalJson)
+      : (controlled.confidencePilot?.thresholdPoolReviewPage || controlled.reviewArtifacts?.thresholdPoolReviewPage || controlled.confidencePilot?.validationReviewPage || controlled.reviewArtifacts?.reviewPage);
     failures.push({
       track: "M2/M3 ordinary upload candidate gate",
       reason: controlled.blockingReasons || ["ordinary-upload-gate-not-ready"],
-      artifact: controlled.confidencePilot?.thresholdPoolReviewPage || controlled.reviewArtifacts?.thresholdPoolReviewPage || controlled.confidencePilot?.validationReviewPage || controlled.reviewArtifacts?.reviewPage || "",
+      artifact: ordinaryArtifact || "",
     });
   }
   if (requiredTracks.has("m3plus") && !m3plus.m3plusModeReleaseReady) {

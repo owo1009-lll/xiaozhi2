@@ -62,7 +62,7 @@
 
 ## 六、下一步优先级
 
-1. **普通上传 confidence 重校准**:普通上传 confidence gate 的 30 条预筛 validation 通过,但完整阈值池分层复核失败(selected precision=0.5556,coverage=0.6102)。当前 release candidate 不能进入受控 pilot。下一步先检查 `data/experiments/western-strings-m3/confidence-threshold-pool-review/confidence-threshold-pool-eval-rows.csv`,分析 high / above-threshold 中的 wrong 样本,再重校准特征或模型;完成前继续 fail-closed。
+1. **普通上传 confidence 重校准**:普通上传 confidence gate 的 30 条预筛 validation 通过,但完整阈值池分层复核失败(selected precision=0.5556,coverage=0.6102)。当前 release candidate 不能进入受控 pilot。诊断报告 `data/experiments/western-strings-m3/confidence-threshold-pool-review/confidence-threshold-pool-diagnosis.json` 显示最佳简单规则 `predictedUsableProbability>=0.95` 也只有 precision=0.857(selected=14),没有 selected≥10 且 precision≥0.90 的简单规则。下一步必须重校准特征/模型或收集更强候选证据;完成前继续 fail-closed。
 2. **M3+ 数据补强或保持 review-only**:当前 per-mode eval 显示 stable control 通过,但 slide/trill/ornament/double-stop/variable-f0 等非 control 模式没有 release-ready 证据。若要继续减少复核,需要补更多真实对应模式样本后重跑 `npm run western:m3plus-mode-eval`;否则保持 M3+ 全部 `review_required`。
 3. **M4 独立 gold**:按 `data/experiments/western-strings-m4/independent-gold-todo.md` 逐条对照原谱生成独立 gold MusicXML/MXL,更新 clean-score intake 后重跑 `npm run western:m4-omr-benchmark`。
 4. **后续扩展**:extra-note/多音和 duration 若要开放学生端硬反馈,必须补专门样本并通过独立 gate;大提琴作为 M5 独立验证,不得复用小提琴阈值。
