@@ -82,3 +82,11 @@ Independent gold application has two safety gates:
 Rows left as `needs-human-edit` must not be applied, even if the file timestamp
 or bytes changed. Use `npm run western:m4-apply-independent-gold-workspace --
 --dry-run` before applying changes.
+
+Before any apply attempt, run
+`npm run western:m4-independent-gold-workspace-audit`. It reports:
+
+- changed but not approved files;
+- approved files that are still byte-identical to the Audiveris draft;
+- missing source/current/draft/editable files; and
+- rows that are actually ready to apply.

@@ -315,6 +315,18 @@ const M4_INDEPENDENT_GOLD_TODO_HTML = path.join(
   "western-strings-m4",
   "independent-gold-todo.html",
 );
+const M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "independent-gold-workspace-audit.json",
+);
+const M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT_CSV = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "independent-gold-workspace-audit.csv",
+);
 
 function parseArgs(argv) {
   const args = {
@@ -774,6 +786,7 @@ async function buildControlledStatus() {
 async function buildM4OmrStatus() {
   const readiness = await readJson(M4_READINESS);
   const benchmark = await readJson(M4_BENCHMARK);
+  const workspaceAudit = await readJson(M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT);
   const readinessReady = Boolean(readiness?.gate?.m4OmrBenchmarkDatasetReady);
   const benchmarkEvaluated = Boolean(benchmark?.gate?.m4OmrBenchmarkEvaluated);
   const draftQualityReady = Boolean(benchmark?.gate?.m4OmrDraftQualityReady);
@@ -811,9 +824,23 @@ async function buildM4OmrStatus() {
       benchmarkJson: M4_BENCHMARK.replace(/\\/g, "/"),
       independentGoldTodo: M4_INDEPENDENT_GOLD_TODO.replace(/\\/g, "/"),
       independentGoldTodoHtml: M4_INDEPENDENT_GOLD_TODO_HTML.replace(/\\/g, "/"),
+      independentGoldWorkspaceAuditJson: M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT.replace(/\\/g, "/"),
+      independentGoldWorkspaceAuditCsv: M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT_CSV.replace(/\\/g, "/"),
       readinessCsv: String(readiness?.artifacts?.csv || "data/experiments/western-strings-m4/omr-readiness.csv").replace(/\\/g, "/"),
       benchmarkCsv: String(benchmark?.artifacts?.csv || "data/experiments/western-strings-m4/omr-benchmark.csv").replace(/\\/g, "/"),
     },
+    independentGoldWorkspaceAudit: workspaceAudit
+      ? {
+          source: M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT.replace(/\\/g, "/"),
+          readyForApply: Boolean(workspaceAudit.readyForApply),
+          counts: workspaceAudit.counts || {},
+        }
+      : {
+          source: M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT.replace(/\\/g, "/"),
+          readyForApply: false,
+          counts: {},
+          missing: true,
+        },
   };
 }
 
@@ -980,6 +1007,7 @@ function printProjectStatus(status, outPath) {
       draftQualityReady: m4Omr.m4OmrDraftQualityReady,
       teacherReviewNeeded: m4Omr.teacherReviewNeeded,
       humanTask: m4Omr.humanTask,
+      independentGoldWorkspaceAudit: m4Omr.independentGoldWorkspaceAudit,
       counts: m4Omr.counts,
       blockingReasons: m4Omr.blockingReasons,
     },

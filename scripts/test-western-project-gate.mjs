@@ -145,6 +145,16 @@ assert.equal(
   "score-editor-independent-gold-correction",
   "M4 should identify the remaining human task as score-editor gold correction",
 );
+assert.equal(
+  m4.independentGoldWorkspaceAudit?.source,
+  "data/experiments/western-strings-m4/independent-gold-workspace-audit.json",
+  "M4 should expose the independent-gold workspace audit artifact",
+);
+assert.equal(
+  m4.independentGoldWorkspaceAudit?.readyForApply,
+  false,
+  "M4 independent-gold workspace must not be apply-ready before checked score edits",
+);
 assert.equal(m4.counts.usableBenchmarkRows, 0, "self-comparison rows must not count as usable independent gold");
 assert.equal(m4.counts.selfComparisonRows, 12, "current M4 fixture should expose all self-comparison rows");
 assert(m4.blockingReasons.includes("m4-omr-self-comparison-detected"), "M4 must block on self-comparison");
