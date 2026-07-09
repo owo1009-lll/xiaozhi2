@@ -203,6 +203,38 @@ def collect_unreviewed_candidates(batch_runs_path: Path, labels_path: Path) -> l
     return rows
 
 
+def split_filter_values(values: list[str]) -> set[str]:
+    result: set[str] = set()
+    for value in values:
+        for item in str(value or "").split(","):
+            item = item.strip()
+            if item:
+                result.add(item)
+    return result
+
+
+def filter_candidates(
+    rows: list[dict[str, Any]],
+    *,
+    exclude_recording_ids: set[str],
+    exclude_pieces: set[str],
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    kept: list[dict[str, Any]] = []
+    excluded = {
+        "recordingId": 0,
+        "piece": 0,
+    }
+    for row in rows:
+        if safe_string(row.get("recordingId")) in exclude_recording_ids:
+            excluded["recordingId"] += 1
+            continue
+        if safe_string(row.get("piece")) in exclude_pieces:
+            excluded["piece"] += 1
+            continue
+        kept.append(row)
+    return kept, excluded
+
+
 def round_robin_top(rows: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
     if limit <= 0 or len(rows) <= limit:
         return rows
@@ -260,6 +292,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model", default="")
     parser.add_argument("--threshold", type=float, default=None)
     parser.add_argument("--limit", type=int, default=30)
+    parser.add_argument(
+        "--exclude-recording-id",
+        action="append",
+        default=[],
+        help="Recording id(s) to exclude from this blind batch. Repeat or comma-separate.",
+    )
+    parser.add_argument(
+        "--exclude-piece",
+        action="append",
+        default=[],
+        help="Piece id(s) to exclude from this blind batch. Repeat or comma-separate.",
+    )
     return parser.parse_args()
 
 
@@ -280,7 +324,14 @@ def main() -> int:
     pipeline = make_pipeline(DEPLOYABLE_CATEGORICAL_FEATURES, model_name)
     pipeline.fit(pd.DataFrame(train_rows), labels)
 
-    candidates = collect_unreviewed_candidates(batch_runs_path, labels_path)
+    all_candidates = collect_unreviewed_candidates(batch_runs_path, labels_path)
+    exclude_recording_ids = split_filter_values(args.exclude_recording_id)
+    exclude_pieces = split_filter_values(args.exclude_piece)
+    candidates, excluded_counts = filter_candidates(
+        all_candidates,
+        exclude_recording_ids=exclude_recording_ids,
+        exclude_pieces=exclude_pieces,
+    )
     feature_rows = [build_feature_row(row) for row in candidates]
     if feature_rows:
         probabilities = pipeline.predict_proba(pd.DataFrame(feature_rows))[:, 1]
@@ -313,7 +364,13 @@ def main() -> int:
         "threshold": threshold,
         "featureSet": feature_set,
         "groupBy": group_by,
+        "candidateCountBeforeExclusions": len(all_candidates),
         "candidateCount": len(candidates),
+        "excluded": {
+            "recordingIds": sorted(exclude_recording_ids),
+            "pieces": sorted(exclude_pieces),
+            "counts": excluded_counts,
+        },
         "selectedAboveThresholdCount": len(scored),
         "rowCount": len(selected),
         "sampleLimit": args.limit,
@@ -324,7 +381,13 @@ def main() -> int:
         "ok": True,
         "modelName": model_name,
         "threshold": threshold,
+        "candidateCountBeforeExclusions": len(all_candidates),
         "candidateCount": len(candidates),
+        "excluded": {
+            "recordingIds": sorted(exclude_recording_ids),
+            "pieces": sorted(exclude_pieces),
+            "counts": excluded_counts,
+        },
         "selectedAboveThresholdCount": len(scored),
         "rowCount": len(selected),
         "out": repo_relative(out_path),
