@@ -109,6 +109,8 @@ export function summarizeControlledCandidateConfidencePilot(
     (!releaseFloor.featureSet || candidate.featureSet === releaseFloor.featureSet)
     && (!releaseFloor.groupBy || candidate.groupBy === releaseFloor.groupBy)
   ));
+  const thresholdPoolRuntime = releaseAudit?.thresholdPoolReviewedSample?.runtimePolicy || {};
+  const thresholdPoolConfidenceOnly = releaseAudit?.thresholdPoolReviewedSample?.confidenceOnly || {};
   return {
     source: source.replace(/\\/g, "/"),
     sourceExists: Boolean(pilot),
@@ -159,10 +161,14 @@ export function summarizeControlledCandidateConfidencePilot(
       pilotCoverage: releaseAudit?.pilotOutOfFold?.coverageWithinRows ?? null,
       thresholdPoolCoverage: releaseAudit?.validationExport?.thresholdPoolCoverage ?? null,
       validationPrecision: releaseAudit?.validationReviewedSample?.precision ?? null,
-      thresholdPoolPrecision: releaseAudit?.thresholdPoolReviewedSample?.precision ?? null,
-      thresholdPoolReviewedRows: releaseAudit?.thresholdPoolReviewedSample?.rowCount ?? null,
-      thresholdPoolSelectedRows: releaseAudit?.thresholdPoolReviewedSample?.selectedRows ?? null,
-      thresholdPoolPassed: releaseAudit?.thresholdPoolReviewedSample?.blindValidationPassed === true,
+      thresholdPoolPrecision: thresholdPoolRuntime?.precision ?? releaseAudit?.thresholdPoolReviewedSample?.precision ?? null,
+      thresholdPoolReviewedRows: thresholdPoolRuntime?.rowCount ?? releaseAudit?.thresholdPoolReviewedSample?.rowCount ?? null,
+      thresholdPoolSelectedRows: thresholdPoolRuntime?.selectedRows ?? releaseAudit?.thresholdPoolReviewedSample?.selectedRows ?? null,
+      thresholdPoolConfidenceOnlyPrecision: thresholdPoolConfidenceOnly?.precision ?? null,
+      thresholdPoolConfidenceOnlySelectedRows: thresholdPoolConfidenceOnly?.selectedRows ?? null,
+      thresholdPoolRuntimeConfidenceSelectedRows: thresholdPoolRuntime?.confidenceSelectedRows ?? null,
+      thresholdPoolPitchSupportRejectedRows: thresholdPoolRuntime?.pitchSupportRejectedRows ?? null,
+      thresholdPoolPassed: Boolean((thresholdPoolRuntime?.selectedRows || 0) > 0 && thresholdPoolRuntime?.precision >= 0.9),
       readyForDefaultEnable: releaseAudit?.releaseReadiness?.readyForDefaultEnable === true,
       blockingReasons: releaseAudit?.releaseReadiness?.blockingReasons || [],
       caveat: releaseAudit?.validationExport?.importantCaveat || "",

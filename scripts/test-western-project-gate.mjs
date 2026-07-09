@@ -72,9 +72,10 @@ assert(
   || status.nextActions[0]?.action.includes("separate monitored pilot plan")
   || status.nextActions[0]?.action.includes("recalibration blind-validation pack")
   || status.nextActions[0]?.action.includes("context-feature confidence recalibration pack")
+  || status.nextActions[0]?.action.includes("improve candidate/pitch-support evidence")
   || status.nextActions[0]?.action.includes("wire a runtime gate")
   || status.nextActions[0]?.action.includes("runtime gate is wired"),
-  "project next action should route to threshold-pool review, recalibration, runtime wiring, or explicit release-flag gating",
+  "project next action should route to threshold-pool review, recalibration, runtime wiring, pitch-support improvement, or explicit release-flag gating",
 );
 const expectedOrdinaryArtifact = status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-recalibration-context-validation-needed")
   ? "data/experiments/western-strings-m3/confidence-recalibration-context-validation-review/index.html"

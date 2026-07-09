@@ -133,6 +133,8 @@ def write_rows_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "pageNumber",
         "midi",
         "predictedOnsetSeconds",
+        "centsError",
+        "pitchSupportWithin80Cents",
         "candidateRowsPath",
     ]
     with path.open("w", encoding="utf-8-sig", newline="") as handle:

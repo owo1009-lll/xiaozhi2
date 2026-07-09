@@ -91,21 +91,50 @@ def probability_value(row: dict[str, Any]) -> float:
     return 0.0
 
 
+def boolish(value: Any) -> bool | None:
+    text = str(value or "").strip().lower()
+    if text in {"1", "true", "yes", "y"}:
+        return True
+    if text in {"0", "false", "no", "n"}:
+        return False
+    return None
+
+
 def summarize_reviewed_predictions(rows: list[dict[str, str]], threshold: float) -> dict[str, Any]:
-    selected = [row for row in rows if probability_value(row) >= threshold]
-    selected_usable = sum(1 for row in selected if status_value(row) == "usable")
-    selected_wrong = sum(1 for row in selected if status_value(row) == "wrong")
+    confidence_selected = [row for row in rows if probability_value(row) >= threshold]
+    runtime_selected = [
+        row
+        for row in confidence_selected
+        if boolish(row.get("pitchSupportWithin80Cents")) is True
+    ]
+    missing_pitch_support = [
+        row
+        for row in confidence_selected
+        if boolish(row.get("pitchSupportWithin80Cents")) is None
+    ]
+    no_pitch_support = [
+        row
+        for row in confidence_selected
+        if boolish(row.get("pitchSupportWithin80Cents")) is False
+    ]
+    selected_usable = sum(1 for row in runtime_selected if status_value(row) == "usable")
+    selected_wrong = sum(1 for row in runtime_selected if status_value(row) == "wrong")
     reviewed = [row for row in rows if status_value(row) in {"usable", "wrong", "uncertain"}]
     scored = [row for row in rows if status_value(row) in {"usable", "wrong"}]
     return {
         "rowCount": len(rows),
         "reviewedRows": len(reviewed),
         "scoredRows": len(scored),
-        "selectedRows": len(selected),
+        "confidenceSelectedRows": len(confidence_selected),
+        "runtimeSelectedRows": len(runtime_selected),
+        "selectedRows": len(runtime_selected),
         "selectedUsableRows": selected_usable,
         "selectedWrongRows": selected_wrong,
-        "precision": round(selected_usable / len(selected), 6) if selected else None,
-        "coverageWithinRows": round(len(selected) / len(rows), 6) if rows else 0.0,
+        "precision": round(selected_usable / len(runtime_selected), 6) if runtime_selected else None,
+        "coverageWithinRows": round(len(runtime_selected) / len(rows), 6) if rows else 0.0,
+        "pitchSupportRequired": True,
+        "pitchSupportMissingRows": len(missing_pitch_support),
+        "pitchSupportRejectedRows": len(no_pitch_support),
     }
 
 
@@ -118,12 +147,16 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
     validation_eval_rows = read_csv(
         repo_path(validation.get("rowsOut") or DEFAULT_VALIDATION_EVAL.with_name("confidence-validation-eval-rows.csv"))
     )
+    threshold_pool_eval_rows = read_csv(
+        repo_path(threshold_pool_eval.get("rowsOut") or DEFAULT_THRESHOLD_POOL_EVAL.with_name("confidence-threshold-pool-eval-rows.csv"))
+    ) if threshold_pool_eval else []
     candidate_count = int(selection.get("candidateCount") or 0)
     selected_above_threshold = int(selection.get("selectedAboveThresholdCount") or 0)
     sampled_row_count = int(selection.get("rowCount") or 0)
     threshold_pool_coverage = selected_above_threshold / candidate_count if candidate_count else 0.0
     pilot = summarize_reviewed_predictions(pilot_rows, threshold)
     validation_rows = summarize_reviewed_predictions(validation_eval_rows, threshold)
+    threshold_pool_rows = summarize_reviewed_predictions(threshold_pool_eval_rows, threshold)
     validation_counts = validation.get("counts") or {}
     validation_metrics = validation.get("metrics") or {}
     threshold_pool_counts = threshold_pool_eval.get("counts") or {}
@@ -137,16 +170,30 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
                 blocking_reasons.append("ordinary-confidence-threshold-pool-not-ready")
     else:
         blocking_reasons.append("ordinary-confidence-full-threshold-pool-precision-unmeasured")
+    if threshold_pool_eval:
+        if threshold_pool_rows["confidenceSelectedRows"] > 0 and threshold_pool_rows["pitchSupportMissingRows"] > 0:
+            blocking_reasons.append("ordinary-confidence-runtime-pitch-support-unmeasured")
+        if threshold_pool_rows["confidenceSelectedRows"] > 0 and threshold_pool_rows["runtimeSelectedRows"] <= 0:
+            blocking_reasons.append("ordinary-confidence-runtime-selected-too-low")
+        if threshold_pool_rows["runtimeSelectedRows"] > 0 and threshold_pool_rows["precision"] is not None and threshold_pool_rows["precision"] < 0.9:
+            blocking_reasons.append("ordinary-confidence-runtime-precision-too-low")
 
     if threshold_pool_eval and not threshold_pool_eval.get("blindValidationPassed"):
         recommended_next_step = (
             "Keep the default fail-closed. The stratified threshold-pool review failed the precision floor; "
             "recalibrate the confidence model/features or collect stronger evidence before any monitored pilot."
         )
+    elif threshold_pool_eval and threshold_pool_eval.get("blindValidationPassed") and threshold_pool_rows["runtimeSelectedRows"] > 0:
+        recommended_next_step = (
+            "Runtime-selected threshold-pool precision passed under the current RF + pitch-support policy. Keep "
+            "default fail-closed until a separate monitored pilot plan sets WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 "
+            "in that process only, and still run the ordinary auto-pass precision precheck before asking for teacher review."
+        )
     elif threshold_pool_eval and threshold_pool_eval.get("blindValidationPassed"):
         recommended_next_step = (
-            "Threshold-pool precision passed. Keep default fail-closed until a separate monitored pilot plan "
-            "sets WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 in that process only."
+            "The old confidence-only threshold-pool precision passed, but the current runtime policy also requires "
+            "pitchSupportWithin80Cents=true and selects no reviewed rows. Do not ask for another teacher review pack; "
+            "improve candidate/pitch-support evidence first."
         )
     else:
         recommended_next_step = (
@@ -186,13 +233,28 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             "sourceExists": bool(threshold_pool_eval),
             "blindValidationPassed": bool(threshold_pool_eval.get("blindValidationPassed")),
             "blockingReasons": threshold_pool_eval.get("blockingReasons") or [],
-            "rowCount": int(threshold_pool_counts.get("reviewedRows") or 0),
-            "scoredRows": int(threshold_pool_counts.get("scoredRows") or 0),
-            "selectedRows": int(threshold_pool_counts.get("selectedRows") or 0),
-            "selectedUsableRows": int(threshold_pool_counts.get("selectedUsableRows") or 0),
-            "selectedWrongRows": int(threshold_pool_counts.get("selectedWrongRows") or 0),
-            "precision": threshold_pool_metrics.get("precision"),
-            "coverageWithinReviewedSample": threshold_pool_metrics.get("coverage"),
+            "confidenceOnly": {
+                "rowCount": int(threshold_pool_counts.get("reviewedRows") or 0),
+                "scoredRows": int(threshold_pool_counts.get("scoredRows") or 0),
+                "selectedRows": int(threshold_pool_counts.get("selectedRows") or 0),
+                "selectedUsableRows": int(threshold_pool_counts.get("selectedUsableRows") or 0),
+                "selectedWrongRows": int(threshold_pool_counts.get("selectedWrongRows") or 0),
+                "precision": threshold_pool_metrics.get("precision"),
+                "coverageWithinReviewedSample": threshold_pool_metrics.get("coverage"),
+            },
+            "runtimePolicy": {
+                "rowCount": threshold_pool_rows["rowCount"],
+                "scoredRows": threshold_pool_rows["scoredRows"],
+                "confidenceSelectedRows": threshold_pool_rows["confidenceSelectedRows"],
+                "selectedRows": threshold_pool_rows["runtimeSelectedRows"],
+                "selectedUsableRows": threshold_pool_rows["selectedUsableRows"],
+                "selectedWrongRows": threshold_pool_rows["selectedWrongRows"],
+                "precision": threshold_pool_rows["precision"],
+                "coverageWithinReviewedSample": threshold_pool_rows["coverageWithinRows"],
+                "pitchSupportRequired": True,
+                "pitchSupportMissingRows": threshold_pool_rows["pitchSupportMissingRows"],
+                "pitchSupportRejectedRows": threshold_pool_rows["pitchSupportRejectedRows"],
+            },
         },
         "releaseReadiness": {
             "runtimeScorerWired": True,
@@ -229,7 +291,9 @@ def main() -> None:
         "pilotCoverage": report["pilotOutOfFold"]["coverageWithinRows"],
         "thresholdPoolCoverage": report["validationExport"]["thresholdPoolCoverage"],
         "validationPrecision": report["validationReviewedSample"]["precision"],
-        "thresholdPoolPrecision": report["thresholdPoolReviewedSample"]["precision"],
+        "thresholdPoolConfidenceOnlyPrecision": report["thresholdPoolReviewedSample"]["confidenceOnly"]["precision"],
+        "thresholdPoolRuntimePrecision": report["thresholdPoolReviewedSample"]["runtimePolicy"]["precision"],
+        "thresholdPoolRuntimeSelectedRows": report["thresholdPoolReviewedSample"]["runtimePolicy"]["selectedRows"],
         "readyForDefaultEnable": report["releaseReadiness"]["readyForDefaultEnable"],
         "blockingReasons": report["releaseReadiness"]["blockingReasons"],
     }, ensure_ascii=False, indent=2))

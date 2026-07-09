@@ -87,10 +87,25 @@ function commandForAction(action) {
         "Then generate a new blind/stratified review pack and rerun npm run western:project-status",
       ];
     }
+    if (
+      hasReason(action, "ordinary-confidence-runtime-selected-too-low")
+      || hasReason(action, "ordinary-confidence-runtime-pitch-support-unmeasured")
+      || hasReason(action, "ordinary-confidence-runtime-precision-too-low")
+    ) {
+      return [
+        "Keep production/default runtime fail-closed.",
+        "Do not ask a teacher to review another ordinary-upload auto-pass pack yet.",
+        "Inspect data/experiments/western-strings-m3/confidence-validation-review/ordinary-confidence-release-audit.json.",
+        "The confidence-only threshold pool is historical evidence only; current runtime auto_pass also requires pitchSupportWithin80Cents=true.",
+        "Current runtime-policy evidence has too few/no safe selected rows, so the next step is candidate/pitch-support feature improvement, not human review.",
+        "After changing candidate generation or pitch-support evidence, rerun npm run western:ordinary-auto-pass-precision-review-pack before involving a teacher.",
+        "Only if that precheck generates self-checked rows should a teacher review pack be used.",
+      ];
+    }
     if (hasReason(action, "ordinary-auto-gate-disabled-by-default")) {
       return [
         "Keep production/default runtime fail-closed.",
-        "P1.1 context validation and threshold-pool precision have passed for the frozen RF scorer at threshold 0.8, after excluding the documented score-audio mismatch source.",
+        "P1.1 context validation and confidence-only threshold-pool precision have historical passing evidence, but runtime auto_pass must also pass the current pitch-support policy.",
         "Use npm run western:controlled-candidate-confidence-release-audit to inspect the frozen evidence before any pilot.",
         "Run npm run western:ordinary-monitored-pilot-plan to generate the disabled-by-default pilot plan artifact.",
         "Run npm run western:ordinary-monitored-pilot-smoke to verify the frozen RF scorer under the release flag inside a temporary repo root.",
