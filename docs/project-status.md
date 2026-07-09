@@ -76,18 +76,18 @@
 - 不可声称支持大提琴;架构预留,但未独立 M0/M5 验证。
 # 2026-07-09 最新执行结论(覆盖下文旧状态)
 
-- **P1 普通上传 confidence 重校准盲测已完成但未通过**:10 行盲测包已导入并评估,结果为 8 usable / 2 wrong,precision=0.80,低于 0.90 release floor。普通上传自动 gate 继续 fail-closed;下一步不是重复复核同一 10 行,而是查看 `data/experiments/western-strings-m3/confidence-recalibration-validation-review/confidence-recalibration-failure-diagnosis.json` 与 rows/groups CSV。当前诊断显示 10 个 selected 行全都缺 pitch support,abs cents error 为 2685–3680c,2 个 false positive 集中在 `stu02-ex05-weak_onset`;因此不要只调高阈值,应改候选/定位质量特征或补更强校准证据后再导出新的盲测包。
+- **P1 普通上传 confidence 重校准盲测已补强并通过精度闸,但运行时仍默认关闭**: 最新 30 行 context-validation 已导入,`western:project-status` 报 validation precision=0.90 / coverage=1.0。普通上传自动 gate 仍按安全策略 `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE` 默认关闭;下一步只能做受控 pilot,不能默认给学生端放行。
 - **M3+ 第二轮已完成,但定位/候选质量是 blocker**:累计 84 reviewed / 60 scored;per-mode eval 仍无任何非 control release-ready 模式。新增 `npm run western:m3plus-localization-diagnosis`,当前诊断为 60 match / 19 mismatch / 5 uncertain,即 24/84 non-match(28.57%)。最高风险组是 `stu02-ex05-weak_onset`(9/9 mismatch)。下一步先看 `data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-localization-diagnosis-groups.csv` 和 rows CSV,修谱面-录音定位/候选生成,不要继续复用同一复核包。
 - **当前优先级**:1) P1 失败行分析与 confidence 特征/模型重校准;2) M3+ 定位/候选质量修复;3) M4 独立 gold。学生端仍全部 fail-closed。
 # 2026-07-09 P1.1 context validation update
 
-- P1 10-row confidence recalibration blind validation is complete and failed: 8 usable / 2 wrong, precision=0.80, below the 0.90 release floor. Keep ordinary-upload auto feedback fail-closed.
+- **P1 普通上传 confidence 重校准盲测已补强并通过精度闸,但运行时仍默认关闭**: 最新 30 行 context-validation 已导入,`western:project-status` 报 validation precision=0.90 / coverage=1.0。普通上传自动 gate 仍按安全策略 `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE` 默认关闭;下一步只能做受控 pilot,不能默认给学生端放行。
 - The failure is preserved as evidence at `data/experiments/western-strings-m3/confidence-recalibration-validation-review/confidence-recalibration-failure-diagnosis.json`.
-- A new P1.1 context-feature validation pack has been generated at `data/experiments/western-strings-m3/confidence-recalibration-context-validation-review/index.html` (30 rows, RF threshold 0.8). Current next action is to review this P1.1 pack, then run `npm run western:controlled-candidate-confidence-recalibration-context-validation-eval`.
-- Do not review the old 10-row P1 pack again; it is a failed baseline, not the current action.
+- P1.1 context-feature validation has been imported and passed the precision floor; no more P1.1 review is currently requested.
+- Do not review the old 10-row P1 pack again; ordinary-upload auto feedback remains disabled by default until a separate monitored pilot is explicitly started.
 
 # 2026-07-09 M3+ candidate-quality review update
 
 - M3+ localization diagnosis shows `stu02-ex05-weak_onset` is a recording-level bad source for M3+ review: 9/9 rows are mismatch.
-- A new candidate-quality review pack was generated at `data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/index.html`; it excludes the 100% non-match recording and already-reviewed rows.
+- The candidate-quality review pack at `data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/index.html` is now restricted to recordings whose prior M3+ review rows were all audio-score matches, and excludes already-reviewed rows. This is stricter than only excluding the single 100% non-match recording.
 - The pack has 24 rows: variable-f0 6, slide-like 6, trill-like 6, double-stop-candidate 6, ornament-candidate 0 because no unreviewed ornament candidates remain after exclusions. It is evidence collection only; M3+ remains review-only.

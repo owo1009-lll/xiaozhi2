@@ -351,7 +351,7 @@
 22. ✅ 2026-07-09 M3+ 第二轮补强包已导入并评估:`npm run western:m3plus-review-pack-round2` 生成的 36 条非 control 样本已通过带 `--source`/`--reviews` 的 `western:m3plus-review-import` 导入同一个累计 labels CSV。当前累计 84 reviewed / 60 scored,`npm run western:m3plus-mode-eval` 仍返回 `m3plusModeReleaseReady=false`,`releaseReadyModes=[]`,`controlReadyModes=["stable"]`。非 control 模式没有 release-ready 证据;同时 19 mismatch + 5 uncertain-or-other 暴露谱面-录音定位质量问题。未改候选/定位前,M3+ 仍全部 review-only。
 # 2026-07-09 最新闸门状态补充
 
-- P1 confidence 重校准 blind validation 已完成且失败:10/10 reviewed,8 usable / 2 wrong,precision=0.80。失败诊断见 `data/experiments/western-strings-m3/confidence-recalibration-validation-review/confidence-recalibration-failure-diagnosis.json`:10 个 selected 行全都缺 pitch support,abs cents error 为 2685–3680c,2 个 false positive 集中在 `stu02-ex05-weak_onset`。普通上传自动 gate 不得开启;下一步不是重复复核,而是重做候选/定位质量特征、confidence 特征/模型或补强校准证据。
+- P1 confidence 重校准已补强:30 行 context-validation 已导入,当前验证 precision=0.90 / coverage=1.0。普通上传自动 gate 仍默认 fail-closed,不得直接常开;只能在单独受控 pilot 中设置 `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1` 并监控。
 - M3+ 第二轮复核已完成并导入:84 reviewed / 60 scored。per-mode eval 无非 control release-ready;新增定位诊断显示 24/84 non-match(19 mismatch + 5 uncertain),其中 `stu02-ex05-weak_onset` 为 9/9 mismatch。M3+ 当前不是继续标同一包,而是先修谱面-录音定位/候选质量。
 - 以上补充覆盖下文较早的“待复核 P1 / 继续补 M3+”描述;runtime 仍 fail-closed。
 # 2026-07-09 P1.1 context validation update
@@ -362,6 +362,6 @@
 
 # 2026-07-09 M3+ candidate-quality review update
 
-- M3+ localization diagnosis identified `stu02-ex05-weak_onset` as a recording-level 100% non-match source (9/9 mismatch).
-- `npm run western:m3plus-review-pack-candidate-quality` now generates `data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/index.html`, excluding that bad recording and already-reviewed rows.
+- M3+ localization diagnosis identified `stu02-ex05-weak_onset` as a recording-level 100% non-match source (9/9 mismatch). Candidate-quality sampling is now stricter: it only draws from recordings whose prior M3+ review rows were all audio-score matches.
+- `npm run western:m3plus-review-pack-candidate-quality` now generates `data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/index.html`, restricted to previously all-match recordings and already-reviewed rows excluded.
 - The generated pack has 24 rows and is for evidence collection only. M3+ pitch-behavior feedback remains review-only until the refreshed labels pass per-mode precision and localization checks.

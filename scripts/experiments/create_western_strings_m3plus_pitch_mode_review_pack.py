@@ -53,30 +53,30 @@ REVIEW_COLUMNS = [
 ]
 
 BEHAVIOR_OPTIONS = [
-    ("", "未标"),
-    ("stable", "稳定音"),
-    ("vibrato", "揉弦/周期波动"),
-    ("slide", "滑音/连续滑动"),
-    ("trill", "颤音/两音交替"),
-    ("ornament", "装饰音/倚音"),
-    ("double-stop", "双音/多音"),
-    ("harmonic", "泛音"),
-    ("variable-f0", "音高不稳定"),
-    ("other", "其他"),
-    ("uncertain", "不确定"),
+    ("", "\u672a\u6807"),
+    ("stable", "\u7a33\u5b9a\u97f3"),
+    ("vibrato", "\u63c9\u5f26/\u5468\u671f\u6ce2\u52a8"),
+    ("slide", "\u6ed1\u97f3/\u8fde\u7eed\u6ed1\u52a8"),
+    ("trill", "\u98a4\u97f3/\u4e24\u97f3\u4ea4\u66ff"),
+    ("ornament", "\u88c5\u9970\u97f3/\u501a\u97f3"),
+    ("double-stop", "\u53cc\u97f3/\u591a\u97f3"),
+    ("harmonic", "\u6cdb\u97f3"),
+    ("variable-f0", "\u97f3\u9ad8\u4e0d\u7a33\u5b9a"),
+    ("other", "\u5176\u4ed6"),
+    ("uncertain", "\u4e0d\u786e\u5b9a"),
 ]
 
 JUDGEMENT_OPTIONS = [
-    ("", "未标"),
-    ("normal-center", "常规中心音高"),
-    ("vibrato-center", "揉弦中心音高"),
-    ("slide-start-end", "滑音起止目标"),
-    ("trill-two-targets", "颤音两个目标"),
-    ("ornament-main-note", "装饰音主音"),
-    ("multi-f0", "双音 multi-f0"),
-    ("sounding-pitch", "泛音 sounding pitch"),
-    ("not-judgeable", "不可判"),
-    ("uncertain", "不确定"),
+    ("", "\u672a\u6807"),
+    ("normal-center", "\u5e38\u89c4\u4e2d\u5fc3\u97f3\u9ad8"),
+    ("vibrato-center", "\u63c9\u5f26\u4e2d\u5fc3\u97f3\u9ad8"),
+    ("slide-start-end", "\u6ed1\u97f3\u8d77\u6b62\u76ee\u6807"),
+    ("trill-two-targets", "\u98a4\u97f3\u4e24\u4e2a\u76ee\u6807"),
+    ("ornament-main-note", "\u88c5\u9970\u97f3\u4e3b\u97f3"),
+    ("multi-f0", "\u53cc\u97f3 multi-f0"),
+    ("sounding-pitch", "\u6cdb\u97f3 sounding pitch"),
+    ("not-judgeable", "\u4e0d\u53ef\u5224"),
+    ("uncertain", "\u4e0d\u786e\u5b9a"),
 ]
 
 def repo_path(value: str | Path) -> Path:
@@ -187,16 +187,50 @@ def load_diagnosis_excluded_recordings(
     return excluded
 
 
+def load_review_trusted_recordings(
+    paths: list[str],
+    min_reviewed: int,
+    max_nonmatch_rate: float,
+) -> set[str]:
+    counts: dict[str, dict[str, int]] = defaultdict(lambda: {"total": 0, "nonmatch": 0})
+    for value in paths:
+        path = repo_path(value)
+        if not path.exists():
+            continue
+        for row in read_csv(path):
+            recording_id = str(row.get("recordingId") or "").strip()
+            if not recording_id:
+                continue
+            status = str(row.get("audioScoreMatch") or "").strip()
+            if status not in {"match", "mismatch", "uncertain"}:
+                continue
+            counts[recording_id]["total"] += 1
+            if status != "match":
+                counts[recording_id]["nonmatch"] += 1
+
+    trusted: set[str] = set()
+    for recording_id, item in counts.items():
+        total = int(item.get("total") or 0)
+        if total < min_reviewed:
+            continue
+        nonmatch_rate = float(item.get("nonmatch") or 0) / max(total, 1)
+        if nonmatch_rate <= max_nonmatch_rate:
+            trusted.add(recording_id)
+    return trusted
+
+
 def select_rows(
     rows: list[dict[str, str]],
     modes: list[str],
     per_mode: int,
     excluded_keys: set[str] | None = None,
     excluded_recording_ids: set[str] | None = None,
+    allowed_recording_ids: set[str] | None = None,
 ) -> tuple[list[dict[str, str]], dict[str, Any]]:
     selected: list[dict[str, str]] = []
     selected_keys: set[str] = set(excluded_keys or set())
     excluded_recordings: set[str] = set(excluded_recording_ids or set())
+    allowed_recordings = set(allowed_recording_ids or set())
     mode_counts: dict[str, int] = {}
     available_counts: dict[str, int] = {}
     eligible_counts: dict[str, int] = {}
@@ -204,6 +238,8 @@ def select_rows(
         candidates = [row for row in rows if mode_matches(row, mode)]
         available_counts[mode] = len(candidates)
         candidates = [row for row in candidates if str(row.get("recordingId", "")).strip() not in excluded_recordings]
+        if allowed_recordings:
+            candidates = [row for row in candidates if str(row.get("recordingId", "")).strip() in allowed_recordings]
         candidates = [row for row in candidates if row_key(row) not in selected_keys]
         eligible_counts[mode] = len(candidates)
         candidates.sort(key=lambda item: (mode_strength(item, mode), -safe_int(item.get("noteIndex"))), reverse=True)
@@ -245,6 +281,8 @@ def select_rows(
         "excludedKeyCount": len(excluded_keys or set()),
         "excludedRecordingIds": sorted(excluded_recordings),
         "excludedRecordingCount": len(excluded_recordings),
+        "allowedRecordingIds": sorted(allowed_recordings),
+        "allowedRecordingCount": len(allowed_recordings),
         "selectedCounts": mode_counts,
     }
 
@@ -587,7 +625,19 @@ def build_pack(args: argparse.Namespace) -> dict[str, Any]:
         int(args.exclude_diagnosis_min_recording_total),
         float(args.exclude_diagnosis_min_nonmatch_rate),
     ))
-    selected, stats = select_rows(rows, modes, int(args.per_mode), excluded_keys, excluded_recordings)
+    allowed_recordings = load_review_trusted_recordings(
+        list(args.require_trusted_recordings_from_reviewed or []),
+        int(args.trusted_recording_min_reviewed),
+        float(args.trusted_recording_max_nonmatch_rate),
+    )
+    selected, stats = select_rows(
+        rows,
+        modes,
+        int(args.per_mode),
+        excluded_keys,
+        excluded_recordings,
+        allowed_recordings,
+    )
     audio_paths = load_summary_audio_paths(summary_path)
     review_rows, warnings = build_review_rows(
         selected,
@@ -648,6 +698,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--exclude-localization-diagnosis", action="append", default=[], help="Localization diagnosis JSON whose high-risk recording groups should be excluded. Can be repeated.")
     parser.add_argument("--exclude-diagnosis-min-recording-total", type=int, default=3)
     parser.add_argument("--exclude-diagnosis-min-nonmatch-rate", type=float, default=1.0)
+    parser.add_argument("--require-trusted-recordings-from-reviewed", action="append", default=[], help="Reviewed CSV/labels file used to allow only recordings whose prior rows all matched. Can be repeated.")
+    parser.add_argument("--trusted-recording-min-reviewed", type=int, default=2)
+    parser.add_argument("--trusted-recording-max-nonmatch-rate", type=float, default=0.0)
     return parser.parse_args()
 
 
