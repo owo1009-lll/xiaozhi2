@@ -7,7 +7,7 @@
 >
 > **路线重构(2026-07-09):** 原"技巧识别 M4(技法名称展示)"**已删除**——技法不再作为独立展示功能,而是并入 **M3+ 少退复核延伸**:识别技法只为把该区的**音准**判对(揉弦判中心音高、滑音判起止、颤音判两目标、双音需 multi-f0、泛音需谱面 sounding pitch),**不展示技法名、不降音准标准、拿不准仍退复核**。里程碑重编号:**OMR = M4(提前)、大提琴 = M5(最后)**。目标次序:先 M3+ 判准小提琴音准 → 再 M4 OMR 识谱+落到谱面 → 大提琴最后。
 >
-> **受控 pilot 决策包(2026-07-10):** `npm run western:release-review` 之后必须运行 `npm run western:controlled-pilot-decision`。当前机器自测结果为 `readyForControlledPilotDecision=true`,`readyToStartControlledPilot=false`,`approvalPresent=false`;下一步不是继续教师/专业人员复核,而是产品负责人是否批准一个单独受控 pilot。无批准文件时默认保持 review-only / fail-closed;只有机器预检报告 unknown/unsafe auto-pass 时才做定向人工复核。
+> **受控 pilot 决策包(2026-07-10):** `npm run western:release-review` 之后必须运行 `npm run western:controlled-pilot-decision`。当前机器自测结果为 `readyForControlledPilotDecision=true`,`readyToStartControlledPilot=false`,`approvalPresent=false`;下一步不是继续教师/专业人员复核,而是产品负责人是否批准一个单独受控 pilot。可用 `npm run western:controlled-pilot-approval-template` 生成不批准的模板;无明确批准文件时默认保持 review-only / fail-closed。只有机器预检报告 unknown/unsafe auto-pass 时才做定向人工复核。
 
 ---
 

@@ -219,7 +219,8 @@ function commandForAction(action) {
     return [
       "Open data/experiments/western-strings-controlled-pilot-decision.md.",
       "No teacher/professional review is needed at this step; the machine checks are already complete.",
-      "Either create data/experiments/western-strings-controlled-pilot-approval.json with explicit owner approval, or stop safely in review-only mode.",
+      "Optionally run npm run western:controlled-pilot-approval-template to generate a non-approving template.",
+      "Only if the owner explicitly approves the monitored pilot, copy/fill the template as data/experiments/western-strings-controlled-pilot-approval.json; otherwise stop safely in review-only mode.",
       "Keep production/default runtime fail-closed.",
       "Do not commit WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 or enable it globally.",
     ];

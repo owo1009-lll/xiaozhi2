@@ -109,6 +109,7 @@
 ```bash
 npm run western:release-review
 npm run western:controlled-pilot-decision
+npm run western:controlled-pilot-approval-template
 ```
 
 `western:release-review` 会串联:
@@ -124,12 +125,15 @@ npm run western:controlled-pilot-decision
 - 只有机器预检发现 unknown auto-pass 或 unsafe auto-pass 时,才进入定向人工复核。
 - 没有负责人显式批准时,系统保持 review-only / fail-closed。
 
+`western:controlled-pilot-approval-template` 只生成不批准的模板文件,不会解锁 pilot。只有负责人明确批准后,才可把模板复制/填写为 `data/experiments/western-strings-controlled-pilot-approval.json`。
+
 产物:
 
 - `data/experiments/western-strings-release-review.json`
 - `data/experiments/western-strings-release-review.md`
 - `data/experiments/western-strings-controlled-pilot-decision.json`
 - `data/experiments/western-strings-controlled-pilot-decision.md`
+- `data/experiments/western-strings-controlled-pilot-approval.template.json`
 
 当前实测:
 

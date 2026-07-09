@@ -8,6 +8,7 @@ const DEFAULT_RELEASE_REVIEW = path.join("data", "experiments", "western-strings
 const DEFAULT_OUT = path.join("data", "experiments", "western-strings-controlled-pilot-decision.json");
 const DEFAULT_SUMMARY = path.join("data", "experiments", "western-strings-controlled-pilot-decision.md");
 const DEFAULT_APPROVAL = path.join("data", "experiments", "western-strings-controlled-pilot-approval.json");
+const DEFAULT_APPROVAL_TEMPLATE = path.join("data", "experiments", "western-strings-controlled-pilot-approval.template.json");
 
 function parseArgs(argv) {
   const args = {
@@ -102,8 +103,15 @@ function renderMarkdown(decision) {
     "## Approval File",
     "",
     `- expectedPath: ${decision.artifacts.approval}`,
+    `- templatePath: ${decision.artifacts.approvalTemplate}`,
     "",
-    "Example approval file, only if the owner explicitly approves the monitored pilot:",
+    "Generate a non-approving template with:",
+    "",
+    "```bash",
+    "npm run western:controlled-pilot-approval-template",
+    "```",
+    "",
+    "Only if the owner explicitly approves the monitored pilot, copy/fill the template as the expected approval file. Example approval file:",
     "",
     "```json",
     JSON.stringify({
@@ -189,6 +197,7 @@ export async function buildControlledPilotDecision(args = {}) {
       out: rel(args.out || DEFAULT_OUT),
       summary: rel(args.summary || DEFAULT_SUMMARY),
       approval: rel(approvalPath),
+      approvalTemplate: rel(DEFAULT_APPROVAL_TEMPLATE),
       releaseReview: rel(releaseReviewPath),
       projectStatus: "data/experiments/western-strings-project-status.json",
     },
