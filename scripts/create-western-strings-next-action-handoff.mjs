@@ -111,6 +111,16 @@ function commandForAction(action) {
   }
   if (track === "M3+ pitch behavior modes") {
     if (hasReason(action, "m3plus-no-mode-specific-release-ready")) {
+      if (String(action.action || "").includes("candidate-quality review pack")) {
+        return [
+          "Keep all M3+ pitch-behavior modes review-only in student/runtime output.",
+          "Open data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/index.html and review the 24 candidate-quality rows.",
+          "This pack excludes the recording-level 100% non-match group stu02-ex05-weak_onset, but it is still evidence collection, not a release.",
+          "After review, save the downloaded CSV as data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/m3plus-pitch-mode-review.completed.csv, or leave it in Downloads and run npm run western:ingest-review-downloads -- --apply.",
+          "Import with npm run western:m3plus-review-import -- --source data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/m3plus-pitch-mode-review.csv --reviews data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/m3plus-pitch-mode-review.completed.csv",
+          "Then rerun npm run western:m3plus-mode-eval, npm run western:m3plus-localization-diagnosis, and npm run western:project-status.",
+        ];
+      }
       if (String(action.action || "").includes("round-2 is imported")) {
         return [
           "Keep all M3+ pitch-behavior modes review-only in student/runtime output.",

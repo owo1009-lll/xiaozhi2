@@ -123,10 +123,13 @@ assert(
   (m3plusFailure.reason || []).includes("m3plus-no-mode-specific-release-ready"),
   "M3+ track should block on lack of non-control mode-specific release evidence",
 );
+const expectedM3PlusArtifact = m3plus.candidateQualityReview?.needsReview
+  ? "data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/index.html"
+  : "data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-localization-diagnosis-groups.csv";
 assert.equal(
   m3plusFailure.artifact,
-  "data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-localization-diagnosis-groups.csv",
-  "M3+ gate failure should point to localization diagnosis after labels expose score-audio mismatch",
+  expectedM3PlusArtifact,
+  "M3+ gate failure should point to the active candidate-quality review or localization diagnosis",
 );
 assert(fullGate.failures.some((failure) => failure.track === "M4 OMR benchmark"), "M4 track failure should be reported");
 assert.equal(

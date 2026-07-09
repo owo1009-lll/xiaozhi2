@@ -85,3 +85,9 @@
 - The failure is preserved as evidence at `data/experiments/western-strings-m3/confidence-recalibration-validation-review/confidence-recalibration-failure-diagnosis.json`.
 - A new P1.1 context-feature validation pack has been generated at `data/experiments/western-strings-m3/confidence-recalibration-context-validation-review/index.html` (30 rows, RF threshold 0.8). Current next action is to review this P1.1 pack, then run `npm run western:controlled-candidate-confidence-recalibration-context-validation-eval`.
 - Do not review the old 10-row P1 pack again; it is a failed baseline, not the current action.
+
+# 2026-07-09 M3+ candidate-quality review update
+
+- M3+ localization diagnosis shows `stu02-ex05-weak_onset` is a recording-level bad source for M3+ review: 9/9 rows are mismatch.
+- A new candidate-quality review pack was generated at `data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/index.html`; it excludes the 100% non-match recording and already-reviewed rows.
+- The pack has 24 rows: variable-f0 6, slide-like 6, trill-like 6, double-stop-candidate 6, ornament-candidate 0 because no unreviewed ornament candidates remain after exclusions. It is evidence collection only; M3+ remains review-only.

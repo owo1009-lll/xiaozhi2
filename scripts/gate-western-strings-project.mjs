@@ -47,7 +47,9 @@ export function evaluateProjectGate(status, requiredTracks) {
     failures.push({
       track: "M3+ pitch behavior modes",
       reason: m3plus.blockingReasons || ["m3plus-gate-not-ready"],
-      artifact: m3plus.reviewArtifacts?.localizationDiagnosisGroupsCsv || m3plus.reviewArtifacts?.modeEvalCsv || m3plus.reviewArtifacts?.modeEvalJson || m3plus.reviewArtifacts?.round2ReviewPage || m3plus.reviewArtifacts?.reviewPage || "",
+      artifact: m3plus.candidateQualityReview?.needsReview
+        ? m3plus.candidateQualityReview.reviewPage
+        : (m3plus.reviewArtifacts?.localizationDiagnosisGroupsCsv || m3plus.reviewArtifacts?.modeEvalCsv || m3plus.reviewArtifacts?.modeEvalJson || m3plus.reviewArtifacts?.round2ReviewPage || m3plus.reviewArtifacts?.reviewPage || ""),
     });
   }
   if (requiredTracks.has("m4") && !m4.m4OmrDraftQualityReady) {

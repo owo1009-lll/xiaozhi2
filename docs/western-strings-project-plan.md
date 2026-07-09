@@ -359,3 +359,9 @@
 - P1 10-row confidence recalibration blind validation is complete and failed: 8 usable / 2 wrong, precision=0.80. It remains evidence only.
 - P1.1 adds deployable context/candidate-quality features and generates a fresh 30-row blind validation pack at `data/experiments/western-strings-m3/confidence-recalibration-context-validation-review/index.html`.
 - Review P1.1 and evaluate it with `npm run western:controlled-candidate-confidence-recalibration-context-validation-eval` before considering any runtime integration. Student-facing ordinary-upload auto feedback remains fail-closed.
+
+# 2026-07-09 M3+ candidate-quality review update
+
+- M3+ localization diagnosis identified `stu02-ex05-weak_onset` as a recording-level 100% non-match source (9/9 mismatch).
+- `npm run western:m3plus-review-pack-candidate-quality` now generates `data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/index.html`, excluding that bad recording and already-reviewed rows.
+- The generated pack has 24 rows and is for evidence collection only. M3+ pitch-behavior feedback remains review-only until the refreshed labels pass per-mode precision and localization checks.

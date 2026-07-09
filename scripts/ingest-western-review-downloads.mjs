@@ -61,6 +61,25 @@ const TARGETS = [
     filePattern: /^m3plus-pitch-mode-review.*\.csv$/i,
     keyColumns: ["rowId"],
   },
+  {
+    name: "m3plus-candidate-quality",
+    source: path.join(
+      "data",
+      "experiments",
+      "western-strings-m3plus",
+      "pitch-mode-review-pack-candidate-quality",
+      "m3plus-pitch-mode-review.csv",
+    ),
+    dest: path.join(
+      "data",
+      "experiments",
+      "western-strings-m3plus",
+      "pitch-mode-review-pack-candidate-quality",
+      "m3plus-pitch-mode-review.completed.csv",
+    ),
+    filePattern: /^m3plus-pitch-mode-review.*\.csv$/i,
+    keyColumns: ["rowId"],
+  },
 ];
 
 function parseArgs(argv) {

@@ -220,6 +220,27 @@ const M3PLUS_ROUND2_COMPLETED = path.join(
   "pitch-mode-review-pack-round2",
   "m3plus-pitch-mode-review.completed.csv",
 );
+const M3PLUS_CANDIDATE_QUALITY_REVIEW_PAGE = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3plus",
+  "pitch-mode-review-pack-candidate-quality",
+  "index.html",
+);
+const M3PLUS_CANDIDATE_QUALITY_SOURCE = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3plus",
+  "pitch-mode-review-pack-candidate-quality",
+  "m3plus-pitch-mode-review.csv",
+);
+const M3PLUS_CANDIDATE_QUALITY_COMPLETED = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3plus",
+  "pitch-mode-review-pack-candidate-quality",
+  "m3plus-pitch-mode-review.completed.csv",
+);
 const M3PLUS_MODE_EVAL = path.join(
   "data",
   "experiments",
@@ -425,6 +446,8 @@ async function buildM3PlusStatus() {
   const labelRows = await readCsv(M3PLUS_LABELS);
   const modeEval = await readJson(M3PLUS_MODE_EVAL);
   const localizationDiagnosis = await readJson(M3PLUS_LOCALIZATION_DIAGNOSIS);
+  const candidateQualityReviewPageExists = await exists(M3PLUS_CANDIDATE_QUALITY_REVIEW_PAGE);
+  const candidateQualityCompletedExists = await exists(M3PLUS_CANDIDATE_QUALITY_COMPLETED);
   const allSourceRows = [...sourceRows];
   const sourceKeys = new Set(sourceRows.map(m3plusLabelKey).filter(Boolean));
   for (const row of labelRows) {
@@ -507,6 +530,14 @@ async function buildM3PlusStatus() {
       summary: localizationDiagnosis?.summary || {},
       highRiskGroups: localizationDiagnosis?.highRiskGroups || [],
     },
+    candidateQualityReview: {
+      reviewPage: M3PLUS_CANDIDATE_QUALITY_REVIEW_PAGE.replace(/\\/g, "/"),
+      sourceCsv: M3PLUS_CANDIDATE_QUALITY_SOURCE.replace(/\\/g, "/"),
+      completedCsv: M3PLUS_CANDIDATE_QUALITY_COMPLETED.replace(/\\/g, "/"),
+      reviewPageExists: candidateQualityReviewPageExists,
+      completedCsvExists: candidateQualityCompletedExists,
+      needsReview: candidateQualityReviewPageExists && !candidateQualityCompletedExists,
+    },
     labelBlockingReasons,
     blockingReasons,
     reviewArtifacts: {
@@ -521,6 +552,9 @@ async function buildM3PlusStatus() {
       round2ReviewPage: M3PLUS_ROUND2_REVIEW_PAGE.replace(/\\/g, "/"),
       round2SourceCsv: M3PLUS_ROUND2_SOURCE.replace(/\\/g, "/"),
       round2CompletedCsv: M3PLUS_ROUND2_COMPLETED.replace(/\\/g, "/"),
+      candidateQualityReviewPage: M3PLUS_CANDIDATE_QUALITY_REVIEW_PAGE.replace(/\\/g, "/"),
+      candidateQualitySourceCsv: M3PLUS_CANDIDATE_QUALITY_SOURCE.replace(/\\/g, "/"),
+      candidateQualityCompletedCsv: M3PLUS_CANDIDATE_QUALITY_COMPLETED.replace(/\\/g, "/"),
     },
   };
 }
@@ -762,6 +796,7 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
   } else if (!m3plus.m3plusModeReleaseReady) {
     const counts = m3plus.modeEval?.counts || {};
     const localizationSummary = m3plus.localizationDiagnosis?.summary || {};
+    const candidateQualityReview = m3plus.candidateQualityReview || {};
     const mismatchText = counts.rows
       ? ` Current eval has ${counts.match || 0} match, ${counts.mismatch || 0} mismatch, and ${Math.max(0, (counts.rows || 0) - (counts.match || 0) - (counts.mismatch || 0))} uncertain/other rows out of ${counts.rows}; fix score-audio localization/candidate quality before another release attempt.`
       : "";
@@ -771,8 +806,12 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
     actions.push({
       priority: 2,
       track: "M3+ pitch behavior modes",
-      action: `M3+ labels are sufficient and round-2 is imported, but no non-control pitch-behavior mode is release-ready.${mismatchText}${localizationText} Keep M3+ review-only and inspect localization groups before changing candidate generation.`,
-      artifact: m3plus.reviewArtifacts.localizationDiagnosisGroupsCsv || m3plus.reviewArtifacts.modeEvalCsv || m3plus.reviewArtifacts.modeEvalJson,
+      action: candidateQualityReview.needsReview
+        ? `M3+ labels are sufficient and round-2 is imported, but no non-control pitch-behavior mode is release-ready.${mismatchText}${localizationText} A candidate-quality review pack now excludes the 100% non-match recording; review it before another release attempt.`
+        : `M3+ labels are sufficient and round-2 is imported, but no non-control pitch-behavior mode is release-ready.${mismatchText}${localizationText} Keep M3+ review-only and inspect localization groups before changing candidate generation.`,
+      artifact: candidateQualityReview.needsReview
+        ? candidateQualityReview.reviewPage
+        : (m3plus.reviewArtifacts.localizationDiagnosisGroupsCsv || m3plus.reviewArtifacts.modeEvalCsv || m3plus.reviewArtifacts.modeEvalJson),
       reason: m3plus.blockingReasons,
     });
   }

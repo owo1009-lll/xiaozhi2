@@ -159,15 +159,45 @@ def mode_strength(row: dict[str, str], mode: str) -> float:
     return 0.0
 
 
-def select_rows(rows: list[dict[str, str]], modes: list[str], per_mode: int, excluded_keys: set[str] | None = None) -> tuple[list[dict[str, str]], dict[str, Any]]:
+def load_diagnosis_excluded_recordings(
+    paths: list[str],
+    min_recording_total: int,
+    min_nonmatch_rate: float,
+) -> set[str]:
+    excluded: set[str] = set()
+    for value in paths:
+        path = repo_path(value)
+        if not path.exists():
+            continue
+        report = json.loads(path.read_text(encoding="utf-8"))
+        for group in report.get("highRiskGroups") or []:
+            if group.get("group") != "recording":
+                continue
+            recording_id = str(group.get("recordingId") or "").strip()
+            total = safe_int(group.get("total"), 0)
+            nonmatch_rate = safe_float(group.get("nonMatchRate"), 0.0)
+            if recording_id and total >= min_recording_total and nonmatch_rate >= min_nonmatch_rate:
+                excluded.add(recording_id)
+    return excluded
+
+
+def select_rows(
+    rows: list[dict[str, str]],
+    modes: list[str],
+    per_mode: int,
+    excluded_keys: set[str] | None = None,
+    excluded_recording_ids: set[str] | None = None,
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
     selected: list[dict[str, str]] = []
     selected_keys: set[str] = set(excluded_keys or set())
+    excluded_recordings: set[str] = set(excluded_recording_ids or set())
     mode_counts: dict[str, int] = {}
     available_counts: dict[str, int] = {}
     eligible_counts: dict[str, int] = {}
     for mode in modes:
         candidates = [row for row in rows if mode_matches(row, mode)]
         available_counts[mode] = len(candidates)
+        candidates = [row for row in candidates if str(row.get("recordingId", "")).strip() not in excluded_recordings]
         candidates = [row for row in candidates if row_key(row) not in selected_keys]
         eligible_counts[mode] = len(candidates)
         candidates.sort(key=lambda item: (mode_strength(item, mode), -safe_int(item.get("noteIndex"))), reverse=True)
@@ -207,6 +237,8 @@ def select_rows(rows: list[dict[str, str]], modes: list[str], per_mode: int, exc
         "availableCounts": available_counts,
         "eligibleCounts": eligible_counts,
         "excludedKeyCount": len(excluded_keys or set()),
+        "excludedRecordingIds": sorted(excluded_recordings),
+        "excludedRecordingCount": len(excluded_recordings),
         "selectedCounts": mode_counts,
     }
 
@@ -675,7 +707,13 @@ def build_pack(args: argparse.Namespace) -> dict[str, Any]:
     rows = read_csv(inventory_path)
     modes = [item.strip() for item in str(args.modes).split(",") if item.strip()]
     excluded_keys = load_excluded_keys(list(args.exclude_reviewed or []))
-    selected, stats = select_rows(rows, modes, int(args.per_mode), excluded_keys)
+    excluded_recordings = set(str(item).strip() for item in (args.exclude_recording_id or []) if str(item).strip())
+    excluded_recordings.update(load_diagnosis_excluded_recordings(
+        list(args.exclude_localization_diagnosis or []),
+        int(args.exclude_diagnosis_min_recording_total),
+        float(args.exclude_diagnosis_min_nonmatch_rate),
+    ))
+    selected, stats = select_rows(rows, modes, int(args.per_mode), excluded_keys, excluded_recordings)
     audio_paths = load_summary_audio_paths(summary_path)
     review_rows, warnings = build_review_rows(
         selected,
@@ -731,6 +769,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--clip-before", type=float, default=1.5)
     parser.add_argument("--clip-after", type=float, default=2.5)
     parser.add_argument("--exclude-reviewed", action="append", default=[], help="CSV with already reviewed rows to exclude by recordingId/noteIndex/noteId. Can be repeated.")
+    parser.add_argument("--exclude-recording-id", action="append", default=[], help="RecordingId to exclude from this review pack. Can be repeated.")
+    parser.add_argument("--exclude-localization-diagnosis", action="append", default=[], help="Localization diagnosis JSON whose high-risk recording groups should be excluded. Can be repeated.")
+    parser.add_argument("--exclude-diagnosis-min-recording-total", type=int, default=3)
+    parser.add_argument("--exclude-diagnosis-min-nonmatch-rate", type=float, default=1.0)
     return parser.parse_args()
 
 
