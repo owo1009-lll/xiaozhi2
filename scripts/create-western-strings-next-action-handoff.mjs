@@ -32,6 +32,16 @@ function hasReason(action, reason) {
 function commandForAction(action) {
   const track = action?.track || "";
   if (track === "M2/M3 ordinary upload candidate gate") {
+    if (hasReason(action, "ordinary-confidence-recalibration-validation-needed")) {
+      return [
+        "Keep production/default runtime fail-closed.",
+        "Open data/experiments/western-strings-m3/confidence-recalibration-validation-review/index.html and review the 10-row recalibration blind-validation pack.",
+        "Save the downloaded CSV as data/experiments/western-strings-m3/confidence-recalibration-validation-review/controlled-candidate-review.completed.csv.",
+        "Run npm run western:controlled-candidate-confidence-recalibration-validation-eval.",
+        "Then run npm run western:project-status and npm run test:western-project-gate.",
+        "Only if the recalibration blind validation passes should a new monitored pilot be considered; do not enable the student gate by default.",
+      ];
+    }
     if (hasReason(action, "ordinary-confidence-threshold-pool-precision-too-low")) {
       return [
         "Keep production/default runtime fail-closed.",

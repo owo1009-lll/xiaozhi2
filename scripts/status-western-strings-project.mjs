@@ -87,6 +87,41 @@ const CONTROLLED_CONFIDENCE_THRESHOLD_POOL_DIAGNOSIS = path.join(
   "confidence-threshold-pool-review",
   "confidence-threshold-pool-diagnosis.json",
 );
+const CONTROLLED_CONFIDENCE_RECALIBRATION_LABELS = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-recalibration",
+  "combined-controlled-candidate-review-labels.csv",
+);
+const CONTROLLED_CONFIDENCE_RECALIBRATION_PILOT = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-recalibration",
+  "candidate-confidence-recalibration-pilot.json",
+);
+const CONTROLLED_CONFIDENCE_RECALIBRATION_VALIDATION_REVIEW_PAGE = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-recalibration-validation-review",
+  "index.html",
+);
+const CONTROLLED_CONFIDENCE_RECALIBRATION_VALIDATION_COMPLETED = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-recalibration-validation-review",
+  "controlled-candidate-review.completed.csv",
+);
+const CONTROLLED_CONFIDENCE_RECALIBRATION_VALIDATION_EVAL = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-recalibration-validation-review",
+  "confidence-recalibration-validation-eval.json",
+);
 const M3PLUS_SOURCE = path.join(
   "data",
   "experiments",
@@ -218,6 +253,28 @@ async function readJson(filePath, fallback = null) {
   }
 }
 
+function bestDeployableReleaseCandidate(pilot) {
+  const candidates = [];
+  for (const evaluation of pilot?.evaluations || []) {
+    if (evaluation.featureSet !== "deployable" || evaluation.groupBy !== "recordingId") continue;
+    for (const [modelName, model] of Object.entries(evaluation.models || {})) {
+      if (!model?.releaseCandidate) continue;
+      candidates.push({
+        modelName,
+        featureSet: evaluation.featureSet,
+        groupBy: evaluation.groupBy,
+        ...model.releaseCandidate,
+      });
+    }
+  }
+  candidates.sort((a, b) => (
+    Number(b.precision || 0) - Number(a.precision || 0)
+    || Number(b.coverage || 0) - Number(a.coverage || 0)
+    || Number(b.selected || 0) - Number(a.selected || 0)
+  ));
+  return candidates[0] || null;
+}
+
 function isM3PlusReviewed(row) {
   return [
     "audioScoreMatch",
@@ -340,6 +397,39 @@ async function buildControlledStatus() {
     await readJson(CONTROLLED_CONFIDENCE_RELEASE_AUDIT),
   );
   const status = attachConfidencePilotStatus(buildControlledCandidateReviewStatus(report), confidencePilot);
+  const recalibrationPilot = await readJson(CONTROLLED_CONFIDENCE_RECALIBRATION_PILOT);
+  const recalibrationEval = await readJson(CONTROLLED_CONFIDENCE_RECALIBRATION_VALIDATION_EVAL);
+  const recalibrationReleaseCandidate = bestDeployableReleaseCandidate(recalibrationPilot);
+  const recalibrationNeedsBlindValidation = Boolean(
+    recalibrationReleaseCandidate
+    && !recalibrationEval?.blindValidationPassed
+  );
+  status.confidenceRecalibration = {
+    labelsCsv: CONTROLLED_CONFIDENCE_RECALIBRATION_LABELS.replace(/\\/g, "/"),
+    pilotJson: CONTROLLED_CONFIDENCE_RECALIBRATION_PILOT.replace(/\\/g, "/"),
+    validationReviewPage: CONTROLLED_CONFIDENCE_RECALIBRATION_VALIDATION_REVIEW_PAGE.replace(/\\/g, "/"),
+    validationCompletedCsv: CONTROLLED_CONFIDENCE_RECALIBRATION_VALIDATION_COMPLETED.replace(/\\/g, "/"),
+    validationEvalJson: CONTROLLED_CONFIDENCE_RECALIBRATION_VALIDATION_EVAL.replace(/\\/g, "/"),
+    releaseCandidateFound: Boolean(recalibrationReleaseCandidate),
+    bestReleaseCandidate: recalibrationReleaseCandidate,
+    validationEval: recalibrationEval || {
+      sourceExists: false,
+      blindValidationPassed: false,
+      blockingReasons: ["confidence-recalibration-validation-eval-missing"],
+    },
+    needsBlindValidation: recalibrationNeedsBlindValidation,
+  };
+  if (recalibrationNeedsBlindValidation) {
+    status.blockingReasons = [
+      ...new Set([
+        ...(status.blockingReasons || []),
+        "ordinary-confidence-recalibration-validation-needed",
+      ]),
+    ];
+    status.nextActions = [
+      "Review the confidence recalibration blind-validation pack, save controlled-candidate-review.completed.csv in that folder, then run western:controlled-candidate-confidence-recalibration-validation-eval.",
+    ];
+  }
   status.reviewArtifacts = {
     reviewPage: CONTROLLED_REVIEW_PAGE.replace(/\\/g, "/"),
     completedCsv: CONTROLLED_COMPLETED.replace(/\\/g, "/"),
@@ -349,6 +439,11 @@ async function buildControlledStatus() {
     thresholdPoolCompletedCsv: CONTROLLED_CONFIDENCE_THRESHOLD_POOL_COMPLETED.replace(/\\/g, "/"),
     thresholdPoolEvalJson: CONTROLLED_CONFIDENCE_THRESHOLD_POOL_EVAL.replace(/\\/g, "/"),
     thresholdPoolDiagnosisJson: CONTROLLED_CONFIDENCE_THRESHOLD_POOL_DIAGNOSIS.replace(/\\/g, "/"),
+    recalibrationLabelsCsv: CONTROLLED_CONFIDENCE_RECALIBRATION_LABELS.replace(/\\/g, "/"),
+    recalibrationPilotJson: CONTROLLED_CONFIDENCE_RECALIBRATION_PILOT.replace(/\\/g, "/"),
+    recalibrationValidationReviewPage: CONTROLLED_CONFIDENCE_RECALIBRATION_VALIDATION_REVIEW_PAGE.replace(/\\/g, "/"),
+    recalibrationValidationCompletedCsv: CONTROLLED_CONFIDENCE_RECALIBRATION_VALIDATION_COMPLETED.replace(/\\/g, "/"),
+    recalibrationValidationEvalJson: CONTROLLED_CONFIDENCE_RECALIBRATION_VALIDATION_EVAL.replace(/\\/g, "/"),
   };
   return status;
 }
@@ -398,7 +493,9 @@ async function buildM4OmrStatus() {
 function summarizeNextActions(controlled, m3plus, m4Omr) {
   const actions = [];
   if (!controlled.studentSafeCandidateGateReady) {
-    const ordinaryArtifact = (controlled.blockingReasons || []).includes("ordinary-confidence-threshold-pool-precision-too-low")
+    const ordinaryArtifact = (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-validation-needed")
+      ? (controlled.reviewArtifacts.recalibrationValidationReviewPage || controlled.confidenceRecalibration?.validationReviewPage)
+      : (controlled.blockingReasons || []).includes("ordinary-confidence-threshold-pool-precision-too-low")
       ? (controlled.reviewArtifacts.thresholdPoolDiagnosisJson || controlled.confidencePilot?.thresholdPoolEvalJson)
       : (controlled.confidencePilot?.thresholdPoolReviewPage || controlled.reviewArtifacts.thresholdPoolReviewPage || controlled.confidencePilot?.validationReviewPage || controlled.reviewArtifacts.reviewPage);
     actions.push({

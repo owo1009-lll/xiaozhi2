@@ -45,11 +45,14 @@ assert.equal(controlled.confidencePilot.bestReleaseCandidate.groupBy, "recording
 assert(
   status.nextActions[0]?.action.includes("confidence-threshold-pool-review/index.html")
   || status.nextActions[0]?.action.includes("threshold-pool review failed")
+  || status.nextActions[0]?.action.includes("recalibration blind-validation pack")
   || status.nextActions[0]?.action.includes("wire a runtime gate")
   || status.nextActions[0]?.action.includes("runtime gate is wired"),
   "project next action should route to threshold-pool review, recalibration, runtime wiring, or explicit release-flag gating",
 );
-const expectedOrdinaryArtifact = status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-threshold-pool-precision-too-low")
+const expectedOrdinaryArtifact = status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-recalibration-validation-needed")
+  ? "data/experiments/western-strings-m3/confidence-recalibration-validation-review/index.html"
+  : status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-threshold-pool-precision-too-low")
   ? "data/experiments/western-strings-m3/confidence-threshold-pool-review/confidence-threshold-pool-diagnosis.json"
   : "data/experiments/western-strings-m3/confidence-threshold-pool-review/index.html";
 assert.equal(status.nextActions[0]?.artifact, expectedOrdinaryArtifact, "project artifact should point to the current ordinary-gate evidence artifact");
