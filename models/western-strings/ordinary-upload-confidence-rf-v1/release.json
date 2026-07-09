@@ -1,0 +1,33 @@
+{
+  "modelVersion": "ordinary-upload-confidence-rf-v1",
+  "gateVersion": "western-offline-feature-gate-v1-confidence-rf",
+  "enabledByDefault": false,
+  "enableEnvVar": "WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE",
+  "modelName": "rf",
+  "threshold": 0.7,
+  "featureSet": "deployable",
+  "groupBy": "recordingId",
+  "pilot": {
+    "source": "data/experiments/western-strings-m3/offline-feature-candidate-review/candidate-confidence-pilot.json",
+    "precision": 0.9375,
+    "coverage": 0.5333,
+    "selected": 32,
+    "wrongSelected": 2
+  },
+  "blindValidation": {
+    "source": "data/experiments/western-strings-m3/confidence-validation-review/confidence-validation-eval.json",
+    "precision": 0.9,
+    "coverage": 1.0,
+    "selected": 30,
+    "wrongSelected": 3
+  },
+  "runtimePolicy": {
+    "default": "review_required",
+    "whenEnabled": "auto_pass candidates with confidenceProbability >= threshold; all other candidates remain review_required",
+    "studentFacingRequires": [
+      "WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1",
+      "blindValidation.blindValidationPassed=true",
+      "confidence scorer ok=true"
+    ]
+  }
+}

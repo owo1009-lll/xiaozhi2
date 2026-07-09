@@ -46,6 +46,12 @@ const CONTROLLED_CONFIDENCE_VALIDATION_EVAL = path.join(
   "confidence-validation-review",
   "confidence-validation-eval.json",
 );
+const CONTROLLED_CONFIDENCE_RELEASE = path.join(
+  "models",
+  "western-strings",
+  "ordinary-upload-confidence-rf-v1",
+  "release.json",
+);
 const M3PLUS_SOURCE = path.join(
   "data",
   "experiments",
@@ -265,6 +271,7 @@ async function buildControlledStatus() {
     await readJson(CONTROLLED_CONFIDENCE_PILOT),
     CONTROLLED_CONFIDENCE_PILOT,
     await readJson(CONTROLLED_CONFIDENCE_VALIDATION_EVAL),
+    await readJson(CONTROLLED_CONFIDENCE_RELEASE),
   );
   const status = attachConfidencePilotStatus(buildControlledCandidateReviewStatus(report), confidencePilot);
   status.reviewArtifacts = {

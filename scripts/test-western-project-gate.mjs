@@ -21,9 +21,10 @@ assert.equal(controlled.confidencePilot?.readyForStudentGate, false, "eval-only 
 assert.equal(controlled.confidencePilot?.validationEval?.readyForRuntimeGate, false, "validation eval must not enable runtime gate");
 if (controlled.confidencePilot?.validationEval?.blindValidationPassed) {
   assert.equal(controlled.confidencePilot?.needsBlindValidation, false, "passed blind validation should clear needsBlindValidation");
+  assert.equal(controlled.confidencePilot?.runtimeGateWired, true, "passed blind validation should expose the wired runtime release manifest");
   assert(
-    controlled.blockingReasons.includes("candidate-confidence-validation-not-wired"),
-    "passed blind validation must still block until runtime gate wiring is explicitly released",
+    controlled.blockingReasons.includes("ordinary-auto-gate-disabled-by-default"),
+    "wired runtime gate must still block until the explicit release flag is enabled",
   );
 } else {
   assert.equal(controlled.confidencePilot?.needsBlindValidation, true, "confidence pilot should require blind validation before eval passes");
@@ -35,7 +36,7 @@ if (controlled.confidencePilot?.validationEval?.blindValidationPassed) {
 assert(controlled.confidencePilot?.bestReleaseCandidate, "confidence pilot should report the best release candidate");
 assert.equal(controlled.confidencePilot.bestReleaseCandidate.featureSet, "deployable", "confidence pilot should report the deployable candidate");
 assert.equal(controlled.confidencePilot.bestReleaseCandidate.groupBy, "recordingId", "confidence pilot should report the strict leave-one-recording candidate");
-assert(status.nextActions[0]?.action.includes("confidence-validation-review/index.html") || status.nextActions[0]?.action.includes("wire a runtime gate"), "project next action should route to validation review or runtime wiring");
+assert(status.nextActions[0]?.action.includes("confidence-validation-review/index.html") || status.nextActions[0]?.action.includes("wire a runtime gate") || status.nextActions[0]?.action.includes("runtime gate is wired"), "project next action should route to validation review, runtime wiring, or explicit release-flag gating");
 assert.equal(status.nextActions[0]?.artifact, "data/experiments/western-strings-m3/confidence-validation-review/index.html", "project artifact should point to the confidence validation review page");
 
 const m4 = status.tracks.m4Omr;

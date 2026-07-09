@@ -32,6 +32,12 @@ const DEFAULT_CONFIDENCE_VALIDATION_EVAL = path.join(
   "confidence-validation-review",
   "confidence-validation-eval.json",
 );
+const DEFAULT_CONFIDENCE_RELEASE = path.join(
+  "models",
+  "western-strings",
+  "ordinary-upload-confidence-rf-v1",
+  "release.json",
+);
 
 function clampMissing(required, actual) {
   return Math.max(0, Number(required || 0) - Number(actual || 0));
@@ -49,6 +55,7 @@ export function summarizeControlledCandidateConfidencePilot(
   pilot,
   source = DEFAULT_CONFIDENCE_PILOT,
   validationEval = null,
+  runtimeRelease = null,
 ) {
   const releaseCandidates = [];
   for (const evaluation of pilot?.evaluations || []) {
@@ -79,10 +86,23 @@ export function summarizeControlledCandidateConfidencePilot(
     readyForStudentGate: false,
     releaseCandidateFound,
     needsBlindValidation: releaseCandidateFound && !validationEval?.blindValidationPassed,
+    runtimeRelease: runtimeRelease ? {
+      source: DEFAULT_CONFIDENCE_RELEASE.replace(/\\/g, "/"),
+      modelVersion: runtimeRelease.modelVersion || "",
+      gateVersion: runtimeRelease.gateVersion || "",
+      enabledByDefault: runtimeRelease.enabledByDefault === true,
+      enableEnvVar: runtimeRelease.enableEnvVar || "WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE",
+      threshold: runtimeRelease.threshold ?? null,
+      modelName: runtimeRelease.modelName || "",
+    } : {
+      source: DEFAULT_CONFIDENCE_RELEASE.replace(/\\/g, "/"),
+      sourceExists: false,
+    },
+    runtimeGateWired: Boolean(runtimeRelease?.modelVersion && runtimeRelease?.gateVersion),
     reason: !pilot
       ? "confidence-pilot-missing"
       : validationEval?.blindValidationPassed
-        ? "confidence-validation-passed-runtime-gate-still-disabled"
+        ? (runtimeRelease?.modelVersion ? "confidence-runtime-gate-wired-disabled-by-default" : "confidence-validation-passed-runtime-gate-still-disabled")
         : "eval-only-confidence-pilot-needs-blind-validation",
     reviewedRowsUsed: Number(pilot?.reviewedRowsUsed || 0),
     usableRows: Number(pilot?.usableRows || 0),
@@ -109,9 +129,12 @@ export function attachConfidencePilotStatus(status, confidencePilot) {
     return { ...status, confidencePilot };
   }
   const validationPassed = Boolean(confidencePilot.validationEval?.blindValidationPassed);
+  const runtimeGateWired = Boolean(confidencePilot.runtimeGateWired);
   const nextActions = [
     validationPassed
-      ? "Confidence blind validation passed. Review metrics and wire a runtime gate in a separate release phase; current runtime remains fail-closed."
+      ? (runtimeGateWired
+        ? "Confidence runtime gate is wired but disabled by default. Keep default fail-closed, and enable only with WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 after an explicit release decision."
+        : "Confidence blind validation passed. Review metrics and wire a runtime gate in a separate release phase; current runtime remains fail-closed.")
       : `Confidence pilot found release candidates; review ${DEFAULT_CONFIDENCE_VALIDATION_REVIEW_PAGE.replace(/\\/g, "/")} and run western:controlled-candidate-confidence-validation-eval before changing the runtime gate.`,
   ];
   const baseBlockingReasons = validationPassed
@@ -120,7 +143,7 @@ export function attachConfidencePilotStatus(status, confidencePilot) {
   const blockingReasons = [...new Set([
     ...baseBlockingReasons,
     validationPassed
-      ? "candidate-confidence-validation-not-wired"
+      ? (runtimeGateWired ? "ordinary-auto-gate-disabled-by-default" : "candidate-confidence-validation-not-wired")
       : "candidate-confidence-pilot-needs-blind-validation",
   ])];
   return {
@@ -189,6 +212,7 @@ function parseArgs(argv) {
     completedCsv: path.join("data", "experiments", "western-strings-m3", "offline-feature-candidate-review", "controlled-candidate-review.completed.csv"),
     confidencePilot: DEFAULT_CONFIDENCE_PILOT,
     confidenceValidationEval: DEFAULT_CONFIDENCE_VALIDATION_EVAL,
+    confidenceRelease: DEFAULT_CONFIDENCE_RELEASE,
     minReviewedRows: 30,
     minScoredRows: 30,
     minPrecision: 0.9,
@@ -203,6 +227,7 @@ function parseArgs(argv) {
     else if (arg === "--completed-csv") args.completedCsv = argv[++index] || args.completedCsv;
     else if (arg === "--confidence-pilot") args.confidencePilot = argv[++index] || args.confidencePilot;
     else if (arg === "--confidence-validation-eval") args.confidenceValidationEval = argv[++index] || args.confidenceValidationEval;
+    else if (arg === "--confidence-release") args.confidenceRelease = argv[++index] || args.confidenceRelease;
     else if (arg === "--min-reviewed-rows") args.minReviewedRows = Number(argv[++index] || args.minReviewedRows);
     else if (arg === "--min-scored-rows") args.minScoredRows = Number(argv[++index] || args.minScoredRows);
     else if (arg === "--min-precision") args.minPrecision = Number(argv[++index] || args.minPrecision);
@@ -226,6 +251,7 @@ async function main() {
       await readJson(args.confidencePilot),
       args.confidencePilot,
       await readJson(args.confidenceValidationEval),
+      await readJson(args.confidenceRelease),
     ),
   );
   status.reviewArtifacts = {

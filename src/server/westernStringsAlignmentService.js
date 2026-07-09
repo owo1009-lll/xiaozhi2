@@ -9,6 +9,13 @@ import { clamp, createId, nowIso, safeBoolean, safeNumber, safeString } from "./
 const execFileAsync = promisify(execFile);
 const SOURCE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const OFFLINE_FEATURE_STUDENT_GATE_VERSION = "western-offline-feature-gate-v0-review-only";
+const OFFLINE_FEATURE_CONFIDENCE_RELEASE_PATH = path.join(
+  SOURCE_ROOT,
+  "models",
+  "western-strings",
+  "ordinary-upload-confidence-rf-v1",
+  "release.json",
+);
 
 export const WESTERN_ALIGNMENT_METHOD_PREFERENCE = [
   "parangonar-basic-pitch",
@@ -296,6 +303,127 @@ async function writeControlledSubmissionCandidateRows(repoRoot, { batchRunId, su
   return path.relative(repoRoot, outPath).replace(/\\/g, "/");
 }
 
+function resolveRepoPath(repoRoot, maybeRelativePath) {
+  const value = safeString(maybeRelativePath).trim();
+  if (!value) return "";
+  return path.isAbsolute(value) ? value : path.join(repoRoot, value);
+}
+
+function ordinaryUploadConfidenceGateEnabled() {
+  return ["1", "true", "yes", "on"].includes(safeString(process.env.WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE).trim().toLowerCase());
+}
+
+function ordinaryUploadConfidenceReleasePath() {
+  const override = safeString(process.env.WESTERN_STRINGS_ORDINARY_AUTO_GATE_RELEASE).trim();
+  return override ? path.resolve(override) : OFFLINE_FEATURE_CONFIDENCE_RELEASE_PATH;
+}
+
+function controlledCandidateRuntimeConfidenceDir(repoRoot, batchRunId) {
+  return path.join(
+    repoRoot,
+    "data",
+    "experiments",
+    "western-strings-m3",
+    "runtime-confidence",
+    safeString(batchRunId, "unknown-batch"),
+  );
+}
+
+async function writeControlledCandidateRuntimeConfidenceInput(repoRoot, {
+  batchRunId = "",
+  submission = {},
+  candidateRows = [],
+}) {
+  const safeSubmissionId = safeString(submission.submissionId, "unknown-submission").replace(/[^A-Za-z0-9_.-]/g, "_");
+  const outPath = path.join(controlledCandidateRuntimeConfidenceDir(repoRoot, batchRunId), `${safeSubmissionId}.input.json`);
+  await fs.mkdir(path.dirname(outPath), { recursive: true });
+  await fs.writeFile(outPath, `${JSON.stringify({
+    context: {
+      batchRunId: safeString(batchRunId),
+      submissionId: safeString(submission.submissionId),
+      scoreId: safeString(submission.scoreId),
+      dataset: safeString(submission.dataset),
+      piece: safeString(submission.piece),
+      recordingId: safeString(submission.recordingId),
+      instrument: safeString(submission.instrument),
+    },
+    candidateRows: Array.isArray(candidateRows) ? candidateRows : [],
+  }, null, 2)}\n`, "utf8");
+  return outPath;
+}
+
+function buildOfflineFeatureReviewOnlyGate(candidateRows = [], {
+  reason = "ordinary-upload-student-safe-gate-not-calibrated",
+  blockingReasons = null,
+  gateVersion = OFFLINE_FEATURE_STUDENT_GATE_VERSION,
+} = {}) {
+  const evaluatedCandidateCount = Array.isArray(candidateRows) ? candidateRows.length : 0;
+  const reasons = Array.isArray(blockingReasons) && blockingReasons.length ? blockingReasons : [reason];
+  return {
+    gateVersion,
+    ready: false,
+    mode: "review_only",
+    reason,
+    blockingReasons: reasons,
+    evaluatedCandidateCount,
+    autoPassCandidateCount: 0,
+    reviewRequiredCandidateCount: evaluatedCandidateCount,
+    allowedDiagnosticCategories: [],
+    reviewOnlyDiagnosticCategories: ["pitch", "onset", "missing", "duration", "extra"],
+  };
+}
+
+async function scoreOfflineFeatureCandidateRows(repoRoot, candidateRows, submission, release, { batchRunId = "" } = {}) {
+  const inputPath = await writeControlledCandidateRuntimeConfidenceInput(repoRoot, {
+    batchRunId,
+    submission,
+    candidateRows,
+  });
+  const scriptPath = path.join(SOURCE_ROOT, "scripts", "experiments", "score_western_controlled_candidate_confidence.py");
+  const runnerPath = path.join(SOURCE_ROOT, "scripts", "run-python.ps1");
+  const labelsPath = path.join(repoRoot, "data", "experiments", "western-strings-m3", "offline-feature-candidate-review", "controlled-candidate-review-labels.csv");
+  const pilotPath = resolveRepoPath(repoRoot, release?.pilot?.source)
+    || path.join(repoRoot, "data", "experiments", "western-strings-m3", "offline-feature-candidate-review", "candidate-confidence-pilot.json");
+  const validationPath = resolveRepoPath(repoRoot, release?.blindValidation?.source)
+    || path.join(repoRoot, "data", "experiments", "western-strings-m3", "confidence-validation-review", "confidence-validation-eval.json");
+  const args = [
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    runnerPath,
+    scriptPath,
+    "--input",
+    inputPath,
+    "--labels",
+    labelsPath,
+    "--pilot-json",
+    pilotPath,
+    "--validation-json",
+    validationPath,
+    "--require-validation-pass",
+  ];
+  const modelName = safeString(release?.modelName).trim();
+  if (modelName) args.push("--model", modelName);
+  const threshold = Number(release?.threshold);
+  if (Number.isFinite(threshold)) args.push("--threshold", String(threshold));
+  const { stdout, stderr } = await execFileAsync("powershell.exe", args, {
+    cwd: SOURCE_ROOT,
+    timeout: Math.max(10000, Math.round(safeNumber(process.env.WESTERN_STRINGS_CONFIDENCE_SCORER_TIMEOUT_MS, 120000))),
+    maxBuffer: 10 * 1024 * 1024,
+    env: {
+      ...process.env,
+      ERHU_CPU_THREAD_LIMIT: process.env.ERHU_CPU_THREAD_LIMIT || "1",
+      PYTHONIOENCODING: "utf-8",
+      PYTHONUTF8: "1",
+    },
+  });
+  const parsed = parseJsonFromStdout(stdout);
+  if (!parsed) {
+    throw new Error(`confidence scorer returned no JSON.${stderr ? ` stderr=${safeString(stderr).slice(0, 500)}` : ""}`);
+  }
+  return parsed;
+}
+
 async function readStudentGate(repoRoot) {
   const summaryPath = path.join(repoRoot, "data", "experiments", "western-strings-m2", "m2d-sequence-support-summary.json");
   try {
@@ -571,7 +699,7 @@ async function buildControlledBatchItem(repoRoot, submission, gateSnapshot, { ba
     inputStatus: "accepted_for_batch",
     analysisStatus: replay.status,
     offlineAnalysisProduced: replay.produced,
-    autoDiagnosisIssued: false,
+    autoDiagnosisIssued: replay.autoDiagnosisIssued === true,
     reasons: replay.reasons,
     analysisSummary: replay.summary || null,
     decisionCount: replay.decisionCount || 0,
@@ -705,22 +833,29 @@ async function buildControlledBatchOfflineFeatureAnalysis(repoRoot, submission, 
       };
     }
     const candidateRows = Array.isArray(analysis.candidateRows) ? analysis.candidateRows : [];
-    const candidateGate = evaluateOfflineFeatureStudentSafeGate(candidateRows);
-    const gatedCandidateRows = applyOfflineFeatureStudentSafeGate(candidateRows, candidateGate);
+    const candidateGate = await evaluateOfflineFeatureStudentSafeGate(repoRoot, candidateRows, submission, { batchRunId });
+    const gateInputRows = Array.isArray(candidateGate.scoredCandidateRows) ? candidateGate.scoredCandidateRows : candidateRows;
+    const gatedCandidateRows = applyOfflineFeatureStudentSafeGate(gateInputRows, candidateGate);
     const candidateRowsPath = await writeControlledSubmissionCandidateRows(repoRoot, {
       batchRunId,
       submissionId: submission.submissionId,
       candidateRows: gatedCandidateRows,
     });
+    const autoPassCandidateCount = gatedCandidateRows.filter((candidate) => candidate.autoDecision === "auto_pass").length;
     return {
       produced: true,
-      status: "offline_feature_review_ready",
-      reasons: ["controlled-batch-offline-feature-review-only"],
+      status: candidateGate.ready ? "offline_feature_confidence_ready" : "offline_feature_review_ready",
+      reasons: [candidateGate.ready ? "controlled-batch-offline-feature-confidence-gate-ready" : "controlled-batch-offline-feature-review-only"],
+      autoDiagnosisIssued: candidateGate.ready && autoPassCandidateCount > 0,
       summary: {
         ...(analysis.summary || {}),
-        studentSafeGateReady: false,
+        autoPassCount: autoPassCandidateCount,
+        reviewOnlyCandidateCount: Math.max(0, gatedCandidateRows.length - autoPassCandidateCount),
+        studentSafeGateReady: candidateGate.ready,
         studentSafeCandidateGateReady: candidateGate.ready,
         studentSafeCandidateGateVersion: candidateGate.gateVersion,
+        confidenceModelVersion: safeString(candidateGate.modelVersion),
+        confidenceThreshold: candidateGate.threshold ?? null,
       },
       decisionCount: Array.isArray(analysis.decisions) ? analysis.decisions.length : 0,
       candidateRowCount: candidateRows.length,
@@ -728,10 +863,11 @@ async function buildControlledBatchOfflineFeatureAnalysis(repoRoot, submission, 
       candidateGate,
       candidatePreview: gatedCandidateRows.slice(0, 5),
       recordingDiagnosis: {
-        mode: "offline_feature_review_only",
+        mode: candidateGate.ready ? "offline_feature_confidence_gate" : "offline_feature_review_only",
         scoreId,
         audioHash: safeString(submission.audioHash),
-        autoDiagnosisIssued: false,
+        autoDiagnosisIssued: candidateGate.ready && autoPassCandidateCount > 0,
+        autoPassCandidateCount,
       },
     };
   } catch (error) {
@@ -744,34 +880,84 @@ async function buildControlledBatchOfflineFeatureAnalysis(repoRoot, submission, 
   }
 }
 
-function evaluateOfflineFeatureStudentSafeGate(candidateRows = []) {
-  const evaluatedCandidateCount = Array.isArray(candidateRows) ? candidateRows.length : 0;
+async function evaluateOfflineFeatureStudentSafeGate(repoRoot, candidateRows = [], submission = {}, { batchRunId = "" } = {}) {
+  if (!ordinaryUploadConfidenceGateEnabled()) {
+    return buildOfflineFeatureReviewOnlyGate(candidateRows);
+  }
+  const releasePath = ordinaryUploadConfidenceReleasePath();
+  const release = await readJsonOrNull(releasePath);
+  if (!release) {
+    return buildOfflineFeatureReviewOnlyGate(candidateRows, {
+      reason: "ordinary-upload-confidence-release-missing",
+      blockingReasons: ["ordinary-upload-confidence-release-missing"],
+    });
+  }
+  const validationPath = resolveRepoPath(repoRoot, release?.blindValidation?.source);
+  const validation = validationPath ? await readJsonOrNull(validationPath) : null;
+  if (validation?.blindValidationPassed !== true) {
+    return buildOfflineFeatureReviewOnlyGate(candidateRows, {
+      reason: "ordinary-upload-confidence-validation-not-passed",
+      blockingReasons: ["ordinary-upload-confidence-validation-not-passed"],
+      gateVersion: safeString(release.gateVersion, OFFLINE_FEATURE_STUDENT_GATE_VERSION),
+    });
+  }
+  let scored = null;
+  try {
+    scored = await scoreOfflineFeatureCandidateRows(repoRoot, candidateRows, submission, release, { batchRunId });
+  } catch (error) {
+    return buildOfflineFeatureReviewOnlyGate(candidateRows, {
+      reason: "ordinary-upload-confidence-scorer-failed",
+      blockingReasons: ["ordinary-upload-confidence-scorer-failed", safeString(error?.message || error).slice(0, 300)].filter(Boolean),
+      gateVersion: safeString(release.gateVersion, OFFLINE_FEATURE_STUDENT_GATE_VERSION),
+    });
+  }
+  if (scored?.ok !== true) {
+    return buildOfflineFeatureReviewOnlyGate(candidateRows, {
+      reason: safeString(scored?.reason, "ordinary-upload-confidence-scorer-not-ready"),
+      blockingReasons: [safeString(scored?.reason, "ordinary-upload-confidence-scorer-not-ready")],
+      gateVersion: safeString(release.gateVersion, OFFLINE_FEATURE_STUDENT_GATE_VERSION),
+    });
+  }
+  const scoredRows = Array.isArray(scored.rows) ? scored.rows : [];
+  const autoPassCandidateCount = scoredRows.filter((candidate) => candidate.confidenceSelected === true).length;
+  const evaluatedCandidateCount = scoredRows.length;
   return {
-    gateVersion: OFFLINE_FEATURE_STUDENT_GATE_VERSION,
-    ready: false,
-    mode: "review_only",
-    reason: "ordinary-upload-student-safe-gate-not-calibrated",
-    blockingReasons: ["ordinary-upload-student-safe-gate-not-calibrated"],
+    gateVersion: safeString(release.gateVersion, "western-offline-feature-gate-v1-confidence-rf"),
+    modelVersion: safeString(release.modelVersion, "ordinary-upload-confidence-rf-v1"),
+    ready: true,
+    mode: "confidence_rf",
+    reason: "ordinary-upload-confidence-gate-enabled",
+    blockingReasons: [],
     evaluatedCandidateCount,
-    autoPassCandidateCount: 0,
-    reviewRequiredCandidateCount: evaluatedCandidateCount,
-    allowedDiagnosticCategories: [],
+    autoPassCandidateCount,
+    reviewRequiredCandidateCount: Math.max(0, evaluatedCandidateCount - autoPassCandidateCount),
+    threshold: scored.threshold ?? release.threshold ?? null,
+    modelName: safeString(scored.modelName, safeString(release.modelName, "rf")),
+    featureSet: safeString(scored.featureSet, safeString(release.featureSet, "deployable")),
+    groupBy: safeString(scored.groupBy, safeString(release.groupBy, "recordingId")),
+    allowedDiagnosticCategories: ["candidate-evidence"],
     reviewOnlyDiagnosticCategories: ["pitch", "onset", "missing", "duration", "extra"],
+    releaseManifest: path.relative(repoRoot, releasePath).replace(/\\/g, "/"),
+    validationEvidence: validationPath ? path.relative(repoRoot, validationPath).replace(/\\/g, "/") : "",
+    scoredCandidateRows: scoredRows,
   };
 }
 
 function applyOfflineFeatureStudentSafeGate(candidateRows = [], candidateGate = {}) {
-  return (Array.isArray(candidateRows) ? candidateRows : []).map((candidate) => ({
-    ...candidate,
-    autoDecision: "review_required",
-    confidenceScore: 0,
-    gateDecision: "review_required",
-    gateReason: safeString(candidateGate.reason, "ordinary-upload-student-safe-gate-not-calibrated"),
-    gateVersion: safeString(candidateGate.gateVersion, OFFLINE_FEATURE_STUDENT_GATE_VERSION),
-    reviewRequiredReason: safeString(candidate.reviewRequiredReason, "offline-feature-analysis-review-only"),
-    studentSafeGateReady: false,
-    studentFacing: false,
-  }));
+  return (Array.isArray(candidateRows) ? candidateRows : []).map((candidate) => {
+    const selected = candidateGate.ready === true && candidate.confidenceSelected === true;
+    return {
+      ...candidate,
+      autoDecision: selected ? "auto_pass" : "review_required",
+      confidenceScore: selected ? safeNumber(candidate.confidenceProbability, 0) : 0,
+      gateDecision: selected ? "auto_pass" : "review_required",
+      gateReason: selected ? "ordinary-upload-confidence-gate-auto-pass" : safeString(candidateGate.reason, "ordinary-upload-student-safe-gate-not-calibrated"),
+      gateVersion: safeString(candidateGate.gateVersion, OFFLINE_FEATURE_STUDENT_GATE_VERSION),
+      reviewRequiredReason: selected ? "" : safeString(candidate.reviewRequiredReason, "offline-feature-analysis-review-only"),
+      studentSafeGateReady: candidateGate.ready === true,
+      studentFacing: selected,
+    };
+  });
 }
 
 export async function runWesternControlledSubmissionBatch({
@@ -791,8 +977,10 @@ export async function runWesternControlledSubmissionBatch({
     items.push(await buildControlledBatchItem(repoRoot, raw, gateSnapshot, { batchRunId }));
   }
   const offlineAnalysisProducedCount = items.filter((item) => item.offlineAnalysisProduced === true).length;
+  const autoDiagnosisIssued = items.some((item) => item.autoDiagnosisIssued === true);
   const hasValidatedReplay = items.some((item) => item.analysisStatus === "offline_analysis_ready");
   const hasFeatureReview = items.some((item) => item.analysisStatus === "offline_feature_review_ready");
+  const hasFeatureConfidence = items.some((item) => item.analysisStatus === "offline_feature_confidence_ready");
   const run = {
     batchRunId,
     createdAt: nowIso(),
@@ -800,12 +988,12 @@ export async function runWesternControlledSubmissionBatch({
     itemCount: items.length,
     acceptedQueueCount: accepted.length,
     offlineAnalysisProducedCount,
-    autoDiagnosisIssued: false,
+    autoDiagnosisIssued,
     status: items.length
-      ? (hasValidatedReplay ? "offline_analysis_ready" : hasFeatureReview ? "offline_feature_review_ready" : "review_required")
+      ? (hasValidatedReplay ? "offline_analysis_ready" : hasFeatureConfidence ? "offline_feature_confidence_ready" : hasFeatureReview ? "offline_feature_review_ready" : "review_required")
       : "no_accepted_submissions",
     reason: items.length
-      ? (offlineAnalysisProducedCount > 0 ? "controlled-batch-not-student-facing" : "controlled-batch-offline-feature-extractor-not-connected")
+      ? (autoDiagnosisIssued ? "controlled-batch-confidence-gate-issued-candidate-feedback" : offlineAnalysisProducedCount > 0 ? "controlled-batch-not-student-facing" : "controlled-batch-offline-feature-extractor-not-connected")
       : "controlled-batch-empty",
     gateSnapshot,
     items,
