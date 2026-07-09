@@ -45,9 +45,10 @@ function commandForAction(action) {
     if (hasReason(action, "ordinary-confidence-recalibration-validation-failed")) {
       return [
         "Keep production/default runtime fail-closed.",
-        "Inspect data/experiments/western-strings-m3/confidence-recalibration-validation-review/confidence-recalibration-validation-eval.json and confidence-recalibration-validation-eval-rows.csv.",
+        "Inspect data/experiments/western-strings-m3/confidence-recalibration-validation-review/confidence-recalibration-failure-diagnosis.json first, then the rows/groups CSV next to it.",
+        "The current 10 selected rows all lack pitch support, and the false positives cluster in stu02-ex05-weak_onset.",
         "The 10-row recalibration blind-validation pack is already reviewed and failed the release floor; do not ask for the same review again.",
-        "Analyze the wrong selected rows, then improve candidate features/model or collect stronger calibration evidence before exporting another blind-validation pack.",
+        "Do not only raise the threshold; improve deployable candidate/localization quality features or collect stronger calibration evidence before exporting another blind-validation pack.",
         "After any recalibration, rerun npm run western:controlled-candidate-confidence-recalibration-pilot, export a fresh blind-validation pack, and rerun npm run western:project-status.",
       ];
     }

@@ -27,7 +27,7 @@ export function evaluateProjectGate(status, requiredTracks) {
     const ordinaryArtifact = (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-validation-needed")
       ? (controlled.reviewArtifacts?.recalibrationValidationReviewPage || controlled.confidenceRecalibration?.validationReviewPage)
       : (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-validation-failed")
-      ? (controlled.reviewArtifacts?.recalibrationValidationEvalJson || controlled.confidenceRecalibration?.validationEvalJson)
+      ? (controlled.reviewArtifacts?.recalibrationFailureDiagnosisJson || controlled.reviewArtifacts?.recalibrationValidationEvalJson || controlled.confidenceRecalibration?.validationEvalJson)
       : (controlled.blockingReasons || []).includes("ordinary-confidence-threshold-pool-precision-too-low")
       ? (controlled.reviewArtifacts?.thresholdPoolDiagnosisJson || controlled.confidencePilot?.thresholdPoolEvalJson)
       : (controlled.confidencePilot?.thresholdPoolReviewPage || controlled.reviewArtifacts?.thresholdPoolReviewPage || controlled.confidencePilot?.validationReviewPage || controlled.reviewArtifacts?.reviewPage);

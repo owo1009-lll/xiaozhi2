@@ -122,6 +122,27 @@ const CONTROLLED_CONFIDENCE_RECALIBRATION_VALIDATION_EVAL = path.join(
   "confidence-recalibration-validation-review",
   "confidence-recalibration-validation-eval.json",
 );
+const CONTROLLED_CONFIDENCE_RECALIBRATION_FAILURE_DIAGNOSIS = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-recalibration-validation-review",
+  "confidence-recalibration-failure-diagnosis.json",
+);
+const CONTROLLED_CONFIDENCE_RECALIBRATION_FAILURE_ROWS = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-recalibration-validation-review",
+  "confidence-recalibration-failure-diagnosis-rows.csv",
+);
+const CONTROLLED_CONFIDENCE_RECALIBRATION_FAILURE_GROUPS = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-recalibration-validation-review",
+  "confidence-recalibration-failure-diagnosis-groups.csv",
+);
 const M3PLUS_SOURCE = path.join(
   "data",
   "experiments",
@@ -493,6 +514,7 @@ async function buildControlledStatus() {
   const status = attachConfidencePilotStatus(buildControlledCandidateReviewStatus(report), confidencePilot);
   const recalibrationPilot = await readJson(CONTROLLED_CONFIDENCE_RECALIBRATION_PILOT);
   const recalibrationEval = await readJson(CONTROLLED_CONFIDENCE_RECALIBRATION_VALIDATION_EVAL);
+  const recalibrationFailureDiagnosis = await readJson(CONTROLLED_CONFIDENCE_RECALIBRATION_FAILURE_DIAGNOSIS);
   const recalibrationReleaseCandidate = bestDeployableReleaseCandidate(recalibrationPilot);
   const recalibrationEvalExists = Boolean(recalibrationEval);
   const recalibrationNeedsBlindValidation = Boolean(
@@ -517,6 +539,11 @@ async function buildControlledStatus() {
       blindValidationPassed: false,
       blockingReasons: ["confidence-recalibration-validation-eval-missing"],
     },
+    failureDiagnosis: {
+      source: CONTROLLED_CONFIDENCE_RECALIBRATION_FAILURE_DIAGNOSIS.replace(/\\/g, "/"),
+      sourceExists: Boolean(recalibrationFailureDiagnosis),
+      summary: recalibrationFailureDiagnosis?.summary || {},
+    },
     needsBlindValidation: recalibrationNeedsBlindValidation,
     validationFailed: recalibrationValidationFailed,
   };
@@ -539,7 +566,7 @@ async function buildControlledStatus() {
       ]),
     ];
     status.nextActions = [
-      `The confidence recalibration blind-validation pack failed${Number.isFinite(precision) ? ` (precision=${precision})` : ""}; do not enable the ordinary-upload auto gate. Inspect the failed rows and improve candidate features/model or collect stronger calibration evidence before exporting another blind-validation pack.`,
+      `The confidence recalibration blind-validation pack failed${Number.isFinite(precision) ? ` (precision=${precision})` : ""}; do not enable the ordinary-upload auto gate. Inspect the failure diagnosis and improve candidate/localization quality features or collect stronger calibration evidence before exporting another blind-validation pack.`,
     ];
   }
   status.reviewArtifacts = {
@@ -556,6 +583,9 @@ async function buildControlledStatus() {
     recalibrationValidationReviewPage: CONTROLLED_CONFIDENCE_RECALIBRATION_VALIDATION_REVIEW_PAGE.replace(/\\/g, "/"),
     recalibrationValidationCompletedCsv: CONTROLLED_CONFIDENCE_RECALIBRATION_VALIDATION_COMPLETED.replace(/\\/g, "/"),
     recalibrationValidationEvalJson: CONTROLLED_CONFIDENCE_RECALIBRATION_VALIDATION_EVAL.replace(/\\/g, "/"),
+    recalibrationFailureDiagnosisJson: CONTROLLED_CONFIDENCE_RECALIBRATION_FAILURE_DIAGNOSIS.replace(/\\/g, "/"),
+    recalibrationFailureDiagnosisRowsCsv: CONTROLLED_CONFIDENCE_RECALIBRATION_FAILURE_ROWS.replace(/\\/g, "/"),
+    recalibrationFailureDiagnosisGroupsCsv: CONTROLLED_CONFIDENCE_RECALIBRATION_FAILURE_GROUPS.replace(/\\/g, "/"),
   };
   return status;
 }
@@ -609,7 +639,7 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
     const ordinaryArtifact = (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-validation-needed")
       ? (controlled.reviewArtifacts.recalibrationValidationReviewPage || controlled.confidenceRecalibration?.validationReviewPage)
       : (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-validation-failed")
-      ? (controlled.reviewArtifacts.recalibrationValidationEvalJson || controlled.confidenceRecalibration?.validationEvalJson)
+      ? (controlled.reviewArtifacts.recalibrationFailureDiagnosisJson || controlled.reviewArtifacts.recalibrationValidationEvalJson || controlled.confidenceRecalibration?.validationEvalJson)
       : (controlled.blockingReasons || []).includes("ordinary-confidence-threshold-pool-precision-too-low")
       ? (controlled.reviewArtifacts.thresholdPoolDiagnosisJson || controlled.confidencePilot?.thresholdPoolEvalJson)
       : (controlled.confidencePilot?.thresholdPoolReviewPage || controlled.reviewArtifacts.thresholdPoolReviewPage || controlled.confidencePilot?.validationReviewPage || controlled.reviewArtifacts.reviewPage);

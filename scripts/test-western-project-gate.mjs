@@ -42,6 +42,11 @@ if (controlled.confidencePilot?.validationEval?.blindValidationPassed) {
   assert.equal(controlled.confidencePilot?.needsBlindValidation, true, "confidence pilot should still track that the old v1 candidate did not pass the full release process");
   if (controlled.confidenceRecalibration?.validationFailed) {
     assert.equal(controlled.confidenceRecalibration.needsBlindValidation, false, "failed recalibration validation should not ask for the same blind review again");
+    assert.equal(
+      controlled.confidenceRecalibration.failureDiagnosis?.summary?.selectedWrongRows,
+      2,
+      "failed recalibration validation should expose the selected false-positive count",
+    );
     assert(
       controlled.blockingReasons.includes("ordinary-confidence-recalibration-validation-failed"),
       "ordinary upload should block on the failed recalibration blind-validation result",
@@ -67,7 +72,7 @@ assert(
 const expectedOrdinaryArtifact = status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-recalibration-validation-needed")
   ? "data/experiments/western-strings-m3/confidence-recalibration-validation-review/index.html"
   : status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-recalibration-validation-failed")
-  ? "data/experiments/western-strings-m3/confidence-recalibration-validation-review/confidence-recalibration-validation-eval.json"
+  ? "data/experiments/western-strings-m3/confidence-recalibration-validation-review/confidence-recalibration-failure-diagnosis.json"
   : status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-threshold-pool-precision-too-low")
   ? "data/experiments/western-strings-m3/confidence-threshold-pool-review/confidence-threshold-pool-diagnosis.json"
   : "data/experiments/western-strings-m3/confidence-threshold-pool-review/index.html";
