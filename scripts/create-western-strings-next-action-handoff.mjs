@@ -150,7 +150,9 @@ function commandForAction(action) {
     return [
       "Open data/experiments/western-strings-m4/independent-gold-todo.html",
       "For each row, compare the source score image/PDF with the current goldPath and Audiveris draftPath",
-      "Prepare independent human-corrected gold MusicXML/MXL files for the listed rows",
+      "Run npm run western:m4-independent-gold-workspace to create editable copies under data/private/western-strings-m4-independent-gold/",
+      "Edit those workspace MXL files against the source score until they are independent human-corrected gold, not copies of the Audiveris draft",
+      "Run npm run western:m4-apply-independent-gold-workspace to update clean-score-intake for changed files",
       "Run npm run western:m4-omr-benchmark",
       "Then run npm run western:project-status",
     ];

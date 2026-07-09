@@ -832,7 +832,7 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
     actions.push({
       priority: 3,
       track: "M4 OMR benchmark",
-      action: "Open the M4 visual checklist, prepare independent human-corrected gold MusicXML/MXL or external gold, then rerun `npm run western:m4-omr-benchmark`.",
+      action: "Open the M4 visual checklist, generate the independent-gold workspace, correct the workspace MXL files against the source scores, apply the changed files, then rerun `npm run western:m4-omr-benchmark`.",
       artifact: m4Omr.artifacts.independentGoldTodoHtml || m4Omr.artifacts.independentGoldTodo,
       reason: m4Omr.blockingReasons,
     });
