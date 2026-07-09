@@ -107,6 +107,15 @@ function commandForAction(action) {
     ];
   }
   if (track === "M3+ pitch behavior modes") {
+    if (hasReason(action, "m3plus-runtime-disabled-by-default")) {
+      return [
+        "Do not request more M3+ review for the current pack; the first-measure safe subset has already been imported and evaluated.",
+        "Keep production/default runtime fail-closed: m3plusAutoFeedbackReady must remain false unless a separate monitored pilot is explicitly started.",
+        "Inspect data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-pitch-mode-eval.json and confirm releaseReadyModes are slide-like and trill-like.",
+        "If productizing, design a scoped pilot that only allows first-measure, trusted-recording, slide-like/trill-like rows; later measures and other modes must remain review_required.",
+        "After any runtime pilot code change, run npm run test:western-project-gate, npm run western:project-status, and npm run build.",
+      ];
+    }
     if (hasReason(action, "m3plus-no-mode-specific-release-ready")) {
       if (String(action.action || "").includes("candidate-quality review pack")) {
         return [
