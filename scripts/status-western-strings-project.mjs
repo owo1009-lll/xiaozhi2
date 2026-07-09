@@ -150,6 +150,27 @@ const M3PLUS_REVIEW_PAGE = path.join(
   "pitch-mode-review-pack",
   "index.html",
 );
+const M3PLUS_ROUND2_REVIEW_PAGE = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3plus",
+  "pitch-mode-review-pack-round2",
+  "index.html",
+);
+const M3PLUS_ROUND2_SOURCE = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3plus",
+  "pitch-mode-review-pack-round2",
+  "m3plus-pitch-mode-review.csv",
+);
+const M3PLUS_ROUND2_COMPLETED = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3plus",
+  "pitch-mode-review-pack-round2",
+  "m3plus-pitch-mode-review.completed.csv",
+);
 const M3PLUS_MODE_EVAL = path.join(
   "data",
   "experiments",
@@ -378,6 +399,9 @@ async function buildM3PlusStatus() {
       completedCsv: M3PLUS_COMPLETED.replace(/\\/g, "/"),
       labelsCsv: M3PLUS_LABELS.replace(/\\/g, "/"),
       modeEvalJson: M3PLUS_MODE_EVAL.replace(/\\/g, "/"),
+      round2ReviewPage: M3PLUS_ROUND2_REVIEW_PAGE.replace(/\\/g, "/"),
+      round2SourceCsv: M3PLUS_ROUND2_SOURCE.replace(/\\/g, "/"),
+      round2CompletedCsv: M3PLUS_ROUND2_COMPLETED.replace(/\\/g, "/"),
     },
   };
 }
@@ -518,8 +542,8 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
     actions.push({
       priority: 2,
       track: "M3+ pitch behavior modes",
-      action: "M3+ labels are sufficient, but no non-control pitch-behavior mode is release-ready. Keep M3+ review-only or collect more true mode-specific samples, then rerun western:m3plus-mode-eval.",
-      artifact: m3plus.reviewArtifacts.modeEvalJson,
+      action: "M3+ labels are sufficient, but no non-control pitch-behavior mode is release-ready. Review the round-2 non-control sample pack, import it into the cumulative labels, then rerun western:m3plus-mode-eval.",
+      artifact: m3plus.reviewArtifacts.round2ReviewPage || m3plus.reviewArtifacts.modeEvalJson,
       reason: m3plus.blockingReasons,
     });
   }

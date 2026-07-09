@@ -79,7 +79,9 @@ function commandForAction(action) {
       return [
         "Keep all M3+ pitch-behavior modes review-only in student/runtime output.",
         "Inspect data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-pitch-mode-eval.csv for per-mode evidence.",
-        "If reducing review is still desired, collect more true slide/trill/ornament/double-stop/variable-f0 examples; stable control is not a release target.",
+        "Open data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/index.html and review the 36 non-control supplemental samples.",
+        "After review, save m3plus-pitch-mode-review.completed.csv in data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/.",
+        "Import with npm run western:m3plus-review-import -- --source data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/m3plus-pitch-mode-review.csv --reviews data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/m3plus-pitch-mode-review.completed.csv",
         "After adding labels, rerun npm run western:m3plus-mode-eval",
         "Then run npm run western:project-status",
       ];

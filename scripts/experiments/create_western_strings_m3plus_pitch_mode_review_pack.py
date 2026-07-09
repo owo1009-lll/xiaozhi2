@@ -123,6 +123,19 @@ def row_key(row: dict[str, str]) -> str:
     return f"{row.get('recordingId', '')}::{row.get('noteIndex', '')}::{row.get('noteId', '')}"
 
 
+def load_excluded_keys(paths: list[str]) -> set[str]:
+    excluded: set[str] = set()
+    for value in paths:
+        path = repo_path(value)
+        if not path.exists():
+            continue
+        for row in read_csv(path):
+            key = row_key(row)
+            if key.replace(":", ""):
+                excluded.add(key)
+    return excluded
+
+
 def mode_matches(row: dict[str, str], mode: str) -> bool:
     if row.get("primaryMode") == mode:
         return True
@@ -146,14 +159,17 @@ def mode_strength(row: dict[str, str], mode: str) -> float:
     return 0.0
 
 
-def select_rows(rows: list[dict[str, str]], modes: list[str], per_mode: int) -> tuple[list[dict[str, str]], dict[str, Any]]:
+def select_rows(rows: list[dict[str, str]], modes: list[str], per_mode: int, excluded_keys: set[str] | None = None) -> tuple[list[dict[str, str]], dict[str, Any]]:
     selected: list[dict[str, str]] = []
-    selected_keys: set[str] = set()
+    selected_keys: set[str] = set(excluded_keys or set())
     mode_counts: dict[str, int] = {}
     available_counts: dict[str, int] = {}
+    eligible_counts: dict[str, int] = {}
     for mode in modes:
         candidates = [row for row in rows if mode_matches(row, mode)]
         available_counts[mode] = len(candidates)
+        candidates = [row for row in candidates if row_key(row) not in selected_keys]
+        eligible_counts[mode] = len(candidates)
         candidates.sort(key=lambda item: (mode_strength(item, mode), -safe_int(item.get("noteIndex"))), reverse=True)
 
         per_recording: dict[str, list[dict[str, str]]] = defaultdict(list)
@@ -187,7 +203,12 @@ def select_rows(rows: list[dict[str, str]], modes: list[str], per_mode: int) -> 
             selected.append(copy)
         mode_counts[mode] = len(picked)
     selected.sort(key=lambda item: (str(item.get("recordingId", "")), safe_float(item.get("predictedOnsetSeconds"))))
-    return selected, {"availableCounts": available_counts, "selectedCounts": mode_counts}
+    return selected, {
+        "availableCounts": available_counts,
+        "eligibleCounts": eligible_counts,
+        "excludedKeyCount": len(excluded_keys or set()),
+        "selectedCounts": mode_counts,
+    }
 
 
 def load_summary_audio_paths(summary_path: Path) -> dict[str, Path]:
@@ -653,7 +674,8 @@ def build_pack(args: argparse.Namespace) -> dict[str, Any]:
     out_dir = repo_path(args.out)
     rows = read_csv(inventory_path)
     modes = [item.strip() for item in str(args.modes).split(",") if item.strip()]
-    selected, stats = select_rows(rows, modes, int(args.per_mode))
+    excluded_keys = load_excluded_keys(list(args.exclude_reviewed or []))
+    selected, stats = select_rows(rows, modes, int(args.per_mode), excluded_keys)
     audio_paths = load_summary_audio_paths(summary_path)
     review_rows, warnings = build_review_rows(
         selected,
@@ -708,6 +730,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--per-mode", type=int, default=8)
     parser.add_argument("--clip-before", type=float, default=1.5)
     parser.add_argument("--clip-after", type=float, default=2.5)
+    parser.add_argument("--exclude-reviewed", action="append", default=[], help="CSV with already reviewed rows to exclude by recordingId/noteIndex/noteId. Can be repeated.")
     return parser.parse_args()
 
 

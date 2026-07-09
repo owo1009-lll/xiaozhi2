@@ -64,6 +64,11 @@ def build_status(
     source_rows = read_csv(source_path)
     label_rows = read_csv(labels_path)
     source_ids = {row.get("rowId", "") for row in source_rows}
+    for row in label_rows:
+        row_id = row.get("rowId", "")
+        if row_id and row_id not in source_ids:
+            source_rows.append(row)
+            source_ids.add(row_id)
     labels_by_id = {row.get("rowId", ""): row for row in label_rows if row.get("rowId", "")}
 
     reviewed_rows = [row for row in label_rows if row.get("rowId", "") in source_ids and is_reviewed(row)]
