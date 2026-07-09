@@ -118,8 +118,9 @@
 2026-07-10 实测:
 
 - `npm run western:ordinary-auto-pass-precision-review-pack` 已先跑系统自检。
-- 结果:60 个候选中 RF 产生 8 个 `auto_pass`,但 8 个都缺少 `pitchSupportWithin80Cents`。
-- 收紧后的 precision precheck 要求 `confidence>=0.95` 且必须有 pitch support,因此 `selfCheckedAutoPassCandidateCount=0`。
+- 结果:60 个候选中,硬性 pitch-support gate 后 runtime `auto_pass=0`。
+- 说明:此前 RF 高置信但缺少 `pitchSupportWithin80Cents` 的候选已被 runtime gate 改为 `review_required`。
+- precision precheck 要求 `confidence>=0.95` 且必须有 pitch support,因此 `selfCheckedAutoPassCandidateCount=0`。
 - 当前不生成教师复核包,不再要求教师复核这批候选。下一步应先改候选/特征,而不是继续人工标注。
 
 要求:

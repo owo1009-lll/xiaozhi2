@@ -57,10 +57,11 @@
   },
   "runtimePolicy": {
     "default": "review_required",
-    "whenEnabled": "auto_pass candidates with confidenceProbability >= threshold; all other candidates remain review_required",
+    "whenEnabled": "auto_pass candidates with confidenceProbability >= threshold and pitchSupportWithin80Cents=true; all other candidates remain review_required",
     "studentFacingRequires": [
       "WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1",
       "blindValidation.blindValidationPassed=true",
+      "pitchSupportWithin80Cents=true",
       "confidence scorer ok=true"
     ]
   }

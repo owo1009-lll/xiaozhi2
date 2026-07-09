@@ -94,7 +94,7 @@ function commandForAction(action) {
         "Use npm run western:controlled-candidate-confidence-release-audit to inspect the frozen evidence before any pilot.",
         "Run npm run western:ordinary-monitored-pilot-plan to generate the disabled-by-default pilot plan artifact.",
         "Run npm run western:ordinary-monitored-pilot-smoke to verify the frozen RF scorer under the release flag inside a temporary repo root.",
-        "Run npm run western:ordinary-auto-pass-precision-review-pack before asking for any teacher review. The current strict self-check requires high confidence plus pitch support; if it reports zero self-checked rows, do not ask a teacher to review and instead improve candidate features/pitch-support evidence.",
+        "Run npm run western:ordinary-auto-pass-precision-review-pack before asking for any teacher review. Runtime auto_pass now requires RF confidence plus pitchSupportWithin80Cents=true; if it reports zero self-checked rows, do not ask a teacher to review and instead improve candidate features/pitch-support evidence.",
         "Only consider WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 inside a separate monitored controlled-pilot process.",
         "Do not commit an enabled env value or turn the gate on by default.",
         "After any smoke/release check, run npm run test:western-project-gate",
