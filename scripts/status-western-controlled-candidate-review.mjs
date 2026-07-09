@@ -45,6 +45,13 @@ const DEFAULT_CONFIDENCE_RELEASE_AUDIT = path.join(
   "confidence-validation-review",
   "ordinary-confidence-release-audit.json",
 );
+const DEFAULT_ORDINARY_MONITORED_PILOT_AUDIT = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "ordinary-monitored-pilot",
+  "ordinary-monitored-pilot-audit.json",
+);
 const DEFAULT_CONFIDENCE_THRESHOLD_POOL_REVIEW_PAGE = path.join(
   "data",
   "experiments",
@@ -85,6 +92,7 @@ export function summarizeControlledCandidateConfidencePilot(
   validationEval = null,
   runtimeRelease = null,
   releaseAudit = null,
+  monitoredPilotAudit = null,
 ) {
   const releaseCandidates = [];
   for (const evaluation of pilot?.evaluations || []) {
@@ -176,6 +184,29 @@ export function summarizeControlledCandidateConfidencePilot(
     } : {
       source: DEFAULT_CONFIDENCE_RELEASE_AUDIT.replace(/\\/g, "/"),
       sourceExists: false,
+    },
+    monitoredPilotAudit: monitoredPilotAudit ? {
+      source: DEFAULT_ORDINARY_MONITORED_PILOT_AUDIT.replace(/\\/g, "/"),
+      sourceExists: true,
+      ok: monitoredPilotAudit.ok === true,
+      readyForMonitoredPilot: monitoredPilotAudit.readyForMonitoredPilot === true,
+      teacherReviewNeeded: monitoredPilotAudit.teacherReviewNeeded === true,
+      defaultOrdinaryReadyAfter: monitoredPilotAudit.defaultOrdinaryReadyAfter === true,
+      blockingReasons: monitoredPilotAudit.blockingReasons || [],
+      precisionPrecheck: {
+        selfCheckedAutoPassCandidateCount: monitoredPilotAudit.precisionPrecheck?.selfCheckedAutoPassCandidateCount ?? 0,
+        knownUsableAutoPassCandidateCount: monitoredPilotAudit.precisionPrecheck?.knownUsableAutoPassCandidateCount ?? 0,
+        knownWrongAutoPassCandidateCount: monitoredPilotAudit.precisionPrecheck?.knownWrongAutoPassCandidateCount ?? 0,
+        unknownReviewCandidateCount: monitoredPilotAudit.precisionPrecheck?.unknownReviewCandidateCount ?? 0,
+      },
+    } : {
+      source: DEFAULT_ORDINARY_MONITORED_PILOT_AUDIT.replace(/\\/g, "/"),
+      sourceExists: false,
+      ok: false,
+      readyForMonitoredPilot: false,
+      teacherReviewNeeded: false,
+      defaultOrdinaryReadyAfter: false,
+      blockingReasons: ["ordinary-monitored-pilot-audit-missing"],
     },
   };
 }

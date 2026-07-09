@@ -65,19 +65,30 @@ if (controlled.confidencePilot?.validationEval?.blindValidationPassed) {
 assert(controlled.confidencePilot?.bestReleaseCandidate, "confidence pilot should report the best release candidate");
 assert.equal(controlled.confidencePilot.bestReleaseCandidate.featureSet, "deployable", "confidence pilot should report the deployable candidate");
 assert.equal(controlled.confidencePilot.bestReleaseCandidate.groupBy, "recordingId", "confidence pilot should report the strict leave-one-recording candidate");
-assert(
-  status.nextActions[0]?.action.includes("confidence-threshold-pool-review/index.html")
-  || status.nextActions[0]?.action.includes("threshold-pool review failed")
-  || status.nextActions[0]?.action.includes("Threshold-pool precision passed")
-  || status.nextActions[0]?.action.includes("separate monitored pilot plan")
-  || status.nextActions[0]?.action.includes("recalibration blind-validation pack")
-  || status.nextActions[0]?.action.includes("context-feature confidence recalibration pack")
-  || status.nextActions[0]?.action.includes("improve candidate/pitch-support evidence")
-  || status.nextActions[0]?.action.includes("wire a runtime gate")
-  || status.nextActions[0]?.action.includes("runtime gate is wired")
-  || status.nextActions[0]?.action.includes("ordinary-monitored-pilot-audit"),
-  "project next action should route to threshold-pool review, recalibration, runtime wiring, pitch-support improvement, or explicit release-flag gating",
-);
+const ordinaryPilotAuditPassed = controlled.confidencePilot?.monitoredPilotAudit?.readyForMonitoredPilot === true
+  && controlled.confidencePilot?.monitoredPilotAudit?.teacherReviewNeeded === false
+  && controlled.confidencePilot?.monitoredPilotAudit?.defaultOrdinaryReadyAfter === false;
+if (ordinaryPilotAuditPassed) {
+  assert.equal(
+    status.nextActions[0]?.track,
+    "M3+ pitch behavior modes",
+    "after ordinary pilot audit passes, handoff should move to the next unfinished track while release stays fail-closed",
+  );
+} else {
+  assert(
+    status.nextActions[0]?.action.includes("confidence-threshold-pool-review/index.html")
+    || status.nextActions[0]?.action.includes("threshold-pool review failed")
+    || status.nextActions[0]?.action.includes("Threshold-pool precision passed")
+    || status.nextActions[0]?.action.includes("separate monitored pilot plan")
+    || status.nextActions[0]?.action.includes("recalibration blind-validation pack")
+    || status.nextActions[0]?.action.includes("context-feature confidence recalibration pack")
+    || status.nextActions[0]?.action.includes("improve candidate/pitch-support evidence")
+    || status.nextActions[0]?.action.includes("wire a runtime gate")
+    || status.nextActions[0]?.action.includes("runtime gate is wired")
+    || status.nextActions[0]?.action.includes("ordinary-monitored-pilot-audit"),
+    "project next action should route to threshold-pool review, recalibration, runtime wiring, pitch-support improvement, or explicit release-flag gating",
+  );
+}
 const expectedOrdinaryArtifact = status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-recalibration-context-validation-needed")
   ? "data/experiments/western-strings-m3/confidence-recalibration-context-validation-review/index.html"
   : status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-recalibration-context-validation-failed")
@@ -91,7 +102,15 @@ const expectedOrdinaryArtifact = status.tracks.controlledCandidate.blockingReaso
   : status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-threshold-pool-precision-too-low")
   ? "data/experiments/western-strings-m3/confidence-threshold-pool-review/confidence-threshold-pool-diagnosis.json"
   : "data/experiments/western-strings-m3/confidence-validation-review/ordinary-confidence-release-audit.json";
-assert.equal(status.nextActions[0]?.artifact, expectedOrdinaryArtifact, "project artifact should point to the current ordinary-gate evidence artifact");
+if (ordinaryPilotAuditPassed) {
+  assert.equal(
+    status.nextActions[0]?.artifact,
+    "data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-pitch-mode-eval.json",
+    "after ordinary pilot audit passes, handoff artifact should point to the next unfinished track",
+  );
+} else {
+  assert.equal(status.nextActions[0]?.artifact, expectedOrdinaryArtifact, "project artifact should point to the current ordinary-gate evidence artifact");
+}
 
 const m4 = status.tracks.m4Omr;
 assert.equal(m4.m4OmrBenchmarkDatasetReady, true, "M4 intake dataset should be ready for benchmarking");

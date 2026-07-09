@@ -59,6 +59,13 @@ const CONTROLLED_CONFIDENCE_RELEASE_AUDIT = path.join(
   "confidence-validation-review",
   "ordinary-confidence-release-audit.json",
 );
+const CONTROLLED_ORDINARY_MONITORED_PILOT_AUDIT = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "ordinary-monitored-pilot",
+  "ordinary-monitored-pilot-audit.json",
+);
 const CONTROLLED_CONFIDENCE_THRESHOLD_POOL_REVIEW_PAGE = path.join(
   "data",
   "experiments",
@@ -573,6 +580,7 @@ async function buildControlledStatus() {
     await readJson(CONTROLLED_CONFIDENCE_VALIDATION_EVAL),
     runtimeRelease,
     await readJson(CONTROLLED_CONFIDENCE_RELEASE_AUDIT),
+    await readJson(CONTROLLED_ORDINARY_MONITORED_PILOT_AUDIT),
   );
   const status = attachConfidencePilotStatus(buildControlledCandidateReviewStatus(report), confidencePilot);
   const recalibrationPilot = await readJson(CONTROLLED_CONFIDENCE_RECALIBRATION_PILOT);
@@ -711,6 +719,7 @@ async function buildControlledStatus() {
     completedCsv: CONTROLLED_COMPLETED.replace(/\\/g, "/"),
     labelsCsv: CONTROLLED_LABELS.replace(/\\/g, "/"),
     releaseAuditJson: CONTROLLED_CONFIDENCE_RELEASE_AUDIT.replace(/\\/g, "/"),
+    ordinaryMonitoredPilotAuditJson: CONTROLLED_ORDINARY_MONITORED_PILOT_AUDIT.replace(/\\/g, "/"),
     thresholdPoolReviewPage: CONTROLLED_CONFIDENCE_THRESHOLD_POOL_REVIEW_PAGE.replace(/\\/g, "/"),
     thresholdPoolCompletedCsv: CONTROLLED_CONFIDENCE_THRESHOLD_POOL_COMPLETED.replace(/\\/g, "/"),
     thresholdPoolEvalJson: CONTROLLED_CONFIDENCE_THRESHOLD_POOL_EVAL.replace(/\\/g, "/"),
@@ -776,7 +785,15 @@ async function buildM4OmrStatus() {
 
 function summarizeNextActions(controlled, m3plus, m4Omr) {
   const actions = [];
-  if (!controlled.studentSafeCandidateGateReady) {
+  const ordinaryBlockers = controlled.blockingReasons || [];
+  const ordinaryPilotAudit = controlled.confidencePilot?.monitoredPilotAudit || {};
+  const ordinaryPilotEvidencePassed = ordinaryPilotAudit.readyForMonitoredPilot === true
+    && ordinaryPilotAudit.teacherReviewNeeded !== true
+    && ordinaryPilotAudit.defaultOrdinaryReadyAfter !== true
+    && (ordinaryPilotAudit.blockingReasons || []).length === 0;
+  const ordinaryOnlyDefaultDisabled = ordinaryBlockers.length > 0
+    && ordinaryBlockers.every((reason) => reason === "ordinary-auto-gate-disabled-by-default");
+  if (!controlled.studentSafeCandidateGateReady && !(ordinaryPilotEvidencePassed && ordinaryOnlyDefaultDisabled)) {
     const ordinaryArtifact = (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-context-validation-needed")
       ? (controlled.reviewArtifacts.recalibrationContextValidationReviewPage || controlled.confidenceRecalibration?.contextValidation?.reviewPage)
       : (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-context-validation-failed")
