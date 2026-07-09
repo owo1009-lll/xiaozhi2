@@ -54,7 +54,7 @@ REVIEW_COLUMNS = [
 
 BEHAVIOR_OPTIONS = [
     ("", "未标"),
-    ("stable", "稳态音"),
+    ("stable", "稳定音"),
     ("vibrato", "揉弦/周期波动"),
     ("slide", "滑音/连续滑动"),
     ("trill", "颤音/两音交替"),
@@ -399,88 +399,88 @@ def render_html(pack: dict[str, Any]) -> str:
         audio_html = (
             f'<audio controls preload="metadata" src="{h(row.get("audioClip"))}"></audio>'
             if row.get("audioClip")
-            else '<p class="warn">没有找到音频片段。请把本条标为不确定，并在备注里说明。</p>'
+            else '<p class="warn">\u6ca1\u6709\u627e\u5230\u97f3\u9891\u7247\u6bb5\u3002\u8bf7\u628a\u672c\u6761\u6807\u4e3a\u4e0d\u786e\u5b9a\uff0c\u5e76\u5728\u5907\u6ce8\u91cc\u8bf4\u660e\u3002</p>'
         )
         score_html = (
             f"""
             <figure class="score-panel">
-              <figcaption>对应五线谱: 第 {h(row.get("pageNumber"))} 页 / 第 {h(row.get("measureIndex"))} 小节 / note {h(row.get("noteId"))}</figcaption>
+              <figcaption>\u5bf9\u5e94\u4e94\u7ebf\u8c31\uff1a\u7b2c {h(row.get("pageNumber"))} \u9875 / \u7b2c {h(row.get("measureIndex"))} \u5c0f\u8282 / note {h(row.get("noteId"))}</figcaption>
               <a href="{h(row.get("scoreImage"))}" target="_blank" rel="noreferrer">
-                <img src="{h(row.get("scoreImage"))}" alt="对应五线谱: {h(row.get("pieceId"))}" loading="lazy" />
+                <img src="{h(row.get("scoreImage"))}" alt="\u5bf9\u5e94\u4e94\u7ebf\u8c31 {h(row.get("pieceId"))}" loading="lazy" />
               </a>
             </figure>
             """
             if row.get("scoreImage")
-            else '<p class="warn">没有找到对应五线谱图片。请按小节/MIDI 文本辅助判断,并在备注说明。</p>'
+            else '<p class="warn">\u6ca1\u6709\u627e\u5230\u5bf9\u5e94\u4e94\u7ebf\u8c31\u56fe\u7247\u3002\u8bf7\u6309\u5c0f\u8282 / MIDI \u6587\u672c\u8f85\u52a9\u5224\u65ad\uff0c\u5e76\u5728\u5907\u6ce8\u8bf4\u660e\u3002</p>'
         )
         cards.append(f"""
         <section class="card" data-index="{index}">
           <header>
             <div>
-              <h2>{h(row["rowId"])} · {h(row["candidateMode"])}</h2>
-              <p>录音 {h(row["recordingId"])} / 第 {h(row["measureIndex"])} 小节 / MIDI {h(row["midi"])} / 预测 {h(row["predictedOnsetSeconds"])} 秒</p>
+              <h2>{h(row["rowId"])} - {h(row["candidateMode"])}</h2>
+              <p>\u5f55\u97f3 {h(row["recordingId"])} / \u7b2c {h(row["measureIndex"])} \u5c0f\u8282 / MIDI {h(row["midi"])} / \u9884\u6d4b {h(row["predictedOnsetSeconds"])} \u79d2</p>
             </div>
             <span class="badge">{h(row["scenario"])}</span>
           </header>
           {audio_html}
           {score_html}
           <div class="meta">
-            <span>音频片段: {h(row.get("clipStartSeconds"))}s - {h(row.get("clipEndSeconds"))}s</span>
-            <span>谱面: {h(row.get("pieceId"))} / 第 {h(row.get("pageNumber"))} 页 / 第 {h(row.get("measureIndex"))} 小节</span>
-            <span>候选标记: {h(row.get("flags"))}</span>
+            <span>\u97f3\u9891\u7247\u6bb5: {h(row.get("clipStartSeconds"))}s - {h(row.get("clipEndSeconds"))}s</span>
+            <span>\u8c31\u9762: {h(row.get("pieceId"))} / \u7b2c {h(row.get("pageNumber"))} \u9875 / \u7b2c {h(row.get("measureIndex"))} \u5c0f\u8282</span>
+            <span>\u5019\u9009\u6807\u8bb0: {h(row.get("flags"))}</span>
             {metrics_html}
           </div>
           <div class="form-grid">
-            <label>1. 音频和谱面是否匹配
+            <label>1. \u97f3\u9891\u548c\u8c31\u9762\u662f\u5426\u5339\u914d
               <select class="review-input" data-field="audioScoreMatch">
-                <option value="">未标</option>
-                <option value="match">匹配</option>
-                <option value="mismatch">不匹配</option>
-                <option value="uncertain">不确定</option>
+                <option value="">\u672a\u6807</option>
+                <option value="match">\u5339\u914d</option>
+                <option value="mismatch">\u4e0d\u5339\u914d</option>
+                <option value="uncertain">\u4e0d\u786e\u5b9a</option>
               </select>
             </label>
-            <label>2. 实际听到的音高行为
+            <label>2. \u5b9e\u9645\u542c\u5230\u7684\u97f3\u9ad8\u884c\u4e3a
               {render_select("observedPitchBehavior", BEHAVIOR_OPTIONS)}
             </label>
-            <label>3. 应采用哪种音准判法
+            <label>3. \u5e94\u91c7\u7528\u54ea\u79cd\u97f3\u51c6\u5224\u6cd5
               {render_select("pitchJudgementMode", JUDGEMENT_OPTIONS)}
             </label>
-            <label>4. 这个片段能否判音准
+            <label>4. \u8fd9\u4e2a\u7247\u6bb5\u80fd\u5426\u5224\u97f3\u51c6
               <select class="review-input" data-field="pitchJudgeable">
-                <option value="">未标</option>
-                <option value="yes">可以</option>
-                <option value="no">不可以</option>
-                <option value="uncertain">不确定</option>
+                <option value="">\u672a\u6807</option>
+                <option value="yes">\u53ef\u4ee5</option>
+                <option value="no">\u4e0d\u53ef\u4ee5</option>
+                <option value="uncertain">\u4e0d\u786e\u5b9a</option>
               </select>
             </label>
-            <label>5. 音准结论
+            <label>5. \u97f3\u51c6\u7ed3\u8bba
               <select class="review-input" data-field="pitchAccuracyLabel">
-                <option value="">未标</option>
-                <option value="in-tune">准</option>
-                <option value="sharp">偏高</option>
-                <option value="flat">偏低</option>
-                <option value="wrong-note">明显错音</option>
-                <option value="not-judgeable">不可判</option>
-                <option value="uncertain">不确定</option>
+                <option value="">\u672a\u6807</option>
+                <option value="in-tune">\u51c6</option>
+                <option value="sharp">\u504f\u9ad8</option>
+                <option value="flat">\u504f\u4f4e</option>
+                <option value="wrong-note">\u660e\u663e\u9519\u97f3</option>
+                <option value="not-judgeable">\u4e0d\u53ef\u5224</option>
+                <option value="uncertain">\u4e0d\u786e\u5b9a</option>
               </select>
             </label>
-            <label>6. 置信度 1-5
+            <label>6. \u7f6e\u4fe1\u5ea6 1-5
               <select class="review-input" data-field="reviewConfidence">
-                <option value="">未标</option>
-                <option value="5">5 很确定</option>
-                <option value="4">4 较确定</option>
-                <option value="3">3 一般</option>
-                <option value="2">2 较不确定</option>
-                <option value="1">1 很不确定</option>
+                <option value="">\u672a\u6807</option>
+                <option value="5">5 \u5f88\u786e\u5b9a</option>
+                <option value="4">4 \u8f83\u786e\u5b9a</option>
+                <option value="3">3 \u4e00\u822c</option>
+                <option value="2">2 \u8f83\u4e0d\u786e\u5b9a</option>
+                <option value="1">1 \u5f88\u4e0d\u786e\u5b9a</option>
               </select>
             </label>
           </div>
-          <label>备注<textarea class="review-input" data-field="reviewComments" rows="2"></textarea></label>
+          <label>\u5907\u6ce8<textarea class="review-input" data-field="reviewComments" rows="2"></textarea></label>
           <div class="actions">
-            <button type="button" class="mark-correct secondary">本条匹配且音准正确</button>
-            <button type="button" class="mark-uncertain">本条不确定</button>
-            <button type="button" class="mark-mismatch ghost">本条不匹配</button>
-            <button type="button" class="clear-row ghost">清空本条</button>
+            <button type="button" class="mark-correct secondary">\u672c\u6761\u5339\u914d\u4e14\u97f3\u51c6\u6b63\u786e</button>
+            <button type="button" class="mark-uncertain">\u672c\u6761\u4e0d\u786e\u5b9a</button>
+            <button type="button" class="mark-mismatch ghost">\u672c\u6761\u4e0d\u5339\u914d</button>
+            <button type="button" class="clear-row ghost">\u6e05\u7a7a\u672c\u6761</button>
           </div>
         </section>
         """)
@@ -489,218 +489,85 @@ def render_html(pack: dict[str, Any]) -> str:
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>M3+ 音高行为复核包</title>
+  <title>\u004d\u0033\u002b \u97f3\u9ad8\u884c\u4e3a\u4eba\u5de5\u590d\u6838\u5305</title>
   <style>
     :root {{ font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #17202a; background: #f6f7f9; }}
-    body {{ margin: 0; }}
-    main {{ max-width: 1180px; margin: 0 auto; padding: 24px; }}
-    h1 {{ margin: 0 0 8px; font-size: 28px; }}
+    body {{ margin: 0; }} main {{ max-width: 1180px; margin: 0 auto; padding: 24px; }} h1 {{ margin: 0 0 8px; font-size: 28px; }}
     .intro, .toolbar, .card {{ background: #fff; border: 1px solid #d8dee8; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }}
-    .intro {{ padding: 16px; margin-bottom: 16px; }}
-    .toolbar {{ position: sticky; top: 0; z-index: 5; padding: 12px; margin-bottom: 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }}
-    button {{ border: 0; border-radius: 6px; padding: 9px 12px; background: #1f6feb; color: #fff; cursor: pointer; font-weight: 650; }}
-    button.ghost {{ background: #eef2f7; color: #1d2733; }}
-    button.secondary {{ background: #0f766e; }}
-    button:focus, select:focus, textarea:focus {{ outline: 3px solid rgba(31,111,235,.25); }}
-    .card {{ margin: 16px 0; padding: 16px; }}
-    header {{ display: flex; justify-content: space-between; gap: 16px; align-items: start; }}
-    h2 {{ margin: 0 0 4px; font-size: 20px; }}
-    p {{ margin: 4px 0; }}
-    audio {{ width: 100%; margin: 12px 0; }}
-    .score-panel {{ margin: 12px 0; padding: 10px; border: 1px solid #d8dee8; border-radius: 8px; background: #fbfcfe; }}
-    .score-panel figcaption {{ margin-bottom: 8px; font-weight: 700; color: #344054; }}
-    .score-panel img {{ display: block; width: 100%; max-height: 520px; object-fit: contain; background: white; border: 1px solid #e5e7eb; border-radius: 6px; }}
-    .badge {{ background: #edf7ed; color: #1f6b2d; padding: 5px 8px; border-radius: 999px; white-space: nowrap; }}
-    .meta {{ display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }}
-    .meta span {{ background: #f0f3f8; border-radius: 999px; padding: 4px 8px; font-size: 13px; }}
-    .form-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }}
-    label {{ display: flex; flex-direction: column; gap: 5px; font-weight: 650; margin-top: 8px; }}
-    select, textarea {{ border: 1px solid #b8c2d1; border-radius: 6px; padding: 8px; font: inherit; background: white; }}
-    textarea {{ resize: vertical; }}
-    .actions {{ display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }}
-    .warn {{ color: #9a3412; font-weight: 650; }}
-    .muted {{ color: #667085; }}
-    code {{ background: #f0f3f8; padding: 2px 4px; border-radius: 4px; }}
+    .intro {{ padding: 16px; margin-bottom: 16px; }} .toolbar {{ position: sticky; top: 0; z-index: 5; padding: 12px; margin-bottom: 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }}
+    button {{ border: 0; border-radius: 6px; padding: 9px 12px; background: #1f6feb; color: #fff; cursor: pointer; font-weight: 650; }} button.ghost {{ background: #eef2f7; color: #1d2733; }} button.secondary {{ background: #0f766e; }}
+    button:focus, select:focus, textarea:focus {{ outline: 3px solid rgba(31,111,235,.25); }} .card {{ margin: 16px 0; padding: 16px; }} header {{ display: flex; justify-content: space-between; gap: 16px; align-items: start; }} h2 {{ margin: 0 0 4px; font-size: 20px; }} p {{ margin: 4px 0; }} audio {{ width: 100%; margin: 12px 0; }}
+    .score-panel {{ margin: 12px 0; padding: 10px; border: 1px solid #d8dee8; border-radius: 8px; background: #fbfcfe; }} .score-panel figcaption {{ margin-bottom: 8px; font-weight: 700; color: #344054; }} .score-panel img {{ display: block; width: 100%; max-height: 520px; object-fit: contain; background: white; border: 1px solid #e5e7eb; border-radius: 6px; }}
+    .badge {{ background: #edf7ed; color: #1f6b2d; padding: 5px 8px; border-radius: 999px; white-space: nowrap; }} .meta {{ display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }} .meta span {{ background: #f0f3f8; border-radius: 999px; padding: 4px 8px; font-size: 13px; }} .form-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }}
+    label {{ display: flex; flex-direction: column; gap: 5px; font-weight: 650; margin-top: 8px; }} select, textarea {{ border: 1px solid #b8c2d1; border-radius: 6px; padding: 8px; font: inherit; background: white; }} textarea {{ resize: vertical; }} .actions {{ display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }} .warn {{ color: #9a3412; font-weight: 650; }} .muted {{ color: #667085; }} code {{ background: #f0f3f8; padding: 2px 4px; border-radius: 4px; }}
   </style>
 </head>
-<body>
-  <main>
-    <h1>M3+ 音高行为人工复核包</h1>
-    <section class="intro">
-      <p><strong>目标:</strong> 不是展示技巧名称,也不是评价技巧质量。这里只判断这些特殊音高行为区域能否安全判音准,从而将来减少 review_required。</p>
-      <p><strong>标注顺序:</strong> 先听音频是否匹配谱面音;不匹配就选“不匹配”。匹配时再标音高行为、判法、是否可判、音准结论和置信度。</p>
-      <p><strong>快捷按钮:</strong> “本条匹配且音准正确”和“未标全部设为匹配且正确”只填写未标项;如果不确定,请用“不确定”,不要为了凑样本硬判。</p>
-      <p><strong>安全边界:</strong> 本包只产生人工标签。未通过 precision≥90% / unsafe=0 闸门前,学生端仍全部 review-only。</p>
-      <p class="muted">候选数: {len(pack["rows"])}; inventory: <code>{h(pack["sourceInventory"])}</code></p>
-    </section>
-    <section class="toolbar">
-      <button type="button" id="download">下载已填 CSV</button>
-      <button type="button" id="markAllCorrect" class="secondary">未标全部设为匹配且正确</button>
-      <button type="button" id="markAllUncertain" class="ghost">未标全部设为不确定</button>
-      <span id="progress" class="muted"></span>
-    </section>
-    {"".join(cards)}
-  </main>
-  <script>
+<body><main>
+  <h1>\u004d\u0033\u002b \u97f3\u9ad8\u884c\u4e3a\u4eba\u5de5\u590d\u6838\u5305</h1>
+  <section class="intro">
+    <p><strong>\u76ee\u6807:</strong> \u8fd9\u4e0d\u662f\u5c55\u793a\u6280\u5de7\u540d\u79f0\uff0c\u4e5f\u4e0d\u662f\u8bc4\u4ef7\u6280\u5de7\u8d28\u91cf\u3002\u8fd9\u91cc\u53ea\u5224\u65ad\u8fd9\u4e9b\u7279\u6b8a\u97f3\u9ad8\u884c\u4e3a\u533a\u57df\u80fd\u5426\u5b89\u5168\u5224\u97f3\u51c6\uff0c\u4ece\u800c\u5c06\u6765\u51cf\u5c11 review_required\u3002</p>
+    <p><strong>\u6807\u6ce8\u987a\u5e8f:</strong> \u5148\u542c\u97f3\u9891\u662f\u5426\u5339\u914d\u8c31\u9762\u97f3\u3002\u4e0d\u5339\u914d\u5c31\u9009\u201c\u4e0d\u5339\u914d\u201d\u3002\u5339\u914d\u65f6\u518d\u6807\u97f3\u9ad8\u884c\u4e3a\u3001\u5224\u6cd5\u3001\u662f\u5426\u53ef\u5224\u3001\u97f3\u51c6\u7ed3\u8bba\u548c\u7f6e\u4fe1\u5ea6\u3002</p>
+    <p><strong>\u5feb\u6377\u6309\u94ae:</strong> \u201c\u672c\u6761\u5339\u914d\u4e14\u97f3\u51c6\u6b63\u786e\u201d\u548c\u201c\u672a\u6807\u5168\u90e8\u8bbe\u4e3a\u5339\u914d\u4e14\u6b63\u786e\u201d\u53ea\u586b\u5199\u672a\u6807\u9879\u3002\u5982\u679c\u4e0d\u786e\u5b9a\uff0c\u8bf7\u7528\u201c\u4e0d\u786e\u5b9a\u201d\u3002</p>
+    <p><strong>\u5b89\u5168\u8fb9\u754c:</strong> \u672c\u5305\u53ea\u4ea7\u751f\u4eba\u5de5\u6807\u7b7e\u3002\u672a\u901a\u8fc7 precision&gt;=90% / unsafe=0 \u95f8\u95e8\u524d\uff0c\u5b66\u751f\u7aef\u4ecd\u5168\u90e8 review-only\u3002</p>
+    <p class="muted">\u5019\u9009\u6570: {len(pack["rows"])}; inventory: <code>{h(pack["sourceInventory"])}</code></p>
+  </section>
+  <section class="toolbar"><button type="button" id="download">\u4e0b\u8f7d\u5df2\u586b CSV</button><button type="button" id="markAllCorrect" class="secondary">\u672a\u6807\u5168\u90e8\u8bbe\u4e3a\u5339\u914d\u4e14\u6b63\u786e</button><button type="button" id="markAllUncertain" class="ghost">\u672a\u6807\u5168\u90e8\u8bbe\u4e3a\u4e0d\u786e\u5b9a</button><span id="progress" class="muted"></span></section>
+  {"".join(cards)}
+</main><script>
     const pack = {pack_json};
     const columns = {json.dumps(REVIEW_COLUMNS, ensure_ascii=False)};
     const rows = pack.rows.map((row) => ({{ ...row }}));
-    function csvEscape(value) {{
-      const text = value == null ? "" : String(value);
-      return /[",\\n\\r]/.test(text) ? '"' + text.replaceAll('"', '""') + '"' : text;
-    }}
-    function defaultBehavior(mode) {{
-      return {{
-        "slide-like": "slide",
-        "trill-like": "trill",
-        "double-stop-candidate": "double-stop",
-        "ornament-candidate": "ornament",
-        "stable": "stable",
-        "variable-f0": "variable-f0",
-      }}[mode] || "uncertain";
-    }}
-    function defaultJudgement(mode) {{
-      return {{
-        "slide-like": "slide-start-end",
-        "trill-like": "trill-two-targets",
-        "double-stop-candidate": "multi-f0",
-        "ornament-candidate": "ornament-main-note",
-        "stable": "normal-center",
-        "variable-f0": "normal-center",
-      }}[mode] || "uncertain";
-    }}
-    function isUnmarked(row) {{
-      return !row.audioScoreMatch && !row.observedPitchBehavior && !row.pitchJudgeable && !row.pitchAccuracyLabel;
-    }}
-    function markCorrect(row) {{
-      row.audioScoreMatch = "match";
-      row.observedPitchBehavior = defaultBehavior(row.candidateMode);
-      row.pitchJudgementMode = defaultJudgement(row.candidateMode);
-      row.pitchJudgeable = "yes";
-      row.pitchAccuracyLabel = "in-tune";
-      row.reviewConfidence = row.reviewConfidence || "4";
-    }}
-    function markUncertain(row) {{
-      row.audioScoreMatch = "uncertain";
-      row.observedPitchBehavior = "uncertain";
-      row.pitchJudgementMode = "uncertain";
-      row.pitchJudgeable = "uncertain";
-      row.pitchAccuracyLabel = "uncertain";
-      row.reviewConfidence = row.reviewConfidence || "1";
-    }}
-    function markMismatch(row) {{
-      row.audioScoreMatch = "mismatch";
-      row.pitchJudgeable = "no";
-      row.pitchAccuracyLabel = "not-judgeable";
-      row.reviewConfidence = row.reviewConfidence || "4";
-    }}
-    function refreshProgress() {{
-      const reviewed = rows.filter((row) => row.audioScoreMatch || row.pitchJudgeable || row.observedPitchBehavior).length;
-      document.getElementById("progress").textContent = `已标 ${{reviewed}} / ${{rows.length}}`;
-    }}
-    function applyRowToCard(index, card) {{
-      card.querySelectorAll(".review-input").forEach((input) => {{
-        input.value = rows[index][input.dataset.field] || "";
-      }});
-      refreshProgress();
-    }}
-    function bindCard(card) {{
-      const index = Number(card.dataset.index);
-      card.querySelectorAll(".review-input").forEach((input) => {{
-        const field = input.dataset.field;
-        input.addEventListener("change", () => {{
-          rows[index][field] = input.value;
-          refreshProgress();
-        }});
-        input.addEventListener("input", () => {{
-          rows[index][field] = input.value;
-          refreshProgress();
-        }});
-      }});
-      card.querySelector(".mark-correct").addEventListener("click", () => {{
-        markCorrect(rows[index]);
-        applyRowToCard(index, card);
-      }});
-      card.querySelector(".mark-uncertain").addEventListener("click", () => {{
-        markUncertain(rows[index]);
-        applyRowToCard(index, card);
-      }});
-      card.querySelector(".mark-mismatch").addEventListener("click", () => {{
-        markMismatch(rows[index]);
-        applyRowToCard(index, card);
-      }});
-      card.querySelector(".clear-row").addEventListener("click", () => {{
-        for (const field of ["audioScoreMatch","observedPitchBehavior","pitchJudgementMode","pitchJudgeable","pitchAccuracyLabel","reviewConfidence","reviewComments"]) {{
-          rows[index][field] = "";
-        }}
-        applyRowToCard(index, card);
-      }});
-    }}
+    function csvEscape(value) {{ const text = value == null ? "" : String(value); return /[",\\n\\r]/.test(text) ? '"' + text.replaceAll('"', '""') + '"' : text; }}
+    function defaultBehavior(mode) {{ return {{ "slide-like": "slide", "trill-like": "trill", "double-stop-candidate": "double-stop", "ornament-candidate": "ornament", "stable": "stable", "variable-f0": "variable-f0" }}[mode] || "uncertain"; }}
+    function defaultJudgement(mode) {{ return {{ "slide-like": "slide-start-end", "trill-like": "trill-two-targets", "double-stop-candidate": "multi-f0", "ornament-candidate": "ornament-main-note", "stable": "normal-center", "variable-f0": "normal-center" }}[mode] || "uncertain"; }}
+    function isUnmarked(row) {{ return !row.audioScoreMatch && !row.observedPitchBehavior && !row.pitchJudgeable && !row.pitchAccuracyLabel; }}
+    function markCorrect(row) {{ row.audioScoreMatch = "match"; row.observedPitchBehavior = defaultBehavior(row.candidateMode); row.pitchJudgementMode = defaultJudgement(row.candidateMode); row.pitchJudgeable = "yes"; row.pitchAccuracyLabel = "in-tune"; row.reviewConfidence = row.reviewConfidence || "4"; }}
+    function markUncertain(row) {{ row.audioScoreMatch = "uncertain"; row.observedPitchBehavior = "uncertain"; row.pitchJudgementMode = "uncertain"; row.pitchJudgeable = "uncertain"; row.pitchAccuracyLabel = "uncertain"; row.reviewConfidence = row.reviewConfidence || "1"; }}
+    function markMismatch(row) {{ row.audioScoreMatch = "mismatch"; row.pitchJudgeable = "no"; row.pitchAccuracyLabel = "not-judgeable"; row.reviewConfidence = row.reviewConfidence || "4"; }}
+    function refreshProgress() {{ const reviewed = rows.filter((row) => row.audioScoreMatch || row.pitchJudgeable || row.observedPitchBehavior).length; document.getElementById("progress").textContent = `\u5df2\u6807 ${{reviewed}} / ${{rows.length}}`; }}
+    function applyRowToCard(index, card) {{ card.querySelectorAll(".review-input").forEach((input) => {{ input.value = rows[index][input.dataset.field] || ""; }}); refreshProgress(); }}
+    function bindCard(card) {{ const index = Number(card.dataset.index); card.querySelectorAll(".review-input").forEach((input) => {{ const field = input.dataset.field; input.addEventListener("change", () => {{ rows[index][field] = input.value; refreshProgress(); }}); input.addEventListener("input", () => {{ rows[index][field] = input.value; refreshProgress(); }}); }}); card.querySelector(".mark-correct").addEventListener("click", () => {{ markCorrect(rows[index]); applyRowToCard(index, card); }}); card.querySelector(".mark-uncertain").addEventListener("click", () => {{ markUncertain(rows[index]); applyRowToCard(index, card); }}); card.querySelector(".mark-mismatch").addEventListener("click", () => {{ markMismatch(rows[index]); applyRowToCard(index, card); }}); card.querySelector(".clear-row").addEventListener("click", () => {{ for (const field of ["audioScoreMatch","observedPitchBehavior","pitchJudgementMode","pitchJudgeable","pitchAccuracyLabel","reviewConfidence","reviewComments"]) {{ rows[index][field] = ""; }} applyRowToCard(index, card); }}); }}
     document.querySelectorAll(".card").forEach(bindCard);
-    document.getElementById("markAllCorrect").addEventListener("click", () => {{
-      rows.forEach((row) => {{
-        if (isUnmarked(row)) markCorrect(row);
-      }});
-      document.querySelectorAll(".card").forEach((card) => applyRowToCard(Number(card.dataset.index), card));
-    }});
-    document.getElementById("markAllUncertain").addEventListener("click", () => {{
-      rows.forEach((row) => {{
-        if (isUnmarked(row)) markUncertain(row);
-      }});
-      document.querySelectorAll(".card").forEach((card) => applyRowToCard(Number(card.dataset.index), card));
-    }});
-    document.getElementById("download").addEventListener("click", () => {{
-      const lines = [columns.join(",")];
-      for (const row of rows) {{
-        lines.push(columns.map((column) => csvEscape(row[column] || "")).join(","));
-      }}
-      const blob = new Blob(["\\ufeff" + lines.join("\\n")], {{ type: "text/csv;charset=utf-8" }});
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = {filename_json};
-      link.click();
-      URL.revokeObjectURL(link.href);
-    }});
+    document.getElementById("markAllCorrect").addEventListener("click", () => {{ rows.forEach((row) => {{ if (isUnmarked(row)) markCorrect(row); }}); document.querySelectorAll(".card").forEach((card) => applyRowToCard(Number(card.dataset.index), card)); }});
+    document.getElementById("markAllUncertain").addEventListener("click", () => {{ rows.forEach((row) => {{ if (isUnmarked(row)) markUncertain(row); }}); document.querySelectorAll(".card").forEach((card) => applyRowToCard(Number(card.dataset.index), card)); }});
+    document.getElementById("download").addEventListener("click", () => {{ const lines = [columns.join(",")]; for (const row of rows) {{ lines.push(columns.map((column) => csvEscape(row[column] || "")).join(",")); }} const blob = new Blob(["\\ufeff" + lines.join("\\n")], {{ type: "text/csv;charset=utf-8" }}); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = {filename_json}; link.click(); URL.revokeObjectURL(link.href); }});
     refreshProgress();
-  </script>
-</body>
-</html>
+  </script></body></html>
 """
-
 
 def write_guide(path: Path, rows: list[dict[str, Any]], stats: dict[str, Any]) -> None:
     path.write_text(
         "\n".join([
-            "# M3+ 音高行为复核指南",
+            "# M3+ \u97f3\u9ad8\u884c\u4e3a\u590d\u6838\u6307\u5357",
             "",
-            "## 这一步要判断什么",
+            "## \u8fd9\u4e00\u5305\u8981\u5224\u65ad\u4ec0\u4e48",
             "",
-            "这不是技巧名称展示,也不是技巧质量评价。目标是确认某些音高行为区域能否安全判音准,从而在将来减少 review_required。",
+            "\u8fd9\u4e0d\u662f\u6280\u5de7\u540d\u79f0\u5c55\u793a\uff0c\u4e5f\u4e0d\u662f\u6280\u5de7\u8d28\u91cf\u8bc4\u4ef7\u3002\u76ee\u6807\u662f\u786e\u8ba4\u67d0\u4e9b\u97f3\u9ad8\u884c\u4e3a\u533a\u57df\u80fd\u5426\u5b89\u5168\u5224\u97f3\u51c6\uff0c\u4ece\u800c\u5728\u5c06\u6765\u51cf\u5c11 review_required\u3002",
             "",
-            "标注顺序:",
-            "1. 先听短音频,对照页面里的对应五线谱图片,判断音频是否匹配这一行的谱面音。",
-            "2. 不匹配就标 `mismatch`,后面的音准字段可设为不可判。",
-            "3. 匹配时,再标实际音高行为、应采用的音准判法、是否可判音准、音准结论和置信度。",
-            "4. 拿不准就标 `uncertain`;不要为了凑样本硬判。",
-            "5. 页面里的快捷按钮只填未标项。若要全局快速处理,先确认大部分样本确实符合该判断。",
-            "6. 五线谱图片按 `pieceId/page/measure/note` 定位;若图片缺失或看不清,在备注说明并标为不确定。",
+            "\u6807\u6ce8\u987a\u5e8f:",
+            "1. \u5148\u542c\u77ed\u97f3\u9891\uff0c\u5bf9\u7167\u9875\u9762\u91cc\u7684\u5bf9\u5e94\u4e94\u7ebf\u8c31\u56fe\u7247\uff0c\u5224\u65ad\u97f3\u9891\u662f\u5426\u5339\u914d\u8fd9\u4e00\u884c\u7684\u8c31\u9762\u97f3\u3002",
+            "2. \u4e0d\u5339\u914d\u5c31\u6807 `mismatch`\uff0c\u540e\u9762\u7684\u97f3\u51c6\u5b57\u6bb5\u53ef\u8bbe\u4e3a\u4e0d\u53ef\u5224\u3002",
+            "3. \u5339\u914d\u65f6\uff0c\u518d\u6807\u5b9e\u9645\u97f3\u9ad8\u884c\u4e3a\u3001\u5e94\u91c7\u7528\u7684\u97f3\u51c6\u5224\u6cd5\u3001\u662f\u5426\u53ef\u5224\u97f3\u51c6\u3001\u97f3\u51c6\u7ed3\u8bba\u548c\u7f6e\u4fe1\u5ea6\u3002",
+            "4. \u62ff\u4e0d\u51c6\u5c31\u6807 `uncertain`\uff1b\u4e0d\u8981\u4e3a\u4e86\u51d1\u6837\u672c\u786c\u5224\u3002",
+            "5. \u9875\u9762\u91cc\u7684\u5feb\u6377\u6309\u94ae\u53ea\u586b\u672a\u6807\u9879\u3002\u82e5\u8981\u5168\u5c40\u5feb\u901f\u5904\u7406\uff0c\u5148\u786e\u8ba4\u5927\u90e8\u5206\u6837\u672c\u786e\u5b9e\u7b26\u5408\u8be5\u5224\u65ad\u3002",
+            "6. \u4e94\u7ebf\u8c31\u56fe\u7247\u6309 `pieceId/page/measure/note` \u5b9a\u4f4d\uff1b\u82e5\u56fe\u7247\u7f3a\u5931\u6216\u770b\u4e0d\u6e05\uff0c\u5728\u5907\u6ce8\u8bf4\u660e\u5e76\u6807\u4e3a\u4e0d\u786e\u5b9a\u3002",
             "",
-            "## 本包规模",
+            "## \u672c\u5305\u89c4\u6a21",
             "",
             f"- rows: {len(rows)}",
             f"- availableCounts: `{json.dumps(stats.get('availableCounts', {}), ensure_ascii=False)}`",
             f"- selectedCounts: `{json.dumps(stats.get('selectedCounts', {}), ensure_ascii=False)}`",
             "",
-            "## 输出",
+            "## \u8f93\u51fa",
             "",
-            "- 打开 `index.html` 复核。",
-            "- 标完点击页面上的 `下载已填 CSV`,得到 `m3plus-pitch-mode-review.completed.csv`。",
-            "- 下载后运行 `npm run western:m3plus-review-import -- --reviews <completed.csv>` 导入标签。",
-            "- 当前标签只用于 M3+ precision 评估,不直接打开学生端。",
+            "- \u6253\u5f00 `index.html` \u590d\u6838\u3002",
+            f"- \u6807\u5b8c\u70b9\u51fb\u9875\u9762\u4e0a\u7684 `\u4e0b\u8f7d\u5df2\u586b CSV`\uff0c\u5f97\u5230 `{download_filename(path.parent)}`\u3002",
+            "- \u5982\u679c CSV \u4e0b\u8f7d\u5230 Downloads\uff0c\u53ef\u8fd0\u884c `npm run western:ingest-review-downloads -- --target m3plus-candidate-quality --apply` \u5bfc\u5165\u5230\u672c\u5305\u3002",
+            "- \u5f53\u524d\u6807\u7b7e\u53ea\u7528\u4e8e M3+ precision \u8bc4\u4f30\uff0c\u4e0d\u76f4\u63a5\u6253\u5f00\u5b66\u751f\u7aef\u3002",
             "",
-            "## 安全边界",
+            "## \u5b89\u5168\u8fb9\u754c",
             "",
-            "在具体模式证明 note-level 音准 precision>=90% 且 unsafe=0 前,学生端仍保持 review-only。",
+            "\u5728\u5177\u4f53\u6a21\u5f0f\u8bc1\u660e note-level \u97f3\u51c6 precision>=90% \u4e14 unsafe=0 \u524d\uff0c\u5b66\u751f\u7aef\u4ecd\u4fdd\u6301 review-only\u3002",
             "",
         ]),
         encoding="utf-8",
