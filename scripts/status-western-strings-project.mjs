@@ -820,7 +820,7 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
       priority: 2,
       track: "M3+ pitch behavior modes",
       action: candidateQualityReview.needsReview
-        ? `M3+ labels are sufficient and round-2 is imported, but no non-control pitch-behavior mode is release-ready.${mismatchText}${localizationText} The candidate-quality review pack is now restricted to recordings whose prior review rows were all audio-score matches; review only this stricter pack before another release attempt.`
+        ? `M3+ labels are sufficient and round-2 is imported, but no non-control pitch-behavior mode is release-ready.${mismatchText}${localizationText} The candidate-quality review pack is now restricted to first-measure rows from recordings whose prior review rows were all audio-score matches; later measures are treated as localization-drift risk and excluded.`
         : `M3+ labels are sufficient and round-2 is imported, but no non-control pitch-behavior mode is release-ready.${mismatchText}${localizationText} Keep M3+ review-only and inspect localization groups before changing candidate generation.`,
       artifact: candidateQualityReview.needsReview
         ? candidateQualityReview.reviewPage

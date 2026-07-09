@@ -226,6 +226,8 @@ def select_rows(
     excluded_keys: set[str] | None = None,
     excluded_recording_ids: set[str] | None = None,
     allowed_recording_ids: set[str] | None = None,
+    min_measure_index: int | None = None,
+    max_measure_index: int | None = None,
 ) -> tuple[list[dict[str, str]], dict[str, Any]]:
     selected: list[dict[str, str]] = []
     selected_keys: set[str] = set(excluded_keys or set())
@@ -240,6 +242,10 @@ def select_rows(
         candidates = [row for row in candidates if str(row.get("recordingId", "")).strip() not in excluded_recordings]
         if allowed_recordings:
             candidates = [row for row in candidates if str(row.get("recordingId", "")).strip() in allowed_recordings]
+        if min_measure_index is not None:
+            candidates = [row for row in candidates if safe_int(row.get("measureIndex"), -1) >= min_measure_index]
+        if max_measure_index is not None:
+            candidates = [row for row in candidates if safe_int(row.get("measureIndex"), 10**9) <= max_measure_index]
         candidates = [row for row in candidates if row_key(row) not in selected_keys]
         eligible_counts[mode] = len(candidates)
         candidates.sort(key=lambda item: (mode_strength(item, mode), -safe_int(item.get("noteIndex"))), reverse=True)
@@ -283,6 +289,8 @@ def select_rows(
         "excludedRecordingCount": len(excluded_recordings),
         "allowedRecordingIds": sorted(allowed_recordings),
         "allowedRecordingCount": len(allowed_recordings),
+        "minMeasureIndex": min_measure_index,
+        "maxMeasureIndex": max_measure_index,
         "selectedCounts": mode_counts,
     }
 
@@ -426,6 +434,13 @@ def render_select(name: str, options: list[tuple[str, str]]) -> str:
 def render_html(pack: dict[str, Any]) -> str:
     pack_json = json.dumps(pack, ensure_ascii=False).replace("</script>", "<\\/script>")
     filename_json = json.dumps(str(pack.get("downloadFilename") or "m3plus-pitch-mode-review.completed.csv"), ensure_ascii=False)
+    stats = pack.get("stats") if isinstance(pack.get("stats"), dict) else {}
+    max_measure = stats.get("maxMeasureIndex")
+    measure_filter_html = (
+        f"<p><strong>\u672c\u5305\u8fb9\u754c:</strong> \u53ea\u5305\u542b\u7b2c {h(max_measure)} \u5c0f\u8282\u5019\u9009\u3002\u4f60\u5df2\u786e\u8ba4\u540e\u7eed\u5c0f\u8282\u97f3\u9891-\u8c31\u9762\u5bf9\u4e0d\u4e0a\uff0c\u56e0\u6b64\u540e\u7eed\u5c0f\u8282\u6682\u4e0d\u518d\u8fdb\u5165\u4eba\u5de5\u590d\u6838\u5305\u3002</p>"
+        if max_measure is not None
+        else ""
+    )
     cards: list[str] = []
     for index, row in enumerate(pack["rows"]):
         metrics = row.get("metrics", {})
@@ -545,6 +560,7 @@ def render_html(pack: dict[str, Any]) -> str:
   <section class="intro">
     <p><strong>\u76ee\u6807:</strong> \u8fd9\u4e0d\u662f\u5c55\u793a\u6280\u5de7\u540d\u79f0\uff0c\u4e5f\u4e0d\u662f\u8bc4\u4ef7\u6280\u5de7\u8d28\u91cf\u3002\u8fd9\u91cc\u53ea\u5224\u65ad\u8fd9\u4e9b\u7279\u6b8a\u97f3\u9ad8\u884c\u4e3a\u533a\u57df\u80fd\u5426\u5b89\u5168\u5224\u97f3\u51c6\uff0c\u4ece\u800c\u5c06\u6765\u51cf\u5c11 review_required\u3002</p>
     <p><strong>\u6807\u6ce8\u987a\u5e8f:</strong> \u5148\u542c\u97f3\u9891\u662f\u5426\u5339\u914d\u8c31\u9762\u97f3\u3002\u4e0d\u5339\u914d\u5c31\u9009\u201c\u4e0d\u5339\u914d\u201d\u3002\u5339\u914d\u65f6\u518d\u6807\u97f3\u9ad8\u884c\u4e3a\u3001\u5224\u6cd5\u3001\u662f\u5426\u53ef\u5224\u3001\u97f3\u51c6\u7ed3\u8bba\u548c\u7f6e\u4fe1\u5ea6\u3002</p>
+    {measure_filter_html}
     <p><strong>\u5feb\u6377\u6309\u94ae:</strong> \u201c\u672c\u6761\u5339\u914d\u4e14\u97f3\u51c6\u6b63\u786e\u201d\u548c\u201c\u672a\u6807\u5168\u90e8\u8bbe\u4e3a\u5339\u914d\u4e14\u6b63\u786e\u201d\u53ea\u586b\u5199\u672a\u6807\u9879\u3002\u5982\u679c\u4e0d\u786e\u5b9a\uff0c\u8bf7\u7528\u201c\u4e0d\u786e\u5b9a\u201d\u3002</p>
     <p><strong>\u5b89\u5168\u8fb9\u754c:</strong> \u672c\u5305\u53ea\u4ea7\u751f\u4eba\u5de5\u6807\u7b7e\u3002\u672a\u901a\u8fc7 precision&gt;=90% / unsafe=0 \u95f8\u95e8\u524d\uff0c\u5b66\u751f\u7aef\u4ecd\u5168\u90e8 review-only\u3002</p>
     <p class="muted">\u5019\u9009\u6570: {len(pack["rows"])}; inventory: <code>{h(pack["sourceInventory"])}</code></p>
@@ -589,6 +605,7 @@ def write_guide(path: Path, rows: list[dict[str, Any]], stats: dict[str, Any]) -
             "4. \u62ff\u4e0d\u51c6\u5c31\u6807 `uncertain`\uff1b\u4e0d\u8981\u4e3a\u4e86\u51d1\u6837\u672c\u786c\u5224\u3002",
             "5. \u9875\u9762\u91cc\u7684\u5feb\u6377\u6309\u94ae\u53ea\u586b\u672a\u6807\u9879\u3002\u82e5\u8981\u5168\u5c40\u5feb\u901f\u5904\u7406\uff0c\u5148\u786e\u8ba4\u5927\u90e8\u5206\u6837\u672c\u786e\u5b9e\u7b26\u5408\u8be5\u5224\u65ad\u3002",
             "6. \u4e94\u7ebf\u8c31\u56fe\u7247\u6309 `pieceId/page/measure/note` \u5b9a\u4f4d\uff1b\u82e5\u56fe\u7247\u7f3a\u5931\u6216\u770b\u4e0d\u6e05\uff0c\u5728\u5907\u6ce8\u8bf4\u660e\u5e76\u6807\u4e3a\u4e0d\u786e\u5b9a\u3002",
+            "7. \u5f53\u524d candidate-quality \u5305\u53ea\u62bd\u53d6\u5386\u53f2\u5168\u5339\u914d\u5f55\u97f3\u7684\u7b2c 1 \u5c0f\u8282\u3002\u540e\u7eed\u5c0f\u8282\u5df2\u88ab\u5224\u5b9a\u4e3a\u7ebf\u6027\u5b9a\u4f4d\u6f02\u79fb\u9ad8\u98ce\u9669\uff0c\u6682\u4e0d\u8fdb\u590d\u6838\u5305\u3002",
             "",
             "## \u672c\u5305\u89c4\u6a21",
             "",
@@ -637,6 +654,8 @@ def build_pack(args: argparse.Namespace) -> dict[str, Any]:
         excluded_keys,
         excluded_recordings,
         allowed_recordings,
+        int(args.min_measure_index) if args.min_measure_index is not None else None,
+        int(args.max_measure_index) if args.max_measure_index is not None else None,
     )
     audio_paths = load_summary_audio_paths(summary_path)
     review_rows, warnings = build_review_rows(
@@ -701,6 +720,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--require-trusted-recordings-from-reviewed", action="append", default=[], help="Reviewed CSV/labels file used to allow only recordings whose prior rows all matched. Can be repeated.")
     parser.add_argument("--trusted-recording-min-reviewed", type=int, default=2)
     parser.add_argument("--trusted-recording-max-nonmatch-rate", type=float, default=0.0)
+    parser.add_argument("--min-measure-index", type=int, default=None)
+    parser.add_argument("--max-measure-index", type=int, default=None)
     return parser.parse_args()
 
 

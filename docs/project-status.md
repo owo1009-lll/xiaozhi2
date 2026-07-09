@@ -89,5 +89,5 @@
 # 2026-07-09 M3+ candidate-quality review update
 
 - M3+ localization diagnosis shows `stu02-ex05-weak_onset` is a recording-level bad source for M3+ review: 9/9 rows are mismatch.
-- The candidate-quality review pack at `data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/index.html` is now restricted to recordings whose prior M3+ review rows were all audio-score matches, and excludes already-reviewed rows. This is stricter than only excluding the single 100% non-match recording.
+- The candidate-quality review pack at `data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/index.html` is now restricted to first-measure rows from recordings whose prior M3+ review rows were all audio-score matches, and excludes already-reviewed rows. Later measures are excluded because the linear score-time windows drift after measure 1.
 - The pack has 24 rows: variable-f0 6, slide-like 6, trill-like 6, double-stop-candidate 6, ornament-candidate 0 because no unreviewed ornament candidates remain after exclusions. It is evidence collection only; M3+ remains review-only.
