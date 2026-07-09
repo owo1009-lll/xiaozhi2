@@ -104,6 +104,12 @@ def h(value: Any) -> str:
     return html.escape(str(value if value is not None else ""))
 
 
+def download_filename(out_dir: Path) -> str:
+    slug = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in out_dir.name).strip("-")
+    suffix = f".{slug}" if slug else ""
+    return f"m3plus-pitch-mode-review{suffix}.completed.csv"
+
+
 def safe_float(value: Any, default: float = 0.0) -> float:
     try:
         result = float(value)
@@ -381,6 +387,7 @@ def render_select(name: str, options: list[tuple[str, str]]) -> str:
 
 def render_html(pack: dict[str, Any]) -> str:
     pack_json = json.dumps(pack, ensure_ascii=False).replace("</script>", "<\\/script>")
+    filename_json = json.dumps(str(pack.get("downloadFilename") or "m3plus-pitch-mode-review.completed.csv"), ensure_ascii=False)
     cards: list[str] = []
     for index, row in enumerate(pack["rows"]):
         metrics = row.get("metrics", {})
@@ -650,7 +657,7 @@ def render_html(pack: dict[str, Any]) -> str:
       const blob = new Blob(["\\ufeff" + lines.join("\\n")], {{ type: "text/csv;charset=utf-8" }});
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      link.download = "m3plus-pitch-mode-review.completed.csv";
+      link.download = {filename_json};
       link.click();
       URL.revokeObjectURL(link.href);
     }});
@@ -742,6 +749,7 @@ def build_pack(args: argparse.Namespace) -> dict[str, Any]:
         "sourceInventory": str(inventory_path.relative_to(REPO) if inventory_path.is_relative_to(REPO) else inventory_path),
         "sourceSummary": str(summary_path.relative_to(REPO) if summary_path.is_relative_to(REPO) else summary_path),
         "outDir": str(out_dir.relative_to(REPO) if out_dir.is_relative_to(REPO) else out_dir),
+        "downloadFilename": download_filename(out_dir),
         "rows": display_rows,
         "reviewColumns": REVIEW_COLUMNS,
         "stats": stats,
