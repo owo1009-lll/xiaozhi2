@@ -38,6 +38,13 @@ const DEFAULT_CONFIDENCE_RELEASE = path.join(
   "ordinary-upload-confidence-rf-v1",
   "release.json",
 );
+const DEFAULT_CONFIDENCE_RELEASE_AUDIT = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-validation-review",
+  "ordinary-confidence-release-audit.json",
+);
 
 function clampMissing(required, actual) {
   return Math.max(0, Number(required || 0) - Number(actual || 0));
@@ -56,6 +63,7 @@ export function summarizeControlledCandidateConfidencePilot(
   source = DEFAULT_CONFIDENCE_PILOT,
   validationEval = null,
   runtimeRelease = null,
+  releaseAudit = null,
 ) {
   const releaseCandidates = [];
   for (const evaluation of pilot?.evaluations || []) {
@@ -121,6 +129,20 @@ export function summarizeControlledCandidateConfidencePilot(
       reason: "confidence-validation-eval-missing",
       blockingReasons: ["confidence-validation-eval-missing"],
     },
+    releaseAudit: releaseAudit ? {
+      source: DEFAULT_CONFIDENCE_RELEASE_AUDIT.replace(/\\/g, "/"),
+      pilotPrecision: releaseAudit?.pilotOutOfFold?.precision ?? null,
+      pilotCoverage: releaseAudit?.pilotOutOfFold?.coverageWithinRows ?? null,
+      thresholdPoolCoverage: releaseAudit?.validationExport?.thresholdPoolCoverage ?? null,
+      validationPrecision: releaseAudit?.validationReviewedSample?.precision ?? null,
+      readyForDefaultEnable: releaseAudit?.releaseReadiness?.readyForDefaultEnable === true,
+      blockingReasons: releaseAudit?.releaseReadiness?.blockingReasons || [],
+      caveat: releaseAudit?.validationExport?.importantCaveat || "",
+      recommendedNextStep: releaseAudit?.recommendedNextStep || "",
+    } : {
+      source: DEFAULT_CONFIDENCE_RELEASE_AUDIT.replace(/\\/g, "/"),
+      sourceExists: false,
+    },
   };
 }
 
@@ -133,7 +155,7 @@ export function attachConfidencePilotStatus(status, confidencePilot) {
   const nextActions = [
     validationPassed
       ? (runtimeGateWired
-        ? "Confidence runtime gate is wired but disabled by default. Keep default fail-closed; before any controlled pilot, verify ordinary-upload feature extraction/scoring on the runtime path, investigate the pilot-vs-validation operating-point drift, then enable only in a monitored process with WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1."
+        ? "Confidence runtime gate is wired but disabled by default. Runtime scoring smoke is covered; release audit shows the fresh validation batch was prefiltered above threshold, so full threshold-pool precision remains unmeasured. Keep default fail-closed; only run WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 in a monitored pilot after stratified review of the full threshold pool."
         : "Confidence blind validation passed. Review metrics and wire a runtime gate in a separate release phase; current runtime remains fail-closed.")
       : `Confidence pilot found release candidates; review ${DEFAULT_CONFIDENCE_VALIDATION_REVIEW_PAGE.replace(/\\/g, "/")} and run western:controlled-candidate-confidence-validation-eval before changing the runtime gate.`,
   ];
@@ -145,6 +167,9 @@ export function attachConfidencePilotStatus(status, confidencePilot) {
     validationPassed
       ? (runtimeGateWired ? "ordinary-auto-gate-disabled-by-default" : "candidate-confidence-validation-not-wired")
       : "candidate-confidence-pilot-needs-blind-validation",
+    ...(confidencePilot?.releaseAudit?.readyForDefaultEnable === false
+      ? (confidencePilot.releaseAudit.blockingReasons || [])
+      : []),
   ])];
   return {
     ...status,
@@ -213,6 +238,7 @@ function parseArgs(argv) {
     confidencePilot: DEFAULT_CONFIDENCE_PILOT,
     confidenceValidationEval: DEFAULT_CONFIDENCE_VALIDATION_EVAL,
     confidenceRelease: DEFAULT_CONFIDENCE_RELEASE,
+    confidenceReleaseAudit: DEFAULT_CONFIDENCE_RELEASE_AUDIT,
     minReviewedRows: 30,
     minScoredRows: 30,
     minPrecision: 0.9,
@@ -228,6 +254,7 @@ function parseArgs(argv) {
     else if (arg === "--confidence-pilot") args.confidencePilot = argv[++index] || args.confidencePilot;
     else if (arg === "--confidence-validation-eval") args.confidenceValidationEval = argv[++index] || args.confidenceValidationEval;
     else if (arg === "--confidence-release") args.confidenceRelease = argv[++index] || args.confidenceRelease;
+    else if (arg === "--confidence-release-audit") args.confidenceReleaseAudit = argv[++index] || args.confidenceReleaseAudit;
     else if (arg === "--min-reviewed-rows") args.minReviewedRows = Number(argv[++index] || args.minReviewedRows);
     else if (arg === "--min-scored-rows") args.minScoredRows = Number(argv[++index] || args.minScoredRows);
     else if (arg === "--min-precision") args.minPrecision = Number(argv[++index] || args.minPrecision);
@@ -252,6 +279,7 @@ async function main() {
       args.confidencePilot,
       await readJson(args.confidenceValidationEval),
       await readJson(args.confidenceRelease),
+      await readJson(args.confidenceReleaseAudit),
     ),
   );
   status.reviewArtifacts = {

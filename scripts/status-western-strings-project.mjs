@@ -52,6 +52,13 @@ const CONTROLLED_CONFIDENCE_RELEASE = path.join(
   "ordinary-upload-confidence-rf-v1",
   "release.json",
 );
+const CONTROLLED_CONFIDENCE_RELEASE_AUDIT = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "confidence-validation-review",
+  "ordinary-confidence-release-audit.json",
+);
 const M3PLUS_SOURCE = path.join(
   "data",
   "experiments",
@@ -302,12 +309,14 @@ async function buildControlledStatus() {
     CONTROLLED_CONFIDENCE_PILOT,
     await readJson(CONTROLLED_CONFIDENCE_VALIDATION_EVAL),
     await readJson(CONTROLLED_CONFIDENCE_RELEASE),
+    await readJson(CONTROLLED_CONFIDENCE_RELEASE_AUDIT),
   );
   const status = attachConfidencePilotStatus(buildControlledCandidateReviewStatus(report), confidencePilot);
   status.reviewArtifacts = {
     reviewPage: CONTROLLED_REVIEW_PAGE.replace(/\\/g, "/"),
     completedCsv: CONTROLLED_COMPLETED.replace(/\\/g, "/"),
     labelsCsv: CONTROLLED_LABELS.replace(/\\/g, "/"),
+    releaseAuditJson: CONTROLLED_CONFIDENCE_RELEASE_AUDIT.replace(/\\/g, "/"),
   };
   return status;
 }

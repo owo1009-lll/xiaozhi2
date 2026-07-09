@@ -12,7 +12,11 @@ import {
   persistPayloadAudio,
   persistUploadedAudioFile,
 } from "../src/server/audioPayload.js";
-import { buildWesternAlignmentPreview, buildWesternStudentAnalysis } from "../src/server/westernStringsAlignmentService.js";
+import {
+  buildWesternAlignmentPreview,
+  buildWesternStudentAnalysis,
+  runWesternControlledSubmissionBatch,
+} from "../src/server/westernStringsAlignmentService.js";
 import { createWesternStringsRouter } from "../src/server/westernStringsRoutes.js";
 import { auditControlledBatchRuns } from "./audit-western-controlled-batch-candidates.mjs";
 import {
@@ -929,6 +933,142 @@ async function testControlledSubmissionOfflineFeatureReviewBatch() {
   }
 }
 
+async function testControlledSubmissionOfflineFeatureConfidenceGateEnabled() {
+  const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "western-controlled-confidence-gate-"));
+  const m2Root = path.join(tempRoot, "data", "experiments", "western-strings-m2");
+  const m3Root = path.join(tempRoot, "data", "experiments", "western-strings-m3");
+  await fs.mkdir(m2Root, { recursive: true });
+  await fs.mkdir(m3Root, { recursive: true });
+  await fs.writeFile(
+    path.join(m2Root, "m2d-sequence-support-summary.json"),
+    JSON.stringify({ ok: true, studentGateReady: true }),
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(m2Root, "m2f-real-student-recording-summary.json"),
+    JSON.stringify({ ok: true, studentGateReady: true }),
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(m3Root, "m3-diagnosis-summary.json"),
+    JSON.stringify({
+      ok: true,
+      diagnosisGateReady: true,
+      gate: { requiredCategories: ["pitch", "onset", "missing"], reviewOnlyCategories: ["duration", "extra"] },
+    }),
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(tempRoot, "data", "erhu-score-imports.json"),
+    JSON.stringify({
+      jobs: [],
+      scores: [
+        {
+          scoreId: "score-test-clean",
+          title: "Tiny clean violin score",
+          scoreSource: "musicxml",
+          sections: [
+            {
+              sectionId: "section-1",
+              title: "Section 1",
+              tempo: 72,
+              notes: [
+                { noteId: "n1", measureIndex: 1, beatStart: 0, beatDuration: 1, midiPitch: 69, notePosition: { pageNumber: 1, globalMeasureIndex: 1, localMeasureIndex: 1 } },
+                { noteId: "n2", measureIndex: 1, beatStart: 1, beatDuration: 1, midiPitch: 69, notePosition: { pageNumber: 1, globalMeasureIndex: 1, localMeasureIndex: 1 } },
+                { noteId: "n3", measureIndex: 1, beatStart: 2, beatDuration: 1, midiPitch: 69, notePosition: { pageNumber: 1, globalMeasureIndex: 1, localMeasureIndex: 1 } },
+              ],
+            },
+          ],
+        },
+      ],
+    }),
+    "utf8",
+  );
+  const audioPath = path.join(tempRoot, "student.wav");
+  await fs.writeFile(audioPath, sineWavBuffer());
+  await fs.writeFile(
+    path.join(m3Root, "controlled-submissions.jsonl"),
+    `${JSON.stringify({
+      submissionId: "sub-confidence-1",
+      submittedAt: new Date().toISOString(),
+      scoreId: "score-test-clean",
+      audioPath,
+      instrument: "violin",
+      limit: 3,
+      status: "review_required",
+    })}\n`,
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(m3Root, "controlled-submission-reviews.jsonl"),
+    `${JSON.stringify({ submissionId: "sub-confidence-1", action: "accepted_for_batch" })}\n`,
+    "utf8",
+  );
+
+  const fixtureCopies = [
+    [
+      path.join(process.cwd(), "data", "experiments", "western-strings-m3", "offline-feature-candidate-review", "controlled-candidate-review-labels.csv"),
+      path.join(m3Root, "offline-feature-candidate-review", "controlled-candidate-review-labels.csv"),
+    ],
+    [
+      path.join(process.cwd(), "data", "experiments", "western-strings-m3", "offline-feature-candidate-review", "candidate-confidence-pilot.json"),
+      path.join(m3Root, "offline-feature-candidate-review", "candidate-confidence-pilot.json"),
+    ],
+    [
+      path.join(process.cwd(), "data", "experiments", "western-strings-m3", "confidence-validation-review", "confidence-validation-eval.json"),
+      path.join(m3Root, "confidence-validation-review", "confidence-validation-eval.json"),
+    ],
+  ];
+  for (const [from, to] of fixtureCopies) {
+    await fs.mkdir(path.dirname(to), { recursive: true });
+    await fs.copyFile(from, to);
+  }
+  const releasePath = path.join(tempRoot, "models", "western-strings", "ordinary-upload-confidence-rf-v1", "release.json");
+  await fs.mkdir(path.dirname(releasePath), { recursive: true });
+  await fs.copyFile(
+    path.join(process.cwd(), "models", "western-strings", "ordinary-upload-confidence-rf-v1", "release.json"),
+    releasePath,
+  );
+
+  const oldEnable = process.env.WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE;
+  const oldRelease = process.env.WESTERN_STRINGS_ORDINARY_AUTO_GATE_RELEASE;
+  process.env.WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE = "1";
+  process.env.WESTERN_STRINGS_ORDINARY_AUTO_GATE_RELEASE = releasePath;
+  try {
+    const result = await runWesternControlledSubmissionBatch({ repoRoot: tempRoot, limit: 1 });
+    assert.equal(result.ok, true);
+    assert.equal(result.batch.itemCount, 1);
+    assert.equal(result.batch.status, "offline_feature_confidence_ready");
+    const item = result.batch.items[0];
+    assert.equal(item.analysisStatus, "offline_feature_confidence_ready");
+    assert.equal(item.candidateGate.ready, true);
+    assert.equal(item.candidateGate.mode, "confidence_rf");
+    assert.equal(item.candidateGate.gateVersion, "western-offline-feature-gate-v1-confidence-rf");
+    assert.equal(item.candidateGate.modelVersion, "ordinary-upload-confidence-rf-v1");
+    assert.equal(item.candidateGate.threshold, 0.7);
+    assert.equal(item.candidateGate.evaluatedCandidateCount, 3);
+    assert.equal(item.candidateGate.autoPassCandidateCount + item.candidateGate.reviewRequiredCandidateCount, 3);
+    assert.equal(item.candidatePreview.length, 3);
+    assert(item.candidatePreview.every((candidate) => typeof candidate.confidenceProbability === "number"));
+    assert(item.candidatePreview.every((candidate) => candidate.gateVersion === "western-offline-feature-gate-v1-confidence-rf"));
+    assert(item.candidatePreview.every((candidate) => candidate.studentSafeGateReady === true));
+    const artifact = JSON.parse(await fs.readFile(path.join(tempRoot, item.candidateRowsPath), "utf8"));
+    assert.equal(artifact.rowCount, 3);
+    assert(artifact.candidateRows.every((candidate) => typeof candidate.confidenceProbability === "number"));
+  } finally {
+    if (oldEnable === undefined) {
+      delete process.env.WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE;
+    } else {
+      process.env.WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE = oldEnable;
+    }
+    if (oldRelease === undefined) {
+      delete process.env.WESTERN_STRINGS_ORDINARY_AUTO_GATE_RELEASE;
+    } else {
+      process.env.WESTERN_STRINGS_ORDINARY_AUTO_GATE_RELEASE = oldRelease;
+    }
+  }
+}
+
 await testServiceDefaultNoLeakage();
 await testServiceEvaluationSummary();
 await testStudentSafeFailClosed();
@@ -939,5 +1079,6 @@ await testStudentAnalyzeAndReviewRoutes();
 await testControlledSubmissionRoute();
 await testControlledSubmissionValidatedReplayBatch();
 await testControlledSubmissionOfflineFeatureReviewBatch();
+await testControlledSubmissionOfflineFeatureConfidenceGateEnabled();
 
 console.log(JSON.stringify({ ok: true, checks: ["western-alignment-preview-service", "western-alignment-preview-route", "western-student-analysis-route", "western-controlled-submission-route"] }));
