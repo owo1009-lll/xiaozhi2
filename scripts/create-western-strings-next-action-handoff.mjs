@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 
 import { buildProjectStatus, writeProjectStatus } from "./status-western-strings-project.mjs";
 
-const DEFAULT_OUT = path.join("data", "experiments", "western-strings-next-actions.md");
+export const DEFAULT_OUT = path.join("data", "experiments", "western-strings-next-actions.md");
 const DEFAULT_STATUS_OUT = path.join("data", "experiments", "western-strings-project-status.json");
 
 function parseArgs(argv) {
@@ -67,7 +67,7 @@ function commandForAction(action) {
   return ["Run npm run western:project-status after completing this item"];
 }
 
-function renderHandoff(status) {
+export function renderHandoff(status) {
   const lines = [
     "# Western Strings Next Actions",
     "",

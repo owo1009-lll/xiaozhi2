@@ -1,9 +1,10 @@
-import { access } from "node:fs/promises";
+import { access, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
 import { buildProjectStatus, writeProjectStatus } from "./status-western-strings-project.mjs";
+import { DEFAULT_OUT as DEFAULT_HANDOFF_OUT, renderHandoff } from "./create-western-strings-next-action-handoff.mjs";
 
 const DEFAULT_STATUS_OUT = path.join("data", "experiments", "western-strings-project-status.json");
 
@@ -55,18 +56,35 @@ function openPath(filePath) {
   });
 }
 
+function shouldOpenHandoff(action) {
+  return action?.track === "M2/M3 ordinary upload candidate gate"
+    && (action.reason || []).includes("ordinary-auto-gate-disabled-by-default");
+}
+
+async function writeHandoff(status) {
+  const outPath = path.resolve(process.cwd(), DEFAULT_HANDOFF_OUT);
+  await mkdir(path.dirname(outPath), { recursive: true });
+  await writeFile(outPath, renderHandoff(status), "utf8");
+  return outPath;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const status = await buildProjectStatus();
   await writeProjectStatus(status, args.statusOut);
   const action = (status.nextActions || []).find((item) => Number(item.priority) === args.priority)
     || (status.nextActions || [])[0];
-  if (!action?.artifact) {
+  if (!action) {
     throw new Error("No next-action artifact is available to open.");
   }
-  const artifactPath = path.resolve(process.cwd(), action.artifact);
+  if (!shouldOpenHandoff(action) && !action.artifact) {
+    throw new Error("No next-action artifact is available to open.");
+  }
+  const artifactPath = shouldOpenHandoff(action)
+    ? await writeHandoff(status)
+    : path.resolve(process.cwd(), action.artifact);
   if (!(await fileExists(artifactPath))) {
-    throw new Error(`Next-action artifact does not exist: ${action.artifact}`);
+    throw new Error(`Next-action artifact does not exist: ${path.relative(process.cwd(), artifactPath)}`);
   }
   await openPath(artifactPath);
   console.log(JSON.stringify({
