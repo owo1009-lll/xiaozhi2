@@ -185,6 +185,27 @@ const M3PLUS_MODE_EVAL_CSV = path.join(
   "pitch-mode-review-pack",
   "m3plus-pitch-mode-eval.csv",
 );
+const M3PLUS_LOCALIZATION_DIAGNOSIS = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3plus",
+  "pitch-mode-review-pack",
+  "m3plus-localization-diagnosis.json",
+);
+const M3PLUS_LOCALIZATION_GROUPS_CSV = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3plus",
+  "pitch-mode-review-pack",
+  "m3plus-localization-diagnosis-groups.csv",
+);
+const M3PLUS_LOCALIZATION_ROWS_CSV = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3plus",
+  "pitch-mode-review-pack",
+  "m3plus-localization-diagnosis-rows.csv",
+);
 const M4_READINESS = path.join(
   "data",
   "experiments",
@@ -354,6 +375,7 @@ async function buildM3PlusStatus() {
   const sourceRows = await readCsv(M3PLUS_SOURCE);
   const labelRows = await readCsv(M3PLUS_LABELS);
   const modeEval = await readJson(M3PLUS_MODE_EVAL);
+  const localizationDiagnosis = await readJson(M3PLUS_LOCALIZATION_DIAGNOSIS);
   const allSourceRows = [...sourceRows];
   const sourceKeys = new Set(sourceRows.map(m3plusLabelKey).filter(Boolean));
   for (const row of labelRows) {
@@ -401,6 +423,9 @@ async function buildM3PlusStatus() {
     modeEvalBlockingReasons.push("m3plus-mode-eval-missing");
   } else if (labelReady && !modeReleaseReady) {
     modeEvalBlockingReasons.push(...(modeEval?.blockingReasons || ["m3plus-no-mode-specific-release-ready"]));
+    if (localizationDiagnosis?.summary?.nonMatch) {
+      modeEvalBlockingReasons.push("m3plus-localization-candidate-quality-blocker");
+    }
   }
   const blockingReasons = [...labelBlockingReasons, ...modeEvalBlockingReasons];
   return {
@@ -427,6 +452,12 @@ async function buildM3PlusStatus() {
       counts: modeEval?.counts || {},
       blockingReasons: modeEval?.blockingReasons || modeEvalBlockingReasons,
     },
+    localizationDiagnosis: {
+      source: M3PLUS_LOCALIZATION_DIAGNOSIS.replace(/\\/g, "/"),
+      sourceExists: Boolean(localizationDiagnosis),
+      summary: localizationDiagnosis?.summary || {},
+      highRiskGroups: localizationDiagnosis?.highRiskGroups || [],
+    },
     labelBlockingReasons,
     blockingReasons,
     reviewArtifacts: {
@@ -435,6 +466,9 @@ async function buildM3PlusStatus() {
       labelsCsv: M3PLUS_LABELS.replace(/\\/g, "/"),
       modeEvalJson: M3PLUS_MODE_EVAL.replace(/\\/g, "/"),
       modeEvalCsv: M3PLUS_MODE_EVAL_CSV.replace(/\\/g, "/"),
+      localizationDiagnosisJson: M3PLUS_LOCALIZATION_DIAGNOSIS.replace(/\\/g, "/"),
+      localizationDiagnosisGroupsCsv: M3PLUS_LOCALIZATION_GROUPS_CSV.replace(/\\/g, "/"),
+      localizationDiagnosisRowsCsv: M3PLUS_LOCALIZATION_ROWS_CSV.replace(/\\/g, "/"),
       round2ReviewPage: M3PLUS_ROUND2_REVIEW_PAGE.replace(/\\/g, "/"),
       round2SourceCsv: M3PLUS_ROUND2_SOURCE.replace(/\\/g, "/"),
       round2CompletedCsv: M3PLUS_ROUND2_COMPLETED.replace(/\\/g, "/"),
@@ -460,8 +494,14 @@ async function buildControlledStatus() {
   const recalibrationPilot = await readJson(CONTROLLED_CONFIDENCE_RECALIBRATION_PILOT);
   const recalibrationEval = await readJson(CONTROLLED_CONFIDENCE_RECALIBRATION_VALIDATION_EVAL);
   const recalibrationReleaseCandidate = bestDeployableReleaseCandidate(recalibrationPilot);
+  const recalibrationEvalExists = Boolean(recalibrationEval);
   const recalibrationNeedsBlindValidation = Boolean(
     recalibrationReleaseCandidate
+    && !recalibrationEvalExists
+  );
+  const recalibrationValidationFailed = Boolean(
+    recalibrationReleaseCandidate
+    && recalibrationEvalExists
     && !recalibrationEval?.blindValidationPassed
   );
   status.confidenceRecalibration = {
@@ -478,6 +518,7 @@ async function buildControlledStatus() {
       blockingReasons: ["confidence-recalibration-validation-eval-missing"],
     },
     needsBlindValidation: recalibrationNeedsBlindValidation,
+    validationFailed: recalibrationValidationFailed,
   };
   if (recalibrationNeedsBlindValidation) {
     status.blockingReasons = [
@@ -488,6 +529,17 @@ async function buildControlledStatus() {
     ];
     status.nextActions = [
       "Review the confidence recalibration blind-validation pack; if the CSV downloads to Downloads, run `npm run western:ingest-review-downloads -- --apply`, then run western:controlled-candidate-confidence-recalibration-validation-eval.",
+    ];
+  } else if (recalibrationValidationFailed) {
+    const precision = recalibrationEval?.metrics?.precision;
+    status.blockingReasons = [
+      ...new Set([
+        ...(status.blockingReasons || []),
+        "ordinary-confidence-recalibration-validation-failed",
+      ]),
+    ];
+    status.nextActions = [
+      `The confidence recalibration blind-validation pack failed${Number.isFinite(precision) ? ` (precision=${precision})` : ""}; do not enable the ordinary-upload auto gate. Inspect the failed rows and improve candidate features/model or collect stronger calibration evidence before exporting another blind-validation pack.`,
     ];
   }
   status.reviewArtifacts = {
@@ -556,6 +608,8 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
   if (!controlled.studentSafeCandidateGateReady) {
     const ordinaryArtifact = (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-validation-needed")
       ? (controlled.reviewArtifacts.recalibrationValidationReviewPage || controlled.confidenceRecalibration?.validationReviewPage)
+      : (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-validation-failed")
+      ? (controlled.reviewArtifacts.recalibrationValidationEvalJson || controlled.confidenceRecalibration?.validationEvalJson)
       : (controlled.blockingReasons || []).includes("ordinary-confidence-threshold-pool-precision-too-low")
       ? (controlled.reviewArtifacts.thresholdPoolDiagnosisJson || controlled.confidencePilot?.thresholdPoolEvalJson)
       : (controlled.confidencePilot?.thresholdPoolReviewPage || controlled.reviewArtifacts.thresholdPoolReviewPage || controlled.confidencePilot?.validationReviewPage || controlled.reviewArtifacts.reviewPage);
@@ -577,14 +631,18 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
     });
   } else if (!m3plus.m3plusModeReleaseReady) {
     const counts = m3plus.modeEval?.counts || {};
+    const localizationSummary = m3plus.localizationDiagnosis?.summary || {};
     const mismatchText = counts.rows
       ? ` Current eval has ${counts.match || 0} match, ${counts.mismatch || 0} mismatch, and ${Math.max(0, (counts.rows || 0) - (counts.match || 0) - (counts.mismatch || 0))} uncertain/other rows out of ${counts.rows}; fix score-audio localization/candidate quality before another release attempt.`
+      : "";
+    const localizationText = localizationSummary.total
+      ? ` Localization diagnosis reports ${localizationSummary.nonMatch || 0}/${localizationSummary.total} non-match rows (${Math.round((localizationSummary.nonMatchRate || 0) * 100)}%).`
       : "";
     actions.push({
       priority: 2,
       track: "M3+ pitch behavior modes",
-      action: `M3+ labels are sufficient and round-2 is imported, but no non-control pitch-behavior mode is release-ready.${mismatchText} Keep M3+ review-only and inspect the per-mode eval before changing candidate generation.`,
-      artifact: m3plus.reviewArtifacts.modeEvalCsv || m3plus.reviewArtifacts.modeEvalJson,
+      action: `M3+ labels are sufficient and round-2 is imported, but no non-control pitch-behavior mode is release-ready.${mismatchText}${localizationText} Keep M3+ review-only and inspect localization groups before changing candidate generation.`,
+      artifact: m3plus.reviewArtifacts.localizationDiagnosisGroupsCsv || m3plus.reviewArtifacts.modeEvalCsv || m3plus.reviewArtifacts.modeEvalJson,
       reason: m3plus.blockingReasons,
     });
   }

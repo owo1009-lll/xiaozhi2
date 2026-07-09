@@ -19,6 +19,12 @@ assert.equal(m3plus.m3plusModeEvalReady, true, "M3+ review labels should be suff
 assert.equal(m3plus.m3plusModeReleaseReady, false, "M3+ must remain review-only until a non-control mode passes precision/unsafe evaluation");
 assert(m3plus.modeEval?.controlReadyModes?.includes("stable"), "stable should be reported as a control-ready mode");
 assert.deepEqual(m3plus.modeEval?.releaseReadyModes || [], [], "no non-control M3+ mode should be release-ready yet");
+assert.equal(m3plus.localizationDiagnosis?.sourceExists, true, "M3+ localization diagnosis should be generated after round-2 import");
+assert.equal(m3plus.localizationDiagnosis?.summary?.nonMatch, 24, "M3+ localization diagnosis should expose the current non-match row count");
+assert(
+  m3plus.blockingReasons.includes("m3plus-localization-candidate-quality-blocker"),
+  "M3+ should block on localization/candidate quality before another mode release attempt",
+);
 
 const controlled = status.tracks.controlledCandidate;
 assert.equal(controlled.studentSafeCandidateGateReady, false, "ordinary upload must still require blind validation");
@@ -33,11 +39,19 @@ if (controlled.confidencePilot?.validationEval?.blindValidationPassed) {
     "wired runtime gate must still block until the explicit release flag is enabled",
   );
 } else {
-  assert.equal(controlled.confidencePilot?.needsBlindValidation, true, "confidence pilot should require blind validation before eval passes");
-  assert(
-    controlled.blockingReasons.includes("candidate-confidence-pilot-needs-blind-validation"),
-    "ordinary upload should block on blind validation before eval passes",
-  );
+  assert.equal(controlled.confidencePilot?.needsBlindValidation, true, "confidence pilot should still track that the old v1 candidate did not pass the full release process");
+  if (controlled.confidenceRecalibration?.validationFailed) {
+    assert.equal(controlled.confidenceRecalibration.needsBlindValidation, false, "failed recalibration validation should not ask for the same blind review again");
+    assert(
+      controlled.blockingReasons.includes("ordinary-confidence-recalibration-validation-failed"),
+      "ordinary upload should block on the failed recalibration blind-validation result",
+    );
+  } else {
+    assert(
+      controlled.blockingReasons.includes("candidate-confidence-pilot-needs-blind-validation"),
+      "ordinary upload should block on blind validation before eval passes",
+    );
+  }
 }
 assert(controlled.confidencePilot?.bestReleaseCandidate, "confidence pilot should report the best release candidate");
 assert.equal(controlled.confidencePilot.bestReleaseCandidate.featureSet, "deployable", "confidence pilot should report the deployable candidate");
@@ -52,6 +66,8 @@ assert(
 );
 const expectedOrdinaryArtifact = status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-recalibration-validation-needed")
   ? "data/experiments/western-strings-m3/confidence-recalibration-validation-review/index.html"
+  : status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-recalibration-validation-failed")
+  ? "data/experiments/western-strings-m3/confidence-recalibration-validation-review/confidence-recalibration-validation-eval.json"
   : status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-threshold-pool-precision-too-low")
   ? "data/experiments/western-strings-m3/confidence-threshold-pool-review/confidence-threshold-pool-diagnosis.json"
   : "data/experiments/western-strings-m3/confidence-threshold-pool-review/index.html";
@@ -90,8 +106,8 @@ assert(
 );
 assert.equal(
   m3plusFailure.artifact,
-  "data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-pitch-mode-eval.csv",
-  "M3+ gate failure should point to the per-mode eval after labels are sufficient",
+  "data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-localization-diagnosis-groups.csv",
+  "M3+ gate failure should point to localization diagnosis after labels expose score-audio mismatch",
 );
 assert(fullGate.failures.some((failure) => failure.track === "M4 OMR benchmark"), "M4 track failure should be reported");
 assert.equal(

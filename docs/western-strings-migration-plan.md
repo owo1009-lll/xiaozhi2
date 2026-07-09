@@ -321,3 +321,8 @@ OMR 只解决"谱面从哪来",不改变音频诊断逻辑。未过 note-level �
 ## 12. 一句话路线
 
 **小提琴优先,clean score 输入,先把 note-level 对齐和基础诊断做到 fail-closed V2 alpha;再做 M3+ 少退复核延伸和 M4 OMR,大提琴最后独立验证。**
+# 2026-07-09 最新闸门状态补充
+
+- P1 confidence 重校准 blind validation 已完成且失败:10/10 reviewed,8 usable / 2 wrong,precision=0.80。普通上传自动 gate 继续 fail-closed;下一步转为分析失败行并重做 confidence 特征/模型或补强校准证据。
+- M3+ 第二轮复核已完成并导入:84 reviewed / 60 scored。per-mode eval 无非 control release-ready;新增定位诊断显示 24/84 non-match(19 mismatch + 5 uncertain),其中 `stu02-ex05-weak_onset` 为 9/9 mismatch。M3+ 当前不是继续标同一包,而是先修谱面-录音定位/候选质量。
+- 本补充覆盖下文较早的“待复核 P1 / 继续补 M3+”描述;runtime 仍 fail-closed。

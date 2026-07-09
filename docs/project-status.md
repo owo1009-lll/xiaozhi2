@@ -74,3 +74,8 @@
 - 不可声称 M3+ 技法区音准已达标;当前 per-mode eval 只证明 stable control 可作为对照,没有任何非 control pitch-behavior 模式可开放。
 - 不可声称 OMR 准确率已通过;当前 benchmark 仍是 self-comparison,usable rows 为 0。
 - 不可声称支持大提琴;架构预留,但未独立 M0/M5 验证。
+# 2026-07-09 最新执行结论(覆盖下文旧状态)
+
+- **P1 普通上传 confidence 重校准盲测已完成但未通过**:10 行盲测包已导入并评估,结果为 8 usable / 2 wrong,precision=0.80,低于 0.90 release floor。普通上传自动 gate 继续 fail-closed;下一步不是重复复核同一 10 行,而是查看 `data/experiments/western-strings-m3/confidence-recalibration-validation-review/confidence-recalibration-validation-eval.json` 与 rows CSV,改候选特征/模型或补更强校准证据后再导出新的盲测包。
+- **M3+ 第二轮已完成,但定位/候选质量是 blocker**:累计 84 reviewed / 60 scored;per-mode eval 仍无任何非 control release-ready 模式。新增 `npm run western:m3plus-localization-diagnosis`,当前诊断为 60 match / 19 mismatch / 5 uncertain,即 24/84 non-match(28.57%)。最高风险组是 `stu02-ex05-weak_onset`(9/9 mismatch)。下一步先看 `data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-localization-diagnosis-groups.csv` 和 rows CSV,修谱面-录音定位/候选生成,不要继续复用同一复核包。
+- **当前优先级**:1) P1 失败行分析与 confidence 特征/模型重校准;2) M3+ 定位/候选质量修复;3) M4 独立 gold。学生端仍全部 fail-closed。

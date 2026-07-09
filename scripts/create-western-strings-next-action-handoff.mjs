@@ -42,6 +42,15 @@ function commandForAction(action) {
         "Only if the recalibration blind validation passes should a new monitored pilot be considered; do not enable the student gate by default.",
       ];
     }
+    if (hasReason(action, "ordinary-confidence-recalibration-validation-failed")) {
+      return [
+        "Keep production/default runtime fail-closed.",
+        "Inspect data/experiments/western-strings-m3/confidence-recalibration-validation-review/confidence-recalibration-validation-eval.json and confidence-recalibration-validation-eval-rows.csv.",
+        "The 10-row recalibration blind-validation pack is already reviewed and failed the release floor; do not ask for the same review again.",
+        "Analyze the wrong selected rows, then improve candidate features/model or collect stronger calibration evidence before exporting another blind-validation pack.",
+        "After any recalibration, rerun npm run western:controlled-candidate-confidence-recalibration-pilot, export a fresh blind-validation pack, and rerun npm run western:project-status.",
+      ];
+    }
     if (hasReason(action, "ordinary-confidence-threshold-pool-precision-too-low")) {
       return [
         "Keep production/default runtime fail-closed.",
@@ -79,10 +88,12 @@ function commandForAction(action) {
       if (String(action.action || "").includes("round-2 is imported")) {
         return [
           "Keep all M3+ pitch-behavior modes review-only in student/runtime output.",
-          "Inspect data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-pitch-mode-eval.csv.",
-          "Treat the current high mismatch/uncertain rate as a localization/candidate-quality blocker before any M3+ release attempt.",
+          "Inspect data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-localization-diagnosis-groups.csv first; it identifies the recording/scenario/candidate-mode groups with the highest non-match rate.",
+          "Use data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-localization-diagnosis-rows.csv to inspect the concrete mismatch/uncertain rows.",
+          "Treat the current high mismatch/uncertain rate as a score-audio localization/candidate-quality blocker before any M3+ release attempt.",
+          "Use data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-pitch-mode-eval.csv only after localization is improved; it explains per-mode precision but does not fix wrong score/audio windows.",
           "Improve score-audio localization or candidate generation, then create a fresh targeted eval pack instead of reusing the current round-2 pack.",
-          "After any candidate-generation change, rerun npm run western:m3plus-pitch-modes, create a new review pack, import labels, and rerun npm run western:m3plus-mode-eval.",
+          "After any candidate-generation change, rerun npm run western:m3plus-pitch-modes, create a new review pack, import labels, then rerun npm run western:m3plus-mode-eval and npm run western:m3plus-localization-diagnosis.",
         ];
       }
       return [

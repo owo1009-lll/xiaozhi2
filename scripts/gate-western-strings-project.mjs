@@ -26,6 +26,8 @@ export function evaluateProjectGate(status, requiredTracks) {
   if (requiredTracks.has("ordinary") && !controlled.studentSafeCandidateGateReady) {
     const ordinaryArtifact = (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-validation-needed")
       ? (controlled.reviewArtifacts?.recalibrationValidationReviewPage || controlled.confidenceRecalibration?.validationReviewPage)
+      : (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-validation-failed")
+      ? (controlled.reviewArtifacts?.recalibrationValidationEvalJson || controlled.confidenceRecalibration?.validationEvalJson)
       : (controlled.blockingReasons || []).includes("ordinary-confidence-threshold-pool-precision-too-low")
       ? (controlled.reviewArtifacts?.thresholdPoolDiagnosisJson || controlled.confidencePilot?.thresholdPoolEvalJson)
       : (controlled.confidencePilot?.thresholdPoolReviewPage || controlled.reviewArtifacts?.thresholdPoolReviewPage || controlled.confidencePilot?.validationReviewPage || controlled.reviewArtifacts?.reviewPage);
@@ -39,7 +41,7 @@ export function evaluateProjectGate(status, requiredTracks) {
     failures.push({
       track: "M3+ pitch behavior modes",
       reason: m3plus.blockingReasons || ["m3plus-gate-not-ready"],
-      artifact: m3plus.reviewArtifacts?.modeEvalCsv || m3plus.reviewArtifacts?.modeEvalJson || m3plus.reviewArtifacts?.round2ReviewPage || m3plus.reviewArtifacts?.reviewPage || "",
+      artifact: m3plus.reviewArtifacts?.localizationDiagnosisGroupsCsv || m3plus.reviewArtifacts?.modeEvalCsv || m3plus.reviewArtifacts?.modeEvalJson || m3plus.reviewArtifacts?.round2ReviewPage || m3plus.reviewArtifacts?.reviewPage || "",
     });
   }
   if (requiredTracks.has("m4") && !m4.m4OmrDraftQualityReady) {
