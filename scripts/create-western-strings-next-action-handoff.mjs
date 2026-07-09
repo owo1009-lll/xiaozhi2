@@ -52,6 +52,15 @@ function commandForAction(action) {
     ];
   }
   if (track === "M3+ pitch behavior modes") {
+    if (hasReason(action, "m3plus-no-mode-specific-release-ready")) {
+      return [
+        "Keep all M3+ pitch-behavior modes review-only in student/runtime output.",
+        "Inspect data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-pitch-mode-eval.csv for per-mode evidence.",
+        "If reducing review is still desired, collect more true slide/trill/ornament/double-stop/variable-f0 examples; stable control is not a release target.",
+        "After adding labels, rerun npm run western:m3plus-mode-eval",
+        "Then run npm run western:project-status",
+      ];
+    }
     return [
       "Open data/experiments/western-strings-m3plus/pitch-mode-review-pack/index.html",
       "After review, save m3plus-pitch-mode-review.completed.csv in that folder",

@@ -80,6 +80,13 @@ const M3PLUS_REVIEW_PAGE = path.join(
   "pitch-mode-review-pack",
   "index.html",
 );
+const M3PLUS_MODE_EVAL = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3plus",
+  "pitch-mode-review-pack",
+  "m3plus-pitch-mode-eval.json",
+);
 const M4_READINESS = path.join(
   "data",
   "experiments",
@@ -208,6 +215,7 @@ function countBy(rows, field) {
 async function buildM3PlusStatus() {
   const sourceRows = await readCsv(M3PLUS_SOURCE);
   const labelRows = await readCsv(M3PLUS_LABELS);
+  const modeEval = await readJson(M3PLUS_MODE_EVAL);
   const sourceIds = new Set(sourceRows.map((row) => row.rowId).filter(Boolean));
   const reviewedRows = labelRows.filter((row) => sourceIds.has(row.rowId) && isM3PlusReviewed(row));
   const scoredRows = reviewedRows.filter(isM3PlusScored);
@@ -228,21 +236,32 @@ async function buildM3PlusStatus() {
       scoredDeficit: Math.max(0, minScoredPerMode - scored),
     };
   }
-  const blockingReasons = [];
-  if (!(await exists(M3PLUS_SOURCE))) blockingReasons.push("m3plus-review-source-missing");
-  if (!(await exists(M3PLUS_LABELS))) blockingReasons.push("m3plus-review-labels-missing");
-  if (!(await exists(M3PLUS_COMPLETED))) blockingReasons.push("m3plus-review-completed-csv-missing");
+  const labelBlockingReasons = [];
+  if (!(await exists(M3PLUS_SOURCE))) labelBlockingReasons.push("m3plus-review-source-missing");
+  if (!(await exists(M3PLUS_LABELS))) labelBlockingReasons.push("m3plus-review-labels-missing");
+  if (!(await exists(M3PLUS_COMPLETED))) labelBlockingReasons.push("m3plus-review-completed-csv-missing");
   if (Object.values(perMode).some((item) => item.reviewedDeficit > 0)) {
-    blockingReasons.push("m3plus-review-reviewed-per-mode-too-low");
+    labelBlockingReasons.push("m3plus-review-reviewed-per-mode-too-low");
   }
   if (Object.values(perMode).some((item) => item.scoredDeficit > 0)) {
-    blockingReasons.push("m3plus-review-scored-per-mode-too-low");
+    labelBlockingReasons.push("m3plus-review-scored-per-mode-too-low");
   }
+  const labelReady = labelBlockingReasons.length === 0;
+  const modeEvalExists = Boolean(modeEval);
+  const modeReleaseReady = Boolean(modeEval?.m3plusModeReleaseReady);
+  const modeEvalBlockingReasons = [];
+  if (labelReady && !modeEvalExists) {
+    modeEvalBlockingReasons.push("m3plus-mode-eval-missing");
+  } else if (labelReady && !modeReleaseReady) {
+    modeEvalBlockingReasons.push(...(modeEval?.blockingReasons || ["m3plus-no-mode-specific-release-ready"]));
+  }
+  const blockingReasons = [...labelBlockingReasons, ...modeEvalBlockingReasons];
   return {
     ok: true,
-    m3plusModeEvalReady: blockingReasons.length === 0,
+    m3plusModeEvalReady: labelReady,
+    m3plusModeReleaseReady: modeReleaseReady,
     studentGateReady: false,
-    reason: "human-label-status-only",
+    reason: modeReleaseReady ? "mode-specific-offline-eval-ready" : "mode-specific-review-only",
     counts: {
       rowCount: sourceRows.length,
       labelRows: labelRows.length,
@@ -251,11 +270,22 @@ async function buildM3PlusStatus() {
       missingLabelRows: Math.max(0, sourceRows.length - labelRows.length),
     },
     perMode,
+    modeEval: {
+      source: M3PLUS_MODE_EVAL.replace(/\\/g, "/"),
+      sourceExists: modeEvalExists,
+      m3plusModeReleaseReady: modeReleaseReady,
+      releaseReadyModes: modeEval?.releaseReadyModes || [],
+      controlReadyModes: modeEval?.controlReadyModes || [],
+      counts: modeEval?.counts || {},
+      blockingReasons: modeEval?.blockingReasons || modeEvalBlockingReasons,
+    },
+    labelBlockingReasons,
     blockingReasons,
     reviewArtifacts: {
       reviewPage: M3PLUS_REVIEW_PAGE.replace(/\\/g, "/"),
       completedCsv: M3PLUS_COMPLETED.replace(/\\/g, "/"),
       labelsCsv: M3PLUS_LABELS.replace(/\\/g, "/"),
+      modeEvalJson: M3PLUS_MODE_EVAL.replace(/\\/g, "/"),
     },
   };
 }
@@ -343,6 +373,14 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
       artifact: m3plus.reviewArtifacts.reviewPage,
       reason: m3plus.blockingReasons,
     });
+  } else if (!m3plus.m3plusModeReleaseReady) {
+    actions.push({
+      priority: 2,
+      track: "M3+ pitch behavior modes",
+      action: "M3+ labels are sufficient, but no non-control pitch-behavior mode is release-ready. Keep M3+ review-only or collect more true mode-specific samples, then rerun western:m3plus-mode-eval.",
+      artifact: m3plus.reviewArtifacts.modeEvalJson,
+      reason: m3plus.blockingReasons,
+    });
   }
   if (!m4Omr.m4OmrDraftQualityReady) {
     actions.push({
@@ -412,7 +450,10 @@ function printProjectStatus(status, outPath) {
       blockingReasons: controlledCandidate.blockingReasons,
     },
     m3plusPitchModes: {
-      ready: m3plusPitchModes.m3plusModeEvalReady,
+      ready: m3plusPitchModes.m3plusModeReleaseReady,
+      labelReady: m3plusPitchModes.m3plusModeEvalReady,
+      releaseReadyModes: m3plusPitchModes.modeEval?.releaseReadyModes || [],
+      controlReadyModes: m3plusPitchModes.modeEval?.controlReadyModes || [],
       counts: m3plusPitchModes.counts,
       blockingReasons: m3plusPitchModes.blockingReasons,
     },

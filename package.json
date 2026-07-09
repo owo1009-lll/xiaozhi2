@@ -84,6 +84,7 @@
     "western:m3plus-review-pack": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\create_western_strings_m3plus_pitch_mode_review_pack.py",
     "western:m3plus-review-import": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\import_western_strings_m3plus_pitch_mode_review.py",
     "western:m3plus-review-status": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\status_western_strings_m3plus_pitch_mode_review.py",
+    "western:m3plus-mode-eval": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\eval_western_strings_m3plus_pitch_mode_precision.py",
     "western:m4-omr-readiness": "node scripts\\audit-western-strings-m4-omr-readiness.mjs",
     "western:m4-omr-benchmark": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\eval_western_strings_m4_omr_benchmark.py",
     "western:m4-independent-gold-todo": "node scripts\\create-western-strings-m4-independent-gold-todo.mjs",

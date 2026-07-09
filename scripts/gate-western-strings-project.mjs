@@ -30,11 +30,11 @@ export function evaluateProjectGate(status, requiredTracks) {
       artifact: controlled.confidencePilot?.validationReviewPage || controlled.reviewArtifacts?.reviewPage || "",
     });
   }
-  if (requiredTracks.has("m3plus") && !m3plus.m3plusModeEvalReady) {
+  if (requiredTracks.has("m3plus") && !m3plus.m3plusModeReleaseReady) {
     failures.push({
       track: "M3+ pitch behavior modes",
       reason: m3plus.blockingReasons || ["m3plus-gate-not-ready"],
-      artifact: m3plus.reviewArtifacts?.reviewPage || "",
+      artifact: m3plus.reviewArtifacts?.modeEvalJson || m3plus.reviewArtifacts?.reviewPage || "",
     });
   }
   if (requiredTracks.has("m4") && !m4.m4OmrDraftQualityReady) {

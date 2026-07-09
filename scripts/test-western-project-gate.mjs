@@ -14,6 +14,12 @@ assert(status.tracks?.controlledCandidate, "project status must include ordinary
 assert(status.tracks?.m3plusPitchModes, "project status must include M3+ pitch-mode track");
 assert(status.tracks?.m4Omr, "project status must include M4 OMR track");
 
+const m3plus = status.tracks.m3plusPitchModes;
+assert.equal(m3plus.m3plusModeEvalReady, true, "M3+ review labels should be sufficient for offline mode evaluation");
+assert.equal(m3plus.m3plusModeReleaseReady, false, "M3+ must remain review-only until a non-control mode passes precision/unsafe evaluation");
+assert(m3plus.modeEval?.controlReadyModes?.includes("stable"), "stable should be reported as a control-ready mode");
+assert.deepEqual(m3plus.modeEval?.releaseReadyModes || [], [], "no non-control M3+ mode should be release-ready yet");
+
 const controlled = status.tracks.controlledCandidate;
 assert.equal(controlled.studentSafeCandidateGateReady, false, "ordinary upload must still require blind validation");
 assert.equal(controlled.confidencePilot?.releaseCandidateFound, true, "confidence pilot should report release candidates");
@@ -59,12 +65,12 @@ assert.equal(
   "data/experiments/western-strings-m3/confidence-validation-review/index.html",
   "ordinary gate failure should point to the confidence validation review page",
 );
-const m3plusFailure = fullGate.failures.some((failure) => failure.track === "M3+ pitch behavior modes");
-if (status.tracks.m3plusPitchModes.m3plusModeEvalReady) {
-  assert.equal(m3plusFailure, false, "M3+ track should not fail once review labels meet the offline eval threshold");
-} else {
-  assert.equal(m3plusFailure, true, "M3+ track failure should be reported until review labels meet the offline eval threshold");
-}
+const m3plusFailure = fullGate.failures.find((failure) => failure.track === "M3+ pitch behavior modes");
+assert(m3plusFailure, "M3+ track failure should be reported until a non-control mode is release-ready");
+assert(
+  (m3plusFailure.reason || []).includes("m3plus-no-mode-specific-release-ready"),
+  "M3+ track should block on lack of non-control mode-specific release evidence",
+);
 assert(fullGate.failures.some((failure) => failure.track === "M4 OMR benchmark"), "M4 track failure should be reported");
 
 console.log(JSON.stringify({

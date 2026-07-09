@@ -12,7 +12,7 @@
 
 - **M2/M3 core 诊断链路**:clean score + audio 的受控上传、离线 batch、候选特征生成、人工复核、置信模型 pilot、fresh blind validation 与 runtime scorer 已接入。
 - **普通上传置信 gate**:RF threshold=0.7 的 release artifact 已冻结在 `models/western-strings/ordinary-upload-confidence-rf-v1/release.json`;fresh validation 30 条通过当前 floor(precision=0.90, coverage=1.0)。运行时默认仍关闭,保持当前安全态。若后续要验证,先确认普通上传特征提取与冻结 RF scorer 走同一 runtime 路径,并排查 pilot(coverage=0.5333 / precision=0.9375)与 fresh validation(coverage=1.0 / precision=0.90)的操作点漂移;只允许在受控 pilot 进程里显式设置 `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1`。
-- **M3+ 音高行为复核包**:48 条本地复核页已完成并导入,6 类各 8 条,用于判断揉弦/滑音/颤音/装饰音/双音/不稳定音高等区域是否能安全判音准。当前标签状态已满足 offline mode-eval 门槛:48 reviewed / 43 scored,每类 reviewed/scored 缺口均为 0。注意:这只说明人工标签足够进入离线模式评估,**不等于学生端 M3+ 自动反馈已开放**。
+- **M3+ 音高行为复核包**:48 条本地复核页已完成并导入,6 类各 8 条,用于判断揉弦/滑音/颤音/装饰音/双音/不稳定音高等区域是否能安全判音准。标签状态已满足 offline mode-eval 门槛:48 reviewed / 43 scored,每类 reviewed/scored 缺口均为 0。离线 per-mode 评估已运行:只有 `stable` control 模式证据通过;非 control 的 pitch-behavior 模式没有任何 release-ready 项,因此**学生端 M3+ 自动反馈仍保持关闭**。
 - **M4 OMR benchmark 前置**:12 条图片谱面 + clean score pair 已齐备,Audiveris 草稿均可解析;但当前 clean score 与草稿完全同 SHA-1,属于 self-comparison,所以 OMR 准确率仍不能声明。独立 gold 校正清单已生成。
 
 ## 三、当前实时状态(2026-07-09)
@@ -29,7 +29,7 @@
 | 轨道 | 当前状态 | 阻塞原因 | 入口 |
 |---|---|---|---|
 | M2/M3 ordinary upload candidate gate | 模型与 runtime scorer 已接线,默认关闭 | `ordinary-auto-gate-disabled-by-default`;保持默认关闭,先做受控 pilot 前置检查与操作点漂移排查 | `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1` 仅限受控 pilot |
-| M3+ pitch behavior modes | 48 条复核已导入,offline eval 证据齐备 | 无标签缺口;下一步是 per-mode precision/unsafe 评估,学生端仍关闭 | `data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-pitch-mode-review-status.json` |
+| M3+ pitch behavior modes | 48 条复核已导入并完成 per-mode eval | `m3plus-no-mode-specific-release-ready`;stable 仅为 control,非 control 模式继续 review-only | `data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-pitch-mode-eval.json` |
 | M4 OMR benchmark | 数据集前置齐备,草稿可解析 | 缺独立 gold;当前 12/12 为 self-comparison | `data/experiments/western-strings-m4/independent-gold-todo.md` |
 
 ## 四、已完成且有验证的事项
@@ -38,9 +38,9 @@
 - M2f/M3 core:真实学生式录音 core gate 已通过;当前硬反馈范围只包括 pitch / onset / missing。duration 与 extra-note/多音仍 review-only。
 - 普通上传候选复核:累计 60 条 usable/wrong 标签;初始规则不足以 release,随后训练置信模型并通过 30 条 fresh blind validation。
 - runtime scorer:普通上传候选可通过 `western:controlled-candidate-confidence-score` 打分;无 release flag 时仍 review-only。
-- M3+ pack:`npm run western:m3plus-review-pack` 可生成 48 条人工复核包;`npm run western:m3plus-review-import` 已导入 completed CSV;`npm run western:m3plus-review-status` 当前报告 `m3plusModeEvalReady=true`。
+- M3+ pack:`npm run western:m3plus-review-pack` 可生成 48 条人工复核包;`npm run western:m3plus-review-import` 已导入 completed CSV;`npm run western:m3plus-review-status` 当前报告 `m3plusModeEvalReady=true`;`npm run western:m3plus-mode-eval` 当前报告 `m3plusModeReleaseReady=false`,`controlReadyModes=["stable"]`,`releaseReadyModes=[]`。
 - M4 handoff:`npm run western:m4-independent-gold-todo` 生成中文独立 gold 校正清单,列出 `sourceScorePath`、当前 `goldPath`、Audiveris `draftPath`、`scoreId` 与音符数。
-- 项目级 gate:`npm run western:project-gate` 仍应非零退出,防止在 ordinary/M4 等轨道未 ready 时误发布;M3+ 标签状态已不再是项目级阻塞项,但其学生端自动反馈仍需单独 per-mode precision/unsafe 评估。
+- 项目级 gate:`npm run western:project-gate` 仍应非零退出,防止在 ordinary/M3+/M4 任一 release 轨未 ready 时误发布;M3+ 标签状态已过,但 per-mode eval 未发现可 release 的非 control 模式。
 
 已复核命令:
 
@@ -63,13 +63,13 @@
 ## 六、下一步优先级
 
 1. **普通上传受控 pilot 前置**:普通上传 confidence gate 已满足当前 validation floor,但默认继续关闭。若要验证,先确认特征提取与冻结 RF scorer 已接在同一 runtime 路径,并解释 pilot 53% 覆盖/93.75% precision 与 fresh validation 100% 覆盖/90% precision 的操作点差异;然后只在受控 pilot 进程中设置 `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1`,并重新跑项目 gate / build / 相关 route smoke。未完成前继续 fail-closed。
-2. **M3+ per-mode 离线评估**:基于已导入的 48 条标签,新增/运行模式级 precision 与 unsafe 评估;只有某一模式证明 note-level 音准 precision≥90%、unsafe=0,才能考虑减少该模式的复核。未过的模式继续 `review_required`。
+2. **M3+ 数据补强或保持 review-only**:当前 per-mode eval 显示 stable control 通过,但 slide/trill/ornament/double-stop/variable-f0 等非 control 模式没有 release-ready 证据。若要继续减少复核,需要补更多真实对应模式样本后重跑 `npm run western:m3plus-mode-eval`;否则保持 M3+ 全部 `review_required`。
 3. **M4 独立 gold**:按 `data/experiments/western-strings-m4/independent-gold-todo.md` 逐条对照原谱生成独立 gold MusicXML/MXL,更新 clean-score intake 后重跑 `npm run western:m4-omr-benchmark`。
 4. **后续扩展**:extra-note/多音和 duration 若要开放学生端硬反馈,必须补专门样本并通过独立 gate;大提琴作为 M5 独立验证,不得复用小提琴阈值。
 
 ## 七、当前不可声称
 
 - 不可声称任意普通上传音频已经默认实时自动诊断;默认仍 fail-closed。
-- 不可声称 M3+ 技法区音准已达标;目前只是人工复核标签已齐备,还没完成 per-mode precision/unsafe 评估。
+- 不可声称 M3+ 技法区音准已达标;当前 per-mode eval 只证明 stable control 可作为对照,没有任何非 control pitch-behavior 模式可开放。
 - 不可声称 OMR 准确率已通过;当前 benchmark 仍是 self-comparison,usable rows 为 0。
 - 不可声称支持大提琴;架构预留,但未独立 M0/M5 验证。
