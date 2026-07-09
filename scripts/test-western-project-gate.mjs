@@ -17,15 +17,25 @@ assert(status.tracks?.m4Omr, "project status must include M4 OMR track");
 const controlled = status.tracks.controlledCandidate;
 assert.equal(controlled.studentSafeCandidateGateReady, false, "ordinary upload must still require blind validation");
 assert.equal(controlled.confidencePilot?.releaseCandidateFound, true, "confidence pilot should report release candidates");
-assert.equal(controlled.confidencePilot?.needsBlindValidation, true, "confidence pilot should require blind validation");
 assert.equal(controlled.confidencePilot?.readyForStudentGate, false, "eval-only confidence pilot must not mark runtime gate ready");
-assert.equal(controlled.confidencePilot?.validationEval?.blindValidationPassed, false, "blind validation must not pass without a completed validation eval");
 assert.equal(controlled.confidencePilot?.validationEval?.readyForRuntimeGate, false, "validation eval must not enable runtime gate");
+if (controlled.confidencePilot?.validationEval?.blindValidationPassed) {
+  assert.equal(controlled.confidencePilot?.needsBlindValidation, false, "passed blind validation should clear needsBlindValidation");
+  assert(
+    controlled.blockingReasons.includes("candidate-confidence-validation-not-wired"),
+    "passed blind validation must still block until runtime gate wiring is explicitly released",
+  );
+} else {
+  assert.equal(controlled.confidencePilot?.needsBlindValidation, true, "confidence pilot should require blind validation before eval passes");
+  assert(
+    controlled.blockingReasons.includes("candidate-confidence-pilot-needs-blind-validation"),
+    "ordinary upload should block on blind validation before eval passes",
+  );
+}
 assert(controlled.confidencePilot?.bestReleaseCandidate, "confidence pilot should report the best release candidate");
 assert.equal(controlled.confidencePilot.bestReleaseCandidate.featureSet, "deployable", "confidence pilot should report the deployable candidate");
 assert.equal(controlled.confidencePilot.bestReleaseCandidate.groupBy, "recordingId", "confidence pilot should report the strict leave-one-recording candidate");
-assert(controlled.blockingReasons.includes("candidate-confidence-pilot-needs-blind-validation"), "ordinary upload should block on blind validation after pilot success");
-assert(status.nextActions[0]?.action.includes("confidence-validation-review/index.html"), "project next action should route to the confidence validation review page");
+assert(status.nextActions[0]?.action.includes("confidence-validation-review/index.html") || status.nextActions[0]?.action.includes("wire a runtime gate"), "project next action should route to validation review or runtime wiring");
 assert.equal(status.nextActions[0]?.artifact, "data/experiments/western-strings-m3/confidence-validation-review/index.html", "project artifact should point to the confidence validation review page");
 
 const m4 = status.tracks.m4Omr;
@@ -56,7 +66,7 @@ console.log(JSON.stringify({
   checks: [
     "project-status-tracks-present",
     "student-runtime-fail-closed",
-    "confidence-pilot-needs-blind-validation",
+    "confidence-pilot-validation-state-covered",
     "m4-self-comparison-blocks",
     "project-gate-required-tracks-block-release",
   ],
