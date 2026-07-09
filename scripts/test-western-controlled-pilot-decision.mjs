@@ -209,6 +209,23 @@ try {
     handoff.includes("No teacher/professional review is needed"),
     "handoff should say no teacher/professional review is needed after explicit no-go",
   );
+
+  await fs.writeFile(DEFAULT_APPROVAL_PATH, `${JSON.stringify({
+    pilotApproved: true,
+    approvedBy: "test-owner",
+    approvedAt: "2026-07-10T00:00:00+08:00",
+    scope: "ordinary candidate-evidence auto_pass only",
+    notes: "Test-only approval. Default runtime remains fail-closed.",
+  }, null, 2)}\n`, "utf8");
+  const defaultApprovedDecision = await buildControlledPilotDecision();
+  await fs.writeFile(DEFAULT_DECISION_PATH, `${JSON.stringify(defaultApprovedDecision, null, 2)}\n`, "utf8");
+  const statusWithApprovedPilot = await buildProjectStatus();
+  assert.equal(statusWithApprovedPilot.nextActions?.[0]?.track, "Start monitored pilot");
+  const approvedHandoff = renderHandoff(statusWithApprovedPilot);
+  assert(
+    approvedHandoff.includes("npm run western:controlled-pilot-run -- --execute --limit 1"),
+    "approved handoff must point to the one-shot controlled-pilot runner",
+  );
 } finally {
   await restoreText(DEFAULT_APPROVAL_PATH, originalApproval);
   await restoreText(DEFAULT_DECISION_PATH, originalDecision);
@@ -231,6 +248,7 @@ console.log(JSON.stringify({
     "decision-passes-with-valid-temp-approval",
     "preflight-passes-with-valid-temp-approval",
     "default-runtime-remains-fail-closed",
+    "approved-handoff-points-to-one-shot-pilot-runner",
   ],
   artifacts: {
     template: TEMPLATE_PATH.replace(/\\/g, "/"),

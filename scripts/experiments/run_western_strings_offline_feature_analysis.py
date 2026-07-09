@@ -3,8 +3,11 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
+import shutil
 import sqlite3
 import statistics
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -114,8 +117,68 @@ def build_symbolic_timeline(notes: list[dict[str, Any]]) -> list[dict[str, Any]]
     return notes
 
 
+def resolve_ffmpeg_executable() -> str | None:
+    candidates = [os.getenv("ERHU_FFMPEG_PATH", ""), shutil.which("ffmpeg")]
+    try:
+        import imageio_ffmpeg
+
+        candidates.append(imageio_ffmpeg.get_ffmpeg_exe())
+    except (ImportError, RuntimeError):
+        pass
+    return next((str(candidate) for candidate in candidates if candidate and Path(candidate).exists()), None)
+
+
+def decode_audio_with_ffmpeg(audio_path: Path, target_sr: int = 22050) -> tuple[np.ndarray, int]:
+    ffmpeg = resolve_ffmpeg_executable()
+    if not ffmpeg:
+        raise RuntimeError("ffmpeg-unavailable-for-compressed-audio")
+    result = subprocess.run(
+        [
+            ffmpeg,
+            "-v",
+            "error",
+            "-i",
+            str(audio_path),
+            "-f",
+            "f32le",
+            "-acodec",
+            "pcm_f32le",
+            "-ac",
+            "1",
+            "-ar",
+            str(target_sr),
+            "pipe:1",
+        ],
+        capture_output=True,
+        check=False,
+        timeout=120,
+    )
+    if result.returncode != 0:
+        detail = result.stderr.decode("utf-8", errors="replace").strip()[:500]
+        raise RuntimeError(f"ffmpeg-audio-decode-failed:{detail or result.returncode}")
+    waveform = np.frombuffer(result.stdout, dtype="<f4").copy()
+    if waveform.size == 0:
+        raise ValueError("audio-empty-after-ffmpeg-decode")
+    return waveform, target_sr
+
+
+def load_audio_mono(audio_path: Path, target_sr: int = 22050) -> tuple[np.ndarray, int]:
+    if audio_path.suffix.lower() in {".aac", ".m4a", ".mp4"}:
+        return decode_audio_with_ffmpeg(audio_path, target_sr)
+    try:
+        return librosa.load(str(audio_path), sr=target_sr, mono=True)
+    except Exception as librosa_error:
+        try:
+            return decode_audio_with_ffmpeg(audio_path, target_sr)
+        except Exception as ffmpeg_error:
+            raise RuntimeError(
+                f"audio-decode-failed:librosa={type(librosa_error).__name__}:{librosa_error};"
+                f"ffmpeg={type(ffmpeg_error).__name__}:{ffmpeg_error}"
+            ) from ffmpeg_error
+
+
 def extract_f0(audio_path: Path) -> tuple[np.ndarray, np.ndarray, float]:
-    y, sr = librosa.load(str(audio_path), sr=22050, mono=True)
+    y, sr = load_audio_mono(audio_path, target_sr=22050)
     if y.size == 0:
         raise ValueError("audio-empty")
     hop_length = 512
@@ -273,7 +336,7 @@ def main() -> int:
         print(json.dumps({
             "ok": False,
             "blockingReasons": ["controlled-batch-offline-feature-analysis-failed"],
-            "error": str(exc),
+            "error": f"{type(exc).__name__}: {exc}",
             "summary": {"noteCount": len(notes), "autoPassCount": 0},
         }, ensure_ascii=False))
         return 0

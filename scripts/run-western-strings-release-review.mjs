@@ -10,6 +10,8 @@ const DEFAULT_OUT = path.join("data", "experiments", "western-strings-release-re
 const DEFAULT_SUMMARY = path.join("data", "experiments", "western-strings-release-review.md");
 
 const STEPS = [
+  "test:western-offline-feature-audio",
+  "test:western-controlled-pilot-run",
   "western:ordinary-monitored-pilot-audit",
   "western:m3plus-monitored-pilot-audit",
   "western:m4-preflight",

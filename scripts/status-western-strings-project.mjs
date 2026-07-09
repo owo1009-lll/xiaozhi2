@@ -1002,7 +1002,7 @@ function summarizeNextActions(controlled, m3plus, m4Omr, releaseReview, controll
         actions.push({
           priority: 1,
           track: "Start monitored pilot",
-          action: "Controlled-pilot approval is present and machine checks are green. Start only the separate monitored pilot process described in the decision packet; keep default student runtime fail-closed.",
+          action: "Controlled-pilot approval is present and machine checks are green. Run `npm run western:controlled-pilot-run -- --execute --limit 1` for one offline monitored batch; keep default student runtime fail-closed.",
           artifact: CONTROLLED_PILOT_DECISION_MD.replace(/\\/g, "/"),
           reason: ["approved-monitored-pilot-only"],
         });

@@ -212,6 +212,7 @@ const m4ChecklistMd = await fs.readFile("data/experiments/western-strings-m4/ind
 const reviewPolicy = await fs.readFile("docs/western-strings-review-policy.md", "utf8");
 const projectPlan = await fs.readFile("docs/western-strings-project-plan.md", "utf8");
 const migrationPlan = await fs.readFile("docs/western-strings-migration-plan.md", "utf8");
+const releaseReviewSource = await fs.readFile("scripts/run-western-strings-release-review.mjs", "utf8");
 const packageJson = JSON.parse(await fs.readFile("package.json", "utf8"));
 const handoff = renderHandoff(status);
 assert(
@@ -241,6 +242,18 @@ assert(
 assert(
   packageJson.scripts?.["western:controlled-pilot-start-preflight"],
   "package.json must expose the controlled-pilot start preflight command",
+);
+assert(
+  packageJson.scripts?.["western:controlled-pilot-run"],
+  "package.json must expose the one-shot controlled-pilot runner",
+);
+assert(
+  packageJson.scripts?.["test:western-controlled-pilot-run"],
+  "package.json must expose controlled-pilot runner tests",
+);
+assert(
+  releaseReviewSource.includes('"test:western-controlled-pilot-run"'),
+  "release review must rerun the controlled-pilot runner safety tests before approval",
 );
 assert(
   packageJson.scripts?.["test:western-controlled-pilot-decision"],

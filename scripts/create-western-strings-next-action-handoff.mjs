@@ -238,7 +238,8 @@ function commandForAction(action) {
     return [
       "Open data/experiments/western-strings-controlled-pilot-decision.md.",
       "Run npm run western:controlled-pilot-start-preflight immediately before starting the pilot.",
-      "Start only the approved separate monitored pilot process.",
+      "Run npm run western:controlled-pilot-run -- --execute --limit 1 for one approved offline monitored batch.",
+      "The command must exit after the batch, restore its process environment, and write a session report under data/experiments/western-strings-controlled-pilot-sessions/.",
       "Keep production/default runtime fail-closed.",
       "After pilot wiring, rerun npm run western:release-review, npm run western:controlled-pilot-decision, npm run test:western-project-gate, and npm run build.",
     ];

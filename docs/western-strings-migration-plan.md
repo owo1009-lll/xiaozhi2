@@ -330,6 +330,7 @@ OMR 只解决"谱面从哪来",不改变音频诊断逻辑。未过 note-level �
 - `npm run western:controlled-pilot-record-decision -- --decision defer --by <负责人>` 记录暂缓/不启动,继续 review-only。
 - `npm run western:controlled-pilot-record-decision -- --decision approve --by <负责人> --confirm-separate-monitored-pilot --confirm-default-runtime-fail-closed` 记录负责人批准,但仍不改变默认 runtime。
 - `npm run western:controlled-pilot-start-preflight` 是批准后的最后机器预检;当前没有 approval 文件时必须失败,通过前不得启动 pilot。
+- `npm run western:controlled-pilot-run` 默认只检查状态;批准且 preflight 通过后,`npm run western:controlled-pilot-run -- --execute --limit 1` 只运行一个离线受控批次并立即退出。它不启动公开学生服务器,会恢复进程环境,未知 auto-pass 暂停定向复核,已知错误 auto-pass 中止。
 - 当前状态:`readyForControlledPilotDecision=true`,`readyToStartControlledPilot=false`,`approvalPresent=false`,`runtimeFailClosed=true`。
 - 这表示机器自测已完成,当前不需要继续教师/专业人员复核;只剩产品负责人是否批准单独受控 pilot。
 - 无批准文件时保持 review-only / fail-closed;只有机器预检发现 unknown/unsafe auto-pass 时才进入定向人工复核。
