@@ -167,7 +167,7 @@ export function summarizeControlledCandidateConfidencePilot(
       thresholdPoolConfidenceOnlyPrecision: thresholdPoolConfidenceOnly?.precision ?? null,
       thresholdPoolConfidenceOnlySelectedRows: thresholdPoolConfidenceOnly?.selectedRows ?? null,
       thresholdPoolRuntimeConfidenceSelectedRows: thresholdPoolRuntime?.confidenceSelectedRows ?? null,
-      thresholdPoolPitchSupportRejectedRows: thresholdPoolRuntime?.pitchSupportRejectedRows ?? null,
+      thresholdPoolPitchSupportNoRows: thresholdPoolRuntime?.pitchSupportNoRows ?? thresholdPoolRuntime?.pitchSupportRejectedRows ?? null,
       thresholdPoolPassed: Boolean((thresholdPoolRuntime?.selectedRows || 0) > 0 && thresholdPoolRuntime?.precision >= 0.9),
       readyForDefaultEnable: releaseAudit?.releaseReadiness?.readyForDefaultEnable === true,
       blockingReasons: releaseAudit?.releaseReadiness?.blockingReasons || [],

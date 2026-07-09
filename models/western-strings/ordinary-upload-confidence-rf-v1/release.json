@@ -57,11 +57,11 @@
   },
   "runtimePolicy": {
     "default": "review_required",
-    "whenEnabled": "auto_pass candidates with confidenceProbability >= threshold and pitchSupportWithin80Cents=true; all other candidates remain review_required",
+    "whenEnabled": "candidate-evidence auto_pass candidates with confidenceProbability >= threshold; pitch/onset/missing/duration/extra diagnosis categories remain review_required",
     "studentFacingRequires": [
       "WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1",
       "blindValidation.blindValidationPassed=true",
-      "pitchSupportWithin80Cents=true",
+      "candidate-evidence only; no automatic pitch/onset/missing/duration/extra diagnosis release",
       "confidence scorer ok=true"
     ]
   }

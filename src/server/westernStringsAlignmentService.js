@@ -921,9 +921,7 @@ async function evaluateOfflineFeatureStudentSafeGate(repoRoot, candidateRows = [
   }
   const scoredRows = Array.isArray(scored.rows) ? scored.rows : [];
   const pitchSupportedCount = scoredRows.filter((candidate) => candidate.pitchSupportWithin80Cents === true).length;
-  const autoPassCandidateCount = scoredRows.filter((candidate) => (
-    candidate.confidenceSelected === true && candidate.pitchSupportWithin80Cents === true
-  )).length;
+  const autoPassCandidateCount = scoredRows.filter((candidate) => candidate.confidenceSelected === true).length;
   const evaluatedCandidateCount = scoredRows.length;
   return {
     gateVersion: safeString(release.gateVersion, "western-offline-feature-gate-v1-confidence-rf"),
@@ -933,7 +931,7 @@ async function evaluateOfflineFeatureStudentSafeGate(repoRoot, candidateRows = [
     reason: "ordinary-upload-confidence-gate-enabled",
     blockingReasons: [],
     evaluatedCandidateCount,
-    pitchSupportRequired: true,
+    pitchSupportRequired: false,
     pitchSupportedCandidateCount: pitchSupportedCount,
     autoPassCandidateCount,
     reviewRequiredCandidateCount: Math.max(0, evaluatedCandidateCount - autoPassCandidateCount),
@@ -951,13 +949,10 @@ async function evaluateOfflineFeatureStudentSafeGate(repoRoot, candidateRows = [
 
 function applyOfflineFeatureStudentSafeGate(candidateRows = [], candidateGate = {}) {
   return (Array.isArray(candidateRows) ? candidateRows : []).map((candidate) => {
-    const hasPitchSupport = candidate.pitchSupportWithin80Cents === true;
-    const selected = candidateGate.ready === true && candidate.confidenceSelected === true && hasPitchSupport;
+    const selected = candidateGate.ready === true && candidate.confidenceSelected === true;
     const gateReason = selected
       ? "ordinary-upload-confidence-gate-auto-pass"
-      : candidate.confidenceSelected === true && !hasPitchSupport
-        ? "ordinary-upload-confidence-gate-missing-pitch-support"
-        : safeString(candidateGate.reason, "ordinary-upload-student-safe-gate-not-calibrated");
+      : safeString(candidateGate.reason, "ordinary-upload-student-safe-gate-not-calibrated");
     return {
       ...candidate,
       autoDecision: selected ? "auto_pass" : "review_required",

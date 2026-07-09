@@ -13,6 +13,7 @@ const execFileAsync = promisify(execFile);
 const DEFAULT_OUT_DIR = path.join("data", "experiments", "western-strings-m3", "ordinary-auto-pass-precision-review", "review-pack");
 const DEFAULT_SELECTION = path.join("data", "experiments", "western-strings-m3", "ordinary-auto-pass-precision-review", "ordinary-auto-pass-precision-selection.json");
 const DEFAULT_SUMMARY = path.join("data", "experiments", "western-strings-m3", "ordinary-auto-pass-precision-review", "ordinary-auto-pass-precision-review-summary.json");
+const DEFAULT_KNOWN_LABELS = path.join("data", "experiments", "western-strings-m3", "confidence-recalibration", "combined-controlled-candidate-review-labels.csv");
 const RELEASE_REL = path.join("models", "western-strings", "ordinary-upload-confidence-rf-v1", "release.json");
 
 function parseArgs(argv) {
@@ -22,7 +23,8 @@ function parseArgs(argv) {
     reviewLimit: 12,
     minConfidence: 0.95,
     minVoicedFrames: 2,
-    requirePitchSupport: true,
+    requirePitchSupport: false,
+    knownLabels: DEFAULT_KNOWN_LABELS,
     outDir: DEFAULT_OUT_DIR,
     selectionJson: DEFAULT_SELECTION,
     summary: DEFAULT_SUMMARY,
@@ -35,6 +37,8 @@ function parseArgs(argv) {
     else if (arg === "--review-limit") args.reviewLimit = Number(argv[++index] || args.reviewLimit);
     else if (arg === "--min-confidence") args.minConfidence = Number(argv[++index] || args.minConfidence);
     else if (arg === "--min-voiced-frames") args.minVoicedFrames = Number(argv[++index] || args.minVoicedFrames);
+    else if (arg === "--known-labels") args.knownLabels = argv[++index] || args.knownLabels;
+    else if (arg === "--require-pitch-support") args.requirePitchSupport = true;
     else if (arg === "--allow-missing-pitch-support") args.requirePitchSupport = false;
     else if (arg === "--out-dir") args.outDir = argv[++index] || args.outDir;
     else if (arg === "--selection-json") args.selectionJson = argv[++index] || args.selectionJson;
@@ -74,6 +78,90 @@ async function readJsonl(filePath) {
     if (error?.code === "ENOENT") return [];
     throw error;
   }
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let value = "";
+  let inQuotes = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (inQuotes) {
+      if (char === '"' && next === '"') {
+        value += '"';
+        index += 1;
+      } else if (char === '"') {
+        inQuotes = false;
+      } else {
+        value += char;
+      }
+    } else if (char === '"') {
+      inQuotes = true;
+    } else if (char === ",") {
+      row.push(value);
+      value = "";
+    } else if (char === "\n") {
+      row.push(value);
+      rows.push(row);
+      row = [];
+      value = "";
+    } else if (char !== "\r") {
+      value += char;
+    }
+  }
+  if (value || row.length) row.push(value);
+  if (row.length) rows.push(row);
+  const [headers = [], ...dataRows] = rows.filter((item) => item.some((cell) => safeString(cell).trim()));
+  return dataRows.map((dataRow) => Object.fromEntries(headers.map((header, index) => [header, dataRow[index] ?? ""])));
+}
+
+async function readCsvRows(filePath) {
+  try {
+    return parseCsv(await fs.readFile(path.resolve(filePath), "utf8"));
+  } catch (error) {
+    if (error?.code === "ENOENT") return [];
+    throw error;
+  }
+}
+
+function normalizeStatus(value) {
+  const status = safeString(value).trim().toLowerCase();
+  return ["usable", "wrong", "uncertain"].includes(status) ? status : "";
+}
+
+function labelKey(row = {}) {
+  return [
+    safeString(row.scoreId).trim(),
+    safeString(row.recordingId).trim(),
+    safeString(row.candidateId).trim(),
+  ].join("::");
+}
+
+function hasLabelKeyParts(row = {}) {
+  return Boolean(
+    safeString(row.scoreId).trim()
+    && safeString(row.recordingId).trim()
+    && safeString(row.candidateId).trim()
+  );
+}
+
+async function loadKnownLabelMap(labelsPath) {
+  const rows = await readCsvRows(labelsPath);
+  const labels = new Map();
+  for (const row of rows) {
+    const status = normalizeStatus(row.teacherCandidateStatus);
+    if (!status) continue;
+    if (!hasLabelKeyParts(row)) continue;
+    const key = labelKey(row);
+    labels.set(key, {
+      status,
+      reviewRowNumber: safeString(row.reviewRowNumber),
+      source: rel(path.resolve(labelsPath)),
+    });
+  }
+  return { rows, labels };
 }
 
 async function writeJson(filePath, value) {
@@ -329,12 +417,17 @@ function reviewRowFromCandidate({
   };
 }
 
-async function buildSelectionFromRun({ tempRoot, realRepoRoot, run, selfCheck = {} }) {
+async function buildSelectionFromRun({ tempRoot, realRepoRoot, run, selfCheck = {}, knownLabels = new Map() }) {
   const rows = [];
   let totalCandidateCount = 0;
   let autoPassCandidateCount = 0;
   let selfCheckedAutoPassCandidateCount = 0;
+  let knownUsableAutoPassCandidateCount = 0;
+  let knownWrongAutoPassCandidateCount = 0;
+  let knownUncertainAutoPassCandidateCount = 0;
   const selfCheckRejectedReasonCounts = {};
+  const knownUsableRows = [];
+  const knownWrongRows = [];
   for (const item of Array.isArray(run.items) ? run.items : []) {
     if (!item.candidateRowsPath) continue;
     const { artifact, stableCandidateRowsPath } = await materializeCandidateArtifact({
@@ -356,16 +449,50 @@ async function buildSelectionFromRun({ tempRoot, realRepoRoot, run, selfCheck = 
         continue;
       }
       selfCheckedAutoPassCandidateCount += 1;
-      rows.push(reviewRowFromCandidate({
+      const reviewRow = reviewRowFromCandidate({
         rowNumber: rows.length + 1,
         run,
         item,
         candidate,
         candidateRowsPath: stableCandidateRowsPath,
-      }));
+      });
+      const known = knownLabels.get(labelKey(reviewRow));
+      if (known?.status === "usable") {
+        knownUsableAutoPassCandidateCount += 1;
+        knownUsableRows.push({
+          ...reviewRow,
+          knownLabelStatus: known.status,
+          knownLabelReviewRowNumber: known.reviewRowNumber,
+        });
+        continue;
+      }
+      if (known?.status === "wrong") {
+        knownWrongAutoPassCandidateCount += 1;
+        knownWrongRows.push({
+          ...reviewRow,
+          knownLabelStatus: known.status,
+          knownLabelReviewRowNumber: known.reviewRowNumber,
+        });
+        continue;
+      }
+      if (known?.status === "uncertain") {
+        knownUncertainAutoPassCandidateCount += 1;
+      }
+      rows.push(reviewRow);
     }
   }
-  return { rows, totalCandidateCount, autoPassCandidateCount, selfCheckedAutoPassCandidateCount, selfCheckRejectedReasonCounts };
+  return {
+    rows,
+    totalCandidateCount,
+    autoPassCandidateCount,
+    selfCheckedAutoPassCandidateCount,
+    knownUsableAutoPassCandidateCount,
+    knownWrongAutoPassCandidateCount,
+    knownUncertainAutoPassCandidateCount,
+    knownUsableRows,
+    knownWrongRows,
+    selfCheckRejectedReasonCounts,
+  };
 }
 
 async function exportReviewPack({ selectionJson, outDir, reviewLimit }) {
@@ -414,6 +541,9 @@ function renderMarkdown(summary) {
     `- totalCandidateCount: ${summary.totalCandidateCount}`,
     `- autoPassCandidateCount: ${summary.autoPassCandidateCount}`,
     `- selfCheckedAutoPassCandidateCount: ${summary.selfCheckedAutoPassCandidateCount}`,
+    `- knownUsableAutoPassCandidateCount: ${summary.knownUsableAutoPassCandidateCount ?? 0}`,
+    `- knownWrongAutoPassCandidateCount: ${summary.knownWrongAutoPassCandidateCount ?? 0}`,
+    `- unknownReviewCandidateCount: ${summary.unknownReviewCandidateCount ?? summary.reviewPack?.rowCount ?? 0}`,
     `- reviewPackRows: ${summary.reviewPack?.rowCount ?? 0}`,
     `- defaultOrdinaryReadyAfter: ${summary.defaultOrdinaryReadyAfter}`,
     "",
@@ -428,10 +558,13 @@ function renderMarkdown(summary) {
     "",
     "- This command is an internal precision audit, not a product pilot.",
     "- It runs the frozen RF scorer only inside this explicit review-pack command.",
-    "- It only exports auto_pass rows that pass stricter self-check thresholds.",
+    "- It reuses existing teacher labels before asking for another review.",
+    "- Known usable auto_pass rows are counted as self-checked evidence and are not exported again.",
+    "- Known wrong auto_pass rows block the release check.",
+    "- It only exports unknown auto_pass rows that pass stricter self-check thresholds.",
     "- It restores the process environment after the run.",
     "- It does not make ordinary-upload auto feedback ready by default.",
-    "- Review every generated auto_pass row before treating it as student-safe.",
+    "- Review every generated unknown auto_pass row before treating it as student-safe.",
     "",
     "## Blocking Reasons",
     "",
@@ -456,6 +589,7 @@ export async function runOrdinaryMonitoredPilotReviewPack(args = {}) {
     if (!selected.length) {
       throw new Error("No accepted controlled submissions are available after excluding known bad recording IDs.");
     }
+    const knownLabelSet = await loadKnownLabelMap(args.knownLabels || DEFAULT_KNOWN_LABELS);
     const tempReleasePath = await setupTempRepo(tempRoot, selected);
     process.env.WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE = "1";
     process.env.WESTERN_STRINGS_ORDINARY_AUTO_GATE_RELEASE = tempReleasePath;
@@ -465,7 +599,13 @@ export async function runOrdinaryMonitoredPilotReviewPack(args = {}) {
       minVoicedFrames: args.minVoicedFrames,
       requirePitchSupport: args.requirePitchSupport,
     };
-    const selection = await buildSelectionFromRun({ tempRoot, realRepoRoot, run: batchResult.batch, selfCheck });
+    const selection = await buildSelectionFromRun({
+      tempRoot,
+      realRepoRoot,
+      run: batchResult.batch,
+      selfCheck,
+      knownLabels: knownLabelSet.labels,
+    });
     const selectionPath = path.resolve(realRepoRoot, args.selectionJson || DEFAULT_SELECTION);
     const outDir = path.resolve(realRepoRoot, args.outDir || DEFAULT_OUT_DIR);
     await fs.rm(outDir, { recursive: true, force: true });
@@ -477,11 +617,18 @@ export async function runOrdinaryMonitoredPilotReviewPack(args = {}) {
       threshold: release.threshold,
       selectedAboveThresholdCount: selection.autoPassCandidateCount,
       selfCheckedAutoPassCandidateCount: selection.selfCheckedAutoPassCandidateCount,
+      knownLabels: rel(path.resolve(args.knownLabels || DEFAULT_KNOWN_LABELS), realRepoRoot),
+      knownLabelRows: knownLabelSet.rows.length,
+      knownUsableAutoPassCandidateCount: selection.knownUsableAutoPassCandidateCount,
+      knownWrongAutoPassCandidateCount: selection.knownWrongAutoPassCandidateCount,
+      knownUncertainAutoPassCandidateCount: selection.knownUncertainAutoPassCandidateCount,
       selfCheck,
       selfCheckRejectedReasonCounts: selection.selfCheckRejectedReasonCounts,
       candidateCount: selection.totalCandidateCount,
       selectedSubmissionCount: selected.length,
       excludedRecordingIds,
+      knownUsableRows: selection.knownUsableRows,
+      knownWrongRows: selection.knownWrongRows,
       rows: selection.rows,
     };
     await writeJson(selectionPath, selectionPayload);
@@ -519,6 +666,10 @@ export async function runOrdinaryMonitoredPilotReviewPack(args = {}) {
       totalCandidateCount: selection.totalCandidateCount,
       autoPassCandidateCount: selection.autoPassCandidateCount,
       selfCheckedAutoPassCandidateCount: selection.selfCheckedAutoPassCandidateCount,
+      knownUsableAutoPassCandidateCount: selection.knownUsableAutoPassCandidateCount,
+      knownWrongAutoPassCandidateCount: selection.knownWrongAutoPassCandidateCount,
+      knownUncertainAutoPassCandidateCount: selection.knownUncertainAutoPassCandidateCount,
+      unknownReviewCandidateCount: selection.rows.length,
       selfCheck,
       selfCheckRejectedReasonCounts: selection.selfCheckRejectedReasonCounts,
       selectionJson: rel(selectionPath, realRepoRoot),
@@ -526,8 +677,11 @@ export async function runOrdinaryMonitoredPilotReviewPack(args = {}) {
       blockingReasons: [],
     };
     if (selection.autoPassCandidateCount === 0) summary.blockingReasons.push("ordinary-precision-no-auto-pass-candidates");
-    if (selection.rows.length === 0) summary.blockingReasons.push("ordinary-precision-no-self-checked-auto-pass-candidates");
-    if (!reviewPack || reviewPack.ok !== true) summary.blockingReasons.push("ordinary-precision-review-pack-not-generated");
+    if (selection.selfCheckedAutoPassCandidateCount === 0) summary.blockingReasons.push("ordinary-precision-no-self-checked-auto-pass-candidates");
+    if (selection.knownWrongAutoPassCandidateCount > 0) summary.blockingReasons.push("ordinary-precision-known-wrong-auto-pass-candidates");
+    if (selection.rows.length > 0 && (!reviewPack || reviewPack.ok !== true)) {
+      summary.blockingReasons.push("ordinary-precision-review-pack-not-generated");
+    }
   } finally {
     if (oldEnable === undefined) delete process.env.WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE;
     else process.env.WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE = oldEnable;

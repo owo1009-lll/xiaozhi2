@@ -105,11 +105,12 @@ function commandForAction(action) {
     if (hasReason(action, "ordinary-auto-gate-disabled-by-default")) {
       return [
         "Keep production/default runtime fail-closed.",
-        "P1.1 context validation and confidence-only threshold-pool precision have historical passing evidence, but runtime auto_pass must also pass the current pitch-support policy.",
+        "P1.1 context validation and threshold-pool precision have passing evidence for candidate-evidence auto_pass. Pitch/onset/missing/duration/extra diagnosis categories remain review-only.",
         "Use npm run western:controlled-candidate-confidence-release-audit to inspect the frozen evidence before any pilot.",
         "Run npm run western:ordinary-monitored-pilot-plan to generate the disabled-by-default pilot plan artifact.",
         "Run npm run western:ordinary-monitored-pilot-smoke to verify the frozen RF scorer under the release flag inside a temporary repo root.",
-        "Run npm run western:ordinary-auto-pass-precision-review-pack before asking for any teacher review. Runtime auto_pass now requires RF confidence plus pitchSupportWithin80Cents=true; if it reports zero self-checked rows, do not ask a teacher to review and instead improve candidate features/pitch-support evidence.",
+        "Run npm run western:ordinary-auto-pass-precision-review-pack before asking for any teacher review. It first reuses known labels as a self-test; if it reports zero unknown review rows and zero known-wrong rows, no teacher review is needed for that check.",
+        "If it reports known-wrong rows, stop and improve the candidate/confidence model. If it reports unknown review rows, review only those unknown rows.",
         "Only consider WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 inside a separate monitored controlled-pilot process.",
         "Do not commit an enabled env value or turn the gate on by default.",
         "After any smoke/release check, run npm run test:western-project-gate",

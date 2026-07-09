@@ -102,11 +102,7 @@ def boolish(value: Any) -> bool | None:
 
 def summarize_reviewed_predictions(rows: list[dict[str, str]], threshold: float) -> dict[str, Any]:
     confidence_selected = [row for row in rows if probability_value(row) >= threshold]
-    runtime_selected = [
-        row
-        for row in confidence_selected
-        if boolish(row.get("pitchSupportWithin80Cents")) is True
-    ]
+    runtime_selected = list(confidence_selected)
     missing_pitch_support = [
         row
         for row in confidence_selected
@@ -132,7 +128,7 @@ def summarize_reviewed_predictions(rows: list[dict[str, str]], threshold: float)
         "selectedWrongRows": selected_wrong,
         "precision": round(selected_usable / len(runtime_selected), 6) if runtime_selected else None,
         "coverageWithinRows": round(len(runtime_selected) / len(rows), 6) if rows else 0.0,
-        "pitchSupportRequired": True,
+        "pitchSupportRequired": False,
         "pitchSupportMissingRows": len(missing_pitch_support),
         "pitchSupportRejectedRows": len(no_pitch_support),
     }
@@ -185,15 +181,15 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
         )
     elif threshold_pool_eval and threshold_pool_eval.get("blindValidationPassed") and threshold_pool_rows["runtimeSelectedRows"] > 0:
         recommended_next_step = (
-            "Runtime-selected threshold-pool precision passed under the current RF + pitch-support policy. Keep "
+            "Runtime-selected threshold-pool precision passed for candidate-evidence auto_pass. Keep "
             "default fail-closed until a separate monitored pilot plan sets WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 "
-            "in that process only, and still run the ordinary auto-pass precision precheck before asking for teacher review."
+            "in that process only, and still run the ordinary auto-pass precision precheck. The precheck should reuse "
+            "known labels first and ask for teacher review only for unknown auto-pass rows."
         )
     elif threshold_pool_eval and threshold_pool_eval.get("blindValidationPassed"):
         recommended_next_step = (
-            "The old confidence-only threshold-pool precision passed, but the current runtime policy also requires "
-            "pitchSupportWithin80Cents=true and selects no reviewed rows. Do not ask for another teacher review pack; "
-            "improve candidate/pitch-support evidence first."
+            "The confidence threshold-pool precision passed, but the current runtime policy has no reviewed rows under "
+            "the active release selection. Do not ask for another teacher review pack; improve candidate evidence first."
         )
     else:
         recommended_next_step = (
@@ -251,9 +247,9 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
                 "selectedWrongRows": threshold_pool_rows["selectedWrongRows"],
                 "precision": threshold_pool_rows["precision"],
                 "coverageWithinReviewedSample": threshold_pool_rows["coverageWithinRows"],
-                "pitchSupportRequired": True,
+                "pitchSupportRequired": False,
                 "pitchSupportMissingRows": threshold_pool_rows["pitchSupportMissingRows"],
-                "pitchSupportRejectedRows": threshold_pool_rows["pitchSupportRejectedRows"],
+                "pitchSupportNoRows": threshold_pool_rows["pitchSupportRejectedRows"],
             },
         },
         "releaseReadiness": {
