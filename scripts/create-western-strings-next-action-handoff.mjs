@@ -25,8 +25,23 @@ function bulletList(items) {
   return values.length ? values.map((item) => `- ${item}`).join("\n") : "- none";
 }
 
-function commandForTrack(track) {
+function hasReason(action, reason) {
+  return (action?.reason || []).includes(reason);
+}
+
+function commandForAction(action) {
+  const track = action?.track || "";
   if (track === "M2/M3 ordinary upload candidate gate") {
+    if (hasReason(action, "ordinary-auto-gate-disabled-by-default")) {
+      return [
+        "Make an explicit release decision; default remains fail-closed.",
+        "For a controlled local smoke only, set WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 in the process environment.",
+        "Do not commit an enabled env value or turn the gate on by default.",
+        "After any smoke/release check, run npm run test:western-project-gate",
+        "Then run npm run western:project-status",
+        "Run npm run build if the release check touches UI/server code",
+      ];
+    }
     return [
       "Open data/experiments/western-strings-m3/confidence-validation-review/index.html",
       "After review, download/save controlled-candidate-review.completed.csv in that folder",
@@ -81,7 +96,7 @@ function renderHandoff(status) {
       `- ${action.action}`,
       "",
       "Commands:",
-      bulletList(commandForTrack(action.track)),
+      bulletList(commandForAction(action)),
       "",
     );
   }
