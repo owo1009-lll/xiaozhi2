@@ -119,6 +119,7 @@
     "western:ordinary-monitored-pilot-plan": "node scripts\\create-western-ordinary-monitored-pilot-plan.mjs",
     "western:ordinary-monitored-pilot-smoke": "node scripts\\run-western-ordinary-monitored-pilot-smoke.mjs",
     "western:ordinary-auto-pass-precision-review-pack": "node scripts\\run-western-ordinary-monitored-pilot-review-pack.mjs",
+    "test:western-ordinary-pilot-plan": "node scripts\\test-western-ordinary-monitored-pilot-plan.mjs",
     "western:controlled-candidate-confidence-score": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\score_western_controlled_candidate_confidence.py",
     "western:ingest-review-downloads": "node scripts\\ingest-western-review-downloads.mjs",
     "western:controlled-candidate-review-status": "node scripts\\status-western-controlled-candidate-review.mjs",
