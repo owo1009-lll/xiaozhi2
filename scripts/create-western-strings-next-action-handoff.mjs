@@ -36,7 +36,7 @@ function commandForAction(action) {
       return [
         "Keep production/default runtime fail-closed.",
         "Open data/experiments/western-strings-m3/confidence-recalibration-validation-review/index.html and review the 10-row recalibration blind-validation pack.",
-        "Save the downloaded CSV as data/experiments/western-strings-m3/confidence-recalibration-validation-review/controlled-candidate-review.completed.csv.",
+        "Either save the downloaded CSV as data/experiments/western-strings-m3/confidence-recalibration-validation-review/controlled-candidate-review.completed.csv, or leave it in Downloads and run npm run western:ingest-review-downloads -- --apply.",
         "Run npm run western:controlled-candidate-confidence-recalibration-validation-eval.",
         "Then run npm run western:project-status and npm run test:western-project-gate.",
         "Only if the recalibration blind validation passes should a new monitored pilot be considered; do not enable the student gate by default.",
@@ -80,7 +80,7 @@ function commandForAction(action) {
         "Keep all M3+ pitch-behavior modes review-only in student/runtime output.",
         "Inspect data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-pitch-mode-eval.csv for per-mode evidence.",
         "Open data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/index.html and review the 36 non-control supplemental samples.",
-        "After review, save m3plus-pitch-mode-review.completed.csv in data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/.",
+        "After review, either save m3plus-pitch-mode-review.completed.csv in data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/, or leave it in Downloads and run npm run western:ingest-review-downloads -- --apply.",
         "Import with npm run western:m3plus-review-import -- --source data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/m3plus-pitch-mode-review.csv --reviews data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/m3plus-pitch-mode-review.completed.csv",
         "After adding labels, rerun npm run western:m3plus-mode-eval",
         "Then run npm run western:project-status",

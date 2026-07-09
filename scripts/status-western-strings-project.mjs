@@ -457,7 +457,7 @@ async function buildControlledStatus() {
       ]),
     ];
     status.nextActions = [
-      "Review the confidence recalibration blind-validation pack, save controlled-candidate-review.completed.csv in that folder, then run western:controlled-candidate-confidence-recalibration-validation-eval.",
+      "Review the confidence recalibration blind-validation pack; if the CSV downloads to Downloads, run `npm run western:ingest-review-downloads -- --apply`, then run western:controlled-candidate-confidence-recalibration-validation-eval.",
     ];
   }
   status.reviewArtifacts = {
@@ -532,7 +532,7 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
     actions.push({
       priority: 1,
       track: "M2/M3 ordinary upload candidate gate",
-      action: controlled.nextActions?.[0] || "Finish the current blind review batch, import it, then rerun gate/status.",
+      action: controlled.nextActions?.[0] || "Finish the current blind review batch, run `npm run western:ingest-review-downloads -- --apply` if the CSV is in Downloads, then rerun gate/status.",
       artifact: ordinaryArtifact,
       reason: controlled.blockingReasons,
     });
@@ -549,7 +549,7 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
     actions.push({
       priority: 2,
       track: "M3+ pitch behavior modes",
-      action: "M3+ labels are sufficient, but no non-control pitch-behavior mode is release-ready. Review the round-2 non-control sample pack, import it into the cumulative labels, then rerun western:m3plus-mode-eval.",
+      action: "M3+ labels are sufficient, but no non-control pitch-behavior mode is release-ready. Review the round-2 non-control sample pack, run `npm run western:ingest-review-downloads -- --apply` if the CSV is in Downloads, import it into the cumulative labels, then rerun western:m3plus-mode-eval.",
       artifact: m3plus.reviewArtifacts.round2ReviewPage || m3plus.reviewArtifacts.modeEvalJson,
       reason: m3plus.blockingReasons,
     });
