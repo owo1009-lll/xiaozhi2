@@ -196,6 +196,12 @@ const M4_INDEPENDENT_GOLD_TODO = path.join(
   "western-strings-m4",
   "independent-gold-todo.md",
 );
+const M4_INDEPENDENT_GOLD_TODO_HTML = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "independent-gold-todo.html",
+);
 
 function parseArgs(argv) {
   const args = {
@@ -508,6 +514,7 @@ async function buildM4OmrStatus() {
       readinessJson: M4_READINESS.replace(/\\/g, "/"),
       benchmarkJson: M4_BENCHMARK.replace(/\\/g, "/"),
       independentGoldTodo: M4_INDEPENDENT_GOLD_TODO.replace(/\\/g, "/"),
+      independentGoldTodoHtml: M4_INDEPENDENT_GOLD_TODO_HTML.replace(/\\/g, "/"),
       readinessCsv: String(readiness?.artifacts?.csv || "data/experiments/western-strings-m4/omr-readiness.csv").replace(/\\/g, "/"),
       benchmarkCsv: String(benchmark?.artifacts?.csv || "data/experiments/western-strings-m4/omr-benchmark.csv").replace(/\\/g, "/"),
     },
@@ -551,8 +558,8 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
     actions.push({
       priority: 3,
       track: "M4 OMR benchmark",
-      action: "Prepare independent human-corrected gold MusicXML/MXL or external gold, then rerun `npm run western:m4-omr-benchmark`.",
-      artifact: m4Omr.artifacts.independentGoldTodo,
+      action: "Open the M4 visual checklist, prepare independent human-corrected gold MusicXML/MXL or external gold, then rerun `npm run western:m4-omr-benchmark`.",
+      artifact: m4Omr.artifacts.independentGoldTodoHtml || m4Omr.artifacts.independentGoldTodo,
       reason: m4Omr.blockingReasons,
     });
   }

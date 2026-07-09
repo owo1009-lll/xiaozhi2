@@ -30,7 +30,7 @@
 |---|---|---|---|
 | M2/M3 ordinary upload candidate gate | 旧 release 失败;重校准标签集 120 行已生成,RF threshold=0.9 产生 10 行 recalibration blind-validation 包 | `ordinary-auto-gate-disabled-by-default`,`ordinary-confidence-threshold-pool-precision-too-low`,`ordinary-confidence-recalibration-validation-needed`;先复核 10 行新包 | `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1` 不得用于学生端 |
 | M3+ pitch behavior modes | 48 条复核已导入并完成 per-mode eval;第二轮 36 条非 control 补强包已生成 | `m3plus-no-mode-specific-release-ready`;stable 仅为 control,非 control 模式继续 review-only | `data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/index.html` |
-| M4 OMR benchmark | 数据集前置齐备,草稿可解析 | 缺独立 gold;当前 12/12 为 self-comparison | `data/experiments/western-strings-m4/independent-gold-todo.md` |
+| M4 OMR benchmark | 数据集前置齐备,草稿可解析 | 缺独立 gold;当前 12/12 为 self-comparison | `data/experiments/western-strings-m4/independent-gold-todo.html` |
 
 ## 四、已完成且有验证的事项
 
@@ -39,7 +39,7 @@
 - 普通上传候选复核:累计 60 条 usable/wrong 标签;初始规则不足以 release,随后训练置信模型并通过 30 条 fresh blind validation。
 - runtime scorer:普通上传候选可通过 `western:controlled-candidate-confidence-score` 打分;runtime batch smoke 已验证显式 flag 下会调用冻结 RF scorer 并写入 `confidenceProbability`;无 release flag 时仍 review-only。
 - M3+ pack:`npm run western:m3plus-review-pack` 可生成 48 条人工复核包;`npm run western:m3plus-review-import` 已导入 completed CSV;`npm run western:m3plus-review-status` 当前报告 `m3plusModeEvalReady=true`;`npm run western:m3plus-mode-eval` 当前报告 `m3plusModeReleaseReady=false`,`controlReadyModes=["stable"]`,`releaseReadyModes=[]`。第二轮补强包已生成在 `data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/index.html`,共 36 条非 control 样本。
-- M4 handoff:`npm run western:m4-independent-gold-todo` 生成中文独立 gold 校正清单,列出 `sourceScorePath`、当前 `goldPath`、Audiveris `draftPath`、`scoreId` 与音符数。
+- M4 handoff:`npm run western:m4-independent-gold-todo` 生成中文独立 gold 校正清单,其中 `independent-gold-todo.html` 是可视化入口,同时保留 `.md/.csv`;清单列出 `sourceScorePath`、当前 `goldPath`、Audiveris `draftPath`、`scoreId` 与音符数。
 - 项目级 gate:`npm run western:project-gate` 仍应非零退出,防止在 ordinary/M3+/M4 任一 release 轨未 ready 时误发布;M3+ 标签状态已过,但 per-mode eval 未发现可 release 的非 control 模式。
 
 已复核命令:
@@ -64,7 +64,7 @@
 
 1. **普通上传 confidence 重校准盲测**:普通上传旧 confidence gate 的 30 条预筛 validation 通过,但完整阈值池分层复核失败(selected precision=0.5556,coverage=0.6102)。诊断报告 `data/experiments/western-strings-m3/confidence-threshold-pool-review/confidence-threshold-pool-diagnosis.json` 显示最佳简单规则 `predictedUsableProbability>=0.95` 也只有 precision=0.857(selected=14),没有 selected≥10 且 precision≥0.90 的简单规则。已把旧 60 行 + threshold-pool 60 行合并为 `data/experiments/western-strings-m3/confidence-recalibration/combined-controlled-candidate-review-labels.csv`,重校准 pilot 产生 RF threshold=0.9 候选,并导出 `data/experiments/western-strings-m3/confidence-recalibration-validation-review/index.html` 供 10 行盲测。下一步先复核这 10 行并运行 `npm run western:controlled-candidate-confidence-recalibration-validation-eval`;通过前继续 fail-closed。
 2. **M3+ 第二轮补强复核**:当前 per-mode eval 显示 stable control 通过,但 slide/trill/ornament/double-stop/variable-f0 等非 control 模式没有 release-ready 证据。已生成第二轮补强包 `data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/index.html`:variable-f0/slide/trill/double-stop 各 8 条,ornament 仅 4 条可用候选。标完后用 `npm run western:m3plus-review-import -- --source data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/m3plus-pitch-mode-review.csv --reviews data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/m3plus-pitch-mode-review.completed.csv` 导入,再重跑 `npm run western:m3plus-mode-eval`。
-3. **M4 独立 gold**:按 `data/experiments/western-strings-m4/independent-gold-todo.md` 逐条对照原谱生成独立 gold MusicXML/MXL,更新 clean-score intake 后重跑 `npm run western:m4-omr-benchmark`。
+3. **M4 独立 gold**:打开 `data/experiments/western-strings-m4/independent-gold-todo.html`,逐条对照原谱生成独立 gold MusicXML/MXL,更新 clean-score intake 后重跑 `npm run western:m4-omr-benchmark`。
 4. **后续扩展**:extra-note/多音和 duration 若要开放学生端硬反馈,必须补专门样本并通过独立 gate;大提琴作为 M5 独立验证,不得复用小提琴阈值。
 
 ## 七、当前不可声称

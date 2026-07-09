@@ -114,6 +114,115 @@ function buildMarkdown(report, todoRows) {
   return lines.join("\n");
 }
 
+function relativeLink(fromDir, targetPath) {
+  if (!targetPath) return "";
+  const absolute = path.resolve(process.cwd(), targetPath);
+  return path.relative(fromDir, absolute).replace(/\\/g, "/");
+}
+
+function isImagePath(filePath) {
+  return /\.(png|jpe?g|webp|gif)$/i.test(String(filePath || ""));
+}
+
+function htmlEscape(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function renderPathLink(outDir, filePath) {
+  const text = String(filePath || "");
+  if (!text) return "<span class=\"muted\">空</span>";
+  const href = relativeLink(outDir, text);
+  return `<a href="${htmlEscape(href)}" target="_blank" rel="noreferrer">${htmlEscape(text)}</a>`;
+}
+
+function buildHtml(report, todoRows, outDir) {
+  const cards = todoRows.map((row, index) => {
+    const sourceHref = relativeLink(outDir, row.sourceScorePath);
+    const image = isImagePath(row.sourceScorePath)
+      ? `<a href="${htmlEscape(sourceHref)}" target="_blank" rel="noreferrer"><img src="${htmlEscape(sourceHref)}" alt="${htmlEscape(row.pieceId)} 原谱"/></a>`
+      : `<p><a href="${htmlEscape(sourceHref)}" target="_blank" rel="noreferrer">打开原谱文件</a></p>`;
+    return `
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <h2>${index + 1}. ${htmlEscape(row.pieceId)} / ${htmlEscape(row.recordingId)}</h2>
+            <p class="muted">scoreId: ${htmlEscape(row.scoreId)} · issue: ${htmlEscape(row.issue)}</p>
+          </div>
+          <span class="pill">goldNotes=${htmlEscape(row.goldNotes)} · draftNotes=${htmlEscape(row.draftNotes)}</span>
+        </div>
+        <div class="grid">
+          <div class="score">${image}</div>
+          <div class="meta">
+            <h3>人工校正动作</h3>
+            <ol>
+              <li>打开左侧原谱图片,逐小节核对当前 gold 或 Audiveris draft。</li>
+              <li>保存一个新的独立 gold MusicXML/MXL,不要直接覆盖 Audiveris draft。</li>
+              <li>更新 clean-score intake 的 goldPath 后重跑 <code>npm run western:m4-omr-benchmark</code>。</li>
+            </ol>
+            <dl>
+              <dt>sourceScorePath</dt><dd>${renderPathLink(outDir, row.sourceScorePath)}</dd>
+              <dt>current goldPath</dt><dd>${renderPathLink(outDir, row.goldPath)}</dd>
+              <dt>Audiveris draftPath</dt><dd>${renderPathLink(outDir, row.draftPath)}</dd>
+              <dt>当前状态</dt><dd>goldEqualsDraftHash=${htmlEscape(row.goldEqualsDraftHash || "no")} · parseOk=${htmlEscape(row.parseOk || "")}</dd>
+            </dl>
+          </div>
+        </div>
+      </section>
+    `;
+  }).join("\n");
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>M4 独立 gold score 校正清单</title>
+  <style>
+    body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f6f7f9; color: #1f2933; }
+    header { position: sticky; top: 0; z-index: 2; background: #fff; border-bottom: 1px solid #d7dde5; padding: 16px 24px; }
+    h1 { margin: 0 0 8px; font-size: 22px; }
+    h2 { margin: 0; font-size: 18px; }
+    h3 { margin: 0 0 8px; font-size: 15px; }
+    code { background: #eef2f7; border-radius: 4px; padding: 1px 5px; }
+    .summary { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .pill { display: inline-flex; align-items: center; border: 1px solid #c8d2df; border-radius: 999px; padding: 4px 10px; background: #fff; font-size: 13px; color: #3e4c59; }
+    main { padding: 20px 24px 44px; }
+    .card { background: #fff; border: 1px solid #d7dde5; border-radius: 10px; margin: 0 0 18px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,42,0.05); }
+    .card-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; padding: 14px 16px; border-bottom: 1px solid #e4e9f0; }
+    .muted { color: #607080; font-size: 13px; margin: 4px 0 0; }
+    .grid { display: grid; grid-template-columns: minmax(320px, 1.2fr) minmax(280px, 0.8fr); gap: 0; }
+    .score { background: #f9fafb; padding: 12px; border-right: 1px solid #e4e9f0; }
+    .score img { width: 100%; max-height: 720px; object-fit: contain; background: white; border: 1px solid #e4e9f0; }
+    .meta { padding: 14px 16px; }
+    dt { margin-top: 10px; font-weight: 700; font-size: 13px; color: #374151; }
+    dd { margin: 3px 0 0; overflow-wrap: anywhere; }
+    a { color: #0f5e9c; }
+    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } .score { border-right: 0; border-bottom: 1px solid #e4e9f0; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>M4 独立 gold score 校正清单</h1>
+    <p class="muted">用途: 防止把 Audiveris draft 与自身比较得到的 100% 误当成 OMR 准确率。只有人工独立校正 gold 后,M4 才能评估。</p>
+    <div class="summary">
+      <span class="pill">benchmark 行数: ${htmlEscape(report.counts?.rows ?? 0)}</span>
+      <span class="pill">可解析草稿: ${htmlEscape(report.counts?.parseOkRows ?? 0)}</span>
+      <span class="pill">可用 gold 行: ${htmlEscape(report.counts?.usableBenchmarkRows ?? 0)}</span>
+      <span class="pill">self-comparison: ${htmlEscape(report.counts?.selfComparisonRows ?? 0)}</span>
+      <span class="pill">draft quality ready: ${report.gate?.m4OmrDraftQualityReady ? "yes" : "no"}</span>
+    </div>
+  </header>
+  <main>
+    ${cards || "<p>没有待处理项。</p>"}
+  </main>
+</body>
+</html>
+`;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const benchmarkPath = path.resolve(process.cwd(), args.benchmark);
@@ -124,6 +233,7 @@ async function main() {
   const todoRows = buildTodoRows(report, readinessReport);
   const csvPath = path.join(outDir, "independent-gold-todo.csv");
   const mdPath = path.join(outDir, "independent-gold-todo.md");
+  const htmlPath = path.join(outDir, "independent-gold-todo.html");
   await writeCsv(csvPath, todoRows, [
     "recordingId",
     "pieceId",
@@ -139,6 +249,7 @@ async function main() {
     "draftNotes",
   ]);
   await fs.writeFile(mdPath, buildMarkdown(report, todoRows), "utf8");
+  await fs.writeFile(htmlPath, buildHtml(report, todoRows, outDir), "utf8");
   console.log(JSON.stringify({
     ok: true,
     todoRows: todoRows.length,
@@ -146,6 +257,7 @@ async function main() {
     readiness: args.readiness,
     csv: path.relative(process.cwd(), csvPath).replace(/\\/g, "/"),
     markdown: path.relative(process.cwd(), mdPath).replace(/\\/g, "/"),
+    html: path.relative(process.cwd(), htmlPath).replace(/\\/g, "/"),
     readyForOmrAccuracyClaim: todoRows.length === 0 && Boolean(report.gate?.m4OmrDraftQualityReady),
   }, null, 2));
 }

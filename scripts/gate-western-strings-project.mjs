@@ -46,7 +46,7 @@ export function evaluateProjectGate(status, requiredTracks) {
     failures.push({
       track: "M4 OMR benchmark",
       reason: m4.blockingReasons || ["m4-omr-gate-not-ready"],
-      artifact: m4.artifacts?.independentGoldTodo || "",
+      artifact: m4.artifacts?.independentGoldTodoHtml || m4.artifacts?.independentGoldTodo || "",
     });
   }
 

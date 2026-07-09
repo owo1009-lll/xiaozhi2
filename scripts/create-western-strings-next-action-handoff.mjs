@@ -95,7 +95,9 @@ function commandForAction(action) {
   }
   if (track === "M4 OMR benchmark") {
     return [
-      "Prepare independent human-corrected gold MusicXML/MXL files listed in data/experiments/western-strings-m4/independent-gold-todo.md",
+      "Open data/experiments/western-strings-m4/independent-gold-todo.html",
+      "For each row, compare the source score image/PDF with the current goldPath and Audiveris draftPath",
+      "Prepare independent human-corrected gold MusicXML/MXL files for the listed rows",
       "Run npm run western:m4-omr-benchmark",
       "Then run npm run western:project-status",
     ];

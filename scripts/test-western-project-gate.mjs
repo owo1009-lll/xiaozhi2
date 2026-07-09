@@ -64,6 +64,11 @@ assert.equal(m4.counts.usableBenchmarkRows, 0, "self-comparison rows must not co
 assert.equal(m4.counts.selfComparisonRows, 12, "current M4 fixture should expose all self-comparison rows");
 assert(m4.blockingReasons.includes("m4-omr-self-comparison-detected"), "M4 must block on self-comparison");
 assert(m4.blockingReasons.includes("m4-omr-no-independent-gold"), "M4 must block when independent gold is missing");
+assert.equal(
+  m4.artifacts.independentGoldTodoHtml,
+  "data/experiments/western-strings-m4/independent-gold-todo.html",
+  "M4 handoff should expose the visual independent-gold checklist",
+);
 
 const noRequiredGate = evaluateProjectGate(status, new Set());
 assert.equal(noRequiredGate.projectReleaseReady, true, "empty required track set should not block");
@@ -84,6 +89,11 @@ assert(
   "M3+ track should block on lack of non-control mode-specific release evidence",
 );
 assert(fullGate.failures.some((failure) => failure.track === "M4 OMR benchmark"), "M4 track failure should be reported");
+assert.equal(
+  fullGate.failures.find((failure) => failure.track === "M4 OMR benchmark")?.artifact,
+  "data/experiments/western-strings-m4/independent-gold-todo.html",
+  "M4 gate failure should point to the visual independent-gold checklist",
+);
 
 console.log(JSON.stringify({
   ok: true,
