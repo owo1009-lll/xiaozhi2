@@ -6,18 +6,21 @@ import { buildProjectStatus } from "./status-western-strings-project.mjs";
 
 const DEFAULT_RELEASE = path.join("models", "western-strings", "ordinary-upload-confidence-rf-v1", "release.json");
 const DEFAULT_AUDIT = path.join("data", "experiments", "western-strings-m3", "confidence-validation-review", "ordinary-confidence-release-audit.json");
+const DEFAULT_PRECISION_REVIEW = path.join("data", "experiments", "western-strings-m3", "ordinary-auto-pass-precision-review", "ordinary-auto-pass-precision-review-summary.json");
 const DEFAULT_OUT_DIR = path.join("data", "experiments", "western-strings-m3", "ordinary-monitored-pilot");
 
 function parseArgs(argv) {
   const args = {
     release: DEFAULT_RELEASE,
     audit: DEFAULT_AUDIT,
+    precisionReview: DEFAULT_PRECISION_REVIEW,
     outDir: DEFAULT_OUT_DIR,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--release") args.release = argv[++index] || args.release;
     else if (arg === "--audit") args.audit = argv[++index] || args.audit;
+    else if (arg === "--precision-review") args.precisionReview = argv[++index] || args.precisionReview;
     else if (arg === "--out-dir") args.outDir = argv[++index] || args.outDir;
   }
   return args;
@@ -25,6 +28,15 @@ function parseArgs(argv) {
 
 async function readJson(filePath) {
   return JSON.parse(await fs.readFile(filePath, "utf8"));
+}
+
+async function readJsonOrNull(filePath) {
+  try {
+    return await readJson(filePath);
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
 }
 
 function toRel(filePath) {
@@ -52,6 +64,11 @@ function renderMarkdown(plan) {
     `- blindValidationPrecision: ${plan.evidence.blindValidationPrecision}`,
     `- thresholdPoolPrecision: ${plan.evidence.thresholdPoolPrecision}`,
     `- thresholdPoolCoverage: ${plan.evidence.thresholdPoolCoverage}`,
+    `- precisionPrecheckOk: ${plan.evidence.precisionPrecheckOk}`,
+    `- precisionPrecheckSelfChecked: ${plan.evidence.precisionPrecheckSelfChecked}`,
+    `- precisionPrecheckKnownUsable: ${plan.evidence.precisionPrecheckKnownUsable}`,
+    `- precisionPrecheckKnownWrong: ${plan.evidence.precisionPrecheckKnownWrong}`,
+    `- precisionPrecheckUnknownReviewRows: ${plan.evidence.precisionPrecheckUnknownReviewRows}`,
     `- threshold: ${plan.evidence.threshold}`,
     "",
     "## Pilot Scope",
@@ -59,6 +76,8 @@ function renderMarkdown(plan) {
     "- Run only in a separate monitored process.",
     "- Do not commit an enabled env value.",
     "- Do not enable production/default student runtime.",
+    "- Reuse known labels before asking for another teacher review.",
+    "- If unknown auto-pass rows appear, review only those unknown rows before a pilot.",
     "- Treat every rejected candidate as review_required.",
     "- Log auto-pass count, review-required count, unsafe false positives, and source recording IDs.",
     "",
@@ -89,9 +108,11 @@ function renderMarkdown(plan) {
 export async function buildOrdinaryMonitoredPilotPlan(args = {}) {
   const releasePath = path.resolve(args.release || DEFAULT_RELEASE);
   const auditPath = path.resolve(args.audit || DEFAULT_AUDIT);
+  const precisionReviewPath = path.resolve(args.precisionReview || DEFAULT_PRECISION_REVIEW);
   const outDir = path.resolve(args.outDir || DEFAULT_OUT_DIR);
   const release = await readJson(releasePath);
   const audit = await readJson(auditPath);
+  const precisionReview = await readJsonOrNull(precisionReviewPath);
   const status = await buildProjectStatus();
   const controlled = status.tracks?.controlledCandidate || {};
 
@@ -105,6 +126,13 @@ export async function buildOrdinaryMonitoredPilotPlan(args = {}) {
   }
   if (status.runtimeStudentGate?.ordinaryUploadAutoFeedbackReady !== false) blockingReasons.push("ordinary-runtime-default-not-fail-closed");
   if (!controlled.confidencePilot?.runtimeGateWired) blockingReasons.push("ordinary-runtime-gate-not-wired");
+  if (!precisionReview) blockingReasons.push("ordinary-precision-precheck-missing");
+  else {
+    if (precisionReview.ok !== true) blockingReasons.push("ordinary-precision-precheck-failed");
+    if ((precisionReview.selfCheckedAutoPassCandidateCount || 0) <= 0) blockingReasons.push("ordinary-precision-precheck-no-self-checked-auto-pass");
+    if ((precisionReview.knownWrongAutoPassCandidateCount || 0) > 0) blockingReasons.push("ordinary-precision-precheck-known-wrong-auto-pass");
+    if ((precisionReview.unknownReviewCandidateCount || 0) > 0) blockingReasons.push("ordinary-precision-precheck-has-unknown-review-rows");
+  }
 
   const plan = {
     ok: blockingReasons.length === 0,
@@ -114,13 +142,19 @@ export async function buildOrdinaryMonitoredPilotPlan(args = {}) {
     enableEnvVar: release.enableEnvVar || "WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE",
     releaseManifest: toRel(releasePath),
     releaseAudit: toRel(auditPath),
+    precisionReview: toRel(precisionReviewPath),
     evidence: {
       threshold: audit.threshold ?? release.threshold ?? null,
       pilotOutOfFoldPrecision: audit.pilotOutOfFold?.precision ?? null,
       pilotOutOfFoldCoverage: audit.pilotOutOfFold?.coverageWithinRows ?? null,
       blindValidationPrecision: audit.validationReviewedSample?.precision ?? release.blindValidation?.precision ?? null,
-      thresholdPoolPrecision: audit.thresholdPoolReviewedSample?.precision ?? release.thresholdPoolValidation?.precision ?? null,
-      thresholdPoolCoverage: audit.thresholdPoolReviewedSample?.coverageWithinReviewedSample ?? release.thresholdPoolValidation?.coverage ?? null,
+      thresholdPoolPrecision: audit.thresholdPoolReviewedSample?.runtimePolicy?.precision ?? release.thresholdPoolValidation?.precision ?? null,
+      thresholdPoolCoverage: audit.thresholdPoolReviewedSample?.runtimePolicy?.coverageWithinReviewedSample ?? release.thresholdPoolValidation?.coverage ?? null,
+      precisionPrecheckOk: precisionReview?.ok === true,
+      precisionPrecheckSelfChecked: precisionReview?.selfCheckedAutoPassCandidateCount ?? 0,
+      precisionPrecheckKnownUsable: precisionReview?.knownUsableAutoPassCandidateCount ?? 0,
+      precisionPrecheckKnownWrong: precisionReview?.knownWrongAutoPassCandidateCount ?? 0,
+      precisionPrecheckUnknownReviewRows: precisionReview?.unknownReviewCandidateCount ?? 0,
     },
     blockingReasons,
     outDir: toRel(outDir),
