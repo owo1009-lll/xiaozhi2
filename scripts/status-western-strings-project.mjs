@@ -970,8 +970,8 @@ function summarizeNextActions(controlled, m3plus, m4Omr) {
     actions.push({
       priority: 1,
       track: "Release review",
-      action: "Both label gates have enough data for offline evaluation; run the relevant precision/unsafe checks before touching runtime gates.",
-      artifact: "",
+      action: "Both label gates have enough data for offline evaluation. Run `npm run western:release-review` to aggregate ordinary, M3+, and M4 machine checks before touching any runtime gate.",
+      artifact: "data/experiments/western-strings-release-review.md",
       reason: [],
     });
   }

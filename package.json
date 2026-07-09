@@ -123,6 +123,7 @@
     "western:ordinary-monitored-pilot-plan": "node scripts\\create-western-ordinary-monitored-pilot-plan.mjs",
     "western:ordinary-monitored-pilot-smoke": "node scripts\\run-western-ordinary-monitored-pilot-smoke.mjs",
     "western:ordinary-monitored-pilot-audit": "node scripts\\run-western-ordinary-monitored-pilot-audit.mjs",
+    "western:release-review": "node scripts\\run-western-strings-release-review.mjs",
     "western:m3plus-monitored-pilot-audit": "node scripts\\run-western-m3plus-monitored-pilot-audit.mjs",
     "western:ordinary-auto-pass-precision-review-pack": "node scripts\\run-western-ordinary-monitored-pilot-review-pack.mjs",
     "test:western-ordinary-pilot-plan": "node scripts\\test-western-ordinary-monitored-pilot-plan.mjs",

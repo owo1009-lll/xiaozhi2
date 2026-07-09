@@ -125,8 +125,8 @@ const expectedOrdinaryArtifact = status.tracks.controlledCandidate.blockingReaso
 if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
   assert.equal(
     status.nextActions[0]?.artifact,
-    "",
-    "after ordinary, M3+, and M4 checks pass, release-review handoff should not point to a stale M4 checklist",
+    "data/experiments/western-strings-release-review.md",
+    "after ordinary, M3+, and M4 checks pass, handoff artifact should point to the release-review report",
   );
 } else if (ordinaryPilotAuditPassed) {
   assert.equal(
@@ -216,6 +216,10 @@ assert(
   packageJson.scripts?.["western:m4-independent-gold-note-summary"],
   "package.json must expose the M4 editable-gold note summary command",
 );
+assert(
+  packageJson.scripts?.["western:release-review"],
+  "package.json must expose the aggregate release-review command",
+);
 for (const [label, text] of [["review policy", reviewPolicy]]) {
   assert(
     text.includes("npm run western:m4-preflight"),
@@ -238,6 +242,10 @@ if (m4.m4OmrDraftQualityReady) {
   assert(
     !handoff.includes("score-editor independent-gold correction task"),
     "current handoff must not keep stale M4 score-editor instructions after M4 clears",
+  );
+  assert(
+    handoff.includes("npm run western:release-review"),
+    "release-review handoff must route through the aggregate release-review command",
   );
 } else {
   assert(

@@ -193,6 +193,16 @@ function commandForAction(action) {
       "Then run npm run western:project-status",
     ];
   }
+  if (track === "Release review") {
+    return [
+      "Run npm run western:release-review.",
+      "Open data/experiments/western-strings-release-review.md.",
+      "If readyForControlledPilot=true, the evidence supports a separate monitored pilot; keep default production/student runtime fail-closed.",
+      "Do not commit WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 or enable it globally.",
+      "If readyForDefaultStudentRelease=false, treat that as expected unless an explicit monitored-pilot process has been approved.",
+      "After any runtime/pilot wiring change, rerun npm run western:release-review, npm run test:western-project-gate, and npm run build.",
+    ];
+  }
   return ["Run npm run western:project-status after completing this item"];
 }
 
