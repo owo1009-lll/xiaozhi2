@@ -86,11 +86,13 @@ function parseArgs(argv) {
   const args = {
     downloadsDir: path.join(os.homedir(), "Downloads"),
     apply: false,
+    target: "",
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--downloads-dir") args.downloadsDir = argv[++index] || args.downloadsDir;
     else if (arg === "--apply") args.apply = true;
+    else if (arg === "--target") args.target = argv[++index] || args.target;
   }
   return args;
 }
@@ -218,8 +220,17 @@ async function inspectTarget(target, downloadsDir, apply) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  const targets = args.target
+    ? TARGETS.filter((target) => target.name === args.target)
+    : TARGETS;
+  if (args.target && !targets.length) {
+    console.error(`Unknown target: ${args.target}`);
+    console.error(`Available targets: ${TARGETS.map((target) => target.name).join(", ")}`);
+    process.exitCode = 1;
+    return;
+  }
   const results = [];
-  for (const target of TARGETS) {
+  for (const target of targets) {
     results.push(await inspectTarget(target, args.downloadsDir, args.apply));
   }
   const ok = results.every((result) => result.status === "copied" || result.status === "match-found-dry-run");

@@ -113,7 +113,7 @@ function commandForAction(action) {
           "Keep all M3+ pitch-behavior modes review-only in student/runtime output.",
           "Open data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/index.html and review the 24 candidate-quality rows.",
           "This pack excludes the recording-level 100% non-match group stu02-ex05-weak_onset, but it is still evidence collection, not a release.",
-          "After review, save the downloaded CSV as data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/m3plus-pitch-mode-review.completed.csv, or leave it in Downloads and run npm run western:ingest-review-downloads -- --apply.",
+          "After review, save the downloaded CSV as data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/m3plus-pitch-mode-review.completed.csv, or leave it in Downloads and run npm run western:ingest-review-downloads -- --target m3plus-candidate-quality --apply.",
           "Import with npm run western:m3plus-review-import -- --source data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/m3plus-pitch-mode-review.csv --reviews data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/m3plus-pitch-mode-review.completed.csv",
           "Then rerun npm run western:m3plus-mode-eval, npm run western:m3plus-localization-diagnosis, and npm run western:project-status.",
         ];
@@ -133,7 +133,7 @@ function commandForAction(action) {
         "Keep all M3+ pitch-behavior modes review-only in student/runtime output.",
         "Inspect data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-pitch-mode-eval.csv for per-mode evidence.",
         "Open data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/index.html and review the 36 non-control supplemental samples.",
-        "After review, either save m3plus-pitch-mode-review.completed.csv in data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/, or leave it in Downloads and run npm run western:ingest-review-downloads -- --apply.",
+        "After review, either save m3plus-pitch-mode-review.completed.csv in data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/, or leave it in Downloads and run npm run western:ingest-review-downloads -- --target m3plus-round2 --apply.",
         "Import with npm run western:m3plus-review-import -- --source data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/m3plus-pitch-mode-review.csv --reviews data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/m3plus-pitch-mode-review.completed.csv",
         "After adding labels, rerun npm run western:m3plus-mode-eval",
         "Then run npm run western:project-status",
