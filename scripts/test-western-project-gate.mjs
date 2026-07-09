@@ -210,6 +210,8 @@ if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
 const m4ChecklistHtml = await fs.readFile("data/experiments/western-strings-m4/independent-gold-todo.html", "utf8");
 const m4ChecklistMd = await fs.readFile("data/experiments/western-strings-m4/independent-gold-todo.md", "utf8");
 const reviewPolicy = await fs.readFile("docs/western-strings-review-policy.md", "utf8");
+const projectPlan = await fs.readFile("docs/western-strings-project-plan.md", "utf8");
+const migrationPlan = await fs.readFile("docs/western-strings-migration-plan.md", "utf8");
 const packageJson = JSON.parse(await fs.readFile("package.json", "utf8"));
 const handoff = renderHandoff(status);
 assert(
@@ -276,6 +278,24 @@ if (m4.m4OmrDraftQualityReady) {
       || handoff.includes("Controlled pilot deferred")
       || handoff.includes("Start monitored pilot"),
     "handoff must route through release-review or the controlled-pilot decision after M4 clears",
+  );
+  for (const [label, text] of [["project plan", projectPlan], ["migration plan", migrationPlan]]) {
+    assert(
+      !text.includes("`usableBenchmarkRows=0`,`selfComparisonRows=12`,`m4OmrDraftQualityReady=false`"),
+      `${label} must not keep the obsolete unreviewed M4 self-comparison status after provenance clears`,
+    );
+    assert(
+      !text.includes("下一步必须准备**独立人工校正的 gold score**"),
+      `${label} must not send the user back to obsolete M4 manual-gold work after provenance clears`,
+    );
+  }
+  assert(
+    !projectPlan.includes("人工复核完成后将下载 CSV 保存为 `controlled-candidate-review.completed.csv`"),
+    "project plan must not reassign the completed historical threshold-pool review",
+  );
+  assert(
+    projectPlan.includes("历史失败,已被 P1.1 context-feature 重校准取代"),
+    "project plan must distinguish the obsolete confidence-only failure from the current P1.1 release candidate",
   );
 } else {
   assert(
@@ -344,6 +364,7 @@ console.log(JSON.stringify({
     "m3plus-first-measure-mode-evidence-covered",
     "m4-human-approved-unchanged-gold-clears",
     "m4-checklist-human-readable",
+    "handbook-current-status-does-not-reassign-completed-review",
     "project-gate-required-tracks-block-release",
   ],
 }, null, 2));
