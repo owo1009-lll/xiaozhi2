@@ -245,6 +245,7 @@ async function main() {
     nextActions: (status.nextActions || []).map((item) => ({
       priority: item.priority,
       track: item.track,
+      action: item.action,
       artifact: item.artifact,
       reason: item.reason,
     })),
