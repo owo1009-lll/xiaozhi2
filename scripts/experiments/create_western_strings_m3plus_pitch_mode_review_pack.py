@@ -78,7 +78,6 @@ JUDGEMENT_OPTIONS = [
     ("uncertain", "不确定"),
 ]
 
-
 def repo_path(value: str | Path) -> Path:
     path = Path(value)
     return path if path.is_absolute() else REPO / path
@@ -318,25 +317,25 @@ def render_html(pack: dict[str, Any]) -> str:
         audio_html = (
             f'<audio controls preload="metadata" src="{h(row.get("audioClip"))}"></audio>'
             if row.get("audioClip")
-            else '<p class="warn">没有找到音频片段,请在备注里标 uncertain。</p>'
+            else '<p class="warn">没有找到音频片段。请把本条标为不确定，并在备注里说明。</p>'
         )
         cards.append(f"""
         <section class="card" data-index="{index}">
           <header>
             <div>
               <h2>{h(row["rowId"])} · {h(row["candidateMode"])}</h2>
-              <p>录音 {h(row["recordingId"])} / 第 {h(row["measureIndex"])} 小节 / MIDI {h(row["midi"])} / 预测 {h(row["predictedOnsetSeconds"])}s</p>
+              <p>录音 {h(row["recordingId"])} / 第 {h(row["measureIndex"])} 小节 / MIDI {h(row["midi"])} / 预测 {h(row["predictedOnsetSeconds"])} 秒</p>
             </div>
             <span class="badge">{h(row["scenario"])}</span>
           </header>
           {audio_html}
           <div class="meta">
-            <span>clip: {h(row.get("clipStartSeconds"))}s–{h(row.get("clipEndSeconds"))}s</span>
-            <span>flags: {h(row.get("flags"))}</span>
+            <span>音频片段: {h(row.get("clipStartSeconds"))}s - {h(row.get("clipEndSeconds"))}s</span>
+            <span>候选标记: {h(row.get("flags"))}</span>
             {metrics_html}
           </div>
           <div class="form-grid">
-            <label>音频和谱面音是否匹配
+            <label>1. 音频和谱面是否匹配
               <select class="review-input" data-field="audioScoreMatch">
                 <option value="">未标</option>
                 <option value="match">匹配</option>
@@ -344,13 +343,13 @@ def render_html(pack: dict[str, Any]) -> str:
                 <option value="uncertain">不确定</option>
               </select>
             </label>
-            <label>实际听到的音高行为
+            <label>2. 实际听到的音高行为
               {render_select("observedPitchBehavior", BEHAVIOR_OPTIONS)}
             </label>
-            <label>如果要判音准,应采用哪种判法
+            <label>3. 应采用哪种音准判法
               {render_select("pitchJudgementMode", JUDGEMENT_OPTIONS)}
             </label>
-            <label>这个片段能否判音准
+            <label>4. 这个片段能否判音准
               <select class="review-input" data-field="pitchJudgeable">
                 <option value="">未标</option>
                 <option value="yes">可以</option>
@@ -358,7 +357,7 @@ def render_html(pack: dict[str, Any]) -> str:
                 <option value="uncertain">不确定</option>
               </select>
             </label>
-            <label>音准结论
+            <label>5. 音准结论
               <select class="review-input" data-field="pitchAccuracyLabel">
                 <option value="">未标</option>
                 <option value="in-tune">准</option>
@@ -369,7 +368,7 @@ def render_html(pack: dict[str, Any]) -> str:
                 <option value="uncertain">不确定</option>
               </select>
             </label>
-            <label>置信度 1-5
+            <label>6. 置信度 1-5
               <select class="review-input" data-field="reviewConfidence">
                 <option value="">未标</option>
                 <option value="5">5 很确定</option>
@@ -382,6 +381,7 @@ def render_html(pack: dict[str, Any]) -> str:
           </div>
           <label>备注<textarea class="review-input" data-field="reviewComments" rows="2"></textarea></label>
           <div class="actions">
+            <button type="button" class="mark-correct secondary">本条匹配且音准正确</button>
             <button type="button" class="mark-uncertain">本条不确定</button>
             <button type="button" class="mark-mismatch ghost">本条不匹配</button>
             <button type="button" class="clear-row ghost">清空本条</button>
@@ -393,7 +393,7 @@ def render_html(pack: dict[str, Any]) -> str:
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>M3+ pitch behavior 复核包</title>
+  <title>M3+ 音高行为复核包</title>
   <style>
     :root {{ font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #17202a; background: #f6f7f9; }}
     body {{ margin: 0; }}
@@ -426,15 +426,17 @@ def render_html(pack: dict[str, Any]) -> str:
 </head>
 <body>
   <main>
-    <h1>M3+ pitch behavior 人工复核包</h1>
+    <h1>M3+ 音高行为人工复核包</h1>
     <section class="intro">
-      <p><strong>目标:</strong> 判断这些候选音是否能用特定音准判法安全减少复核。这里不是给学生展示技巧名,也不是降低音准标准。</p>
-      <p><strong>标注顺序:</strong> 先判音频是否匹配该谱面音;不匹配就选"不匹配"。匹配时再标实际音高行为、应采用的音准判法、能否判音准、音准结论和置信度。</p>
-      <p><strong>安全边界:</strong> 该包只产生人工标签。未通过 precision≥90% / unsafe=0 闸门前,学生端仍全部 review-only。</p>
-      <p class="muted">候选数: {len(pack["rows"])}; 源 inventory: <code>{h(pack["sourceInventory"])}</code></p>
+      <p><strong>目标:</strong> 不是展示技巧名称,也不是评价技巧质量。这里只判断这些特殊音高行为区域能否安全判音准,从而将来减少 review_required。</p>
+      <p><strong>标注顺序:</strong> 先听音频是否匹配谱面音;不匹配就选“不匹配”。匹配时再标音高行为、判法、是否可判、音准结论和置信度。</p>
+      <p><strong>快捷按钮:</strong> “本条匹配且音准正确”和“未标全部设为匹配且正确”只填写未标项;如果不确定,请用“不确定”,不要为了凑样本硬判。</p>
+      <p><strong>安全边界:</strong> 本包只产生人工标签。未通过 precision≥90% / unsafe=0 闸门前,学生端仍全部 review-only。</p>
+      <p class="muted">候选数: {len(pack["rows"])}; inventory: <code>{h(pack["sourceInventory"])}</code></p>
     </section>
     <section class="toolbar">
       <button type="button" id="download">下载已填 CSV</button>
+      <button type="button" id="markAllCorrect" class="secondary">未标全部设为匹配且正确</button>
       <button type="button" id="markAllUncertain" class="ghost">未标全部设为不确定</button>
       <span id="progress" class="muted"></span>
     </section>
@@ -448,9 +450,60 @@ def render_html(pack: dict[str, Any]) -> str:
       const text = value == null ? "" : String(value);
       return /[",\\n\\r]/.test(text) ? '"' + text.replaceAll('"', '""') + '"' : text;
     }}
+    function defaultBehavior(mode) {{
+      return {{
+        "slide-like": "slide",
+        "trill-like": "trill",
+        "double-stop-candidate": "double-stop",
+        "ornament-candidate": "ornament",
+        "stable": "stable",
+        "variable-f0": "variable-f0",
+      }}[mode] || "uncertain";
+    }}
+    function defaultJudgement(mode) {{
+      return {{
+        "slide-like": "slide-start-end",
+        "trill-like": "trill-two-targets",
+        "double-stop-candidate": "multi-f0",
+        "ornament-candidate": "ornament-main-note",
+        "stable": "normal-center",
+        "variable-f0": "normal-center",
+      }}[mode] || "uncertain";
+    }}
+    function isUnmarked(row) {{
+      return !row.audioScoreMatch && !row.observedPitchBehavior && !row.pitchJudgeable && !row.pitchAccuracyLabel;
+    }}
+    function markCorrect(row) {{
+      row.audioScoreMatch = "match";
+      row.observedPitchBehavior = defaultBehavior(row.candidateMode);
+      row.pitchJudgementMode = defaultJudgement(row.candidateMode);
+      row.pitchJudgeable = "yes";
+      row.pitchAccuracyLabel = "in-tune";
+      row.reviewConfidence = row.reviewConfidence || "4";
+    }}
+    function markUncertain(row) {{
+      row.audioScoreMatch = "uncertain";
+      row.observedPitchBehavior = "uncertain";
+      row.pitchJudgementMode = "uncertain";
+      row.pitchJudgeable = "uncertain";
+      row.pitchAccuracyLabel = "uncertain";
+      row.reviewConfidence = row.reviewConfidence || "1";
+    }}
+    function markMismatch(row) {{
+      row.audioScoreMatch = "mismatch";
+      row.pitchJudgeable = "no";
+      row.pitchAccuracyLabel = "not-judgeable";
+      row.reviewConfidence = row.reviewConfidence || "4";
+    }}
     function refreshProgress() {{
       const reviewed = rows.filter((row) => row.audioScoreMatch || row.pitchJudgeable || row.observedPitchBehavior).length;
       document.getElementById("progress").textContent = `已标 ${{reviewed}} / ${{rows.length}}`;
+    }}
+    function applyRowToCard(index, card) {{
+      card.querySelectorAll(".review-input").forEach((input) => {{
+        input.value = rows[index][input.dataset.field] || "";
+      }});
+      refreshProgress();
     }}
     function bindCard(card) {{
       const index = Number(card.dataset.index);
@@ -465,20 +518,16 @@ def render_html(pack: dict[str, Any]) -> str:
           refreshProgress();
         }});
       }});
+      card.querySelector(".mark-correct").addEventListener("click", () => {{
+        markCorrect(rows[index]);
+        applyRowToCard(index, card);
+      }});
       card.querySelector(".mark-uncertain").addEventListener("click", () => {{
-        rows[index].audioScoreMatch = "uncertain";
-        rows[index].observedPitchBehavior = "uncertain";
-        rows[index].pitchJudgementMode = "uncertain";
-        rows[index].pitchJudgeable = "uncertain";
-        rows[index].pitchAccuracyLabel = "uncertain";
-        rows[index].reviewConfidence = "1";
+        markUncertain(rows[index]);
         applyRowToCard(index, card);
       }});
       card.querySelector(".mark-mismatch").addEventListener("click", () => {{
-        rows[index].audioScoreMatch = "mismatch";
-        rows[index].pitchJudgeable = "no";
-        rows[index].pitchAccuracyLabel = "not-judgeable";
-        rows[index].reviewConfidence = "4";
+        markMismatch(rows[index]);
         applyRowToCard(index, card);
       }});
       card.querySelector(".clear-row").addEventListener("click", () => {{
@@ -488,23 +537,16 @@ def render_html(pack: dict[str, Any]) -> str:
         applyRowToCard(index, card);
       }});
     }}
-    function applyRowToCard(index, card) {{
-      card.querySelectorAll(".review-input").forEach((input) => {{
-        input.value = rows[index][input.dataset.field] || "";
-      }});
-      refreshProgress();
-    }}
     document.querySelectorAll(".card").forEach(bindCard);
+    document.getElementById("markAllCorrect").addEventListener("click", () => {{
+      rows.forEach((row) => {{
+        if (isUnmarked(row)) markCorrect(row);
+      }});
+      document.querySelectorAll(".card").forEach((card) => applyRowToCard(Number(card.dataset.index), card));
+    }});
     document.getElementById("markAllUncertain").addEventListener("click", () => {{
       rows.forEach((row) => {{
-        if (!row.audioScoreMatch && !row.observedPitchBehavior && !row.pitchJudgeable) {{
-          row.audioScoreMatch = "uncertain";
-          row.observedPitchBehavior = "uncertain";
-          row.pitchJudgementMode = "uncertain";
-          row.pitchJudgeable = "uncertain";
-          row.pitchAccuracyLabel = "uncertain";
-          row.reviewConfidence = "1";
-        }}
+        if (isUnmarked(row)) markUncertain(row);
       }});
       document.querySelectorAll(".card").forEach((card) => applyRowToCard(Number(card.dataset.index), card));
     }});
@@ -530,17 +572,18 @@ def render_html(pack: dict[str, Any]) -> str:
 def write_guide(path: Path, rows: list[dict[str, Any]], stats: dict[str, Any]) -> None:
     path.write_text(
         "\n".join([
-            "# M3+ pitch behavior 复核指南",
+            "# M3+ 音高行为复核指南",
             "",
             "## 这一步要判断什么",
             "",
             "这不是技巧名称展示,也不是技巧质量评价。目标是确认某些音高行为区域能否安全判音准,从而在将来减少 review_required。",
             "",
-            "标注时按顺序做:",
+            "标注顺序:",
             "1. 先听短音频,判断音频是否匹配这一行的谱面音。",
             "2. 不匹配就标 `mismatch`,后面的音准字段可设为不可判。",
             "3. 匹配时,再标实际音高行为、应采用的音准判法、是否可判音准、音准结论和置信度。",
             "4. 拿不准就标 `uncertain`;不要为了凑样本硬判。",
+            "5. 页面里的快捷按钮只填未标项。若要全局快速处理,先确认大部分样本确实符合该判断。",
             "",
             "## 本包规模",
             "",
@@ -552,11 +595,12 @@ def write_guide(path: Path, rows: list[dict[str, Any]], stats: dict[str, Any]) -
             "",
             "- 打开 `index.html` 复核。",
             "- 标完点击页面上的 `下载已填 CSV`,得到 `m3plus-pitch-mode-review.completed.csv`。",
-            "- 当前没有 import/gate 步骤;这批标签先用于设计 M3+ precision 评估。",
+            "- 下载后运行 `npm run western:m3plus-review-import -- --reviews <completed.csv>` 导入标签。",
+            "- 当前标签只用于 M3+ precision 评估,不直接打开学生端。",
             "",
             "## 安全边界",
             "",
-            "在具体模式证明 note-level 音准 precision≥90% 且 unsafe=0 前,学生端仍保持 review-only。",
+            "在具体模式证明 note-level 音准 precision>=90% 且 unsafe=0 前,学生端仍保持 review-only。",
             "",
         ]),
         encoding="utf-8",
