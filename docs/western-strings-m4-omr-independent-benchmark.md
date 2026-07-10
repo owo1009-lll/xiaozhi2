@@ -47,3 +47,24 @@
 1. 原型 **音频仲裁的变体赛马**(B 层):复用 basic-pitch 事件支持,反向校验 OMR 谱。
 2. 为 2–3 份真照片人工编辑独立 gold,校准"真照片域独立准确率"。
 3. 手册 M4 阈值由"[待定 ≥98%]"改为本基准支持的分层闸门(见 §4)。
+
+## 7. 端到端原型:照片 + 录音 → 问题落回谱面(2026-07-11)
+
+脚本: `scripts/experiments/proto_western_strings_score_anchored_feedback.py`(eval-only,不触碰生产闸门)
+产物: `data/experiments/western-strings-m4/score-anchored-proto/`(标注图 + 逐音 verdict JSON)
+
+**链路**:Audiveris `.omr` 的 `<measure><head-chords>` 权威和弦 ID 列表 + `<head-chord><bounds>` 像素框 → 与识别 MusicXML 逐小节一一对应(数量不符的小节整体标"锚定不确定");录音经 basic-pitch 提取音高事件,与谱面音序做半音代价对齐;逐音判定后画回**原始照片**。
+
+**颜色语义(fail-closed)**:绿=音频确认;红=音频矛盾(仅在整篇吻合度≥60% 时才允许出现);黄=无音频证据(检测漏与演奏漏不可分,不指控);灰=录音未覆盖;蓝=锚定不确定小节。
+
+**真实录音验证**:
+| 片段 | 场景 | 结果 |
+|---|---|---|
+| violin-ex02 | 故意错音 | **2 个红框落在确切错音位置**(谱81/实83;谱71/实72),吻合度 97.5%,不确定小节仅 1/14 |
+| violin-ex08 | 故意错音 | 11 红,吻合度 90.4% |
+| violin-ex01 | 正确演奏 | 88 绿、0 红(快速连奏段 basic-pitch 漏检→黄,中性) |
+| violin-ex05 | 弱起音 | 吻合度 44.7%(疑对齐伪影)→ **pieceGate=low-agreement-review,全部红降级为黄**,不冤枉学生 |
+
+**发现的额外数据问题**:violin-ex02 照片含 25 小节,而"人工批准未改动"的草稿仅导出前 14 小节——批准草稿存在不完整风险,佐证独立核对必要性。
+
+**边界**:单声部假设(取和弦最高音)、basic-pitch 对快速连奏欠检出、对齐为纯音高序列(未用节拍/时值);`audioAgreementHeard` 即 M4 B 层变体仲裁指标的雏形。
