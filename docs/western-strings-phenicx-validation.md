@@ -62,32 +62,45 @@ PHENICX-Anechoic 用于补上 Bach Violin Dataset 的主要证据缺口:Bach 参
 - gold 末端不超过音频时长。
 - score/gold 音高序列一一对应。
 
+适配器已通过:
+
+- `adapterReady=true`。
+- 4/4 小提琴声部混音可解码、有限值、0 削波,输出峰值约 0.95。
+- 2,969 行 score/gold 映射和音高顺序保持不变。
+- 54 个零时值/回退 score 音符只在派生时间线上修复;源注释未修改。
+- development 固定为 Mozart/Beethoven,holdout 固定为 Mahler/Bruckner。
+- 连续两次生成的 4 个混音 SHA-256 和 4 个 notes SHA-256 全部一致。
+
 尚未通过:
 
-- 派生小提琴声部混音尚未生成和审计。
 - Parangonar/Basic Pitch 尚未在 PHENICX 人工 gold 上评测。
 - PHENICX alignment gate 尚未判定。
 
-因此当前只允许进入适配器阶段,不得把 `readyForAlignmentBenchmark=true` 写成“人工 gold 对齐已通过”。
+因此当前只允许进入模型评测阶段,不得把 `adapterReady=true` 写成“人工 gold 对齐已通过”。
 
 ## 6. 可复跑命令
 
 ```bash
 npm run test:western-phenicx-dataset-audit
 npm run western:phenicx-dataset-audit
+npm run test:western-phenicx-alignment-adapter
+npm run western:phenicx-prepare-alignment
 ```
 
 权威机器报告:
 
 - `data/experiments/western-strings-phenicx-dataset-audit.json`
 - `data/experiments/western-strings-phenicx-dataset-audit.md`
+- `data/experiments/western-strings-phenicx-adapter/manifest.json`
+- `data/experiments/western-strings-phenicx-adapter/manifest.md`
 
 ## 7. 下一环节进入条件
 
-只有混音适配器满足以下条件才进入模型评测:
+混音适配器条件已经全部满足。下一环节只有在以下人工 gold 对齐闸门通过后才算成功:
 
-- 4/4 派生混音可解码、时长与源分轨一致。
-- 混音无 NaN/Inf,峰值不削波。
-- 源文件及注释保持只读不变。
-- score 时间归一化是确定性的,音符行数/音高/映射不变。
-- 单元测试和真实数据适配审计全部通过。
+- development 只能选择规则/阈值,holdout 不调参。
+- holdout median onset error <150ms。
+- holdout p90 onset error <500ms。
+- holdout hit@300ms >=85%。
+- holdout coverage >=80%。
+- 复音音符和每部作品必须单独报告,不得用总体均值掩盖失败作品。

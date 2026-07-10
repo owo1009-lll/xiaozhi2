@@ -206,4 +206,4 @@ npm run western:ordinary-auto-pass-precision-review-pack -- --recording-id <fres
 
 下一环节 PHENICX 数据许可、下载和结构审计已通过:`readyForAlignmentBenchmark=true`,4/4 作品、22 条同步小提琴分轨、2,969 个逐乐器人工对齐音符。完整边界和进入条件见 [western-strings-phenicx-validation.md](western-strings-phenicx-validation.md)。
 
-这只表示数据可进入适配器阶段,尚不表示 PHENICX 对齐模型通过。当前下一步是确定性生成 4 份小提琴声部混音和单调 score 时间副本;该适配审计全过后才运行模型。
+PHENICX 适配器现已通过:`adapterReady=true`,4/4 混音 0 削波、2,969 行映射保持、54 个 score 时间异常只在派生副本修复,且两次生成哈希完全一致。当前下一步已推进为人工 gold 模型评测;对齐闸门未通过前仍不得称为 PHENICX 对齐成功。

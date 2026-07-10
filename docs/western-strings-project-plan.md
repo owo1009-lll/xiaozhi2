@@ -398,3 +398,5 @@
 - 已显式记录 54 个零时值 score 音符和 Beethoven 1 个 150ms score onset 回退装饰音;适配器必须保留行顺序并只在内存中做单调时间归一化。
 - `violin.txt` 是整个小提琴声部复音 gold;必须混合每部作品全部 violin 分轨,不得拿单分轨对整声部 gold。
 - 当前仅 `readyForAlignmentBenchmark=true`,PHENICX 模型对齐尚未通过。详细闸门见 `docs/western-strings-phenicx-validation.md`。
+- PHENICX 适配器已完成并通过确定性复跑:`adapterReady=true`,4/4 混音、0 clipping、2,969 行映射保留、重复生成 SHA-256 一致。固定分组为 development=Mozart/Beethoven、holdout=Mahler/Bruckner。
+- 下一步只运行人工 gold 对齐模型,holdout 不调参;median<150ms、p90<500ms、hit@300>=85%、coverage>=80% 全过后才进入 Violin Etudes。
