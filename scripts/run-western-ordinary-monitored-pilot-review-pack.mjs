@@ -30,6 +30,7 @@ function parseArgs(argv) {
     summary: DEFAULT_SUMMARY,
     keepTemp: false,
     excludeRecordingIds: [],
+    includeRecordingIds: [],
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -45,6 +46,7 @@ function parseArgs(argv) {
     else if (arg === "--selection-json") args.selectionJson = argv[++index] || args.selectionJson;
     else if (arg === "--summary") args.summary = argv[++index] || args.summary;
     else if (arg === "--exclude-recording-id") args.excludeRecordingIds.push(argv[++index] || "");
+    else if (arg === "--recording-id") args.includeRecordingIds.push(argv[++index] || "");
     else if (arg === "--keep-temp") args.keepTemp = true;
   }
   return args;
@@ -241,10 +243,31 @@ function excludedRecordingIdsFromRelease(release) {
   return ids;
 }
 
+export function filterAcceptedSubmissions({
+  submissions = [],
+  acceptedReviews = [],
+  excludedRecordingIds = [],
+  includeRecordingIds = [],
+} = {}) {
+  const acceptedIds = new Set(
+    acceptedReviews
+      .filter((review) => safeString(review.action).trim() === "accepted_for_batch")
+      .map((review) => safeString(review.submissionId).trim())
+      .filter(Boolean),
+  );
+  const excluded = new Set(excludedRecordingIds.map((value) => safeString(value).trim()).filter(Boolean));
+  const included = new Set(includeRecordingIds.map((value) => safeString(value).trim()).filter(Boolean));
+  return submissions
+    .filter((submission) => acceptedIds.has(safeString(submission.submissionId).trim()))
+    .filter((submission) => !excluded.has(safeString(submission.recordingId).trim()))
+    .filter((submission) => included.size === 0 || included.has(safeString(submission.recordingId).trim()));
+}
+
 async function selectAcceptedSubmissions({
   batchLimit,
   analysisLimit,
   excludeRecordingIds: requestedExcludedRecordingIds = [],
+  includeRecordingIds: requestedIncludedRecordingIds = [],
 }) {
   const submissionsPath = path.join(process.cwd(), "data", "experiments", "western-strings-m3", "controlled-submissions.jsonl");
   const reviewsPath = path.join(process.cwd(), "data", "experiments", "western-strings-m3", "controlled-submission-reviews.jsonl");
@@ -256,19 +279,20 @@ async function selectAcceptedSubmissions({
   }
   const submissions = await readJsonl(submissionsPath);
   const acceptedReviews = await readJsonl(reviewsPath);
-  const acceptedIds = new Set(
-    acceptedReviews
-      .filter((review) => safeString(review.action).trim() === "accepted_for_batch")
-      .map((review) => safeString(review.submissionId).trim())
-      .filter(Boolean),
-  );
-  const accepted = submissions
-    .filter((submission) => acceptedIds.has(safeString(submission.submissionId).trim()))
-    .filter((submission) => !excludedRecordingIds.has(safeString(submission.recordingId).trim()));
+  const includeRecordingIds = [...new Set(
+    requestedIncludedRecordingIds.map((value) => safeString(value).trim()).filter(Boolean),
+  )];
+  const accepted = filterAcceptedSubmissions({
+    submissions,
+    acceptedReviews,
+    excludedRecordingIds: [...excludedRecordingIds],
+    includeRecordingIds,
+  });
   const limit = Number.isFinite(batchLimit) && batchLimit > 0 ? Math.floor(batchLimit) : accepted.length;
   return {
     release,
     excludedRecordingIds: [...excludedRecordingIds],
+    includeRecordingIds,
     selected: accepted.slice(0, limit).map((submission) => ({
       ...submission,
       limit: Number.isFinite(analysisLimit) && analysisLimit > 0 ? Math.floor(analysisLimit) : submission.limit,
@@ -598,10 +622,16 @@ export async function runOrdinaryMonitoredPilotReviewPack(args = {}) {
     summary: DEFAULT_SUMMARY,
     keepTemp: false,
     excludeRecordingIds: [],
+    includeRecordingIds: [],
     ...args,
   };
   args.excludeRecordingIds = [...new Set(
     (Array.isArray(args.excludeRecordingIds) ? args.excludeRecordingIds : [])
+      .map((recordingId) => safeString(recordingId).trim())
+      .filter(Boolean),
+  )];
+  args.includeRecordingIds = [...new Set(
+    (Array.isArray(args.includeRecordingIds) ? args.includeRecordingIds : [])
       .map((recordingId) => safeString(recordingId).trim())
       .filter(Boolean),
   )];
@@ -613,13 +643,16 @@ export async function runOrdinaryMonitoredPilotReviewPack(args = {}) {
   let tempRootDeleted = false;
   let summary;
   try {
-    const { release, excludedRecordingIds, selected } = await selectAcceptedSubmissions({
+    const { release, excludedRecordingIds, includeRecordingIds, selected } = await selectAcceptedSubmissions({
       batchLimit: args.batchLimit,
       analysisLimit: args.analysisLimit,
       excludeRecordingIds: args.excludeRecordingIds,
+      includeRecordingIds: args.includeRecordingIds,
     });
     if (!selected.length) {
-      throw new Error("No accepted controlled submissions are available after excluding known bad recording IDs.");
+      throw new Error(includeRecordingIds.length
+        ? `No accepted controlled submission matches recordingId=${includeRecordingIds.join(",")}.`
+        : "No accepted controlled submissions are available after excluding known bad recording IDs.");
     }
     const knownLabelSet = await loadKnownLabelMap(args.knownLabels || DEFAULT_KNOWN_LABELS);
     const tempReleasePath = await setupTempRepo(tempRoot, selected);
@@ -661,6 +694,7 @@ export async function runOrdinaryMonitoredPilotReviewPack(args = {}) {
       selectedSubmissionCount: selected.length,
       excludedRecordingIds,
       requestedExcludedRecordingIds: args.excludeRecordingIds,
+      requestedIncludedRecordingIds: includeRecordingIds,
       knownUsableRows: selection.knownUsableRows,
       knownWrongRows: selection.knownWrongRows,
       rows: selection.rows,
@@ -688,6 +722,7 @@ export async function runOrdinaryMonitoredPilotReviewPack(args = {}) {
       })),
       excludedRecordingIds,
       requestedExcludedRecordingIds: args.excludeRecordingIds,
+      requestedIncludedRecordingIds: includeRecordingIds,
       tempRunOnly: true,
       tempRoot: args.keepTemp ? tempRoot : "",
       tempRootDeleted: false,

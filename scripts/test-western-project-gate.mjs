@@ -273,12 +273,20 @@ assert(
   "package.json must expose fresh blind intake tests",
 );
 assert(
+  packageJson.scripts?.["test:western-ordinary-pilot-selection"],
+  "package.json must expose exact-recording pilot selection tests",
+);
+assert(
   releaseReviewSource.includes('"test:western-controlled-pilot-run"'),
   "release review must rerun the controlled-pilot runner safety tests before approval",
 );
 assert(
   releaseReviewSource.includes('"test:western-fresh-blind-intake"'),
   "release review must rerun fresh blind intake leakage tests before approval",
+);
+assert(
+  releaseReviewSource.includes('"test:western-ordinary-pilot-selection"'),
+  "release review must rerun exact-recording selection tests before approval",
 );
 assert(
   releaseReviewSource.includes('"test:western-controlled-pilot-evidence-audit"')

@@ -14,6 +14,7 @@ const STEPS = [
   "test:western-controlled-pilot-run",
   "test:western-controlled-pilot-evidence-audit",
   "test:western-fresh-blind-intake",
+  "test:western-ordinary-pilot-selection",
   "western:ordinary-monitored-pilot-audit",
   "western:m3plus-monitored-pilot-audit",
   "western:m4-preflight",

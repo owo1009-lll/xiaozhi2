@@ -116,6 +116,14 @@ npm run western:fresh-blind-intake-init
 npm run western:fresh-blind-intake-status
 ```
 
+入场闸门通过后，机器预检必须精确指定本次全新录音，不能按队列顺序取样:
+
+```bash
+npm run western:ordinary-auto-pass-precision-review-pack -- --recording-id <fresh-recording-id>
+```
+
+若该录音没有候选、出现不安全候选或被历史证据排除，立即停止，不生成教师复核包。
+
 模板位置:
 
 - `data/private/western-strings-v2alpha-blind-intake/intake.json`

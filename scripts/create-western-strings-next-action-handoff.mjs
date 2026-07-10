@@ -271,7 +271,7 @@ function commandForAction(action) {
     return [
       "Open data/experiments/western-strings-v2alpha-blind-intake-status.md and confirm readyForMachinePrecheck=true.",
       "Stage only the candidate named in that report into the controlled intake; do not mix it into training labels.",
-      "Run the ordinary machine precheck with the first-measure-only scope and keep every later-measure candidate review_required.",
+      "Run the ordinary machine precheck with --recording-id set to the fresh intake recording; the whitelist must select exactly that recording. Keep every later-measure candidate review_required.",
       "If the machine precheck produces no scoped candidate or any unsafe candidate, stop and fix the input/candidate pipeline before professional review.",
       "Generate a small fresh blind professional pack only after the machine precheck passes, then machine-QA audio playback, score location, controls, and scope membership.",
       "Keep production/default student runtime fail-closed until the fresh blind professional audit passes.",

@@ -69,6 +69,8 @@ The intake must use a new recording and, by default, a new piece/score; it also
 requires a clean-score approval, consent/license metadata, a resolvable violin
 part with a parseable first measure, decodable audio, and an existing score image/PDF. Any missing or reused
 evidence blocks staging and professional review.
+The ordinary precheck must use `--recording-id <fresh recordingId>` so accepted
+historical submissions cannot be selected by list order.
 
 ### M3+ Pitch Behavior Modes
 
