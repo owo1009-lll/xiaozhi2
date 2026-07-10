@@ -37,7 +37,7 @@ npm run test:western-hf2-hardanger-audit
 
 ## 3. 低负载增量协议
 
-当前电脑不允许一次连续推理 20 或 100 条。评测命令默认每次最多新增一条模型推理；已有缓存只复用，不重复计算。未缓存录音按时长从短到长调度，避免长录音反复撞固定时间闸。
+当前电脑不允许一次连续推理 20 或 100 条。评测命令使用单进程顺序小批量：每次最多新增 2 条、总音频时长不超过 100 秒、`batch=128`，不并行；已有缓存只复用，不重复计算。未缓存录音按时长从短到长调度，避免长录音反复撞固定时间闸，也避免每条重复支付超过 60 秒的模型初始化成本。
 
 HF2 的整数 MIDI、onset-only 评分已从 `mir_eval` 稠密/私有匹配器改为 SciPy 稀疏 Hopcroft-Karp 最大二分匹配。真实第一条缓存（551 gold / 371 estimated）三档容差总计耗时约 0.004 秒；原路径在同一缓存上超过 10 分钟。该优化只替换等价的最大匹配实现，不修改模型输出、冻结阈值或 gate。
 
@@ -47,13 +47,13 @@ HF2 的整数 MIDI、onset-only 评分已从 `mir_eval` 稠密/私有匹配器�
 npm run western:hf2-hardanger-musc-direct-status
 ```
 
-每次只推进一条直接核心：
+每次推进一个受资源上限约束的小批量：
 
 ```bash
 npm run western:hf2-hardanger-musc-direct
 ```
 
-只有 `20/20` 完成且 `hardangerDirectCoreV2Passed=true`，表现压力入口才会解锁。之后每次仍只新增一条：
+只有 `20/20` 完成且 `hardangerDirectCoreV2Passed=true`，表现压力入口才会解锁。之后仍使用相同的小批量资源上限：
 
 ```bash
 npm run western:hf2-hardanger-musc-all

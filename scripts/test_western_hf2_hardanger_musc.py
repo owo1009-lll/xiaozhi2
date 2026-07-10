@@ -65,6 +65,7 @@ class WesternHf2HardangerMuscTest(unittest.TestCase):
                 postprocessing,
                 force=False,
                 max_new_units=1,
+                max_new_audio_seconds=100,
             )
         self.assertEqual(
             [(item["source"]["id"], item["action"]) for item in plan],
@@ -80,8 +81,26 @@ class WesternHf2HardangerMuscTest(unittest.TestCase):
                 {"onsetThreshold": 0.5, "frameThreshold": 0.4, "minimumNoteLengthMs": 60},
                 force=False,
                 max_new_units=0,
+                max_new_audio_seconds=100,
             )
         self.assertEqual(plan[0]["action"], "pending")
+
+    def test_incremental_plan_caps_total_audio_duration_without_blocking_first(self) -> None:
+        selected = [
+            {"id": "a", "audioPath": "a.wav", "audio": {"durationSeconds": 44}},
+            {"id": "b", "audioPath": "b.wav", "audio": {"durationSeconds": 46}},
+            {"id": "c", "audioPath": "c.wav", "audio": {"durationSeconds": 60}},
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plan = MODULE.build_incremental_plan(
+                selected,
+                Path(temp_dir),
+                {"onsetThreshold": 0.5, "frameThreshold": 0.4, "minimumNoteLengthMs": 60},
+                force=False,
+                max_new_units=3,
+                max_new_audio_seconds=100,
+            )
+        self.assertEqual([item["action"] for item in plan], ["predict", "predict", "pending"])
 
     def test_sparse_integer_midi_matching_finds_maximum_cardinality(self) -> None:
         reference_rows = [

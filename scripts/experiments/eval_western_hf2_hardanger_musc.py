@@ -209,9 +209,12 @@ def build_incremental_plan(
     *,
     force: bool,
     max_new_units: int,
+    max_new_audio_seconds: float,
 ) -> list[dict[str, Any]]:
     if max_new_units < 0:
         raise ValueError("max_new_units must be non-negative")
+    if max_new_audio_seconds < 0:
+        raise ValueError("max_new_audio_seconds must be non-negative")
     cached_items = []
     uncached_items = []
     for source in selected:
@@ -228,13 +231,22 @@ def build_incremental_plan(
             str(item["source"].get("id") or ""),
         )
     )
-    scheduled_items = [
-        {
-            **item,
-            "action": "predict" if index < max_new_units else "pending",
-        }
-        for index, item in enumerate(uncached_items)
-    ]
+    scheduled_items = []
+    scheduled_count = 0
+    scheduled_seconds = 0.0
+    for item in uncached_items:
+        duration = float((item["source"].get("audio") or {}).get("durationSeconds") or 0.0)
+        within_count = scheduled_count < max_new_units
+        within_duration = (
+            max_new_audio_seconds <= 0
+            or scheduled_count == 0
+            or scheduled_seconds + duration <= max_new_audio_seconds
+        )
+        action = "predict" if within_count and within_duration else "pending"
+        if action == "predict":
+            scheduled_count += 1
+            scheduled_seconds += duration
+        scheduled_items.append({**item, "action": action})
     return cached_items + scheduled_items
 
 
@@ -284,6 +296,12 @@ def parse_args() -> argparse.Namespace:
         default=1,
         help="Maximum uncached recordings to infer in this invocation; 0 is status-only.",
     )
+    parser.add_argument(
+        "--max-new-audio-seconds",
+        type=float,
+        default=100.0,
+        help="Maximum total duration of newly inferred recordings; 0 disables this cap.",
+    )
     parser.add_argument("--force", action="store_true")
     return parser.parse_args()
 
@@ -299,6 +317,8 @@ def main() -> int:
         raise SystemExit(f"HF2 selection count mismatch: expected {expected}, found {len(selected)}")
     if int(args.max_new_units) < 0:
         raise SystemExit("--max-new-units must be non-negative.")
+    if float(args.max_new_audio_seconds) < 0:
+        raise SystemExit("--max-new-audio-seconds must be non-negative.")
 
     calibration = json.loads(Path(args.calibration).resolve().read_text(encoding="utf-8"))
     if calibration.get("calibrationV2Ready") is not True:
@@ -324,6 +344,7 @@ def main() -> int:
         postprocessing,
         force=bool(args.force),
         max_new_units=int(args.max_new_units),
+        max_new_audio_seconds=float(args.max_new_audio_seconds),
     )
     if int(args.max_new_units) == 0 and not args.force:
         cached = [item for item in plan if item["action"] == "cache"]
@@ -468,6 +489,14 @@ def main() -> int:
         "directCoreEvaluationComplete": direct_complete,
         "cacheHitUnitCount": cache_hits,
         "newlyPredictedUnitCount": newly_predicted,
+        "newlyPredictedAudioSeconds": round(
+            sum(
+                float((item["source"].get("audio") or {}).get("durationSeconds") or 0.0)
+                for item in plan
+                if item["action"] == "predict"
+            ),
+            3,
+        ),
         "pendingUnitCount": len(pending),
         "pending": pending,
         "units": units,
@@ -510,6 +539,7 @@ def main() -> int:
                 "directCoreEvaluationComplete": direct_complete,
                 "cacheHitUnitCount": cache_hits,
                 "newlyPredictedUnitCount": newly_predicted,
+                "newlyPredictedAudioSeconds": report["newlyPredictedAudioSeconds"],
                 "pendingUnitCount": len(pending),
                 "directHumanCore": direct,
                 "transferredExpressiveStress": expressive,
