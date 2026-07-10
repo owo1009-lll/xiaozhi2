@@ -538,6 +538,7 @@ async function readDiagnosisRows(repoRoot) {
 function hasControlledSubmissionPayload(payload = {}) {
   return Boolean(
     safeString(payload?.scoreId).trim()
+    || safeString(payload?.scorePhotoPath).trim()
     || safeString(payload?.audioPath).trim()
     || safeString(payload?.audioHash).trim()
     || safeString(payload?.audioSubmission?.name).trim()
@@ -546,18 +547,24 @@ function hasControlledSubmissionPayload(payload = {}) {
 
 async function buildControlledSubmissionAnalysis(repoRoot, payload = {}) {
   const scoreId = safeString(payload.scoreId).trim();
+  const scorePhotoPath = safeString(payload.scorePhotoPath).trim();
   const audioHash = safeString(payload.audioHash).trim();
   const audioPath = safeString(payload.audioPath).trim();
   const hasAudio = Boolean(audioHash || audioPath || safeString(payload.audioSubmission?.name).trim());
+  const isPhotoScore = Boolean(scorePhotoPath) && !scoreId;
   const blockingReasons = [
-    scoreId ? "" : "controlled-submission-missing-score",
+    scoreId || scorePhotoPath ? "" : "controlled-submission-missing-score",
     hasAudio ? "" : "controlled-submission-missing-audio",
-    scoreId && hasAudio ? "controlled-submission-requires-offline-analysis" : "",
+    (scoreId || scorePhotoPath) && hasAudio
+      ? (isPhotoScore ? "photo-score-requires-offline-pipeline" : "controlled-submission-requires-offline-analysis")
+      : "",
   ].filter(Boolean);
   const submission = {
     submissionId: createId("strings-submit"),
     submittedAt: nowIso(),
     scoreId,
+    kind: isPhotoScore ? "photo-score" : "clean-score",
+    scorePhotoPath,
     dataset: safeString(payload.dataset).trim(),
     piece: safeString(payload.piece).trim(),
     recordingId: safeString(payload.recordingId).trim(),
@@ -567,7 +574,8 @@ async function buildControlledSubmissionAnalysis(repoRoot, payload = {}) {
     audioPath,
     audioSubmission: payload.audioSubmission || null,
     status: "review_required",
-    reason: blockingReasons[0] || "controlled-submission-requires-offline-analysis",
+    reason: blockingReasons[0]
+      || (isPhotoScore ? "photo-score-requires-offline-pipeline" : "controlled-submission-requires-offline-analysis"),
   };
   const outPath = controlledSubmissionsPath(repoRoot);
   await fs.mkdir(path.dirname(outPath), { recursive: true });
@@ -1291,6 +1299,7 @@ export function parseStudentAnalysisPayload(payload = {}) {
     limit: Math.max(0, Math.round(safeNumber(payload.limit, 0))),
     recordingId: safeString(payload.recordingId).trim(),
     scoreId: safeString(payload.scoreId).trim(),
+    scorePhotoPath: safeString(payload.scorePhotoPath).trim(),
     audioPath: safeString(payload.audioPath).trim(),
     audioHash: safeString(payload.audioHash).trim(),
     audioSubmission: payload.audioSubmission || null,

@@ -126,3 +126,9 @@
 4. 仲裁器按"音频确认量"选胜者,不含页面结构完整性信号(ex11 类歧义);
 5. 性能:单条约 2–6 分钟(OMR×3+basic-pitch),定位为离线批处理,非实时;
 6. 服务端路由/UI 接线未做(归 runtime 线,受既有审批闸门);真照片人工 gold 仍缺。
+
+### 8.6 服务端接线完成(2026-07-11 第四轮)
+- **入口**:`POST /api/strings/analyze` 受控提交现接受 `scorePhotoPath`+audio → 登记为 `kind=photo-score` 队列项(`photo-score-requires-offline-pipeline`,`studentReady=false`,零 decisions)。
+- **执行**:`npm run western:photo-score-batch` 只处理教师审核 `accepted_for_batch` 的照片提交,调用 python 管线,追加审计(`autoDiagnosisIssued=false`、`studentFacing=false`),幂等(已跑过的跳过)。
+- **E2E 实证**:入口→审核→批处理→审计 一条真数据(violin-ex12 照片+录音)走通,decision=`full-feedback:up3`。
+- **测试**:`test:western-photo-score-intake`(入口 fail-closed 4 项)通过;`test:western-feature-flags`、`test:western-alignment-preview` 回归无破坏。学生端运行时闸门全程未动。

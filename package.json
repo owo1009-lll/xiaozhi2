@@ -244,7 +244,9 @@
     "teacher:technique-labeling-export": "node scripts/export-technique-labeling-dataset.mjs",
     "teacher:manual-anchor-export": "node scripts/export-manual-anchor-labels.mjs",
     "western:photo-score": "python scripts/western_photo_score_pipeline.py",
-    "test:western-photo-score": "python scripts/test_western_photo_score_pipeline.py"
+    "test:western-photo-score": "python scripts/test_western_photo_score_pipeline.py",
+    "western:photo-score-batch": "node scripts/run-western-photo-score-batch.mjs",
+    "test:western-photo-score-intake": "node scripts/test-western-photo-score-intake.mjs"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.99",
