@@ -91,3 +91,9 @@ npm run western:bach-violin-musc-fresh-confirmation
 - `data/experiments/western-strings-bach-violin-musc-fresh-confirmation/report.json`
 
 模型代码、权重、音频、缓存和报告均在 gitignored `data/`,不入 Git。
+
+## 7. HF2 域外复音/表现压力
+
+HF2 Hardanger Fiddle 数据已通过文件、许可证和人工标注来源审计。冻结 MUSC 模型仅按一次一条的低负载协议推进；当前直接核心缓存为 1/20，尚不能形成 V2/V3 结论。只有直接核心 20/20 完成且 V2 闸门通过，才允许继续 80 条表现变体。
+
+完整边界、命令和资源纪律见 [western-strings-hf2-hardanger-validation.md](western-strings-hf2-hardanger-validation.md)。HF2 是域外复音/装饰压力集，不得写成古典小提琴、学生端或运行时发布证据。
