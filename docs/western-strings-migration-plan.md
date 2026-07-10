@@ -361,3 +361,10 @@ OMR 只解决"谱面从哪来",不改变音频诊断逻辑。未过 note-level �
 - 只有 4/4 混音和映射审计通过后才允许运行 Parangonar/Basic Pitch 人工 gold 对齐评测。详见 `docs/western-strings-phenicx-validation.md`。
 - 适配器和 PHENICX 人工 gold 工程闸门现已通过。冻结组合 `parangonar-with-basic-fallback` 的 holdout coverage=1.000、median=32.9ms、p90=352.6ms、`hit@300ms=0.8834`,两首逐曲过闸。
 - 复音子组未过,且当前是顺序工程验证而非未触碰 holdout。下一步仅允许在新外部数据冻结确认和评测识别;学生域与“完美”结论仍不成立。
+
+# 2026-07-10 MUSC/弱标签执行结果
+
+- MUSC 默认后处理在快速音上漏检;development-only 校准后,冻结配置在未参与校准的 Oliver 单声部核心上达到 precision@100ms=0.9142、recall@100ms=0.9396,V2 识别候选通过。
+- 50ms precision=0.8025,V3 严格目标未过;Silei 和高双音乐章只作压力测试,自动多音反馈继续关闭。
+- Violin Etudes 原始包受限;开放 Violin MIDI Dataset 仅提供约 34 小时 score-aligned 弱标签 MIDI,可用于后续训练扩展,不能作独立音频识别金标。
+- 当前仍不满足学生域发布、V3 或“完美识别”;下一步必须进入总审计并维持 fail-closed。

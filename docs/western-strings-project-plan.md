@@ -401,3 +401,12 @@
 - PHENICX 适配器已完成并通过确定性复跑:`adapterReady=true`,4/4 混音、0 clipping、2,969 行映射保留、重复生成 SHA-256 一致。固定分组为 development=Mozart/Beethoven、holdout=Mahler/Bruckner。
 - 人工 gold 工程闸门已通过:`parangonar-with-basic-fallback` 在 PHENICX holdout 上 coverage 1.000、median 32.9ms、p90 352.6ms、`hit@300ms=0.8834`,且两首 holdout 逐曲通过。
 - 复音子组仍未过同一闸门,第一轮 holdout 也在 fallback 加入前被查看过。下一步进入 Violin Etudes/F0 时冻结该组合,只做外部确认与识别评测;不得回用 PHENICX 调参,不得开放复音/学生自动反馈。
+
+# 2026-07-10 MUSC 识别与 Violin MIDI 弱标签阶段
+
+- Violin Etudes Zenodo 原始文件为 restricted,未取得访问权,不得伪装为已下载数据。
+- 改用 MTG 官方 MUSC 预训练模型做直接音频转写评测。固定代码 commit 与权重 SHA-256,仅 eval-only,AGPL 影响未审前不进生产。
+- 默认解码在快速音中失败;development-only 48 组后处理校准选出 `onset=0.5/frame=0.4/min=60ms`。V2 development 过,V3 50ms 未过。
+- 冻结后在 Oliver/Silei fresh 录音确认:单声部核心 precision@100ms=0.9142、recall@100ms=0.9396,V2 通过;50ms precision=0.8025,V3 未过。双音全部 review-only。
+- 开放 Violin MIDI Dataset 已完成全量结构审计:1,006/1,021 可用、15 个隔离、约 34 小时弱标签。其不含音频且非人工 gold,只准作弱标签扩展,不准作独立 benchmark。
+- 下一步总审计只能把专业单声部识别标为 V2 candidate;`studentReleaseEligible=false`,`V3=false`,`nearPerfect=false`。
