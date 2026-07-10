@@ -132,3 +132,10 @@
 - **执行**:`npm run western:photo-score-batch` 只处理教师审核 `accepted_for_batch` 的照片提交,调用 python 管线,追加审计(`autoDiagnosisIssued=false`、`studentFacing=false`),幂等(已跑过的跳过)。
 - **E2E 实证**:入口→审核→批处理→审计 一条真数据(violin-ex12 照片+录音)走通,decision=`full-feedback:up3`。
 - **测试**:`test:western-photo-score-intake`(入口 fail-closed 4 项)通过;`test:western-feature-flags`、`test:western-alignment-preview` 回归无破坏。学生端运行时闸门全程未动。
+
+### 8.7 多引擎救回 ex07 + 第二轮收口(2026-07-11 第五轮)
+- **oemer 0.1.8 已装并实测**:对 ex07(Audiveris 三变体全无输出的九行谱照片)识别出 176 事件/23 小节,**录音交叉验证吻合度 92.0%**(87 对齐中 80 确认)。多引擎变体池成立:**12/12 真实照片全部机器可用**(11 Audiveris + 1 oemer)。
+- **边界**:oemer 输出为 MusicXML 无我方像素坐标链(Audiveris `.omr` 专有),故 ex07 目前只能给"已识谱+音频核对"级反馈,谱面标注需坐标适配(后续);oemer CPU 推理约数分钟/页。
+- **⚠️ 依赖坑(运维必读)**:`pip install oemer` 会把 numpy 拉到 2.x,**直接弄坏 basic-pitch/tensorflow/numba**;装后必须 `pip install "numpy<2"` 回 1.26.x,两引擎可共存。
+- **仲裁器结构信号结论**:纯 events 计数排序实测更糟(幻觉小节推高计数,ex10/ex06 反被误选)→ 维持(确认数,吻合度)排序;events 差异作为 `structureSpreadNote` 教师提示保留;ex11 为已度量接受边界。
+- **状态可见性**:`western:project-status` 新增 `photoScoreOfflineChain`;gold 溯源审计排除同引擎复识/评测产物(independentCandidateRows 恢复 0,`test:western-project-gate` 复绿)。
