@@ -11,6 +11,11 @@ import {
 
 const DEFAULT_OUT = path.join("data", "experiments", "western-strings-project-status.json");
 const REVIEW_POLICY_DOC = path.join("docs", "western-strings-review-policy.md");
+const PUBLIC_BACH_V2_AUDIT = path.join(
+  "data",
+  "experiments",
+  "western-strings-bach-violin-v2-audit.json",
+);
 const V2_ALPHA_MIN_PRECISION = 0.9;
 const V2_ALPHA_MIN_COVERAGE = 0.2;
 
@@ -1288,6 +1293,7 @@ export async function buildProjectStatus(args = {}) {
     controlledPilotSessions,
     controlledPilotMachineAudit,
     freshBlindIntake,
+    publicBachV2Audit,
   ] = await Promise.all([
     buildControlledStatus(),
     buildM3PlusStatus(),
@@ -1297,6 +1303,7 @@ export async function buildProjectStatus(args = {}) {
     readControlledPilotSessions(args.controlledPilotSessionsRoot),
     readJson(CONTROLLED_PILOT_EVIDENCE_AUDIT),
     readJson(FRESH_BLIND_INTAKE_STATUS),
+    readJson(PUBLIC_BACH_V2_AUDIT),
   ]);
   const controlledPilotSession = controlledPilotSessions.find((session) => session.executionPerformed === true)
     || controlledPilotSessions[0]
@@ -1317,6 +1324,24 @@ export async function buildProjectStatus(args = {}) {
       m4OmrAutoScoreReady: false,
       policy: "fail-closed",
     },
+    publicProfessionalBenchmark: publicBachV2Audit
+      ? {
+          source: PUBLIC_BACH_V2_AUDIT.replace(/\\/g, "/"),
+          scope: publicBachV2Audit.scope || "public-professional-violin-recordings",
+          publicProfessionalV2AlphaReady: publicBachV2Audit.gates?.publicProfessionalV2AlphaReady === true,
+          publicEventV3PrototypeReady: publicBachV2Audit.gates?.publicEventV3PrototypeReady === true,
+          publicRawAudioCorePrototypeReady: publicBachV2Audit.gates?.publicRawAudioCorePrototypeReady === true,
+          publicWeakNotePrototypeReady: publicBachV2Audit.gates?.publicWeakNotePrototypeReady === true,
+          v3Ready: publicBachV2Audit.gates?.v3Ready === true,
+          nearPerfectReady: publicBachV2Audit.gates?.nearPerfectReady === true,
+          defaultStudentReleaseEligible: publicBachV2Audit.gates?.defaultStudentReleaseEligible === true,
+          blockingReasons: publicBachV2Audit.blockingReasons || [],
+        }
+      : {
+          source: PUBLIC_BACH_V2_AUDIT.replace(/\\/g, "/"),
+          missing: true,
+          defaultStudentReleaseEligible: false,
+        },
     releaseReview: releaseReview
       ? {
           source: RELEASE_REVIEW.replace(/\\/g, "/"),
@@ -1444,6 +1469,7 @@ function printProjectStatus(status, outPath) {
     ok: status.ok,
     reviewPolicy: status.reviewPolicy,
     runtimeStudentGate: status.runtimeStudentGate,
+    publicProfessionalBenchmark: status.publicProfessionalBenchmark,
     releaseReview: status.releaseReview,
     controlledPilotSession: status.controlledPilotSession,
     controlledPilotEvidence: status.controlledPilotEvidence,

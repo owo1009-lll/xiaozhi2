@@ -201,15 +201,34 @@ def cents_error(observed_midi: float, target_midi: int) -> float:
     return float((observed_midi - target_midi) * 100.0)
 
 
-def build_decisions(notes: list[dict[str, Any]], times: np.ndarray, midi_track: np.ndarray, audio_duration: float, limit: int) -> list[dict[str, Any]]:
+def build_decisions(
+    notes: list[dict[str, Any]],
+    times: np.ndarray,
+    midi_track: np.ndarray,
+    audio_duration: float,
+    limit: int,
+    *,
+    audio_start_seconds: float = 0.0,
+    audio_end_seconds: float | None = None,
+) -> list[dict[str, Any]]:
     if not notes:
         return []
     score_span = max((safe_float(note.get("scoreUnit"), 0.0) or 0.0) for note in notes)
-    scale = (audio_duration / score_span) if score_span > 0 else 0.0
+    active_start = max(0.0, min(audio_duration, float(audio_start_seconds)))
+    active_end = (
+        audio_duration
+        if audio_end_seconds is None
+        else max(active_start, min(audio_duration, float(audio_end_seconds)))
+    )
+    scale = ((active_end - active_start) / score_span) if score_span > 0 else 0.0
     decisions: list[dict[str, Any]] = []
     for note in notes[: limit if limit > 0 else len(notes)]:
         score_unit = safe_float(note.get("scoreUnit"), 0.0) or 0.0
-        predicted_onset = max(0.0, min(audio_duration, score_unit * scale)) if scale > 0 else 0.0
+        predicted_onset = (
+            max(active_start, min(active_end, active_start + score_unit * scale))
+            if scale > 0
+            else active_start
+        )
         window = np.abs(times - predicted_onset) <= 0.18
         observed = midi_track[window]
         observed = observed[np.isfinite(observed)]

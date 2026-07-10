@@ -344,3 +344,11 @@ OMR 只解决"谱面从哪来",不改变音频诊断逻辑。未过 note-level �
 - P1 confidence 重校准旧 10-row blind validation 曾失败,但后续 P1.1 context-feature validation 已补强并通过当前精度闸。普通上传自动 gate 仍默认 fail-closed;下一步不是重复旧 10-row 复核,而是在单独受控进程中做 monitored pilot,且不得提交默认开启的 env。
 - M3+ first-measure candidate-quality 复核已完成并导入:98 reviewed / 74 scored。per-mode eval 已有 `slide-like` / `trill-like` 离线 release-ready 证据,但只限 first-measure + trusted-recording 安全子集;历史定位诊断仍显示后续小节存在错位风险。M3+ 当前不是继续标同一包,而是若要产品化,设计窄范围 monitored pilot。
 - 本补充覆盖下文较早的“待复核 P1 / 继续补 M3+”描述;runtime 仍 fail-closed。
+
+# 2026-07-10 公开专业录音执行补充
+
+- 当前无法继续获得大量真实学生录音,允许使用 65 个公开 Bach 小提琴乐章推进开发、跨演奏者评测和原始波形压力测试。证据口径见 `docs/western-strings-public-bach-validation.md`。
+- 对齐和独立音符识别已经形成 `publicProfessionalV2AlphaReady=true`;这不改变默认学生端 fail-closed。
+- 原始波形 rawv2 严格闸门已在 development 与 unseen-performer holdout 上验证漏音、错音、迟到均 0 危险放行,记为 `publicRawAudioCorePrototypeReady=true`。
+- 弱音 shallow-model bake-off 未通过 holdout,固定为 `review_required`;extra-note 继续 review-only。
+- 公开专业录音不能证明学生错误声学分布。没有学生域证据时可以继续研究版和公开专业录音版,但不得命名为学生端 V3 release 或“完美识别”。

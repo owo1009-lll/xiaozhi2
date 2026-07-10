@@ -1,0 +1,5 @@
+# Evaluation-only dependencies. Do not add these packages to the production analyzer image.
+basic-pitch==0.4.0
+parangonar==3.3.2
+mir_eval==0.8.2
+scikit-learn==1.8.0

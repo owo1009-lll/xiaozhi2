@@ -13,6 +13,12 @@ assert.equal(status.reviewPolicy?.source, "docs/western-strings-review-policy.md
 assert.equal(status.runtimeStudentGate.ordinaryUploadAutoFeedbackReady, false, "ordinary upload must not auto-feedback before release gate");
 assert.equal(status.runtimeStudentGate.m3plusAutoFeedbackReady, false, "M3+ mode feedback must stay disabled before labels are ready");
 assert.equal(status.runtimeStudentGate.m4OmrAutoScoreReady, false, "M4 OMR auto score must stay disabled before independent gold");
+assert.ok(status.publicProfessionalBenchmark, "public professional benchmark status must always be present");
+assert.equal(
+  status.publicProfessionalBenchmark.defaultStudentReleaseEligible,
+  false,
+  "public professional recordings must never enable the student release gate",
+);
 
 assert(status.tracks?.controlledCandidate, "project status must include ordinary upload candidate track");
 assert(status.tracks?.m3plusPitchModes, "project status must include M3+ pitch-mode track");

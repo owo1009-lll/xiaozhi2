@@ -179,3 +179,25 @@ npm run western:ordinary-auto-pass-precision-review-pack -- --recording-id <fres
 - `ordinary-auto-gate-disabled-by-default`
 
 这是安全态, 不是缺复核数据。
+
+## 7. 公开 Bach 语料主开发决策(2026-07-10)
+
+由于无法持续获得大量真实学生录音,当前主开发和压力测试改用 65 个公开专业小提琴乐章。详细数据、指标和限制见 [western-strings-public-bach-validation.md](western-strings-public-bach-validation.md)。
+
+当前新增机器证据:
+
+- unseen-performer 对齐:precision@300ms=92.81%,coverage=95.08%,median=35.4ms,p90=215.5ms。
+- 独立 Basic Pitch 高精度子集:precision=90.50%,recall=77.67%。
+- rawv2 原始波形测试:漏音/错音/迟到在 development 与 holdout 均为 0 危险放行;holdout 干净 precision=97.59%,coverage=33.05%。
+- 弱音模型 bake-off 全部失败:最佳模型仍漏放 3/12 个 holdout 弱音,因此 weak-note 固定为 review-only。
+
+统一状态:
+
+- `publicProfessionalV2AlphaReady=true`
+- `publicRawAudioCorePrototypeReady=true`
+- `publicWeakNotePrototypeReady=false`
+- `v3Ready=false`
+- `nearPerfectReady=false`
+- `defaultStudentReleaseEligible=false`
+
+本节替代“当前必须继续采集大量学生录音才能开展开发”的说法。公开专业录音足以继续研发、比较模型和形成论文实验,但没有真实学生域证据时,不得声称默认学生发布安全或完美识别。

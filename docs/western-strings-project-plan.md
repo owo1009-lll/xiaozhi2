@@ -380,3 +380,13 @@
 - Scope of this result is narrow: it proves slide-like and trill-like pitch-judgement modes have enough **offline first-measure evidence**. It does not prove later-measure localization, broad technique display, or default student-facing auto feedback.
 - Runtime remains fail-closed: `m3plusAutoFeedbackReady=false`. Any product use must be a separate monitored pilot scoped to first-measure, trusted-recording, slide/trill rows; default runtime must stay off.
 - This supersedes older handbook statements from before the first-measure candidate-quality import. No more M3+ manual review is currently requested.
+
+# 2026-07-10 公开 Bach 语料扩展验证
+
+- 公开专业录音现在作为主开发集与压力测试集,不是学生域发布替代品。完整报告见 `docs/western-strings-public-bach-validation.md`。
+- 65 个乐章按演奏者分成 31 development / 34 unseen-performer holdout。参考起音为数据集 CQT-DTW 估计,不是人工逐音 gold。
+- Parangonar + Basic Pitch holdout 对齐达到 precision@300ms=92.81%、coverage=95.08%、median=35.4ms。
+- Basic Pitch 独立识别经 development 阈值冻结后,holdout precision=90.50%、recall=77.67%,只够 V2-alpha 高精度子集。
+- rawv2 原始波形注入表明漏音、+2 半音错音、迟到 800ms 的严格策略在 development/holdout 均为 0 危险放行;弱音仍无法跨演奏者安全自动判。
+- 产品范围据此固定:公开专业录音核心三类可作为 V2/V3 研究原型;weak-note、extra-note 和学生域默认发布继续 fail-closed。
+- “完美”不是开发口号。只有独立人工逐音 gold、最终盲测、alignment/recognition precision 与 coverage/recall 均至少 99% 才可讨论近乎完美;当前未达到。
