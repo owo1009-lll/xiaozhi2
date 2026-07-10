@@ -1404,6 +1404,36 @@ function summarizeNextActions(
   return actions;
 }
 
+const PHOTO_SCORE_BATCH_RUNS = path.join(
+  "data", "experiments", "western-strings-m4", "photo-score-batch-runs.jsonl",
+);
+
+async function readPhotoScoreChainStatus() {
+  // Display-only visibility for the offline photo-score chain (intake ->
+  // accepted_for_batch -> western:photo-score-batch). Never feeds any gate.
+  const base = {
+    wired: true,
+    studentFacing: false,
+    intake: "POST /api/strings/analyze with scorePhotoPath (kind=photo-score, review_required)",
+    batchCommand: "npm run western:photo-score-batch",
+    source: PHOTO_SCORE_BATCH_RUNS.replace(/\\/g, "/"),
+  };
+  try {
+    const text = await fs.readFile(PHOTO_SCORE_BATCH_RUNS, "utf8");
+    const rows = text.split(/\r?\n/).filter(Boolean).map((line) => {
+      try { return JSON.parse(line); } catch { return null; }
+    }).filter(Boolean);
+    const decisions = {};
+    for (const row of rows) {
+      const key = row.status === "ok" ? String(row.decision || "").split(":")[0] || "ok" : `failed:${row.reason || "unknown"}`;
+      decisions[key] = (decisions[key] || 0) + 1;
+    }
+    return { ...base, batchRuns: rows.length, decisions };
+  } catch {
+    return { ...base, batchRuns: 0, decisions: {} };
+  }
+}
+
 export async function buildProjectStatus(args = {}) {
   const [
     controlledCandidate,
@@ -1459,6 +1489,7 @@ export async function buildProjectStatus(args = {}) {
       m4OmrAutoScoreReady: false,
       policy: "fail-closed",
     },
+    photoScoreOfflineChain: await readPhotoScoreChainStatus(),
     publicProfessionalBenchmark: publicBachV2Audit
       ? {
           source: PUBLIC_BACH_V2_AUDIT.replace(/\\/g, "/"),
@@ -1605,6 +1636,7 @@ function printProjectStatus(status, outPath) {
     ok: status.ok,
     reviewPolicy: status.reviewPolicy,
     runtimeStudentGate: status.runtimeStudentGate,
+    photoScoreOfflineChain: status.photoScoreOfflineChain,
     publicProfessionalBenchmark: status.publicProfessionalBenchmark,
     publicModelValidation: status.publicModelValidation,
     releaseReview: status.releaseReview,

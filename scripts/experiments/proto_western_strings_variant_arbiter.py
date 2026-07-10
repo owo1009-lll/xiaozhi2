@@ -50,10 +50,20 @@ def main(argv=None) -> int:
             cands.append({"variant": variant, "status": r.get("status", "ok"),
                           "confirmed": (r.get("verdictCounts") or {}).get("confirmed", 0),
                           "agreement": r.get("audioAgreementHeard", 0.0),
+                          "events": r.get("events", 0),
                           "uncertainMeasures": len(r.get("uncertainMeasures", [])) if ok else None,
                           "annotated": r.get("annotated")})
         scored = [c for c in cands if c["status"] == "ok"]
+        # Ranking stays (confirmed, agreement): a raw event-count "completeness"
+        # signal was tried and MEASURED WORSE — hallucinated measures inflate
+        # events (ex10/ex06), so low events can mean either dropped content
+        # (ex11) or a hallucination-free recognition; audio confirmations are
+        # the only trustworthy currency. Event spread is still surfaced as a
+        # review hint for teachers (structureSpreadNote).
         winner = max(scored, key=lambda c: (c["confirmed"], c["agreement"]), default=None)
+        max_events = max((c.get("events") or 0 for c in scored), default=0)
+        structure_note = (winner is not None and max_events > 0
+                          and (winner.get("events") or 0) < 0.7 * max_events)
         # machine-only mode: no expert queue. Failures route to user-side retry
         # (retake-photo) or degraded feedback (confirmed-only display).
         if winner is None:
@@ -65,6 +75,7 @@ def main(argv=None) -> int:
         else:
             decision = "retake-photo"
         rows.append({"piece": piece, "decision": decision,
+                     "structureSpreadNote": structure_note,
                      "winner": winner, "candidates": cands})
         print(json.dumps(rows[-1], ensure_ascii=False))
 

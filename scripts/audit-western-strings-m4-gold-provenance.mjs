@@ -174,6 +174,12 @@ function filterAlternativeCandidates(pieceId, candidates, knownPaths) {
       if (lower.includes("/audiveris-draft/")) return false;
       if (lower.includes("/western-strings-m4-independent-gold/")) return false;
       if (lower.includes("/western-strings-m2/") && lower.endsWith(`/${pieceId.toLowerCase()}.mxl`)) return false;
+      // same-engine re-recognition / eval artifacts are NOT independent gold candidates
+      if (lower.includes("/real-jpg-omr")) return false;
+      if (lower.includes("/render-gold-omr")) return false;
+      if (lower.includes("/analysis-photo-score/")) return false;
+      if (lower.includes("/score-anchored-proto/")) return false;
+      if (lower.includes("/variant-arbiter/")) return false;
       return true;
     });
 }
