@@ -70,37 +70,89 @@ def mxl_events(mxl_path: Path) -> list[dict]:
 # ---------- 3. audio events ----------
 
 def audio_events(audio_path: Path) -> list[dict]:
+    """basic-pitch note events grouped into audio chords by onset proximity."""
     from basic_pitch.inference import predict
     _, _, notes = predict(str(audio_path))
     notes = sorted(notes, key=lambda n: n[0])  # (start, end, midi, amplitude, bends)
-    return [{"start": float(n[0]), "end": float(n[1]), "midi": int(n[2]), "amp": float(n[3])}
-            for n in notes]
-
-
-def align(score_midis: list[int], audio: list[dict]) -> list[int | None]:
-    """NW alignment; returns audio index per score note (None = unmatched)."""
-    A, B = score_midis, [a["midi"] for a in audio]
-    GAP = 1.6  # substitution (wrong pitch <=3 semitones) preferred over insert+delete
-    n, m = len(A), len(B)
-    import numpy as np
-    D = np.zeros((n + 1, m + 1)); P = np.zeros((n + 1, m + 1), dtype=int)
-    D[:, 0] = np.arange(n + 1) * GAP; D[0, :] = np.arange(m + 1) * GAP
-    P[:, 0] = 1; P[0, :] = 2
-    for i in range(1, n + 1):
-        for j in range(1, m + 1):
-            d = min(abs(A[i - 1] - B[j - 1]), 12)  # octave-capped semitone cost
-            opts = (D[i - 1, j - 1] + d, D[i - 1, j] + GAP, D[i, j - 1] + GAP)
-            k = int(np.argmin(opts)); D[i, j] = opts[k]; P[i, j] = k
-    out: list[int | None] = [None] * n
-    i, j = n, m
-    while i > 0 and j > 0:
-        if P[i, j] == 0:
-            out[i - 1] = j - 1; i -= 1; j -= 1
-        elif P[i, j] == 1:
-            i -= 1
+    chords: list[dict] = []
+    TOL = 0.06  # seconds; simultaneous-onset grouping (double stops)
+    for n in notes:
+        start, midi = float(n[0]), int(n[2])
+        if chords and start - chords[-1]["start"] <= TOL:
+            chords[-1]["midis"].append(midi)
         else:
-            j -= 1
-    return out
+            chords.append({"start": start, "midis": [midi]})
+    for c in chords:
+        c["midis"] = sorted(set(c["midis"]))
+    return chords
+
+
+def _pitch_cost(score_midis: list[int], audio_midis: list[int]) -> float:
+    """Chord-aware, octave-tolerant cost: mean over audio tones of distance to
+    the nearest score tone; a pure-octave fold costs 0.5 instead of 12."""
+    total = 0.0
+    for am in audio_midis:
+        best = 12.0
+        for sm in score_midis:
+            d = abs(am - sm)
+            if d % 12 == 0 and d > 0:
+                d = 0.5  # detector octave artifact, common on weak bow
+            best = min(best, float(min(d, 12)))
+        total += best
+    return total / len(audio_midis)
+
+
+def align(events: list[dict], audio: list[dict]) -> list[int | None]:
+    """Two-pass chord-level alignment: pass 1 pitch-only NW; pass 2 adds a
+    time-anchoring term from a robust linear fit of matched (index -> time),
+    which suppresses off-by-one drift in scale passages."""
+    import numpy as np
+    A = [e["midis"] for e in events]
+    B = [c["midis"] for c in audio]
+    T = [c["start"] for c in audio]
+    GAP = 1.6
+    n, m = len(A), len(B)
+
+    def nw(time_pred=None, tw=0.0):
+        D = np.zeros((n + 1, m + 1)); P = np.zeros((n + 1, m + 1), dtype=int)
+        D[:, 0] = np.arange(n + 1) * GAP; D[0, :] = np.arange(m + 1) * GAP
+        P[:, 0] = 1; P[0, :] = 2
+        for i in range(1, n + 1):
+            for j in range(1, m + 1):
+                d = _pitch_cost(A[i - 1], B[j - 1])
+                if time_pred is not None:
+                    d += tw * min(abs(T[j - 1] - time_pred[i - 1]) / 2.0, 2.0)
+                opts = (D[i - 1, j - 1] + d, D[i - 1, j] + GAP, D[i, j - 1] + GAP)
+                k = int(np.argmin(opts)); D[i, j] = opts[k]; P[i, j] = k
+        out: list[int | None] = [None] * n
+        i, j = n, m
+        while i > 0 and j > 0:
+            if P[i, j] == 0:
+                out[i - 1] = j - 1; i -= 1; j -= 1
+            elif P[i, j] == 1:
+                i -= 1
+            else:
+                j -= 1
+        return out
+
+    first = nw()
+    pairs = [(i, T[mi]) for i, mi in enumerate(first) if mi is not None]
+    if len(pairs) < 8:
+        return first
+    # robust linear fit index->time (median of pairwise slopes over a sample)
+    import random
+    rng = random.Random(7)
+    slopes = []
+    for _ in range(min(200, len(pairs) * 2)):
+        (i1, t1), (i2, t2) = rng.sample(pairs, 2)
+        if i1 != i2:
+            slopes.append((t2 - t1) / (i2 - i1))
+    slope = float(np.median(slopes)) if slopes else 0.0
+    if slope <= 0:
+        return first
+    inter = float(np.median([t - slope * i for i, t in pairs]))
+    time_pred = [slope * i + inter for i in range(n)]
+    return nw(time_pred=time_pred, tw=0.8)
 
 
 # ---------- 4/5. verdicts + overlay ----------
@@ -109,15 +161,20 @@ COLORS = {"confirmed": (46, 160, 67), "pitch-mismatch": (220, 38, 38),
           "no-audio-evidence": (250, 204, 21), "beyond-recording": (156, 163, 175),
           "anchor-uncertain": (59, 130, 246)}
 
-def run_piece(piece: str, variant: str, out_root: Path) -> dict:
+def run_piece(piece: str, variant: str, out_root: Path,
+              omr_root: Path | None = None, aev: list[dict] | None = None) -> dict:
     from PIL import Image, ImageDraw
-    omr_dir = OMR_ROOT / piece / variant / "omr"
-    omr = next(omr_dir.glob("*.omr")); mxl = next(omr_dir.glob("*.mxl"))
+    omr_dir = (omr_root or OMR_ROOT) / piece / variant / "omr"
+    omrs = sorted(omr_dir.glob("*.omr")); mxls = sorted(omr_dir.glob("*.mxl"))
+    if not omrs or not mxls:
+        return {"piece": piece, "variant": variant, "status": "omr-no-output"}
+    omr, mxl = omrs[0], mxls[0]
     photo = PRIVATE / f"{piece}-score.jpg"; audio = PRIVATE / f"{piece}.m4a"
 
     manchors = measure_anchor_map(omr)
     events = mxl_events(mxl)
-    aev = audio_events(audio)
+    if aev is None:
+        aev = audio_events(audio)
 
     # measure-scoped anchor<->event mapping; count-mismatch measures -> anchor-uncertain
     per_note: list[dict] = []          # {event_i, box|None, measure, uncertain}
@@ -137,8 +194,7 @@ def run_piece(piece: str, variant: str, out_root: Path) -> dict:
                                  "measure": meas, "uncertain": True})
     per_note.sort(key=lambda r: r["i"])
 
-    smidis = [e["midis"][-1] for e in events]
-    match = align(smidis, aev)
+    match = align(events, aev)
     # recording-coverage end = last index whose local (+-6) match density >= 0.5;
     # a short recording covers a prefix of the page — beyond it is neutral, not an error
     W = 6
@@ -148,6 +204,15 @@ def run_piece(piece: str, variant: str, out_root: Path) -> dict:
         dens = sum(1 for k in range(lo, hi) if match[k] is not None) / (hi - lo)
         if dens >= 0.5:
             cover_end = i
+    def judge(score_midis: list[int], audio_midis: list[int]) -> str:
+        """mismatch only if some audio tone is a genuine (non-octave) wrong pitch."""
+        for am in audio_midis:
+            dists = [abs(am - sm) for sm in score_midis]
+            folded = [0.0 if (d % 12 == 0) else d for d in dists]
+            if min(folded) > 0:
+                return "pitch-mismatch"
+        return "confirmed"
+
     verdicts = []
     for i, mi in enumerate(match):
         if per_note[i]["uncertain"]:
@@ -155,10 +220,8 @@ def run_piece(piece: str, variant: str, out_root: Path) -> dict:
         elif mi is None:
             # neutral: detector miss and player miss are indistinguishable here -> never accuse
             verdicts.append("no-audio-evidence" if i <= cover_end else "beyond-recording")
-        elif aev[mi]["midi"] == smidis[i]:
-            verdicts.append("confirmed")
         else:
-            verdicts.append("pitch-mismatch")
+            verdicts.append(judge(events[i]["midis"], aev[mi]["midis"]))
 
     im = Image.open(photo).convert("RGB")
     dr = ImageDraw.Draw(im)
@@ -174,12 +237,22 @@ def run_piece(piece: str, variant: str, out_root: Path) -> dict:
     annotated = out_dir / f"{piece}-annotated.jpg"
     im.save(annotated, quality=90)
 
-    heard = [v for v in verdicts if v in ("confirmed", "pitch-mismatch")]
-    agree = (verdicts.count("confirmed") / len(heard)) if heard else 0.0
-    # fail-closed: unreliable alignment must not accuse — demote reds to neutral
+    # piece gate uses RAW alignment agreement (pre-demotion) — an unreliable
+    # alignment must never accuse, and demotion must not re-open the gate.
+    heard_raw = [v for v in verdicts if v in ("confirmed", "pitch-mismatch")]
+    agree = (verdicts.count("confirmed") / len(heard_raw)) if heard_raw else 0.0
     piece_gate = "ok" if agree >= 0.6 else "low-agreement-review"
     if piece_gate != "ok":
         verdicts = ["no-audio-evidence" if v == "pitch-mismatch" else v for v in verdicts]
+    else:
+        # neighbor-context rule: a red is only trustworthy when the alignment is
+        # locally reliable on BOTH sides; drift zones demote to neutral.
+        for i, v in enumerate(verdicts):
+            if v == "pitch-mismatch":
+                left_ok = i > 0 and verdicts[i - 1] == "confirmed"
+                right_ok = i + 1 < len(verdicts) and verdicts[i + 1] == "confirmed"
+                if not (left_ok and right_ok):
+                    verdicts[i] = "no-audio-evidence"
     counts = {v: verdicts.count(v) for v in COLORS}
     row = {"piece": piece, "variant": variant, "events": len(events), "audioNotes": len(aev),
            "uncertainMeasures": uncertain_measures, "verdictCounts": counts,
@@ -188,8 +261,8 @@ def run_piece(piece: str, variant: str, out_root: Path) -> dict:
            "caveat": "eval-only prototype; production gate untouched"}
     (out_dir / f"{piece}-verdicts.json").write_text(json.dumps(
         {**row, "perNote": [{"i": i, "measure": per_note[i]["measure"], "verdict": verdicts[i],
-                             "scoreMidi": smidis[i],
-                             "audioMidi": aev[match[i]]["midi"] if match[i] is not None else None}
+                             "scoreMidis": events[i]["midis"],
+                             "audioMidis": aev[match[i]]["midis"] if match[i] is not None else None}
                             for i in range(len(events))]}, ensure_ascii=False, indent=1), encoding="utf-8")
     return row
 
