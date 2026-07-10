@@ -150,7 +150,12 @@
 ### M4 — PDF/图片谱面识别(OMR,带精度闸门)
 - **动机:** 让学生/教师直接传 PDF 或拍照谱,不必先有干净电子谱。**这是主线诉求,但也正是二胡翻车的坎1**,因此按 M0 同样的纪律:先在数据集上验准确率,再谈信任。
 - **pipeline:** PDF/图片 → Audiveris OMR → MusicXML 草稿 → **note-level 精度评测**(对齐 gold MusicXML,报 pitch 识别正确率 / onset 正确率 / 小节级错误率 / 漏识别率)→ 达标进 score store(`scoreSource=omr`),不达标进人工核对队列(复用 m2f clean-score 流程)。
-- **精度闸门(release 前必过):** 在有 gold MusicXML 的曲目上,note pitch 识别准确率 ≥**[待定,建议 ≥98%]**、漏/多音率 ≤**[待定]**;未达标的谱**一律 fail-closed 退人工**,不得直接进音高/节奏判断。阈值必须先在真实曲目上定标,不得凭空写死。
+- **精度闸门(2026-07-11 已由独立基准定标,分层制):** 独立 render-gold 基准(32 乐章,gold=公版 MusicXML 与 Audiveris 无关)实测:干净渲染 mean pitch P=96.9%/R=93.8%,**P≥98% 仅 14/32**;合成 scan/photo 退化仅再掉 1–2 点;12 张真实练习曲照片呈**双峰**(8 张 92–100%,4 张结构性崩溃且特征自暴露)。结论:**裸 OMR 不设统一 ≥98% 硬线(达不到),改分层闸门**——
+  - **A 层自动采纳(带标记):** 单声部曲目 + 结构自检全过(全页有输出、多预处理变体小节数一致、与学生录音 basic-pitch 事件计数/时长一致)→ 识别谱可作诊断底谱,UI 标明"识别谱,已自动校验"。
+  - **B 层变体赛马+音频仲裁:** 结构自检不一致 → up2/up2-otsu/up3 多变体,由录音事件仲裁选择;仍不一致 → C 层。
+  - **C 层 fail-closed 人工:** 无输出/全变体打架/和弦复调密集 → m2f 人工核谱(一次核对长期复用)。
+  - **诊断联动:** OMR 谱未经人工核对的小节,**禁用 missing/extra 硬判**(漏音是实测最大短板,防冤枉学生),只留音准/起音。
+  详见 `docs/western-strings-m4-omr-independent-benchmark.md`;脚本 `scripts/experiments/eval_western_strings_m4_omr_render_gold.py`、`eval_western_strings_m4_real_jpg_omr.py`。
 - **schema:** score 记录加 `scoreSource=omr`、`omrEngine`、`omrConfidence`、`omrReviewStatus`(draft/human-approved);低置信小节单独标记,判断时该小节降级 review。
 - **与判断层的关系:** OMR 只解决"谱面从哪来";判断仍是音频侧 M2/M3。**谱面错 → 判断全错**,所以 OMR 闸门必须比音频闸门更严,且学生端要明示"此谱由识别得到、是否经人工核对"。
 - **验收:** OMR note 准确率达标闸门通过;不达标谱 100% 走人工;`scoreSource=omr` 全链路可追溯;判断层不读取 `omrReviewStatus≠human-approved` 且未过闸门的谱。
