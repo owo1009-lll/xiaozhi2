@@ -107,3 +107,22 @@
 **12 张真照片实测**:11 张全自动出反馈(8 直通 + 3 仲裁救回),1 张(ex07,九行谱表谱号识别失败)→ retake-photo。**专家人工介入:0。**
 
 **代价(诚实)**:难页反馈变少而非变错;复调/密集页覆盖率仍低;人工核谱仍是把"降级页"升级为"全反馈页"的最佳通道,但不再阻塞任何流程。
+
+### 8.5 生产管线落地 + 12 条全量回归(2026-07-11 第三轮)
+**生产入口**:`scripts/western_photo_score_pipeline.py`(npm:`western:photo-score`)——单命令完成 照片+录音 → 三变体 OMR(带缓存)→ 录音仲裁 → 标注图 + 审计 JSON;决策枚举 `full-feedback:<variant>` / `degraded-feedback:<variant>`(仅绿)/ `retake-photo`。审计契约:`studentRuntimeTouched=false`、`missingExtraVerdictsEmitted=false`。快速单测 19 项(`test:western-photo-score`,纯逻辑,秒级)。对齐输出新增 `timingDeviationSec`(节奏偏差,信息性,为 M3 onset 维度铺路)。
+
+**12 条真实录音全量回归(经生产入口)**:
+| 出口 | 数量 | 明细 |
+|---|---|---|
+| full-feedback | **10/12** | 仲裁选非 up2 变体 7 次(otsu×4、up3×3),如 ex12: up3=104 确认 vs up2=44 |
+| degraded-feedback | 1/12 | ex05(原始吻合 0.597<0.6,仅绿不指控) |
+| retake-photo | 1/12 | ex07(全变体无输出,自检出) |
+| 专家人工 / 误指控出口 | **0 / 0** | |
+
+**缺陷/边界清单(如实)**:
+1. basic-pitch 对快速连奏欠检出 → 黄区偏大、红灵敏度保守(precision-first 取舍);
+2. 弱起音/低吻合录音(ex05)只能降级,节奏维度尚未参与判定(数据已输出);
+3. ex07 类密集多行谱页三变体全崩 → 只能重拍;oemer(pip 0.1.8)未装,多引擎救回待做;
+4. 仲裁器按"音频确认量"选胜者,不含页面结构完整性信号(ex11 类歧义);
+5. 性能:单条约 2–6 分钟(OMR×3+basic-pitch),定位为离线批处理,非实时;
+6. 服务端路由/UI 接线未做(归 runtime 线,受既有审批闸门);真照片人工 gold 仍缺。

@@ -102,10 +102,13 @@ def _pitch_cost(score_midis: list[int], audio_midis: list[int]) -> float:
     return total / len(audio_midis)
 
 
-def align(events: list[dict], audio: list[dict]) -> list[int | None]:
+def align(events: list[dict], audio: list[dict]) -> tuple[list[int | None], list[float] | None]:
     """Two-pass chord-level alignment: pass 1 pitch-only NW; pass 2 adds a
     time-anchoring term from a robust linear fit of matched (index -> time),
-    which suppresses off-by-one drift in scale passages."""
+    which suppresses off-by-one drift in scale passages.
+    Returns (match, time_pred); time_pred is the fitted expected time per
+    score event (None when too few matches to fit) — the basis for timing
+    (rhythm) deviation output."""
     import numpy as np
     A = [e["midis"] for e in events]
     B = [c["midis"] for c in audio]
@@ -138,7 +141,7 @@ def align(events: list[dict], audio: list[dict]) -> list[int | None]:
     first = nw()
     pairs = [(i, T[mi]) for i, mi in enumerate(first) if mi is not None]
     if len(pairs) < 8:
-        return first
+        return first, None
     # robust linear fit index->time (median of pairwise slopes over a sample)
     import random
     rng = random.Random(7)
@@ -149,10 +152,10 @@ def align(events: list[dict], audio: list[dict]) -> list[int | None]:
             slopes.append((t2 - t1) / (i2 - i1))
     slope = float(np.median(slopes)) if slopes else 0.0
     if slope <= 0:
-        return first
+        return first, None
     inter = float(np.median([t - slope * i for i, t in pairs]))
     time_pred = [slope * i + inter for i in range(n)]
-    return nw(time_pred=time_pred, tw=0.8)
+    return nw(time_pred=time_pred, tw=0.8), time_pred
 
 
 # ---------- 4/5. verdicts + overlay ----------
@@ -162,14 +165,16 @@ COLORS = {"confirmed": (46, 160, 67), "pitch-mismatch": (220, 38, 38),
           "anchor-uncertain": (59, 130, 246)}
 
 def run_piece(piece: str, variant: str, out_root: Path,
-              omr_root: Path | None = None, aev: list[dict] | None = None) -> dict:
+              omr_root: Path | None = None, aev: list[dict] | None = None,
+              photo_path: Path | None = None, audio_path: Path | None = None) -> dict:
     from PIL import Image, ImageDraw
     omr_dir = (omr_root or OMR_ROOT) / piece / variant / "omr"
     omrs = sorted(omr_dir.glob("*.omr")); mxls = sorted(omr_dir.glob("*.mxl"))
     if not omrs or not mxls:
         return {"piece": piece, "variant": variant, "status": "omr-no-output"}
     omr, mxl = omrs[0], mxls[0]
-    photo = PRIVATE / f"{piece}-score.jpg"; audio = PRIVATE / f"{piece}.m4a"
+    photo = photo_path or (PRIVATE / f"{piece}-score.jpg")
+    audio = audio_path or (PRIVATE / f"{piece}.m4a")
 
     manchors = measure_anchor_map(omr)
     events = mxl_events(mxl)
@@ -194,7 +199,7 @@ def run_piece(piece: str, variant: str, out_root: Path,
                                  "measure": meas, "uncertain": True})
     per_note.sort(key=lambda r: r["i"])
 
-    match = align(events, aev)
+    match, time_pred = align(events, aev)
     # recording-coverage end = last index whose local (+-6) match density >= 0.5;
     # a short recording covers a prefix of the page — beyond it is neutral, not an error
     W = 6
@@ -262,7 +267,11 @@ def run_piece(piece: str, variant: str, out_root: Path,
     (out_dir / f"{piece}-verdicts.json").write_text(json.dumps(
         {**row, "perNote": [{"i": i, "measure": per_note[i]["measure"], "verdict": verdicts[i],
                              "scoreMidis": events[i]["midis"],
-                             "audioMidis": aev[match[i]]["midis"] if match[i] is not None else None}
+                             "audioMidis": aev[match[i]]["midis"] if match[i] is not None else None,
+                             # timing (rhythm) deviation vs fitted tempo line; informational,
+                             # feeds a future M3 onset verdict after its own validation
+                             "timingDeviationSec": (round(aev[match[i]]["start"] - time_pred[i], 3)
+                                                    if match[i] is not None and time_pred is not None else None)}
                             for i in range(len(events))]}, ensure_ascii=False, indent=1), encoding="utf-8")
     return row
 
