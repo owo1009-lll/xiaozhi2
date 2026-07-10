@@ -359,4 +359,5 @@ OMR 只解决"谱面从哪来",不改变音频诊断逻辑。未过 note-level �
 - 许可为本地非商业研究且禁止重新分发;音频/注释/混音均不得入 Git。
 - 下一步严格限定为适配器:每部作品混合全部同步 violin 分轨、保留 score/gold 行映射、内存单调化异常 score 时间。
 - 只有 4/4 混音和映射审计通过后才允许运行 Parangonar/Basic Pitch 人工 gold 对齐评测。详见 `docs/western-strings-phenicx-validation.md`。
-- 适配器现已满足该条件:`adapterReady=true`,4/4 混音无削波、映射保持、确定性哈希复跑一致。现进入 PHENICX 人工 gold 模型评测,但 alignment gate 尚未通过。
+- 适配器和 PHENICX 人工 gold 工程闸门现已通过。冻结组合 `parangonar-with-basic-fallback` 的 holdout coverage=1.000、median=32.9ms、p90=352.6ms、`hit@300ms=0.8834`,两首逐曲过闸。
+- 复音子组未过,且当前是顺序工程验证而非未触碰 holdout。下一步仅允许在新外部数据冻结确认和评测识别;学生域与“完美”结论仍不成立。

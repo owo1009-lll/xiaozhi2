@@ -71,12 +71,21 @@ PHENICX-Anechoic 用于补上 Bach Violin Dataset 的主要证据缺口:Bach 参
 - development 固定为 Mozart/Beethoven,holdout 固定为 Mahler/Bruckner。
 - 连续两次生成的 4 个混音 SHA-256 和 4 个 notes SHA-256 全部一致。
 
-尚未通过:
+人工 gold 对齐工程闸门已通过:
 
-- Parangonar/Basic Pitch 尚未在 PHENICX 人工 gold 上评测。
-- PHENICX alignment gate 尚未判定。
+- 固定候选:`linear-duration`、`basic-pitch-dtw`、`parangonar-basic-pitch`、`parangonar-with-basic-fallback`。
+- development 选择 `parangonar-with-basic-fallback`:Parangonar 有结果时保持不变,只对缺失预测使用 Basic Pitch-DTW 补位,不调误差阈值。
+- holdout(Mahler/Bruckner)覆盖率 1.000、中位误差 32.9ms、p90 352.6ms、`hit@300ms=0.8834`。
+- Mahler 与 Bruckner 逐曲均通过预设四项闸门;重复运行 `report.json` SHA-256 一致。
+- 复音子组未通过同一强闸门:holdout `hit@300ms=0.836`,p90 536.3ms。因此复音结果仍是 review-only,不得写成完美识别。
 
-因此当前只允许进入模型评测阶段,不得把 `adapterReady=true` 写成“人工 gold 对齐已通过”。
+协议边界:
+
+- 第一轮只含前三种方法时,development 选择 Parangonar,但 holdout `hit@300ms=0.8114`、coverage 0.8992,未通过。
+- missing-only fallback 由 development 的缺失预测问题提出并在 development 上选中,但提出前已查看第一轮 holdout。当前结果属于顺序工程验证,不是一次性未触碰 holdout。
+- 必须在新的外部数据上冻结确认后,才能把该组合写成泛化完成;公开专业声部数据也不能替代学生域发布证据。
+
+因此当前可以进入下一公开数据环节,但 `studentReleaseEligible=false`,不得写成“学生录音自动诊断完成”或“完美对齐”。
 
 ## 6. 可复跑命令
 
@@ -85,6 +94,8 @@ npm run test:western-phenicx-dataset-audit
 npm run western:phenicx-dataset-audit
 npm run test:western-phenicx-alignment-adapter
 npm run western:phenicx-prepare-alignment
+npm run test:western-phenicx-alignment-eval
+npm run western:phenicx-eval-alignment
 ```
 
 权威机器报告:
@@ -93,10 +104,13 @@ npm run western:phenicx-prepare-alignment
 - `data/experiments/western-strings-phenicx-dataset-audit.md`
 - `data/experiments/western-strings-phenicx-adapter/manifest.json`
 - `data/experiments/western-strings-phenicx-adapter/manifest.md`
+- `data/experiments/western-strings-phenicx-alignment/report.json`
+- `data/experiments/western-strings-phenicx-alignment/report.md`
+- `data/experiments/western-strings-phenicx-alignment/per-note.csv`
 
 ## 7. 下一环节进入条件
 
-混音适配器条件已经全部满足。下一环节只有在以下人工 gold 对齐闸门通过后才算成功:
+混音适配器和 PHENICX 工程闸门已经满足以下条件:
 
 - development 只能选择规则/阈值,holdout 不调参。
 - holdout median onset error <150ms。
@@ -104,3 +118,5 @@ npm run western:phenicx-prepare-alignment
 - holdout hit@300ms >=85%。
 - holdout coverage >=80%。
 - 复音音符和每部作品必须单独报告,不得用总体均值掩盖失败作品。
+
+下一环节只允许使用冻结的 `parangonar-with-basic-fallback` 规则做外部确认和识别评测。不得再利用 PHENICX holdout 调规则;不得因总体通过而放开复音自动反馈。

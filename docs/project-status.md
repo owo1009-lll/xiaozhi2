@@ -206,4 +206,4 @@ npm run western:ordinary-auto-pass-precision-review-pack -- --recording-id <fres
 
 下一环节 PHENICX 数据许可、下载和结构审计已通过:`readyForAlignmentBenchmark=true`,4/4 作品、22 条同步小提琴分轨、2,969 个逐乐器人工对齐音符。完整边界和进入条件见 [western-strings-phenicx-validation.md](western-strings-phenicx-validation.md)。
 
-PHENICX 适配器现已通过:`adapterReady=true`,4/4 混音 0 削波、2,969 行映射保持、54 个 score 时间异常只在派生副本修复,且两次生成哈希完全一致。当前下一步已推进为人工 gold 模型评测;对齐闸门未通过前仍不得称为 PHENICX 对齐成功。
+PHENICX 适配器与人工 gold 工程闸门现已通过。development 选出的 `parangonar-with-basic-fallback` 在 Mahler/Bruckner holdout 上达到 coverage 1.000、median 32.9ms、p90 352.6ms、`hit@300ms=0.8834`,两首逐曲均过闸。复音子组仍未过(`hit@300ms=0.836`,p90 536.3ms),且 fallback 加入前已查看过第一轮 holdout,因此必须另用新外部数据冻结确认;`studentReleaseEligible=false`,不得表述为完美对齐或学生域完成。
