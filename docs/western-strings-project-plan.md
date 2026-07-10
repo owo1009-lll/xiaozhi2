@@ -409,4 +409,5 @@
 - 默认解码在快速音中失败;development-only 48 组后处理校准选出 `onset=0.5/frame=0.4/min=60ms`。V2 development 过,V3 50ms 未过。
 - 冻结后在 Oliver/Silei fresh 录音确认:单声部核心 precision@100ms=0.9142、recall@100ms=0.9396,V2 通过;50ms precision=0.8025,V3 未过。双音全部 review-only。
 - 开放 Violin MIDI Dataset 已完成全量结构审计:1,006/1,021 可用、15 个隔离、约 34 小时弱标签。其不含音频且非人工 gold,只准作弱标签扩展,不准作独立 benchmark。
-- 下一步总审计只能把专业单声部识别标为 V2 candidate;`studentReleaseEligible=false`,`V3=false`,`nearPerfect=false`。
+- 统一总审计已接入 `western:project-status` 和独立命令 `western:public-model-gate`。当前只把专业单声部识别标为 V2 candidate;`studentReleaseEligible=false`,`V3=false`,`doubleStopAutoFeedbackReady=false`,`nearPerfect=false`。
+- 下一研究闸门不是继续宣称完成,而是获得一份未用于调参的新外部人工 gold 做冻结确认,并单独提升双音与 50ms 精度。未过前默认学生端保持 fail-closed。

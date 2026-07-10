@@ -11,6 +11,10 @@ const DEFAULT_SUMMARY = path.join("data", "experiments", "western-strings-releas
 
 const STEPS = [
   "test:western-offline-feature-audio",
+  "test:western-phenicx-alignment-eval",
+  "test:western-bach-violin-musc-pilot",
+  "test:western-bach-violin-musc-calibration",
+  "test:western-violin-midi-dataset-audit",
   "test:western-controlled-pilot-run",
   "test:western-controlled-pilot-evidence-audit",
   "test:western-fresh-blind-intake",
@@ -87,6 +91,9 @@ function buildSummary(report) {
     `- ordinary monitored pilot evidence: ${report.tracks.ordinary.readyForControlledPilot}`,
     `- M3+ monitored pilot evidence: ${report.tracks.m3plus.readyForControlledPilot}`,
     `- M4 OMR benchmark evidence: ${report.tracks.m4.readyForOmrAccuracyClaim}`,
+    `- public professional monophonic V2 candidate: ${report.tracks.publicValidation.publicProfessionalMonophonicV2CandidateReady}`,
+    `- public professional monophonic V3: ${report.tracks.publicValidation.publicProfessionalMonophonicV3Ready}`,
+    `- public double-stop auto feedback: ${report.tracks.publicValidation.doubleStopAutoFeedbackReady}`,
     "",
     "## Default Release Gate",
     "",
@@ -134,6 +141,7 @@ async function main() {
   const m3plus = status.tracks?.m3plusPitchModes || {};
   const m3plusAudit = m3plus.monitoredPilotAudit || {};
   const m4 = status.tracks?.m4Omr || {};
+  const publicValidation = status.publicModelValidation || {};
   const ordinaryReady = ordinaryAudit.readyForMonitoredPilot === true
     && ordinaryAudit.teacherReviewNeeded !== true
     && ordinaryAudit.defaultOrdinaryReadyAfter !== true
@@ -191,6 +199,17 @@ async function main() {
         humanTask: m4.humanTask || "",
         counts: m4.counts || {},
         blockingReasons: m4.blockingReasons || [],
+      },
+      publicValidation: {
+        publicProfessionalMonophonicV2CandidateReady:
+          publicValidation.gates?.publicProfessionalMonophonicV2CandidateReady === true,
+        publicProfessionalMonophonicV3Ready:
+          publicValidation.gates?.publicProfessionalMonophonicV3Ready === true,
+        doubleStopAutoFeedbackReady:
+          publicValidation.gates?.doubleStopAutoFeedbackReady === true,
+        studentReleaseEligible: publicValidation.gates?.studentReleaseEligible === true,
+        nearPerfectReady: publicValidation.gates?.nearPerfectReady === true,
+        blockingReasons: publicValidation.blockingReasons || [],
       },
     },
     artifacts: {

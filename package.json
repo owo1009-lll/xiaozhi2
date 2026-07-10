@@ -165,6 +165,7 @@
     "western:controlled-candidate-input-status": "node scripts\\status-western-controlled-candidate-inputs.mjs",
     "western:project-status": "node scripts\\status-western-strings-project.mjs",
     "western:project-gate": "node scripts\\gate-western-strings-project.mjs",
+    "western:public-model-gate": "node scripts\\gate-western-strings-project.mjs --require public --out data\\experiments\\western-strings-public-model-gate.json",
     "western:next-actions": "node scripts\\create-western-strings-next-action-handoff.mjs",
     "western:open-next-action": "node scripts\\open-western-strings-next-action.mjs",
     "test:western-project-gate": "node scripts\\test-western-project-gate.mjs",

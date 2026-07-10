@@ -3,7 +3,10 @@ import fs from "node:fs/promises";
 
 import { evaluateProjectGate } from "./gate-western-strings-project.mjs";
 import { renderHandoff } from "./create-western-strings-next-action-handoff.mjs";
-import { buildProjectStatus } from "./status-western-strings-project.mjs";
+import {
+  buildProjectStatus,
+  summarizePublicModelValidation,
+} from "./status-western-strings-project.mjs";
 
 const status = await buildProjectStatus();
 
@@ -18,6 +21,63 @@ assert.equal(
   status.publicProfessionalBenchmark.defaultStudentReleaseEligible,
   false,
   "public professional recordings must never enable the student release gate",
+);
+assert.ok(status.publicModelValidation, "public model validation status must always be present");
+assert.equal(
+  status.publicModelValidation.gates.studentReleaseEligible,
+  false,
+  "public model validation must never enable the student release gate",
+);
+assert.equal(
+  status.publicModelValidation.gates.nearPerfectReady,
+  false,
+  "public model validation must not claim near-perfect readiness",
+);
+
+const syntheticPublicValidation = summarizePublicModelValidation({
+  phenicxAlignment: {
+    ok: true,
+    alignmentGatePassed: true,
+    freshExternalConfirmationRequired: true,
+    polyphonicSubgroupGate: { passed: false },
+  },
+  muscCalibration: {
+    ok: true,
+    calibrationV2Ready: true,
+    calibrationV3Ready: false,
+  },
+  muscFresh: {
+    ok: true,
+    freshConfirmationPassed: true,
+    muscV2CoreGatePassed: true,
+    muscV3CoreGatePassed: false,
+    doubleStopAutoFeedbackEligible: false,
+  },
+  violinMidiAudit: {
+    ok: true,
+    readyAsWeakLabelSource: true,
+    readyAsIndependentRecognitionBenchmark: false,
+  },
+});
+assert.equal(
+  syntheticPublicValidation.gates.publicProfessionalMonophonicV2CandidateReady,
+  true,
+  "PHENICX plus fresh MUSC evidence should expose the public monophonic V2 candidate",
+);
+assert.equal(
+  syntheticPublicValidation.gates.publicProfessionalMonophonicV3Ready,
+  false,
+  "failed strict MUSC evidence must keep public V3 closed",
+);
+assert.equal(
+  syntheticPublicValidation.gates.doubleStopAutoFeedbackReady,
+  false,
+  "failed polyphonic evidence must keep double-stop feedback closed",
+);
+assert.equal(
+  syntheticPublicValidation.weakLabels.independentRecognitionBenchmarkReady,
+  false,
+  "weak labels must not be promoted to independent recognition gold",
 );
 
 assert(status.tracks?.controlledCandidate, "project status must include ordinary upload candidate track");
@@ -239,6 +299,10 @@ assert(
   "package.json must expose the aggregate release-review command",
 );
 assert(
+  packageJson.scripts?.["western:public-model-gate"],
+  "package.json must expose the public professional model evidence gate",
+);
+assert(
   packageJson.scripts?.["western:controlled-pilot-decision"],
   "package.json must expose the controlled-pilot decision command",
 );
@@ -406,6 +470,18 @@ const noRequiredGate = evaluateProjectGate(status, new Set());
 assert.equal(noRequiredGate.projectReleaseReady, true, "empty required track set should not block");
 assert.deepEqual(noRequiredGate.failures, [], "empty required track set should have no failures");
 
+const publicGate = evaluateProjectGate(status, new Set(["public"]));
+assert.equal(
+  publicGate.gateScope,
+  "public-professional-research-candidate",
+  "public-only gate must identify itself as research evidence rather than student release",
+);
+assert.equal(
+  publicGate.projectReleaseReady,
+  status.publicModelValidation.gates.publicProfessionalMonophonicV2CandidateReady,
+  "optional public gate must follow the unified monophonic V2 evidence",
+);
+
 const fullGate = evaluateProjectGate(status, new Set(["ordinary", "m3plus", "m4"]));
 assert.equal(fullGate.projectReleaseReady, false, "full project gate must block until all required tracks are ready");
 assert(fullGate.failures.some((failure) => failure.track === "M2/M3 ordinary upload candidate gate"), "ordinary track failure should be reported");
@@ -423,6 +499,7 @@ console.log(JSON.stringify({
   ok: true,
   checks: [
     "project-status-tracks-present",
+    "public-model-validation-evidence-covered",
     "student-runtime-fail-closed",
     "confidence-pilot-validation-state-covered",
     "m3plus-first-measure-mode-evidence-covered",

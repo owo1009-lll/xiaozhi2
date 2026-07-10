@@ -16,6 +16,29 @@ const PUBLIC_BACH_V2_AUDIT = path.join(
   "experiments",
   "western-strings-bach-violin-v2-audit.json",
 );
+const PHENICX_ALIGNMENT_REPORT = path.join(
+  "data",
+  "experiments",
+  "western-strings-phenicx-alignment",
+  "report.json",
+);
+const MUSC_CALIBRATION_REPORT = path.join(
+  "data",
+  "experiments",
+  "western-strings-bach-violin-musc-calibration",
+  "report.json",
+);
+const MUSC_FRESH_REPORT = path.join(
+  "data",
+  "experiments",
+  "western-strings-bach-violin-musc-fresh-confirmation",
+  "report.json",
+);
+const VIOLIN_MIDI_AUDIT = path.join(
+  "data",
+  "experiments",
+  "western-strings-violin-midi-dataset-audit.json",
+);
 const V2_ALPHA_MIN_PRECISION = 0.9;
 const V2_ALPHA_MIN_COVERAGE = 0.2;
 
@@ -633,6 +656,104 @@ function bestDeployableReleaseCandidate(pilot) {
     || Number(b.selected || 0) - Number(a.selected || 0)
   ));
   return candidates[0] || null;
+}
+
+export function summarizePublicModelValidation({
+  phenicxAlignment = null,
+  muscCalibration = null,
+  muscFresh = null,
+  violinMidiAudit = null,
+} = {}) {
+  const alignmentEngineeringGatePassed = phenicxAlignment?.ok === true
+    && phenicxAlignment?.alignmentGatePassed === true;
+  const alignmentPolyphonicGatePassed = phenicxAlignment?.polyphonicSubgroupGate?.passed === true;
+  const recognitionCalibrationV2Ready = muscCalibration?.ok === true
+    && muscCalibration?.calibrationV2Ready === true;
+  const recognitionCalibrationV3Ready = muscCalibration?.ok === true
+    && muscCalibration?.calibrationV3Ready === true;
+  const recognitionFreshV2Ready = muscFresh?.ok === true
+    && muscFresh?.freshConfirmationPassed === true
+    && muscFresh?.muscV2CoreGatePassed === true;
+  const recognitionFreshV3Ready = muscFresh?.ok === true
+    && muscFresh?.freshConfirmationPassed === true
+    && muscFresh?.muscV3CoreGatePassed === true;
+  const doubleStopAutoFeedbackReady = muscFresh?.doubleStopAutoFeedbackEligible === true
+    && alignmentPolyphonicGatePassed;
+  const weakLabelSourceReady = violinMidiAudit?.ok === true
+    && violinMidiAudit?.readyAsWeakLabelSource === true;
+  const independentRecognitionBenchmarkReady = violinMidiAudit?.ok === true
+    && violinMidiAudit?.readyAsIndependentRecognitionBenchmark === true;
+  const publicProfessionalMonophonicV2CandidateReady = alignmentEngineeringGatePassed
+    && recognitionCalibrationV2Ready
+    && recognitionFreshV2Ready;
+  const publicProfessionalMonophonicV3Ready = alignmentEngineeringGatePassed
+    && recognitionCalibrationV3Ready
+    && recognitionFreshV3Ready;
+  const blockingReasons = [];
+  if (!phenicxAlignment) blockingReasons.push("phenicx-alignment-report-missing");
+  else if (!alignmentEngineeringGatePassed) blockingReasons.push("phenicx-alignment-engineering-gate-failed");
+  if (phenicxAlignment?.freshExternalConfirmationRequired === true) {
+    blockingReasons.push("phenicx-fresh-external-confirmation-required");
+  }
+  if (!alignmentPolyphonicGatePassed) blockingReasons.push("phenicx-polyphonic-alignment-gate-failed");
+  if (!muscCalibration) blockingReasons.push("musc-calibration-report-missing");
+  else if (!recognitionCalibrationV2Ready) blockingReasons.push("musc-v2-calibration-gate-failed");
+  if (!muscFresh) blockingReasons.push("musc-fresh-confirmation-report-missing");
+  else if (!recognitionFreshV2Ready) blockingReasons.push("musc-v2-fresh-confirmation-failed");
+  if (!recognitionFreshV3Ready) blockingReasons.push("musc-v3-strict-gate-failed");
+  if (!doubleStopAutoFeedbackReady) blockingReasons.push("double-stop-auto-feedback-not-ready");
+  if (!violinMidiAudit) blockingReasons.push("violin-midi-audit-missing");
+  else if (!weakLabelSourceReady) blockingReasons.push("violin-midi-weak-label-source-not-ready");
+  if (!independentRecognitionBenchmarkReady) {
+    blockingReasons.push("violin-midi-not-independent-recognition-gold");
+  }
+  blockingReasons.push("student-domain-evidence-not-covered");
+  return {
+    scope: "public-professional-violin-eval-only",
+    artifacts: {
+      phenicxAlignment: PHENICX_ALIGNMENT_REPORT.replace(/\\/g, "/"),
+      muscCalibration: MUSC_CALIBRATION_REPORT.replace(/\\/g, "/"),
+      muscFreshConfirmation: MUSC_FRESH_REPORT.replace(/\\/g, "/"),
+      violinMidiAudit: VIOLIN_MIDI_AUDIT.replace(/\\/g, "/"),
+    },
+    alignment: {
+      reportAvailable: Boolean(phenicxAlignment),
+      engineeringGatePassed: alignmentEngineeringGatePassed,
+      polyphonicGatePassed: alignmentPolyphonicGatePassed,
+      freshExternalConfirmationRequired: phenicxAlignment?.freshExternalConfirmationRequired === true,
+      selectedMethod: phenicxAlignment?.selectedMethod || "",
+      gate: phenicxAlignment?.gate || {},
+      polyphonicGate: phenicxAlignment?.polyphonicSubgroupGate || {},
+    },
+    recognition: {
+      calibrationReportAvailable: Boolean(muscCalibration),
+      freshReportAvailable: Boolean(muscFresh),
+      calibrationV2Ready: recognitionCalibrationV2Ready,
+      calibrationV3Ready: recognitionCalibrationV3Ready,
+      freshConfirmationPassed: muscFresh?.freshConfirmationPassed === true,
+      monophonicV2Ready: recognitionFreshV2Ready,
+      monophonicV3Ready: recognitionFreshV3Ready,
+      doubleStopAutoFeedbackReady,
+      postprocessing: muscFresh?.postprocessing || muscCalibration?.selectedPostprocessing || {},
+      coreMetrics: muscFresh?.aggregate?.monophonicCore?.musc || {},
+      doubleStopStressMetrics: muscFresh?.aggregate?.doubleStopStressReviewOnly?.musc || {},
+    },
+    weakLabels: {
+      reportAvailable: Boolean(violinMidiAudit),
+      sourceReady: weakLabelSourceReady,
+      independentRecognitionBenchmarkReady,
+      counts: violinMidiAudit?.counts || {},
+      blockers: violinMidiAudit?.benchmarkBlockers || [],
+    },
+    gates: {
+      publicProfessionalMonophonicV2CandidateReady,
+      publicProfessionalMonophonicV3Ready,
+      doubleStopAutoFeedbackReady,
+      studentReleaseEligible: false,
+      nearPerfectReady: false,
+    },
+    blockingReasons: [...new Set(blockingReasons)],
+  };
 }
 
 function isM3PlusReviewed(row) {
@@ -1294,6 +1415,10 @@ export async function buildProjectStatus(args = {}) {
     controlledPilotMachineAudit,
     freshBlindIntake,
     publicBachV2Audit,
+    phenicxAlignment,
+    muscCalibration,
+    muscFresh,
+    violinMidiAudit,
   ] = await Promise.all([
     buildControlledStatus(),
     buildM3PlusStatus(),
@@ -1304,11 +1429,21 @@ export async function buildProjectStatus(args = {}) {
     readJson(CONTROLLED_PILOT_EVIDENCE_AUDIT),
     readJson(FRESH_BLIND_INTAKE_STATUS),
     readJson(PUBLIC_BACH_V2_AUDIT),
+    readJson(PHENICX_ALIGNMENT_REPORT),
+    readJson(MUSC_CALIBRATION_REPORT),
+    readJson(MUSC_FRESH_REPORT),
+    readJson(VIOLIN_MIDI_AUDIT),
   ]);
   const controlledPilotSession = controlledPilotSessions.find((session) => session.executionPerformed === true)
     || controlledPilotSessions[0]
     || null;
   const controlledPilotEvidence = summarizeControlledPilotEvidence(controlledPilotSessions);
+  const publicModelValidation = summarizePublicModelValidation({
+    phenicxAlignment,
+    muscCalibration,
+    muscFresh,
+    violinMidiAudit,
+  });
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -1342,6 +1477,7 @@ export async function buildProjectStatus(args = {}) {
           missing: true,
           defaultStudentReleaseEligible: false,
         },
+    publicModelValidation,
     releaseReview: releaseReview
       ? {
           source: RELEASE_REVIEW.replace(/\\/g, "/"),
@@ -1470,6 +1606,7 @@ function printProjectStatus(status, outPath) {
     reviewPolicy: status.reviewPolicy,
     runtimeStudentGate: status.runtimeStudentGate,
     publicProfessionalBenchmark: status.publicProfessionalBenchmark,
+    publicModelValidation: status.publicModelValidation,
     releaseReview: status.releaseReview,
     controlledPilotSession: status.controlledPilotSession,
     controlledPilotEvidence: status.controlledPilotEvidence,

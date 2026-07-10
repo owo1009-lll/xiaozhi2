@@ -367,4 +367,5 @@ OMR 只解决"谱面从哪来",不改变音频诊断逻辑。未过 note-level �
 - MUSC 默认后处理在快速音上漏检;development-only 校准后,冻结配置在未参与校准的 Oliver 单声部核心上达到 precision@100ms=0.9142、recall@100ms=0.9396,V2 识别候选通过。
 - 50ms precision=0.8025,V3 严格目标未过;Silei 和高双音乐章只作压力测试,自动多音反馈继续关闭。
 - Violin Etudes 原始包受限;开放 Violin MIDI Dataset 仅提供约 34 小时 score-aligned 弱标签 MIDI,可用于后续训练扩展,不能作独立音频识别金标。
-- 当前仍不满足学生域发布、V3 或“完美识别”;下一步必须进入总审计并维持 fail-closed。
+- 统一总审计已接入 `western:project-status` 和独立命令 `western:public-model-gate`。当前只把专业单声部识别标为 V2 candidate;`studentReleaseEligible=false`,`V3=false`,`doubleStopAutoFeedbackReady=false`,`nearPerfect=false`。
+- 下一研究闸门是新外部人工 gold 冻结确认、双音路径和 50ms 精度提升;任何一项缺失都不得升级为学生发布或“完美识别”。

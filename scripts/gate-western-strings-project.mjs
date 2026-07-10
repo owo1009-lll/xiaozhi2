@@ -22,6 +22,7 @@ export function evaluateProjectGate(status, requiredTracks) {
   const controlled = status.tracks?.controlledCandidate || {};
   const m3plus = status.tracks?.m3plusPitchModes || {};
   const m4 = status.tracks?.m4Omr || {};
+  const publicValidation = status.publicModelValidation || {};
 
   if (requiredTracks.has("ordinary") && !controlled.studentSafeCandidateGateReady) {
     const ordinaryArtifact = (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-context-validation-needed")
@@ -59,9 +60,22 @@ export function evaluateProjectGate(status, requiredTracks) {
       artifact: m4.artifacts?.independentGoldTodoHtml || m4.artifacts?.independentGoldTodo || "",
     });
   }
+  if (
+    requiredTracks.has("public")
+    && publicValidation.gates?.publicProfessionalMonophonicV2CandidateReady !== true
+  ) {
+    failures.push({
+      track: "Public professional monophonic V2 validation",
+      reason: publicValidation.blockingReasons || ["public-professional-v2-validation-not-ready"],
+      artifact: publicValidation.artifacts?.muscFreshConfirmation || "",
+    });
+  }
 
   return {
     projectReleaseReady: failures.length === 0,
+    gateScope: requiredTracks.size === 1 && requiredTracks.has("public")
+      ? "public-professional-research-candidate"
+      : "configured-project-tracks",
     requiredTracks: [...requiredTracks],
     failures,
   };
@@ -79,6 +93,10 @@ async function main() {
   console.log(JSON.stringify({
     ok: true,
     projectReleaseReady: gate.projectReleaseReady,
+    gateScope: gate.gateScope,
+    defaultStudentReleaseEligible:
+      status.runtimeStudentGate?.ordinaryUploadAutoFeedbackReady === true,
+    nearPerfectReady: status.publicModelValidation?.gates?.nearPerfectReady === true,
     requiredTracks: gate.requiredTracks,
     failures: gate.failures,
     out: outPath.replace(process.cwd(), ".").replace(/\\/g, "/"),
