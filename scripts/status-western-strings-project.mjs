@@ -376,6 +376,16 @@ const CONTROLLED_PILOT_EVIDENCE_AUDIT = path.join(
   "experiments",
   "western-strings-controlled-pilot-evidence-audit.json",
 );
+const FRESH_BLIND_INTAKE_STATUS = path.join(
+  "data",
+  "experiments",
+  "western-strings-v2alpha-blind-intake-status.json",
+);
+const FRESH_BLIND_INTAKE_STATUS_MD = path.join(
+  "data",
+  "experiments",
+  "western-strings-v2alpha-blind-intake-status.md",
+);
 
 function parseArgs(argv) {
   const args = {
@@ -1070,6 +1080,7 @@ function summarizeNextActions(
   controlledPilotSession,
   controlledPilotEvidence,
   controlledPilotMachineAudit,
+  freshBlindIntake,
 ) {
   const actions = [];
   const ordinaryBlockers = controlled.blockingReasons || [];
@@ -1178,14 +1189,31 @@ function summarizeNextActions(
         const v2AlphaGate = controlledPilotEvidence?.v2AlphaGate || {};
         const scopedCandidate = controlledPilotMachineAudit?.scopedV2AlphaCandidate || {};
         if (scopedCandidate.teacherReviewAllowed === true) {
-          actions.push({
-            priority: 1,
-            track: "Scoped V2-alpha blind audit preparation",
-            action: `Machine testing now passes only for scope=${scopedCandidate.scopeName}: historical precision/coverage=${(Number(scopedCandidate.historical?.precision || 0) * 100).toFixed(2)}%/${(Number(scopedCandidate.historical?.coverage || 0) * 100).toFixed(2)}%, operational precision/coverage=${(Number(scopedCandidate.operational?.knownPrecision || 0) * 100).toFixed(2)}%/${(Number(scopedCandidate.operational?.coverage || 0) * 100).toFixed(2)}% across ${scopedCandidate.operationalRecordingCount || 0} recordings. Do not reuse the current labels. Prepare and machine-QA one small fresh blind professional pack; all later measures remain review_required and default runtime stays fail-closed.`,
-            artifact: CONTROLLED_PILOT_EVIDENCE_AUDIT_MD.replace(/\\/g, "/"),
-            teacherReviewNeeded: false,
-            reason: ["fresh-blind-pack-not-prepared", "first-measure-only", "default-runtime-fail-closed"],
-          });
+          const sharedEvidence = `Machine testing passes only for scope=${scopedCandidate.scopeName}: historical precision/coverage=${(Number(scopedCandidate.historical?.precision || 0) * 100).toFixed(2)}%/${(Number(scopedCandidate.historical?.coverage || 0) * 100).toFixed(2)}%, operational precision/coverage=${(Number(scopedCandidate.operational?.knownPrecision || 0) * 100).toFixed(2)}%/${(Number(scopedCandidate.operational?.coverage || 0) * 100).toFixed(2)}% across ${scopedCandidate.operationalRecordingCount || 0} recordings.`;
+          if (freshBlindIntake?.readyForMachinePrecheck === true) {
+            actions.push({
+              priority: 1,
+              track: "Fresh blind machine precheck",
+              action: `${sharedEvidence} Fresh intake ${freshBlindIntake.candidate?.recordingId || ""} passed novelty, audio, score, approval, and first-measure checks. Stage only this candidate into the controlled intake and run the ordinary machine precheck. Do not generate a professional pack until that precheck passes; later measures remain review_required and default runtime stays fail-closed.`,
+              artifact: FRESH_BLIND_INTAKE_STATUS_MD.replace(/\\/g, "/"),
+              teacherReviewNeeded: false,
+              reason: ["fresh-blind-machine-precheck-not-run", "first-measure-only", "default-runtime-fail-closed"],
+            });
+          } else {
+            actions.push({
+              priority: 1,
+              track: "Scoped V2-alpha blind audit preparation",
+              action: `${sharedEvidence} Do not reuse the current labels. Add one new independent recording, clean reviewed MusicXML/MXL, and score image/PDF to data/private/western-strings-v2alpha-blind-intake/intake.json, then run npm run western:fresh-blind-intake-status. Generate a professional pack only after that intake and the ordinary machine precheck pass; all later measures remain review_required and default runtime stays fail-closed.`,
+              artifact: FRESH_BLIND_INTAKE_STATUS_MD.replace(/\\/g, "/"),
+              teacherReviewNeeded: false,
+              reason: [
+                ...(freshBlindIntake?.blockingReasons || ["fresh-blind-intake-status-missing"]),
+                "fresh-blind-pack-not-prepared",
+                "first-measure-only",
+                "default-runtime-fail-closed",
+              ],
+            });
+          }
         } else if (v2AlphaGate.ready !== true) {
           const precisionPercent = v2AlphaGate.precision === null || v2AlphaGate.precision === undefined
             ? "unavailable"
@@ -1259,6 +1287,7 @@ export async function buildProjectStatus(args = {}) {
     controlledPilotDecision,
     controlledPilotSessions,
     controlledPilotMachineAudit,
+    freshBlindIntake,
   ] = await Promise.all([
     buildControlledStatus(),
     buildM3PlusStatus(),
@@ -1267,6 +1296,7 @@ export async function buildProjectStatus(args = {}) {
     readJson(CONTROLLED_PILOT_DECISION),
     readControlledPilotSessions(args.controlledPilotSessionsRoot),
     readJson(CONTROLLED_PILOT_EVIDENCE_AUDIT),
+    readJson(FRESH_BLIND_INTAKE_STATUS),
   ]);
   const controlledPilotSession = controlledPilotSessions.find((session) => session.executionPerformed === true)
     || controlledPilotSessions[0]
@@ -1363,6 +1393,23 @@ export async function buildProjectStatus(args = {}) {
           source: CONTROLLED_PILOT_EVIDENCE_AUDIT.replace(/\\/g, "/"),
           missing: true,
         },
+    freshBlindIntake: freshBlindIntake
+      ? {
+          source: FRESH_BLIND_INTAKE_STATUS.replace(/\\/g, "/"),
+          summary: FRESH_BLIND_INTAKE_STATUS_MD.replace(/\\/g, "/"),
+          readyForMachinePrecheck: freshBlindIntake.readyForMachinePrecheck === true,
+          candidate: freshBlindIntake.candidate || {},
+          scope: freshBlindIntake.scope || {},
+          blockingReasons: freshBlindIntake.blockingReasons || [],
+          warnings: freshBlindIntake.warnings || [],
+        }
+      : {
+          source: FRESH_BLIND_INTAKE_STATUS.replace(/\\/g, "/"),
+          summary: FRESH_BLIND_INTAKE_STATUS_MD.replace(/\\/g, "/"),
+          readyForMachinePrecheck: false,
+          missing: true,
+          blockingReasons: ["fresh-blind-intake-status-missing"],
+        },
     tracks: {
       controlledCandidate,
       m3plusPitchModes,
@@ -1377,6 +1424,7 @@ export async function buildProjectStatus(args = {}) {
       controlledPilotSession,
       controlledPilotEvidence,
       controlledPilotMachineAudit,
+      freshBlindIntake,
     ),
   };
 }

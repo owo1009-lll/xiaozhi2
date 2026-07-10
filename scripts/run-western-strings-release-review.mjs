@@ -13,6 +13,7 @@ const STEPS = [
   "test:western-offline-feature-audio",
   "test:western-controlled-pilot-run",
   "test:western-controlled-pilot-evidence-audit",
+  "test:western-fresh-blind-intake",
   "western:ordinary-monitored-pilot-audit",
   "western:m3plus-monitored-pilot-audit",
   "western:m4-preflight",

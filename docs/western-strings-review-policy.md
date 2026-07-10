@@ -53,7 +53,7 @@ Use these before asking for any review:
 upload monitored pilot. A safe session is not enough for V2-alpha: raw model
 auto-pass rows must be separated from strict self-check eligible rows. Run
 `npm run western:controlled-pilot-evidence-audit` before any new professional
-review request. The current result has 100% precision on 5 strict self-check
+review request. The current result has 100% precision on 11 strict self-check
 rows but only 4.00% whole-piece operational coverage, below the 20% floor. The
 joint threshold sweep found no confidence threshold that fixes the whole-piece
 scope. A narrower first-measure-only scope has now passed machine checks across
@@ -63,6 +63,12 @@ one small fresh blind pack for that exact scope. Do not reuse existing labels,
 do not include later measures, and do not send a pack until audio playback,
 score location, controls, and scope membership pass machine QA. Raw model
 auto-pass rows outside the scope remain `review_required`.
+
+Before staging that fresh recording, run `npm run western:fresh-blind-intake-status`.
+The intake must use a new recording and, by default, a new piece/score; it also
+requires a clean-score approval, consent/license metadata, a resolvable violin
+part with a parseable first measure, decodable audio, and an existing score image/PDF. Any missing or reused
+evidence blocks staging and professional review.
 
 ### M3+ Pitch Behavior Modes
 

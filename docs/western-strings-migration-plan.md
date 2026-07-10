@@ -335,6 +335,7 @@ OMR 只解决"谱面从哪来",不改变音频诊断逻辑。未过 note-level �
 - 2026-07-10 五批一次性离线受控 pilot 已安全完成,统计严格区分模型原始决策与范围内可放行数:共 275 候选 / 33 个模型原始 auto-pass / 11 个 first-measure pilot-eligible / 22 个自动抑制回 `review_required`;known usable=11、known wrong=0、unknown=0。进程环境均已恢复,未发布学生反馈,默认 runtime 仍 fail-closed。
 - `stu02-ex02-wrong_pitch` 与 `stu01-ex04-rhythm_shift` 在机器预检被淘汰,未要求教师复核。五条正式证据来自 `stu01-ex01-correct`、`stu03-ex03-missing_note`、`stu03-ex06-noisy`、`stu01-ex07-correct`、`stu02-ex08-wrong_pitch`,跨 5 条录音/5 首练习。
 - `npm run western:controlled-pilot-evidence-audit` 当前报告:全曲阈值调优仍失败,但 `first-measure-only + confidence≥0.95` 安全范围通过。历史留一录音 12/12、precision=1.0、coverage=0.2553;5 条独立真实 pilot 共 11/11、precision=1.0、范围内 coverage=0.2683。显式 pilot runtime scope 已接线并通过正反单测/smoke,默认 runtime 仍关闭。当前 `machinePreflightPassed=true`,`teacherReviewAllowed=true` 只授权准备一份**新录音上的小型 blind 专业审计**,不授权旧包复核、后续小节 auto-pass 或默认学生发布。
+- 现有 12 条录音全部已进入历史标签/复核,不能再作 fresh blind evidence。`npm run western:fresh-blind-intake-init` 创建私有模板;全新录音、已审 clean MusicXML/MXL 与谱面图片/PDF 填入后,必须通过 `npm run western:fresh-blind-intake-status` 的 ID/内容哈希去重、音频解码、第一小节可分析性、谱面批准和授权检查,才允许进入普通机器预检。未通过不得生成专业复核包。
 - 不得把同一录音重复执行算作新证据。只有机器审计同时达到 precision≥0.90、coverage≥0.20、跨曲证据后,才允许生成一小批 fresh blind 专业复核;任何默认发布决策前仍须重新运行 release review。
 - runner 从历史 session 自动排除已执行录音;机器预检淘汰但尚未执行的录音通过 `--exclude-recording-id <recordingId>` 排除并随下一次成功 session 固化。底层若返回重复录音,session 必须以 `pilot-reused-recording` 中止。
 - 无批准文件时保持 review-only / fail-closed;只有机器预检发现 unknown/unsafe auto-pass 时才进入定向人工复核。

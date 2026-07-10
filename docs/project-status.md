@@ -39,19 +39,22 @@
 
 - 60 条候选人工标签:46 usable / 14 wrong。
 - confidence pilot、fresh blind validation、threshold-pool runtime-policy audit。
-- runtime scorer 已接入, 但默认关闭。
-- `npm run western:ordinary-monitored-pilot-audit` 已通过。
+- 5 批独立机器受控 pilot 已安全完成,默认运行时均已恢复关闭。
+- runtime scorer 与 first-measure-only 显式 pilot scope 已接入,但默认关闭。
+- `npm run western:ordinary-monitored-pilot-audit` 与 `npm run western:controlled-pilot-evidence-audit` 已通过机器前置检查。
 
 当前关键结果:
 
-- fresh validation precision=0.90。
-- monitored pilot audit: `readyForMonitoredPilot=true`。
-- `teacherReviewNeeded=false`。
-- precision precheck 中 self-checked auto-pass 3 条均为 known usable,0 条 known wrong,0 条 unknown。
+- 全曲 operational:275 候选 / 33 个模型原始 auto-pass / 11 个严格 eligible;precision=1.0,但 coverage=4.00%,不达 V2-alpha 20% 下限。
+- 联合 threshold sweep 没有找到能同时满足 precision>=0.90 与 coverage>=0.20 的全曲阈值。
+- first-measure-only + confidence>=0.95 历史留一录音:12/12 usable,precision=1.0,coverage=25.53%。
+- first-measure-only 真实机器 pilot:11/11 usable,0 wrong,0 unknown,precision=1.0,coverage=26.83%,覆盖 5 条独立录音/曲目。
+- `machinePreflightPassed=true`,`teacherReviewAllowed=true`,但只授权准备一份全新、小型、第一小节范围的专业盲审包。
 
 结论:
 
-- 可以进入单独受控 pilot 的发布审查。
+- 全曲普通上传仍不达 V2-alpha;只有第一小节安全子集可以进入最终小型盲审。
+- 现有 12 条录音全部已经进入训练/复核证据,不得重复使用。
 - 不得默认开启学生端。
 - 不得提交或全局设置 `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1`。
 
@@ -102,73 +105,39 @@
 
 ## 4. 当前唯一下一步
 
-### P1: 受控 pilot 批准
+### V2-alpha 第一小节安全子集:全新盲审素材入场
 
-发布前汇总审查和 pilot 决策包都已经可以由机器完成:
+现有机器证据已经达到“允许准备盲审”的门槛,但现有 12 条录音全部参与过训练或复核,不能再作 fresh blind evidence。当前不需要教师继续调试旧包。
+
+已新增独立入场闸门:
 
 ```bash
-npm run western:release-review
-npm run western:controlled-pilot-decision
-npm run western:controlled-pilot-approval-template
-npm run western:controlled-pilot-record-decision
-npm run western:controlled-pilot-start-preflight
-npm run western:controlled-pilot-run
+npm run western:fresh-blind-intake-init
+npm run western:fresh-blind-intake-status
 ```
 
-`western:release-review` 会串联:
+模板位置:
 
-- `western:ordinary-monitored-pilot-audit`
-- `western:m3plus-monitored-pilot-audit`
-- `western:m4-preflight`
-- `western:project-status`
+- `data/private/western-strings-v2alpha-blind-intake/intake.json`
 
-`western:controlled-pilot-decision` 会把机器证据转成明确决策包:
+需要放入并填写:
 
-- 不再默认要求教师/专业人员复核。
-- 只有机器预检发现 unknown auto-pass 或 unsafe auto-pass 时,才进入定向人工复核。
-- 没有负责人显式批准时,系统保持 review-only / fail-closed。
+- 一条未参与任何训练、复核或 pilot 的新小提琴录音。
+- 一份已人工核对的 clean MusicXML/MXL,且第一小节有可分析音符。
+- 对应 JPG/PNG/PDF 谱面显示文件,用于后续页面定位质检。
+- 新的 `recordingId` / `pieceId`、审核人、授权和许可状态。
 
-`western:controlled-pilot-approval-template` 只生成不批准的模板文件,不会解锁 pilot。现在建议用 `western:controlled-pilot-record-decision` 记录负责人决策,避免手工复制/编辑 JSON。
+入场闸门会自动检查:
 
-如果负责人明确决定暂缓/不启动 pilot,运行 `npm run western:controlled-pilot-record-decision -- --decision defer --by <负责人>`;系统会记录为 explicit no-go,继续安全停在 review-only。只有负责人明确批准时,才运行 `npm run western:controlled-pilot-record-decision -- --decision approve --by <负责人> --confirm-separate-monitored-pilot --confirm-default-runtime-fail-closed`。
+- 录音 ID、音频内容哈希是否曾出现。
+- 曲目 ID、谱面内容是否曾出现(默认要求新曲目)。
+- 音频能否由 ffprobe 解码、时长是否有效。
+- MusicXML/MXL 能否解析、单声部或唯一小提琴声部能否确定、第一小节是否有音符。
+- 谱面是否已批准、显示谱页是否真实存在、授权字段是否齐全。
 
-`western:controlled-pilot-start-preflight` 是批准后的最后机器预检。当前没有 approval 文件时它必须失败;通过前不得启动 pilot。
+当前实测 `readyForMachinePrecheck=false`,原因只是模板尚未填入新的外部素材。只有该命令返回 `readyForMachinePrecheck=true`,才进入下一环节:把候选安全写入受控 intake,运行普通上传机器预检。机器预检成功后才生成专业盲审包;生成后还要先由机器验证音频播放、第一小节谱面定位、按钮和 scope membership。任何一步失败都不得交给教师。
 
-`western:controlled-pilot-run` 默认只做状态检查,不会运行候选。只有负责人批准且 preflight 通过后,才可执行 `npm run western:controlled-pilot-run -- --execute --limit 1`:它只跑一个离线受控批次,结束后立即退出并恢复进程环境,不会启动公开学生服务器。未知 auto-pass 会暂停到定向复核,已知错误 auto-pass 会中止。
-
-runner 会读取 `western-strings-controlled-pilot-sessions/` 自动排除所有历史已执行录音。机器预检已拒绝但尚未形成 session 的录音,用可重复参数 `--exclude-recording-id <recordingId>` 排除;成功执行后该排除项会写入 session,以后自动继承。重复录音即使被底层错误返回也会触发 `pilot-reused-recording` 并中止。
-
-产物:
-
-- `data/experiments/western-strings-release-review.json`
-- `data/experiments/western-strings-release-review.md`
-- `data/experiments/western-strings-controlled-pilot-decision.json`
-- `data/experiments/western-strings-controlled-pilot-decision.md`
-- `data/experiments/western-strings-controlled-pilot-approval.template.json`
-- `data/experiments/western-strings-controlled-pilot-start-preflight.json`
-- `data/experiments/western-strings-controlled-pilot-start-preflight.md`
-
-当前实测:
-
-- `readyForControlledPilot=true`
-- `readyForDefaultStudentRelease=false`
-- `teacherReviewNeeded=false`
-- `runtimeFailClosed=true`
-- `readyForControlledPilotDecision=true`
-- `readyToStartControlledPilot=true`
-- `approvalPresent=true`
-- `controlledPilotSessionStatus=completed_safe`
-- `completedSafeSessionCount=2`
-- `safeDistinctRecordingCount=2`
-- `totalCandidateCount=120`
-- `autoPassCandidateCount=19`
-- `knownUsableAutoPassCandidateCount=5`
-- `knownWrongAutoPassCandidateCount=0`
-- `unknownAutoPassCandidateCount=0`
-- `precheckRejectedRecordingIds=stu02-ex02-wrong_pitch`
-- `defaultRuntimeFailClosedAfter=true`
-
-这表示:两批独立受控 pilot 已安全完成,当前不需要继续找教师复核。该结果仍不授权默认学生端开放。不得重复历史录音或机器预检淘汰录音凑证据;扩大 pilot 前必须使用新的独立受控提交并重新跑 release review。默认学生端继续保持 review-only / fail-closed。
+专业盲审仍只审 `first-measure-only + confidence>=0.95` 候选;所有后续小节继续 `review_required`,默认学生端继续 fail-closed。
 
 ## 5. 当前不可声称
 
@@ -181,6 +150,9 @@ runner 会读取 `western-strings-controlled-pilot-sessions/` 自动排除所有
 ## 6. 最近确认通过的命令
 
 - `npm run western:m4-preflight`
+- `npm run western:controlled-pilot-evidence-audit`
+- `npm run test:western-fresh-blind-intake`
+- `npm run western:fresh-blind-intake-status`(当前按设计因缺全新素材返回阻断)
 - `npm run western:project-status`
 - `npm run western:next-actions`
 - `npm run test:western-project-gate`

@@ -259,11 +259,22 @@ function commandForAction(action) {
     return [
       "Do not send any existing review pack to the teacher; current labels and pilot recordings are not fresh blind evidence.",
       "Open data/experiments/western-strings-controlled-pilot-evidence-audit.md and confirm the scope is first-measure-only with confidence >= 0.95.",
-      "Prepare one new independent violin recording with a clean reviewed MusicXML/MXL score; later measures remain review_required.",
+      "Run npm run western:fresh-blind-intake-init once, then fill data/private/western-strings-v2alpha-blind-intake/intake.json with one new independent violin recording, a clean reviewed MusicXML/MXL score, and its score image/PDF.",
+      "Run npm run western:fresh-blind-intake-status. Do not stage the candidate unless readyForMachinePrecheck=true; reused recording IDs, audio content, piece IDs, or score content are rejected.",
       "Run the ordinary machine precheck on the new recording before generating a professional-review pack.",
       "Machine-QA the generated pack: audio opens, score locator shows the first measure, controls work, and every row is inside the scoped gate.",
       "Only then request a small fresh blind professional audit. Do not ask the reviewer to debug playback, score localization, or candidate generation.",
       "Keep production/default student runtime fail-closed until that fresh blind audit passes.",
+    ];
+  }
+  if (track === "Fresh blind machine precheck") {
+    return [
+      "Open data/experiments/western-strings-v2alpha-blind-intake-status.md and confirm readyForMachinePrecheck=true.",
+      "Stage only the candidate named in that report into the controlled intake; do not mix it into training labels.",
+      "Run the ordinary machine precheck with the first-measure-only scope and keep every later-measure candidate review_required.",
+      "If the machine precheck produces no scoped candidate or any unsafe candidate, stop and fix the input/candidate pipeline before professional review.",
+      "Generate a small fresh blind professional pack only after the machine precheck passes, then machine-QA audio playback, score location, controls, and scope membership.",
+      "Keep production/default student runtime fail-closed until the fresh blind professional audit passes.",
     ];
   }
   if (track === "Controlled pilot completed") {
