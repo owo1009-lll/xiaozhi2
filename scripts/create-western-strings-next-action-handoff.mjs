@@ -259,8 +259,9 @@ function commandForAction(action) {
     return [
       "Do not send any existing review pack to the teacher; current labels and pilot recordings are not fresh blind evidence.",
       "Open data/experiments/western-strings-controlled-pilot-evidence-audit.md and confirm the scope is first-measure-only with confidence >= 0.95.",
-      "Run npm run western:fresh-blind-intake-init once, then fill data/private/western-strings-v2alpha-blind-intake/intake.json with one new independent violin recording, a clean reviewed MusicXML/MXL score, and its score image/PDF.",
-      "Run npm run western:fresh-blind-intake-status. Do not stage the candidate unless readyForMachinePrecheck=true; reused recording IDs, audio content, piece IDs, or score content are rejected.",
+      "Put one new independent violin recording, a clean reviewed MusicXML/MXL score, and its score image/PDF in the private intake directory. Do not hand-edit intake.json.",
+      "Run npm run western:fresh-blind-intake-stage with explicit --recording-id, --piece-id, --audio, --score, --score-display, and --reviewed-by values. It audits a temporary manifest and replaces intake.json only when readyForMachinePrecheck=true.",
+      "Confirm with npm run western:fresh-blind-intake-status; reused recording IDs, audio content, piece IDs, or score content are rejected.",
       "Run the ordinary machine precheck on the new recording before generating a professional-review pack.",
       "Machine-QA the generated pack: audio opens, score locator shows the first measure, controls work, and every row is inside the scoped gate.",
       "Only then request a small fresh blind professional audit. Do not ask the reviewer to debug playback, score localization, or candidate generation.",

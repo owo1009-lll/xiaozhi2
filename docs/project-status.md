@@ -116,6 +116,14 @@ npm run western:fresh-blind-intake-init
 npm run western:fresh-blind-intake-status
 ```
 
+不再手改 `intake.json`。三个文件就位后由项目维护者运行原子化登记命令:
+
+```bash
+npm run western:fresh-blind-intake-stage -- --recording-id <new-recording-id> --piece-id <new-piece-id> --audio "<audio-path>" --score "<musicxml-or-mxl-path>" --score-display "<pdf-or-image-path>" --reviewed-by "<reviewer>"
+```
+
+该命令先审计临时清单；任何重复、解码失败、谱面解析失败或审核信息缺失都会保持正式 `intake.json` 不变。
+
 入场闸门通过后，机器预检必须精确指定本次全新录音，不能按队列顺序取样:
 
 ```bash

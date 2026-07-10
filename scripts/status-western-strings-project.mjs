@@ -1203,7 +1203,7 @@ function summarizeNextActions(
             actions.push({
               priority: 1,
               track: "Scoped V2-alpha blind audit preparation",
-              action: `${sharedEvidence} Do not reuse the current labels. Add one new independent recording, clean reviewed MusicXML/MXL, and score image/PDF to data/private/western-strings-v2alpha-blind-intake/intake.json, then run npm run western:fresh-blind-intake-status. Generate a professional pack only after that intake and the ordinary machine precheck pass; all later measures remain review_required and default runtime stays fail-closed.`,
+              action: `${sharedEvidence} Do not reuse the current labels. Put one new independent recording, clean reviewed MusicXML/MXL, and score image/PDF in the private intake directory, then use npm run western:fresh-blind-intake-stage with explicit recording/piece/reviewer metadata. The command audits a temporary manifest and replaces intake.json only after every check passes. Confirm with npm run western:fresh-blind-intake-status. Generate a professional pack only after that intake and the ordinary machine precheck pass; all later measures remain review_required and default runtime stays fail-closed.`,
               artifact: FRESH_BLIND_INTAKE_STATUS_MD.replace(/\\/g, "/"),
               teacherReviewNeeded: false,
               reason: [

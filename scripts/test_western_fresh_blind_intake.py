@@ -161,6 +161,53 @@ class FreshBlindIntakeTest(unittest.TestCase):
         write_mxl(self.score, MULTIPART_WITHOUT_VIOLIN_XML)
         self.assertIn("fresh-blind-violin-part-not-resolved", self.audit()["blockingReasons"])
 
+    def test_stage_replaces_manifest_only_after_full_audit_passes(self) -> None:
+        original = {"auditId": "keep-this"}
+        self.manifest.write_text(json.dumps(original), encoding="utf-8")
+        payload = MODULE.build_stage_payload(
+            repo_root=self.root,
+            audit_id="blind-stage-001",
+            recording_id="new-recording",
+            piece_id="new-piece",
+            audio_path=str(self.audio),
+            score_path=str(self.score),
+            score_display_path=str(self.display),
+            reviewed_by="reviewer-1",
+        )
+        report = MODULE.stage_intake(
+            self.manifest,
+            payload,
+            repo_root=self.root,
+            audio_probe=self.audio_probe,
+        )
+        self.assertTrue(report["staged"])
+        self.assertEqual(json.loads(self.manifest.read_text(encoding="utf-8"))["recordingId"], "new-recording")
+        self.assertFalse(self.manifest.with_name(f".{self.manifest.name}.candidate").exists())
+
+    def test_rejected_stage_preserves_existing_manifest(self) -> None:
+        original = {"auditId": "keep-this"}
+        self.manifest.write_text(json.dumps(original), encoding="utf-8")
+        payload = MODULE.build_stage_payload(
+            repo_root=self.root,
+            audit_id="blind-stage-002",
+            recording_id="old-recording",
+            piece_id="new-piece",
+            audio_path=str(self.audio),
+            score_path=str(self.score),
+            score_display_path=str(self.display),
+            reviewed_by="reviewer-1",
+        )
+        report = MODULE.stage_intake(
+            self.manifest,
+            payload,
+            repo_root=self.root,
+            audio_probe=self.audio_probe,
+        )
+        self.assertFalse(report["staged"])
+        self.assertIn("fresh-blind-recording-id-already-seen", report["blockingReasons"])
+        self.assertEqual(json.loads(self.manifest.read_text(encoding="utf-8")), original)
+        self.assertFalse(self.manifest.with_name(f".{self.manifest.name}.candidate").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

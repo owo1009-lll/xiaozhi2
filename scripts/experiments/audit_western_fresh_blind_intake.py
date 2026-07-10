@@ -317,6 +317,65 @@ def build_template() -> dict[str, Any]:
     }
 
 
+def build_stage_payload(
+    *,
+    repo_root: Path,
+    audit_id: str,
+    recording_id: str,
+    piece_id: str,
+    audio_path: str,
+    score_path: str,
+    score_display_path: str,
+    reviewed_by: str,
+    require_new_piece: bool = True,
+    notes: str = "",
+) -> dict[str, Any]:
+    def normalized_path(value: str) -> str:
+        stripped = str(value or "").strip()
+        if not stripped:
+            return ""
+        return relative_path(repo_root, resolve_path(repo_root, stripped))
+
+    return {
+        "auditId": str(audit_id or "").strip(),
+        "recordingId": str(recording_id or "").strip(),
+        "pieceId": str(piece_id or "").strip(),
+        "audioPath": normalized_path(audio_path),
+        "scorePath": normalized_path(score_path),
+        "scoreDisplayPath": normalized_path(score_display_path),
+        "cleanScoreReviewStatus": "approved",
+        "cleanScoreReviewedBy": str(reviewed_by or "").strip(),
+        "consent": "yes",
+        "licenseStatus": "local-only",
+        "requireNewPiece": bool(require_new_piece),
+        "notes": str(notes or "").strip(),
+    }
+
+
+def stage_intake(
+    manifest_path: Path,
+    payload: dict[str, Any],
+    *,
+    repo_root: Path = REPO_ROOT,
+    audio_probe: Callable[[Path], dict[str, Any]] = probe_audio,
+) -> dict[str, Any]:
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    candidate_path = manifest_path.with_name(f".{manifest_path.name}.candidate")
+    candidate_path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    try:
+        report = audit_intake(candidate_path, repo_root=repo_root, audio_probe=audio_probe)
+        report["manifest"] = relative_path(repo_root, manifest_path)
+        report["staged"] = bool(report.get("readyForMachinePrecheck"))
+        if report["staged"]:
+            candidate_path.replace(manifest_path)
+        return report
+    finally:
+        candidate_path.unlink(missing_ok=True)
+
+
 def audit_intake(
     manifest_path: Path,
     *,
@@ -509,6 +568,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out", default=str(DEFAULT_OUT))
     parser.add_argument("--markdown", default=str(DEFAULT_MARKDOWN))
     parser.add_argument("--init", action="store_true")
+    parser.add_argument("--stage", action="store_true")
+    parser.add_argument("--audit-id", default="v2alpha-blind-001")
+    parser.add_argument("--recording-id", default="")
+    parser.add_argument("--piece-id", default="")
+    parser.add_argument("--audio", default="")
+    parser.add_argument("--score", default="")
+    parser.add_argument("--score-display", default="")
+    parser.add_argument("--reviewed-by", default="")
+    parser.add_argument("--notes", default="")
+    parser.add_argument("--allow-seen-piece", action="store_true")
     return parser.parse_args()
 
 
@@ -522,7 +591,24 @@ def main() -> int:
         print(json.dumps({"ok": True, "created": str(manifest_path)}, indent=2))
         return 0
 
-    report = audit_intake(manifest_path)
+    if args.stage:
+        report = stage_intake(
+            manifest_path,
+            build_stage_payload(
+                repo_root=REPO_ROOT,
+                audit_id=args.audit_id,
+                recording_id=args.recording_id,
+                piece_id=args.piece_id,
+                audio_path=args.audio,
+                score_path=args.score,
+                score_display_path=args.score_display,
+                reviewed_by=args.reviewed_by,
+                require_new_piece=not args.allow_seen_piece,
+                notes=args.notes,
+            ),
+        )
+    else:
+        report = audit_intake(manifest_path)
     out_path = Path(args.out).resolve()
     markdown_path = Path(args.markdown).resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)

@@ -64,7 +64,9 @@ do not include later measures, and do not send a pack until audio playback,
 score location, controls, and scope membership pass machine QA. Raw model
 auto-pass rows outside the scope remain `review_required`.
 
-Before staging that fresh recording, run `npm run western:fresh-blind-intake-status`.
+Stage that fresh recording with `npm run western:fresh-blind-intake-stage`; it audits a temporary
+manifest and replaces the official intake only after every check passes. Confirm the persisted
+candidate with `npm run western:fresh-blind-intake-status`.
 The intake must use a new recording and, by default, a new piece/score; it also
 requires a clean-score approval, consent/license metadata, a resolvable violin
 part with a parseable first measure, decodable audio, and an existing score image/PDF. Any missing or reused

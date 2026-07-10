@@ -269,6 +269,10 @@ assert(
   "package.json must expose the fresh blind intake status command",
 );
 assert(
+  packageJson.scripts?.["western:fresh-blind-intake-stage"],
+  "package.json must expose the atomic fresh blind intake staging command",
+);
+assert(
   packageJson.scripts?.["test:western-fresh-blind-intake"],
   "package.json must expose fresh blind intake tests",
 );

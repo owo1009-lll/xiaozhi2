@@ -131,6 +131,7 @@
     "western:controlled-pilot-run": "node scripts\\run-western-controlled-pilot-session.mjs",
     "western:controlled-pilot-evidence-audit": "node scripts\\audit-western-controlled-pilot-evidence.mjs",
     "western:fresh-blind-intake-init": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\audit_western_fresh_blind_intake.py --init",
+    "western:fresh-blind-intake-stage": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\audit_western_fresh_blind_intake.py --stage",
     "western:fresh-blind-intake-status": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\audit_western_fresh_blind_intake.py",
     "test:western-offline-feature-audio": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-western-offline-feature-audio.py",
     "western:m3plus-monitored-pilot-audit": "node scripts\\run-western-m3plus-monitored-pilot-audit.mjs",
