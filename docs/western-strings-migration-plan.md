@@ -352,3 +352,10 @@ OMR 只解决"谱面从哪来",不改变音频诊断逻辑。未过 note-level �
 - 原始波形 rawv2 严格闸门已在 development 与 unseen-performer holdout 上验证漏音、错音、迟到均 0 危险放行,记为 `publicRawAudioCorePrototypeReady=true`。
 - 弱音 shallow-model bake-off 未通过 holdout,固定为 `review_required`;extra-note 继续 review-only。
 - 公开专业录音不能证明学生错误声学分布。没有学生域证据时可以继续研究版和公开专业录音版,但不得命名为学生端 V3 release 或“完美识别”。
+
+# 2026-07-10 PHENICX 人工起止金标补充
+
+- PHENICX 数据前置审计已通过:`readyForAlignmentBenchmark=true`,4/4 作品、22 violin tracks、2,969 个逐乐器人工 gold 音符。
+- 许可为本地非商业研究且禁止重新分发;音频/注释/混音均不得入 Git。
+- 下一步严格限定为适配器:每部作品混合全部同步 violin 分轨、保留 score/gold 行映射、内存单调化异常 score 时间。
+- 只有 4/4 混音和映射审计通过后才允许运行 Parangonar/Basic Pitch 人工 gold 对齐评测。详见 `docs/western-strings-phenicx-validation.md`。

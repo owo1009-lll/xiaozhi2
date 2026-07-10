@@ -390,3 +390,11 @@
 - rawv2 原始波形注入表明漏音、+2 半音错音、迟到 800ms 的严格策略在 development/holdout 均为 0 危险放行;弱音仍无法跨演奏者安全自动判。
 - 产品范围据此固定:公开专业录音核心三类可作为 V2/V3 研究原型;weak-note、extra-note 和学生域默认发布继续 fail-closed。
 - “完美”不是开发口号。只有独立人工逐音 gold、最终盲测、alignment/recognition precision 与 coverage/recall 均至少 99% 才可讨论近乎完美;当前未达到。
+
+# 2026-07-10 PHENICX 人工 gold 阶段
+
+- PHENICX-Anechoic 已下载到 gitignored `data/external/`,官方字节数与 MD5 校验通过;许可限定本地非商业研究,不得重新分发。
+- 数据审计已通过:4/4 作品、22 条同步小提琴分轨、2,969 个人工对齐音符,score/gold 音高序列逐行一致。
+- 已显式记录 54 个零时值 score 音符和 Beethoven 1 个 150ms score onset 回退装饰音;适配器必须保留行顺序并只在内存中做单调时间归一化。
+- `violin.txt` 是整个小提琴声部复音 gold;必须混合每部作品全部 violin 分轨,不得拿单分轨对整声部 gold。
+- 当前仅 `readyForAlignmentBenchmark=true`,PHENICX 模型对齐尚未通过。详细闸门见 `docs/western-strings-phenicx-validation.md`。

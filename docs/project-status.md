@@ -201,3 +201,9 @@ npm run western:ordinary-auto-pass-precision-review-pack -- --recording-id <fres
 - `defaultStudentReleaseEligible=false`
 
 本节替代“当前必须继续采集大量学生录音才能开展开发”的说法。公开专业录音足以继续研发、比较模型和形成论文实验,但没有真实学生域证据时,不得声称默认学生发布安全或完美识别。
+
+## 8. PHENICX 人工 gold 前置审计(2026-07-10)
+
+下一环节 PHENICX 数据许可、下载和结构审计已通过:`readyForAlignmentBenchmark=true`,4/4 作品、22 条同步小提琴分轨、2,969 个逐乐器人工对齐音符。完整边界和进入条件见 [western-strings-phenicx-validation.md](western-strings-phenicx-validation.md)。
+
+这只表示数据可进入适配器阶段,尚不表示 PHENICX 对齐模型通过。当前下一步是确定性生成 4 份小提琴声部混音和单调 score 时间副本;该适配审计全过后才运行模型。
