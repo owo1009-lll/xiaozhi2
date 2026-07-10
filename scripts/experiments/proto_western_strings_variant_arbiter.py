@@ -54,10 +54,16 @@ def main(argv=None) -> int:
                           "annotated": r.get("annotated")})
         scored = [c for c in cands if c["status"] == "ok"]
         winner = max(scored, key=lambda c: (c["confirmed"], c["agreement"]), default=None)
-        decision = ("human-review" if winner is None
-                    or winner["confirmed"] < MIN_CONFIRMED
-                    or winner["agreement"] < MIN_AGREEMENT
-                    else winner["variant"])
+        # machine-only mode: no expert queue. Failures route to user-side retry
+        # (retake-photo) or degraded feedback (confirmed-only display).
+        if winner is None:
+            decision = "retake-photo"          # OMR produced nothing on any variant
+        elif winner["confirmed"] >= MIN_CONFIRMED and winner["agreement"] >= MIN_AGREEMENT:
+            decision = winner["variant"]       # full feedback on winner
+        elif winner["confirmed"] > 0:
+            decision = f"degraded-feedback:{winner['variant']}"  # greens only, no accusations
+        else:
+            decision = "retake-photo"
         rows.append({"piece": piece, "decision": decision,
                      "winner": winner, "candidates": cands})
         print(json.dumps(rows[-1], ensure_ascii=False))
