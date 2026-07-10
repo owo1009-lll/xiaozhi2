@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import bisect
 import json
 import sys
 from collections import defaultdict
@@ -8,6 +9,9 @@ from pathlib import Path
 from typing import Any
 
 import pretty_midi
+import numpy as np
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import maximum_bipartite_matching
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -16,8 +20,9 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from eval_western_bach_violin_basic_pitch_transcription import (  # noqa: E402
+    ONSET_TOLERANCES,
     aggregate_units,
-    evaluate_unit,
+    metrics_from_counts,
 )
 from eval_western_bach_violin_musc_transcription import (  # noqa: E402
     load_or_predict_musc_events,
@@ -98,6 +103,97 @@ def group_metrics(units: list[dict[str, Any]], field: str) -> dict[str, Any]:
     return {key: aggregate_units(value) for key, value in sorted(grouped.items())}
 
 
+def sparse_integer_midi_matches(
+    reference_rows: list[dict[str, str]],
+    events: list[dict[str, Any]],
+    onset_tolerance: float,
+) -> list[tuple[int, int]]:
+    """Match integer-MIDI notes exactly like mir_eval without dense outer matrices."""
+    estimated_by_midi: dict[int, list[tuple[float, int]]] = defaultdict(list)
+    for estimated_index, event in enumerate(events):
+        estimated_by_midi[int(event["midi"])].append((float(event["start"]), estimated_index))
+    for rows in estimated_by_midi.values():
+        rows.sort()
+
+    edge_references: list[int] = []
+    edge_estimates: list[int] = []
+    for reference_index, row in enumerate(reference_rows):
+        candidates = estimated_by_midi.get(int(row["midi"])) or []
+        if not candidates:
+            continue
+        reference_onset = float(row["goldTime"])
+        candidate_onsets = [candidate[0] for candidate in candidates]
+        lower = bisect.bisect_left(candidate_onsets, reference_onset - onset_tolerance - 1e-9)
+        upper = bisect.bisect_right(candidate_onsets, reference_onset + onset_tolerance + 1e-9)
+        estimated_indexes = sorted(
+            estimated_index
+            for estimated_onset, estimated_index in candidates[lower:upper]
+            if round(abs(reference_onset - estimated_onset), 4) <= onset_tolerance
+        )
+        for estimated_index in estimated_indexes:
+            edge_references.append(reference_index)
+            edge_estimates.append(estimated_index)
+    if not edge_references:
+        return []
+    graph = csr_matrix(
+        (
+            np.ones(len(edge_references), dtype=np.int8),
+            (edge_references, edge_estimates),
+        ),
+        shape=(len(reference_rows), len(events)),
+    )
+    matched_estimate_by_reference = maximum_bipartite_matching(graph, perm_type="column")
+    return [
+        (reference_index, int(estimated_index))
+        for reference_index, estimated_index in enumerate(matched_estimate_by_reference)
+        if estimated_index >= 0
+    ]
+
+
+def evaluate_hf2_tolerance(
+    reference_rows: list[dict[str, str]],
+    events: list[dict[str, Any]],
+    onset_tolerance: float,
+) -> dict[str, Any]:
+    matches = sparse_integer_midi_matches(reference_rows, events, onset_tolerance)
+    matched_reference = {int(reference_index) for reference_index, _ in matches}
+    double_stop = [
+        str(row.get("doubleStop") or "").strip().lower() == "true"
+        for row in reference_rows
+    ]
+    single_reference = sum(not value for value in double_stop)
+    double_reference = sum(double_stop)
+    single_matched = sum(not double_stop[index] for index in matched_reference)
+    double_matched = sum(double_stop[index] for index in matched_reference)
+    metrics = metrics_from_counts(len(reference_rows), len(events), len(matches))
+    metrics["singleNoteRecall"] = single_matched / single_reference if single_reference else None
+    metrics["doubleStopRecall"] = double_matched / double_reference if double_reference else None
+    return metrics
+
+
+def evaluate_hf2_unit(
+    reference_rows: list[dict[str, str]],
+    events: list[dict[str, Any]],
+) -> dict[str, Any]:
+    double_stop_count = sum(
+        str(row.get("doubleStop") or "").strip().lower() == "true"
+        for row in reference_rows
+    )
+    return {
+        "referenceNotes": len(reference_rows),
+        "estimatedNotes": len(events),
+        "doubleStopReferenceNotes": double_stop_count,
+        "byOnsetTolerance": {
+            f"{int(round(tolerance * 1000))}ms": evaluate_hf2_tolerance(
+                reference_rows,
+                events,
+                tolerance,
+            )
+            for tolerance in ONSET_TOLERANCES
+        },
+    }
+
+
 def musc_cache_path(
     audio_path: Path,
     cache_dir: Path,
@@ -116,20 +212,30 @@ def build_incremental_plan(
 ) -> list[dict[str, Any]]:
     if max_new_units < 0:
         raise ValueError("max_new_units must be non-negative")
-    new_units = 0
-    plan = []
+    cached_items = []
+    uncached_items = []
     for source in selected:
         cache_path = musc_cache_path(Path(source["audioPath"]), cache_dir, postprocessing)
         cached = cache_path.is_file() and not force
         if cached:
-            action = "cache"
-        elif new_units < max_new_units:
-            action = "predict"
-            new_units += 1
+            cached_items.append({"source": source, "cachePath": cache_path, "action": "cache"})
         else:
-            action = "pending"
-        plan.append({"source": source, "cachePath": cache_path, "action": action})
-    return plan
+            uncached_items.append({"source": source, "cachePath": cache_path})
+    uncached_items.sort(
+        key=lambda item: (
+            float((item["source"].get("audio") or {}).get("durationSeconds") or float("inf")),
+            str(item["source"].get("songName") or ""),
+            str(item["source"].get("id") or ""),
+        )
+    )
+    scheduled_items = [
+        {
+            **item,
+            "action": "predict" if index < max_new_units else "pending",
+        }
+        for index, item in enumerate(uncached_items)
+    ]
+    return cached_items + scheduled_items
 
 
 def render_markdown(report: dict[str, Any]) -> str:
@@ -311,7 +417,7 @@ def main() -> int:
                     "emotion": source["emotion"],
                     "role": role,
                     "goldProvenance": source["goldProvenance"],
-                    "musc": evaluate_unit(reference_rows, events),
+                    "musc": evaluate_hf2_unit(reference_rows, events),
                     "predictedPitchBendNoteCount": sum(
                         int(event.get("pitchBendFrameCount") or 0) > 0 for event in events
                     ),

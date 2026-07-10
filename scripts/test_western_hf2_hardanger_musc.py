@@ -52,9 +52,9 @@ class WesternHf2HardangerMuscTest(unittest.TestCase):
             cache_dir = Path(temp_dir)
             postprocessing = {"onsetThreshold": 0.5, "frameThreshold": 0.4, "minimumNoteLengthMs": 60}
             selected = [
-                {"id": "a", "audioPath": str(cache_dir / "a.wav")},
-                {"id": "b", "audioPath": str(cache_dir / "b.wav")},
-                {"id": "c", "audioPath": str(cache_dir / "c.wav")},
+                {"id": "a", "audioPath": str(cache_dir / "a.wav"), "audio": {"durationSeconds": 30}},
+                {"id": "b", "audioPath": str(cache_dir / "b.wav"), "audio": {"durationSeconds": 20}},
+                {"id": "c", "audioPath": str(cache_dir / "c.wav"), "audio": {"durationSeconds": 10}},
             ]
             MODULE.musc_cache_path(Path(selected[0]["audioPath"]), cache_dir, postprocessing).write_text(
                 "[]\n", encoding="utf-8"
@@ -66,7 +66,10 @@ class WesternHf2HardangerMuscTest(unittest.TestCase):
                 force=False,
                 max_new_units=1,
             )
-        self.assertEqual([item["action"] for item in plan], ["cache", "predict", "pending"])
+        self.assertEqual(
+            [(item["source"]["id"], item["action"]) for item in plan],
+            [("a", "cache"), ("c", "predict"), ("b", "pending")],
+        )
 
     def test_incremental_plan_supports_status_only_mode(self) -> None:
         selected = [{"id": "a", "audioPath": "a.wav"}]
@@ -79,6 +82,39 @@ class WesternHf2HardangerMuscTest(unittest.TestCase):
                 max_new_units=0,
             )
         self.assertEqual(plan[0]["action"], "pending")
+
+    def test_sparse_integer_midi_matching_finds_maximum_cardinality(self) -> None:
+        reference_rows = [
+            {"goldTime": "0.00", "goldOffset": "0.2", "midi": "60", "doubleStop": "false"},
+            {"goldTime": "0.09", "goldOffset": "0.3", "midi": "60", "doubleStop": "false"},
+            {"goldTime": "1.00", "goldOffset": "1.4", "midi": "64", "doubleStop": "true"},
+            {"goldTime": "1.00", "goldOffset": "1.4", "midi": "67", "doubleStop": "true"},
+        ]
+        events = [
+            {"start": 0.05, "end": 0.2, "midi": 60},
+            {"start": 0.14, "end": 0.3, "midi": 60},
+            {"start": 1.05, "end": 1.4, "midi": 64},
+            {"start": 1.05, "end": 1.4, "midi": 67},
+        ]
+        matches = MODULE.sparse_integer_midi_matches(reference_rows, events, 0.05)
+        self.assertEqual(len(matches), 4)
+        self.assertEqual(len({row[0] for row in matches}), 4)
+        self.assertEqual(len({row[1] for row in matches}), 4)
+
+        metrics = MODULE.evaluate_hf2_tolerance(reference_rows, events, 0.05)
+        self.assertEqual(metrics["matchedNotes"], 4)
+        self.assertEqual(metrics["singleNoteRecall"], 1.0)
+        self.assertEqual(metrics["doubleStopRecall"], 1.0)
+
+    def test_sparse_integer_midi_matching_rejects_wrong_pitch_and_late_onset(self) -> None:
+        reference_rows = [
+            {"goldTime": "1.0", "goldOffset": "1.2", "midi": "69", "doubleStop": "false"}
+        ]
+        events = [
+            {"start": 1.05, "end": 1.2, "midi": 70},
+            {"start": 1.051, "end": 1.2, "midi": 69},
+        ]
+        self.assertEqual(MODULE.sparse_integer_midi_matches(reference_rows, events, 0.05), [])
 
 
 if __name__ == "__main__":
