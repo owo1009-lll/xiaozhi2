@@ -129,7 +129,10 @@ function renderMarkdown(report) {
     "",
     `- selectedSubmissionCount: ${report.monitoring.selectedSubmissionCount}`,
     `- totalCandidateCount: ${report.monitoring.totalCandidateCount}`,
-    `- autoPassCandidateCount: ${report.monitoring.autoPassCandidateCount}`,
+    `- modelAutoPassCandidateCount: ${report.monitoring.modelAutoPassCandidateCount}`,
+    `- scopedAutoPassCandidateCount: ${report.monitoring.scopedAutoPassCandidateCount}`,
+    `- pilotEligibleAutoPassCandidateCount: ${report.monitoring.pilotEligibleAutoPassCandidateCount}`,
+    `- suppressedModelAutoPassCandidateCount: ${report.monitoring.suppressedModelAutoPassCandidateCount}`,
     `- reviewRequiredCandidateCount: ${report.monitoring.reviewRequiredCandidateCount}`,
     `- knownUsableAutoPassCandidateCount: ${report.monitoring.knownUsableAutoPassCandidateCount}`,
     `- knownWrongAutoPassCandidateCount: ${report.monitoring.knownWrongAutoPassCandidateCount}`,
@@ -140,6 +143,8 @@ function renderMarkdown(report) {
     "",
     "- This is a one-shot offline controlled batch, not a public student server.",
     "- The runtime flag exists only inside this command and is restored before exit.",
+    "- Model auto-pass rows that do not pass the stricter pilot self-check are suppressed as review_required.",
+    "- Only pilotEligibleAutoPassCandidateCount is allowed to count toward controlled-pilot coverage.",
     "- Unknown auto-pass rows pause the session for targeted review.",
     "- Known-wrong auto-pass rows abort the session.",
     "- No M4 OMR output enters runtime diagnosis.",
@@ -163,6 +168,12 @@ function emptyMonitoring() {
     selectedSubmissionCount: 0,
     totalCandidateCount: 0,
     autoPassCandidateCount: 0,
+    modelAutoPassCandidateCount: 0,
+    scopedAutoPassCandidateCount: 0,
+    selfCheckedAutoPassCandidateCount: 0,
+    pilotEligibleAutoPassCandidateCount: 0,
+    suppressedModelAutoPassCandidateCount: 0,
+    rawModelReviewRequiredCandidateCount: 0,
     reviewRequiredCandidateCount: 0,
     knownUsableAutoPassCandidateCount: 0,
     knownWrongAutoPassCandidateCount: 0,
@@ -244,9 +255,29 @@ export async function runControlledPilotSession(args = {}, dependencies = {}) {
   const repeatedRecordingIds = selectedSubmissions
     .map((submission) => String(submission?.recordingId || "").trim())
     .filter((recordingId) => recordingId && effectiveExcludedRecordingIds.includes(recordingId));
+  const totalCandidateCount = Number(summary.totalCandidateCount || 0);
+  const modelAutoPassCandidateCount = Number(
+    summary.modelAutoPassCandidateCount
+    ?? summary.autoPassCandidateCount
+    ?? 0,
+  );
+  const scopedAutoPassCandidateCount = Number(summary.autoPassCandidateCount || 0);
+  const selfCheckedAutoPassCandidateCount = Number(summary.selfCheckedAutoPassCandidateCount || 0);
+  const knownUsable = Number(summary.knownUsableAutoPassCandidateCount || 0);
   const knownWrong = Number(summary.knownWrongAutoPassCandidateCount || 0);
   const unknown = Number(summary.unknownReviewCandidateCount || 0);
+  const selfCheckAccountedCandidateCount = knownUsable + knownWrong + unknown;
   if (summary.ok === false) blockingReasons.push(...(summary.blockingReasons || []).map((reason) => `pilot:${reason}`));
+  if (executionPerformed && selfCheckedAutoPassCandidateCount > modelAutoPassCandidateCount) {
+    blockingReasons.push(
+      `pilot-self-check-exceeds-model-auto-pass:${selfCheckedAutoPassCandidateCount}:${modelAutoPassCandidateCount}`,
+    );
+  }
+  if (executionPerformed && selfCheckAccountedCandidateCount !== selfCheckedAutoPassCandidateCount) {
+    blockingReasons.push(
+      `pilot-self-check-accounting-mismatch:${selfCheckedAutoPassCandidateCount}:${selfCheckAccountedCandidateCount}`,
+    );
+  }
   if (knownWrong > 0) blockingReasons.push(`pilot-known-wrong-auto-pass:${knownWrong}`);
   if (unknown > 0) blockingReasons.push(`pilot-unknown-auto-pass-needs-targeted-review:${unknown}`);
   if (repeatedRecordingIds.length > 0) {
@@ -272,10 +303,20 @@ export async function runControlledPilotSession(args = {}, dependencies = {}) {
 
   const monitoring = executionPerformed ? {
     selectedSubmissionCount: Number(summary.selectedSubmissionCount || 0),
-    totalCandidateCount: Number(summary.totalCandidateCount || 0),
-    autoPassCandidateCount: Number(summary.autoPassCandidateCount || 0),
-    reviewRequiredCandidateCount: Math.max(0, Number(summary.totalCandidateCount || 0) - Number(summary.autoPassCandidateCount || 0)),
-    knownUsableAutoPassCandidateCount: Number(summary.knownUsableAutoPassCandidateCount || 0),
+    totalCandidateCount,
+    // Retained for old report readers; this is the raw model decision count.
+    autoPassCandidateCount: modelAutoPassCandidateCount,
+    modelAutoPassCandidateCount,
+    scopedAutoPassCandidateCount,
+    selfCheckedAutoPassCandidateCount,
+    pilotEligibleAutoPassCandidateCount: selfCheckedAutoPassCandidateCount,
+    suppressedModelAutoPassCandidateCount: Math.max(
+      0,
+      modelAutoPassCandidateCount - selfCheckedAutoPassCandidateCount,
+    ),
+    rawModelReviewRequiredCandidateCount: Math.max(0, totalCandidateCount - modelAutoPassCandidateCount),
+    reviewRequiredCandidateCount: Math.max(0, totalCandidateCount - selfCheckedAutoPassCandidateCount),
+    knownUsableAutoPassCandidateCount: knownUsable,
     knownWrongAutoPassCandidateCount: knownWrong,
     unknownAutoPassCandidateCount: unknown,
   } : emptyMonitoring();

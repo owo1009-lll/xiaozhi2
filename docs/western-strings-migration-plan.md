@@ -332,9 +332,10 @@ OMR 只解决"谱面从哪来",不改变音频诊断逻辑。未过 note-level �
 - `npm run western:controlled-pilot-start-preflight` 是批准后的最后机器预检;当前没有 approval 文件时必须失败,通过前不得启动 pilot。
 - `npm run western:controlled-pilot-run` 默认只检查状态;批准且 preflight 通过后,`npm run western:controlled-pilot-run -- --execute --limit 1` 只运行一个离线受控批次并立即退出。它不启动公开学生服务器,会恢复进程环境,未知 auto-pass 暂停定向复核,已知错误 auto-pass 中止。
 - 当前状态:产品负责人批准已记录,`readyForControlledPilotDecision=true`,`readyToStartControlledPilot=true`,`approvalPresent=true`,`runtimeFailClosed=true`。
-- 2026-07-10 首批一次性离线受控 pilot 已完成:`sessionStatus=completed_safe`,`selectedSubmissionCount=1`,`totalCandidateCount=60`,`autoPassCandidateCount=8`,`knownUsableAutoPassCandidateCount=3`,`knownWrongAutoPassCandidateCount=0`,`unknownAutoPassCandidateCount=0`。进程环境已恢复,未发布学生反馈,默认 runtime 仍 fail-closed。
-- 第二条 `stu02-ex02-wrong_pitch` 在机器预检因 `selfCheckedAutoPassCandidateCount=0` 被淘汰,未计入 pilot。第二批独立录音 `stu03-ex03-missing_note` 也达到 `completed_safe`:60 候选 / 11 auto-pass / 2 known usable / 0 known wrong / 0 unknown。累计为 2 个安全 session、2 条独立录音、120 候选、19 auto-pass、5 known usable、0 known wrong、0 unknown。
-- 这批不需要教师/专业人员复核。不得把同一录音重复执行算作新证据;下一轮扩大 pilot 必须换新的独立受控提交,且在任何默认发布决策前重新运行 release review。
+- 2026-07-10 五批一次性离线受控 pilot 已安全完成,统计严格区分模型原始决策与范围内可放行数:共 275 候选 / 33 个模型原始 auto-pass / 11 个 first-measure pilot-eligible / 22 个自动抑制回 `review_required`;known usable=11、known wrong=0、unknown=0。进程环境均已恢复,未发布学生反馈,默认 runtime 仍 fail-closed。
+- `stu02-ex02-wrong_pitch` 与 `stu01-ex04-rhythm_shift` 在机器预检被淘汰,未要求教师复核。五条正式证据来自 `stu01-ex01-correct`、`stu03-ex03-missing_note`、`stu03-ex06-noisy`、`stu01-ex07-correct`、`stu02-ex08-wrong_pitch`,跨 5 条录音/5 首练习。
+- `npm run western:controlled-pilot-evidence-audit` 当前报告:全曲阈值调优仍失败,但 `first-measure-only + confidence≥0.95` 安全范围通过。历史留一录音 12/12、precision=1.0、coverage=0.2553;5 条独立真实 pilot 共 11/11、precision=1.0、范围内 coverage=0.2683。显式 pilot runtime scope 已接线并通过正反单测/smoke,默认 runtime 仍关闭。当前 `machinePreflightPassed=true`,`teacherReviewAllowed=true` 只授权准备一份**新录音上的小型 blind 专业审计**,不授权旧包复核、后续小节 auto-pass 或默认学生发布。
+- 不得把同一录音重复执行算作新证据。只有机器审计同时达到 precision≥0.90、coverage≥0.20、跨曲证据后,才允许生成一小批 fresh blind 专业复核;任何默认发布决策前仍须重新运行 release review。
 - runner 从历史 session 自动排除已执行录音;机器预检淘汰但尚未执行的录音通过 `--exclude-recording-id <recordingId>` 排除并随下一次成功 session 固化。底层若返回重复录音,session 必须以 `pilot-reused-recording` 中止。
 - 无批准文件时保持 review-only / fail-closed;只有机器预检发现 unknown/unsafe auto-pass 时才进入定向人工复核。
 # 2026-07-09 最新闸门状态补充

@@ -427,6 +427,7 @@ function reviewRowFromCandidate({
 async function buildSelectionFromRun({ tempRoot, realRepoRoot, run, selfCheck = {}, knownLabels = new Map() }) {
   const rows = [];
   let totalCandidateCount = 0;
+  let modelAutoPassCandidateCount = 0;
   let autoPassCandidateCount = 0;
   let selfCheckedAutoPassCandidateCount = 0;
   let knownUsableAutoPassCandidateCount = 0;
@@ -446,6 +447,7 @@ async function buildSelectionFromRun({ tempRoot, realRepoRoot, run, selfCheck = 
     });
     for (const candidate of Array.isArray(artifact.candidateRows) ? artifact.candidateRows : []) {
       totalCandidateCount += 1;
+      if (candidate.confidenceSelected === true) modelAutoPassCandidateCount += 1;
       if (!isAutoPassCandidate(candidate)) continue;
       autoPassCandidateCount += 1;
       const check = selfCheckAutoPassCandidate(candidate, selfCheck);
@@ -491,6 +493,7 @@ async function buildSelectionFromRun({ tempRoot, realRepoRoot, run, selfCheck = 
   return {
     rows,
     totalCandidateCount,
+    modelAutoPassCandidateCount,
     autoPassCandidateCount,
     selfCheckedAutoPassCandidateCount,
     knownUsableAutoPassCandidateCount,
@@ -546,7 +549,8 @@ function renderMarkdown(summary) {
     `- selectedSubmissionCount: ${summary.selectedSubmissionCount}`,
     `- excludedRecordingIds: ${summary.excludedRecordingIds.join(", ") || "none"}`,
     `- totalCandidateCount: ${summary.totalCandidateCount}`,
-    `- autoPassCandidateCount: ${summary.autoPassCandidateCount}`,
+    `- modelAutoPassCandidateCount: ${summary.modelAutoPassCandidateCount}`,
+    `- scopedAutoPassCandidateCount: ${summary.autoPassCandidateCount}`,
     `- selfCheckedAutoPassCandidateCount: ${summary.selfCheckedAutoPassCandidateCount}`,
     `- knownUsableAutoPassCandidateCount: ${summary.knownUsableAutoPassCandidateCount ?? 0}`,
     `- knownWrongAutoPassCandidateCount: ${summary.knownWrongAutoPassCandidateCount ?? 0}`,
@@ -643,7 +647,8 @@ export async function runOrdinaryMonitoredPilotReviewPack(args = {}) {
       modelName: release.modelName,
       modelVersion: release.modelVersion,
       threshold: release.threshold,
-      selectedAboveThresholdCount: selection.autoPassCandidateCount,
+      selectedAboveThresholdCount: selection.modelAutoPassCandidateCount,
+      scopedAutoPassCandidateCount: selection.autoPassCandidateCount,
       selfCheckedAutoPassCandidateCount: selection.selfCheckedAutoPassCandidateCount,
       knownLabels: rel(path.resolve(args.knownLabels || DEFAULT_KNOWN_LABELS), realRepoRoot),
       knownLabelRows: knownLabelSet.rows.length,
@@ -694,6 +699,7 @@ export async function runOrdinaryMonitoredPilotReviewPack(args = {}) {
         itemCount: batchResult.batch.itemCount,
       },
       totalCandidateCount: selection.totalCandidateCount,
+      modelAutoPassCandidateCount: selection.modelAutoPassCandidateCount,
       autoPassCandidateCount: selection.autoPassCandidateCount,
       selfCheckedAutoPassCandidateCount: selection.selfCheckedAutoPassCandidateCount,
       knownUsableAutoPassCandidateCount: selection.knownUsableAutoPassCandidateCount,

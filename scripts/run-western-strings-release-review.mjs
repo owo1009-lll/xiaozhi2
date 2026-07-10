@@ -12,10 +12,12 @@ const DEFAULT_SUMMARY = path.join("data", "experiments", "western-strings-releas
 const STEPS = [
   "test:western-offline-feature-audio",
   "test:western-controlled-pilot-run",
+  "test:western-controlled-pilot-evidence-audit",
   "western:ordinary-monitored-pilot-audit",
   "western:m3plus-monitored-pilot-audit",
   "western:m4-preflight",
   "western:project-status",
+  "western:controlled-pilot-evidence-audit",
 ];
 
 function parseArgs(argv) {

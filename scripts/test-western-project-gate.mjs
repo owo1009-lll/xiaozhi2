@@ -85,7 +85,7 @@ const m3plusPilotAuditPassed = m3plus.monitoredPilotAudit?.readyForMonitoredPilo
 if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
   assert(
     status.releaseReview?.readyForControlledPilot
-      ? ["Controlled pilot decision", "Controlled pilot approval", "Controlled pilot deferred", "Start monitored pilot", "Controlled pilot completed"].includes(status.nextActions[0]?.track)
+      ? ["Controlled pilot decision", "Controlled pilot approval", "Controlled pilot deferred", "Start monitored pilot", "Controlled pilot coverage audit", "Scoped V2-alpha blind audit preparation", "Controlled pilot completed"].includes(status.nextActions[0]?.track)
       : status.nextActions[0]?.track === "Release review",
     "after ordinary, M3+, and M4 machine checks pass, handoff should move to release review or controlled pilot decision while runtime stays fail-closed",
   );
@@ -129,6 +129,7 @@ if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
     [
       "data/experiments/western-strings-release-review.md",
       "data/experiments/western-strings-controlled-pilot-decision.md",
+      "data/experiments/western-strings-controlled-pilot-evidence-audit.md",
     ].includes(nextArtifact)
       || (nextArtifact.startsWith("data/experiments/western-strings-controlled-pilot-sessions/")
         && nextArtifact.endsWith("/session.md")),
@@ -204,7 +205,7 @@ assert.equal(
 if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
   assert(
     status.releaseReview?.readyForControlledPilot
-      ? ["Controlled pilot decision", "Controlled pilot approval", "Controlled pilot deferred", "Start monitored pilot", "Controlled pilot completed"].includes(status.nextActions[0]?.track)
+      ? ["Controlled pilot decision", "Controlled pilot approval", "Controlled pilot deferred", "Start monitored pilot", "Controlled pilot coverage audit", "Scoped V2-alpha blind audit preparation", "Controlled pilot completed"].includes(status.nextActions[0]?.track)
       : status.nextActions[0]?.track === "Release review",
     "M4 should no longer produce a human-task next action after clean-score approval is recognized",
   );
@@ -255,8 +256,21 @@ assert(
   "package.json must expose controlled-pilot runner tests",
 );
 assert(
+  packageJson.scripts?.["western:controlled-pilot-evidence-audit"],
+  "package.json must expose the machine-only controlled-pilot evidence audit",
+);
+assert(
+  packageJson.scripts?.["test:western-controlled-pilot-evidence-audit"],
+  "package.json must expose controlled-pilot evidence audit tests",
+);
+assert(
   releaseReviewSource.includes('"test:western-controlled-pilot-run"'),
   "release review must rerun the controlled-pilot runner safety tests before approval",
+);
+assert(
+  releaseReviewSource.includes('"test:western-controlled-pilot-evidence-audit"')
+    && releaseReviewSource.includes('"western:controlled-pilot-evidence-audit"'),
+  "release review must refresh the machine-only evidence audit before any human handoff",
 );
 assert(
   packageJson.scripts?.["test:western-controlled-pilot-decision"],
@@ -293,6 +307,8 @@ if (m4.m4OmrDraftQualityReady) {
       || handoff.includes("Controlled pilot approval")
       || handoff.includes("Controlled pilot deferred")
       || handoff.includes("Start monitored pilot")
+      || handoff.includes("Controlled pilot coverage audit")
+      || handoff.includes("Scoped V2-alpha blind audit preparation")
       || handoff.includes("Controlled pilot completed"),
     "handoff must route through release-review or the controlled-pilot decision after M4 clears",
   );

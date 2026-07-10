@@ -143,8 +143,10 @@ function summarizeItem(item) {
       modelVersion: item?.candidateGate?.modelVersion || "",
       threshold: item?.candidateGate?.threshold ?? null,
       evaluatedCandidateCount: item?.candidateGate?.evaluatedCandidateCount ?? null,
+      modelAutoPassCandidateCount: item?.candidateGate?.modelAutoPassCandidateCount ?? null,
       autoPassCandidateCount: item?.candidateGate?.autoPassCandidateCount ?? null,
       reviewRequiredCandidateCount: item?.candidateGate?.reviewRequiredCandidateCount ?? null,
+      controlledPilotScope: item?.candidateGate?.controlledPilotScope || null,
       reason: item?.candidateGate?.reason || "",
     },
     previewDecisions: (item?.candidatePreview || []).map((candidate) => ({
@@ -179,8 +181,11 @@ function renderMarkdown(report) {
     `- modelVersion: ${gate.modelVersion}`,
     `- threshold: ${gate.threshold}`,
     `- evaluatedCandidateCount: ${gate.evaluatedCandidateCount}`,
+    `- modelAutoPassCandidateCount: ${gate.modelAutoPassCandidateCount}`,
     `- autoPassCandidateCount: ${gate.autoPassCandidateCount}`,
     `- reviewRequiredCandidateCount: ${gate.reviewRequiredCandidateCount}`,
+    `- controlledPilotScope: ${gate.controlledPilotScope?.scopeName || "none"}`,
+    `- controlledPilotScopeCoverage: ${gate.controlledPilotScope?.scopeCoverage ?? ""}`,
     "",
     "## Safety Interpretation",
     "",
@@ -235,6 +240,9 @@ export async function runOrdinaryMonitoredPilotSmoke(args = {}) {
     const evaluated = Number(batchItem.candidateGate.evaluatedCandidateCount);
     const autoPass = Number(batchItem.candidateGate.autoPassCandidateCount);
     const reviewRequired = Number(batchItem.candidateGate.reviewRequiredCandidateCount);
+    if (batchItem.candidateGate.controlledPilotScope?.scopeName !== "first-measure-only") {
+      report.blockingReasons.push("controlled-pilot-first-measure-scope-missing");
+    }
     if (!Number.isFinite(evaluated) || evaluated <= 0) report.blockingReasons.push("no-candidates-evaluated");
     if (Number.isFinite(evaluated) && Number.isFinite(autoPass) && Number.isFinite(reviewRequired) && autoPass + reviewRequired !== evaluated) {
       report.blockingReasons.push("candidate-decision-count-mismatch");

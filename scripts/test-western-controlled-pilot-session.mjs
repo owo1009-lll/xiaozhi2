@@ -37,16 +37,26 @@ function blockedPreflight() {
   };
 }
 
-function precisionResult({ knownWrong = 0, unknown = 0, ok = true, recordingId = "recording-new" } = {}) {
+function precisionResult({
+  knownWrong = 0,
+  unknown = 0,
+  ok = true,
+  recordingId = "recording-new",
+  modelAutoPass = 3,
+  selfChecked = 3,
+  scopedAutoPass = selfChecked,
+  knownUsable = Math.max(0, selfChecked - knownWrong - unknown),
+} = {}) {
   return {
     summary: {
       ok,
       selectedSubmissionCount: 1,
       selectedSubmissions: [{ submissionId: `submission-${recordingId}`, recordingId }],
       totalCandidateCount: 8,
-      autoPassCandidateCount: 3,
-      selfCheckedAutoPassCandidateCount: 3,
-      knownUsableAutoPassCandidateCount: Math.max(0, 3 - knownWrong),
+      modelAutoPassCandidateCount: modelAutoPass,
+      autoPassCandidateCount: scopedAutoPass,
+      selfCheckedAutoPassCandidateCount: selfChecked,
+      knownUsableAutoPassCandidateCount: knownUsable,
       knownWrongAutoPassCandidateCount: knownWrong,
       unknownReviewCandidateCount: unknown,
       defaultOrdinaryReadyAfter: false,
@@ -105,9 +115,39 @@ try {
   assert.equal(safe.sessionStatus, "completed_safe");
   assert.equal(safe.pilotRunAccepted, true);
   assert.equal(safe.monitoring.knownUsableAutoPassCandidateCount, 3);
+  assert.equal(safe.monitoring.modelAutoPassCandidateCount, 3);
+  assert.equal(safe.monitoring.pilotEligibleAutoPassCandidateCount, 3);
+  assert.equal(safe.monitoring.scopedAutoPassCandidateCount, 3);
+  assert.equal(safe.monitoring.suppressedModelAutoPassCandidateCount, 0);
+  assert.equal(safe.monitoring.reviewRequiredCandidateCount, 5);
   assert.equal(safe.defaultRuntimeFailClosedAfter, true);
   assert.equal(safe.processEnvironmentRestored, true);
   assert.equal(process.env[ENABLE_ENV], undefined);
+
+  const suppressed = await runControlledPilotSession({ execute: true, sessionId: "suppressed", outRoot: tempRoot }, {
+    ...common,
+    buildPreflight: async () => approvedPreflight(),
+    runPrecisionSession: async () => precisionResult({ modelAutoPass: 8, selfChecked: 3 }),
+  });
+  assert.equal(suppressed.sessionStatus, "completed_safe");
+  assert.equal(suppressed.monitoring.modelAutoPassCandidateCount, 8);
+  assert.equal(suppressed.monitoring.pilotEligibleAutoPassCandidateCount, 3);
+  assert.equal(suppressed.monitoring.suppressedModelAutoPassCandidateCount, 5);
+  assert.equal(suppressed.monitoring.reviewRequiredCandidateCount, 5);
+
+  const accountingMismatch = await runControlledPilotSession({
+    execute: true,
+    sessionId: "accounting-mismatch",
+    outRoot: tempRoot,
+  }, {
+    ...common,
+    buildPreflight: async () => approvedPreflight(),
+    runPrecisionSession: async () => precisionResult({ selfChecked: 3, knownUsable: 2 }),
+  });
+  assert.equal(accountingMismatch.sessionStatus, "aborted");
+  assert(
+    accountingMismatch.blockingReasons.includes("pilot-self-check-accounting-mismatch:3:2"),
+  );
 
   let historyAwareArgs = null;
   const historyAware = await runControlledPilotSession({ execute: true, sessionId: "history-aware", outRoot: tempRoot }, {
@@ -200,6 +240,8 @@ console.log(JSON.stringify({
     "missing-approval-blocks",
     "parent-enabled-env-blocks",
     "safe-session-completes",
+    "raw-model-auto-pass-is-suppressed-unless-self-checked",
+    "self-check-accounting-mismatch-aborts",
     "historical-recordings-are-excluded",
     "precheck-rejections-are-persisted-as-exclusions",
     "repeated-recording-aborts",

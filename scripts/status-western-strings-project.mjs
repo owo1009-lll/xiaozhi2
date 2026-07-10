@@ -11,6 +11,8 @@ import {
 
 const DEFAULT_OUT = path.join("data", "experiments", "western-strings-project-status.json");
 const REVIEW_POLICY_DOC = path.join("docs", "western-strings-review-policy.md");
+const V2_ALPHA_MIN_PRECISION = 0.9;
+const V2_ALPHA_MIN_COVERAGE = 0.2;
 
 const CONTROLLED_LABELS = path.join(
   "data",
@@ -364,6 +366,16 @@ const CONTROLLED_PILOT_SESSIONS_ROOT = path.join(
   "experiments",
   "western-strings-controlled-pilot-sessions",
 );
+const CONTROLLED_PILOT_EVIDENCE_AUDIT_MD = path.join(
+  "data",
+  "experiments",
+  "western-strings-controlled-pilot-evidence-audit.md",
+);
+const CONTROLLED_PILOT_EVIDENCE_AUDIT = path.join(
+  "data",
+  "experiments",
+  "western-strings-controlled-pilot-evidence-audit.json",
+);
 
 function parseArgs(argv) {
   const args = {
@@ -483,12 +495,15 @@ function summarizeControlledPilotEvidence(sessions = []) {
     && (session.blockingReasons || []).length === 0);
   const recordingIds = new Set();
   const safeRecordingIds = new Set();
+  const safePieceIds = new Set();
   const precheckRejectedRecordingIds = new Set();
   for (const session of executed) {
     for (const submission of session.selectedSubmissions || []) {
       const recordingId = String(submission?.recordingId || "").trim();
       if (recordingId) recordingIds.add(recordingId);
       if (recordingId && completedSafe.includes(session)) safeRecordingIds.add(recordingId);
+      const piece = String(submission?.piece || "").trim();
+      if (piece && completedSafe.includes(session)) safePieceIds.add(piece);
     }
     for (const recordingId of session.additionalExcludedRecordingIds || []) {
       const normalized = String(recordingId || "").trim();
@@ -499,20 +514,87 @@ function summarizeControlledPilotEvidence(sessions = []) {
     (total, session) => total + Number(session.monitoring?.[field] || 0),
     0,
   );
+  const normalizedSafeMonitoring = completedSafe.map((session) => {
+    const monitoring = session.monitoring || {};
+    const knownUsable = Number(monitoring.knownUsableAutoPassCandidateCount || 0);
+    const knownWrong = Number(monitoring.knownWrongAutoPassCandidateCount || 0);
+    const unknown = Number(monitoring.unknownAutoPassCandidateCount || 0);
+    const modelAutoPass = Number(
+      monitoring.modelAutoPassCandidateCount
+      ?? monitoring.autoPassCandidateCount
+      ?? 0,
+    );
+    const pilotEligible = Number(
+      monitoring.pilotEligibleAutoPassCandidateCount
+      ?? monitoring.selfCheckedAutoPassCandidateCount
+      ?? (knownUsable + knownWrong + unknown),
+    );
+    return {
+      total: Number(monitoring.totalCandidateCount || 0),
+      modelAutoPass,
+      pilotEligible,
+      suppressed: Number(
+        monitoring.suppressedModelAutoPassCandidateCount
+        ?? Math.max(0, modelAutoPass - pilotEligible),
+      ),
+      knownUsable,
+      knownWrong,
+      unknown,
+    };
+  });
+  const safeSum = (field) => normalizedSafeMonitoring.reduce(
+    (total, monitoring) => total + monitoring[field],
+    0,
+  );
+  const safeTotalCandidateCount = safeSum("total");
+  const pilotEligibleAutoPassCandidateCount = safeSum("pilotEligible");
+  const knownUsableAutoPassCandidateCount = safeSum("knownUsable");
+  const knownWrongAutoPassCandidateCount = safeSum("knownWrong");
+  const unknownAutoPassCandidateCount = safeSum("unknown");
+  const scoredAutoPassCandidateCount = knownUsableAutoPassCandidateCount + knownWrongAutoPassCandidateCount;
+  const precision = scoredAutoPassCandidateCount > 0
+    ? knownUsableAutoPassCandidateCount / scoredAutoPassCandidateCount
+    : null;
+  const coverage = safeTotalCandidateCount > 0
+    ? pilotEligibleAutoPassCandidateCount / safeTotalCandidateCount
+    : 0;
+  const meetsPrecisionFloor = precision !== null && precision >= V2_ALPHA_MIN_PRECISION;
+  const meetsCoverageFloor = coverage >= V2_ALPHA_MIN_COVERAGE;
+  const hasCrossPieceEvidence = safePieceIds.size >= 2;
   return {
     sessionCount: sessions.length,
     executedSessionCount: executed.length,
     completedSafeSessionCount: completedSafe.length,
     distinctRecordingCount: recordingIds.size,
     safeDistinctRecordingCount: safeRecordingIds.size,
+    safeDistinctPieceCount: safePieceIds.size,
     recordingIds: [...recordingIds].sort(),
     safeRecordingIds: [...safeRecordingIds].sort(),
+    safePieceIds: [...safePieceIds].sort(),
     precheckRejectedRecordingIds: [...precheckRejectedRecordingIds].sort(),
     totalCandidateCount: sumMonitoring("totalCandidateCount"),
     autoPassCandidateCount: sumMonitoring("autoPassCandidateCount"),
-    knownUsableAutoPassCandidateCount: sumMonitoring("knownUsableAutoPassCandidateCount"),
-    knownWrongAutoPassCandidateCount: sumMonitoring("knownWrongAutoPassCandidateCount"),
-    unknownAutoPassCandidateCount: sumMonitoring("unknownAutoPassCandidateCount"),
+    modelAutoPassCandidateCount: safeSum("modelAutoPass"),
+    pilotEligibleAutoPassCandidateCount,
+    suppressedModelAutoPassCandidateCount: safeSum("suppressed"),
+    reviewRequiredCandidateCount: Math.max(0, safeTotalCandidateCount - pilotEligibleAutoPassCandidateCount),
+    knownUsableAutoPassCandidateCount,
+    knownWrongAutoPassCandidateCount,
+    unknownAutoPassCandidateCount,
+    v2AlphaGate: {
+      minPrecision: V2_ALPHA_MIN_PRECISION,
+      minCoverage: V2_ALPHA_MIN_COVERAGE,
+      precision,
+      coverage,
+      meetsPrecisionFloor,
+      meetsCoverageFloor,
+      hasCrossPieceEvidence,
+      ready: completedSafe.length >= 2
+        && meetsPrecisionFloor
+        && meetsCoverageFloor
+        && hasCrossPieceEvidence
+        && unknownAutoPassCandidateCount === 0,
+    },
   };
 }
 
@@ -979,7 +1061,16 @@ async function buildM4OmrStatus() {
   };
 }
 
-function summarizeNextActions(controlled, m3plus, m4Omr, releaseReview, controlledPilotDecision, controlledPilotSession, controlledPilotEvidence) {
+function summarizeNextActions(
+  controlled,
+  m3plus,
+  m4Omr,
+  releaseReview,
+  controlledPilotDecision,
+  controlledPilotSession,
+  controlledPilotEvidence,
+  controlledPilotMachineAudit,
+) {
   const actions = [];
   const ordinaryBlockers = controlled.blockingReasons || [];
   const ordinaryPilotAudit = controlled.confidencePilot?.monitoredPilotAudit || {};
@@ -1084,13 +1175,43 @@ function summarizeNextActions(controlled, m3plus, m4Omr, releaseReview, controll
         && controlledPilotSession?.processEnvironmentRestored === true
         && controlledPilotSession?.studentFeedbackPublished === false
         && (controlledPilotSession?.blockingReasons || []).length === 0) {
-        actions.push({
-          priority: 1,
-          track: "Controlled pilot completed",
-          action: `Controlled pilot evidence now has ${controlledPilotEvidence?.completedSafeSessionCount || 0} safe session(s) across ${controlledPilotEvidence?.safeDistinctRecordingCount || 0} independent recording(s). Keep the default student runtime fail-closed; do not rerun prior or precheck-rejected recordings. Broader evidence must use a new independently accepted submission before any release decision.`,
-          artifact: controlledPilotSession.artifacts?.sessionMd || controlledPilotSession.source,
-          reason: ["controlled-pilot-completed-safe", "default-runtime-fail-closed"],
-        });
+        const v2AlphaGate = controlledPilotEvidence?.v2AlphaGate || {};
+        const scopedCandidate = controlledPilotMachineAudit?.scopedV2AlphaCandidate || {};
+        if (scopedCandidate.teacherReviewAllowed === true) {
+          actions.push({
+            priority: 1,
+            track: "Scoped V2-alpha blind audit preparation",
+            action: `Machine testing now passes only for scope=${scopedCandidate.scopeName}: historical precision/coverage=${(Number(scopedCandidate.historical?.precision || 0) * 100).toFixed(2)}%/${(Number(scopedCandidate.historical?.coverage || 0) * 100).toFixed(2)}%, operational precision/coverage=${(Number(scopedCandidate.operational?.knownPrecision || 0) * 100).toFixed(2)}%/${(Number(scopedCandidate.operational?.coverage || 0) * 100).toFixed(2)}% across ${scopedCandidate.operationalRecordingCount || 0} recordings. Do not reuse the current labels. Prepare and machine-QA one small fresh blind professional pack; all later measures remain review_required and default runtime stays fail-closed.`,
+            artifact: CONTROLLED_PILOT_EVIDENCE_AUDIT_MD.replace(/\\/g, "/"),
+            teacherReviewNeeded: false,
+            reason: ["fresh-blind-pack-not-prepared", "first-measure-only", "default-runtime-fail-closed"],
+          });
+        } else if (v2AlphaGate.ready !== true) {
+          const precisionPercent = v2AlphaGate.precision === null || v2AlphaGate.precision === undefined
+            ? "unavailable"
+            : `${(Number(v2AlphaGate.precision) * 100).toFixed(2)}%`;
+          const coveragePercent = `${(Number(v2AlphaGate.coverage || 0) * 100).toFixed(2)}%`;
+          const reasons = ["default-runtime-fail-closed"];
+          if (v2AlphaGate.meetsPrecisionFloor !== true) reasons.push("controlled-pilot-precision-below-v2-alpha");
+          if (v2AlphaGate.meetsCoverageFloor !== true) reasons.push("controlled-pilot-coverage-below-v2-alpha");
+          if (v2AlphaGate.hasCrossPieceEvidence !== true) reasons.push("controlled-pilot-cross-piece-evidence-missing");
+          actions.push({
+            priority: 1,
+            track: "Controlled pilot coverage audit",
+            action: `The machine-only controlled pilot is safe but not V2-alpha: strict self-check precision=${precisionPercent}, effective coverage=${coveragePercent} (${controlledPilotEvidence?.pilotEligibleAutoPassCandidateCount || 0}/${controlledPilotEvidence?.totalCandidateCount || 0}). Keep every non-self-checked model auto-pass suppressed and do not request teacher review yet. The evidence audit rules out threshold tuning alone; improve candidate/localization evidence, then rerun the offline gate.`,
+            artifact: CONTROLLED_PILOT_EVIDENCE_AUDIT_MD.replace(/\\/g, "/"),
+            teacherReviewNeeded: false,
+            reason: reasons,
+          });
+        } else {
+          actions.push({
+            priority: 1,
+            track: "Controlled pilot completed",
+            action: `Controlled pilot evidence now has ${controlledPilotEvidence?.completedSafeSessionCount || 0} safe session(s) across ${controlledPilotEvidence?.safeDistinctRecordingCount || 0} independent recording(s), and it meets the V2-alpha precision/coverage floors. Keep the default student runtime fail-closed; use a fresh blind professional audit before any release decision.`,
+            artifact: controlledPilotSession.artifacts?.sessionMd || controlledPilotSession.source,
+            reason: ["controlled-pilot-completed-safe", "default-runtime-fail-closed"],
+          });
+        }
       } else if (controlledPilotDecision.readyToStartControlledPilot === true) {
         actions.push({
           priority: 1,
@@ -1130,13 +1251,22 @@ function summarizeNextActions(controlled, m3plus, m4Omr, releaseReview, controll
 }
 
 export async function buildProjectStatus(args = {}) {
-  const [controlledCandidate, m3plusPitchModes, m4Omr, releaseReview, controlledPilotDecision, controlledPilotSessions] = await Promise.all([
+  const [
+    controlledCandidate,
+    m3plusPitchModes,
+    m4Omr,
+    releaseReview,
+    controlledPilotDecision,
+    controlledPilotSessions,
+    controlledPilotMachineAudit,
+  ] = await Promise.all([
     buildControlledStatus(),
     buildM3PlusStatus(),
     buildM4OmrStatus(),
     readJson(RELEASE_REVIEW),
     readJson(CONTROLLED_PILOT_DECISION),
     readControlledPilotSessions(args.controlledPilotSessionsRoot),
+    readJson(CONTROLLED_PILOT_EVIDENCE_AUDIT),
   ]);
   const controlledPilotSession = controlledPilotSessions.find((session) => session.executionPerformed === true)
     || controlledPilotSessions[0]
@@ -1213,6 +1343,26 @@ export async function buildProjectStatus(args = {}) {
           missing: true,
         },
     controlledPilotEvidence,
+    controlledPilotMachineAudit: controlledPilotMachineAudit
+      ? {
+          source: CONTROLLED_PILOT_EVIDENCE_AUDIT.replace(/\\/g, "/"),
+          machinePreflightPassed: controlledPilotMachineAudit.machinePreflightPassed === true,
+          teacherReviewAllowed: controlledPilotMachineAudit.teacherReviewAllowed === true,
+          thresholdDiagnostic: controlledPilotMachineAudit.thresholdDiagnostic
+            ? {
+                operationalCandidateRows: controlledPilotMachineAudit.thresholdDiagnostic.operationalCandidateRows || 0,
+                operationalKnownLabelRows: controlledPilotMachineAudit.thresholdDiagnostic.operationalKnownLabelRows || 0,
+                simpleThresholdCandidateFound: controlledPilotMachineAudit.thresholdDiagnostic.simpleThresholdCandidateFound === true,
+                conclusion: controlledPilotMachineAudit.thresholdDiagnostic.conclusion || "",
+              }
+            : {},
+          scopedV2AlphaCandidate: controlledPilotMachineAudit.scopedV2AlphaCandidate || {},
+          blockingReasons: controlledPilotMachineAudit.blockingReasons || [],
+        }
+      : {
+          source: CONTROLLED_PILOT_EVIDENCE_AUDIT.replace(/\\/g, "/"),
+          missing: true,
+        },
     tracks: {
       controlledCandidate,
       m3plusPitchModes,
@@ -1226,6 +1376,7 @@ export async function buildProjectStatus(args = {}) {
       controlledPilotDecision,
       controlledPilotSession,
       controlledPilotEvidence,
+      controlledPilotMachineAudit,
     ),
   };
 }
@@ -1248,6 +1399,7 @@ function printProjectStatus(status, outPath) {
     releaseReview: status.releaseReview,
     controlledPilotSession: status.controlledPilotSession,
     controlledPilotEvidence: status.controlledPilotEvidence,
+    controlledPilotMachineAudit: status.controlledPilotMachineAudit,
     controlledCandidate: {
       ready: controlledCandidate.studentSafeCandidateGateReady,
       counts: controlledCandidate.counts,

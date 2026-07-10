@@ -58,6 +58,12 @@
   "runtimePolicy": {
     "default": "review_required",
     "whenEnabled": "candidate-evidence auto_pass candidates with confidenceProbability >= threshold; pitch/onset/missing/duration/extra diagnosis categories remain review_required",
+    "controlledPilotScope": {
+      "scopeName": "first-measure-only",
+      "maxMeasureIndex": 1,
+      "minConfidence": 0.95,
+      "reason": "Machine evidence meets the V2-alpha precision and coverage floors only inside this scope."
+    },
     "studentFacingRequires": [
       "WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1",
       "blindValidation.blindValidationPassed=true",

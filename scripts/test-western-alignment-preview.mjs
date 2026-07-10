@@ -13,6 +13,7 @@ import {
   persistUploadedAudioFile,
 } from "../src/server/audioPayload.js";
 import {
+  applyOrdinaryControlledPilotScope,
   buildWesternAlignmentPreview,
   buildWesternStudentAnalysis,
   runWesternControlledSubmissionBatch,
@@ -933,6 +934,37 @@ async function testControlledSubmissionOfflineFeatureReviewBatch() {
   }
 }
 
+function testOrdinaryControlledPilotScope() {
+  const result = applyOrdinaryControlledPilotScope([
+    { candidateId: "pass", measureIndex: 1, confidenceProbability: 0.96, confidenceSelected: true },
+    { candidateId: "low-confidence", measureIndex: 1, confidenceProbability: 0.94, confidenceSelected: true },
+    { candidateId: "later-measure", measureIndex: 2, confidenceProbability: 0.99, confidenceSelected: true },
+    { candidateId: "model-rejected", measureIndex: 1, confidenceProbability: 0.99, confidenceSelected: false },
+  ], {
+    runtimePolicy: {
+      controlledPilotScope: {
+        scopeName: "first-measure-only",
+        maxMeasureIndex: 1,
+        minConfidence: 0.95,
+      },
+    },
+  });
+  assert.equal(result.modelAutoPassCandidateCount, 3);
+  assert.equal(result.autoPassCandidateCount, 1);
+  assert.equal(result.controlledPilotScope.pilotScopeCandidateCount, 3);
+  assert.equal(result.controlledPilotScope.scopeCoverage, 1 / 3);
+  assert.equal(result.rows.find((row) => row.candidateId === "pass").controlledPilotScopeSelected, true);
+  assert.equal(
+    result.rows.find((row) => row.candidateId === "low-confidence").controlledPilotScopeReason,
+    "ordinary-upload-below-controlled-pilot-confidence",
+  );
+  assert.equal(
+    result.rows.find((row) => row.candidateId === "later-measure").controlledPilotScopeReason,
+    "ordinary-upload-outside-controlled-pilot-measure-scope",
+  );
+  assert.equal(result.rows.find((row) => row.candidateId === "model-rejected").controlledPilotScopeSelected, false);
+}
+
 async function testControlledSubmissionOfflineFeatureConfidenceGateEnabled() {
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "western-controlled-confidence-gate-"));
   const m2Root = path.join(tempRoot, "data", "experiments", "western-strings-m2");
@@ -1055,11 +1087,19 @@ async function testControlledSubmissionOfflineFeatureConfidenceGateEnabled() {
     assert.equal(item.candidateGate.modelVersion, "ordinary-upload-confidence-rf-v1");
     assert.equal(item.candidateGate.threshold, 0.8);
     assert.equal(item.candidateGate.evaluatedCandidateCount, 3);
+    assert.equal(item.candidateGate.controlledPilotScope.scopeName, "first-measure-only");
+    assert.equal(item.candidateGate.controlledPilotScope.maxMeasureIndex, 1);
+    assert.equal(item.candidateGate.controlledPilotScope.minConfidence, 0.95);
+    assert(item.candidateGate.modelAutoPassCandidateCount >= item.candidateGate.autoPassCandidateCount);
     assert.equal(item.candidateGate.autoPassCandidateCount + item.candidateGate.reviewRequiredCandidateCount, 3);
     assert.equal(item.candidatePreview.length, 3);
     assert(item.candidatePreview.every((candidate) => typeof candidate.confidenceProbability === "number"));
     assert(item.candidatePreview.every((candidate) => candidate.gateVersion === "western-offline-feature-gate-v1-confidence-rf"));
     assert(item.candidatePreview.every((candidate) => candidate.studentSafeGateReady === true));
+    assert(item.candidatePreview.every((candidate) => (
+      candidate.studentFacing !== true
+      || (candidate.measureIndex === 1 && candidate.confidenceProbability >= 0.95)
+    )));
     const artifact = JSON.parse(await fs.readFile(path.join(tempRoot, item.candidateRowsPath), "utf8"));
     assert.equal(artifact.rowCount, 3);
     assert(artifact.candidateRows.every((candidate) => typeof candidate.confidenceProbability === "number"));
@@ -1077,6 +1117,7 @@ async function testControlledSubmissionOfflineFeatureConfidenceGateEnabled() {
   }
 }
 
+testOrdinaryControlledPilotScope();
 await testServiceDefaultNoLeakage();
 await testServiceEvaluationSummary();
 await testStudentSafeFailClosed();
@@ -1089,4 +1130,4 @@ await testControlledSubmissionValidatedReplayBatch();
 await testControlledSubmissionOfflineFeatureReviewBatch();
 await testControlledSubmissionOfflineFeatureConfidenceGateEnabled();
 
-console.log(JSON.stringify({ ok: true, checks: ["western-alignment-preview-service", "western-alignment-preview-route", "western-student-analysis-route", "western-controlled-submission-route"] }));
+console.log(JSON.stringify({ ok: true, checks: ["western-controlled-pilot-first-measure-scope", "western-alignment-preview-service", "western-alignment-preview-route", "western-student-analysis-route", "western-controlled-submission-route"] }));

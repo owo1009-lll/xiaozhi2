@@ -244,6 +244,28 @@ function commandForAction(action) {
       "After pilot wiring, rerun npm run western:release-review, npm run western:controlled-pilot-decision, npm run test:western-project-gate, and npm run build.",
     ];
   }
+  if (track === "Controlled pilot coverage audit") {
+    return [
+      "Do not ask a teacher or professional reviewer for another pack yet.",
+      "Run npm run western:controlled-pilot-evidence-audit.",
+      "Open data/experiments/western-strings-controlled-pilot-evidence-audit.md.",
+      "Keep all model auto-pass rows that fail strict self-check suppressed as review_required.",
+      "Improve candidate/localization evidence or the machine self-check, then rerun the audit.",
+      "Only after machinePreflightPassed=true and teacherReviewAllowed=true should one small fresh blind professional audit pack be generated.",
+      "Keep production/default student runtime fail-closed throughout.",
+    ];
+  }
+  if (track === "Scoped V2-alpha blind audit preparation") {
+    return [
+      "Do not send any existing review pack to the teacher; current labels and pilot recordings are not fresh blind evidence.",
+      "Open data/experiments/western-strings-controlled-pilot-evidence-audit.md and confirm the scope is first-measure-only with confidence >= 0.95.",
+      "Prepare one new independent violin recording with a clean reviewed MusicXML/MXL score; later measures remain review_required.",
+      "Run the ordinary machine precheck on the new recording before generating a professional-review pack.",
+      "Machine-QA the generated pack: audio opens, score locator shows the first measure, controls work, and every row is inside the scoped gate.",
+      "Only then request a small fresh blind professional audit. Do not ask the reviewer to debug playback, score localization, or candidate generation.",
+      "Keep production/default student runtime fail-closed until that fresh blind audit passes.",
+    ];
+  }
   if (track === "Controlled pilot completed") {
     return [
       "Open the completed controlled-pilot session report listed above.",

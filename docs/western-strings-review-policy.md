@@ -38,6 +38,7 @@ Use these before asking for any review:
 - `npm run western:project-status`
 - `npm run western:next-actions`
 - `npm run test:western-project-gate`
+- `npm run western:controlled-pilot-evidence-audit`
 - `npm run western:ordinary-monitored-pilot-audit`
 - `npm run western:m3plus-monitored-pilot-audit`
 - `npm run western:m4-gold-provenance-audit`
@@ -49,9 +50,19 @@ Use these before asking for any review:
 ### Ordinary Upload
 
 `npm run western:ordinary-monitored-pilot-audit` must pass before any ordinary
-upload monitored pilot. The current audit passes with no teacher review needed:
-all self-checked auto-pass rows are known usable, with zero known wrong rows and
-zero unknown rows.
+upload monitored pilot. A safe session is not enough for V2-alpha: raw model
+auto-pass rows must be separated from strict self-check eligible rows. Run
+`npm run western:controlled-pilot-evidence-audit` before any new professional
+review request. The current result has 100% precision on 5 strict self-check
+rows but only 4.00% whole-piece operational coverage, below the 20% floor. The
+joint threshold sweep found no confidence threshold that fixes the whole-piece
+scope. A narrower first-measure-only scope has now passed machine checks across
+five independent recordings: historical 12/12 and operational 11/11, with
+25.53% and 26.83% scoped coverage. `teacherReviewAllowed=true` applies only to
+one small fresh blind pack for that exact scope. Do not reuse existing labels,
+do not include later measures, and do not send a pack until audio playback,
+score location, controls, and scope membership pass machine QA. Raw model
+auto-pass rows outside the scope remain `review_required`.
 
 ### M3+ Pitch Behavior Modes
 
@@ -68,14 +79,13 @@ This is not a broad M3+ release and not a technique-name display feature.
 
 ### M4 OMR
 
-M4 still requires independent gold correction. Do not ask for broad model or
-teacher review until the independent-gold workspace is corrected and the OMR
-benchmark is rerun.
-
-This M4 task is a score-editor task, not an audio-diagnosis task: compare each
-source score image/PDF against the editable MusicXML/MXL gold file. A music
-teacher is only needed if they are acting as a score editor; they should not be
-asked to judge intonation, rhythm, or student performance for this gate.
+The current 12 M4 rows already have explicit human clean-score approval and the
+provenance audit reports `manualGoldRequiredRows=0`. Do not ask for another M4
+review of this same set. If a future provenance audit reports rows that really
+need independent correction, that is a score-editor task, not an audio-diagnosis
+task: compare the source score image/PDF against editable MusicXML/MXL. A music
+teacher should not be asked to judge intonation, rhythm, or student performance
+for this gate.
 
 Independent gold application has two safety gates:
 
@@ -86,13 +96,13 @@ Rows left as `needs-human-edit` must not be applied, even if the file timestamp
 or bytes changed. Use `npm run western:m4-apply-independent-gold-workspace --
 --dry-run` before applying changes.
 
-Before asking anyone to edit score files, run
+Before asking anyone to edit future score files, run
 `npm run western:m4-preflight`. It runs the M4 readiness, benchmark,
 independent-gold todo/workspace, provenance, workspace audit, project status,
 independent-gold note summary, and next-action handoff commands in one machine
 self-test pass. The note summary is only a machine-readable preview of the
-current editable MXL files; it does not replace score-editor correction. If this
-still reports `humanTask=score-editor-independent-gold-correction`, then the
+current editable MXL files; it does not replace score-editor correction. If it
+reports `humanTask=score-editor-independent-gold-correction`, then the
 project has already exhausted the current automatic checks and the remaining
 human work is score-editor correction only.
 

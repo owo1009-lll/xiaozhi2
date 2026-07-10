@@ -318,6 +318,52 @@ function ordinaryUploadConfidenceReleasePath() {
   return override ? path.resolve(override) : OFFLINE_FEATURE_CONFIDENCE_RELEASE_PATH;
 }
 
+export function applyOrdinaryControlledPilotScope(scoredRows = [], release = {}) {
+  const configuredScope = release?.runtimePolicy?.controlledPilotScope || {};
+  const maxMeasureIndex = safeNumber(configuredScope.maxMeasureIndex, 0);
+  const minConfidence = safeNumber(configuredScope.minConfidence, 0);
+  const scopeEnabled = maxMeasureIndex > 0 && minConfidence > 0;
+  const rows = (Array.isArray(scoredRows) ? scoredRows : []).map((candidate) => {
+    const measureIndex = safeNumber(candidate.measureIndex, 0);
+    const confidenceProbability = safeNumber(candidate.confidenceProbability, 0);
+    const withinMeasureScope = !scopeEnabled || (measureIndex > 0 && measureIndex <= maxMeasureIndex);
+    const passesScopeConfidence = !scopeEnabled || confidenceProbability >= minConfidence;
+    const controlledPilotScopeSelected = candidate.confidenceSelected === true
+      && withinMeasureScope
+      && passesScopeConfidence;
+    const controlledPilotScopeReason = controlledPilotScopeSelected
+      ? ""
+      : !withinMeasureScope
+        ? "ordinary-upload-outside-controlled-pilot-measure-scope"
+        : !passesScopeConfidence
+          ? "ordinary-upload-below-controlled-pilot-confidence"
+          : "ordinary-upload-confidence-gate-review-required";
+    return {
+      ...candidate,
+      controlledPilotScopeSelected,
+      controlledPilotScopeReason,
+    };
+  });
+  const modelAutoPassCandidateCount = rows.filter((candidate) => candidate.confidenceSelected === true).length;
+  const autoPassCandidateCount = rows.filter((candidate) => candidate.controlledPilotScopeSelected === true).length;
+  const pilotScopeCandidateCount = rows.filter((candidate) => {
+    const measureIndex = safeNumber(candidate.measureIndex, 0);
+    return !scopeEnabled || (measureIndex > 0 && measureIndex <= maxMeasureIndex);
+  }).length;
+  return {
+    rows,
+    modelAutoPassCandidateCount,
+    autoPassCandidateCount,
+    controlledPilotScope: scopeEnabled ? {
+      scopeName: safeString(configuredScope.scopeName, "first-measure-only"),
+      maxMeasureIndex,
+      minConfidence,
+      pilotScopeCandidateCount,
+      scopeCoverage: pilotScopeCandidateCount > 0 ? autoPassCandidateCount / pilotScopeCandidateCount : 0,
+    } : null,
+  };
+}
+
 function controlledCandidateRuntimeConfidenceDir(repoRoot, batchRunId) {
   return path.join(
     repoRoot,
@@ -919,9 +965,11 @@ async function evaluateOfflineFeatureStudentSafeGate(repoRoot, candidateRows = [
       gateVersion: safeString(release.gateVersion, OFFLINE_FEATURE_STUDENT_GATE_VERSION),
     });
   }
-  const scoredRows = Array.isArray(scored.rows) ? scored.rows : [];
+  const scoped = applyOrdinaryControlledPilotScope(scored.rows, release);
+  const scoredRows = scoped.rows;
   const pitchSupportedCount = scoredRows.filter((candidate) => candidate.pitchSupportWithin80Cents === true).length;
-  const autoPassCandidateCount = scoredRows.filter((candidate) => candidate.confidenceSelected === true).length;
+  const modelAutoPassCandidateCount = scoped.modelAutoPassCandidateCount;
+  const autoPassCandidateCount = scoped.autoPassCandidateCount;
   const evaluatedCandidateCount = scoredRows.length;
   return {
     gateVersion: safeString(release.gateVersion, "western-offline-feature-gate-v1-confidence-rf"),
@@ -933,8 +981,10 @@ async function evaluateOfflineFeatureStudentSafeGate(repoRoot, candidateRows = [
     evaluatedCandidateCount,
     pitchSupportRequired: false,
     pitchSupportedCandidateCount: pitchSupportedCount,
+    modelAutoPassCandidateCount,
     autoPassCandidateCount,
     reviewRequiredCandidateCount: Math.max(0, evaluatedCandidateCount - autoPassCandidateCount),
+    controlledPilotScope: scoped.controlledPilotScope,
     threshold: scored.threshold ?? release.threshold ?? null,
     modelName: safeString(scored.modelName, safeString(release.modelName, "rf")),
     featureSet: safeString(scored.featureSet, safeString(release.featureSet, "deployable")),
@@ -949,10 +999,16 @@ async function evaluateOfflineFeatureStudentSafeGate(repoRoot, candidateRows = [
 
 function applyOfflineFeatureStudentSafeGate(candidateRows = [], candidateGate = {}) {
   return (Array.isArray(candidateRows) ? candidateRows : []).map((candidate) => {
-    const selected = candidateGate.ready === true && candidate.confidenceSelected === true;
+    const selected = candidateGate.ready === true
+      && (typeof candidate.controlledPilotScopeSelected === "boolean"
+        ? candidate.controlledPilotScopeSelected
+        : candidate.confidenceSelected === true);
     const gateReason = selected
       ? "ordinary-upload-confidence-gate-auto-pass"
-      : safeString(candidateGate.reason, "ordinary-upload-student-safe-gate-not-calibrated");
+      : safeString(
+          candidate.controlledPilotScopeReason,
+          safeString(candidateGate.reason, "ordinary-upload-student-safe-gate-not-calibrated"),
+        );
     return {
       ...candidate,
       autoDecision: selected ? "auto_pass" : "review_required",
