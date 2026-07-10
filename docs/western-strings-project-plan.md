@@ -416,3 +416,24 @@
 - 开放 Violin MIDI Dataset 已完成全量结构审计:1,006/1,021 可用、15 个隔离、约 34 小时弱标签。其不含音频且非人工 gold,只准作弱标签扩展,不准作独立 benchmark。
 - 统一总审计已接入 `western:project-status` 和独立命令 `western:public-model-gate`。当前只把专业单声部识别标为 V2 candidate;`studentReleaseEligible=false`,`V3=false`,`doubleStopAutoFeedbackReady=false`,`nearPerfect=false`。
 - 下一研究闸门不是继续宣称完成,而是获得一份未用于调参的新外部人工 gold 做冻结确认,并单独提升双音与 50ms 精度。未过前默认学生端保持 fail-closed。
+
+---
+
+## 附录 B. 完成度快照与受阻点(2026-07-11)
+
+**手册完成度(按承诺范围 M0–M4+V2-release 计约 85%;含 M5/V3/论文约 65–70%):**
+| 条目 | 完成度 |
+|---|---|
+| M0 / M1 / M2(含 M2f)/ M3 core | 100% |
+| M3 全量(时值/多音) | ~70%(缺样本/口径,review-only) |
+| M3+ 少退复核 | ~55%(滑音/颤音离线证据过;双音对齐器已支持;泛音谱面标注未做;未接运行时) |
+| M4 OMR+落到谱面 | ~75%(独立基准、分层闸门、谱面锚定、机器全自动模式已成;缺生产接线、真照片独立 gold、节奏维度、多引擎) |
+| M5 大提琴 / V3 | 0% / ~10% |
+
+**V2-release 剩余缺口(无技术攻关项):** ① 一条全新独立盲测录音(仅用户可录);② 受控 pilot 批准决定;③ 生产接线(受控提交流);④ release 终审。
+
+**受阻点记录:MUSC 推理"假死"(2026-07-11,已定位为环境问题,不可复现):**
+- 报告症状:44s 录音推理 30–50 分钟无输出,3s 音频单帧前向亦挂,GPU 5–9%/CPU 20%。
+- 主环境复验:RTX 5060(sm_120)+ torch 2.11.0+cu128(arch_list 含 sm_120),3s 音频 predict **0.4 秒**完成;真实评测命令成功新增 1 单元(device=cuda)。
+- 结论:模型与主环境健康;原卡死最可能为**别的解释器/环境(旧 torch 无 sm_120 二进制 → 首次 CUDA 调用 PTX JIT 假死)**或**权重网络下载被阻断**。复跑请确认 `python -c "import torch;print(torch.cuda.get_arch_list())"` 含 sm_120。
+- HF2 direct-core 进度:2/20 已评,剩 18 批跑中;V2 闸门状态仍为"未判定"(样本不足),非"不通过"。HF2 为弓弦外域压力测试,不冒充标准小提琴域。
