@@ -61,6 +61,11 @@ def etude_01():  # 正常演奏基线:D 大调级进,四分音符为主
     ms.append([q("F#4"),q("A4"),q("G4"),q("E4")]); ms.append([w("D4")])
     ms.append([q("D5"),q("C#5"),q("B4"),q("A4")]); ms.append([q("B4"),q("C#5"),q("D5"),q("B4")])
     ms.append([q("A4"),q("F#4"),q("G4"),q("E4")]); ms.append([h("F#4"),h("E4")]); ms.append([w("D4")])
+    # B 段
+    ms.append([q("A4"),q("B4"),q("A4"),q("F#4")]); ms.append([q("G4"),q("A4"),q("G4"),q("E4")])
+    ms.append([q("F#4"),q("G4"),q("A4"),q("B4")]); ms.append([h("A4"),h("E4")])
+    ms.append([q("D5"),q("B4"),q("A4"),q("F#4")]); ms.append([q("G4"),q("B4"),q("A4"),q("G4")])
+    ms.append([h("F#4"),h("E4")]); ms.append([w("D4")])
     return build_part(ms, 2), "D大调级进练习(正常演奏)"
 
 def etude_02():  # 故意错音场景:G 大调,音型清晰易于"指定错音"
@@ -71,6 +76,14 @@ def etude_02():  # 故意错音场景:G 大调,音型清晰易于"指定错音"
     ms.append([q("B4"),q("G4"),q("A4"),q("F#4")]); ms.append([w("G4")])
     ms.append([q("G4"),q("B4"),q("D5"),q("B4")]); ms.append([q("C5"),q("A4"),q("F#4"),q("A4")])
     ms.append([h("G4"),h("D5")]); ms.append([w("G4")])
+    # B 段
+    ms.append([q("D5"),q("E5"),q("D5"),q("B4")]); ms.append([q("C5"),q("D5"),q("C5"),q("A4")])
+    ms.append([q("B4"),q("C5"),q("B4"),q("G4")]); ms.append([h("A4"),h("D5")])
+    ms.append([q("E5"),q("C5"),q("A4"),q("C5")]); ms.append([q("D5"),q("B4"),q("G4"),q("B4")])
+    ms.append([q("A4"),q("C5"),q("B4"),q("A4")]); ms.append([w("G4")])
+    # 再现
+    ms.append([q("G4"),q("A4"),q("B4"),q("G4")]); ms.append([q("C5"),q("B4"),q("A4"),q("B4")])
+    ms.append([q("D5"),q("C5"),q("B4"),q("A4")]); ms.append([h("B4"),h("A4")]); ms.append([w("G4")])
     return build_part(ms, 1), "G大调旋律(错音场景用)"
 
 def etude_03():  # 漏音场景:A 小调,均匀八分音符便于"跳过整音"
@@ -81,6 +94,12 @@ def etude_03():  # 漏音场景:A 小调,均匀八分音符便于"跳过整音"
     ms.append([e("A4"),e("C5"),e("B4"),e("D5"),q("C5"),q("E5")])
     ms.append([q("D5"),q("B4"),q("C5"),q("A4")]); ms.append([h("B4"),h("E4")]); ms.append([w("A4")])
     ms.append([q("A4"),q("E5"),q("C5"),q("A4")]); ms.append([h("B4"),h("G#4")]); ms.append([w("A4")])
+    # B 段
+    ms.append([e("E5"),e("D5"),e("C5"),e("D5"),q("E5"),q("A4")])
+    ms.append([e("D5"),e("C5"),e("B4"),e("C5"),q("D5"),q("G#4")])
+    ms.append([q("C5"),q("A4"),q("B4"),q("E4")]); ms.append([h("A4"),h("C5")])
+    ms.append([e("A4"),e("B4"),e("C5"),e("D5"),q("E5"),q("C5")])
+    ms.append([q("B4"),q("D5"),q("C5"),q("B4")]); ms.append([h("A4"),h("E4")]); ms.append([w("A4")])
     return build_part(ms, 0), "a小调八分音符练习(漏音场景用)"
 
 def etude_04():  # 节奏偏移场景:C 大调附点节奏
@@ -91,6 +110,11 @@ def etude_04():  # 节奏偏移场景:C 大调附点节奏
     ms.append([q("E4"),q("G4"),q("F4"),q("D4")]); ms.append([w("C4")])
     ms.append([dq("C5"),e("B4"),q("A4"),q("G4")]); ms.append([q("A4"),q("F4"),q("G4"),q("E4")])
     ms.append([h("D4"),h("G4")]); ms.append([w("C4")])
+    # B 段
+    ms.append([dq("G4"),e("A4"),q("B4"),q("C5")]); ms.append([dq("D5"),e("C5"),q("B4"),q("A4")])
+    ms.append([dq("B4"),e("C5"),q("D5"),q("B4")]); ms.append([h("C5"),h("G4")])
+    ms.append([dq("F4"),e("G4"),q("A4"),q("F4")]); ms.append([dq("E4"),e("F4"),q("G4"),q("E4")])
+    ms.append([q("F4"),q("A4"),q("G4"),q("D4")]); ms.append([w("C4")])
     return build_part(ms, 0, bpm=69), "C大调附点节奏练习(节奏偏移场景用)"
 
 def etude_05():  # 滑音场景:G 大调,长连线级进对(便于加滑音)
@@ -99,7 +123,8 @@ def etude_05():  # 滑音场景:G 大调,长连线级进对(便于加滑音)
         n1, n2 = h(a), h(b)
         m.extend([n1, n2]); return n1, n2
     pairs = [("G4","B4"),("A4","C5"),("B4","D5"),("C5","E5"),
-             ("D5","B4"),("C5","A4"),("B4","G4"),("A4","F#4")]
+             ("D5","B4"),("C5","A4"),("B4","G4"),("A4","F#4"),
+             ("G4","C5"),("B4","E5"),("D5","G4"),("A4","D5")]
     s = stream.Score(); p = stream.Part()
     p.insert(0, clef.TrebleClef()); p.insert(0, key.KeySignature(1)); p.insert(0, meter.TimeSignature("4/4"))
     p.insert(0, tempo.MetronomeMark(number=60))
@@ -119,6 +144,7 @@ def etude_06():  # 揉弦/颤音场景:D 大调长音 + 颤音记号
     ms.append([w("B4")]); ms.append([trill(h("A4")), h("F#4")])
     ms.append([w("G4")]); ms.append([h("E4"), trill(h("D4"))]) ; ms.append([w("D4")])
     ms.append([w("D5")]); ms.append([trill(h("C#5")), h("B4")]); ms.append([w("A4")])
+    ms.append([w("E5")]); ms.append([trill(h("D5")), h("B4")]); ms.append([h("A4"), trill(h("G4"))]); ms.append([w("F#4")]); ms.append([w("D4")])
     return build_part(ms, 2, bpm=56), "D大调长音与颤音(揉弦/颤音场景用)"
 
 def etude_07():  # 双音场景:A 弦旋律 + 空 D 弦持续音
@@ -128,6 +154,8 @@ def etude_07():  # 双音场景:A 弦旋律 + 空 D 弦持续音
     ms.append([dstop("D4","A4"), dstop("D4","D5")]); ms.append([dstop("D4","C#5"), dstop("D4","B4")])
     ms.append([dstop("D4","A4"), dstop("D4","E4")]); ms.append([dstop("D4","F#4", 4.0)])
     ms.append([dstop("D4","G4"), dstop("D4","B4")]); ms.append([dstop("D4","A4", 4.0)]); ms.append([dstop("D4","D4", 4.0)])
+    ms.append([dstop("D4","E4"), dstop("D4","G4")]); ms.append([dstop("D4","F#4"), dstop("D4","A4")])
+    ms.append([dstop("D4","B4"), dstop("D4","G4")]); ms.append([dstop("D4","F#4", 4.0)]); ms.append([dstop("D4","D4", 4.0)])
     return build_part(ms, 2, bpm=56), "空弦双音练习(双音场景用)"
 
 def etude_08():  # 盲测:F 大调小谣曲(全新旋律,正常演奏)
@@ -138,6 +166,11 @@ def etude_08():  # 盲测:F 大调小谣曲(全新旋律,正常演奏)
     ms.append([q("E5"),q("C5"),q("D5"),q("Bb4")]); ms.append([w("F4")])
     ms.append([q("A4"),q("Bb4"),q("C5"),q("A4")]); ms.append([q("G4"),q("E4"),q("F4"),q("G4")])
     ms.append([h("A4"),h("G4")]); ms.append([w("F4")])
+    # B 段
+    ms.append([q("C5"),q("D5"),q("C5"),q("A4")]); ms.append([q("Bb4"),q("C5"),q("Bb4"),q("G4")])
+    ms.append([q("A4"),q("C5"),q("F5"),q("E5")]); ms.append([h("D5"),h("C5")])
+    ms.append([q("Bb4"),q("D5"),q("C5"),q("Bb4")]); ms.append([q("A4"),q("F4"),q("G4"),q("A4")])
+    ms.append([h("G4"),h("C5")]); ms.append([w("F4")])
     return build_part(ms, -1, bpm=72), "F大调小谣曲(盲测,正常演奏)"
 
 ETUDES = [etude_01, etude_02, etude_03, etude_04, etude_05, etude_06, etude_07, etude_08]
