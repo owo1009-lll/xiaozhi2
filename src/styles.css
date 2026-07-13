@@ -153,6 +153,43 @@ button {
   margin-top: 8px;
 }
 
+.western-score-photo-selection {
+  display: grid;
+  grid-template-columns: minmax(96px, 160px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.western-score-photo-selection > img,
+.western-score-photo-link img {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+
+.western-score-photo-selection div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.western-score-photo-selection span {
+  color: var(--text-muted);
+  word-break: break-word;
+}
+
+.western-score-photo-link {
+  width: min(180px, 100%);
+  margin-top: 8px;
+}
+
 .batch-result-list {
   display: grid;
   gap: 4px;
@@ -188,6 +225,10 @@ button {
 
 @media (max-width: 720px) {
   .western-diagnosis-row {
+    grid-template-columns: 1fr;
+  }
+
+  .western-score-photo-selection {
     grid-template-columns: 1fr;
   }
 }
@@ -2066,6 +2107,7 @@ button {
     padding: 16px;
   }
 
+  .western-strings-app .hero-card,
   .hero-card,
   .grid-layout,
   .ops-grid,

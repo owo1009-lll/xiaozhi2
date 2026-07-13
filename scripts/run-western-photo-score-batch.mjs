@@ -14,6 +14,7 @@ const subsPath = path.join(repoRoot, "data", "experiments", "western-strings-m3"
 const reviewsPath = path.join(repoRoot, "data", "experiments", "western-strings-m3", "controlled-submission-reviews.jsonl");
 const outJsonl = path.join(repoRoot, "data", "experiments", "western-strings-m4", "photo-score-batch-runs.jsonl");
 const pipeline = path.join(repoRoot, "scripts", "western_photo_score_pipeline.py");
+const pythonRunner = path.join(repoRoot, "scripts", "run-python.ps1");
 
 function readJsonl(p) {
   if (!fs.existsSync(p)) return [];
@@ -36,7 +37,20 @@ for (const sub of queue) {
   if (!fs.existsSync(photo) || !fs.existsSync(audio)) {
     record = { ...record, status: "failed", reason: "photo-or-audio-missing" };
   } else {
-    const res = spawnSync("python", [pipeline, "--photo", photo, "--audio", audio], { cwd: repoRoot, encoding: "utf8", timeout: 30 * 60 * 1000 });
+    const res = spawnSync("powershell.exe", [
+      "-ExecutionPolicy", "Bypass", "-File", pythonRunner,
+      pipeline, "--photo", photo, "--audio", audio,
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      timeout: 30 * 60 * 1000,
+      env: {
+        ...process.env,
+        ERHU_CPU_THREAD_LIMIT: process.env.ERHU_CPU_THREAD_LIMIT || "2",
+        PYTHONIOENCODING: "utf-8",
+        PYTHONUTF8: "1",
+      },
+    });
     const line = (res.stdout || "").split(/\r?\n/).filter((l) => l.startsWith("{")).pop();
     let parsed = null; try { parsed = line ? JSON.parse(line) : null; } catch { /* keep null */ }
     record = parsed

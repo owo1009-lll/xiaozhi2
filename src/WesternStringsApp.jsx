@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   fetchWesternControlledSubmissions,
   fetchWesternStudentAnalysis,
@@ -23,10 +23,13 @@ function fileTitle(file) {
 export default function WesternStringsApp({ onBackToStudent }) {
   const musicXmlInputRef = useRef(null);
   const midiInputRef = useRef(null);
+  const scorePhotoInputRef = useRef(null);
   const audioInputRef = useRef(null);
   const [instrument, setInstrument] = useState("violin");
   const [scoreFile, setScoreFile] = useState(null);
   const [scoreKind, setScoreKind] = useState("");
+  const [scorePhotoFile, setScorePhotoFile] = useState(null);
+  const [scorePhotoPreviewUrl, setScorePhotoPreviewUrl] = useState("");
   const [audioFile, setAudioFile] = useState(null);
   const [importing, setImporting] = useState(false);
   const [status, setStatus] = useState("Select a clean MusicXML or MIDI score.");
@@ -41,6 +44,18 @@ export default function WesternStringsApp({ onBackToStudent }) {
   const [submissionBatchResult, setSubmissionBatchResult] = useState(null);
   const [reviewSavingNoteId, setReviewSavingNoteId] = useState("");
   const [reviewMessage, setReviewMessage] = useState("");
+
+  const hasScoreInput = Boolean(job?.scoreId || scorePhotoFile);
+
+  useEffect(() => {
+    if (!scorePhotoFile || !scorePhotoFile.type?.startsWith("image/")) {
+      setScorePhotoPreviewUrl("");
+      return undefined;
+    }
+    const previewUrl = URL.createObjectURL(scorePhotoFile);
+    setScorePhotoPreviewUrl(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [scorePhotoFile]);
 
   async function importSelectedScore() {
     if (!scoreFile || !scoreKind) {
@@ -76,10 +91,22 @@ export default function WesternStringsApp({ onBackToStudent }) {
   function pickFile(kind, file) {
     setScoreKind(kind);
     setScoreFile(file || null);
+    setScorePhotoFile(null);
     setJob(null);
     setAudioFile(null);
     setError("");
     setStatus(file ? `${kind === "midi" ? "MIDI" : "MusicXML"} selected: ${file.name}` : "Select a clean MusicXML or MIDI score.");
+  }
+
+  function pickScorePhotoFile(file) {
+    setScorePhotoFile(file || null);
+    setScoreFile(null);
+    setScoreKind("");
+    setJob(null);
+    setAudioFile(null);
+    setError("");
+    setReviewMessage("");
+    setStatus(file ? `Score photo selected: ${file.name}` : "Select a clean score or score photo.");
   }
 
   function pickAudioFile(file) {
@@ -103,8 +130,8 @@ export default function WesternStringsApp({ onBackToStudent }) {
   }
 
   async function submitControlledRecording() {
-    if (!job?.scoreId) {
-      setError("Import a clean score before submitting audio.");
+    if (!hasScoreInput) {
+      setError("Import a clean score or choose a score photo before submitting audio.");
       return;
     }
     if (!audioFile) {
@@ -116,7 +143,13 @@ export default function WesternStringsApp({ onBackToStudent }) {
     setReviewMessage("");
     try {
       const result = await fetchWesternStudentAnalysis({
-        scoreId: job.scoreId,
+        scoreId: job?.scoreId || "",
+        scorePhotoFile,
+        scorePhotoSubmission: scorePhotoFile ? {
+          name: scorePhotoFile.name,
+          mimeType: scorePhotoFile.type,
+          size: scorePhotoFile.size,
+        } : null,
         instrument,
         audioFile,
         audioSubmission: {
@@ -172,9 +205,9 @@ export default function WesternStringsApp({ onBackToStudent }) {
     setReviewMessage("");
     setError("");
     try {
-      const result = await runWesternControlledSubmissionBatch({ limit: 20 });
+      const result = await runWesternControlledSubmissionBatch({ limit: 5 });
       setSubmissionBatchResult(result.batch || null);
-      setReviewMessage("Controlled batch audit finished. No automatic diagnosis was issued.");
+      setReviewMessage("Controlled batch audit finished. Photo-score results remain review-only.");
       await loadControlledSubmissionQueue();
     } catch (queueError) {
       setError(queueError?.message || "Controlled batch audit failed.");
@@ -206,12 +239,12 @@ export default function WesternStringsApp({ onBackToStudent }) {
       <header className="hero-card">
         <div>
           <span className="eyebrow">Western strings V2 alpha</span>
-          <h1>Clean-score practice diagnostics</h1>
-          <p>MusicXML and MIDI only. Low-confidence analysis remains in review until the V2 gates pass.</p>
+          <h1>Western strings practice diagnostics</h1>
+          <p>Clean electronic scores and review-only photo scores. Low-confidence analysis remains in review until the V2 gates pass.</p>
         </div>
-        <div className="metric-card">
+        <div className="hero-side">
           <strong>Input policy</strong>
-          <span>PDF OMR disabled</span>
+          <span>Photo OMR review-only</span>
         </div>
       </header>
 
@@ -226,7 +259,7 @@ export default function WesternStringsApp({ onBackToStudent }) {
       <section className="panel-card western-strings-panel">
         <div className="panel-heading">
           <div>
-            <span className="eyebrow">M1 clean score</span>
+            <span className="eyebrow">M1 clean score / M4 photo score</span>
             <h2>Import score</h2>
           </div>
           <select value={instrument} onChange={(event) => setInstrument(event.target.value)} aria-label="Instrument">
@@ -259,6 +292,13 @@ export default function WesternStringsApp({ onBackToStudent }) {
           hidden
           onChange={(event) => pickAudioFile(event.target.files?.[0] || null)}
         />
+        <input
+          ref={scorePhotoInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+          hidden
+          onChange={(event) => pickScorePhotoFile(event.target.files?.[0] || null)}
+        />
 
         <div className="western-strings-actions">
           <button type="button" className="secondary-button" onClick={() => musicXmlInputRef.current?.click()}>
@@ -267,9 +307,14 @@ export default function WesternStringsApp({ onBackToStudent }) {
           <button type="button" className="secondary-button" onClick={() => midiInputRef.current?.click()}>
             Choose MIDI
           </button>
-          <button type="button" className="primary-button" disabled={importing || !scoreFile} onClick={importSelectedScore}>
-            {importing ? "Importing..." : "Import"}
+          <button type="button" className="secondary-button" onClick={() => scorePhotoInputRef.current?.click()}>
+            Choose score photo
           </button>
+          {scoreFile ? (
+            <button type="button" className="primary-button" disabled={importing} onClick={importSelectedScore}>
+              {importing ? "Importing..." : "Import"}
+            </button>
+          ) : null}
         </div>
 
         <div className="status-banner" aria-live="polite">
@@ -292,6 +337,15 @@ export default function WesternStringsApp({ onBackToStudent }) {
             </div>
           </div>
         ) : null}
+        {scorePhotoFile ? (
+          <div className="western-score-photo-selection">
+            {scorePhotoPreviewUrl ? <img src={scorePhotoPreviewUrl} alt="Selected score" /> : null}
+            <div>
+              <strong>{scorePhotoFile.name}</strong>
+              <span>Score images enter the controlled OMR review queue.</span>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <section className="panel-card western-strings-panel">
@@ -309,8 +363,8 @@ export default function WesternStringsApp({ onBackToStudent }) {
         </div>
 
         <p className="muted-copy">
-          These are uploaded clean-score recordings waiting for manual review or offline batch analysis. Queue actions never create
-          student-facing automatic feedback.
+          Clean-score and score-image recordings wait here for manual review or offline batch analysis. Score-image results never create
+          student-facing automatic feedback. Each batch run processes at most five accepted items to limit local resource use.
         </p>
 
         {submissionQueue ? (
@@ -341,7 +395,8 @@ export default function WesternStringsApp({ onBackToStudent }) {
                   <div className="batch-result-list">
                     {(submissionBatchResult.items || []).slice(0, 5).map((item) => (
                       <span key={item.submissionId}>
-                        {item.scoreId || "score"} · {item.analysisStatus} · candidates {item.candidateRowCount || 0} · decisions {item.decisionCount || 0} · auto {item.analysisSummary?.autoPassCount || 0}
+                        {item.scoreId || item.scorePhotoSubmission?.name || "score"} · {item.analysisStatus} · candidates {item.candidateRowCount || 0} · decisions {item.decisionCount || 0} · auto {item.analysisSummary?.autoPassCount || 0}
+                        {item.photoScoreDecision ? ` · photo ${item.photoScoreDecision}` : ""}
                         {item.candidateGate?.reason ? ` · gate ${item.candidateGate.reason}` : ""}
                       </span>
                     ))}
@@ -354,10 +409,21 @@ export default function WesternStringsApp({ onBackToStudent }) {
               {(submissionQueue.submissions || []).map((submission) => (
                 <div key={submission.submissionId} className="western-diagnosis-row">
                   <div>
-                    <strong>{submission.scoreId || "missing score"}</strong>
+                    <strong>{submission.scoreId || submission.scorePhotoSubmission?.name || "missing score"}</strong>
                     <span>
-                      {submission.audioSubmission?.name || "audio"} · {submission.status}
+                      {submission.kind || "clean-score"} · {submission.audioSubmission?.name || "audio"} · {submission.status}
                     </span>
+                    {submission.scorePhotoUrl ? (
+                      <a
+                        className="western-score-photo-link"
+                        href={submission.scorePhotoUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        title="Open uploaded score image"
+                      >
+                        <img src={submission.scorePhotoUrl} alt={`Uploaded score ${submission.scorePhotoSubmission?.name || "image"}`} />
+                      </a>
+                    ) : null}
                     {submission.audioUrl ? <audio controls src={submission.audioUrl} /> : null}
                   </div>
                   <button
@@ -400,7 +466,7 @@ export default function WesternStringsApp({ onBackToStudent }) {
           <button
             type="button"
             className="secondary-button"
-            disabled={!job?.scoreId}
+            disabled={!hasScoreInput}
             onClick={() => audioInputRef.current?.click()}
           >
             Choose audio
@@ -408,14 +474,14 @@ export default function WesternStringsApp({ onBackToStudent }) {
         </div>
 
         <p className="muted-copy">
-          This accepts a recording only after a clean score is imported. The submission is stored for offline review and does not produce
-          student-facing automatic feedback.
+          This accepts a recording after a clean electronic score is imported or a score image is selected. The submission is stored for
+          controlled offline review. Score-image analysis never produces student-facing automatic feedback.
         </p>
 
         <div className="western-strings-result">
           <div>
             <strong>Score</strong>
-            <span>{job?.scoreId || "import required"}</span>
+            <span>{job?.scoreId || scorePhotoFile?.name || "score required"}</span>
           </div>
           <div>
             <strong>Audio</strong>
@@ -427,7 +493,7 @@ export default function WesternStringsApp({ onBackToStudent }) {
           <button
             type="button"
             className="primary-button"
-            disabled={analysisLoading || !job?.scoreId || !audioFile}
+            disabled={analysisLoading || !hasScoreInput || !audioFile}
             onClick={submitControlledRecording}
           >
             {analysisLoading ? "Submitting..." : "Submit for offline review"}

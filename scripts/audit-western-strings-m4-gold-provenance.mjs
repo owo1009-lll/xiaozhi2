@@ -114,10 +114,10 @@ function isCleanScoreFile(filePath) {
 }
 
 async function collectPieceNamedScoreCandidates(pieceIds) {
-  const roots = [
-    path.join(process.cwd(), "data", "private"),
-    path.join(process.cwd(), "data", "experiments"),
-  ];
+  // Independent clean-score candidates are human/private inputs. Experiment
+  // directories contain OMR probes and model outputs, so scanning them can
+  // misclassify a second model's prediction as independent gold evidence.
+  const roots = [path.join(process.cwd(), "data", "private")];
   const pieceSet = new Set(pieceIds.filter(Boolean));
   const candidates = new Map();
   async function walk(dir) {

@@ -67,6 +67,11 @@ import {
   persistPayloadAudio,
   persistUploadedAudioFile,
 } from "./src/server/audioPayload.js";
+import {
+  buildScorePhotoSubmissionFromUpload,
+  persistPayloadScorePhoto,
+  persistUploadedScorePhotoFile,
+} from "./src/server/scorePhotoPayload.js";
 import { createAnalyzerClient } from "./src/server/analyzerClient.js";
 import { createTaskGate, queueFullPayload } from "./src/server/taskQueue.js";
 import { createAnalysisRouter } from "./src/server/analysisRoutes.js";
@@ -105,6 +110,7 @@ const SCORE_IMPORTS_DIR = path.join(DATA_DIR, "score-imports");
 const PIECE_PASS_DIR = path.join(DATA_DIR, "piece-pass");
 const TEACHER_VALIDATION_PACKS_DIR = path.join(DATA_DIR, "teacher-validation", "packs");
 const AUDIO_CACHE_DIR = path.join(DATA_DIR, "analysis-audio-cache");
+const SCORE_PHOTO_CACHE_DIR = path.join(DATA_DIR, "analysis-score-photo-cache");
 const SECTION_DETECTION_CACHE_DIR = path.join(DATA_DIR, "section-detection-cache");
 const SECTION_ANALYSIS_CACHE_DIR = path.join(DATA_DIR, "section-analysis-cache");
 const PERF_TRACE_FILE = path.join(DATA_DIR, "perf-trace.log");
@@ -4570,10 +4576,14 @@ app.use(createWesternStringsRouter({
   repoRoot: __dirname,
   upload,
   audioCacheDir: AUDIO_CACHE_DIR,
+  scorePhotoCacheDir: SCORE_PHOTO_CACHE_DIR,
   parseIncomingPayload,
   buildAudioSubmissionFromUpload,
+  buildScorePhotoSubmissionFromUpload,
   persistUploadedAudioFile,
   persistPayloadAudio,
+  persistUploadedScorePhotoFile,
+  persistPayloadScorePhoto,
 }));
 
 const noStoreStaticOptions = {

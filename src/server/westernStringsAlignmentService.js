@@ -286,6 +286,10 @@ function controlledSubmissionBatchRunsPath(repoRoot) {
   return path.join(repoRoot, "data", "experiments", "western-strings-m3", "controlled-submission-batch-runs.jsonl");
 }
 
+function photoScoreBatchRunsPath(repoRoot) {
+  return path.join(repoRoot, "data", "experiments", "western-strings-m4", "photo-score-batch-runs.jsonl");
+}
+
 function controlledSubmissionCandidateRowsDir(repoRoot, batchRunId) {
   return path.join(repoRoot, "data", "experiments", "western-strings-m3", "offline-feature-candidates", safeString(batchRunId, "unknown-batch"));
 }
@@ -548,6 +552,7 @@ function hasControlledSubmissionPayload(payload = {}) {
 async function buildControlledSubmissionAnalysis(repoRoot, payload = {}) {
   const scoreId = safeString(payload.scoreId).trim();
   const scorePhotoPath = safeString(payload.scorePhotoPath).trim();
+  const scorePhotoHash = safeString(payload.scorePhotoHash).trim();
   const audioHash = safeString(payload.audioHash).trim();
   const audioPath = safeString(payload.audioPath).trim();
   const hasAudio = Boolean(audioHash || audioPath || safeString(payload.audioSubmission?.name).trim());
@@ -565,6 +570,8 @@ async function buildControlledSubmissionAnalysis(repoRoot, payload = {}) {
     scoreId,
     kind: isPhotoScore ? "photo-score" : "clean-score",
     scorePhotoPath,
+    scorePhotoHash,
+    scorePhotoSubmission: payload.scorePhotoSubmission || null,
     dataset: safeString(payload.dataset).trim(),
     piece: safeString(payload.piece).trim(),
     recordingId: safeString(payload.recordingId).trim(),
@@ -613,10 +620,14 @@ function latestReviewBySubmissionId(reviews) {
 function decorateControlledSubmission(submission, latestReview = null) {
   const submissionId = safeString(submission.submissionId).trim();
   const reviewAction = safeString(latestReview?.action).trim();
+  const kind = safeString(submission.kind, submission.scorePhotoPath ? "photo-score" : "clean-score");
   return {
     submissionId,
     submittedAt: safeString(submission.submittedAt),
+    kind,
     scoreId: safeString(submission.scoreId),
+    scorePhotoHash: safeString(submission.scorePhotoHash),
+    scorePhotoSubmission: submission.scorePhotoSubmission || null,
     dataset: safeString(submission.dataset),
     piece: safeString(submission.piece),
     recordingId: safeString(submission.recordingId),
@@ -627,6 +638,9 @@ function decorateControlledSubmission(submission, latestReview = null) {
     reason: safeString(latestReview?.reason || submission.reason),
     latestReview: latestReview || null,
     audioUrl: submissionId ? `/api/strings/controlled-submissions/${encodeURIComponent(submissionId)}/audio` : "",
+    scorePhotoUrl: kind === "photo-score" && submissionId
+      ? `/api/strings/controlled-submissions/${encodeURIComponent(submissionId)}/score-photo`
+      : "",
   };
 }
 
@@ -722,29 +736,49 @@ async function buildBatchGateSnapshot(repoRoot) {
   };
 }
 
-async function buildControlledBatchItem(repoRoot, submission, gateSnapshot, { batchRunId = "" } = {}) {
+async function buildControlledBatchItem(repoRoot, submission, gateSnapshot, {
+  batchRunId = "",
+  runPhotoScoreAnalysis = runOfflinePhotoScoreAnalyzer,
+} = {}) {
   const audioPath = safeString(submission.audioPath).trim();
   const audioExists = await fileExists(audioPath);
   const scoreId = safeString(submission.scoreId).trim();
+  const scorePhotoPath = safeString(submission.scorePhotoPath).trim();
+  const scorePhotoExists = await fileExists(scorePhotoPath);
+  const kind = safeString(submission.kind, scorePhotoPath && !scoreId ? "photo-score" : "clean-score");
   const dataset = safeString(submission.dataset).trim();
   const piece = safeString(submission.piece).trim();
   const recordingId = safeString(submission.recordingId).trim();
   const instrument = safeString(submission.instrument).trim();
-  const blockingReasons = [
-    scoreId ? "" : "controlled-batch-missing-score",
-    audioExists ? "" : "controlled-batch-missing-audio",
-    gateSnapshot.ready ? "" : "controlled-batch-release-gates-not-ready",
-  ].filter(Boolean);
+  const isPhotoScore = kind === "photo-score";
+  const blockingReasons = isPhotoScore
+    ? [
+      scorePhotoExists ? "" : "controlled-batch-missing-score-photo",
+      audioExists ? "" : "controlled-batch-missing-audio",
+    ].filter(Boolean)
+    : [
+      scoreId ? "" : "controlled-batch-missing-score",
+      audioExists ? "" : "controlled-batch-missing-audio",
+      gateSnapshot.ready ? "" : "controlled-batch-release-gates-not-ready",
+    ].filter(Boolean);
   const replay = blockingReasons.length
     ? {
       produced: false,
       status: "review_required",
       reasons: blockingReasons,
     }
-    : await buildControlledBatchReplayAnalysis(repoRoot, submission, { batchRunId });
+    : isPhotoScore
+      ? await buildControlledBatchPhotoScoreAnalysis(repoRoot, submission, {
+        batchRunId,
+        runPhotoScoreAnalysis,
+      })
+      : await buildControlledBatchReplayAnalysis(repoRoot, submission, { batchRunId });
   return {
     submissionId: safeString(submission.submissionId),
+    kind,
     scoreId,
+    scorePhotoHash: safeString(submission.scorePhotoHash),
+    scorePhotoSubmission: submission.scorePhotoSubmission || null,
     dataset,
     piece,
     recordingId,
@@ -763,6 +797,8 @@ async function buildControlledBatchItem(repoRoot, submission, gateSnapshot, { ba
     candidateGate: replay.candidateGate || null,
     candidatePreview: Array.isArray(replay.candidatePreview) ? replay.candidatePreview : [],
     recordingDiagnosis: replay.recordingDiagnosis || null,
+    photoScoreDecision: safeString(replay.photoScoreDecision),
+    photoScoreAuditPath: safeString(replay.photoScoreAuditPath),
     error: replay.error || "",
   };
 }
@@ -863,6 +899,108 @@ async function runOfflineFeatureAnalyzer(repoRoot, submission) {
     throw new Error(`offline feature analyzer returned no JSON.${stderr ? ` stderr=${safeString(stderr).slice(0, 500)}` : ""}`);
   }
   return parsed;
+}
+
+async function runOfflinePhotoScoreAnalyzer(repoRoot, submission) {
+  const scorePhotoPath = safeString(submission.scorePhotoPath).trim();
+  const audioPath = safeString(submission.audioPath).trim();
+  const submissionId = safeString(submission.submissionId, "photo-score").trim();
+  const scriptPath = path.join(SOURCE_ROOT, "scripts", "western_photo_score_pipeline.py");
+  const runnerPath = path.join(SOURCE_ROOT, "scripts", "run-python.ps1");
+  const outputRoot = path.join(repoRoot, "data", "analysis-photo-score", "controlled-submissions", submissionId);
+  const args = [
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    runnerPath,
+    scriptPath,
+    "--photo",
+    scorePhotoPath,
+    "--audio",
+    audioPath,
+    "--out",
+    outputRoot,
+  ];
+  const { stdout, stderr } = await execFileAsync("powershell.exe", args, {
+    cwd: SOURCE_ROOT,
+    timeout: Math.max(60000, Math.round(safeNumber(process.env.WESTERN_STRINGS_PHOTO_SCORE_TIMEOUT_MS, 30 * 60 * 1000))),
+    maxBuffer: 10 * 1024 * 1024,
+    env: {
+      ...process.env,
+      ERHU_CPU_THREAD_LIMIT: process.env.ERHU_CPU_THREAD_LIMIT || "2",
+      PYTHONIOENCODING: "utf-8",
+      PYTHONUTF8: "1",
+    },
+  });
+  const parsed = parseJsonFromStdout(stdout);
+  if (!parsed) {
+    throw new Error(`photo-score analyzer returned no JSON.${stderr ? ` stderr=${safeString(stderr).slice(0, 500)}` : ""}`);
+  }
+  return parsed;
+}
+
+async function buildControlledBatchPhotoScoreAnalysis(repoRoot, submission, {
+  batchRunId = "",
+  runPhotoScoreAnalysis = runOfflinePhotoScoreAnalyzer,
+} = {}) {
+  try {
+    const analysis = await runPhotoScoreAnalysis(repoRoot, submission);
+    const decision = safeString(analysis?.decision, "retake-photo");
+    const candidateCount = Array.isArray(analysis?.candidates) ? analysis.candidates.length : 0;
+    const record = {
+      submissionId: safeString(submission.submissionId),
+      batchRunId: safeString(batchRunId),
+      ranAt: nowIso(),
+      status: "ok",
+      decision,
+      audit: safeString(analysis?.audit),
+      autoDiagnosisIssued: false,
+      studentFacing: false,
+    };
+    const outPath = photoScoreBatchRunsPath(repoRoot);
+    await fs.mkdir(path.dirname(outPath), { recursive: true });
+    await fs.appendFile(outPath, `${JSON.stringify(record)}\n`, "utf8");
+    return {
+      produced: true,
+      status: "photo_score_review_ready",
+      reasons: ["photo-score-offline-review-only", `photo-score-decision-${decision.split(":", 1)[0]}`],
+      autoDiagnosisIssued: false,
+      summary: {
+        decision,
+        candidateCount,
+        studentFacing: false,
+      },
+      decisionCount: decision ? 1 : 0,
+      candidateRowCount: candidateCount,
+      candidatePreview: [],
+      recordingDiagnosis: {
+        mode: "photo_score_review_only",
+        autoDiagnosisIssued: false,
+      },
+      photoScoreDecision: decision,
+      photoScoreAuditPath: safeString(analysis?.audit),
+    };
+  } catch (error) {
+    const record = {
+      submissionId: safeString(submission.submissionId),
+      batchRunId: safeString(batchRunId),
+      ranAt: nowIso(),
+      status: "failed",
+      reason: "photo-score-offline-analysis-failed",
+      autoDiagnosisIssued: false,
+      studentFacing: false,
+    };
+    const outPath = photoScoreBatchRunsPath(repoRoot);
+    await fs.mkdir(path.dirname(outPath), { recursive: true });
+    await fs.appendFile(outPath, `${JSON.stringify(record)}\n`, "utf8");
+    return {
+      produced: false,
+      status: "failed",
+      reasons: ["photo-score-offline-analysis-failed"],
+      autoDiagnosisIssued: false,
+      error: safeString(error?.message || error),
+    };
+  }
 }
 
 async function buildControlledBatchOfflineFeatureAnalysis(repoRoot, submission, { batchRunId = "" } = {}) {
@@ -1034,6 +1172,7 @@ function applyOfflineFeatureStudentSafeGate(candidateRows = [], candidateGate = 
 export async function runWesternControlledSubmissionBatch({
   repoRoot = process.cwd(),
   limit = 20,
+  runPhotoScoreAnalysis = runOfflinePhotoScoreAnalyzer,
 } = {}) {
   const queue = await listWesternControlledSubmissions({ repoRoot, limit: 0 });
   const accepted = queue.submissions.filter((submission) => submission.status === "accepted_for_batch");
@@ -1045,13 +1184,17 @@ export async function runWesternControlledSubmissionBatch({
   const items = [];
   for (const submission of selected) {
     const raw = rawById.get(submission.submissionId) || submission;
-    items.push(await buildControlledBatchItem(repoRoot, raw, gateSnapshot, { batchRunId }));
+    items.push(await buildControlledBatchItem(repoRoot, raw, gateSnapshot, {
+      batchRunId,
+      runPhotoScoreAnalysis,
+    }));
   }
   const offlineAnalysisProducedCount = items.filter((item) => item.offlineAnalysisProduced === true).length;
   const autoDiagnosisIssued = items.some((item) => item.autoDiagnosisIssued === true);
   const hasValidatedReplay = items.some((item) => item.analysisStatus === "offline_analysis_ready");
   const hasFeatureReview = items.some((item) => item.analysisStatus === "offline_feature_review_ready");
   const hasFeatureConfidence = items.some((item) => item.analysisStatus === "offline_feature_confidence_ready");
+  const hasPhotoScoreReview = items.some((item) => item.analysisStatus === "photo_score_review_ready");
   const run = {
     batchRunId,
     createdAt: nowIso(),
@@ -1061,10 +1204,22 @@ export async function runWesternControlledSubmissionBatch({
     offlineAnalysisProducedCount,
     autoDiagnosisIssued,
     status: items.length
-      ? (hasValidatedReplay ? "offline_analysis_ready" : hasFeatureConfidence ? "offline_feature_confidence_ready" : hasFeatureReview ? "offline_feature_review_ready" : "review_required")
+      ? (hasValidatedReplay
+        ? "offline_analysis_ready"
+        : hasFeatureConfidence
+          ? "offline_feature_confidence_ready"
+          : hasFeatureReview
+            ? "offline_feature_review_ready"
+            : hasPhotoScoreReview
+              ? "photo_score_review_ready"
+              : "review_required")
       : "no_accepted_submissions",
     reason: items.length
-      ? (autoDiagnosisIssued ? "controlled-batch-confidence-gate-issued-candidate-feedback" : offlineAnalysisProducedCount > 0 ? "controlled-batch-not-student-facing" : "controlled-batch-offline-feature-extractor-not-connected")
+      ? (autoDiagnosisIssued
+        ? "controlled-batch-confidence-gate-issued-candidate-feedback"
+        : offlineAnalysisProducedCount > 0
+          ? "controlled-batch-not-student-facing"
+          : "controlled-batch-offline-feature-extractor-not-connected")
       : "controlled-batch-empty",
     gateSnapshot,
     items,
@@ -1300,6 +1455,8 @@ export function parseStudentAnalysisPayload(payload = {}) {
     recordingId: safeString(payload.recordingId).trim(),
     scoreId: safeString(payload.scoreId).trim(),
     scorePhotoPath: safeString(payload.scorePhotoPath).trim(),
+    scorePhotoHash: safeString(payload.scorePhotoHash).trim(),
+    scorePhotoSubmission: payload.scorePhotoSubmission || null,
     audioPath: safeString(payload.audioPath).trim(),
     audioHash: safeString(payload.audioHash).trim(),
     audioSubmission: payload.audioSubmission || null,

@@ -1409,13 +1409,14 @@ const PHOTO_SCORE_BATCH_RUNS = path.join(
 );
 
 async function readPhotoScoreChainStatus() {
-  // Display-only visibility for the offline photo-score chain (intake ->
-  // accepted_for_batch -> western:photo-score-batch). Never feeds any gate.
+  // Display-only visibility for the offline photo-score chain. Browser and CLI
+  // entry points share the same review-only audit log and never feed a release gate.
   const base = {
     wired: true,
     studentFacing: false,
-    intake: "POST /api/strings/analyze with scorePhotoPath (kind=photo-score, review_required)",
-    batchCommand: "npm run western:photo-score-batch",
+    acceptedImageTypes: ["JPG", "PNG", "WebP"],
+    intake: "Browser multipart upload or POST /api/strings/analyze (kind=photo-score, review_required)",
+    batchCommand: "Controlled queue Run batch audit or npm run western:photo-score-batch",
     source: PHOTO_SCORE_BATCH_RUNS.replace(/\\/g, "/"),
   };
   try {

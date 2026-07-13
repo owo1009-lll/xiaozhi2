@@ -279,10 +279,13 @@ export async function saveWesternAlignmentPreviewReview(payload = {}) {
 }
 
 export async function fetchWesternStudentAnalysis(payload = {}) {
-  if (payload?.audioFile instanceof File) {
+  const hasAudioFile = typeof File !== "undefined" && payload?.audioFile instanceof File;
+  const hasScorePhotoFile = typeof File !== "undefined" && payload?.scorePhotoFile instanceof File;
+  if (hasAudioFile || hasScorePhotoFile) {
     const formData = new FormData();
-    formData.append("audio", payload.audioFile);
-    const { audioFile, ...rest } = payload;
+    if (hasAudioFile) formData.append("audio", payload.audioFile);
+    if (hasScorePhotoFile) formData.append("scorePhoto", payload.scorePhotoFile);
+    const { audioFile, scorePhotoFile, ...rest } = payload;
     formData.append("payload", JSON.stringify(rest));
     return readJson(
       await fetch("/api/strings/analyze", {

@@ -24,7 +24,16 @@ async function defaultPersistAudio() {
   return { audioPath: "", audioHash: "" };
 }
 
+async function defaultPersistScorePhoto() {
+  return { scorePhotoPath: "", scorePhotoHash: "" };
+}
+
 function defaultAudioSubmissionFromUpload(file, fallback = {}) {
+  if (!file) return fallback || null;
+  return fallback || null;
+}
+
+function defaultScorePhotoSubmissionFromUpload(file, fallback = {}) {
   if (!file) return fallback || null;
   return fallback || null;
 }
@@ -38,10 +47,14 @@ export function createWesternStringsRouter({
   repoRoot,
   upload = null,
   audioCacheDir = "",
+  scorePhotoCacheDir = "",
   parseIncomingPayload = defaultParseIncomingPayload,
   buildAudioSubmissionFromUpload = defaultAudioSubmissionFromUpload,
+  buildScorePhotoSubmissionFromUpload = defaultScorePhotoSubmissionFromUpload,
   persistUploadedAudioFile = defaultPersistAudio,
   persistPayloadAudio = defaultPersistAudio,
+  persistUploadedScorePhotoFile = defaultPersistScorePhoto,
+  persistPayloadScorePhoto = defaultPersistScorePhoto,
 } = {}) {
   const router = express.Router();
 
@@ -72,21 +85,46 @@ export function createWesternStringsRouter({
   async function parseStudentSubmission(req) {
     const payload = parseIncomingPayload(req);
     const parsed = parseStudentAnalysisPayload(payload || {});
-    const persistedAudio = req.file
-      ? await persistUploadedAudioFile(req.file, { audioCacheDir })
+    const uploadedAudio = req.files?.audio?.[0] || req.file || null;
+    const uploadedScorePhoto = req.files?.scorePhoto?.[0] || null;
+    const persistedAudio = uploadedAudio
+      ? await persistUploadedAudioFile(uploadedAudio, { audioCacheDir })
       : await persistPayloadAudio(payload || {}, { audioCacheDir });
+    const persistedScorePhoto = uploadedScorePhoto
+      ? await persistUploadedScorePhotoFile(uploadedScorePhoto, { scorePhotoCacheDir })
+      : await persistPayloadScorePhoto(payload || {}, { scorePhotoCacheDir });
+    const scorePhotoRequested = Boolean(
+      uploadedScorePhoto
+      || safeString(parsed.scorePhotoPath).trim()
+      || safeString(payload?.scorePhotoDataUrl).trim(),
+    );
+    if (scorePhotoRequested && !safeString(persistedScorePhoto.scorePhotoPath).trim()) {
+      const error = new Error("score photo could not be persisted.");
+      error.statusCode = 400;
+      throw error;
+    }
     return {
       ...parsed,
       audioPath: persistedAudio.audioPath || parsed.audioPath,
       audioHash: persistedAudio.audioHash || parsed.audioHash,
-      audioSubmission: req.file
-        ? buildAudioSubmissionFromUpload(req.file, parsed.audioSubmission)
+      audioSubmission: uploadedAudio
+        ? buildAudioSubmissionFromUpload(uploadedAudio, parsed.audioSubmission)
         : parsed.audioSubmission,
+      scorePhotoPath: persistedScorePhoto.scorePhotoPath || "",
+      scorePhotoHash: persistedScorePhoto.scorePhotoHash || "",
+      scorePhotoSubmission: uploadedScorePhoto
+        ? buildScorePhotoSubmissionFromUpload(uploadedScorePhoto, parsed.scorePhotoSubmission)
+        : parsed.scorePhotoSubmission,
     };
   }
 
   const analyzeHandlers = [];
-  if (upload?.single) {
+  if (upload?.fields) {
+    analyzeHandlers.push(upload.fields([
+      { name: "audio", maxCount: 1 },
+      { name: "scorePhoto", maxCount: 1 },
+    ]));
+  } else if (upload?.single) {
     analyzeHandlers.push(upload.single("audio"));
   }
   analyzeHandlers.push(async (req, res) => {
@@ -102,7 +140,7 @@ export function createWesternStringsRouter({
       });
       return res.json({ ok: true, analysis });
     } catch (error) {
-      return res.status(500).json({ ok: false, error: safeString(error?.message, "failed to build western strings student analysis.") });
+      return res.status(Number(error?.statusCode) || 500).json({ ok: false, error: safeString(error?.message, "failed to build western strings student analysis.") });
     }
   });
   router.post("/api/strings/analyze", ...analyzeHandlers);
@@ -128,6 +166,20 @@ export function createWesternStringsRouter({
       return res.sendFile(audioPath);
     } catch (error) {
       return res.status(500).json({ ok: false, error: safeString(error?.message, "failed to read controlled submission audio.") });
+    }
+  });
+
+  router.get("/api/strings/controlled-submissions/:submissionId/score-photo", async (req, res) => {
+    try {
+      const submission = await findWesternControlledSubmission({ repoRoot, submissionId: req.params.submissionId });
+      const scorePhotoPath = path.resolve(safeString(submission?.scorePhotoPath));
+      const allowedRoot = path.resolve(scorePhotoCacheDir || path.join(repoRoot, "data", "analysis-score-photo-cache"));
+      if (!submission || !scorePhotoPath || !isPathInside(allowedRoot, scorePhotoPath) || !fs.existsSync(scorePhotoPath)) {
+        return res.status(404).json({ ok: false, error: "controlled submission score photo not found." });
+      }
+      return res.sendFile(scorePhotoPath);
+    } catch (error) {
+      return res.status(500).json({ ok: false, error: safeString(error?.message, "failed to read controlled submission score photo.") });
     }
   });
 
