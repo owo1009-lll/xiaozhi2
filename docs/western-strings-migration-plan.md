@@ -215,7 +215,7 @@ M3+ 不做技法名称展示,也不做技法质量评价。它只解决一个产
 - 已接入 `npm run western:m3plus-review-pack`,生成 `data/experiments/western-strings-m3plus/pitch-mode-review-pack/index.html`、待填 CSV/JSON/guide、48 个本地短 WAV 和对应五线谱图片(`score-images/`,按 piece/page/measure/note 定位)。当前抽样为 6 类各 8 条:`slide-like`、`trill-like`、`double-stop-candidate`、`ornament-candidate`、`stable`、`variable-f0`。复核页已改为正常中文说明,并加入单条/批量快捷按钮;批量按钮只填未标项,不得替代听辨。
 - 已接入 `npm run western:m3plus-review-import` 与 `npm run western:m3plus-review-status`:标完网页下载 `m3plus-pitch-mode-review.completed.csv` 后导入,状态命令会报告每类 reviewed/scored 缺口。第一轮、第二轮与 first-measure candidate-quality 复核已累计导入,实测 `m3plusModeEvalReady=true`:98 reviewed / 74 scored,每类 reviewed/scored 缺口均为 0。
 - 已接入并运行 `npm run western:m3plus-mode-eval`:当前结果为 `m3plusModeReleaseReady=true`,`releaseReadyModes=["slide-like","trill-like"]`,`controlReadyModes=["stable"]`。这只证明 first-measure + trusted-recording 安全子集中的 slide/trill 音高判法有离线 release 证据;学生端 M3+ 自动反馈仍默认关闭,后续只能做窄范围 monitored pilot,不能广泛打开。
-- 当前 student gate 仍为 `studentGateReady=false`。M3+ 标签状态已齐备,但 per-mode precision/unsafe 评估未放行任何非 control 模式;未达音准 precision≥90%、unsafe=0 的模式继续 `review_required`。继续推进前应先改定位/候选生成,再做新的 targeted eval pack。
+- 当前默认 student gate 仍为 `studentGateReady=false`。`slide-like` / `trill-like` 已通过 first-measure 受控 pilot 机器审计,但默认运行时不打开;`variable-f0`、双音和装饰音继续 `review_required`。只有新增独立证据再次达到音准 precision≥90%、unsafe=0,才可扩大模式或范围。
 - 项目级状态统一入口:`npm run western:project-status` 会同时汇总普通上传候选 gate、普通上传 confidence pilot blind-validation 状态、M3+ 复核标签状态与 M4 OMR benchmark 状态,输出 `data/experiments/western-strings-project-status.json`。该命令只读,用于判断下一批优先级;任何子 gate 未 ready 时 runtime 仍保持 fail-closed。confidence validation 批次命令为 `npm run western:controlled-candidate-confidence-validation-export` + `npm run western:controlled-candidate-confidence-validation-review-pack`,生成 `data/experiments/western-strings-m3/confidence-validation-review/index.html` 供人工盲标。盲标完成后运行 `npm run western:controlled-candidate-confidence-validation-eval`,它只在 fresh completed CSV 上评估冻结模型/阈值,不先合并进累计 labels;即使 `blindValidationPassed=true`,也只是下一阶段 runtime gate wiring 的证据,不自动打开学生端。发布阻断入口为 `npm run western:project-gate`:默认要求 ordinary/m3plus/m4 三条轨道全 ready,未 ready 时非零退出并写 `data/experiments/western-strings-project-gate.json`。回归测试入口为 `npm run test:western-project-gate`,用于防止项目级 gate 漂移,尤其是 M4 自比样本被误算为独立 gold,以及 eval-only confidence pilot 未经 fresh blind batch 就进入 runtime。
 
 ---
@@ -235,11 +235,13 @@ OMR 只解决"谱面从哪来",不改变音频诊断逻辑。未过 note-level �
 - 100% 可追溯 `scoreSource=omr`、`omrReviewStatus`、识别版本与人工核对状态。
 - 判断层拒绝未达标或未核对 OMR 谱。
 
-### 当前执行状态(2026-07-09)
+### 当前执行状态(2026-07-13)
 - 已接入只读 readiness 命令 `npm run western:m4-omr-readiness`。该命令检查 M2f clean-score intake 中每条图片/PDF 谱面源、gold clean MusicXML/MXL/MIDI、人工 `approved` 状态和 score-store `scoreId` 是否齐备。
 - 当前实测:12 条 intake 全部 ready,`pairReadyRows=12`,`blockedRows=0`,`m4OmrBenchmarkDatasetReady=true`;产物为 `data/experiments/western-strings-m4/omr-readiness.json` 和 `omr-readiness.csv`。
 - 该结果只是 OMR benchmark 的数据前置条件,不是 OMR 准确率通过。学生端仍固定 `studentGateReady=false`,OMR 识别结果在 note-level 精度闸门通过前不得进入 `/api/strings/analyze` 判断层。
 - 已接入 `npm run western:m4-omr-benchmark`,对 Audiveris 草稿和 gold clean score 做只读序列评测。2026-07-10 口径已修正:当前 12/12 clean score 虽然与 Audiveris 草稿 byte-identical,但这 12 条已经有 M2 clean-score review 的 `approved` + `cleanScoreReviewedBy` 证据,因此报告为 `human-approved-unchanged-draft`,不是未复核 self-comparison。当前 `usableBenchmarkRows=12`,`humanApprovedUnchangedRows=12`,`selfComparisonRows=0`,`manualGoldRequiredRows=0`,`m4OmrDraftQualityReady=true`。M4 仍是 eval-only OMR benchmark,不会打开学生端运行时 OMR 自动诊断;论文/表格报告时必须把这批与 `independent-edited-gold` 分开说明。
+- 浏览器现可在 clean MusicXML/MIDI 与单页谱面照片之间二选一。照片入口只接受经过文件签名验证的 JPG/PNG/WebP,独立缓存照片与录音,在受控队列中显示预览,人工批准后才进入最多 5 条一批的离线照片谱分析。一般批处理与专用 CLI 都调用同一受管 Python 环境;结果固定为 `photo_score_review_ready`,`autoDiagnosisIssued=false`,`studentFacing=false`,并写入独立审计日志。
+- 当前单页照片入口不接受 PDF。多页 PDF 仍只属于 M4 benchmark/草稿流程;在实现逐页转换、页序和定位审计前,不得把 PDF 伪装成单页照片输入。
 
 ---
 

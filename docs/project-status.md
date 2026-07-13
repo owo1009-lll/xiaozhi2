@@ -1,6 +1,6 @@
 # 西洋弦乐练习诊断项目状态快照
 
-更新时间: 2026-07-10
+更新时间: 2026-07-13
 
 本文件是当前主线状态快照。实时判断仍以命令为准:
 
@@ -16,7 +16,7 @@
 
 构建西洋弓弦乐练习诊断系统:
 
-- 输入: clean score + audio; PDF/图片 OMR 是 M4 谱面侧能力, 必须先过 OMR 闸门。
+- 输入: clean MusicXML/MIDI + audio,或 review-only 的 JPG/PNG/WebP 单页谱面照片 + audio。PDF/图片 OMR 属于 M4 谱面侧能力,必须先过 OMR 闸门;当前浏览器照片入口不接收多页 PDF。
 - 输出: 高置信音准 / 起音 / 漏音等基础诊断; 低置信或未验证类别进入复核。
 - 原则: validation-first, fail-closed, 机器先自测, 只有未知或危险样本才找教师复核。
 
@@ -102,6 +102,14 @@
 - 当前 M4 不需要继续找教师或清谱人员复核。
 - M4 仍是 eval-only OMR benchmark, 不会打开学生端运行时 OMR 自动诊断。
 - 报告论文/表格时必须把这批写成 `human-approved-unchanged-draft`, 不得伪称为 independent edited gold。
+
+照片谱离线生产链现已接通:
+
+- 浏览器 multipart 上传、JPG/PNG/WebP 文件签名校验、照片/录音独立哈希缓存与队列预览已完成。
+- 人工标记为 batch 后,一般受控批处理会分派到照片谱分析器;每次最多处理 5 条以限制本机负载。
+- 结果固定为 `photo_score_review_ready`,写入 `photo-score-batch-runs.jsonl`;`autoDiagnosisIssued=false`,`studentFacing=false`。
+- multipart、伪造 MIME、缓存越界路径、批处理分派、审计落盘和桌面/移动浏览器交互均有回归验证。
+- 仍缺真照片独立编辑 gold、多引擎交叉验证和默认运行时放行;因此 `m4OmrAutoScoreReady=false` 不变。
 
 ## 4. 当前唯一下一步
 
@@ -228,8 +236,24 @@ MTG MUSC 预训练模型已完成 eval-only 接入。默认 127.7ms 最短音长
 
 因此公开专业单声部录音可以继续作为 V2 研究候选和开发基线;双音、50ms V3、真实学生错误域和“完美识别”仍未达到。弱标签只能用于后续训练扩展,不能替代新外部人工 gold。
 
-## 11. HF2 域外复音压力进度(2026-07-10)
+## 11. HF2 域外复音压力进度(2026-07-13)
 
 HF2 Hardanger Fiddle 的 119 对 WAV/MIDI 已完成只读审计，其中 100 条 HF1 表现变体有可用的人工验证来源。该数据只用于复音、装饰音和表现性弓弦录音的域外压力测试，不属于古典小提琴或学生发布证据。
 
-冻结 MUSC 直接核心按低负载增量协议推进：当前缓存 1/20、待处理 19。首轮全量命令触发 20 分钟资源闸门后已停用；现在每次最多新增一条，纯状态命令不加载模型。直接核心未满 20 条前不产生 V2/V3 判定，也不启动 80 条表现变体。详见 [western-strings-hf2-hardanger-validation.md](western-strings-hf2-hardanger-validation.md)。
+冻结 MUSC 直接核心已按低负载增量协议完成 `20/20`,待处理 `0`。最终 `100 ms` precision=`80.3%`、recall=`56.8%`、F1=`66.6%`,未达到 V2 闸门;因此按停止条件不运行 80 条表现变体。该结果只作为 Hardanger 域外能力边界证据,不构成古典小提琴产品线阻塞。详见 [western-strings-hf2-hardanger-validation.md](western-strings-hf2-hardanger-validation.md)。
+
+## 12. 本地维护与安全清理
+
+先预览,确认目标仅为可再生环境、调试目录、构建产物和 Python 缓存:
+
+```bash
+npm run western:cleanup
+```
+
+确认后执行:
+
+```bash
+npm run western:cleanup:apply
+```
+
+清理脚本拒绝工作区外路径和 `paper/` 下任何目标;不会删除正式数据、模型、音频、教师复核、private intake 或论文。`dist/` 会被清理,发布/验收前必须重新运行 `npm run build`。

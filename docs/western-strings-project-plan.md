@@ -335,7 +335,7 @@
 - ✅ M2d/M2e 通过/拒绝证据已映射到教师后台:Western strings preview 默认加载 `studentSafe=1`,显示 release gate 状态、source、review reason、相邻音序列 Basic Pitch 支持、method agreement 与 candidate sources,方便教师快速复核。
 - ✅ M1 收口已完成: `test:western-string-config` / `test:western-musicxml-import` / `test:western-midi-import` / `test:western-dataset-index` / `test:western-strings-entry` / `test:server-boundaries` / `test:server-p0` / `test:musicxml-import` / `test:analyzer-score-roles` / `test:teacher-validation` / `build` 全部通过。
 
-**M1 已完成。M2f 真实学生录音 gate 已通过;M3 core diagnosis gate 已通过;最小 `/api/strings/analyze` / `/api/strings/review` 服务端闭环已接入;Western strings UI 已支持 clean-score + audio 受控提交进入离线复核队列,并可试听/审核队列项、运行 fail-closed batch audit。学生端仍未开放任意上传音频实时自动反馈。**
+**M1 已完成。M2f 真实学生录音 gate 已通过;M3 core diagnosis gate 已通过;最小 `/api/strings/analyze` / `/api/strings/review` 服务端闭环已接入;Western strings UI 已支持 clean-score 或 review-only JPG/PNG/WebP 谱面照片 + audio 受控提交进入离线复核队列,并可试听/预览/审核队列项、运行 fail-closed batch audit。学生端仍未开放任意上传音频实时自动反馈。**
 
 当前下一阶段步骤:
 1. 以 M2f 通过结果作为 V2-alpha 学生端前置证据,保留 `real-student-recording-results.csv` 和 gate 输出作为审计依据。
@@ -348,6 +348,7 @@
 8. ✅ UI 已从“已验证样本预览”升级到真实 clean-score + audio 的受控提交流:上传音频只进入 `controlled-submissions.jsonl` 离线复核队列并返回 `studentReady=false`,不会生成学生端硬诊断。
 9. ✅ 离线复核队列已接入:可列出 controlled submissions、试听缓存音频、写入 `controlled-submission-reviews.jsonl`,并把条目标为 `accepted_for_batch` / `review_required` / `reject_unsupported` / `failed`。
 10. ✅ fail-closed 批处理审计执行器已接入:`POST /api/strings/controlled-submissions/run-batch` 只处理 `accepted_for_batch` 项,写入 `controlled-submission-batch-runs.jsonl`,并明确 `autoDiagnosisIssued=false`。对携带已验证 `dataset/piece/recordingId` 的受控提交,batch 可回放现有 gated pipeline 并写出 `offline_analysis_ready` 摘要;对普通 clean-score + audio 上传,batch 已接入 review-only pYIN 线性谱面特征执行器,可写出 `offline_feature_review_ready` 完整候选特征表 artifact、前 5 条 preview 与摘要,但所有结果仍为 `review_required`。`western-offline-feature-gate-v0-review-only` 已作为普通上传的 student-safe gate 框架接入,当前版本明确阻断所有候选并写出 `ordinary-upload-student-safe-gate-not-calibrated`;`npm run western:controlled-batch-candidate-audit` 已作为二次审计命令,检查普通上传候选表 artifact 存在、行数匹配、没有 auto-pass、没有 student-facing 输出、没有 student-safe gate 绕过。`npm run western:controlled-candidate-review-export` 默认抽样 30 条最新 batch 候选,生成本地中文复核网页、CSV、JSON 和 `review-guide.md`;`-- --all` 可导出全量候选。`npm run western:controlled-candidate-review-import -- --reviews <completed.csv>` 把人工复核结果合并到累计 labels CSV;`npm run western:controlled-candidate-gate-eval` 默认读取累计 labels CSV 并生成校准报告;`npm run western:controlled-candidate-review-status` 输出当前 reviewed/scored 缺口、bestRule、下一步和 `reviewArtifacts`(复核网页/指南/completed CSV/labels CSV 路径);`uncertain` 只计入复核记录,不计入可评分样本数。当时下一步是积累真实普通上传复核数据(该阶段已被后续 confidence validation、release-review 和 controlled-pilot decision 覆盖;当前不再要求继续复核同一包),在校准报告达到 minReviewedRows/precision 闸门后再讨论替换 `western-offline-feature-gate-v0-review-only`;未完成前不得声称支持任意上传音频实时诊断。
+10a. ✅ 照片谱受控生产链已接通:浏览器只接受经文件签名验证的 JPG/PNG/WebP,照片与录音独立哈希缓存并在队列中显示;一般受控 batch 可把 `photo-score` 项分派到受管 Python 照片谱分析器,每次最多 5 条,结果写为 `photo_score_review_ready` 和独立审计日志。该链始终 `autoDiagnosisIssued=false`,`studentFacing=false`;多页 PDF 不走单页照片入口。multipart、伪造 MIME、缓存路径越界、批处理分派、审计以及桌面/移动浏览器交互均已验证。
 11. ✅ 普通上传候选复核输入预检已接入并打通:`npm run western:controlled-candidate-input-status` 只读检查 M2f manifest、clean-score intake、score store、controlled submissions 和 batch 候选行。当前实测为 12/12 音频存在、12/12 clean score 已批准且文件存在、12/12 已导入 score store 并回填 `scoreId`;12 条 controlled submissions 已审核为 `accepted_for_batch`。最新 batch run `strings-batch-mrb9twcr-ls0kkl` 生成 12 个 `offline_feature_review_ready` 项、2588 行 review-only 候选 artifact,`western:controlled-batch-candidate-audit` 默认审计最新 run 并通过。`western:controlled-candidate-review-export` 默认生成 30 条轮转抽样的本地中文复核网页/CSV/JSON 和按录音分组的 `review-guide.md`,用于第一轮最小校准;需要审全量时加 `-- --all`。当时下一步是人工复核候选行并用 import/status/gate-eval 累积校准证据(该轮复核与后续校准已完成/覆盖;当前不再要求继续复核同一包)。历史上一次缺 `candidateRowsPath` 的旧 batch 保留为数据日志,不作为当前默认审计对象;需要追溯历史时可显式跑 `western:controlled-batch-candidate-audit -- --all-runs`。
 12. ⏳ 当前人工复核口径:打开 `data/experiments/western-strings-m3/offline-feature-candidate-review/index.html`,逐条试听并看候选的预测秒/页/小节/MIDI。若候选确实对应该谱面音符且足以作为后续校准正例,标 `usable`;若候选明显错位、音高不对应、或不能作为该音符证据,标 `wrong`;若听不清、谱音位置无法确认、或只能给定性判断,标 `uncertain`。新版页面用“候选 1 / 30”作本页序号,并在卡片中写明“系统说:录音 X 秒附近可能对应第 Y 小节/MIDI Z”;原始行号只是内部编号,不用判断。导出脚本会把涉及的音频复制到复核页旁边的 `audio/` 文件夹,页面提供 `播放/暂停` 与 `跳到候选秒` 中文按钮,不必依赖浏览器原生音频小图标或后台音频接口;也提供 `一键未标=可用`、`一键未标=错误`、`一键未标=不确定` 和 `清空本页标注`。批量按钮只填未标项,不会覆盖已单独修改的候选。`usable` 与 `wrong` 才计入可评分样本;`uncertain` 只保留记录,不计入 precision/coverage 校准。第一轮至少需要 30 条 `usable/wrong` 后才能运行 import/status/gate-eval 得到有效的 student-safe gate 评估。若 gate-eval 返回 `candidate-review-no-rule-meets-precision` 且规则没有选中样本,应运行 `npm run western:controlled-candidate-review-export -- --gate-candidates` 生成第二轮可校准候选复核页。
 13. ✅ 2026-07-08 普通上传候选第二轮复核已导入:最新下载的 `controlled-candidate-review.completed.csv` 为 30 条可评分样本(16 usable / 14 wrong),合并后累计 labels 为 60 条(46 usable / 14 wrong)。`npm run western:controlled-candidate-review-status` 仍返回 `candidate-review-no-rule-meets-precision`;最新 30 条单独评估的最佳规则 precision 约 0.533,不达 0.90 学生安全闸门。新增只读诊断命令 `npm run western:controlled-candidate-label-audit` 会扫描累计 labels、候选 JSON、数值阈值和分类字段,输出 `candidate-label-audit.json`;本轮发现累计样本存在小样本/批次偏差,最新 30 条在 `--min-selected 10` 下没有任何规则达到 0.90 precision。因此普通上传音频继续保持 `review_required`,不得开放学生端自动反馈。复核页已改为每条生成约 6 秒本地短音频 `clips/`、候选秒按短音频内部时间跳转,并显示对应谱面图 `score-images/`;若页面内播放器不可用,可点“打开短音频文件”直接播放 WAV。
@@ -419,19 +420,21 @@
 
 ---
 
-## 附录 B. 完成度快照与受阻点(2026-07-11)
+## 附录 B. 完成度快照与受阻点(2026-07-13)
 
-**手册完成度(2026-07-11 末次核算,按承诺范围 M0–M4+V2-release 加权约 85–88%;含 M5/V3/论文约 70%):**
-口径说明:该数为唯一权威口径;对话/汇报中出现的其他百分比以本表为准。产品定位:**V2-alpha 受控 pilot 候选**;默认学生端 fail-closed 未开放。照片谱生产链(入口/批处理/审计,提交 c9fd50a、48c8c6d)已完成但尚未注册进 `western:project-status` 状态工具,机器审查暂不可见——注册为待办。
+**手册完成度(2026-07-13 末次核算,按承诺范围 M0–M4+V2-release 加权约 85–88%;含 M5/V3/论文约 70%):**
+口径说明:该数为唯一权威口径;对话/汇报中出现的其他百分比以本表为准。产品定位:**V2-alpha 受控 pilot 候选**;默认学生端 fail-closed 未开放。照片谱生产链已注册进 `western:project-status`,服务端、浏览器、批处理和审计可见;它仍是 review-only,不提高默认学生发布等级。
 | 条目 | 完成度 |
 |---|---|
 | M0 / M1 / M2(含 M2f)/ M3 core | 100%(闸门通过;**但 M3 core 每类有效错误样本仅 2 个,证据浓度薄**,扩证依赖新增含错录音) |
 | M3 全量(时值/多音) | ~70%(缺样本/口径,review-only) |
 | M3+ 少退复核 | ~55%(滑音/颤音离线证据过;双音对齐器已支持;泛音谱面标注未做;未接运行时) |
-| M4 OMR+落到谱面 | ~85%(2026-07-11 三轮后:独立基准、分层闸门、谱面锚定、机器全自动、**离线生产管线+12条全量回归**已成;缺服务端路由/UI 接线、真照片独立 gold、多引擎) |
+| M4 OMR+落到谱面 | ~85%(独立基准、分层闸门、谱面锚定、服务端/浏览器照片入口、离线生产管线和 12 条全量回归已成;关键剩余证据是真照片独立 gold、多引擎和默认运行时闸门) |
 | M5 大提琴 / V3 | 0% / ~10% |
 
-**V2-release 剩余缺口(无技术攻关项):** ① 一条全新独立盲测录音(仅用户可录);② 受控 pilot 批准决定;③ 生产接线(受控提交流);④ release 终审。
+**V2-release 剩余缺口:** 已完成 5 首/5 条安全受控 pilot 和受控提交流接线;仍需 ① 一条全新独立盲测录音 + 已审 clean score + 谱面显示文件 + 核谱人;② 通过 fresh intake 与机器 precheck;③ 专业盲审和 release 终审。当前 coverage=4% 低于 20% 地板,不得仅因 precision=100% 默认开放。
+
+**本地安全清理:** `npm run western:cleanup` 只预览;`npm run western:cleanup:apply` 仅删除旧 model-bakeoff 虚拟环境、M4 调试目录、`dist/` 和源码树 Python 缓存。脚本拒绝工作区外路径和 `paper/` 目标,不删除正式数据、模型、音频、教师复核、private intake 或论文;执行后必须重跑 `npm run build`。
 
 **受阻点记录:MUSC 推理"假死"(2026-07-11,已定位为环境问题,不可复现):**
 - 报告症状:44s 录音推理 30–50 分钟无输出,3s 音频单帧前向亦挂,GPU 5–9%/CPU 20%。

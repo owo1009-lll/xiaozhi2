@@ -168,6 +168,8 @@
     "western:controlled-candidate-review-status": "node scripts\\status-western-controlled-candidate-review.mjs",
     "western:controlled-candidate-input-status": "node scripts\\status-western-controlled-candidate-inputs.mjs",
     "western:project-status": "node scripts\\status-western-strings-project.mjs",
+    "western:cleanup": "powershell -ExecutionPolicy Bypass -File scripts\\cleanup-western-workspace.ps1",
+    "western:cleanup:apply": "powershell -ExecutionPolicy Bypass -File scripts\\cleanup-western-workspace.ps1 -Apply",
     "western:project-gate": "node scripts\\gate-western-strings-project.mjs",
     "western:public-model-gate": "node scripts\\gate-western-strings-project.mjs --require public --out data\\experiments\\western-strings-public-model-gate.json",
     "western:next-actions": "node scripts\\create-western-strings-next-action-handoff.mjs",
