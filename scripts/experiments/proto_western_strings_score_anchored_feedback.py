@@ -77,11 +77,12 @@ def audio_events(audio_path: Path) -> list[dict]:
     chords: list[dict] = []
     TOL = 0.06  # seconds; simultaneous-onset grouping (double stops)
     for n in notes:
-        start, midi = float(n[0]), int(n[2])
+        start, end, midi = float(n[0]), float(n[1]), int(n[2])
         if chords and start - chords[-1]["start"] <= TOL:
             chords[-1]["midis"].append(midi)
+            chords[-1]["end"] = max(float(chords[-1]["end"]), end)
         else:
-            chords.append({"start": start, "midis": [midi]})
+            chords.append({"start": start, "end": end, "midis": [midi]})
     for c in chords:
         c["midis"] = sorted(set(c["midis"]))
     return chords
@@ -100,6 +101,18 @@ def _pitch_cost(score_midis: list[int], audio_midis: list[int]) -> float:
             best = min(best, float(min(d, 12)))
         total += best
     return total / len(audio_midis)
+
+
+def strict_audio_verdict(score_midis: list[int], audio_midis: list[int]) -> str:
+    """Use tolerance for alignment, but exact pitch sets for green evidence."""
+
+    score_set = set(int(value) for value in score_midis)
+    audio_set = set(int(value) for value in audio_midis)
+    if score_set == audio_set:
+        return "confirmed"
+    if audio_set and audio_set.issubset(score_set):
+        return "no-audio-evidence"
+    return "pitch-mismatch"
 
 
 def align(events: list[dict], audio: list[dict]) -> tuple[list[int | None], list[float] | None]:
@@ -209,15 +222,6 @@ def run_piece(piece: str, variant: str, out_root: Path,
         dens = sum(1 for k in range(lo, hi) if match[k] is not None) / (hi - lo)
         if dens >= 0.5:
             cover_end = i
-    def judge(score_midis: list[int], audio_midis: list[int]) -> str:
-        """mismatch only if some audio tone is a genuine (non-octave) wrong pitch."""
-        for am in audio_midis:
-            dists = [abs(am - sm) for sm in score_midis]
-            folded = [0.0 if (d % 12 == 0) else d for d in dists]
-            if min(folded) > 0:
-                return "pitch-mismatch"
-        return "confirmed"
-
     verdicts = []
     for i, mi in enumerate(match):
         if per_note[i]["uncertain"]:
@@ -226,7 +230,7 @@ def run_piece(piece: str, variant: str, out_root: Path,
             # neutral: detector miss and player miss are indistinguishable here -> never accuse
             verdicts.append("no-audio-evidence" if i <= cover_end else "beyond-recording")
         else:
-            verdicts.append(judge(events[i]["midis"], aev[mi]["midis"]))
+            verdicts.append(strict_audio_verdict(events[i]["midis"], aev[mi]["midis"]))
 
     im = Image.open(photo).convert("RGB")
     dr = ImageDraw.Draw(im)

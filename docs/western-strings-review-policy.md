@@ -119,6 +119,16 @@ runtime OMR from it.
 
 Independent gold application has two safety gates:
 
+The 2026-07-15 M3+/M4 non-human validation evidence is recorded in
+`western-strings-m3plus-m4-evidence-2026-07-15.md`. In particular:
+
+- low-quality frame-F0 evidence is `uncertain`, never an automatic negative;
+- unmarked legacy performances are not assumed to be technique-negative;
+- OMR/audio agreement is correlated evidence and does not replace clean score gold;
+- measure-level summaries cannot upgrade an unsafe note-level decision; and
+- no supplemental M3+ teacher review is requested before the recordings exist and
+  the machine gate has identified a real adjudication need.
+
 - the editable MXL/MusicXML file must differ from the Audiveris draft; and
 - the workspace row must explicitly set `reviewStatus=approved`.
 

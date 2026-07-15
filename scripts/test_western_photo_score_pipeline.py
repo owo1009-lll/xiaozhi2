@@ -12,7 +12,11 @@ sys.path.insert(0, str(REPO / "scripts"))
 sys.path.insert(0, str(REPO / "scripts" / "experiments"))
 
 from western_photo_score_pipeline import decide, MIN_CONFIRMED, MIN_AGREEMENT  # noqa: E402
-from proto_western_strings_score_anchored_feedback import _pitch_cost, align  # noqa: E402
+from proto_western_strings_score_anchored_feedback import (  # noqa: E402
+    _pitch_cost,
+    align,
+    strict_audio_verdict,
+)
 
 checks = []
 
@@ -39,6 +43,11 @@ check("cost-exact-zero", _pitch_cost([60], [60]) == 0.0)
 check("cost-octave-half", _pitch_cost([60], [72]) == 0.5)
 check("cost-wrong-semitone", _pitch_cost([60], [61]) == 1.0)
 check("cost-chord-nearest", _pitch_cost([60, 67], [67]) == 0.0)
+
+# Alignment may tolerate octave artifacts, but green evidence must not.
+check("verdict-exact-green", strict_audio_verdict([60], [60]) == "confirmed")
+check("verdict-octave-not-green", strict_audio_verdict([60], [72]) == "pitch-mismatch")
+check("verdict-chord-subset-neutral", strict_audio_verdict([60, 67], [67]) == "no-audio-evidence")
 
 # ---- align(): substitution catches an isolated wrong note; monotonic ----
 score = [{"midis": [m]} for m in [60, 62, 64, 65, 67, 69, 71, 72, 74, 76]]

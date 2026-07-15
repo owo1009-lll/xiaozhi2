@@ -299,6 +299,10 @@ HF2 Hardanger Fiddle 的 119 对 WAV/MIDI 已完成只读审计，其中 100 条
 
 ## 12. 本地维护与安全清理
 
+2026-07-15 的 M3+ 帧级 F0、小节级反馈、M4 OMR/音频双证与时值归一化实测见 [western-strings-m3plus-m4-evidence-2026-07-15.md](western-strings-m3plus-m4-evidence-2026-07-15.md)。这些结果均为离线证据，不改变学生端默认 `fail-closed` 状态。
+
+2026-07-16 补充：M3+ 评测已改为前半标定/后半 holdout，并加入明确直音控制的会话相对基线。M4 受限最小编辑时值修复仍未改善总体准确率；相对 IOI 对 clean-score 候选排序有信号，但 Basic Pitch 仅 40% 可判，增加 spectral-flux+pYIN 后降至 20%，均未过自动采用闸门。
+
 先预览,确认目标仅为可再生环境、调试目录、构建产物和 Python 缓存:
 
 ```bash

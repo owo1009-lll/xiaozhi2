@@ -36,8 +36,11 @@ DEFAULT_OUT = (
 MODE_NAMES = ("vibrato", "trill", "ornament", "slide")
 MIN_MODE_PRECISION = 0.90
 MIN_MODE_RECALL = 0.80
+MIN_MODE_DECISION_COVERAGE = 0.80
 MIN_POSITIVES_PER_MODE = 4
 MIN_NEGATIVES_PER_MODE = 4
+CALIBRATION_MAX_MEASURE = 4
+MIN_SESSION_STRAIGHT_CONTROLS = 4
 DEFAULT_LOCALIZATION_PITCH_TOLERANCE_CENTS = 100.0
 DEFAULT_MAX_NORMALIZED_PATH_COST = 1.20
 ORNAMENT_TAGS = {
@@ -415,13 +418,146 @@ def binary_switch_stats(labels: np.ndarray) -> tuple[int, int]:
     return switches, upper_bouts
 
 
+def periodic_pitch_features(
+    times: np.ndarray,
+    values: np.ndarray,
+    *,
+    center_midi: float,
+) -> dict[str, float | int | None]:
+    """Measure frame-level pitch modulation without quantizing it to notes."""
+
+    if values.size < 12 or times.size != values.size:
+        return {
+            "periodicDurationSeconds": 0.0,
+            "periodicAmplitudeCents": None,
+            "periodicDominantRateHz": None,
+            "periodicBandEnergyRatio4To8Hz": None,
+            "periodicCycleCount": 0.0,
+        }
+    order = np.argsort(times)
+    times = np.asarray(times[order], dtype=np.float64)
+    cents = (np.asarray(values[order], dtype=np.float64) - float(center_midi)) * 100.0
+    unique = np.r_[True, np.diff(times) > 1e-6]
+    times = times[unique]
+    cents = cents[unique]
+    if times.size < 12:
+        return {
+            "periodicDurationSeconds": 0.0,
+            "periodicAmplitudeCents": None,
+            "periodicDominantRateHz": None,
+            "periodicBandEnergyRatio4To8Hz": None,
+            "periodicCycleCount": 0.0,
+        }
+    duration = float(times[-1] - times[0])
+    frame_step = float(np.median(np.diff(times)))
+    if duration <= 0.0 or not math.isfinite(frame_step) or frame_step <= 0.0:
+        return {
+            "periodicDurationSeconds": max(0.0, duration),
+            "periodicAmplitudeCents": None,
+            "periodicDominantRateHz": None,
+            "periodicBandEnergyRatio4To8Hz": None,
+            "periodicCycleCount": 0.0,
+        }
+
+    grid = np.arange(times[0], times[-1] + frame_step * 0.5, frame_step)
+    regular = np.interp(grid, times, cents)
+    elapsed = grid - grid[0]
+    if regular.size >= 3:
+        slope, intercept = np.polyfit(elapsed, regular, 1)
+        residual = regular - (slope * elapsed + intercept)
+    else:
+        residual = regular - np.median(regular)
+    amplitude = float((np.percentile(residual, 95) - np.percentile(residual, 5)) / 2.0)
+    if residual.size < 8 or float(np.std(residual)) < 1e-6:
+        return {
+            "periodicDurationSeconds": duration,
+            "periodicAmplitudeCents": amplitude,
+            "periodicDominantRateHz": None,
+            "periodicBandEnergyRatio4To8Hz": 0.0,
+            "periodicCycleCount": 0.0,
+        }
+
+    spectrum = np.abs(np.fft.rfft((residual - np.mean(residual)) * np.hanning(residual.size))) ** 2
+    frequencies = np.fft.rfftfreq(residual.size, d=frame_step)
+    reference = (frequencies >= 1.0) & (frequencies <= 12.0)
+    band = (frequencies >= 4.0) & (frequencies <= 8.0)
+    reference_power = float(np.sum(spectrum[reference]))
+    band_power = float(np.sum(spectrum[band]))
+    band_ratio = band_power / reference_power if reference_power > 0.0 else 0.0
+    dominant_rate: float | None = None
+    if np.any(reference):
+        indexes = np.flatnonzero(reference)
+        dominant_rate = float(frequencies[indexes[int(np.argmax(spectrum[reference]))]])
+    return {
+        "periodicDurationSeconds": duration,
+        "periodicAmplitudeCents": amplitude,
+        "periodicDominantRateHz": dominant_rate,
+        "periodicBandEnergyRatio4To8Hz": band_ratio,
+        "periodicCycleCount": (dominant_rate or 0.0) * duration,
+    }
+
+
+def mode_state(confirmed: bool, absent: bool) -> str:
+    if confirmed:
+        return "confirmed"
+    if absent:
+        return "absent"
+    return "uncertain"
+
+
+def is_vibrato_signature(features: dict[str, float | int | None]) -> bool:
+    amplitude = features.get("periodicAmplitudeCents")
+    rate = features.get("periodicDominantRateHz")
+    band_ratio = features.get("periodicBandEnergyRatio4To8Hz")
+    return bool(
+        float(features.get("periodicDurationSeconds") or 0.0) >= 0.50
+        and amplitude is not None
+        and 20.0 <= float(amplitude) <= 80.0
+        and rate is not None
+        and 4.0 <= float(rate) <= 8.0
+        and band_ratio is not None
+        and float(band_ratio) >= 0.35
+        and float(features.get("periodicCycleCount") or 0.0) >= 2.0
+    )
+
+
+def overlapping_vibrato_support(
+    times: np.ndarray,
+    midi_track: np.ndarray,
+    *,
+    start: float,
+    end: float,
+    center_midi: float,
+) -> tuple[int, int]:
+    duration = max(0.0, end - start)
+    if duration < 0.50:
+        return 0, 0
+    windows = ((0.0, 0.60), (0.20, 0.80), (0.40, 1.0))
+    supporting = 0
+    evaluated = 0
+    for left, right in windows:
+        sub_start = start + duration * left
+        sub_end = start + duration * right
+        mask = (times >= sub_start) & (times <= sub_end) & np.isfinite(midi_track)
+        sub_times = np.asarray(times[mask], dtype=np.float64)
+        sub_values = np.asarray(midi_track[mask], dtype=np.float64)
+        if sub_values.size < 12:
+            continue
+        evaluated += 1
+        if is_vibrato_signature(
+            periodic_pitch_features(sub_times, sub_values, center_midi=center_midi)
+        ):
+            supporting += 1
+    return supporting, evaluated
+
+
 def infer_modes(
     unit: dict[str, Any],
     times: np.ndarray,
     midi_track: np.ndarray,
     *,
     pitch_tolerance_cents: float = DEFAULT_LOCALIZATION_PITCH_TOLERANCE_CENTS,
-) -> tuple[list[str], dict[str, Any]]:
+) -> tuple[list[str], dict[str, str], dict[str, Any]]:
     start = float(unit["startSeconds"])
     end = float(unit["endSeconds"])
     base = float(unit["baseMidi"])
@@ -433,14 +569,28 @@ def infer_modes(
         end_seconds=end,
     )
     predicted: set[str] = set()
+    decisions = {mode: "uncertain" for mode in MODE_NAMES}
     feature_flags = set(features.get("flags") or [])
-    if "vibrato-like" in feature_flags:
-        predicted.add("vibrato")
-    if "slide-like" in feature_flags:
-        predicted.add("slide")
 
     mask = (times >= start) & (times <= end) & np.isfinite(midi_track)
+    all_frame_mask = (times >= start) & (times <= end)
+    local_times = np.asarray(times[mask], dtype=np.float64)
     values = np.asarray(midi_track[mask], dtype=np.float64)
+    all_frame_count = int(np.sum(all_frame_mask))
+    voiced_coverage = values.size / all_frame_count if all_frame_count else 0.0
+    octave_jump_count = int(np.sum(np.abs(np.diff(values)) >= 8.0)) if values.size >= 2 else 0
+    octave_jump_rate = octave_jump_count / max(1, values.size - 1)
+    f0_quality_ready = bool(
+        values.size >= 12 and voiced_coverage >= 0.70 and octave_jump_rate <= 0.05
+    )
+    periodic = periodic_pitch_features(local_times, values, center_midi=base)
+    vibrato_supporting_subwindows, vibrato_evaluated_subwindows = overlapping_vibrato_support(
+        times,
+        midi_track,
+        start=start,
+        end=end,
+        center_midi=base,
+    )
     auxiliary = unit.get("auxiliaryMidi")
     switch_count = 0
     upper_bouts = 0
@@ -448,6 +598,12 @@ def infer_modes(
     tail_base_ratio = 0.0
     known_pair_net_motion = 0.0
     known_pair_monotonicity = 0.0
+    known_pair_switch_rate_hz = 0.0
+    known_pair_support_rate = 0.0
+    known_pair_directional_step_rate = 0.0
+    known_pair_transition_seconds = 0.0
+    ornament_upper_seconds = 0.0
+    ornament_first_upper_offset_seconds: float | None = None
     if auxiliary is not None and values.size:
         auxiliary = float(auxiliary)
         base_distance = np.abs(values - base)
@@ -455,9 +611,13 @@ def infer_modes(
         close = np.minimum(base_distance, upper_distance) <= max(
             0.1, float(pitch_tolerance_cents) / 100.0
         )
+        close_times = local_times[close]
         labels = (upper_distance[close] < base_distance[close]).astype(np.int8)
         switch_count, upper_bouts = binary_switch_stats(labels)
         upper_ratio = float(np.mean(labels == 1)) if labels.size else 0.0
+        known_pair_support_rate = float(np.mean(close)) if close.size else 0.0
+        pair_duration = float(close_times[-1] - close_times[0]) if close_times.size >= 2 else 0.0
+        known_pair_switch_rate_hz = switch_count / max(0.001, 2.0 * pair_duration)
         tail = labels[-max(1, labels.size // 4) :] if labels.size else labels
         tail_base_ratio = float(np.mean(tail == 0)) if tail.size else 0.0
         head_values = values[: max(1, values.size // 10)]
@@ -470,41 +630,128 @@ def infer_modes(
         known_pair_monotonicity = (
             abs(tail_median - head_median) / total_motion if total_motion > 0 else 0.0
         )
-        if 0.12 <= upper_ratio <= 0.80 and switch_count >= 4 and upper_bouts >= 2:
-            predicted.add("trill")
-        if (
+        interval = abs(auxiliary - base)
+        direction = math.copysign(1.0, auxiliary - base)
+        progress = (values - base) * direction / max(0.001, interval)
+        if progress.size >= 2:
+            directional_steps = np.diff(progress)
+            meaningful_steps = directional_steps[np.abs(directional_steps) >= 0.01]
+            if meaningful_steps.size:
+                known_pair_directional_step_rate = float(np.mean(meaningful_steps >= 0.0))
+            transition_mask = (progress >= 0.10) & (progress <= 0.90)
+            transition_times = local_times[transition_mask]
+            if transition_times.size >= 2:
+                known_pair_transition_seconds = float(transition_times[-1] - transition_times[0])
+        if labels.size:
+            frame_step = (
+                float(np.median(np.diff(close_times))) if close_times.size >= 2 else 0.0
+            )
+            ornament_upper_seconds = float(np.sum(labels == 1) * max(0.0, frame_step))
+            upper_indexes = np.flatnonzero(labels == 1)
+            if upper_indexes.size:
+                ornament_first_upper_offset_seconds = float(
+                    close_times[upper_indexes[0]] - start
+                )
+
+        trill_confirmed = bool(
+            0.8 <= interval <= 2.2
+            and 0.10 <= upper_ratio <= 0.90
+            and switch_count >= 4
+            and upper_bouts >= 2
+            and 4.0 <= known_pair_switch_rate_hz <= 12.0
+            and known_pair_support_rate >= 0.60
+        )
+        trill_absent = bool(upper_ratio < 0.03 or switch_count < 2)
+        decisions["trill"] = mode_state(trill_confirmed, trill_absent)
+
+        ornament_confirmed = bool(
             0.02 <= upper_ratio <= 0.40
             and 1 <= upper_bouts <= 2
             and 2 <= switch_count <= 4
             and tail_base_ratio >= 0.70
-        ):
-            predicted.add("ornament")
-        interval = abs(auxiliary - base)
-        if (
+            and 0.04 <= ornament_upper_seconds <= 0.25
+            and ornament_first_upper_offset_seconds is not None
+            and ornament_first_upper_offset_seconds <= 0.25
+        )
+        ornament_absent = bool(upper_ratio < 0.02 or upper_bouts == 0)
+        decisions["ornament"] = mode_state(ornament_confirmed, ornament_absent)
+
+        slide_confirmed = bool(
             interval >= 0.8
             and known_pair_net_motion >= 0.70 * interval
             and abs(head_median - base) <= 0.5
             and abs(tail_median - auxiliary) <= 0.5
             and known_pair_monotonicity >= 0.45
-        ):
-            predicted.add("slide")
+            and known_pair_directional_step_rate >= 0.65
+            and known_pair_transition_seconds >= 0.10
+        )
+        slide_absent = bool(
+            known_pair_net_motion < 0.35 * interval
+            or known_pair_transition_seconds < 0.05
+        )
+        decisions["slide"] = mode_state(slide_confirmed, slide_absent)
+    else:
+        decisions["trill"] = "confirmed" if "trill-like" in feature_flags else "absent"
+        decisions["slide"] = "confirmed" if "slide-like" in feature_flags else "absent"
+        decisions["ornament"] = "absent" if values.size >= 12 else "uncertain"
 
-    # A resolved two-pitch oscillation is a trill, not a wide vibrato. Likewise,
-    # a resolved one-way transition is a slide. This prevents the broad legacy
-    # vibrato envelope from double-labeling semitone trills and slides.
-    if "trill" in predicted or "slide" in predicted:
-        predicted.discard("vibrato")
+    periodic_duration = float(periodic["periodicDurationSeconds"] or 0.0)
+    periodic_amplitude = periodic["periodicAmplitudeCents"]
+    periodic_band_ratio = periodic["periodicBandEnergyRatio4To8Hz"]
+    vibrato_confirmed = bool(
+        auxiliary is None
+        and is_vibrato_signature(periodic)
+        and vibrato_evaluated_subwindows >= 2
+        and vibrato_supporting_subwindows >= 2
+    )
+    vibrato_absent = bool(
+        periodic_duration >= 0.50
+        and periodic_amplitude is not None
+        and (
+            float(periodic_amplitude) <= 12.0
+            or periodic_band_ratio is None
+            or float(periodic_band_ratio) < 0.15
+        )
+    )
+    decisions["vibrato"] = mode_state(vibrato_confirmed, vibrato_absent)
+
+    # Resolved score-conditioned trill/slide evidence takes precedence over the
+    # broad periodic envelope. This avoids double-labeling square-wave trills.
+    if decisions["trill"] == "confirmed" or decisions["slide"] == "confirmed":
+        decisions["vibrato"] = "absent"
+
+    if not bool(unit.get("localizationUnitReady")) or not f0_quality_ready:
+        decisions = {mode: "uncertain" for mode in MODE_NAMES}
+    predicted = {mode for mode, state in decisions.items() if state == "confirmed"}
 
     diagnostics = {
         **features,
+        **periodic,
+        "windowFrameCount": all_frame_count,
+        "voicedCoverageRate": round(voiced_coverage, 6),
+        "octaveJumpCount": octave_jump_count,
+        "octaveJumpRate": round(octave_jump_rate, 6),
+        "f0QualityReady": f0_quality_ready,
+        "vibratoSupportingSubwindows": vibrato_supporting_subwindows,
+        "vibratoEvaluatedSubwindows": vibrato_evaluated_subwindows,
         "knownPitchSwitchCount": switch_count,
         "knownUpperBoutCount": upper_bouts,
         "knownUpperFrameRatio": round(upper_ratio, 6),
         "knownTailBaseRatio": round(tail_base_ratio, 6),
         "knownPairNetMotionSemitones": round(known_pair_net_motion, 6),
         "knownPairMonotonicity": round(known_pair_monotonicity, 6),
+        "knownPairSwitchRateHz": round(known_pair_switch_rate_hz, 6),
+        "knownPairSupportRate": round(known_pair_support_rate, 6),
+        "knownPairDirectionalStepRate": round(known_pair_directional_step_rate, 6),
+        "knownPairTransitionSeconds": round(known_pair_transition_seconds, 6),
+        "ornamentUpperSeconds": round(ornament_upper_seconds, 6),
+        "ornamentFirstUpperOffsetSeconds": (
+            round(ornament_first_upper_offset_seconds, 6)
+            if ornament_first_upper_offset_seconds is not None
+            else None
+        ),
     }
-    return sorted(predicted), diagnostics
+    return sorted(predicted), decisions, diagnostics
 
 
 def evaluate_track(
@@ -526,7 +773,7 @@ def evaluate_track(
     )
     rows: list[dict[str, Any]] = []
     for unit in alignment["units"]:
-        predicted_modes, diagnostics = infer_modes(
+        predicted_modes, mode_decisions, diagnostics = infer_modes(
             unit,
             times,
             midi_track,
@@ -535,12 +782,18 @@ def evaluate_track(
         rows.append(
             {
                 **unit,
+                "evaluationSplit": (
+                    "calibration"
+                    if int(unit.get("measure") or 0) <= CALIBRATION_MAX_MEASURE
+                    else "holdout"
+                ),
                 "startSeconds": round(float(unit["startSeconds"]), 4),
                 "endSeconds": round(float(unit["endSeconds"]), 4),
                 "durationSeconds": round(float(unit["durationSeconds"]), 4),
                 "durationRatioToMedian": round(float(unit["durationRatioToMedian"]), 4),
                 "pitchSupportRate": round(float(unit["pitchSupportRate"]), 6),
                 "predictedModes": predicted_modes,
+                "modeDecisions": mode_decisions,
                 "modeDiagnostics": diagnostics,
                 "studentDecision": "review_required",
                 "studentFacing": False,
@@ -569,6 +822,84 @@ def evaluate_track(
     }
 
 
+def robust_center_scale(values: list[float]) -> tuple[float | None, float | None]:
+    finite = np.asarray([value for value in values if math.isfinite(value)], dtype=np.float64)
+    if finite.size == 0:
+        return None, None
+    center = float(np.median(finite))
+    mad = float(np.median(np.abs(finite - center)))
+    return center, 1.4826 * mad
+
+
+def attach_session_pitch_baseline(recording_reports: list[dict[str, Any]]) -> dict[str, Any]:
+    """Attach a coarse straight/active comparison without changing mode labels.
+
+    Only explicitly instructed straight-tone calibration units are eligible.
+    The baseline is descriptive until real recordings prove that relative
+    activity improves held-out precision and recall.
+    """
+
+    rows = [row for report in recording_reports for row in report.get("rows", [])]
+    controls = [
+        row
+        for row in rows
+        if row.get("evaluationSplit") == "calibration"
+        and row.get("expectedBehavior") == "stable"
+        and bool((row.get("modeDiagnostics") or {}).get("f0QualityReady"))
+    ]
+    amplitude_values = [
+        float((row.get("modeDiagnostics") or {}).get("periodicAmplitudeCents"))
+        for row in controls
+        if (row.get("modeDiagnostics") or {}).get("periodicAmplitudeCents") is not None
+    ]
+    band_values = [
+        float((row.get("modeDiagnostics") or {}).get("periodicBandEnergyRatio4To8Hz"))
+        for row in controls
+        if (row.get("modeDiagnostics") or {}).get("periodicBandEnergyRatio4To8Hz") is not None
+    ]
+    amplitude_center, amplitude_scale = robust_center_scale(amplitude_values)
+    band_center, band_scale = robust_center_scale(band_values)
+    ready = bool(
+        len(controls) >= MIN_SESSION_STRAIGHT_CONTROLS
+        and amplitude_center is not None
+        and band_center is not None
+    )
+    baseline = {
+        "ready": ready,
+        "source": "explicit-straight-calibration-units",
+        "controlCount": len(controls),
+        "minControlCount": MIN_SESSION_STRAIGHT_CONTROLS,
+        "amplitudeMedianCents": round(amplitude_center, 6) if amplitude_center is not None else None,
+        "amplitudeRobustScaleCents": round(amplitude_scale, 6) if amplitude_scale is not None else None,
+        "bandEnergyMedian4To8Hz": round(band_center, 6) if band_center is not None else None,
+        "bandEnergyRobustScale4To8Hz": round(band_scale, 6) if band_scale is not None else None,
+        "decisionUse": "diagnostic-only-until-heldout-validation",
+    }
+    for row in rows:
+        diagnostics = row.get("modeDiagnostics") or {}
+        diagnostics["sessionPitchBaselineReady"] = ready
+        diagnostics["relativePitchActivityState"] = "uncertain"
+        if not ready or not bool(diagnostics.get("f0QualityReady")):
+            continue
+        amplitude = diagnostics.get("periodicAmplitudeCents")
+        band_ratio = diagnostics.get("periodicBandEnergyRatio4To8Hz")
+        if amplitude is None or band_ratio is None:
+            continue
+        amplitude = float(amplitude)
+        band_ratio = float(band_ratio)
+        amp_scale = float(amplitude_scale or 0.0)
+        local_band_scale = float(band_scale or 0.0)
+        amp_margin = max(8.0, 3.0 * amp_scale)
+        band_margin = max(0.10, 3.0 * local_band_scale)
+        diagnostics["relativeAmplitudeDeltaCents"] = round(amplitude - float(amplitude_center), 6)
+        diagnostics["relativeBandEnergyDelta4To8Hz"] = round(band_ratio - float(band_center), 6)
+        if amplitude <= float(amplitude_center) + amp_margin and band_ratio <= float(band_center) + band_margin:
+            diagnostics["relativePitchActivityState"] = "straight"
+        elif amplitude >= float(amplitude_center) + amp_margin and band_ratio >= float(band_center) + band_margin:
+            diagnostics["relativePitchActivityState"] = "active"
+    return baseline
+
+
 def extract_f0(audio_path: Path) -> tuple[np.ndarray, np.ndarray, float]:
     waveform, sample_rate = load_audio_mono(audio_path, target_sr=22050)
     if waveform.size == 0:
@@ -593,26 +924,35 @@ def mode_metrics(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     result: dict[str, dict[str, Any]] = {}
     for mode in MODE_NAMES:
         tp = fp = tn = fn = 0
+        uncertain_positive = uncertain_negative = 0
         for row in rows:
             positives = set(row.get("expectedPositiveModes") or [])
             negatives = set(row.get("expectedNegativeModes") or [])
             if mode not in positives and mode not in negatives:
                 continue
             expected = mode in positives
-            predicted = mode in set(row.get("predictedModes") or [])
-            if expected and predicted:
+            decision = str((row.get("modeDecisions") or {}).get(mode) or "uncertain")
+            if decision == "uncertain":
+                if expected:
+                    uncertain_positive += 1
+                else:
+                    uncertain_negative += 1
+            elif expected and decision == "confirmed":
                 tp += 1
-            elif expected:
+            elif expected and decision == "absent":
                 fn += 1
-            elif predicted:
+            elif decision == "confirmed":
                 fp += 1
             else:
                 tn += 1
-        positive_count = tp + fn
-        negative_count = tn + fp
+        positive_count = tp + fn + uncertain_positive
+        negative_count = tn + fp + uncertain_negative
         precision = tp / (tp + fp) if tp + fp else None
         recall = tp / positive_count if positive_count else None
         specificity = tn / negative_count if negative_count else None
+        labeled_count = positive_count + negative_count
+        decided_count = tp + fp + tn + fn
+        decision_coverage = decided_count / labeled_count if labeled_count else 0.0
         passed = bool(
             positive_count >= MIN_POSITIVES_PER_MODE
             and negative_count >= MIN_NEGATIVES_PER_MODE
@@ -620,6 +960,7 @@ def mode_metrics(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
             and precision >= MIN_MODE_PRECISION
             and recall is not None
             and recall >= MIN_MODE_RECALL
+            and decision_coverage >= MIN_MODE_DECISION_COVERAGE
         )
         result[mode] = {
             "positiveCount": positive_count,
@@ -628,9 +969,12 @@ def mode_metrics(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
             "falsePositive": fp,
             "trueNegative": tn,
             "falseNegative": fn,
+            "uncertainPositive": uncertain_positive,
+            "uncertainNegative": uncertain_negative,
             "precision": round(precision, 6) if precision is not None else None,
             "recall": round(recall, 6) if recall is not None else None,
             "specificity": round(specificity, 6) if specificity is not None else None,
+            "decisionCoverage": round(decision_coverage, 6),
             "passed": passed,
         }
     return result
@@ -641,10 +985,17 @@ def flatten_rows(recording_reports: list[dict[str, Any]]) -> list[dict[str, Any]
     for report in recording_reports:
         for row in report.get("rows", []):
             diagnostics = row.get("modeDiagnostics") or {}
-            flattened = {key: value for key, value in row.items() if key != "modeDiagnostics"}
+            decisions = row.get("modeDecisions") or {}
+            flattened = {
+                key: value
+                for key, value in row.items()
+                if key not in {"modeDiagnostics", "modeDecisions"}
+            }
             flattened["expectedPositiveModes"] = "|".join(row.get("expectedPositiveModes") or [])
             flattened["expectedNegativeModes"] = "|".join(row.get("expectedNegativeModes") or [])
             flattened["predictedModes"] = "|".join(row.get("predictedModes") or [])
+            for mode in MODE_NAMES:
+                flattened[f"decision_{mode}"] = decisions.get(mode, "uncertain")
             for key, value in diagnostics.items():
                 if isinstance(value, (str, int, float, bool)) or value is None:
                     flattened[f"feature_{key}"] = value
@@ -735,9 +1086,15 @@ def run_evaluation(
             )
             blockers.append(f"{recording_id}:analysis-failed")
 
+    session_pitch_baseline = attach_session_pitch_baseline(reports)
+    raw_rows = [row for report in reports for row in report.get("rows", [])]
     rows = flatten_rows(reports)
-    metrics = mode_metrics(
-        [row for report in reports for row in report.get("rows", [])]
+    metrics_all = mode_metrics(raw_rows)
+    metrics_calibration = mode_metrics(
+        [row for row in raw_rows if row.get("evaluationSplit") == "calibration"]
+    )
+    metrics_holdout = mode_metrics(
+        [row for row in raw_rows if row.get("evaluationSplit") == "holdout"]
     )
     score_intent_ready = bool(
         len(score_intent_reports) == 4
@@ -750,15 +1107,24 @@ def run_evaluation(
     )
     mode_gate_passed = bool(
         machine_complete
-        and metrics
-        and all(metric.get("passed") is True for metric in metrics.values())
+        and metrics_holdout
+        and all(metric.get("passed") is True for metric in metrics_holdout.values())
     )
+    release_ready_modes = sorted(
+        mode
+        for mode, metric in metrics_holdout.items()
+        if machine_complete and metric.get("passed") is True
+    )
+    review_only_modes = sorted(mode for mode in MODE_NAMES if mode not in release_ready_modes)
     if machine_complete and not mode_gate_passed:
         blockers.append("m3plus-supplemental-mode-threshold-failed")
     if not performance_confirmed:
         blockers.append("m3plus-supplemental-performance-intent-unconfirmed")
     teacher_review_allowed = bool(
         score_intent_ready and machine_complete and mode_gate_passed and performance_confirmed
+    )
+    teacher_review_allowed_modes = (
+        release_ready_modes if score_intent_ready and machine_complete and performance_confirmed else []
     )
     status_counts = Counter(str(report.get("status") or "unknown") for report in reports)
     return {
@@ -772,7 +1138,10 @@ def run_evaluation(
         "scoreTechniqueIntentReady": score_intent_ready,
         "machineAnalysisComplete": machine_complete,
         "machineModeThresholdPassed": mode_gate_passed,
+        "machineReleaseReadyModes": release_ready_modes,
+        "machineReviewOnlyModes": review_only_modes,
         "teacherReviewAllowed": teacher_review_allowed,
+        "teacherReviewAllowedModes": teacher_review_allowed_modes,
         "humanTask": (
             "record-m3plus-supplemental-takes"
             if any(report.get("status") == "audio-missing" for report in reports)
@@ -787,18 +1156,24 @@ def run_evaluation(
         "thresholds": {
             "minModePrecision": MIN_MODE_PRECISION,
             "minModeRecall": MIN_MODE_RECALL,
+            "minModeDecisionCoverage": MIN_MODE_DECISION_COVERAGE,
             "minPositivesPerMode": MIN_POSITIVES_PER_MODE,
             "minNegativesPerMode": MIN_NEGATIVES_PER_MODE,
             "localizationPitchToleranceCents": float(pitch_tolerance_cents),
             "maxNormalizedPathCost": float(max_normalized_path_cost),
             "intonationRule": "localization-only; does not certify intonation accuracy",
+            "evaluationPolicy": "measures-1-to-4-calibration; measures-5-to-8-holdout",
         },
         "counts": {
             "recordingCount": len(reports),
             "recordingStatusCounts": dict(sorted(status_counts.items())),
             "analyzedUnitCount": len(rows),
         },
-        "modeMetrics": metrics,
+        "sessionPitchBaseline": session_pitch_baseline,
+        "modeMetrics": metrics_holdout,
+        "modeMetricsHoldout": metrics_holdout,
+        "modeMetricsCalibration": metrics_calibration,
+        "modeMetricsAll": metrics_all,
         "scoreTechniqueIntent": score_intent_reports,
         "blockingReasons": sorted(set(blockers)),
         "recordings": reports,
