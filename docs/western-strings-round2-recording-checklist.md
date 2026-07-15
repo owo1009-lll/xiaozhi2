@@ -1,6 +1,22 @@
 # 第二轮真实录音清单(一次采集,喂饱三个闸门)
 
-更新: 2026-07-11。目的:同时补 ①M3 core 错误样本(现每类仅 2 个)②M3+ 技法模式证据 ③P1 全新盲测录音。
+更新: 2026-07-15。目的:同时补 ①M3 core 错误样本(现每类仅 2 个)②M3+ 技法模式证据 ③P1 全新盲测录音。
+
+## 2026-07-15 执行结果
+
+- 8/8 组音频、MusicXML 和谱面图片已通过文件、解码与结构审计,并已按 `r2-01` 至 `r2-08` 标准名写入本地 private intake。
+- 导入时发现 7 份 MusicXML 被旧逻辑压缩到第 1 小节。现已修复解析与导入逻辑,备份 score store 后原位重建;8 份谱面最终均保持原 `scoreId`,共 444 个音符,小节数和音符 ID 唯一性全部与源 MusicXML 一致。
+- 8/8 已完成受控机器分析,结果均为 `offline_feature_review_ready`;本轮没有发布学生诊断。
+- `r2-08` 已按精确 `recordingId` 完成 fresh-blind 受控 pilot:60 个候选中模型原始 auto-pass 3 个,但范围内 auto-pass=0、自检通过 auto-pass=0,因此 pilot 按规则中止,学生端保持 fail-closed,也没有生成无意义的教师复核任务。
+- M3+ 已完成库存清点:444 个音符中 292 个进入 review-only 行为候选。该数字只表示候选库存,不表示模式已获准自动反馈。
+- 原始目录未提供 `notes.txt`,因此 `r2-02` 错音、`r2-03` 漏音、`r2-04` 节奏偏移的精确小节真值仍缺失。不得据此伪造 M3 分类 recall/precision;只有补齐小节标签后才可计算。
+
+主要机器产物:
+
+- `data/experiments/western-strings-round2/machine-analysis.json`
+- `data/experiments/western-strings-round2/score-structure-repair.json`
+- `data/experiments/western-strings-round2/m3plus/`
+- `data/experiments/western-strings-controlled-pilot-sessions/round2-r2-08-20260715-exact-v4/session.json`
 **你只需按下表录 8 条,其余(登记/评测/闸门)由自动化完成。**
 
 ## 录音要求(通用)

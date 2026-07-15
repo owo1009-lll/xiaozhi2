@@ -198,7 +198,10 @@ export function createWesternStringsRouter({
   router.post("/api/strings/controlled-submissions/run-batch", async (req, res) => {
     try {
       const limit = Math.max(0, Math.round(Number(req.body?.limit || 20)));
-      const result = await runWesternControlledSubmissionBatch({ repoRoot, limit });
+      const submissionIds = Array.isArray(req.body?.submissionIds)
+        ? req.body.submissionIds.map((submissionId) => safeString(submissionId).trim()).filter(Boolean)
+        : [];
+      const result = await runWesternControlledSubmissionBatch({ repoRoot, limit, submissionIds });
       return res.json(result);
     } catch (error) {
       return res.status(500).json({ ok: false, error: safeString(error?.message, "failed to run controlled submission batch.") });

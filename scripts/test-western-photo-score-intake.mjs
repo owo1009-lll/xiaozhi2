@@ -71,10 +71,24 @@ await recordWesternControlledSubmissionReview({
   repoRoot: tmp,
   payload: { submissionId: submission.submissionId, action: "accepted_for_batch" },
 });
+const secondResult = await buildWesternStudentAnalysis({
+  repoRoot: tmp,
+  submissionPayload: {
+    scorePhotoPath: sourcePhoto,
+    scorePhotoSubmission: { name: "demo-2.jpg", mimeType: "image/jpeg" },
+    audioPath: sourceAudio,
+    recordingId: "second-photo-submission",
+  },
+});
+await recordWesternControlledSubmissionReview({
+  repoRoot: tmp,
+  payload: { submissionId: secondResult.submission.submissionId, action: "accepted_for_batch" },
+});
 let photoRunnerCalls = 0;
 const batch = await runWesternControlledSubmissionBatch({
   repoRoot: tmp,
   limit: 1,
+  submissionIds: [submission.submissionId],
   runPhotoScoreAnalysis: async () => {
     photoRunnerCalls += 1;
     return {
@@ -85,6 +99,8 @@ const batch = await runWesternControlledSubmissionBatch({
   },
 });
 assert.equal(photoRunnerCalls, 1, "accepted photo-score submission must dispatch to the photo pipeline");
+assert.equal(batch.batch.itemCount, 1, "an explicit submission filter must not consume another accepted queue item");
+assert.equal(batch.batch.items[0].submissionId, submission.submissionId);
 assert.equal(batch.batch.status, "photo_score_review_ready");
 assert.equal(batch.batch.autoDiagnosisIssued, false);
 assert.equal(batch.batch.items[0].analysisStatus, "photo_score_review_ready");

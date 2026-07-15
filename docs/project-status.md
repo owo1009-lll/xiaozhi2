@@ -12,6 +12,15 @@
 
 二胡线已经冻结为论文证据、困难案例和共享模块来源。当前产品主线是西洋弓弦乐, 小提琴优先, 大提琴后续独立验证。
 
+## 2026-07-15 第二轮 8 份录音更新
+
+- 第二轮 8/8 组音频、MusicXML 和谱面图片已审计、标准化并完成受控机器分析,总计 444 个谱面音符。
+- 旧 MusicXML 导入会把部分多小节谱压缩到第 1 小节;该缺陷已修复并增加结构闸门。7 份受影响 score 已在备份后原位重建,8 份现在的小节数、音符数和唯一 ID 均与源谱一致。
+- `r2-08` fresh-blind 精确受控试验已执行:60 个候选、3 个模型原始 auto-pass,但范围内和自检通过的 auto-pass 均为 0。试验正确中止,未发布学生反馈,不需要教师复核空候选。
+- 新一轮 M3+ 只完成 review-only 库存清点:444 个音符中 292 个被列为行为候选;这不改变运行时门槛。
+- `r2-02` / `r2-03` / `r2-04` 缺少原计划要求的 `notes.txt` 精确错误小节标签,所以本轮不能诚实计算 M3 错音、漏音、节奏三类 recall/precision。
+- 当前默认学生发布仍关闭。项目闸门失败项仍为 `ordinary-auto-gate-disabled-by-default`;受控证据总体 precision=1,但 coverage=0.04,低于 0.20 下限。
+
 ## 1. 当前目标
 
 构建西洋弓弦乐练习诊断系统:
@@ -111,11 +120,27 @@
 - multipart、伪造 MIME、缓存越界路径、批处理分派、审计落盘和桌面/移动浏览器交互均有回归验证。
 - 仍缺真照片独立编辑 gold、多引擎交叉验证和默认运行时放行;因此 `m4OmrAutoScoreReady=false` 不变。
 
-## 4. 当前唯一下一步
+## 4. 第二轮执行后的下一步
+
+`r2-08` 已完成全新素材入场和精确受控机器 pilot,因此“继续寻找一条 fresh blind 素材”不再是当前动作。结果不是发布通过,而是新录音没有任何候选通过现有窄范围自检。
+
+下一步分两条,不得混为一项:
+
+1. **M3 定量补证:** 仅在补齐 `r2-02`、`r2-03`、`r2-04` 的错误小节真值后,重算错音、漏音和节奏分类指标。没有该文件时只保留机器候选,不得填造标签。
+2. **P1/普通上传:** 保持默认关闭。先分析本次 3 个原始 auto-pass 为何全部被 scope/self-check 抑制;只有新策略在独立盲验中同时达到 precision>=0.90 和 coverage>=0.20,才讨论扩大范围。当前不需要教师复核 `r2-08`,因为可复核 auto-pass 为 0。
+
+第二轮命令:
+
+```bash
+npm run western:round2-intake-status
+npm run western:round2-machine-analysis
+npm run western:project-status
+npm run western:project-gate
+```
+
+以下 fresh-blind 入场说明保留为后续批次操作规范:
 
 ### V2-alpha 第一小节安全子集:全新盲审素材入场
-
-现有机器证据已经达到“允许准备盲审”的门槛,但现有 12 条录音全部参与过训练或复核,不能再作 fresh blind evidence。当前不需要教师继续调试旧包。
 
 已新增独立入场闸门:
 
@@ -159,7 +184,7 @@ npm run western:ordinary-auto-pass-precision-review-pack -- --recording-id <fres
 - MusicXML/MXL 能否解析、单声部或唯一小提琴声部能否确定、第一小节是否有音符。
 - 谱面是否已批准、显示谱页是否真实存在、授权字段是否齐全。
 
-当前实测 `readyForMachinePrecheck=false`,原因只是模板尚未填入新的外部素材。只有该命令返回 `readyForMachinePrecheck=true`,才进入下一环节:把候选安全写入受控 intake,运行普通上传机器预检。机器预检成功后才生成专业盲审包;生成后还要先由机器验证音频播放、第一小节谱面定位、按钮和 scope membership。任何一步失败都不得交给教师。
+第二轮 `r2-08` 已实测 `readyForMachinePrecheck=true` 并完成后续精确机器 pilot。未来新批次仍必须从空模板重新走同一闸门;只有状态返回 `true`,才可写入受控 intake。机器预检成功后也只能在出现可复核候选时生成专业盲审包;生成前还要由机器验证音频播放、谱面定位、按钮和 scope membership。任何一步失败都不得交给教师。
 
 专业盲审仍只审 `first-measure-only + confidence>=0.95` 候选;所有后续小节继续 `review_required`,默认学生端继续 fail-closed。
 
@@ -176,7 +201,7 @@ npm run western:ordinary-auto-pass-precision-review-pack -- --recording-id <fres
 - `npm run western:m4-preflight`
 - `npm run western:controlled-pilot-evidence-audit`
 - `npm run test:western-fresh-blind-intake`
-- `npm run western:fresh-blind-intake-status`(当前按设计因缺全新素材返回阻断)
+- `npm run western:fresh-blind-intake-status`(`r2-08` 当前已通过入场审计)
 - `npm run western:project-status`
 - `npm run western:next-actions`
 - `npm run test:western-project-gate`

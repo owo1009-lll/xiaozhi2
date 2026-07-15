@@ -453,7 +453,7 @@ async function testControlledSubmissionRoute() {
     const batchResponse = await fetch(`http://127.0.0.1:${port}/api/strings/controlled-submissions/run-batch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ limit: 5 }),
+      body: JSON.stringify({ limit: 5, submissionIds: [body.analysis.submission.submissionId] }),
     });
     const batchBody = await batchResponse.json();
     assert.equal(batchResponse.status, 200);
@@ -604,6 +604,8 @@ async function testControlledSubmissionOfflineFeatureReviewBatch() {
     const formData = new FormData();
     formData.append("payload", JSON.stringify({
       scoreId: "score-test-clean",
+      dataset: "new-unindexed-dataset",
+      piece: "new-unindexed-piece",
       limit: 3,
       instrument: "violin",
       audioSubmission: {

@@ -304,6 +304,7 @@ async function setupTempRepo(tempRoot, selectedSubmissions) {
   for (const file of [
     path.join("data", "erhu-score-imports.json"),
     path.join("data", "erhu-score-imports.sqlite"),
+    path.join("data", "experiments", "western-strings-m2", "alignment-candidate-feature-table.csv"),
     path.join("data", "experiments", "western-strings-m2", "m2d-sequence-support-summary.json"),
     path.join("data", "experiments", "western-strings-m2", "m2f-real-student-recording-summary.json"),
     path.join("data", "experiments", "western-strings-m3", "m3-diagnosis-summary.json"),

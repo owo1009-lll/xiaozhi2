@@ -300,6 +300,59 @@ def collect_history(repo_root: Path) -> dict[str, set[str]]:
     return history
 
 
+def is_current_machine_precheck_only(
+    repo_root: Path,
+    *,
+    recording_id: str,
+    piece_id: str,
+    audio_hashes: dict[str, str],
+) -> bool:
+    """Allow an ordering repair only when no labeled or pilot evidence exists."""
+    audio_values = {str(value or "").strip().lower() for value in audio_hashes.values() if str(value or "").strip()}
+    m3_root = repo_root / M3_ROOT.relative_to(REPO_ROOT)
+    controlled_matches = [
+        row
+        for row in read_jsonl(m3_root / "controlled-submissions.jsonl")
+        if str(row.get("recordingId") or "").strip() == recording_id
+        and str(row.get("piece") or row.get("pieceId") or "").strip() == piece_id
+        and str(row.get("audioHash") or "").strip().lower() in audio_values
+    ]
+    if not controlled_matches:
+        return False
+
+    for path in (
+        repo_root / M2_MANIFEST.relative_to(REPO_ROOT),
+        repo_root / M2_CLEAN_SCORE_INTAKE.relative_to(REPO_ROOT),
+    ):
+        for row in read_csv_rows(path):
+            if str(row.get("recordingId") or "").strip() == recording_id or str(row.get("pieceId") or "").strip() == piece_id:
+                return False
+
+    for path in m3_root.rglob("*.csv") if m3_root.exists() else []:
+        for row in read_csv_rows(path):
+            row_audio_hash = str(row.get("audioHash") or "").strip().lower()
+            if (
+                str(row.get("recordingId") or "").strip() == recording_id
+                or str(row.get("pieceId") or row.get("piece") or "").strip() == piece_id
+                or (row_audio_hash and row_audio_hash in audio_values)
+            ):
+                return False
+
+    pilot_root = repo_root / PILOT_ROOT.relative_to(REPO_ROOT)
+    for session_path in pilot_root.glob("*/session.json") if pilot_root.exists() else []:
+        try:
+            session = json.loads(session_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        for submission in session.get("selectedSubmissions") or []:
+            if (
+                str(submission.get("recordingId") or "").strip() == recording_id
+                or str(submission.get("piece") or submission.get("pieceId") or "").strip() == piece_id
+            ):
+                return False
+    return True
+
+
 def build_template() -> dict[str, Any]:
     return {
         "auditId": "v2alpha-blind-001",
@@ -313,6 +366,7 @@ def build_template() -> dict[str, Any]:
         "consent": "yes",
         "licenseStatus": "local-only",
         "requireNewPiece": True,
+        "allowCurrentMachinePrecheckHistory": False,
         "notes": "",
     }
 
@@ -329,6 +383,7 @@ def build_stage_payload(
     reviewed_by: str,
     require_new_piece: bool = True,
     notes: str = "",
+    allow_current_machine_precheck_history: bool = False,
 ) -> dict[str, Any]:
     def normalized_path(value: str) -> str:
         stripped = str(value or "").strip()
@@ -348,6 +403,7 @@ def build_stage_payload(
         "consent": "yes",
         "licenseStatus": "local-only",
         "requireNewPiece": bool(require_new_piece),
+        "allowCurrentMachinePrecheckHistory": bool(allow_current_machine_precheck_history),
         "notes": str(notes or "").strip(),
     }
 
@@ -410,6 +466,7 @@ def audit_intake(
     score_path = resolve_path(repo_root, score_path_value) if score_path_value else None
     score_display_path = resolve_path(repo_root, score_display_path_value) if score_display_path_value else None
     require_new_piece = manifest.get("requireNewPiece") is not False
+    allow_current_machine_precheck_history = manifest.get("allowCurrentMachinePrecheckHistory") is True
 
     for field_name, value in [
         ("audit-id", audit_id),
@@ -493,6 +550,25 @@ def audit_intake(
         except (ET.ParseError, OSError, ValueError, zipfile.BadZipFile):
             blockers.append("fresh-blind-score-parse-failed")
 
+    precheck_history_exempted = False
+    historical_blockers = {
+        "fresh-blind-recording-id-already-seen",
+        "fresh-blind-piece-id-already-seen",
+        "fresh-blind-audio-content-already-seen",
+    }
+    if allow_current_machine_precheck_history and any(reason in blockers for reason in historical_blockers):
+        precheck_history_exempted = is_current_machine_precheck_only(
+            repo_root,
+            recording_id=recording_id,
+            piece_id=piece_id,
+            audio_hashes=audio_hashes,
+        )
+        if precheck_history_exempted:
+            blockers = [reason for reason in blockers if reason not in historical_blockers]
+            warnings.append("fresh-blind-current-machine-precheck-history-exempted")
+        else:
+            blockers.append("fresh-blind-current-machine-precheck-history-exemption-invalid")
+
     unique_blockers = list(dict.fromkeys(blockers))
     ready = not unique_blockers
     return {
@@ -504,6 +580,7 @@ def audit_intake(
             "maxMeasureIndex": 1,
             "minConfidence": 0.95,
             "requireNewPiece": require_new_piece,
+            "currentMachinePrecheckHistoryExempted": precheck_history_exempted,
         },
         "candidate": {
             "auditId": audit_id,
@@ -578,6 +655,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--reviewed-by", default="")
     parser.add_argument("--notes", default="")
     parser.add_argument("--allow-seen-piece", action="store_true")
+    parser.add_argument("--allow-current-machine-precheck-history", action="store_true")
     return parser.parse_args()
 
 
@@ -605,6 +683,7 @@ def main() -> int:
                 reviewed_by=args.reviewed_by,
                 require_new_piece=not args.allow_seen_piece,
                 notes=args.notes,
+                allow_current_machine_precheck_history=args.allow_current_machine_precheck_history,
             ),
         )
     else:

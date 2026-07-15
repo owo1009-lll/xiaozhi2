@@ -828,13 +828,17 @@ async function buildControlledBatchReplayAnalysis(repoRoot, submission, { batchR
         ],
       };
     }
+    const replayDecisions = Array.isArray(analysis.decisions) ? analysis.decisions : [];
+    if (replayDecisions.length === 0) {
+      return buildControlledBatchOfflineFeatureAnalysis(repoRoot, submission, { batchRunId });
+    }
     return {
       produced: true,
       status: "offline_analysis_ready",
       reasons: ["controlled-batch-not-student-facing"],
       summary: analysis.summary || null,
-      decisionCount: Array.isArray(analysis.decisions) ? analysis.decisions.length : 0,
-      candidateRowCount: Array.isArray(analysis.decisions) ? analysis.decisions.length : 0,
+      decisionCount: replayDecisions.length,
+      candidateRowCount: replayDecisions.length,
       candidatePreview: [],
       recordingDiagnosis: analysis.recordingDiagnosis || null,
     };
@@ -1173,9 +1177,19 @@ export async function runWesternControlledSubmissionBatch({
   repoRoot = process.cwd(),
   limit = 20,
   runPhotoScoreAnalysis = runOfflinePhotoScoreAnalyzer,
+  submissionIds = [],
 } = {}) {
   const queue = await listWesternControlledSubmissions({ repoRoot, limit: 0 });
-  const accepted = queue.submissions.filter((submission) => submission.status === "accepted_for_batch");
+  const requestedSubmissionIds = new Set(
+    (Array.isArray(submissionIds) ? submissionIds : [])
+      .map((submissionId) => safeString(submissionId).trim())
+      .filter(Boolean),
+  );
+  const accepted = queue.submissions
+    .filter((submission) => submission.status === "accepted_for_batch")
+    .filter((submission) => (
+      requestedSubmissionIds.size === 0 || requestedSubmissionIds.has(submission.submissionId)
+    ));
   const selected = limit > 0 ? accepted.slice(0, limit) : accepted;
   const rawSubmissions = await readJsonlRecords(controlledSubmissionsPath(repoRoot));
   const rawById = new Map(rawSubmissions.map((submission) => [safeString(submission.submissionId).trim(), submission]));

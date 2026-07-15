@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import tempfile
 import unittest
@@ -128,6 +129,38 @@ class FreshBlindIntakeTest(unittest.TestCase):
     def test_duplicate_score_content_is_rejected_for_new_piece_audit(self) -> None:
         self.score.write_bytes((self.root / "old.mxl").read_bytes())
         self.assertIn("fresh-blind-score-content-already-seen", self.audit()["blockingReasons"])
+
+    def test_current_machine_precheck_history_can_be_exempted_before_labels_or_pilot(self) -> None:
+        controlled = self.root / "data/experiments/western-strings-m3/controlled-submissions.jsonl"
+        controlled.write_text(json.dumps({
+            "submissionId": "precheck-only",
+            "recordingId": "new-recording",
+            "piece": "new-piece",
+            "audioHash": hashlib.sha256(self.audio.read_bytes()).hexdigest(),
+        }) + "\n", encoding="utf-8")
+        self.write_manifest(allowCurrentMachinePrecheckHistory=True)
+        report = self.audit()
+        self.assertTrue(report["readyForMachinePrecheck"], report["blockingReasons"])
+        self.assertTrue(report["scope"]["currentMachinePrecheckHistoryExempted"])
+        self.assertIn("fresh-blind-current-machine-precheck-history-exempted", report["warnings"])
+
+    def test_current_machine_precheck_history_exemption_rejects_labeled_csv(self) -> None:
+        controlled = self.root / "data/experiments/western-strings-m3/controlled-submissions.jsonl"
+        controlled.write_text(json.dumps({
+            "submissionId": "precheck-only",
+            "recordingId": "new-recording",
+            "piece": "new-piece",
+            "audioHash": hashlib.sha256(self.audio.read_bytes()).hexdigest(),
+        }) + "\n", encoding="utf-8")
+        write_csv(
+            self.root / "data/experiments/western-strings-m3/review-labels.csv",
+            ["recordingId", "pieceId", "label"],
+            [["new-recording", "new-piece", "usable"]],
+        )
+        self.write_manifest(allowCurrentMachinePrecheckHistory=True)
+        report = self.audit()
+        self.assertFalse(report["readyForMachinePrecheck"])
+        self.assertIn("fresh-blind-current-machine-precheck-history-exemption-invalid", report["blockingReasons"])
 
     def test_unapproved_score_is_rejected(self) -> None:
         self.write_manifest(cleanScoreReviewStatus="pending")

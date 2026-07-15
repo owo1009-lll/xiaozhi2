@@ -180,7 +180,11 @@ async function loadOperationalCandidateRows({ sessionsRoot, knownLabels }) {
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const session = await readJsonOrNull(path.join(root, entry.name, "session.json"));
-    if (session?.executionPerformed !== true || session?.sessionStatus !== "completed_safe") continue;
+    if (
+      session?.executionPerformed !== true
+      || session?.sessionStatus !== "completed_safe"
+      || session?.evidenceInvalidated === true
+    ) continue;
     let submissions = Array.isArray(session.selectedSubmissions) ? session.selectedSubmissions : [];
     if (!submissions.length && session.artifacts?.precisionSummary) {
       const precision = await readJsonOrNull(path.resolve(session.artifacts.precisionSummary));

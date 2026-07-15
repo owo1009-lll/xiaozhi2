@@ -3,7 +3,10 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { runControlledPilotSession } from "./run-western-controlled-pilot-session.mjs";
+import {
+  loadHistoricalRecordingIds,
+  runControlledPilotSession,
+} from "./run-western-controlled-pilot-session.mjs";
 
 const ENABLE_ENV = "WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE";
 
@@ -76,6 +79,31 @@ try {
     buildStatus: async () => statusFailClosed(),
     loadHistoricalRecordingIds: async () => [],
   };
+
+  await fs.mkdir(path.join(tempRoot, "history-zero"), { recursive: true });
+  await fs.writeFile(path.join(tempRoot, "history-zero", "session.json"), JSON.stringify({
+    executionPerformed: true,
+    additionalExcludedRecordingIds: ["recording-rejected-before-run"],
+    selectedSubmissions: [{ recordingId: "recording-infrastructure-failure" }],
+    monitoring: { totalCandidateCount: 0 },
+  }), "utf8");
+  await fs.mkdir(path.join(tempRoot, "history-evidence"), { recursive: true });
+  await fs.writeFile(path.join(tempRoot, "history-evidence", "session.json"), JSON.stringify({
+    executionPerformed: true,
+    selectedSubmissions: [{ recordingId: "recording-with-evidence" }],
+    monitoring: { totalCandidateCount: 8 },
+  }), "utf8");
+  await fs.mkdir(path.join(tempRoot, "history-invalidated"), { recursive: true });
+  await fs.writeFile(path.join(tempRoot, "history-invalidated", "session.json"), JSON.stringify({
+    executionPerformed: true,
+    evidenceInvalidated: true,
+    selectedSubmissions: [{ recordingId: "recording-invalidated-evidence" }],
+    monitoring: { totalCandidateCount: 8 },
+  }), "utf8");
+  assert.deepEqual(
+    await loadHistoricalRecordingIds(tempRoot),
+    ["recording-rejected-before-run", "recording-with-evidence"],
+  );
 
   const dryRun = await runControlledPilotSession({ sessionId: "dry-run", outRoot: tempRoot }, {
     ...common,
@@ -184,6 +212,38 @@ try {
   );
   assert.deepEqual(additionalExclusion.additionalExcludedRecordingIds, ["recording-precheck-rejected"]);
 
+  let targetedArgs = null;
+  const targeted = await runControlledPilotSession({
+    execute: true,
+    sessionId: "targeted-recording",
+    outRoot: tempRoot,
+    includeRecordingIds: ["recording-target", "recording-target", ""],
+  }, {
+    ...common,
+    buildPreflight: async () => approvedPreflight(),
+    runPrecisionSession: async (args) => {
+      targetedArgs = args;
+      return precisionResult({ recordingId: "recording-target" });
+    },
+  });
+  assert.deepEqual(targetedArgs.includeRecordingIds, ["recording-target"]);
+  assert.deepEqual(targeted.requestedRecordingIds, ["recording-target"]);
+  assert.equal(targeted.sessionStatus, "completed_safe");
+
+  const wrongTarget = await runControlledPilotSession({
+    execute: true,
+    sessionId: "wrong-target",
+    outRoot: tempRoot,
+    includeRecordingIds: ["recording-target"],
+  }, {
+    ...common,
+    buildPreflight: async () => approvedPreflight(),
+    runPrecisionSession: async () => precisionResult({ recordingId: "recording-other" }),
+  });
+  assert.equal(wrongTarget.sessionStatus, "aborted");
+  assert(wrongTarget.blockingReasons.includes("pilot-unrequested-recording-selected:recording-other"));
+  assert(wrongTarget.blockingReasons.includes("pilot-requested-recording-not-selected:recording-target"));
+
   const repeated = await runControlledPilotSession({ execute: true, sessionId: "repeated", outRoot: tempRoot }, {
     ...common,
     loadHistoricalRecordingIds: async () => ["recording-old"],
@@ -244,6 +304,9 @@ console.log(JSON.stringify({
     "self-check-accounting-mismatch-aborts",
     "historical-recordings-are-excluded",
     "precheck-rejections-are-persisted-as-exclusions",
+    "zero-candidate-infrastructure-failure-does-not-consume-recording",
+    "explicitly-invalidated-evidence-does-not-consume-recording",
+    "requested-recording-is-forwarded-and-enforced",
     "repeated-recording-aborts",
     "unknown-auto-pass-pauses-for-targeted-review",
     "known-wrong-auto-pass-aborts",

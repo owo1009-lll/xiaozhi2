@@ -505,7 +505,7 @@ async function readControlledPilotSessions(root = CONTROLLED_PILOT_SESSIONS_ROOT
     if (!entry.isDirectory()) continue;
     const sessionPath = path.join(absoluteRoot, entry.name, "session.json");
     const session = await readJson(sessionPath);
-    if (!session) continue;
+    if (!session || session.evidenceInvalidated === true) continue;
     let selectedSubmissions = Array.isArray(session.selectedSubmissions) ? session.selectedSubmissions : [];
     if (!selectedSubmissions.length && session.artifacts?.precisionSummary) {
       const precision = await readJson(session.artifacts.precisionSummary);
