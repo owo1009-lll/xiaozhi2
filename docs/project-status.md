@@ -86,6 +86,14 @@
 - `variable-f0`、`double-stop-candidate`、`ornament-candidate` 仍 blocked/review-only。
 - 默认学生端 M3+ 自动反馈仍关闭。
 
+2026-07-15 第二轮真实对齐复验:
+
+- `r2-06` 的 6 个颤音和其余长音揉弦已经人工确认实际演奏。
+- Basic Pitch 序列 DTW 后的机器检出为:滑音 7/12、颤音 0/6、揉弦 1/16、双音 19/24。
+- 四项均未达 90%;旧 release-ready 结论只适用于 first-measure 安全子集,不得推广。
+- 泛音 MusicXML `sounding-pitch/base-pitch/touching-pitch` 已能保留;只有显式 sounding pitch 自动评分,缺失角色退复核。
+- 第二轮尚缺真实负例、独立装饰音和泛音样本,因此 `studentGateReady=false` 不变。
+
 ### M4 OMR benchmark
 
 当前已修正的关键点:

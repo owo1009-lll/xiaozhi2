@@ -223,6 +223,16 @@ class SymbolicScoreMixin:
 
 
     def _hydrate_piece_notes(self, notes: list[NoteEvent], request: AnalyzeRequest) -> list[SymbolicNote]:
+        # A harmonic note can encode base, touching, and sounding noteheads at
+        # one score position. Only the explicit sounding-pitch notehead is safe
+        # to compare with performed f0. Unqualified harmonic notation remains
+        # visible in the score store but is omitted from automatic scoring.
+        notes = [
+            note
+            for note in notes
+            if "harmonic" not in set(getattr(note, "techniques", []) or [])
+            or "harmonic-sounding-pitch" in set(getattr(note, "techniques", []) or [])
+        ]
         measure_beats = beats_per_measure(request.piecePack.meter)
         seconds_per_beat = 60.0 / max(request.piecePack.tempo, 30)
         min_measure_index = min((int(note.measureIndex) for note in notes), default=1)
@@ -495,6 +505,17 @@ class SymbolicScoreMixin:
                                             tag = sub_node.tag.rsplit("}", 1)[-1]
                                             if tag:
                                                 target.append(tag)
+                                            if tag == "harmonic":
+                                                for harmonic_child in list(sub_node):
+                                                    role = harmonic_child.tag.rsplit("}", 1)[-1]
+                                                    if role in {
+                                                        "natural",
+                                                        "artificial",
+                                                        "base-pitch",
+                                                        "touching-pitch",
+                                                        "sounding-pitch",
+                                                    }:
+                                                        target.append(f"harmonic-{role}")
                                     elif local_notation:
                                         notations.append(local_notation)
                             note_events.append(
