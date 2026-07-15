@@ -110,6 +110,16 @@
 
 该结果解决的是“旧线性窗根本圈错”的候选生成问题，不是 precision 证明。correct 组的支持率为 35.49%，wrong_pitch 组为 35.97%，仅靠支持率无法区分正确与错音；录音级 scenario 也没有给出逐音错误位置。因此动态模式仍只输出 `review_required`，`coverage=0` 的学生安全语义保持不变。下一步必须对动态候选使用独立逐音真值，不能把旧线性窗口的标签迁移过来。
 
+### 6.3 相对 IOI、小节聚合与公开逐音扰动真值
+
+动态时间窗新增局部相对 IOI 特征：以目标音两侧已分配事件做局部线性插值，比较目标起音相对相邻音符的偏差，不依赖全曲绝对速度；双音/同起音保留原始 `scoreOnsetUnit`，不会被顺序匹配所需的单调辅助时间污染。随后按“小节内至少 80% 有证据且零矛盾”生成 review-only 小节摘要。
+
+12 条受控录音共 296 小节上，音高证据就绪为 44 小节（14.86%），相对 IOI 证据就绪为 8 小节（2.70%），两者同时就绪仅 5 小节（1.69%）。`rhythm_shift` 组 55 小节中相对 IOI 就绪为 0，说明该特征确有排错方向；但 correct 组也只有 1/58 小节就绪，不能靠小节聚合扩大自动覆盖，全部仍为 `review_required`。
+
+为获得真正的逐音错误目标，又在 6 首开发演奏者和 6 首未见演奏者的公开巴赫录音上复用既有波形扰动真值。阈值只在开发折选择：`relativeIoiDeviationRatio<=0.075`。锁定后在未见演奏者 clean 折中选出 2604/10059 音，其中 2572 音在 300ms 内，precision=`98.77%`、coverage=`25.89%`；48 个漏音、48 个升高两半音错音和 48 个晚起 800ms 目标均为 0 个危险放行。弱音仍有 12/48 被放行，因此弱音明确保持 review-only。
+
+这是研究级正结果，不是学生端放行证据：公开参考时间仍由估计对齐生成，错误是人工波形扰动而非真实学生错误。报告固定 `studentGateReady=false`，下一门仍是独立真实学生逐音真值。DP 递推已改为结果等价的 Numba 两行成本实现；12 录音 pYIN 结果按音频 SHA-1 缓存，首次约 109 秒，复跑约 1.85 秒，避免重复满载。
+
 ## 7. 当前裁决
 
 1. M3+ 路线保留：完成真实补充录音后，按模式做正负标定、三态质量闸门和留一曲验证。
@@ -120,6 +130,7 @@
 6. 相对 IOI 保留为候选排序研究特征；50 小节按曲留一与起音双保险均未过闸，不接生产。
 
 7. M4 多引擎共识与普通录音动态定位均有实质增益，但在独立盲验完成前只作为 review 候选，不自动给学生结论。
+8. 公开波形核心扰动上动态音高+相对 IOI 达到 98.77% precision / 25.89% coverage 且核心错误零漏放；弱音与真实学生逐音真值未过闸，故不改变默认关闭状态。
 
 ## 8. 可复现命令
 
@@ -131,6 +142,7 @@ npm run western:m4-measure-duration-probe
 npm run western:m4-audio-rhythm-ranking
 npm run western:m4-engine-consensus
 npm run western:offline-dynamic-timing-audit
+npm run western:dynamic-perturbation-gate
 
 npm run test:western-m3plus-supplemental-eval
 npm run test:western-photo-score
@@ -141,6 +153,7 @@ npm run test:western-m4-audio-rhythm-ranking
 npm run test:western-m4-engine-consensus
 npm run test:western-offline-feature-audio
 npm run test:western-offline-dynamic-timing
+npm run test:western-dynamic-perturbation-gate
 ```
 
 生成报告均位于 `data/experiments/`，默认被 Git 忽略，不作为学生端运行时配置。

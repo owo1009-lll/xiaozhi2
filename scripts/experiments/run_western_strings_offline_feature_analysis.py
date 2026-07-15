@@ -13,6 +13,10 @@ from typing import Any
 
 import librosa
 import numpy as np
+from numba import njit
+
+
+RELATIVE_IOI_CONSISTENCY_LIMIT = 0.35
 
 
 def safe_float(value: Any, fallback: float | None = None) -> float | None:
@@ -26,6 +30,18 @@ def safe_float(value: Any, fallback: float | None = None) -> float | None:
 def safe_int(value: Any, fallback: int = 0) -> int:
     numeric = safe_float(value)
     return int(round(numeric)) if numeric is not None else fallback
+
+
+def meter_quarter_span(value: Any, fallback: float = 4.0) -> float:
+    text = str(value or "").strip()
+    if "/" not in text:
+        return fallback
+    numerator_text, denominator_text = text.split("/", 1)
+    numerator = safe_float(numerator_text)
+    denominator = safe_float(denominator_text)
+    if numerator is None or denominator is None or numerator <= 0 or denominator <= 0:
+        return fallback
+    return numerator * 4.0 / denominator
 
 
 def load_store(repo_root: Path) -> dict[str, Any]:
@@ -64,6 +80,7 @@ def collect_score_notes(store: dict[str, Any], score_id: str) -> tuple[dict[str,
     order = 0
     for section in score.get("sections", []) or []:
         section_tempo = safe_float(section.get("tempo"), 72.0) or 72.0
+        measure_span = meter_quarter_span(section.get("meter"), 4.0)
         for note in section.get("notes", []) or []:
             midi = safe_int(note.get("midiPitch"), -1)
             if midi <= 0:
@@ -83,6 +100,7 @@ def collect_score_notes(store: dict[str, Any], score_id: str) -> tuple[dict[str,
                     "beatStart": beat_start,
                     "beatDuration": beat_duration,
                     "tempo": tempo,
+                    "measureQuarterSpan": measure_span,
                     "position": note_position(note),
                 }
             )
@@ -100,20 +118,37 @@ def build_symbolic_timeline(notes: list[dict[str, Any]]) -> list[dict[str, Any]]
     if not notes:
         return []
     min_measure = min(safe_int(note.get("measureIndex"), 0) for note in notes)
+    max_measure = max(safe_int(note.get("measureIndex"), min_measure) for note in notes)
+    spans_by_measure: dict[int, float] = {}
+    for note in notes:
+        measure = safe_int(note.get("measureIndex"), min_measure)
+        span = safe_float(note.get("measureQuarterSpan"), 4.0) or 4.0
+        spans_by_measure.setdefault(measure, max(0.25, span))
+    measure_starts: dict[int, float] = {min_measure: 0.0}
+    previous_span = spans_by_measure.get(min_measure, 4.0)
+    for measure in range(min_measure + 1, max_measure + 1):
+        measure_starts[measure] = measure_starts[measure - 1] + spans_by_measure.get(measure - 1, previous_span)
+        previous_span = spans_by_measure.get(measure, previous_span)
     raw_units: list[float] = []
+    onset_units: list[float] = []
     last_unit = 0.0
     for index, note in enumerate(notes):
         measure = safe_int(note.get("measureIndex"), min_measure)
         beat_start = safe_float(note.get("beatStart"), 0.0) or 0.0
-        unit = max(0.0, (measure - min_measure) * 4.0 + beat_start)
+        onset_unit = max(0.0, measure_starts.get(measure, 0.0) + beat_start)
+        unit = onset_unit
         if index and unit <= last_unit:
             unit = last_unit + max(0.05, safe_float(note.get("beatDuration"), 0.5) or 0.5)
         raw_units.append(unit)
+        onset_units.append(onset_unit)
         last_unit = unit
     start = raw_units[0]
     shifted = [unit - start for unit in raw_units]
-    for note, unit in zip(notes, shifted):
+    onset_start = onset_units[0]
+    shifted_onsets = [unit - onset_start for unit in onset_units]
+    for note, unit, onset_unit in zip(notes, shifted, shifted_onsets):
         note["scoreUnit"] = unit
+        note["scoreOnsetUnit"] = onset_unit
     return notes
 
 
@@ -244,6 +279,56 @@ def basic_pitch_match_cost(score_midi: int, event_midi: int) -> float:
     return min(4.0, 2.2 + diff * 0.18)
 
 
+@njit(cache=False)
+def compute_pitch_alignment_backtrace(
+    score_midis: np.ndarray,
+    event_midis: np.ndarray,
+    skip_score_cost: float,
+    skip_event_cost: float,
+) -> np.ndarray:
+    """Return the exact gap-penalty DP backtrace using two cost rows."""
+
+    n = score_midis.size
+    m = event_midis.size
+    back = np.zeros((n + 1, m + 1), dtype=np.uint8)
+    previous = np.empty(m + 1, dtype=np.float64)
+    current = np.empty(m + 1, dtype=np.float64)
+    previous[0] = 0.0
+    for j in range(1, m + 1):
+        previous[j] = previous[j - 1] + skip_event_cost
+        back[0, j] = 3
+    for i in range(1, n + 1):
+        current[0] = previous[0] + skip_score_cost
+        back[i, 0] = 2
+        score_midi = int(score_midis[i - 1])
+        for j in range(1, m + 1):
+            diff = abs(score_midi - int(event_midis[j - 1]))
+            if diff == 0:
+                match_cost = 0.0
+            elif diff == 1:
+                match_cost = 0.85
+            elif diff == 2:
+                match_cost = 1.35
+            else:
+                match_cost = min(4.0, 2.2 + diff * 0.18)
+            match = previous[j - 1] + match_cost + j * 1e-7
+            skip_score = previous[j] + skip_score_cost
+            skip_event = current[j - 1] + skip_event_cost
+            if match <= skip_score and match <= skip_event:
+                current[j] = match
+                back[i, j] = 1
+            elif skip_score <= skip_event:
+                current[j] = skip_score
+                back[i, j] = 2
+            else:
+                current[j] = skip_event
+                back[i, j] = 3
+        swap = previous
+        previous = current
+        current = swap
+    return back
+
+
 def assign_basic_pitch_events(
     notes: list[dict[str, Any]],
     events: list[dict[str, Any]],
@@ -255,28 +340,14 @@ def assign_basic_pitch_events(
     n, m = len(notes), len(events)
     skip_score_cost = 1.35
     skip_event_cost = 0.75
-    dp = np.full((n + 1, m + 1), np.inf, dtype=np.float64)
-    back = np.zeros((n + 1, m + 1), dtype=np.uint8)
-    dp[0, 0] = 0.0
-    for i in range(1, n + 1):
-        dp[i, 0] = dp[i - 1, 0] + skip_score_cost
-        back[i, 0] = 2
-    for j in range(1, m + 1):
-        dp[0, j] = dp[0, j - 1] + skip_event_cost
-        back[0, j] = 3
-    for i in range(1, n + 1):
-        score_midi = safe_int(notes[i - 1].get("midi"), 0)
-        for j in range(1, m + 1):
-            event_midi = safe_int(events[j - 1].get("midi"), 0)
-            match_cost = basic_pitch_match_cost(score_midi, event_midi)
-            choices = (
-                dp[i - 1, j - 1] + match_cost + (j * 1e-7),
-                dp[i - 1, j] + skip_score_cost,
-                dp[i, j - 1] + skip_event_cost,
-            )
-            action = int(np.argmin(choices)) + 1
-            dp[i, j] = choices[action - 1]
-            back[i, j] = action
+    score_midis = np.asarray([safe_int(note.get("midi"), 0) for note in notes], dtype=np.int16)
+    event_midis = np.asarray([safe_int(event.get("midi"), 0) for event in events], dtype=np.int16)
+    back = compute_pitch_alignment_backtrace(
+        score_midis,
+        event_midis,
+        skip_score_cost,
+        skip_event_cost,
+    )
     assignments: list[dict[str, Any] | None] = [None for _ in notes]
     i, j = n, m
     while i > 0 or j > 0:
@@ -303,6 +374,96 @@ def assign_basic_pitch_events(
         else:
             break
     return assignments
+
+
+def compute_relative_ioi_features(
+    notes: list[dict[str, Any]],
+    assignments: list[dict[str, Any] | None],
+    *,
+    consistency_limit: float = RELATIVE_IOI_CONSISTENCY_LIMIT,
+    neighbor_search: int = 8,
+) -> list[dict[str, Any]]:
+    """Compare local audio timing with score-relative timing.
+
+    The interpolation uses assigned events on both sides of a note, so the
+    feature is insensitive to global tempo and local affine tempo changes. It
+    remains review evidence until independent note-level truth validates a
+    release threshold.
+    """
+
+    features: list[dict[str, Any]] = []
+    for index, assignment in enumerate(assignments):
+        empty = {
+            "relativeIoiEvidenceAvailable": False,
+            "relativeIoiResidualSeconds": None,
+            "relativeIoiDeviationRatio": None,
+            "relativeIoiConsistent": None,
+        }
+        if assignment is None:
+            features.append(empty)
+            continue
+        score_time = safe_float(notes[index].get("scoreOnsetUnit"), safe_float(notes[index].get("scoreUnit")))
+        if score_time is None:
+            features.append(empty)
+            continue
+        previous_index = None
+        next_index = None
+        for distance in range(1, neighbor_search + 1):
+            candidate = index - distance
+            if candidate < 0:
+                break
+            candidate_time = safe_float(
+                notes[candidate].get("scoreOnsetUnit"),
+                safe_float(notes[candidate].get("scoreUnit")),
+            )
+            if assignments[candidate] is not None and candidate_time is not None and candidate_time < score_time - 1e-6:
+                previous_index = candidate
+                break
+        for distance in range(1, neighbor_search + 1):
+            candidate = index + distance
+            if candidate >= len(assignments):
+                break
+            candidate_time = safe_float(
+                notes[candidate].get("scoreOnsetUnit"),
+                safe_float(notes[candidate].get("scoreUnit")),
+            )
+            if assignments[candidate] is not None and candidate_time is not None and candidate_time > score_time + 1e-6:
+                next_index = candidate
+                break
+        if previous_index is None or next_index is None:
+            features.append(empty)
+            continue
+        previous_score = safe_float(
+            notes[previous_index].get("scoreOnsetUnit"),
+            safe_float(notes[previous_index].get("scoreUnit"), 0.0),
+        ) or 0.0
+        next_score = safe_float(
+            notes[next_index].get("scoreOnsetUnit"),
+            safe_float(notes[next_index].get("scoreUnit"), 0.0),
+        ) or 0.0
+        previous_audio = float(assignments[previous_index]["time"])
+        next_audio = float(assignments[next_index]["time"])
+        if next_score <= previous_score or next_audio <= previous_audio:
+            features.append(empty)
+            continue
+        fraction = (score_time - previous_score) / (next_score - previous_score)
+        expected_audio = previous_audio + fraction * (next_audio - previous_audio)
+        local_scale = (next_audio - previous_audio) / (next_score - previous_score)
+        local_spacing = min(score_time - previous_score, next_score - score_time) * local_scale
+        if local_spacing <= 0:
+            features.append(empty)
+            continue
+        residual = abs(float(assignment["time"]) - expected_audio)
+        deviation = residual / max(0.08, local_spacing)
+        features.append(
+            {
+                "relativeIoiEvidenceAvailable": True,
+                "relativeIoiResidualSeconds": round(residual, 6),
+                "relativeIoiDeviationRatio": round(deviation, 6),
+                "relativeIoiConsistent": bool(deviation <= consistency_limit),
+            }
+        )
+    return features
 
 
 def cents_error(observed_midi: float, target_midi: int) -> float:
@@ -333,6 +494,11 @@ def build_decisions(
     scale = ((active_end - active_start) / score_span) if score_span > 0 else 0.0
     decisions: list[dict[str, Any]] = []
     selected_notes = notes[: limit if limit > 0 else len(notes)]
+    relative_ioi = (
+        compute_relative_ioi_features(notes, timing_assignments)
+        if timing_assignments is not None
+        else [{} for _ in notes]
+    )
     for note_index, note in enumerate(selected_notes):
         score_unit = safe_float(note.get("scoreUnit"), 0.0) or 0.0
         assignment = timing_assignments[note_index] if timing_assignments is not None else None
@@ -391,10 +557,64 @@ def build_decisions(
                     "basicPitchEventMidi": assignment.get("eventMidi") if assignment else None,
                     "basicPitchEventConfidence": round(float(assignment["confidence"]), 6) if assignment else None,
                     "basicPitchPitchDistanceSemitones": assignment.get("pitchDistanceSemitones") if assignment else None,
+                    **relative_ioi[note_index],
                 },
             }
         )
     return decisions
+
+
+def aggregate_measure_evidence(decisions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[tuple[str, int], list[dict[str, Any]]] = {}
+    for decision in decisions:
+        measure = safe_int(decision.get("measureIndex"), 0)
+        if measure <= 0:
+            continue
+        key = (str(decision.get("sectionId") or ""), measure)
+        grouped.setdefault(key, []).append(decision)
+    rows: list[dict[str, Any]] = []
+    for (section_id, measure), items in sorted(grouped.items(), key=lambda item: (item[0][0], item[0][1])):
+        note_count = len(items)
+        assigned = [item for item in items if item.get("evidence", {}).get("timingAssignmentAvailable")]
+        supported = [item for item in items if item.get("evidence", {}).get("pitchSupportWithin80Cents")]
+        pitch_conflicts = [
+            item
+            for item in assigned
+            if item.get("evidence", {}).get("basicPitchPitchDistanceSemitones") != 0
+            or not item.get("evidence", {}).get("pitchSupportWithin80Cents")
+        ]
+        ioi_items = [item for item in items if item.get("evidence", {}).get("relativeIoiEvidenceAvailable")]
+        ioi_consistent = [item for item in ioi_items if item.get("evidence", {}).get("relativeIoiConsistent")]
+        assignment_rate = len(assigned) / note_count if note_count else 0.0
+        pitch_support_rate = len(supported) / note_count if note_count else 0.0
+        ioi_opportunity_count = max(1, note_count - 2)
+        ioi_evidence_rate = min(1.0, len(ioi_items) / ioi_opportunity_count)
+        ioi_consistency_rate = len(ioi_consistent) / len(ioi_items) if ioi_items else 0.0
+        pitch_ready = bool(note_count >= 3 and assignment_rate >= 0.8 and pitch_support_rate >= 0.8 and not pitch_conflicts)
+        rhythm_ready = bool(note_count >= 3 and ioi_evidence_rate >= 0.8 and ioi_items and len(ioi_consistent) == len(ioi_items))
+        rows.append(
+            {
+                "sectionId": section_id,
+                "measureIndex": measure,
+                "noteCount": note_count,
+                "timingAssignmentCount": len(assigned),
+                "timingAssignmentRate": round(assignment_rate, 6),
+                "pitchSupportCount": len(supported),
+                "pitchSupportRate": round(pitch_support_rate, 6),
+                "pitchConflictCount": len(pitch_conflicts),
+                "relativeIoiEvidenceCount": len(ioi_items),
+                "relativeIoiOpportunityCount": ioi_opportunity_count,
+                "relativeIoiEvidenceRate": round(ioi_evidence_rate, 6),
+                "relativeIoiConsistentCount": len(ioi_consistent),
+                "relativeIoiConsistencyRate": round(ioi_consistency_rate, 6),
+                "measurePitchReviewEvidenceReady": pitch_ready,
+                "measureRhythmReviewEvidenceReady": rhythm_ready,
+                "measureCombinedReviewEvidenceReady": bool(pitch_ready and rhythm_ready),
+                "autoDecision": "review_required",
+                "studentFacing": False,
+            }
+        )
+    return rows
 
 
 def build_candidate_rows(decisions: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -431,6 +651,10 @@ def build_candidate_rows(decisions: list[dict[str, Any]]) -> list[dict[str, Any]
                 "basicPitchEventMidi": evidence.get("basicPitchEventMidi"),
                 "basicPitchEventConfidence": evidence.get("basicPitchEventConfidence"),
                 "basicPitchPitchDistanceSemitones": evidence.get("basicPitchPitchDistanceSemitones"),
+                "relativeIoiEvidenceAvailable": bool(evidence.get("relativeIoiEvidenceAvailable")),
+                "relativeIoiResidualSeconds": evidence.get("relativeIoiResidualSeconds"),
+                "relativeIoiDeviationRatio": evidence.get("relativeIoiDeviationRatio"),
+                "relativeIoiConsistent": evidence.get("relativeIoiConsistent"),
                 "autoDecision": "review_required",
                 "reviewRequiredReason": "offline-feature-analysis-review-only",
                 "studentSafeGateReady": False,
@@ -461,6 +685,10 @@ def summarize(
         for item in decisions
         if item.get("evidence", {}).get("timingAssignmentAvailable")
     )
+    measure_rows = aggregate_measure_evidence(decisions)
+    measure_pitch_ready = sum(bool(row["measurePitchReviewEvidenceReady"]) for row in measure_rows)
+    measure_rhythm_ready = sum(bool(row["measureRhythmReviewEvidenceReady"]) for row in measure_rows)
+    measure_combined_ready = sum(bool(row["measureCombinedReviewEvidenceReady"]) for row in measure_rows)
     return {
         "analysisMode": analysis_mode,
         "scoreId": score.get("scoreId"),
@@ -478,6 +706,11 @@ def summarize(
         "unassignedNoteCount": len(decisions) - assignment_count,
         "exactEventPitchAssignmentCount": exact_assignment_count,
         "eventPitchConflictCount": assignment_count - exact_assignment_count,
+        "measureCount": len(measure_rows),
+        "measurePitchReviewEvidenceReadyCount": measure_pitch_ready,
+        "measureRhythmReviewEvidenceReadyCount": measure_rhythm_ready,
+        "measureCombinedReviewEvidenceReadyCount": measure_combined_ready,
+        "measureCombinedReviewEvidenceCoverage": round(measure_combined_ready / len(measure_rows), 6) if measure_rows else 0.0,
         "medianAbsCents": round(statistics.median(cents_values), 2) if cents_values else None,
         "studentSafeGateReady": False,
         "studentFacing": False,
@@ -548,7 +781,11 @@ def main() -> int:
         summary = summarize(decisions, score or {}, audio_duration, len(timeline), analysis_mode)
         payload = {"ok": True, "summary": summary}
         if not args.summary_only:
-            payload.update({"decisions": decisions, "candidateRows": candidate_rows})
+            payload.update({
+                "decisions": decisions,
+                "candidateRows": candidate_rows,
+                "measureEvidenceRows": aggregate_measure_evidence(decisions),
+            })
         print(json.dumps(payload, ensure_ascii=False))
         return 0
     except Exception as exc:

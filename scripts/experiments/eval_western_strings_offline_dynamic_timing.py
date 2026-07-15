@@ -9,12 +9,15 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import statistics
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+import numpy as np
 
 from run_western_strings_offline_feature_analysis import (
     assign_basic_pitch_events,
@@ -32,6 +35,25 @@ REPO = Path(__file__).resolve().parents[2]
 DEFAULT_MANIFEST = REPO / "data/experiments/western-strings-m2/real-student-recordings-manifest.csv"
 DEFAULT_EVENTS = REPO / "data/experiments/western-strings-m2/results-review-pack/cache/basic-pitch"
 DEFAULT_OUT = REPO / "data/experiments/western-strings-m3/offline-dynamic-timing-audit"
+
+
+def file_sha1(path: Path) -> str:
+    digest = hashlib.sha1()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def load_or_extract_f0(audio_path: Path, cache_dir: Path, recording_id: str):
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_path = cache_dir / f"{recording_id}-{file_sha1(audio_path)[:12]}.npz"
+    if cache_path.is_file():
+        cached = np.load(cache_path)
+        return cached["times"], cached["midiTrack"], float(cached["duration"])
+    times, midi_track, duration = extract_f0(audio_path)
+    np.savez_compressed(cache_path, times=times, midiTrack=midi_track, duration=np.asarray(duration))
+    return times, midi_track, duration
 
 
 def read_manifest(path: Path) -> list[dict[str, str]]:
@@ -65,6 +87,10 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
     assigned = sum(int(row["timingAssignmentCount"]) for row in rows)
     supported = sum(int(row["pitchSupportWithin80CentsCount"]) for row in rows)
     conflicts = sum(int(row["totalReviewEvidenceCount"]) for row in rows)
+    measure_count = sum(int(row.get("measureCount") or 0) for row in rows)
+    measure_pitch_ready = sum(int(row.get("measurePitchReviewEvidenceReadyCount") or 0) for row in rows)
+    measure_rhythm_ready = sum(int(row.get("measureRhythmReviewEvidenceReadyCount") or 0) for row in rows)
+    measure_combined_ready = sum(int(row.get("measureCombinedReviewEvidenceReadyCount") or 0) for row in rows)
     medians = [float(row["medianAbsCents"]) for row in rows if row.get("medianAbsCents") is not None]
     return {
         "recordingCount": len(rows),
@@ -74,6 +100,13 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "pitchSupportWithin80CentsCount": supported,
         "pitchSupportRate": round(supported / note_count, 6) if note_count else 0.0,
         "totalReviewEvidenceCount": conflicts,
+        "measureCount": measure_count,
+        "measurePitchReviewEvidenceReadyCount": measure_pitch_ready,
+        "measurePitchReviewEvidenceRate": round(measure_pitch_ready / measure_count, 6) if measure_count else 0.0,
+        "measureRhythmReviewEvidenceReadyCount": measure_rhythm_ready,
+        "measureRhythmReviewEvidenceRate": round(measure_rhythm_ready / measure_count, 6) if measure_count else 0.0,
+        "measureCombinedReviewEvidenceReadyCount": measure_combined_ready,
+        "measureCombinedReviewEvidenceRate": round(measure_combined_ready / measure_count, 6) if measure_count else 0.0,
         "medianOfRecordingMedianAbsCents": round(statistics.median(medians), 3) if medians else None,
     }
 
@@ -100,6 +133,9 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"- aggregate assignment rate: {report['aggregate']['timingAssignmentRate']:.2%}",
         f"- aggregate pitch-support rate: {report['aggregate']['pitchSupportRate']:.2%}",
         f"- review-evidence count: {report['aggregate']['totalReviewEvidenceCount']}",
+        f"- pitch-ready measure evidence: {report['aggregate']['measurePitchReviewEvidenceRate']:.2%}",
+        f"- relative-IOI-ready measure evidence: {report['aggregate']['measureRhythmReviewEvidenceRate']:.2%}",
+        f"- combined measure evidence: {report['aggregate']['measureCombinedReviewEvidenceRate']:.2%}",
         "- studentGateReady: false",
         "- next gate: compare selected dynamic candidates with independent note-level truth; do not transfer labels from old linear windows.",
         "",
@@ -112,6 +148,7 @@ def main() -> int:
     parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
     parser.add_argument("--events-dir", default=str(DEFAULT_EVENTS))
     parser.add_argument("--out", default=str(DEFAULT_OUT))
+    parser.add_argument("--f0-cache", default="")
     parser.add_argument("--recording-id", action="append", default=[])
     parser.add_argument("--max-recordings", type=int, default=0)
     args = parser.parse_args()
@@ -123,6 +160,8 @@ def main() -> int:
     if args.max_recordings > 0:
         manifest_rows = manifest_rows[: args.max_recordings]
     store = load_store(REPO)
+    out_dir = Path(args.out)
+    f0_cache = Path(args.f0_cache) if args.f0_cache else out_dir / "f0-cache"
     rows: list[dict[str, Any]] = []
     by_scenario: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for index, source in enumerate(manifest_rows, start=1):
@@ -138,7 +177,7 @@ def main() -> int:
         timeline = build_symbolic_timeline(notes)
         events = read_basic_pitch_events(events_path)
         assignments = assign_basic_pitch_events(timeline, events)
-        times, midi_track, duration = extract_f0(audio_path)
+        times, midi_track, duration = load_or_extract_f0(audio_path, f0_cache, recording_id)
         decisions = build_decisions(
             timeline,
             times,
@@ -169,7 +208,6 @@ def main() -> int:
         "aggregate": aggregate(rows),
         "byScenario": {scenario: aggregate(group) for scenario, group in sorted(by_scenario.items())},
     }
-    out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
     json_path = out_dir / "report.json"
     md_path = out_dir / "report.md"
