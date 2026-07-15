@@ -18,6 +18,7 @@ from eval_western_strings_m3plus_supplemental import (  # noqa: E402
     evaluate_track,
     infer_modes,
     mode_metrics,
+    resolve_f0_backend,
     run_evaluation,
     validate_score_technique_intent,
 )
@@ -164,6 +165,18 @@ def test_missing_real_audio_fails_closed_without_fake_gold() -> None:
     assert len([reason for reason in report["blockingReasons"] if reason.endswith("audio-missing")]) == 4
 
 
+def test_f0_backend_selection_is_explicit_and_bounded() -> None:
+    assert resolve_f0_backend("pyin") == "pyin"
+    assert resolve_f0_backend("crepe") == "crepe"
+    assert resolve_f0_backend("auto") in {"crepe", "pyin"}
+    try:
+        resolve_f0_backend("unknown")
+    except ValueError as error:
+        assert str(error) == "unsupported-f0-backend:unknown"
+    else:
+        raise AssertionError("unsupported F0 backends must fail closed")
+
+
 if __name__ == "__main__":
     test_synthetic_fixed_sequences_localize_and_separate_modes()
     test_score_markings_are_the_source_of_expected_techniques()
@@ -172,4 +185,5 @@ if __name__ == "__main__":
     test_uncertain_rows_reduce_gate_coverage_and_positive_recall()
     test_dirty_f0_is_review_only_not_false_absence()
     test_missing_real_audio_fails_closed_without_fake_gold()
+    test_f0_backend_selection_is_explicit_and_bounded()
     print("western M3+ supplemental machine-eval tests passed")

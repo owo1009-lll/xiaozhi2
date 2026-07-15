@@ -12,6 +12,7 @@ import argparse
 import csv
 import json
 import math
+import os
 import xml.etree.ElementTree as ET
 from collections import Counter
 from pathlib import Path
@@ -900,7 +901,20 @@ def attach_session_pitch_baseline(recording_reports: list[dict[str, Any]]) -> di
     return baseline
 
 
-def extract_f0(audio_path: Path) -> tuple[np.ndarray, np.ndarray, float]:
+def resolve_f0_backend(requested: str) -> str:
+    backend = str(requested or "auto").strip().lower()
+    if backend not in {"auto", "crepe", "pyin"}:
+        raise ValueError(f"unsupported-f0-backend:{backend}")
+    if backend != "auto":
+        return backend
+    try:
+        import torchcrepe  # noqa: F401
+    except ImportError:
+        return "pyin"
+    return "crepe"
+
+
+def _extract_pyin_f0(audio_path: Path) -> tuple[np.ndarray, np.ndarray, float]:
     waveform, sample_rate = load_audio_mono(audio_path, target_sr=22050)
     if waveform.size == 0:
         raise ValueError("audio-empty")
@@ -918,6 +932,69 @@ def extract_f0(audio_path: Path) -> tuple[np.ndarray, np.ndarray, float]:
     midi_track = np.full_like(f0, np.nan, dtype=np.float64)
     midi_track[valid] = librosa.hz_to_midi(f0[valid])
     return times.astype(np.float64), midi_track, float(waveform.size / sample_rate)
+
+
+def _extract_crepe_f0(audio_path: Path) -> tuple[np.ndarray, np.ndarray, float]:
+    """Extract an unsmoothed frame-level F0 track for technique evidence.
+
+    Median/Viterbi smoothing is deliberately omitted because it can erase the
+    fast pitch alternation that distinguishes a trill from vibrato. Runtime
+    thread limits come from ``ERHU_CPU_THREAD_LIMIT`` and the shared npm/Python
+    launchers, so this remains a bounded offline calibration step.
+    """
+
+    try:
+        import torch
+        import torchcrepe
+    except ImportError as error:
+        raise RuntimeError("torchcrepe-unavailable") from error
+
+    sample_rate = 16000
+    hop_length = 160
+    waveform, _ = load_audio_mono(audio_path, target_sr=sample_rate)
+    if waveform.size == 0:
+        raise ValueError("audio-empty")
+    thread_limit = max(1, int(os.getenv("ERHU_CPU_THREAD_LIMIT", "2") or 2))
+    torch.set_num_threads(thread_limit)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    audio = torch.tensor(waveform, dtype=torch.float32).unsqueeze(0).to(device)
+    with torch.no_grad():
+        f0, periodicity = torchcrepe.predict(
+            audio,
+            sample_rate,
+            hop_length,
+            130.0,
+            2000.0,
+            model="tiny",
+            batch_size=1024,
+            device=device,
+            return_periodicity=True,
+        )
+    f0_values = f0.squeeze(0).detach().cpu().numpy().astype(np.float64)
+    periodicity_values = (
+        periodicity.squeeze(0).detach().cpu().numpy().astype(np.float64)
+    )
+    times = np.arange(f0_values.size, dtype=np.float64) * (hop_length / sample_rate)
+    valid = (
+        np.isfinite(f0_values)
+        & (f0_values > 0.0)
+        & np.isfinite(periodicity_values)
+        & (periodicity_values >= 0.30)
+    )
+    midi_track = np.full_like(f0_values, np.nan, dtype=np.float64)
+    midi_track[valid] = librosa.hz_to_midi(f0_values[valid])
+    return times, midi_track, float(waveform.size / sample_rate)
+
+
+def extract_f0(
+    audio_path: Path,
+    *,
+    backend: str = "pyin",
+) -> tuple[np.ndarray, np.ndarray, float]:
+    resolved = resolve_f0_backend(backend)
+    if resolved == "crepe":
+        return _extract_crepe_f0(audio_path)
+    return _extract_pyin_f0(audio_path)
 
 
 def mode_metrics(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -1025,6 +1102,7 @@ def run_evaluation(
     source: Path,
     *,
     performance_confirmed: bool,
+    f0_backend: str = "auto",
     pitch_tolerance_cents: float = DEFAULT_LOCALIZATION_PITCH_TOLERANCE_CENTS,
     max_normalized_path_cost: float = DEFAULT_MAX_NORMALIZED_PATH_COST,
 ) -> dict[str, Any]:
@@ -1036,6 +1114,7 @@ def run_evaluation(
     reports: list[dict[str, Any]] = []
     blockers: list[str] = []
     score_intent_reports: list[dict[str, Any]] = []
+    resolved_f0_backend = resolve_f0_backend(f0_backend)
     for recording in recordings:
         recording_id = str(recording.get("recordingId") or "").strip()
         score_intent_report = validate_score_technique_intent(source, recording)
@@ -1058,7 +1137,10 @@ def run_evaluation(
             blockers.append(f"{recording_id}:audio-missing")
             continue
         try:
-            times, midi_track, duration = extract_f0(audio_path)
+            times, midi_track, duration = extract_f0(
+                audio_path,
+                backend=resolved_f0_backend,
+            )
             recording_report = evaluate_track(
                 recording,
                 times,
@@ -1068,6 +1150,7 @@ def run_evaluation(
                 max_normalized_path_cost=max_normalized_path_cost,
             )
             recording_report["audioPath"] = str(audio_path)
+            recording_report["f0Backend"] = resolved_f0_backend
             recording_report["scoreTechniqueIntent"] = score_intent_report
             reports.append(recording_report)
             if recording_report["status"] != "ok":
@@ -1128,7 +1211,7 @@ def run_evaluation(
     )
     status_counts = Counter(str(report.get("status") or "unknown") for report in reports)
     return {
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "purpose": "M3+ score-conditioned fixed-sequence audio verification",
         "evalOnly": True,
         "studentFacing": False,
@@ -1136,6 +1219,7 @@ def run_evaluation(
         "performanceConfirmedByOwner": bool(performance_confirmed),
         "performanceGoldReady": False,
         "scoreTechniqueIntentReady": score_intent_ready,
+        "f0Backend": resolved_f0_backend,
         "machineAnalysisComplete": machine_complete,
         "machineModeThresholdPassed": mode_gate_passed,
         "machineReleaseReadyModes": release_ready_modes,
@@ -1163,6 +1247,7 @@ def run_evaluation(
             "maxNormalizedPathCost": float(max_normalized_path_cost),
             "intonationRule": "localization-only; does not certify intonation accuracy",
             "evaluationPolicy": "measures-1-to-4-calibration; measures-5-to-8-holdout",
+            "f0BackendPolicy": "CREPE tiny preferred when installed; pYIN is the bounded fallback",
         },
         "counts": {
             "recordingCount": len(reports),
@@ -1186,6 +1271,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--performance-confirmed", action="store_true")
+    parser.add_argument(
+        "--f0-backend",
+        choices=("auto", "crepe", "pyin"),
+        default="auto",
+        help="frame-level F0 backend; auto prefers CREPE and falls back to pYIN",
+    )
     parser.add_argument(
         "--pitch-tolerance-cents",
         type=float,
@@ -1212,6 +1303,7 @@ def main() -> int:
     report = run_evaluation(
         source,
         performance_confirmed=bool(args.performance_confirmed),
+        f0_backend=str(args.f0_backend),
         pitch_tolerance_cents=pitch_tolerance_cents,
         max_normalized_path_cost=max_normalized_path_cost,
     )

@@ -97,7 +97,7 @@
 - 第二轮尚缺真实负例和独立装饰音样本,因此 `studentGateReady=false` 不变。
 - 已生成最小补录包 `音频/m3plus-supplemental/`:4 条均改为“不读谱、固定音符顺序 + 文字要求”,分别覆盖 C 大调上行纯直音负例、独立揉弦/颤音、装饰音/普通音对照、滑音/直音对照。附带的 MusicXML、MIDI、谱图仅供机器校验;`score-intent.json` 仍明确 `performanceConfirmed=false`,不得在录音前计作性能 gold。
 - `npm run western:m3plus-supplemental-status` 当前为 `readyRecordingCount=0/4`,`readyForMachineAnalysis=false`,`humanTask=record-m3plus-supplemental-takes`;只缺 `m3p-01.m4a` 至 `m3p-04.m4a` 四条真实录音。录齐后先由机器验证解码、定位和模式指标,不直接生成教师复核包。
-- 补录机器评测入口已经完成:`npm run western:m3plus-supplemental-eval` 先从 MusicXML 的 `vibrato` 文字、`trill-mark`、`mordent`、`glissando` 与明确的 straight/plain 对照读取谱面技法意图,再用固定音符顺序的单调动态规划定位逐单元 F0,核验录音是否按谱执行;谱面标记本身不算演奏正确。定位阶段允许 `±100 cents` 偏差以避免实录小偏差造成错窗,但音准判定仍使用原始 cents。合成受控回归四类与谱面标记一致性均通过;缺真实音频时报告 4 条 `audio-missing` 且 `studentGateReady=false`,`teacherReviewAllowed=false`。真实录音到位后先跑该命令;机器定位或模式阈值不过时先修特征,不交教师重复复核。
+- 补录机器评测入口已经完成:`npm run western:m3plus-supplemental-eval` 先从 MusicXML 的 `vibrato` 文字、`trill-mark`、`mordent`、`glissando` 与明确的 straight/plain 对照读取谱面技法意图,再用固定音符顺序的单调动态规划定位逐单元帧级 F0,核验录音是否按谱执行;谱面标记本身不算演奏正确。评测默认优先使用未做中值/Viterbi 平滑的 CREPE tiny,以保留颤音快速交替与滑音连续轨迹;环境缺少 `torchcrepe` 时才回退 pYIN,并在状态报告中显式记录 `f0Backend`。定位阶段允许 `±100 cents` 偏差以避免实录小偏差造成错窗,但音准判定仍使用原始 cents。后端替换不放宽任何 precision/recall/coverage 闸门。合成受控回归四类与谱面标记一致性均通过;缺真实音频时报告 4 条 `audio-missing` 且 `studentGateReady=false`,`teacherReviewAllowed=false`。真实录音到位后先跑该命令;机器定位或模式阈值不过时先修特征,不交教师重复复核。
 
 ### M4 OMR benchmark
 

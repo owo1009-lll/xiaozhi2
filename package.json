@@ -169,7 +169,7 @@
     "western:round2-m3plus-diagnostic": "py -3.11 scripts\\experiments\\diagnose_western_strings_round2_trill_vibrato.py",
     "western:m3plus-supplemental-scores": "py -3.11 scripts\\experiments\\generate_western_strings_m3plus_supplemental_scores.py",
     "western:m3plus-supplemental-status": "py -3.11 scripts\\experiments\\status_western_strings_m3plus_supplemental.py",
-    "western:m3plus-supplemental-eval": "py -3.11 scripts\\experiments\\eval_western_strings_m3plus_supplemental.py",
+    "western:m3plus-supplemental-eval": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\eval_western_strings_m3plus_supplemental.py",
     "western:bach-violin-dataset-audit": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\audit_western_bach_violin_dataset.py",
     "western:bach-violin-gate-pilot": "python scripts\\experiments\\eval_western_bach_violin_gate_pilot.py",
     "western:bach-violin-gate-pilot-anchor": "python scripts\\experiments\\eval_western_bach_violin_gate_pilot.py --timing-mode score-pitch-anchor --out data\\experiments\\western-strings-bach-violin-gate-pilot-anchor.json --markdown data\\experiments\\western-strings-bach-violin-gate-pilot-anchor.md",

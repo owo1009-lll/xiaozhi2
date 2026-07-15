@@ -1093,6 +1093,7 @@ async function buildM3PlusStatus() {
     supplementalMachineEval: supplementalEval ? {
       source: M3PLUS_SUPPLEMENTAL_EVAL.replace(/\\/g, "/"),
       sourceExists: true,
+      f0Backend: supplementalEval.f0Backend || "unknown",
       scoreTechniqueIntentReady: supplementalEval.scoreTechniqueIntentReady === true,
       machineAnalysisComplete: supplementalEval.machineAnalysisComplete === true,
       machineModeThresholdPassed: supplementalEval.machineModeThresholdPassed === true,
@@ -1106,6 +1107,7 @@ async function buildM3PlusStatus() {
     } : {
       source: M3PLUS_SUPPLEMENTAL_EVAL.replace(/\\/g, "/"),
       sourceExists: false,
+      f0Backend: "unknown",
       scoreTechniqueIntentReady: false,
       machineAnalysisComplete: false,
       machineModeThresholdPassed: false,
