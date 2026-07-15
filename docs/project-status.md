@@ -1,6 +1,6 @@
 # 西洋弦乐练习诊断项目状态快照
 
-更新时间: 2026-07-13
+更新时间: 2026-07-15
 
 本文件是当前主线状态快照。实时判断仍以命令为准:
 
@@ -18,7 +18,8 @@
 - 旧 MusicXML 导入会把部分多小节谱压缩到第 1 小节;该缺陷已修复并增加结构闸门。7 份受影响 score 已在备份后原位重建,8 份现在的小节数、音符数和唯一 ID 均与源谱一致。
 - `r2-08` fresh-blind 精确受控试验已执行:60 个候选、3 个模型原始 auto-pass,但范围内和自检通过的 auto-pass 均为 0。试验正确中止,未发布学生反馈,不需要教师复核空候选。
 - 新一轮 M3+ 只完成 review-only 库存清点:444 个音符中 292 个被列为行为候选;这不改变运行时门槛。
-- `r2-02` / `r2-03` / `r2-04` 缺少原计划要求的 `notes.txt` 精确错误小节标签,所以本轮不能诚实计算 M3 错音、漏音、节奏三类 recall/precision。
+- 已找到随录音放置的 `README-怎么用.md`,确认 `r2-02` / `r2-03` / `r2-04` 的错误数量分别为 5 / 5 / 4。README 没有具体小节且 `notes.txt` 仍缺失,因此只能做数量对照和机器位置搜索,不能计算精确 recall/precision。
+- README 数量约束下的 Basic Pitch + 序列 DTW 搜索得到:错音阈值候选 5 个;漏音保守候选 3 个,未覆盖 README 目标数量;拖拍阈值候选 5 个,按目标数保留前 4 个。它们均为未人工确认的机器假设,没有进入学生反馈。
 - 当前默认学生发布仍关闭。项目闸门失败项仍为 `ordinary-auto-gate-disabled-by-default`;受控证据总体 precision=1,但 coverage=0.04,低于 0.20 下限。
 
 ## 1. 当前目标
@@ -126,7 +127,7 @@
 
 下一步分两条,不得混为一项:
 
-1. **M3 定量补证:** 仅在补齐 `r2-02`、`r2-03`、`r2-04` 的错误小节真值后,重算错音、漏音和节奏分类指标。没有该文件时只保留机器候选,不得填造标签。
+1. **M3 定量补证:** README 的 5/5/4 数量真值已用于机器候选搜索。当前漏音保守阈值只找到 3 个候选;拖拍有 5 个阈值候选,比目标多 1 个。下一步先改进漏音候选与候选校准;只有补齐精确错误小节真值后,才可区分真命中、漏检和超额假阳性并重算 recall/precision。没有精确标签时不得把候选位置填成 gold。
 2. **P1/普通上传:** 保持默认关闭。先分析本次 3 个原始 auto-pass 为何全部被 scope/self-check 抑制;只有新策略在独立盲验中同时达到 precision>=0.90 和 coverage>=0.20,才讨论扩大范围。当前不需要教师复核 `r2-08`,因为可复核 auto-pass 为 0。
 
 第二轮命令:
@@ -134,6 +135,7 @@
 ```bash
 npm run western:round2-intake-status
 npm run western:round2-machine-analysis
+npm run western:round2-scenario-search
 npm run western:project-status
 npm run western:project-gate
 ```

@@ -4,6 +4,7 @@ import argparse
 import csv
 import hashlib
 import json
+import re
 import shutil
 import struct
 from datetime import datetime
@@ -30,6 +31,12 @@ ROUND2_ROWS = [
     (8, "r2-f-major-fresh-blind", "fresh_blind_correct", "F major fresh-blind air"),
 ]
 
+README_SCENARIO_COUNTS = {
+    2: 5,
+    3: 5,
+    4: 4,
+}
+
 MANIFEST_FIELDS = [
     "recordingId",
     "pieceId",
@@ -41,6 +48,7 @@ MANIFEST_FIELDS = [
     "scoreId",
     "expectedMeasureCount",
     "expectedPitchedNoteCount",
+    "expectedIssueCount",
     "consent",
     "licenseStatus",
     "sourceRound",
@@ -133,6 +141,21 @@ def copy_atomic(source: Path, target: Path, *, replace: bool) -> str:
     shutil.copy2(source, temporary)
     temporary.replace(target)
     return "copied"
+
+
+def parse_readme_scenario_counts(path: Path) -> dict[int, int]:
+    if not path.is_file():
+        return {}
+    text = path.read_text(encoding="utf-8-sig")
+    counts: dict[int, int] = {}
+    for line in text.splitlines():
+        match = re.search(r"\|\s*r2-(0[234])\s*\|", line, flags=re.IGNORECASE)
+        if not match:
+            continue
+        count_match = re.search(r"(?:故意\s*)?(\d+)\s*(?:个音|处)", line)
+        if count_match:
+            counts[int(match.group(1))] = int(count_match.group(1))
+    return counts
 
 
 def empty_history() -> dict[str, set[str]]:
@@ -298,6 +321,14 @@ def prepare_round2(
         items.append(item)
         blockers.extend(f"{recording_id}:{reason}" for reason in item["blockingReasons"])
 
+    readme_source = source_root / "README-怎么用.md"
+    readme_counts = parse_readme_scenario_counts(readme_source)
+    readme_counts_valid = all(readme_counts.get(index) == expected for index, expected in README_SCENARIO_COUNTS.items())
+    if not readme_source.is_file():
+        warnings.append("round2-scenario-count-ground-truth-readme-missing")
+    elif not readme_counts_valid:
+        warnings.append("round2-scenario-count-ground-truth-incomplete:r2-02|r2-03|r2-04")
+
     notes_source = source_root / "notes.txt"
     if not notes_source.is_file():
         warnings.append("round2-error-location-ground-truth-missing:r2-02|r2-03|r2-04")
@@ -321,6 +352,12 @@ def prepare_round2(
                 "kind": "notes",
                 "result": copy_atomic(notes_source, private_root / "notes.txt", replace=replace),
             })
+        if readme_source.is_file():
+            copy_results.append({
+                "recordingId": "round2",
+                "kind": "scenario-count-readme",
+                "result": copy_atomic(readme_source, private_root / "README-source.md", replace=replace),
+            })
 
         manifest_rows = []
         intake_rows = []
@@ -342,6 +379,7 @@ def prepare_round2(
                 "scoreId": old_score_id,
                 "expectedMeasureCount": int((item.get("score") or {}).get("measureCount") or 0),
                 "expectedPitchedNoteCount": int((item.get("score") or {}).get("pitchedNoteCount") or 0),
+                "expectedIssueCount": int(readme_counts.get(int(item["index"]), 0)),
                 "consent": "yes",
                 "licenseStatus": "local-only",
                 "sourceRound": "round2",
@@ -365,6 +403,7 @@ def prepare_round2(
         write_csv(private_root / "clean-score-intake.csv", INTAKE_FIELDS, intake_rows)
         applied = True
 
+    ready_for_scenario_count_evaluation = ready_for_machine and readme_counts_valid
     ready_for_labeled_m3 = ready_for_machine and notes_source.is_file()
     return {
         "ok": ready_for_machine,
@@ -377,7 +416,10 @@ def prepare_round2(
             "expectedPairCount": len(ROUND2_ROWS),
             "validatedPairCount": sum(1 for item in items if not item["blockingReasons"]),
             "readyForMachineAnalysis": ready_for_machine,
+            "readyForScenarioCountEvaluation": ready_for_scenario_count_evaluation,
             "readyForLabeledM3Evaluation": ready_for_labeled_m3,
+            "scenarioCountGroundTruthPresent": readme_counts_valid,
+            "scenarioExpectedIssueCounts": {f"r2-{index:02d}": count for index, count in sorted(readme_counts.items())},
             "notesGroundTruthPresent": notes_source.is_file(),
         },
         "blockingReasons": list(dict.fromkeys(blockers)),
@@ -398,7 +440,9 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         f"- validated pairs: {summary.get('validatedPairCount', 0)}/{summary.get('expectedPairCount', 8)}",
         f"- readyForMachineAnalysis: {str(summary.get('readyForMachineAnalysis', False)).lower()}",
+        f"- readyForScenarioCountEvaluation: {str(summary.get('readyForScenarioCountEvaluation', False)).lower()}",
         f"- readyForLabeledM3Evaluation: {str(summary.get('readyForLabeledM3Evaluation', False)).lower()}",
+        f"- scenarioCountGroundTruthPresent: {str(summary.get('scenarioCountGroundTruthPresent', False)).lower()}",
         f"- notesGroundTruthPresent: {str(summary.get('notesGroundTruthPresent', False)).lower()}",
         f"- applied: {str(report.get('applied', False)).lower()}",
         "",
@@ -426,7 +470,7 @@ def render_markdown(report: dict[str, Any]) -> str:
     lines.extend([f"- {reason}" for reason in warnings] if warnings else ["- none"])
     lines.extend([
         "",
-        "Machine analysis may proceed when readyForMachineAnalysis=true. Exact M3 recall/precision must remain pending until notes.txt supplies the deliberately changed measure locations.",
+        "README scenario counts support count-level evaluation (r2-02=5, r2-03=5, r2-04=4). Exact M3 recall/precision must remain pending until notes.txt supplies the deliberately changed measure locations.",
         "",
     ])
     return "\n".join(lines)

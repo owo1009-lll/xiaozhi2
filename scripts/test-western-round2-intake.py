@@ -52,6 +52,14 @@ def main() -> int:
             score_text = score_text.replace('measure number="1"', f'measure number="{index}"')
             (source / f"r2-{index:02d}.musicxml").write_text(score_text, encoding="utf-8")
             (source / f"r2-{index:02d}.png").write_bytes(png_header() + f"image-{index}".encode())
+        (source / "README-怎么用.md").write_text(
+            "\n".join([
+                "| r2-02 | G大调旋律 | 故意拉错 5 个音 |",
+                "| r2-03 | a小调练习 | 故意漏掉 5 个音 |",
+                "| r2-04 | C大调练习 | 故意 4 处明显拖拍 |",
+            ]),
+            encoding="utf-8",
+        )
 
         report = MODULE.prepare_round2(
             repo_root=repo,
@@ -64,13 +72,19 @@ def main() -> int:
         assert report["ok"] is True, report
         assert report["summary"]["validatedPairCount"] == 8
         assert report["summary"]["readyForMachineAnalysis"] is True
+        assert report["summary"]["readyForScenarioCountEvaluation"] is True
         assert report["summary"]["readyForLabeledM3Evaluation"] is False
+        assert report["summary"]["scenarioExpectedIssueCounts"] == {"r2-02": 5, "r2-03": 5, "r2-04": 4}
+        assert (private / "README-source.md").is_file()
         assert (private / "r2-08.m4a").is_file()
         manifest = rows_by_id(private / "manifest.csv")
         assert len(manifest) == 8
         assert manifest["round2-r2-08-20260715"]["scenario"] == "fresh_blind_correct"
         assert manifest["round2-r2-08-20260715"]["expectedMeasureCount"] == "1"
         assert manifest["round2-r2-08-20260715"]["expectedPitchedNoteCount"] == "1"
+        assert manifest["round2-r2-02-20260715"]["expectedIssueCount"] == "5"
+        assert manifest["round2-r2-03-20260715"]["expectedIssueCount"] == "5"
+        assert manifest["round2-r2-04-20260715"]["expectedIssueCount"] == "4"
 
         # Rerunning intake must preserve score IDs written by the importer.
         manifest["round2-r2-08-20260715"]["scoreId"] = "score-round2-08"

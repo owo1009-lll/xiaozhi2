@@ -9,12 +9,15 @@
 - 8/8 已完成受控机器分析,结果均为 `offline_feature_review_ready`;本轮没有发布学生诊断。
 - `r2-08` 已按精确 `recordingId` 完成 fresh-blind 受控 pilot:60 个候选中模型原始 auto-pass 3 个,但范围内 auto-pass=0、自检通过 auto-pass=0,因此 pilot 按规则中止,学生端保持 fail-closed,也没有生成无意义的教师复核任务。
 - M3+ 已完成库存清点:444 个音符中 292 个进入 review-only 行为候选。该数字只表示候选库存,不表示模式已获准自动反馈。
-- 原始目录未提供 `notes.txt`,因此 `r2-02` 错音、`r2-03` 漏音、`r2-04` 节奏偏移的精确小节真值仍缺失。不得据此伪造 M3 分类 recall/precision;只有补齐小节标签后才可计算。
+- 已找到原始目录中的 `README-怎么用.md`:它给出 `r2-02` 错音 5 个、`r2-03` 漏音 5 个、`r2-04` 拖拍 4 处,因此可做错误数量对照和机器位置搜索。README 没有给出具体小节,且 `notes.txt` 仍缺失,所以不得把机器候选当作人工 gold,也不得计算精确 recall/precision。
+- README 数量约束下的机器搜索已完成:错音阈值候选 5 个;漏音保守候选 3 个(少于目标 5,当前不足);拖拍阈值候选 5 个,按 README 数量列出前 4 个。所有位置仍是 `machine-hypothesis-unverified`。
 
 主要机器产物:
 
 - `data/experiments/western-strings-round2/machine-analysis.json`
 - `data/experiments/western-strings-round2/score-structure-repair.json`
+- `data/experiments/western-strings-round2/scenario-search.json`
+- `data/experiments/western-strings-round2/scenario-search-candidates.csv`
 - `data/experiments/western-strings-round2/m3plus/`
 - `data/experiments/western-strings-controlled-pilot-sessions/round2-r2-08-20260715-exact-v4/session.json`
 **你只需按下表录 8 条,其余(登记/评测/闸门)由自动化完成。**
@@ -31,9 +34,9 @@
 | 编号 | 内容 | 服务的闸门 |
 |---|---|---|
 | r2-01 | **正常演奏**,尽量拉准 | 基线 + P1 |
-| r2-02 | **故意错音 3 处**:各错 1–2 个半音,错完继续往下拉,**记下错在第几小节** | M3 pitch(现仅2样本) |
-| r2-03 | **故意漏音 3 处**:跳过整个音不拉,记小节号 | M3 missing(现仅2样本) |
-| r2-04 | **故意节奏偏移 2 处**:某音明显拖后半拍以上,记小节号 | M3 onset(现仅2样本) |
+| r2-02 | **故意错音 5 个**:各错 1–2 个半音,错完继续往下拉,分散在全曲 | M3 pitch |
+| r2-03 | **故意漏音 5 个**:跳过整个音不拉,分散在全曲 | M3 missing |
+| r2-04 | **故意节奏偏移 4 处**:某音明显拖后半拍以上,分散在全曲 | M3 onset |
 | r2-05 | **含滑音的乐段**(谱上有或自加 2–3 处明显滑音) | M3+ slide 模式 |
 | r2-06 | **含颤音/揉弦的乐段**(长音上加明显揉弦或谱面颤音) | M3+ trill/vibrato 模式 |
 | r2-07 | **含双音的乐段**(谱上有双音最好;没有则任选带双音的练习曲) | M3+ 双音 multi-f0 |
@@ -45,6 +48,12 @@
 
 ## 你录完之后(自动化接手,无需你动)
 1. 登记 manifest(round2 目录 → 受控提交流,consent/licenseStatus=local-only)。
-2. r2-01…07:跑 photo-score 生产管线 + M3/M3+ 评测,按你的小节标注核对每类命中。
+2. r2-01…07:跑 photo-score 生产管线 + M3/M3+ 评测。README 数量可用于候选数量对照;只有拿到精确小节标签后才核算每类命中率。
 3. r2-08:走 P1 fresh-blind 流程(`fresh-blind` intake → 盲审包)。
 4. 闸门重算并汇报:M3 每类样本数、M3+ 模式放行状态、P1 scope 是否可扩。
+
+自动搜索命令:
+
+```bash
+npm run western:round2-scenario-search
+```

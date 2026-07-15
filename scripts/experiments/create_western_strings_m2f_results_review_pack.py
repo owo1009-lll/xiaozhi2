@@ -125,14 +125,33 @@ def load_basic_pitch_events(audio_path: Path, cache_path: Path, *, force: bool =
 
 def parse_score_notes(score_path: Path) -> list[dict[str, Any]]:
     try:
-        from music21 import chord, converter, note
+        from music21 import chord, converter, note, stream
     except ModuleNotFoundError as exc:
         raise SystemExit("music21 is required to parse MXL/MusicXML scores for M2f result review.") from exc
 
     score = converter.parse(str(score_path))
     part = score.parts[0] if getattr(score, "parts", None) else score
     notes: list[dict[str, Any]] = []
-    for element in part.flatten().notesAndRests:
+    measures = list(part.getElementsByClass(stream.Measure))
+    raw_measure_numbers = [int(measure.number or 0) for measure in measures]
+    if (
+        not measures
+        or len(set(raw_measure_numbers)) != len(raw_measure_numbers)
+        or any(current <= previous for previous, current in zip(raw_measure_numbers, raw_measure_numbers[1:]))
+    ):
+        normalized_measure_numbers = list(range(1, len(measures) + 1))
+    else:
+        normalized_measure_numbers = raw_measure_numbers
+
+    elements: list[tuple[Any, int, float]] = []
+    if measures:
+        for measure, measure_number in zip(measures, normalized_measure_numbers):
+            for element in measure.recurse().notesAndRests:
+                elements.append((element, measure_number, float(element.getOffsetInHierarchy(part))))
+    else:
+        elements = [(element, int(element.measureNumber or 1), float(element.offset)) for element in part.flatten().notesAndRests]
+
+    for element, measure_number, global_offset in elements:
         pitches: list[int] = []
         if isinstance(element, note.Note):
             pitches = [int(element.pitch.midi)]
@@ -144,8 +163,8 @@ def parse_score_notes(score_path: Path) -> list[dict[str, Any]]:
             notes.append(
                 {
                     "noteIndex": len(notes),
-                    "measure": int(element.measureNumber or 0),
-                    "scoreBeat": float(element.offset),
+                    "measure": measure_number,
+                    "scoreBeat": global_offset,
                     "durationBeats": float(element.quarterLength),
                     "midi": midi,
                     "chordPitchIndex": pitch_index,
