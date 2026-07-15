@@ -144,3 +144,10 @@
 - **⚠️ 依赖坑(运维必读)**:`pip install oemer` 会把 numpy 拉到 2.x,**直接弄坏 basic-pitch/tensorflow/numba**;装后必须 `pip install "numpy<2"` 回 1.26.x,两引擎可共存。
 - **仲裁器结构信号结论**:纯 events 计数排序实测更糟(幻觉小节推高计数,ex10/ex06 反被误选)→ 维持(确认数,吻合度)排序;events 差异作为 `structureSpreadNote` 教师提示保留;ex11 为已度量接受边界。
 - **状态可见性**:`western:project-status` 新增 `photoScoreOfflineChain`;gold 溯源审计排除同引擎复识/评测产物(independentCandidateRows 恢复 0,`test:western-project-gate` 复绿)。
+
+### 8.8 Oemer 独立 source-gold 对照(2026-07-15)
+- 8.7 的 `92.0%` 是与录音的交叉吻合,不能替代独立 MusicXML gold 准确率。现用 `npm run western:m4-oemer-benchmark` 在冻结的 5 份真实照片 source-gold 上补齐公平对照,输入预处理固定为与 Audiveris 相同的 `up2`。
+- Oemer 0.1.8 成功输出 4/5;`ex05` 将单声部误建为 3 tracks,在 `build_system.py` 的双轨断言处失败。成功 4 份聚合 pitch P/R=`71.70%/76.98%`;将失败页的 gold notes 计入分母后 recall=`62.81%`;严格 P≥98% 且 R≥95% 通过 `0/5`。
+- 同一 4 份 Audiveris up2 聚合 P/R=`83.17%/68.52%`。Oemer 在 `ex12` 明显提高 recall,但 `ex09` precision 大幅下降,且存在 1/5 builder 崩溃;不存在可直接采用的固定替换策略。按 gold 事后逐页挑引擎属于 oracle,不得冒充生产选择器。
+- Oemer 的 SVC 产物来自 `scikit-learn 1.2.0`。已用精确 1.2.0 兼容环境复跑,并与 1.2.2/1.8.0 输出逐字节比较;同页 MusicXML SHA-256 完全一致,故低准确率不是 sklearn 版本警告造成。
+- 裁决:`automaticAdoptionReady=false`,`studentGateReady=false`;保留 Oemer 为 eval-only 外部引擎证据,不替换 Audiveris,不进入学生端。

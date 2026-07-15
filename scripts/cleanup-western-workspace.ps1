@@ -36,6 +36,7 @@ function Measure-Target {
 
 $targets = @(
   (Join-Path $repoRoot "data\experiments\model-bakeoff\.venv"),
+  (Join-Path $repoRoot "data\experiments\western-strings-m4\oemer-compat-venv"),
   (Join-Path $repoRoot "data\experiments\western-strings-m4\_dbg"),
   (Join-Path $repoRoot "dist")
 )

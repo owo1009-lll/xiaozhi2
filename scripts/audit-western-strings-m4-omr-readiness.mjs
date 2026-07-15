@@ -208,7 +208,7 @@ async function buildReport(args) {
     },
     nextActions: m4OmrBenchmarkDatasetReady
       ? [
-          "M4 OMR benchmark dataset is ready. Next step: run an OMR engine on source images/PDFs and compare produced MusicXML against gold clean scores.",
+          "M4 OMR benchmark dataset is ready. Run or refresh Audiveris and stronger-engine comparisons against the frozen independent gold before changing any runtime OMR policy.",
           "Keep OMR out of runtime diagnosis until note-level OMR accuracy gates are implemented and passed.",
         ]
       : [

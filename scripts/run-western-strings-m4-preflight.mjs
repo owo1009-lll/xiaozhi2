@@ -104,6 +104,9 @@ function buildSummary(report) {
     `- independent real-photo gold rows: ${report.counts.independentRealPhotoRows}`,
     `- independent real-photo strict pass: ${report.counts.realPhotoStrictPassedRows}/${report.counts.realPhotoStrictEvaluatedRows}`,
     `- independent real-photo aggregate P/R: ${report.counts.realPhotoPitchPrecision ?? "n/a"}/${report.counts.realPhotoPitchRecall ?? "n/a"}`,
+    `- Oemer source-gold usable/failure rows: ${report.counts.oemerUsableRows}/${report.counts.oemerEngineFailureRows}`,
+    `- Oemer source-gold strict pass: ${report.counts.oemerStrictPassedRows}/${report.counts.oemerBenchmarkRows}`,
+    `- Oemer source-gold P/effective-R: ${report.counts.oemerPitchPrecision ?? "n/a"}/${report.counts.oemerPitchRecallIncludingEngineFailures ?? "n/a"}`,
     "",
     "## Meaning",
     "",
@@ -122,6 +125,7 @@ function buildSummary(report) {
     `- workspaceAuditCsv: ${report.artifacts.workspaceAuditCsv}`,
     `- independentBenchmarkJson: ${report.artifacts.independentBenchmarkJson}`,
     `- independentBenchmarkMd: ${report.artifacts.independentBenchmarkMd}`,
+    `- oemerBenchmark: ${report.artifacts.oemerBenchmark}`,
     `- nextActions: ${report.artifacts.nextActions}`,
     "",
     "## Step Results",
@@ -144,6 +148,7 @@ async function main() {
   const provenance = await readJson(path.join("data", "experiments", "western-strings-m4", "gold-provenance-audit.json"));
   const workspace = await readJson(path.join("data", "experiments", "western-strings-m4", "independent-gold-workspace-audit.json"));
   const independentBenchmark = await readJson(path.join("data", "experiments", "western-strings-m4", "independent-benchmark-audit.json"));
+  const oemerBenchmark = await readJson(path.join("data", "experiments", "western-strings-m4", "oemer-source-benchmark", "oemer-source-benchmark.json"));
   const status = await readJson(path.join("data", "experiments", "western-strings-project-status.json"));
 
   const m4Status = status?.tracks?.m4Omr || {};
@@ -167,6 +172,13 @@ async function main() {
     realPhotoStrictEvaluatedRows: independentBenchmark?.realPhotoGold?.evaluatedRows ?? 0,
     realPhotoPitchPrecision: independentBenchmark?.realPhotoGold?.aggregate?.precision ?? null,
     realPhotoPitchRecall: independentBenchmark?.realPhotoGold?.aggregate?.recall ?? null,
+    oemerBenchmarkRows: oemerBenchmark?.comparison?.oemer?.rows ?? 0,
+    oemerUsableRows: oemerBenchmark?.comparison?.oemer?.usableRows ?? 0,
+    oemerEngineFailureRows: oemerBenchmark?.comparison?.oemer?.engineFailureRows ?? 0,
+    oemerStrictPassedRows: oemerBenchmark?.comparison?.oemer?.strictPassRows ?? 0,
+    oemerPitchPrecision: oemerBenchmark?.comparison?.oemer?.pitchPrecision ?? null,
+    oemerPitchRecallIncludingEngineFailures:
+      oemerBenchmark?.comparison?.oemer?.pitchRecallIncludingEngineFailures ?? null,
   };
 
   const teacherReviewNeeded = Boolean(m4Status.teacherReviewNeeded || provenance?.teacherReviewNeeded || workspace?.teacherReviewNeeded);
@@ -209,6 +221,7 @@ async function main() {
       independentBenchmarkMd: "data/experiments/western-strings-m4/independent-benchmark-audit.md",
       independentRealPhotoManifest: "data/experiments/western-strings-m4/independent-real-photo-gold/independent-gold-manifest.json",
       independentRealPhotoBenchmark: "data/experiments/western-strings-m4/independent-source-benchmark/omr-benchmark.json",
+      oemerBenchmark: "data/experiments/western-strings-m4/oemer-source-benchmark/oemer-source-benchmark.json",
       nextActions: "data/experiments/western-strings-next-actions.md",
     },
     steps,

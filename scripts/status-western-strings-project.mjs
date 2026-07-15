@@ -357,6 +357,13 @@ const M4_INDEPENDENT_BENCHMARK_AUDIT = path.join(
   "western-strings-m4",
   "independent-benchmark-audit.json",
 );
+const M4_OEMER_BENCHMARK = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "oemer-source-benchmark",
+  "oemer-source-benchmark.json",
+);
 const M4_INDEPENDENT_GOLD_TODO = path.join(
   "data",
   "experiments",
@@ -1241,6 +1248,7 @@ async function buildM4OmrStatus() {
   const readiness = await readJson(M4_READINESS);
   const benchmark = await readJson(M4_BENCHMARK);
   const independentBenchmark = await readJson(M4_INDEPENDENT_BENCHMARK_AUDIT);
+  const oemerBenchmark = await readJson(M4_OEMER_BENCHMARK);
   const workspaceAudit = await readJson(M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT);
   const provenanceAudit = await readJson(M4_GOLD_PROVENANCE_AUDIT);
   const readinessReady = Boolean(readiness?.gate?.m4OmrBenchmarkDatasetReady);
@@ -1289,6 +1297,8 @@ async function buildM4OmrStatus() {
     m4OmrIndependentBenchmarkReady: independentBenchmarkReady,
     m4OmrAccuracyClaimReady: independentBenchmarkReady,
     m4OmrAutomaticAdoptionReady: automaticAdoptionReady,
+    m4OemerBenchmarkComplete: oemerBenchmark?.complete === true,
+    m4OemerAutomaticAdoptionReady: oemerBenchmark?.gate?.automaticAdoptionReady === true,
     studentGateReady: false,
     teacherReviewNeeded: false,
     scoreEditorReviewNeeded: humanTask !== "none",
@@ -1312,6 +1322,7 @@ async function buildM4OmrStatus() {
       readinessJson: M4_READINESS.replace(/\\/g, "/"),
       benchmarkJson: M4_BENCHMARK.replace(/\\/g, "/"),
       independentBenchmarkJson: M4_INDEPENDENT_BENCHMARK_AUDIT.replace(/\\/g, "/"),
+      oemerBenchmarkJson: M4_OEMER_BENCHMARK.replace(/\\/g, "/"),
       independentGoldTodo: M4_INDEPENDENT_GOLD_TODO.replace(/\\/g, "/"),
       independentGoldTodoHtml: M4_INDEPENDENT_GOLD_TODO_HTML.replace(/\\/g, "/"),
       independentGoldWorkspaceAuditJson: M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT.replace(/\\/g, "/"),
@@ -1354,6 +1365,20 @@ async function buildM4OmrStatus() {
       source: M4_INDEPENDENT_BENCHMARK_AUDIT.replace(/\\/g, "/"),
       missing: true,
       independentBenchmarkReady: false,
+      automaticAdoptionReady: false,
+      studentGateReady: false,
+    },
+    oemerBenchmark: oemerBenchmark ? {
+      source: M4_OEMER_BENCHMARK.replace(/\\/g, "/"),
+      complete: oemerBenchmark.complete === true,
+      automaticAdoptionReady: oemerBenchmark?.gate?.automaticAdoptionReady === true,
+      studentGateReady: oemerBenchmark?.gate?.studentGateReady === true,
+      runtime: oemerBenchmark.runtime || {},
+      comparison: oemerBenchmark.comparison || {},
+    } : {
+      source: M4_OEMER_BENCHMARK.replace(/\\/g, "/"),
+      missing: true,
+      complete: false,
       automaticAdoptionReady: false,
       studentGateReady: false,
     },
@@ -1502,14 +1527,20 @@ function summarizeNextActions(
       priority: 3,
       track: "M4 OMR automatic adoption",
       action: realPhotoRows >= 3
-        ? `Keep OMR draft-only. ${realPhotoRows} independent source-gold photos are now available, but 0/${realPhotoRows} pass the strict P>=0.98/R>=0.95 floor; preprocessing and runtime confidence probes also found no safe production subset. The next machine task is a stronger OMR engine on this frozen benchmark, not more score-editor review.`
+        ? m4Omr.m4OemerBenchmarkComplete
+          ? `Keep OMR draft-only. ${realPhotoRows} independent source-gold photos are available, but 0/${realPhotoRows} pass the strict P>=0.98/R>=0.95 floor. Preprocessing, runtime confidence, and the Oemer stronger-engine comparison all failed to produce a safe production subset. Do not repeat score-editor review or rerun the same engine; only evaluate a genuinely different engine on this frozen benchmark or add external blind photos.`
+          : `Keep OMR draft-only. ${realPhotoRows} independent source-gold photos are now available, but 0/${realPhotoRows} pass the strict P>=0.98/R>=0.95 floor; preprocessing and runtime confidence probes also found no safe production subset. The next machine task is a stronger OMR engine on this frozen benchmark, not more score-editor review.`
         : "Keep OMR draft-only. Runtime-visible confidence features cannot select a 90%-precision/20%-coverage safe subset. Create at least 3 independent real-photo MusicXML references, rerun blind OMR, then rerun the confidence probe and independent benchmark audit.",
       artifact: realPhotoRows >= 3
-        ? m4Omr.artifacts?.independentBenchmarkJson
+        ? m4Omr.m4OemerBenchmarkComplete
+          ? m4Omr.artifacts?.oemerBenchmarkJson
+          : m4Omr.artifacts?.independentBenchmarkJson
         : m4Omr.artifacts?.independentGoldTodoHtml || m4Omr.artifacts?.independentBenchmarkJson,
       humanTask: m4Omr.humanTask,
       scoreEditorReviewNeeded: m4Omr.scoreEditorReviewNeeded,
-      reason: m4Omr.automaticAdoptionBlockingReasons,
+      reason: m4Omr.m4OemerBenchmarkComplete
+        ? [...m4Omr.automaticAdoptionBlockingReasons, "m4-oemer-source-benchmark-below-floor"]
+        : m4Omr.automaticAdoptionBlockingReasons,
     });
   }
   if (!actions.length) {

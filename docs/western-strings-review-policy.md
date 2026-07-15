@@ -97,6 +97,12 @@ task: compare the source score image/PDF against editable MusicXML/MXL. A music
 teacher should not be asked to judge intonation, rhythm, or student performance
 for this gate.
 
+The stronger-engine machine comparison is also complete. Oemer 0.1.8 failed to
+produce MusicXML for one of five frozen source-gold photos and passed the strict
+precision/recall gate on zero of five. This is a machine accuracy limitation,
+not a request for more teacher review. Keep OMR review-only unless a future
+engine passes the same frozen independent benchmark.
+
 Independent gold application has two safety gates:
 
 - the editable MXL/MusicXML file must differ from the Audiveris draft; and
