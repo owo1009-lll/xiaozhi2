@@ -168,6 +168,7 @@
 - **更强引擎对照(2026-07-15):** `npm run western:m4-oemer-benchmark` 已在同一 5 份真实照片 source-gold、同一 `up2` 输入上评测 Oemer 0.1.8。Oemer 成功输出 4/5,`ex05` 因把单声部误分为 3 tracks 在 MusicXML builder 触发断言而失败;成功 4 份的聚合 P/R=`71.7%/77.0%`,计入引擎失败后的有效 recall=`62.8%`,严格通过 `0/5`。同 4 份 Audiveris 为 P/R=`83.2%/68.5%`:Oemer 提高部分 recall,但 precision 和鲁棒性不足,不能替换 Audiveris。模型训练时 `scikit-learn 1.2.0` 与本机 1.8.0 的兼容性已用精确 1.2.0 复跑排除,同一页输出 SHA-256 完全一致。该比较保持 eval-only、`studentGateReady=false`。
 - **Transformer 引擎对照与闸门修正(2026-07-15):** `npm run western:m4-homr-benchmark` 已用 HOMR 0.7.0 在同一 5 份原始 source 照片评测。5/5 输出,pitch P/R=`89.0%/96.2%`,但 onset-quarter/measure accuracy=`30.7%/79.0%`;pitch-only 可通过 2/5,完整 score gate 为 0/5。`ex05/ex12` 证明音高全对仍可能把时值重建错,所以 M4 自动采用统一要求 pitch precision/recall 与 onset/measure 四项均过线。HOMR 不替换 Audiveris,仍为 eval-only。
 - **Clarity-OMR 对照(2026-07-15):** `npm run western:m4-clarity-benchmark` 已在同一 5 份 source-gold 上运行官方 beam-5 管线。原样截图含播放器黑边,Stage A 在 smoke 中检出 0 个谱表;冻结的通用裁页后 5/5 输出,但 pitch P/R=`72.8%/35.5%`,onset-quarter/measure accuracy=`2.8%/10.1%`,完整严格通过 `0/5`。Clarity 不替换现有引擎,不进入学生端。
+- **Clarity 监督适配前置(2026-07-15):** `western:m4-clarity-adaptation-data-probe` 已验证官方训练生成器可在 Windows 上经现有 SVG rasterizer 产出谱表图像/token 标签;一页样例得到 8 个去重样本。`western:m4-clarity-adaptation-split` 按 BWV 作品冻结为 train/validation/synthetic-test=`21/4/7`,5 份真实照片独立 gold 不进入训练。`western:m4-clarity-training-step` 已在 RTX 5060 上以 bf16+DoRA 完成单步前后向,可训练参数占 `5.1933%`,峰值 reserved 显存约 `1.08 GiB`。这只证明数据/兼容性/硬件可行,不代表模型准确率提升;没有 checkpoint 可接生产。后续训练必须限载,并在 validation、synthetic-test 与冻结真实照片上同时重跑 pitch precision/recall、onset-quarter、measure 四项闸门。
 
 ### M5 — 大提琴扩展
 - cello pitch range + onset/pitch 参数 + **专属误差分析** + **重新校准阈值(不复用小提琴)** + **独立 cello M0**。
@@ -442,7 +443,7 @@
 
 **V2-release 剩余缺口:** 已完成 5 首/5 条安全受控 pilot 和受控提交流接线;仍需 ① 一条全新独立盲测录音 + 已审 clean score + 谱面显示文件 + 核谱人;② 通过 fresh intake 与机器 precheck;③ 专业盲审和 release 终审。当前 coverage=4% 低于 20% 地板,不得仅因 precision=100% 默认开放。
 
-**本地安全清理:** `npm run western:cleanup` 只预览;`npm run western:cleanup:apply` 仅删除旧 model-bakeoff/Oemer/HOMR/Clarity 隔离环境、第三方模型源码与 M4 smoke 调试目录、`dist/` 和源码树 Python 缓存。正式 benchmark MusicXML/JSON/CSV 会保留,可在无第三方环境时用 `--reuse-existing` 重算;脚本拒绝工作区外路径和 `paper/` 目标,不删除正式数据、模型、音频、教师复核、private intake 或论文;执行后必须重跑 `npm run build`。
+**本地安全清理:** `npm run western:cleanup` 只预览;`npm run western:cleanup:apply` 仅删除旧 model-bakeoff/Oemer/HOMR/Clarity 隔离环境、废弃第三方源码、M4 smoke 调试目录、可再下载的空缓存、`dist/` 和源码树 Python 缓存。正式 benchmark MusicXML/JSON/CSV 以及当前监督适配所需的 `clarity-training-audit`、`clarity-train-source-audit`、`clarity-pretrained`、`clarity-adaptation-*` 会保留;脚本拒绝工作区外路径和 `paper/` 目标,不删除正式数据、模型、音频、教师复核、private intake 或论文;执行后必须重跑 `npm run build`。
 
 **受阻点记录:MUSC 推理"假死"(2026-07-11,已定位为环境问题,不可复现):**
 - 报告症状:44s 录音推理 30–50 分钟无输出,3s 音频单帧前向亦挂,GPU 5–9%/CPU 20%。

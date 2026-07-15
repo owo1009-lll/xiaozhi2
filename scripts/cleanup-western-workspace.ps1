@@ -40,6 +40,7 @@ $targets = @(
   (Join-Path $repoRoot "data\experiments\western-strings-m4\homr-compat-venv"),
   (Join-Path $repoRoot "data\experiments\western-strings-m4\clarity-compat-venv"),
   (Join-Path $repoRoot "data\experiments\western-strings-m4\clarity-omr-src"),
+  (Join-Path $repoRoot "data\experiments\western-strings-m4\clarity-pretrained-download-cache"),
   (Join-Path $repoRoot "data\experiments\western-strings-m4\_dbg"),
   (Join-Path $repoRoot "data\experiments\western-strings-m4\homr-smoke"),
   (Join-Path $repoRoot "data\experiments\western-strings-m4\clarity-smoke"),

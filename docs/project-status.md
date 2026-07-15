@@ -127,11 +127,14 @@
 - 更强 OMR 引擎对照已完成:`npm run western:m4-oemer-benchmark` 用 Oemer 0.1.8 在同一 5 份 source-gold 上串行评测。4/5 成功输出,1/5(`ex05`)因错误的 3-track 结构在 MusicXML builder 崩溃;成功 4 份 P/R=`71.70%/76.98%`,计入失败后的有效 recall=`62.81%`,严格通过 `0/5`。同 4 份 Audiveris P/R=`83.17%/68.52%`;Oemer 的 recall 增益不足以抵消 precision 和鲁棒性下降,不接生产。
 - Transformer OMR 对照已完成:`npm run western:m4-homr-benchmark` 用 HOMR 0.7.0 对同一 5 份原始 source 照片串行评测。5/5 均输出,聚合 pitch P/R=`89.00%/96.17%`,onset-quarter/measure accuracy=`30.73%/79.04%`。`ex05/ex12` 若只看音高会成为 `2/5` 假通过,但完整 pitch+onset+measure 严格门槛为 `0/5`;HOMR 因节奏重建错误仍不接生产。
 - 第三方视觉 Transformer 对照已完成:`npm run western:m4-clarity-benchmark` 用 Clarity-OMR 官方 beam-5 管线评测同一 5 份 source-gold。原始截图因播放器黑边/标题栏导致 Stage A 检出 `0` 个谱表;使用冻结的通用行均值裁页后 5/5 均输出,但聚合 pitch P/R=`72.77%/35.53%`,onset-quarter/measure accuracy=`2.81%/10.10%`,完整严格通过 `0/5`。该裁页仅用于公平评测,Clarity 不接生产。
+- Clarity 监督适配的非人工前置已跑通:`npm run western:m4-clarity-adaptation-data-probe` 从一页独立 Bach MusicXML 生成 8 个去重谱表图像/标签对,无盲测照片混入;`npm run western:m4-clarity-adaptation-split` 按 BWV 作品拆成 train/validation/synthetic-test=`21/4/7`,5 份真实照片 gold 冻结在训练集之外。
+- `npm run western:m4-clarity-training-step` 已在本机 RTX 5060 上完成一次 bf16+DoRA 反向传播:可训练参数 `8,946,222`(`5.1933%`),loss 有限、576 个参数张量获得有限梯度,峰值 reserved 显存约 `1.08 GiB`。官方权重中 48 个缺失键经核验为共享 FFN 别名,另 4 个为官方推理权重未包含的训练辅助 contour head;脚本对除此以外的缺失键 fail-closed。
 
 结论:
 
 - M4 已完成可复跑的独立**研究级** OMR 准确率基准,可以报告限定范围内的数字谱/合成退化结果。
 - M4 尚未达到自动采纳:逐谱严格门槛仅 12/32,真实照片独立源谱按 pitch+onset+measure 完整门槛严格通过 `0/5`,运行时置信特征也筛不出安全子集。OMR 不会进入学生端运行时自动诊断。
+- 监督适配目前只证明“数据可生成、划分无作品泄漏、当前硬件能训练一步”,尚未生成候选 checkpoint,更没有证明 pitch/onset/measure 四项提升。下一步只允许受限多作品训练后在 validation、synthetic-test 和冻结真实照片上重跑完整闸门;未过闸门仍保持 `studentGateReady=false`。
 - 当前不需要教师或制谱人员继续操作。新增真实照片 gold 的证据缺口已经关闭,Audiveris 预处理/置信筛选、Oemer、HOMR 与 Clarity-OMR 均未达到完整门槛;继续扩大照片只增强外部效度,不能掩盖当前 `0/5`。
 - 报告论文/表格时必须将独立 render-gold 与 `human-approved-unchanged-draft` 分开,后者不得伪称独立照片准确率。
 
@@ -305,4 +308,4 @@ npm run western:cleanup
 npm run western:cleanup:apply
 ```
 
-清理脚本拒绝工作区外路径和 `paper/` 下任何目标;不会删除正式数据、模型、音频、教师复核、private intake 或论文。`dist/` 会被清理,发布/验收前必须重新运行 `npm run build`。
+清理脚本拒绝工作区外路径和 `paper/` 下任何目标;不会删除正式数据、模型、音频、教师复核、private intake 或论文。当前 M4 监督适配使用的 `clarity-training-audit`、`clarity-train-source-audit`、`clarity-pretrained` 和 `clarity-adaptation-*` 明确保留;只清空可再下载的临时下载缓存。`dist/` 会被清理,发布/验收前必须重新运行 `npm run build`。
