@@ -129,12 +129,14 @@
 - 第三方视觉 Transformer 对照已完成:`npm run western:m4-clarity-benchmark` 用 Clarity-OMR 官方 beam-5 管线评测同一 5 份 source-gold。原始截图因播放器黑边/标题栏导致 Stage A 检出 `0` 个谱表;使用冻结的通用行均值裁页后 5/5 均输出,但聚合 pitch P/R=`72.77%/35.53%`,onset-quarter/measure accuracy=`2.81%/10.10%`,完整严格通过 `0/5`。该裁页仅用于公平评测,Clarity 不接生产。
 - Clarity 监督适配的非人工前置已跑通:`npm run western:m4-clarity-adaptation-data-probe` 从一页独立 Bach MusicXML 生成 8 个去重谱表图像/标签对,无盲测照片混入;`npm run western:m4-clarity-adaptation-split` 按 BWV 作品拆成 train/validation/synthetic-test=`21/4/7`,5 份真实照片 gold 冻结在训练集之外。
 - `npm run western:m4-clarity-training-step` 已在本机 RTX 5060 上完成一次 bf16+DoRA 反向传播:可训练参数 `8,946,222`(`5.1933%`),loss 有限、576 个参数张量获得有限梯度,峰值 reserved 显存约 `1.08 GiB`。官方权重中 48 个缺失键经核验为共享 FFN 别名,另 4 个为官方推理权重未包含的训练辅助 contour head;脚本对除此以外的缺失键 fail-closed。
+- 受限多作品适配已完成:32/32 个 Bach movement 生成 592 个原始/296 个去重 staff-token 对,按作品得到 train/validation/synthetic-test=`199/39/58` 条,无作品、图片哈希或真实照片盲测泄漏。64-step DoRA 峰值 reserved 显存约 `1.21 GiB`;teacher-forced 与自回归 held-out 指标均有提升,说明训练确实改变了模型而非空跑。
+- 冻结 5 张真实照片给出了决定性否定结果:候选 5/5 可输出,但聚合 pitch P/R=`80.00%/31.44%`,onset-quarter/measure accuracy=`2.04%/6.26%`,严格通过 `0/5`。对比官方 Clarity 基线 `72.77%/35.53%`、`2.81%/10.10%`,候选只提高 precision,其余三项退化;自动适配决策为 `reject-and-delete`,候选权重已排除出产品与后续评估。
 
 结论:
 
 - M4 已完成可复跑的独立**研究级** OMR 准确率基准,可以报告限定范围内的数字谱/合成退化结果。
 - M4 尚未达到自动采纳:逐谱严格门槛仅 12/32,真实照片独立源谱按 pitch+onset+measure 完整门槛严格通过 `0/5`,运行时置信特征也筛不出安全子集。OMR 不会进入学生端运行时自动诊断。
-- 监督适配目前只证明“数据可生成、划分无作品泄漏、当前硬件能训练一步”,尚未生成候选 checkpoint,更没有证明 pitch/onset/measure 四项提升。下一步只允许受限多作品训练后在 validation、synthetic-test 和冻结真实照片上重跑完整闸门;未过闸门仍保持 `studentGateReady=false`。
+- Clarity 监督适配已完成一次从数据生成、无泄漏划分、低负载训练到冻结真实照片的完整闭环,但真实照片完整指标不升反降,候选已拒绝并清理。该路线不再继续堆训练步数或调参;除非以后新增独立且更大规模的人工编辑 OMR 训练集,否则 Clarity 只保留为负基线,`studentGateReady=false` 不变。
 - 当前不需要教师或制谱人员继续操作。新增真实照片 gold 的证据缺口已经关闭,Audiveris 预处理/置信筛选、Oemer、HOMR 与 Clarity-OMR 均未达到完整门槛;继续扩大照片只增强外部效度,不能掩盖当前 `0/5`。
 - 报告论文/表格时必须将独立 render-gold 与 `human-approved-unchanged-draft` 分开,后者不得伪称独立照片准确率。
 

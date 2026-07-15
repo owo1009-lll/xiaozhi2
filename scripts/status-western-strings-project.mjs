@@ -378,6 +378,13 @@ const M4_CLARITY_BENCHMARK = path.join(
   "clarity-source-benchmark",
   "clarity-source-benchmark.json",
 );
+const M4_CLARITY_ADAPTATION_BENCHMARK = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "clarity-adaptation-photo-benchmark",
+  "clarity-source-benchmark.json",
+);
 const M4_INDEPENDENT_GOLD_TODO = path.join(
   "data",
   "experiments",
@@ -1265,6 +1272,7 @@ async function buildM4OmrStatus() {
   const oemerBenchmark = await readJson(M4_OEMER_BENCHMARK);
   const homrBenchmark = await readJson(M4_HOMR_BENCHMARK);
   const clarityBenchmark = await readJson(M4_CLARITY_BENCHMARK);
+  const clarityAdaptationBenchmark = await readJson(M4_CLARITY_ADAPTATION_BENCHMARK);
   const workspaceAudit = await readJson(M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT);
   const provenanceAudit = await readJson(M4_GOLD_PROVENANCE_AUDIT);
   const readinessReady = Boolean(readiness?.gate?.m4OmrBenchmarkDatasetReady);
@@ -1280,6 +1288,10 @@ async function buildM4OmrStatus() {
       ? ["m4-homr-source-benchmark-below-complete-score-floor"] : []),
     ...(!automaticAdoptionReady && clarityBenchmark?.complete === true && clarityBenchmark?.gate?.automaticAdoptionReady !== true
       ? ["m4-clarity-source-benchmark-below-complete-score-floor"] : []),
+    ...(!automaticAdoptionReady
+      && clarityAdaptationBenchmark?.adaptationDecision?.evaluated === true
+      && clarityAdaptationBenchmark?.adaptationDecision?.retainForFurtherEvaluation !== true
+      ? ["m4-clarity-supervised-adaptation-rejected"] : []),
   ];
   const provenanceCounts = provenanceAudit?.counts || {};
   const manualGoldRequiredRows = Number(provenanceCounts.manualGoldRequiredRows || 0);
@@ -1326,6 +1338,8 @@ async function buildM4OmrStatus() {
     m4HomrAutomaticAdoptionReady: homrBenchmark?.gate?.automaticAdoptionReady === true,
     m4ClarityBenchmarkComplete: clarityBenchmark?.complete === true,
     m4ClarityAutomaticAdoptionReady: clarityBenchmark?.gate?.automaticAdoptionReady === true,
+    m4ClarityAdaptationEvaluated: clarityAdaptationBenchmark?.adaptationDecision?.evaluated === true,
+    m4ClarityAdaptationRejected: clarityAdaptationBenchmark?.adaptationDecision?.checkpointDisposition === "reject-and-delete",
     studentGateReady: false,
     teacherReviewNeeded: false,
     scoreEditorReviewNeeded: humanTask !== "none",
@@ -1352,6 +1366,7 @@ async function buildM4OmrStatus() {
       oemerBenchmarkJson: M4_OEMER_BENCHMARK.replace(/\\/g, "/"),
       homrBenchmarkJson: M4_HOMR_BENCHMARK.replace(/\\/g, "/"),
       clarityBenchmarkJson: M4_CLARITY_BENCHMARK.replace(/\\/g, "/"),
+      clarityAdaptationBenchmarkJson: M4_CLARITY_ADAPTATION_BENCHMARK.replace(/\\/g, "/"),
       independentGoldTodo: M4_INDEPENDENT_GOLD_TODO.replace(/\\/g, "/"),
       independentGoldTodoHtml: M4_INDEPENDENT_GOLD_TODO_HTML.replace(/\\/g, "/"),
       independentGoldWorkspaceAuditJson: M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT.replace(/\\/g, "/"),
@@ -1439,6 +1454,19 @@ async function buildM4OmrStatus() {
       complete: false,
       automaticAdoptionReady: false,
       studentGateReady: false,
+    },
+    clarityAdaptationBenchmark: clarityAdaptationBenchmark ? {
+      source: M4_CLARITY_ADAPTATION_BENCHMARK.replace(/\\/g, "/"),
+      complete: clarityAdaptationBenchmark.complete === true,
+      studentGateReady: false,
+      comparison: clarityAdaptationBenchmark.comparison || {},
+      adaptationDecision: clarityAdaptationBenchmark.adaptationDecision || {},
+    } : {
+      source: M4_CLARITY_ADAPTATION_BENCHMARK.replace(/\\/g, "/"),
+      missing: true,
+      complete: false,
+      studentGateReady: false,
+      adaptationDecision: {},
     },
     independentGoldWorkspaceAudit: workspaceAudit
       ? {
@@ -1585,7 +1613,9 @@ function summarizeNextActions(
       priority: 3,
       track: "M4 OMR automatic adoption",
       action: realPhotoRows >= 3
-        ? m4Omr.m4ClarityBenchmarkComplete
+        ? m4Omr.m4ClarityAdaptationRejected
+          ? `Keep OMR draft-only. ${realPhotoRows} independent source-gold photos are available, but 0/${realPhotoRows} pass the complete pitch/onset/measure floor. The bounded Clarity supervised-adaptation pilot has also completed and was rejected because recall, onset, and measure accuracy regressed versus the official baseline. Do not repeat this training or request more human review. A future automatic-adoption attempt requires a materially larger independent photo-to-MusicXML training set or a fundamentally different OMR architecture.`
+          : m4Omr.m4ClarityBenchmarkComplete
           ? `Keep OMR draft-only. ${realPhotoRows} independent source-gold photos are available, but 0/${realPhotoRows} pass the complete pitch/onset/measure floor. Audiveris preprocessing, runtime confidence, Oemer, HOMR 0.7.0, and Clarity-OMR all failed to produce a safe production subset. Do not repeat human review or rerun these engines; the next research step must be supervised adaptation or new external blind photos.`
           : m4Omr.m4HomrBenchmarkComplete
             ? `Keep OMR draft-only. ${realPhotoRows} independent source-gold photos are available, but 0/${realPhotoRows} pass the complete pitch/onset/measure floor. Audiveris preprocessing, runtime confidence, Oemer, and HOMR 0.7.0 all failed to produce a safe production subset. Do not repeat human review or rerun these engines; the next research step must be a genuinely different model, supervised adaptation, or new external blind photos.`
@@ -1594,7 +1624,9 @@ function summarizeNextActions(
           : `Keep OMR draft-only. ${realPhotoRows} independent source-gold photos are now available, but 0/${realPhotoRows} pass the strict P>=0.98/R>=0.95 floor; preprocessing and runtime confidence probes also found no safe production subset. The next machine task is a stronger OMR engine on this frozen benchmark, not more score-editor review.`
         : "Keep OMR draft-only. Runtime-visible confidence features cannot select a 90%-precision/20%-coverage safe subset. Create at least 3 independent real-photo MusicXML references, rerun blind OMR, then rerun the confidence probe and independent benchmark audit.",
       artifact: realPhotoRows >= 3
-        ? m4Omr.m4ClarityBenchmarkComplete
+        ? m4Omr.m4ClarityAdaptationRejected
+          ? m4Omr.artifacts?.clarityAdaptationBenchmarkJson
+          : m4Omr.m4ClarityBenchmarkComplete
           ? m4Omr.artifacts?.clarityBenchmarkJson
           : m4Omr.m4HomrBenchmarkComplete
             ? m4Omr.artifacts?.homrBenchmarkJson

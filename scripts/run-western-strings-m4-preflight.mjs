@@ -113,6 +113,8 @@ function buildSummary(report) {
     `- Clarity source-gold usable/failure rows: ${report.counts.clarityUsableRows}/${report.counts.clarityEngineFailureRows}`,
     `- Clarity pitch-only/complete strict pass: ${report.counts.clarityPitchOnlyStrictPassedRows}/${report.counts.clarityStrictPassedRows}`,
     `- Clarity P/R/onset/measure: ${report.counts.clarityPitchPrecision ?? "n/a"}/${report.counts.clarityPitchRecall ?? "n/a"}/${report.counts.clarityOnsetQuarterAccuracy ?? "n/a"}/${report.counts.clarityMeasureAccuracy ?? "n/a"}`,
+    `- Clarity adaptation evaluated/rejected: ${report.counts.clarityAdaptationEvaluated}/${report.counts.clarityAdaptationRejected}`,
+    `- Clarity adaptation P/R/onset/measure: ${report.counts.clarityAdaptationPitchPrecision ?? "n/a"}/${report.counts.clarityAdaptationPitchRecall ?? "n/a"}/${report.counts.clarityAdaptationOnsetQuarterAccuracy ?? "n/a"}/${report.counts.clarityAdaptationMeasureAccuracy ?? "n/a"}`,
     "",
     "## Meaning",
     "",
@@ -134,6 +136,7 @@ function buildSummary(report) {
     `- oemerBenchmark: ${report.artifacts.oemerBenchmark}`,
     `- homrBenchmark: ${report.artifacts.homrBenchmark}`,
     `- clarityBenchmark: ${report.artifacts.clarityBenchmark}`,
+    `- clarityAdaptationBenchmark: ${report.artifacts.clarityAdaptationBenchmark}`,
     `- nextActions: ${report.artifacts.nextActions}`,
     "",
     "## Step Results",
@@ -159,6 +162,7 @@ async function main() {
   const oemerBenchmark = await readJson(path.join("data", "experiments", "western-strings-m4", "oemer-source-benchmark", "oemer-source-benchmark.json"));
   const homrBenchmark = await readJson(path.join("data", "experiments", "western-strings-m4", "homr-source-benchmark", "homr-source-benchmark.json"));
   const clarityBenchmark = await readJson(path.join("data", "experiments", "western-strings-m4", "clarity-source-benchmark", "clarity-source-benchmark.json"));
+  const clarityAdaptationBenchmark = await readJson(path.join("data", "experiments", "western-strings-m4", "clarity-adaptation-photo-benchmark", "clarity-source-benchmark.json"));
   const status = await readJson(path.join("data", "experiments", "western-strings-project-status.json"));
 
   const m4Status = status?.tracks?.m4Omr || {};
@@ -209,6 +213,17 @@ async function main() {
     clarityPitchRecall: clarityBenchmark?.comparison?.clarity?.pitchRecall ?? null,
     clarityOnsetQuarterAccuracy: clarityBenchmark?.comparison?.clarity?.onsetQuarterAccuracy ?? null,
     clarityMeasureAccuracy: clarityBenchmark?.comparison?.clarity?.measureAccuracy ?? null,
+    clarityAdaptationEvaluated: clarityAdaptationBenchmark?.adaptationDecision?.evaluated === true,
+    clarityAdaptationRejected:
+      clarityAdaptationBenchmark?.adaptationDecision?.checkpointDisposition === "reject-and-delete",
+    clarityAdaptationPitchPrecision:
+      clarityAdaptationBenchmark?.comparison?.clarity?.pitchPrecision ?? null,
+    clarityAdaptationPitchRecall:
+      clarityAdaptationBenchmark?.comparison?.clarity?.pitchRecall ?? null,
+    clarityAdaptationOnsetQuarterAccuracy:
+      clarityAdaptationBenchmark?.comparison?.clarity?.onsetQuarterAccuracy ?? null,
+    clarityAdaptationMeasureAccuracy:
+      clarityAdaptationBenchmark?.comparison?.clarity?.measureAccuracy ?? null,
   };
 
   const teacherReviewNeeded = Boolean(m4Status.teacherReviewNeeded || provenance?.teacherReviewNeeded || workspace?.teacherReviewNeeded);
@@ -237,7 +252,9 @@ async function main() {
     counts,
     blockingReasons: m4Status.blockingReasons || [],
     automaticAdoptionBlockingReasons:
-      independentBenchmark?.automaticAdoptionBlockingReasons || ["m4-independent-benchmark-audit-missing"],
+      m4Status.automaticAdoptionBlockingReasons
+      || independentBenchmark?.automaticAdoptionBlockingReasons
+      || ["m4-independent-benchmark-audit-missing"],
     artifacts: {
       out: rel(args.out),
       summary: rel(args.summary),
@@ -254,6 +271,7 @@ async function main() {
       oemerBenchmark: "data/experiments/western-strings-m4/oemer-source-benchmark/oemer-source-benchmark.json",
       homrBenchmark: "data/experiments/western-strings-m4/homr-source-benchmark/homr-source-benchmark.json",
       clarityBenchmark: "data/experiments/western-strings-m4/clarity-source-benchmark/clarity-source-benchmark.json",
+      clarityAdaptationBenchmark: "data/experiments/western-strings-m4/clarity-adaptation-photo-benchmark/clarity-source-benchmark.json",
       nextActions: "data/experiments/western-strings-next-actions.md",
     },
     steps,

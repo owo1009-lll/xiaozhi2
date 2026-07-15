@@ -276,6 +276,24 @@ if (m4.m4ClarityBenchmarkComplete) {
   assert.equal(m4.clarityBenchmark?.comparison?.clarity?.measureAccuracy, 0.100958, "Clarity measure accuracy must match the frozen benchmark");
   assert.equal(m4.clarityBenchmark?.rawNativeSmoke?.staffCrops, 0, "Clarity must expose the native-photo Stage-A failure");
 }
+if (m4.m4ClarityAdaptationEvaluated) {
+  assert.equal(m4.m4ClarityAdaptationRejected, true, "the measured Clarity adaptation candidate must be rejected");
+  assert.equal(m4.clarityAdaptationBenchmark?.studentGateReady, false, "Clarity adaptation must remain eval-only");
+  assert.equal(
+    m4.clarityAdaptationBenchmark?.adaptationDecision?.checkpointDisposition,
+    "reject-and-delete",
+    "Clarity adaptation decision must preserve the measured rejection",
+  );
+  assert.equal(
+    m4.clarityAdaptationBenchmark?.comparison?.clarity?.strictPassRows,
+    0,
+    "Clarity adaptation must not pass the complete score floor",
+  );
+  assert(
+    m4.automaticAdoptionBlockingReasons?.includes("m4-clarity-supervised-adaptation-rejected"),
+    "M4 automatic adoption must report the rejected supervised adaptation",
+  );
+}
 assert(
   m4.automaticAdoptionBlockingReasons?.includes("m4-clean-per-piece-strict-pass-rate-too-low"),
   "M4 automatic adoption must report the strict per-piece shortfall",

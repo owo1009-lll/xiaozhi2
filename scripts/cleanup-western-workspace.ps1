@@ -44,6 +44,7 @@ $targets = @(
   (Join-Path $repoRoot "data\experiments\western-strings-m4\_dbg"),
   (Join-Path $repoRoot "data\experiments\western-strings-m4\homr-smoke"),
   (Join-Path $repoRoot "data\experiments\western-strings-m4\clarity-smoke"),
+  (Join-Path $repoRoot "data\experiments\western-strings-m4\clarity-adaptation-photo-smoke"),
   (Join-Path $repoRoot "dist")
 )
 
