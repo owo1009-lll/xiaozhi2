@@ -240,11 +240,16 @@ assert(
   m4.automaticAdoptionBlockingReasons?.includes("m4-real-photo-independent-gold-missing"),
   "M4 automatic adoption must report missing independent real-photo gold",
 );
+assert(
+  m4.automaticAdoptionBlockingReasons?.includes("m4-runtime-safe-subset-not-found"),
+  "M4 automatic adoption must report that runtime-visible confidence signals cannot select a safe subset",
+);
 assert.equal(m4.teacherReviewNeeded, false, "M4 independent-gold correction must not be reported as teacher audio review");
+assert.equal(m4.scoreEditorReviewNeeded, true, "M4 automatic adoption should expose the independent real-photo score-editor task");
 assert.equal(
   m4.humanTask,
-  "none",
-  "M4 should not ask for a score-editor task when all unchanged drafts have clean-score approval",
+  "score-editor-independent-real-photo-gold",
+  "M4 should distinguish the new independent real-photo gold task from the already-approved unchanged drafts",
 );
 assert.equal(
   m4.independentGoldWorkspaceAudit?.source,

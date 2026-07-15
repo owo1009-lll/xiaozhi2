@@ -20,6 +20,7 @@ const DEFAULT_INPUTS = {
   scan: path.join("data", "experiments", "western-strings-m4", "render-gold-omr-scan", "render-gold-omr-summary.json"),
   photo: path.join("data", "experiments", "western-strings-m4", "render-gold-omr-photo", "render-gold-omr-summary.json"),
   realPhotoConsistency: path.join("data", "experiments", "western-strings-m4", "real-jpg-omr", "real-jpg-omr-summary.json"),
+  confidenceProbe: path.join("data", "experiments", "western-strings-m4", "omr-confidence-probe.json"),
 };
 
 export const DEFAULT_THRESHOLDS = Object.freeze({
@@ -106,6 +107,7 @@ export function evaluateIndependentBenchmark(inputs, thresholds = DEFAULT_THRESH
   // The current real-photo set uses human-approved unchanged Audiveris drafts.
   // It is consistency evidence, not independent photo-domain accuracy gold.
   const independentRealPhotoRows = 0;
+  const confidenceProbeReady = inputs?.confidenceProbe?.safeSubsetReady === true;
   const automaticAdoptionBlockingReasons = [];
   if (!independentBenchmarkReady) {
     automaticAdoptionBlockingReasons.push("m4-independent-benchmark-not-ready");
@@ -115,6 +117,11 @@ export function evaluateIndependentBenchmark(inputs, thresholds = DEFAULT_THRESH
   }
   if (independentRealPhotoRows < thresholds.minIndependentRealPhotoRows) {
     automaticAdoptionBlockingReasons.push("m4-real-photo-independent-gold-missing");
+  }
+  if (!confidenceProbeReady) {
+    automaticAdoptionBlockingReasons.push(
+      inputs?.confidenceProbe ? "m4-runtime-safe-subset-not-found" : "m4-runtime-confidence-probe-missing",
+    );
   }
   const automaticAdoptionReady = automaticAdoptionBlockingReasons.length === 0;
 
@@ -133,7 +140,20 @@ export function evaluateIndependentBenchmark(inputs, thresholds = DEFAULT_THRESH
       passRate: strictPassRate,
       passedPieces: strictRows.map((row) => row.piece),
     },
+    minIndependentRealPhotoRows: thresholds.minIndependentRealPhotoRows,
     realPhotoConsistency: summarizeConsistency(inputs?.realPhotoConsistency),
+    confidenceProbe: inputs?.confidenceProbe ? {
+      sourceAvailable: true,
+      safeSubsetReady: confidenceProbeReady,
+      validation: String(inputs.confidenceProbe.validation || ""),
+      runtimeFeatureOnly: inputs.confidenceProbe.runtimeFeatureOnly === true,
+      counts: inputs.confidenceProbe.counts || {},
+      blockingReasons: inputs.confidenceProbe.blockingReasons || [],
+      models: inputs.confidenceProbe.models || {},
+    } : {
+      sourceAvailable: false,
+      safeSubsetReady: false,
+    },
     independentRealPhotoRows,
     evidenceBlockingReasons,
     automaticAdoptionBlockingReasons,
@@ -188,6 +208,7 @@ function renderSummary(report, sources) {
     "",
     `- strict per-piece pass: ${report.strictPerPiece.passedRows}/${report.strictPerPiece.evaluatedRows} (${(report.strictPerPiece.passRate * 100).toFixed(1)}%)`,
     `- independent real-photo gold rows: ${report.independentRealPhotoRows}`,
+    `- runtime confidence safe subset: ${report.confidenceProbe.safeSubsetReady}`,
     `- blockers: ${report.automaticAdoptionBlockingReasons.join(", ") || "none"}`,
     "",
     "The real-photo JPG result is re-recognition consistency against human-approved unchanged Audiveris drafts. It is not independent photo-domain accuracy and cannot open the runtime gate.",

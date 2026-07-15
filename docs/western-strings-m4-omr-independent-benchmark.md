@@ -6,6 +6,8 @@
 
 > **当前裁决(2026-07-15):** `npm run western:m4-independent-benchmark-audit` 证明独立 clean/scan/photo render-gold 达到研究报告下限,但严格逐谱 P≥98% 且 R≥95% 仅 12/32(37.5%),真实照片独立 gold 为 0。因此本页后文的 A/B/C、自动仲裁与“全自动”内容均是历史 eval-only 原型结果,不能解释为生产自动采纳或真实照片独立准确率。当前 `automaticAdoptionReady=false`,`studentGateReady=false`。
 
+运行时置信筛选也已单独证伪:`npm run western:m4-omr-confidence-probe` 仅使用识别谱和 Audiveris 日志中上线可见的 11 个特征,按 BWV 作品留一。LR AUC=0.567,RF AUC=0.800;RF 最佳观察点仅 precision=0.80/coverage=0.156,不存在 precision≥0.90 且 coverage≥0.20 的安全子集。因此不能靠“模型自报高置信”绕过逐谱精度问题。
+
 ## 1. 为什么需要这份基准
 
 此前 M4 benchmark 的 gold 与 Audiveris 草稿逐字节相同(自比较),给出的 100% 不可采信。本基准用**独立 gold**:Bach Violin Dataset 的公版 MusicXML(与 Audiveris 无关)经 Verovio 渲染成谱面图,再让 Audiveris **盲识**,music21 逐音比对。指标为音高序列 precision / recall / F1(SequenceMatcher;不含节奏/时值评分)。

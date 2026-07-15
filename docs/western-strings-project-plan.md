@@ -163,6 +163,7 @@
 - **与判断层的关系:** OMR 只解决"谱面从哪来";判断仍是音频侧 M2/M3。**谱面错 → 判断全错**,所以 OMR 闸门必须比音频闸门更严,且学生端要明示"此谱由识别得到、是否经人工核对"。
 - **验收:** OMR note 准确率达标闸门通过;不达标谱 100% 走人工;`scoreSource=omr` 全链路可追溯;判断层不读取 `omrReviewStatus≠human-approved` 且未过闸门的谱。
 - **当前执行状态(2026-07-15):** `npm run western:m4-independent-benchmark-audit` 与 `western:m4-preflight` 已将证据拆开。独立 render/scan/photo 三域达到研究报告下限,故 `m4OmrAccuracyClaimReady=true`;但严格逐谱仅 12/32,真照片独立 gold=0,故 `m4OmrAutomaticAdoptionReady=false`,`m4OmrAutoScoreReady=false`。既有 12 条人工批准未改草稿只作一致性证据,无需重复复核,也不能打开自动运行时。实时事实以 `npm run western:m4-preflight` 和 `npm run western:project-status` 为准。
+- **运行时置信探针(2026-07-15):** `npm run western:m4-omr-confidence-probe` 只使用识别规模、页数和 Audiveris 日志等运行时可见特征,按 6 个 BWV 作品留一。LR/RF AUC=0.567/0.800;RF 最佳观察点 precision=0.80、coverage=0.156,没有达到 0.90/0.20 的安全子集。该负结果已接入独立审计,禁止用自报置信绕过逐谱精度门槛。
 
 ### M5 — 大提琴扩展
 - cello pitch range + onset/pitch 参数 + **专属误差分析** + **重新校准阈值(不复用小提琴)** + **独立 cello M0**。
@@ -432,7 +433,7 @@
 | M0 / M1 / M2(含 M2f)/ M3 core | 100%(闸门通过;**但 M3 core 每类有效错误样本仅 2 个,证据浓度薄**,扩证依赖新增含错录音) |
 | M3 全量(时值/多音) | ~70%(缺样本/口径,review-only) |
 | M3+ 少退复核 | ~55%(滑音/颤音离线证据过;双音对齐器已支持;泛音谱面标注未做;未接运行时) |
-| M4 OMR+落到谱面 | ~85%(独立基准、分层闸门、谱面锚定、服务端/浏览器照片入口、离线生产管线和 12 条全量回归已成;关键剩余证据是真照片独立 gold、多引擎和默认运行时闸门) |
+| M4 OMR+落到谱面 | ~85%(独立基准、分层闸门、谱面锚定、服务端/浏览器照片入口、离线生产管线和 12 条全量回归已成;运行时置信探针已证无法筛出 90%/20% 安全子集;关键剩余证据是至少 3 份真照片独立 gold、多引擎和默认运行时闸门) |
 | M5 大提琴 / V3 | 0% / ~10% |
 
 **V2-release 剩余缺口:** 已完成 5 首/5 条安全受控 pilot 和受控提交流接线;仍需 ① 一条全新独立盲测录音 + 已审 clean score + 谱面显示文件 + 核谱人;② 通过 fresh intake 与机器 precheck;③ 专业盲审和 release 终审。当前 coverage=4% 低于 20% 地板,不得仅因 precision=100% 默认开放。

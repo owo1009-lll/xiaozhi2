@@ -21,11 +21,13 @@ const good = evaluateIndependentBenchmark({
   scan: summary(6, 0.94, 0.89),
   photo: summary(6, 0.95, 0.89),
   realPhotoConsistency: { caveat: "not independent", byVariant: { up2: { n: 12 } } },
+  confidenceProbe: { safeSubsetReady: false, validation: "leave-one-work-out" },
 });
 assert.equal(good.independentBenchmarkReady, true, "independent render/scan/photo evidence should pass its research floor");
 assert.equal(good.automaticAdoptionReady, false, "missing independent real-photo gold must keep automatic adoption closed");
 assert.equal(good.studentGateReady, false, "an eval-only benchmark must never open the student runtime gate");
 assert(good.automaticAdoptionBlockingReasons.includes("m4-real-photo-independent-gold-missing"));
+assert(good.automaticAdoptionBlockingReasons.includes("m4-runtime-safe-subset-not-found"));
 assert.equal(good.realPhotoConsistency.independentAccuracyEvidence, false);
 
 const missing = evaluateIndependentBenchmark({
@@ -54,7 +56,12 @@ assert.equal(malformed.independentBenchmarkReady, false, "malformed gold metrics
 
 const strictRows = summary(32, 0.99, 0.97);
 const strict = evaluateIndependentBenchmark(
-  { clean: strictRows, scan: summary(6, 0.94, 0.89), photo: summary(6, 0.95, 0.89) },
+  {
+    clean: strictRows,
+    scan: summary(6, 0.94, 0.89),
+    photo: summary(6, 0.95, 0.89),
+    confidenceProbe: { safeSubsetReady: true, validation: "leave-one-work-out", runtimeFeatureOnly: true },
+  },
   { ...DEFAULT_THRESHOLDS, minIndependentRealPhotoRows: 0 },
 );
 assert.equal(strict.strictPerPiece.passRate, 1);
@@ -67,5 +74,6 @@ console.log(JSON.stringify({ ok: true, checks: [
   "poor-metric-fail-closed",
   "null-metric-fail-closed",
   "real-photo-consistency-not-promoted",
+  "runtime-confidence-probe-fail-closed",
   "student-runtime-never-opened",
 ] }, null, 2));

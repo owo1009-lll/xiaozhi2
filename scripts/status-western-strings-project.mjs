@@ -1213,12 +1213,23 @@ async function buildM4OmrStatus() {
   const draftQualityReady = Boolean(benchmark?.gate?.m4OmrDraftQualityReady);
   const independentBenchmarkReady = independentBenchmark?.independentBenchmarkReady === true;
   const automaticAdoptionReady = independentBenchmark?.automaticAdoptionReady === true;
+  const automaticAdoptionBlockingReasons =
+    independentBenchmark?.automaticAdoptionBlockingReasons || ["m4-independent-benchmark-audit-missing"];
   const provenanceCounts = provenanceAudit?.counts || {};
   const manualGoldRequiredRows = Number(provenanceCounts.manualGoldRequiredRows || 0);
-  const humanTask = manualGoldRequiredRows > 0 ? "score-editor-independent-gold-correction" : "none";
-  const humanTaskScope = manualGoldRequiredRows > 0
-    ? "Correct MusicXML/MXL against source score images only; do not ask for audio diagnosis review."
-    : "No score-editor correction is currently required; unchanged drafts are usable only because prior clean-score review approved them.";
+  const independentRealPhotoGoldMissing = automaticAdoptionBlockingReasons.includes(
+    "m4-real-photo-independent-gold-missing",
+  );
+  const humanTask = independentRealPhotoGoldMissing
+    ? "score-editor-independent-real-photo-gold"
+    : manualGoldRequiredRows > 0
+      ? "score-editor-independent-gold-correction"
+      : "none";
+  const humanTaskScope = independentRealPhotoGoldMissing
+    ? "Create at least 3 MusicXML references directly from real score photos without copying or approving the Audiveris draft, then compare blind OMR output against those references."
+    : manualGoldRequiredRows > 0
+      ? "Correct MusicXML/MXL against source score images only; do not ask for audio diagnosis review."
+      : "No score-editor correction is currently required.";
   const blockingReasons = [];
   if (!readiness) blockingReasons.push("m4-omr-readiness-missing");
   else if (!readinessReady) blockingReasons.push("m4-omr-readiness-not-ready");
@@ -1245,6 +1256,7 @@ async function buildM4OmrStatus() {
     m4OmrAutomaticAdoptionReady: automaticAdoptionReady,
     studentGateReady: false,
     teacherReviewNeeded: false,
+    scoreEditorReviewNeeded: humanTask !== "none",
     humanTask,
     humanTaskScope,
     reason: "omr-status-only",
@@ -1260,8 +1272,7 @@ async function buildM4OmrStatus() {
       blockedRows: benchmark?.counts?.blockedRows || 0,
     },
     blockingReasons,
-    automaticAdoptionBlockingReasons:
-      independentBenchmark?.automaticAdoptionBlockingReasons || ["m4-independent-benchmark-audit-missing"],
+    automaticAdoptionBlockingReasons,
     artifacts: {
       readinessJson: M4_READINESS.replace(/\\/g, "/"),
       benchmarkJson: M4_BENCHMARK.replace(/\\/g, "/"),
@@ -1283,6 +1294,23 @@ async function buildM4OmrStatus() {
       domains: independentBenchmark.domains || {},
       strictPerPiece: independentBenchmark.strictPerPiece || {},
       independentRealPhotoRows: independentBenchmark.independentRealPhotoRows || 0,
+      minIndependentRealPhotoRows: independentBenchmark.minIndependentRealPhotoRows || 0,
+      confidenceProbe: independentBenchmark.confidenceProbe ? {
+        sourceAvailable: independentBenchmark.confidenceProbe.sourceAvailable === true,
+        safeSubsetReady: independentBenchmark.confidenceProbe.safeSubsetReady === true,
+        validation: independentBenchmark.confidenceProbe.validation || "",
+        runtimeFeatureOnly: independentBenchmark.confidenceProbe.runtimeFeatureOnly === true,
+        counts: independentBenchmark.confidenceProbe.counts || {},
+        blockingReasons: independentBenchmark.confidenceProbe.blockingReasons || [],
+        models: Object.fromEntries(Object.entries(independentBenchmark.confidenceProbe.models || {}).map(
+          ([name, result]) => [name, {
+            leaveOneWorkOutRocAuc: result.leaveOneWorkOutRocAuc ?? null,
+            safeSubsetReady: result.safeSubsetReady === true,
+            bestSafePoint: result.bestSafePoint || null,
+            bestObservedPoint: result.bestObservedPoint || null,
+          }],
+        )),
+      } : {},
       evidenceBlockingReasons: independentBenchmark.evidenceBlockingReasons || [],
       automaticAdoptionBlockingReasons: independentBenchmark.automaticAdoptionBlockingReasons || [],
       claimScope: independentBenchmark.claimScope || "",
@@ -1428,6 +1456,16 @@ function summarizeNextActions(
       humanTask: m4Omr.humanTask,
       teacherReviewNeeded: m4Omr.teacherReviewNeeded,
       reason: m4Omr.blockingReasons,
+    });
+  } else if (!m4Omr.m4OmrAutomaticAdoptionReady) {
+    actions.push({
+      priority: 3,
+      track: "M4 OMR automatic adoption",
+      action: "Keep OMR draft-only. Runtime-visible confidence features cannot select a 90%-precision/20%-coverage safe subset. Create at least 3 independent real-photo MusicXML references, rerun blind OMR, then rerun the confidence probe and independent benchmark audit.",
+      artifact: m4Omr.artifacts?.independentGoldTodoHtml || m4Omr.artifacts?.independentBenchmarkJson,
+      humanTask: m4Omr.humanTask,
+      scoreEditorReviewNeeded: m4Omr.scoreEditorReviewNeeded,
+      reason: m4Omr.automaticAdoptionBlockingReasons,
     });
   }
   if (!actions.length) {
@@ -1805,6 +1843,7 @@ function printProjectStatus(status, outPath) {
       accuracyClaimReady: m4Omr.m4OmrAccuracyClaimReady,
       automaticAdoptionReady: m4Omr.m4OmrAutomaticAdoptionReady,
       teacherReviewNeeded: m4Omr.teacherReviewNeeded,
+      scoreEditorReviewNeeded: m4Omr.scoreEditorReviewNeeded,
       humanTask: m4Omr.humanTask,
       independentGoldWorkspaceAudit: m4Omr.independentGoldWorkspaceAudit,
       goldProvenanceAudit: m4Omr.goldProvenanceAudit,

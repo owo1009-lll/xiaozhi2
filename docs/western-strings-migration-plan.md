@@ -242,6 +242,7 @@ OMR 只解决"谱面从哪来",不改变音频诊断逻辑。未过 note-level �
 - 该结果只是 OMR benchmark 的数据前置条件,不是 OMR 准确率通过。学生端仍固定 `studentGateReady=false`,OMR 识别结果在 note-level 精度闸门通过前不得进入 `/api/strings/analyze` 判断层。
 - 已接入 `npm run western:m4-omr-benchmark`,对 Audiveris 草稿和 gold clean score 做只读序列评测。2026-07-10 口径已修正:当前 12/12 clean score 虽然与 Audiveris 草稿 byte-identical,但这 12 条已经有 M2 clean-score review 的 `approved` + `cleanScoreReviewedBy` 证据,因此报告为 `human-approved-unchanged-draft`,不是未复核 self-comparison。当前 `usableBenchmarkRows=12`,`humanApprovedUnchangedRows=12`,`selfComparisonRows=0`,`manualGoldRequiredRows=0`,`m4OmrDraftQualityReady=true`。M4 仍是 eval-only OMR benchmark,不会打开学生端运行时 OMR 自动诊断;论文/表格报告时必须把这批与 `independent-edited-gold` 分开说明。
 - 已接入 `npm run western:m4-independent-benchmark-audit`:独立 clean/scan/photo render-gold 分别为 N=32/6/6,平均 P/R 均达到研究下限,所以限定的独立 OMR 准确率报告可用;但严格逐谱 P≥98% 且 R≥95% 仅 12/32,真实照片独立 gold=0,因此 `automaticAdoptionReady=false`,`studentGateReady=false`。既有真实照片结果仅为复识一致性,不得提升为照片域独立准确率。
+- 已接入 `npm run western:m4-omr-confidence-probe`:仅用运行时可见的识别规模、页数与 Audiveris 日志特征,按 BWV 作品留一。当前 LR/RF AUC=0.567/0.800,RF 最佳观察点 precision=0.80、coverage=0.156,无法达到 0.90/0.20,所以不能用置信模型绕过逐谱门槛。至少 3 份真实照片仍需从原图独立制作 MusicXML 参考谱,不能复制或仅批准同一 Audiveris 草稿。
 - 浏览器现可在 clean MusicXML/MIDI 与单页谱面照片之间二选一。照片入口只接受经过文件签名验证的 JPG/PNG/WebP,独立缓存照片与录音,在受控队列中显示预览,人工批准后才进入最多 5 条一批的离线照片谱分析。一般批处理与专用 CLI 都调用同一受管 Python 环境;结果固定为 `photo_score_review_ready`,`autoDiagnosisIssued=false`,`studentFacing=false`,并写入独立审计日志。
 - 当前单页照片入口不接受 PDF。多页 PDF 仍只属于 M4 benchmark/草稿流程;在实现逐页转换、页序和定位审计前,不得把 PDF 伪装成单页照片输入。
 

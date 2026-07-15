@@ -15,6 +15,7 @@ const STEPS = [
   "western:m4-independent-gold-todo",
   "western:m4-gold-provenance-audit",
   "western:m4-independent-gold-workspace-audit",
+  "western:m4-omr-confidence-probe",
   "western:m4-independent-benchmark-audit",
   "western:project-status",
   "western:next-actions",
@@ -82,6 +83,7 @@ function buildSummary(report) {
     `- automaticAdoptionReady: ${report.automaticAdoptionReady}`,
     `- studentGateReady: ${report.studentGateReady}`,
     `- teacherReviewNeeded: ${report.teacherReviewNeeded}`,
+    `- scoreEditorReviewNeeded: ${report.scoreEditorReviewNeeded}`,
     `- humanTask: ${report.humanTask}`,
     "",
     "## Current Counts",
@@ -160,14 +162,17 @@ async function main() {
   };
 
   const teacherReviewNeeded = Boolean(m4Status.teacherReviewNeeded || provenance?.teacherReviewNeeded || workspace?.teacherReviewNeeded);
+  const scoreEditorReviewNeeded = Boolean(m4Status.scoreEditorReviewNeeded);
   const readyForOmrAccuracyClaim = Boolean(
     commandOk
       && independentBenchmark?.independentBenchmarkReady === true
       && counts.independentCleanRows > 0,
   );
-  const humanTask = readyForOmrAccuracyClaim || counts.manualGoldRequiredRows === 0
-    ? "none"
-    : m4Status.humanTask || provenance?.humanTask || workspace?.humanTask || "unknown";
+  const humanTask = m4Status.humanTask && m4Status.humanTask !== "none"
+    ? m4Status.humanTask
+    : counts.manualGoldRequiredRows > 0
+      ? provenance?.humanTask || workspace?.humanTask || "score-editor-independent-gold-correction"
+      : "none";
 
   const report = {
     ok: commandOk,
@@ -177,6 +182,7 @@ async function main() {
     automaticAdoptionReady: independentBenchmark?.automaticAdoptionReady === true,
     studentGateReady: false,
     teacherReviewNeeded,
+    scoreEditorReviewNeeded,
     humanTask,
     counts,
     blockingReasons: m4Status.blockingReasons || [],
@@ -209,6 +215,7 @@ async function main() {
     automaticAdoptionReady: report.automaticAdoptionReady,
     studentGateReady: report.studentGateReady,
     teacherReviewNeeded: report.teacherReviewNeeded,
+    scoreEditorReviewNeeded: report.scoreEditorReviewNeeded,
     humanTask: report.humanTask,
     counts: report.counts,
     summary: rel(args.summary),

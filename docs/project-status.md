@@ -113,12 +113,14 @@
 - `automaticAdoptionReady=false`
 - `studentGateReady=false`
 - `teacherReviewNeeded=false`
-- `humanTask=none`
+- `scoreEditorReviewNeeded=true`
+- `humanTask=score-editor-independent-real-photo-gold`
+- 运行时可见 OMR 置信探针(32 首、按 6 个 BWV 作品留一):LR AUC=`0.567`,RF AUC=`0.800`;RF 最佳观察点 precision=`0.80`、coverage=`0.156`,没有达到 `0.90/0.20` 的安全子集。
 
 结论:
 
 - M4 已完成可复跑的独立**研究级** OMR 准确率基准,可以报告限定范围内的数字谱/合成退化结果。
-- M4 尚未达到自动采纳:逐谱严格门槛仅 12/32,且真实照片独立人工 gold 为 0。OMR 不会进入学生端运行时自动诊断。
+- M4 尚未达到自动采纳:逐谱严格门槛仅 12/32,真实照片独立人工 gold 为 0,运行时置信特征也筛不出安全子集。OMR 不会进入学生端运行时自动诊断。
 - 当前不重复复核既有 12 条;若要打开真实照片自动采纳,需要另建至少 3 份与 Audiveris 输出独立的照片 gold,并重新通过严格逐谱闸门。
 - 报告论文/表格时必须将独立 render-gold 与 `human-approved-unchanged-draft` 分开,后者不得伪称独立照片准确率。
 
