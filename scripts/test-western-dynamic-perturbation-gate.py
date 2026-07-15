@@ -9,7 +9,9 @@ sys.path.insert(0, str(EXPERIMENTS))
 
 from eval_western_strings_dynamic_perturbation_gate import (  # noqa: E402
     evaluate_scenario,
+    feature_gate_metrics,
     select_development_threshold,
+    select_joint_safety_point,
 )
 
 
@@ -46,6 +48,7 @@ def main() -> int:
     assert clean["selectedCount"] == 3
     assert clean["precisionWithin300ms"] == 1.0
     assert clean["targetSelectedCount"] == 1
+    assert clean["rows"][2]["eventDurationSeconds"] == 0.5
     late = evaluate_scenario(grouped, targets, {"u1": events(target_time=2.8)}, deviation_limit=0.2, min_event_confidence=0.4)
     assert late["targetSelectedCount"] == 0
     wrong = evaluate_scenario(grouped, targets, {"u1": events(target_midi=70)}, deviation_limit=0.2, min_event_confidence=0.4)
@@ -60,6 +63,35 @@ def main() -> int:
         min_event_confidence=0.4,
     )
     assert weak["targetSelectedCount"] == 0
+    feature_rows = [
+        {
+            "target": False,
+            "pitchDistanceSemitones": 0,
+            "eventConfidence": 0.8,
+            "eventDurationSeconds": 0.5,
+            "relativeEventConfidence": 1.2,
+            "relativeIoiDeviationRatio": 0.05,
+            "onsetErrorSeconds": 0.02,
+        },
+        {
+            "target": True,
+            "pitchDistanceSemitones": 0,
+            "eventConfidence": 0.6,
+            "eventDurationSeconds": 0.5,
+            "relativeEventConfidence": 0.8,
+            "relativeIoiDeviationRatio": 0.05,
+            "onsetErrorSeconds": 0.02,
+        },
+    ]
+    feature_metrics = feature_gate_metrics(
+        feature_rows,
+        deviation_limit=0.1,
+        min_event_confidence=0.5,
+        min_relative_event_confidence=1.1,
+        min_event_duration=0.08,
+    )
+    assert feature_metrics["selectedCount"] == 1
+    assert feature_metrics["unsafeTargetAutoPassCount"] == 0
     selected = select_development_threshold(
         [
             {
@@ -75,6 +107,19 @@ def main() -> int:
         ]
     )
     assert selected and selected["deviationLimit"] == 0.1
+    joint = select_joint_safety_point(
+        [
+            {
+                "clean": {"selectedCount": 35, "precisionWithin300ms": 0.95, "coverage": 0.15},
+                "allErrorUnsafeTargetAutoPassCount": 0,
+            },
+            {
+                "clean": {"selectedCount": 45, "precisionWithin300ms": 0.95, "coverage": 0.25},
+                "allErrorUnsafeTargetAutoPassCount": 1,
+            },
+        ]
+    )
+    assert joint and joint["clean"]["coverage"] == 0.15
     print("western dynamic perturbation gate tests passed")
     return 0
 

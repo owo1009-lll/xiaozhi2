@@ -8,6 +8,7 @@ estimated public alignments cannot authorize a student-facing runtime gate.
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import sys
 from pathlib import Path
@@ -45,6 +46,9 @@ DEFAULT_DEVELOPMENT = REPO / "data/experiments/western-strings-bach-violin-raw-a
 DEFAULT_HOLDOUT = REPO / "data/experiments/western-strings-bach-violin-raw-audio-perturbations"
 DEFAULT_OUT = REPO / "data/experiments/western-strings-m3/dynamic-perturbation-gate/report.json"
 THRESHOLD_GRID = (0.05, 0.075, 0.10, 0.15, 0.20, 0.30, 0.40, 0.50)
+EVENT_CONFIDENCE_GRID = (0.40, 0.50, 0.55, 0.60, 0.65, 0.70)
+RELATIVE_EVENT_CONFIDENCE_GRID = (None, 0.80, 0.90, 1.00, 1.05, 1.10)
+MIN_EVENT_DURATION_GRID = (0.08, 0.12, 0.16, 0.20, 0.25, 0.30, 0.40)
 
 
 def load_json(path: Path) -> Any:
@@ -170,6 +174,11 @@ def evaluate_scenario(
                     "onsetErrorSeconds": round(onset_error, 6) if onset_error is not None else None,
                     "pitchDistanceSemitones": assignment.get("pitchDistanceSemitones") if assignment else None,
                     "eventConfidence": round(float(assignment["confidence"]), 6) if assignment else None,
+                    "eventDurationSeconds": (
+                        round(max(0.0, float(assignment["end"]) - float(assignment["time"])), 6)
+                        if assignment
+                        else None
+                    ),
                     "relativeEventConfidence": round(relative_confidence, 6) if relative_confidence is not None else None,
                     "relativeIoiDeviationRatio": ioi.get("relativeIoiDeviationRatio"),
                 }
@@ -231,6 +240,92 @@ def select_development_threshold(rows: list[dict[str, Any]]) -> dict[str, Any] |
     return max(eligible, key=lambda row: (row["clean"]["coverage"], -row["deviationLimit"])) if eligible else None
 
 
+def feature_gate_metrics(
+    rows: list[dict[str, Any]],
+    *,
+    deviation_limit: float,
+    min_event_confidence: float,
+    min_relative_event_confidence: float | None,
+    min_event_duration: float,
+) -> dict[str, Any]:
+    selected = [
+        row
+        for row in rows
+        if row.get("pitchDistanceSemitones") == 0
+        and row.get("eventConfidence") is not None
+        and float(row["eventConfidence"]) >= min_event_confidence
+        and row.get("relativeIoiDeviationRatio") is not None
+        and float(row["relativeIoiDeviationRatio"]) <= deviation_limit
+        and row.get("eventDurationSeconds") is not None
+        and float(row["eventDurationSeconds"]) >= min_event_duration
+        and (
+            min_relative_event_confidence is None
+            or (
+                row.get("relativeEventConfidence") is not None
+                and float(row["relativeEventConfidence"]) >= min_relative_event_confidence
+            )
+        )
+    ]
+    correct = sum(
+        row.get("onsetErrorSeconds") is not None
+        and float(row["onsetErrorSeconds"]) <= 0.30
+        for row in selected
+    )
+    targets = sum(bool(row.get("target")) for row in rows)
+    unsafe_targets = sum(bool(row.get("target")) for row in selected)
+    return {
+        "noteCount": len(rows),
+        "selectedCount": len(selected),
+        "correctWithin300msCount": correct,
+        "precisionWithin300ms": correct / len(selected) if selected else None,
+        "coverage": len(selected) / len(rows) if rows else 0.0,
+        "targetCount": targets,
+        "unsafeTargetAutoPassCount": unsafe_targets,
+        "unsafeTargetAutoPassRate": unsafe_targets / targets if targets else 0.0,
+    }
+
+
+def evaluate_feature_fold(
+    fold: dict[str, Any],
+    *,
+    deviation_limit: float,
+    min_event_confidence: float,
+    min_relative_event_confidence: float | None,
+    min_event_duration: float,
+) -> dict[str, Any]:
+    kwargs = {
+        "deviation_limit": deviation_limit,
+        "min_event_confidence": min_event_confidence,
+        "min_relative_event_confidence": min_relative_event_confidence,
+        "min_event_duration": min_event_duration,
+    }
+    clean = feature_gate_metrics(fold["clean"]["rows"], **kwargs)
+    scenarios = {
+        name: feature_gate_metrics(fold["scenarios"][name]["rows"], **kwargs)
+        for name in SCENARIOS
+    }
+    return {
+        "clean": clean,
+        "scenarios": scenarios,
+        "allErrorUnsafeTargetAutoPassCount": sum(
+            int(scenarios[name]["unsafeTargetAutoPassCount"])
+            for name in SCENARIOS
+        ),
+    }
+
+
+def select_joint_safety_point(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+    safe = [
+        row
+        for row in rows
+        if row["clean"]["selectedCount"] >= 30
+        and row["clean"]["precisionWithin300ms"] is not None
+        and row["clean"]["precisionWithin300ms"] >= 0.90
+        and row["allErrorUnsafeTargetAutoPassCount"] == 0
+    ]
+    return max(safe, key=lambda row: row["clean"]["coverage"]) if safe else None
+
+
 def compact(metrics: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in metrics.items() if key != "rows"}
 
@@ -240,6 +335,23 @@ def compact_fold(fold: dict[str, Any]) -> dict[str, Any]:
         "clean": compact(fold["clean"]),
         "scenarios": {key: compact(value) for key, value in fold["scenarios"].items()},
         "coreUnsafeTargetAutoPassCount": fold["coreUnsafeTargetAutoPassCount"],
+    }
+
+
+def compact_joint_point(point: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: point[key]
+        for key in (
+            "deviationLimit",
+            "minEventConfidence",
+            "minRelativeEventConfidence",
+            "minEventDurationSeconds",
+        )
+        if key in point
+    } | {
+        "clean": compact(point["clean"]),
+        "scenarios": {key: compact(value) for key, value in point["scenarios"].items()},
+        "allErrorUnsafeTargetAutoPassCount": point["allErrorUnsafeTargetAutoPassCount"],
     }
 
 
@@ -316,6 +428,64 @@ def main() -> int:
         core_holdout_ready
         and holdout["scenarios"]["weak-note"]["unsafeTargetAutoPassCount"] == 0
     )
+
+    # This probe asks whether runtime-visible strength/duration features can
+    # close the weak-note hole without using holdout labels for selection.
+    # Calculate feature rows once at the broadest gate, select only on the
+    # development performer, then freeze that point for the holdout performer.
+    development_feature_fold = evaluate_fold(
+        *development_inputs,
+        deviation_limit=max(THRESHOLD_GRID),
+        min_event_confidence=min(EVENT_CONFIDENCE_GRID),
+    )
+    joint_sweep: list[dict[str, Any]] = []
+    for deviation, confidence, relative_confidence, duration in itertools.product(
+        THRESHOLD_GRID,
+        EVENT_CONFIDENCE_GRID,
+        RELATIVE_EVENT_CONFIDENCE_GRID,
+        MIN_EVENT_DURATION_GRID,
+    ):
+        metrics = evaluate_feature_fold(
+            development_feature_fold,
+            deviation_limit=deviation,
+            min_event_confidence=confidence,
+            min_relative_event_confidence=relative_confidence,
+            min_event_duration=duration,
+        )
+        joint_sweep.append({
+            "deviationLimit": deviation,
+            "minEventConfidence": confidence,
+            "minRelativeEventConfidence": relative_confidence,
+            "minEventDurationSeconds": duration,
+            **metrics,
+        })
+    joint_selected = select_joint_safety_point(joint_sweep)
+    development_joint_gate_ready = bool(
+        joint_selected
+        and joint_selected["clean"]["coverage"] >= 0.20
+    )
+    holdout_joint = None
+    holdout_joint_gate_ready = False
+    if joint_selected is not None:
+        holdout_feature_fold = evaluate_fold(
+            *holdout_inputs,
+            deviation_limit=max(THRESHOLD_GRID),
+            min_event_confidence=min(EVENT_CONFIDENCE_GRID),
+        )
+        holdout_joint = evaluate_feature_fold(
+            holdout_feature_fold,
+            deviation_limit=float(joint_selected["deviationLimit"]),
+            min_event_confidence=float(joint_selected["minEventConfidence"]),
+            min_relative_event_confidence=joint_selected["minRelativeEventConfidence"],
+            min_event_duration=float(joint_selected["minEventDurationSeconds"]),
+        )
+        holdout_joint_gate_ready = bool(
+            development_joint_gate_ready
+            and holdout_joint["clean"]["precisionWithin300ms"] is not None
+            and holdout_joint["clean"]["precisionWithin300ms"] >= 0.90
+            and holdout_joint["clean"]["coverage"] >= 0.20
+            and holdout_joint["allErrorUnsafeTargetAutoPassCount"] == 0
+        )
     report = {
         "ok": True,
         "evidenceType": "development-calibrated-holdout-public-waveform-perturbation",
@@ -329,8 +499,48 @@ def main() -> int:
         "publicCorePerturbationGateReady": core_holdout_ready,
         "weakNoteGateReady": weak_note_ready,
         "publicAllPerturbationGateReady": bool(core_holdout_ready and weak_note_ready),
+        "jointSafetyProbe": {
+            "selectionFold": "development-reference-performer-only",
+            "grid": {
+                "deviationLimit": list(THRESHOLD_GRID),
+                "minEventConfidence": list(EVENT_CONFIDENCE_GRID),
+                "minRelativeEventConfidence": list(RELATIVE_EVENT_CONFIDENCE_GRID),
+                "minEventDurationSeconds": list(MIN_EVENT_DURATION_GRID),
+            },
+            "evaluatedPointCount": len(joint_sweep),
+            "allErrorSafePointCount": sum(
+                row["clean"]["selectedCount"] >= 30
+                and row["clean"]["precisionWithin300ms"] is not None
+                and row["clean"]["precisionWithin300ms"] >= 0.90
+                and row["allErrorUnsafeTargetAutoPassCount"] == 0
+                for row in joint_sweep
+            ),
+            "releaseEligiblePointCount": sum(
+                row["clean"]["selectedCount"] >= 30
+                and row["clean"]["precisionWithin300ms"] is not None
+                and row["clean"]["precisionWithin300ms"] >= 0.90
+                and row["clean"]["coverage"] >= 0.20
+                and row["allErrorUnsafeTargetAutoPassCount"] == 0
+                for row in joint_sweep
+            ),
+            "selectedDevelopmentPoint": compact_joint_point(joint_selected) if joint_selected else None,
+            "developmentGateReady": development_joint_gate_ready,
+            "holdout": compact_joint_point(holdout_joint) if holdout_joint else None,
+            "holdoutGateReady": holdout_joint_gate_ready,
+        },
         "studentGateReady": False,
         "blockingReasons": [
+            *(
+                []
+                if development_joint_gate_ready
+                else ["runtime-strength-duration-sweep-below-safe-coverage-floor"]
+            ),
+            *(
+                []
+                if holdout_joint is None
+                or holdout_joint["scenarios"]["weak-note"]["unsafeTargetAutoPassCount"] == 0
+                else ["holdout-weak-note-unsafe-auto-pass-remains"]
+            ),
             "public-reference-times-are-estimated-not-human-note-level-truth",
             "waveform-errors-are-synthetic-not-real-student-errors",
             "independent-student-note-level-validation-required",
@@ -348,6 +558,7 @@ def main() -> int:
         "publicCorePerturbationGateReady",
         "weakNoteGateReady",
         "publicAllPerturbationGateReady",
+        "jointSafetyProbe",
         "studentGateReady",
         "blockingReasons",
     )}, ensure_ascii=False, indent=2))

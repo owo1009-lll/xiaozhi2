@@ -455,6 +455,13 @@ const MEASURE_POLICY_AUDIT = path.join(
   "measure-policy-audit",
   "report.json",
 );
+const DYNAMIC_PERTURBATION_GATE = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "dynamic-perturbation-gate",
+  "report.json",
+);
 const RELEASE_REVIEW = path.join(
   "data",
   "experiments",
@@ -1935,6 +1942,7 @@ export async function buildProjectStatus(args = {}) {
     muscFresh,
     violinMidiAudit,
     measurePolicyAudit,
+    dynamicPerturbationGate,
   ] = await Promise.all([
     buildControlledStatus(),
     buildM3PlusStatus(),
@@ -1950,6 +1958,7 @@ export async function buildProjectStatus(args = {}) {
     readJson(MUSC_FRESH_REPORT),
     readJson(VIOLIN_MIDI_AUDIT),
     readJson(MEASURE_POLICY_AUDIT),
+    readJson(DYNAMIC_PERTURBATION_GATE),
   ]);
   const controlledPilotSession = controlledPilotSessions.find((session) => session.executionPerformed === true)
     || controlledPilotSessions[0]
@@ -2010,6 +2019,22 @@ export async function buildProjectStatus(args = {}) {
       source: MEASURE_POLICY_AUDIT.replace(/\\/g, "/"),
       missing: true,
       measureAggregationReleaseReady: false,
+      studentGateReady: false,
+    },
+    dynamicEvidenceAudit: dynamicPerturbationGate ? {
+      source: DYNAMIC_PERTURBATION_GATE.replace(/\\/g, "/"),
+      publicCorePerturbationGateReady:
+        dynamicPerturbationGate.publicCorePerturbationGateReady === true,
+      weakNoteGateReady: dynamicPerturbationGate.weakNoteGateReady === true,
+      publicAllPerturbationGateReady:
+        dynamicPerturbationGate.publicAllPerturbationGateReady === true,
+      jointSafetyProbe: dynamicPerturbationGate.jointSafetyProbe || {},
+      blockingReasons: dynamicPerturbationGate.blockingReasons || [],
+      studentGateReady: false,
+    } : {
+      source: DYNAMIC_PERTURBATION_GATE.replace(/\\/g, "/"),
+      missing: true,
+      publicAllPerturbationGateReady: false,
       studentGateReady: false,
     },
     releaseReview: releaseReview
@@ -2143,6 +2168,7 @@ function printProjectStatus(status, outPath) {
     publicProfessionalBenchmark: status.publicProfessionalBenchmark,
     publicModelValidation: status.publicModelValidation,
     measureFeedbackAudit: status.measureFeedbackAudit,
+    dynamicEvidenceAudit: status.dynamicEvidenceAudit,
     releaseReview: status.releaseReview,
     controlledPilotSession: status.controlledPilotSession,
     controlledPilotEvidence: status.controlledPilotEvidence,
