@@ -448,6 +448,13 @@ const M4_AUDIO_RHYTHM_RANKING = path.join(
   "audio-rhythm-ranking",
   "report.json",
 );
+const MEASURE_POLICY_AUDIT = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "measure-policy-audit",
+  "report.json",
+);
 const RELEASE_REVIEW = path.join(
   "data",
   "experiments",
@@ -1444,6 +1451,8 @@ async function buildM4OmrStatus() {
     m4RhythmCandidateOracleEvaluated: rhythmCandidateOracle?.summary?.candidateGenerationGatePassed === true,
     m4RhythmRuntimeReady: rhythmCandidateOracle?.summary?.runtimeReady === true,
     m4AudioRhythmRankingGatePassed: audioRhythmRanking?.summary?.evalOnlyGatePassed === true,
+    m4MeasureAudioRhythmRankingGatePassed:
+      audioRhythmRanking?.measureLevel?.leaveOnePieceOut?.evalOnlyGatePassed === true,
     studentGateReady: false,
     teacherReviewNeeded: false,
     scoreEditorReviewNeeded: humanTask !== "none",
@@ -1578,6 +1587,15 @@ async function buildM4OmrStatus() {
     audioRhythmRanking: audioRhythmRanking ? {
       summary: audioRhythmRanking.summary || null,
       ensembleSummary: audioRhythmRanking.ensembleSummary || null,
+      measureLevel: audioRhythmRanking.measureLevel ? {
+        fixedMarginSummary: audioRhythmRanking.measureLevel.fixedMarginSummary || null,
+        leaveOnePieceOut: audioRhythmRanking.measureLevel.leaveOnePieceOut || null,
+        ensembleFixedMarginSummary:
+          audioRhythmRanking.measureLevel.ensembleFixedMarginSummary || null,
+        ensembleLeaveOnePieceOut:
+          audioRhythmRanking.measureLevel.ensembleLeaveOnePieceOut || null,
+        runtimeReady: audioRhythmRanking.measureLevel.runtimeReady === true,
+      } : null,
     } : null,
     independentGoldWorkspaceAudit: workspaceAudit
       ? {
@@ -1916,6 +1934,7 @@ export async function buildProjectStatus(args = {}) {
     muscCalibration,
     muscFresh,
     violinMidiAudit,
+    measurePolicyAudit,
   ] = await Promise.all([
     buildControlledStatus(),
     buildM3PlusStatus(),
@@ -1930,6 +1949,7 @@ export async function buildProjectStatus(args = {}) {
     readJson(MUSC_CALIBRATION_REPORT),
     readJson(MUSC_FRESH_REPORT),
     readJson(VIOLIN_MIDI_AUDIT),
+    readJson(MEASURE_POLICY_AUDIT),
   ]);
   const controlledPilotSession = controlledPilotSessions.find((session) => session.executionPerformed === true)
     || controlledPilotSessions[0]
@@ -1976,6 +1996,22 @@ export async function buildProjectStatus(args = {}) {
           defaultStudentReleaseEligible: false,
         },
     publicModelValidation,
+    measureFeedbackAudit: measurePolicyAudit ? {
+      source: MEASURE_POLICY_AUDIT.replace(/\\/g, "/"),
+      evalOnly: measurePolicyAudit.evalOnly === true,
+      measureAggregationReleaseReady:
+        measurePolicyAudit.measureAggregationReleaseReady === true,
+      clean: measurePolicyAudit.clean || {},
+      safety: measurePolicyAudit.safety || {},
+      eventConfidenceFloorSweep:
+        measurePolicyAudit.eventConfidenceFloorSweep || {},
+      studentGateReady: false,
+    } : {
+      source: MEASURE_POLICY_AUDIT.replace(/\\/g, "/"),
+      missing: true,
+      measureAggregationReleaseReady: false,
+      studentGateReady: false,
+    },
     releaseReview: releaseReview
       ? {
           source: RELEASE_REVIEW.replace(/\\/g, "/"),
@@ -2106,6 +2142,7 @@ function printProjectStatus(status, outPath) {
     photoScoreOfflineChain: status.photoScoreOfflineChain,
     publicProfessionalBenchmark: status.publicProfessionalBenchmark,
     publicModelValidation: status.publicModelValidation,
+    measureFeedbackAudit: status.measureFeedbackAudit,
     releaseReview: status.releaseReview,
     controlledPilotSession: status.controlledPilotSession,
     controlledPilotEvidence: status.controlledPilotEvidence,

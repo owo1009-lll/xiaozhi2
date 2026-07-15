@@ -39,6 +39,8 @@ from eval_western_bach_violin_raw_audio_perturbations import (  # noqa: E402
     SCENARIOS,
     add_gold_offsets,
     attach_mutation_windows,
+    build_event_index,
+    nearby_event_indices,
     read_candidate_rows,
     select_targets,
     strict_accepted_rows,
@@ -50,6 +52,7 @@ DEFAULT_RAW_ROOT = (
 )
 DEFAULT_OUT = REPO / "data" / "experiments" / "western-strings-m3" / "measure-policy-audit"
 THRESHOLDS = (0.80, 0.90, 1.00)
+EVENT_CONFIDENCE_FLOORS = (0.50, 0.60, 0.65, 0.70)
 
 
 def score_measure_intervals(score_path: Path) -> list[tuple[float, float, int]]:
@@ -91,7 +94,18 @@ def measure_policy_metrics(
     accepted_note_keys: set[tuple[str, int]],
     target_note_keys: set[tuple[str, int]],
     threshold: float,
+    accepted_note_evidence: dict[tuple[str, int], dict[str, float]] | None = None,
+    min_event_confidence: float | None = None,
 ) -> dict[str, Any]:
+    effective_accepted_keys = set(accepted_note_keys)
+    if min_event_confidence is not None:
+        evidence = accepted_note_evidence or {}
+        effective_accepted_keys = {
+            key
+            for key in effective_accepted_keys
+            if float((evidence.get(key) or {}).get("eventConfidence") or 0.0)
+            >= min_event_confidence
+        }
     by_measure: dict[tuple[str, int], list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
         by_measure[(str(row["unit"]), int(row["measureIndex"]))].append(row)
@@ -99,7 +113,7 @@ def measure_policy_metrics(
     measure_rows = []
     for key, notes in sorted(by_measure.items()):
         note_keys = {(str(row["unit"]), int(row["noteIndex"])) for row in notes}
-        confirmed = len(note_keys & accepted_note_keys)
+        confirmed = len(note_keys & effective_accepted_keys)
         coverage = confirmed / len(note_keys) if note_keys else 0.0
         auto_pass = coverage >= threshold
         if auto_pass:
@@ -124,6 +138,7 @@ def measure_policy_metrics(
     unsafe = auto_pass_measures & target_measures
     return {
         "threshold": threshold,
+        "minEventConfidence": min_event_confidence,
         "measureCount": len(by_measure),
         "autoPassMeasureCount": len(auto_pass_measures),
         "autoPassMeasureCoverage": round(len(auto_pass_measures) / len(by_measure), 6)
@@ -145,6 +160,48 @@ def measure_policy_metrics(
         ],
         "rows": measure_rows,
     }
+
+
+def accepted_note_evidence(
+    grouped_rows: dict[str, list[dict[str, Any]]],
+    events_by_unit: dict[str, list[dict[str, Any]]],
+    accepted_keys: set[tuple[str, int]],
+    center_threshold: float,
+) -> dict[tuple[str, int], dict[str, float]]:
+    """Recover runtime-visible event strength for already accepted notes."""
+
+    result: dict[tuple[str, int], dict[str, float]] = {}
+    indexes = {
+        unit: build_event_index(events)
+        for unit, events in events_by_unit.items()
+    }
+    for unit, rows in grouped_rows.items():
+        events = events_by_unit.get(unit) or []
+        event_index = indexes.get(unit) or {}
+        for row in rows:
+            key = (str(unit), int(row["noteIndex"]))
+            if key not in accepted_keys or row.get("predictedTime") is None:
+                continue
+            candidates = nearby_event_indices(
+                event_index,
+                int(row["midi"]),
+                float(row["predictedTime"]),
+                center_threshold,
+            )
+            if len(candidates) != 1:
+                continue
+            event = events[candidates[0]]
+            result[key] = {
+                "eventConfidence": float(event.get("confidence") or 0.0),
+                "eventDurationSeconds": max(
+                    0.0,
+                    float(event.get("end") or 0.0) - float(event.get("start") or 0.0),
+                ),
+                "centerErrorSeconds": abs(
+                    float(event.get("start") or 0.0) - float(row["predictedTime"])
+                ),
+            }
+    return result
 
 
 def load_cached_events(cache_path: Path, min_confidence: float, min_duration: float) -> list[dict[str, Any]]:
@@ -230,8 +287,18 @@ def main() -> int:
         return {(str(row["unit"]), int(row["noteIndex"])) for row in accepted}
 
     clean_keys = accepted_keys(base_events)
+    clean_evidence = accepted_note_evidence(
+        grouped,
+        base_events,
+        clean_keys,
+        center_threshold,
+    )
     raw_cache = Path(args.raw_root) / "basic-pitch-cache"
     scenarios: dict[str, Any] = {}
+    scenario_runtime_evidence: dict[
+        str,
+        tuple[set[tuple[str, int]], dict[tuple[str, int], dict[str, float]]],
+    ] = {}
     for scenario in SCENARIOS:
         events = {
             unit: load_cached_events(
@@ -242,6 +309,13 @@ def main() -> int:
             for unit in selected_units
         }
         keys = accepted_keys(events)
+        evidence = accepted_note_evidence(
+            grouped,
+            events,
+            keys,
+            center_threshold,
+        )
+        scenario_runtime_evidence[scenario] = (keys, evidence)
         scenarios[scenario] = {
             str(threshold): measure_policy_metrics(rows, keys, target_keys, threshold)
             for threshold in THRESHOLDS
@@ -263,8 +337,62 @@ def main() -> int:
         }
         for threshold in THRESHOLDS
     }
+    confidence_floor_sweep: dict[str, Any] = {}
+    for floor in EVENT_CONFIDENCE_FLOORS:
+        floor_clean = {
+            str(threshold): measure_policy_metrics(
+                rows,
+                clean_keys,
+                set(),
+                threshold,
+                clean_evidence,
+                floor,
+            )
+            for threshold in THRESHOLDS
+        }
+        floor_scenarios: dict[str, dict[str, Any]] = {}
+        for scenario, (keys, evidence) in scenario_runtime_evidence.items():
+            floor_scenarios[scenario] = {
+                str(threshold): measure_policy_metrics(
+                    rows,
+                    keys,
+                    target_keys,
+                    threshold,
+                    evidence,
+                    floor,
+                )
+                for threshold in THRESHOLDS
+            }
+        floor_safety = {
+            str(threshold): {
+                "coreUnsafeTargetMeasureCount": sum(
+                    int(floor_scenarios[scenario][str(threshold)]["unsafeTargetMeasureCount"])
+                    for scenario in CORE_SCENARIOS
+                ),
+                "allUnsafeTargetMeasureCount": sum(
+                    int(floor_scenarios[scenario][str(threshold)]["unsafeTargetMeasureCount"])
+                    for scenario in SCENARIOS
+                ),
+            }
+            for threshold in THRESHOLDS
+        }
+        confidence_floor_sweep[str(floor)] = {
+            "clean": {
+                key: {
+                    "autoPassMeasureCount": value["autoPassMeasureCount"],
+                    "autoPassMeasureCoverage": value["autoPassMeasureCoverage"],
+                }
+                for key, value in floor_clean.items()
+            },
+            "safety": floor_safety,
+            "safeCoverageGatePassed": any(
+                floor_clean[str(threshold)]["autoPassMeasureCoverage"] >= 0.20
+                and floor_safety[str(threshold)]["allUnsafeTargetMeasureCount"] == 0
+                for threshold in THRESHOLDS
+            ),
+        }
     report = {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "evalOnly": True,
         "studentFacing": False,
@@ -274,11 +402,17 @@ def main() -> int:
         "clean": clean,
         "scenarios": scenarios,
         "safety": safety,
+        "eventConfidenceFloorSweep": confidence_floor_sweep,
+        "measureAggregationReleaseReady": any(
+            value["safeCoverageGatePassed"]
+            for value in confidence_floor_sweep.values()
+        ),
         "studentGateReady": False,
         "limitations": [
             "waveform perturbations are synthetic rather than human mistakes",
             "measure auto-pass is unsafe when one missed note leaves the confirmed fraction above threshold",
             "relative IOI can normalize tempo but cannot independently prove pitch or missing-note correctness",
+            "event-confidence floors are runtime-visible, but a safe floor must retain at least 20% clean-measure coverage before it can expand release scope",
         ],
     }
     out = Path(args.out)
@@ -295,6 +429,21 @@ def main() -> int:
             f"| {threshold:.2f} | {clean[key]['autoPassMeasureCoverage']} | "
             f"{safety[key]['coreUnsafeTargetMeasureCount']} | {safety[key]['allUnsafeTargetMeasureCount']} |"
         )
+    lines += [
+        "",
+        "## Runtime-visible event-confidence sweep",
+        "",
+        "| event confidence | measure threshold | clean coverage | all unsafe target measures |",
+        "|---:|---:|---:|---:|",
+    ]
+    for floor, result in confidence_floor_sweep.items():
+        for threshold in THRESHOLDS:
+            key = str(threshold)
+            lines.append(
+                f"| {floor} | {threshold:.2f} | "
+                f"{result['clean'][key]['autoPassMeasureCoverage']} | "
+                f"{result['safety'][key]['allUnsafeTargetMeasureCount']} |"
+            )
     (out / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(json.dumps({
         "ok": True,
@@ -303,6 +452,8 @@ def main() -> int:
             key: value["autoPassMeasureCoverage"] for key, value in clean.items()
         },
         "safety": safety,
+        "eventConfidenceFloorSweep": confidence_floor_sweep,
+        "measureAggregationReleaseReady": report["measureAggregationReleaseReady"],
         "out": str(out),
     }, ensure_ascii=False, indent=2))
     return 0

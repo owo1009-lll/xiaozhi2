@@ -23,6 +23,9 @@ assert.equal(
   "public professional recordings must never enable the student release gate",
 );
 assert.ok(status.publicModelValidation, "public model validation status must always be present");
+assert.ok(status.measureFeedbackAudit, "project status must expose the measure-feedback safety audit");
+assert.equal(status.measureFeedbackAudit.measureAggregationReleaseReady, false, "measure aggregation must stay closed when safe coverage is below 20%");
+assert.equal(status.measureFeedbackAudit.studentGateReady, false, "eval-only measure aggregation must never directly open student feedback");
 assert.equal(
   status.publicModelValidation.gates.studentReleaseEligible,
   false,
@@ -123,6 +126,8 @@ assert.equal(m3plus.supplementalMachineEval?.scoreTechniqueIntentReady, true, "M
 assert.equal(m3plus.supplementalMachineEval?.machineAnalysisComplete, false, "M3+ machine eval must fail closed before recordings exist");
 assert.equal(m3plus.supplementalMachineEval?.teacherReviewAllowed, false, "M3+ machine eval must not request teacher work before passing");
 assert.equal(m3plus.supplementalMachineEval?.studentGateReady, false, "M3+ supplemental evidence must never directly open the student gate");
+assert.equal(status.tracks.m4Omr.m4MeasureAudioRhythmRankingGatePassed, false, "M4 measure-level audio rhythm ranking must remain below the eval-only gate");
+assert.equal(status.tracks.m4Omr.audioRhythmRanking?.measureLevel?.runtimeReady, false, "M4 measure-level audio rhythm evidence must never directly edit a score");
 if (m3plus.monitoredPilotAudit?.sourceExists) {
   assert.equal(m3plus.monitoredPilotAudit.readyForMonitoredPilot, false, "newer round-two failures must close the old monitored-pilot result");
   assert.equal(m3plus.monitoredPilotAudit.teacherReviewNeeded, false, "M3+ monitored pilot audit must not ask for more review when all auto-pass evidence is already known");
