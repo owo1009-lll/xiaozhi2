@@ -106,7 +106,9 @@
 
 旧离线执行器按谱面总时长把音符线性摊到整段录音。受控正确样本的首音因此被放到 0 秒，pYIN 中位误差达到 `3300 cents`。新增默认关闭的 `--timing-mode basic-pitch-dtw`：Basic Pitch 只负责提出音频事件，带 gap penalty 的一对一单调匹配负责圈定谱音时间，pYIN 在事件内部稳定区测连续音高；未匹配音符直接拒判，不回退旧线性时间。
 
-同一正确录音前 20 音从 `0/20` 音高支持提升到 `20/20`，中位绝对误差从 `3300 cents` 降到 `5 cents`。四类已有受控录音的全曲机器补测得到 31.4%–42.4% 的可检查候选率；错音样本仍有音高冲突，漏音样本仍有未匹配项，没有被强行“洗白”。但这些结果尚未逐候选对照独立教师真值，故动态模式仍只输出 `review_required`，`coverage=0` 的学生安全语义保持不变。
+同一正确录音前 20 音从 `0/20` 音高支持提升到 `20/20`，中位绝对误差从 `3300 cents` 降到 `5 cents`。随后 `western:offline-dynamic-timing-audit` 复用缓存、串行审计全部 12 条受控录音：2588 个谱音中 1155 个获得一对一时间分配（44.63%），968 个同时获得 ±80 cents 稳定 F0 支持（37.40%），录音中位误差的中位数为 10 cents。
+
+该结果解决的是“旧线性窗根本圈错”的候选生成问题，不是 precision 证明。correct 组的支持率为 35.49%，wrong_pitch 组为 35.97%，仅靠支持率无法区分正确与错音；录音级 scenario 也没有给出逐音错误位置。因此动态模式仍只输出 `review_required`，`coverage=0` 的学生安全语义保持不变。下一步必须对动态候选使用独立逐音真值，不能把旧线性窗口的标签迁移过来。
 
 ## 7. 当前裁决
 
@@ -128,6 +130,7 @@ npm run western:measure-policy-audit
 npm run western:m4-measure-duration-probe
 npm run western:m4-audio-rhythm-ranking
 npm run western:m4-engine-consensus
+npm run western:offline-dynamic-timing-audit
 
 npm run test:western-m3plus-supplemental-eval
 npm run test:western-photo-score
@@ -137,6 +140,7 @@ npm run test:western-m4-measure-duration-probe
 npm run test:western-m4-audio-rhythm-ranking
 npm run test:western-m4-engine-consensus
 npm run test:western-offline-feature-audio
+npm run test:western-offline-dynamic-timing
 ```
 
 生成报告均位于 `data/experiments/`，默认被 Git 忽略，不作为学生端运行时配置。

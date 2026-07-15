@@ -199,6 +199,8 @@
     "western:hf2-hardanger-musc-all": "python scripts\\experiments\\eval_western_hf2_hardanger_musc.py --selection all-human-verified --max-new-units 2 --max-new-audio-seconds 100 --batch-size 128",
     "western:violin-activity-anchor-regression": "python scripts\\experiments\\eval_western_violin_activity_anchor_regression.py",
     "test:western-offline-feature-audio": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-western-offline-feature-audio.py",
+    "western:offline-dynamic-timing-audit": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\eval_western_strings_offline_dynamic_timing.py",
+    "test:western-offline-dynamic-timing": "py -3.11 scripts\\test-western-offline-dynamic-timing.py",
     "western:m3plus-monitored-pilot-audit": "node scripts\\run-western-m3plus-monitored-pilot-audit.mjs",
     "western:ordinary-auto-pass-precision-review-pack": "node scripts\\run-western-ordinary-monitored-pilot-review-pack.mjs",
     "test:western-ordinary-pilot-plan": "node scripts\\test-western-ordinary-monitored-pilot-plan.mjs",

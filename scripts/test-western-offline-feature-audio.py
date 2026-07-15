@@ -49,6 +49,7 @@ def main() -> None:
     assert [round(item["time"], 3) if item else None for item in assignments] == [0.1, 0.5, 0.9]
     assert [round(item["end"], 3) if item else None for item in assignments] == [0.4, 0.8, 1.2]
     assert [item["pitchDistanceSemitones"] if item else None for item in assignments] == [0, 0, 1]
+    assert len({item["eventIndex"] for item in assignments if item}) == len([item for item in assignments if item])
     timeline_note = {
         "noteId": "n1",
         "sectionId": "s1",
