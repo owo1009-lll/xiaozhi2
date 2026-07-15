@@ -60,7 +60,6 @@ BEHAVIOR_OPTIONS = [
     ("trill", "\u98a4\u97f3/\u4e24\u97f3\u4ea4\u66ff"),
     ("ornament", "\u88c5\u9970\u97f3/\u501a\u97f3"),
     ("double-stop", "\u53cc\u97f3/\u591a\u97f3"),
-    ("harmonic", "\u6cdb\u97f3"),
     ("variable-f0", "\u97f3\u9ad8\u4e0d\u7a33\u5b9a"),
     ("other", "\u5176\u4ed6"),
     ("uncertain", "\u4e0d\u786e\u5b9a"),
@@ -74,7 +73,6 @@ JUDGEMENT_OPTIONS = [
     ("trill-two-targets", "\u98a4\u97f3\u4e24\u4e2a\u76ee\u6807"),
     ("ornament-main-note", "\u88c5\u9970\u97f3\u4e3b\u97f3"),
     ("multi-f0", "\u53cc\u97f3 multi-f0"),
-    ("sounding-pitch", "\u6cdb\u97f3 sounding pitch"),
     ("not-judgeable", "\u4e0d\u53ef\u5224"),
     ("uncertain", "\u4e0d\u786e\u5b9a"),
 ]

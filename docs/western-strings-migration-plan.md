@@ -39,7 +39,7 @@ M0 证明的是"可进入下一阶段",不是"产品已经完成"。完整报告
 
 ### 明确不做
 - PDF OMR **不进 v2 alpha/release**(避免坎1);但 **2026-07-09 起列为路线内里程碑 M4**,单独开支线、带 note-level 精度闸门,未过闸门/未人工核对的谱不得进判断,不污染 clean-score 主线。详见 project-plan 第 3、6 章。
-- **不做技法名称展示**:原技法识别 M4 已删,技法仅作为 M3+ 少退复核延伸里的**音准评判模式开关**(揉弦/滑音/颤音/装饰音换判法、双音 multi-f0、泛音谱面标注),不给学生展示技法名、不降音准标准。
+- **不做技法名称展示**:原技法识别 M4 已删,技法仅作为 M3+ 少退复核延伸里的**音准评判模式开关**(揉弦/滑音/颤音/装饰音换判法、双音 multi-f0),不给学生展示技法名、不降音准标准。自然泛音音准检测已取消。
 - 不把大提琴当作"改音域参数"直接上线。
 - 不把低置信结果反馈给学生。
 
@@ -78,7 +78,7 @@ M0  对齐可行性验证              已完成,Green
 M1  clean score ingestion       已完成
 M2  confidence-gated alignment  teacher-only preview + studentSafe gate;M2f real-student gate passed
 M3  基础教学诊断 core           pitch/onset/missing 已过 core gate
-M3+ 少退复核延伸                技法感知音准(揉弦/滑音/颤音/装饰音 + 双音 multi-f0 + 泛音谱面);不降音准标准
+M3+ 少退复核延伸                技法感知音准(揉弦/滑音/颤音/装饰音 + 双音 multi-f0);自然泛音不自动判断;不降音准标准
 M4  PDF/图片谱面 OMR            带 note-level 精度闸门,不达标退人工
 M5  大提琴扩展                  小提琴 V2 通过后独立 M0
 ```
@@ -191,7 +191,7 @@ M5  大提琴扩展                  小提琴 V2 通过后独立 M0
 ## 8. M3+: 少退复核延伸
 
 ### 定位
-M3+ 不做技法名称展示,也不做技法质量评价。它只解决一个产品问题:在揉弦、滑音、颤音、装饰音、双音、泛音等区域,尽量把**音准**判准,减少不必要的 `review_required`。
+M3+ 不做技法名称展示,也不做技法质量评价。它只解决一个产品问题:在揉弦、滑音、颤音、装饰音、双音等区域,尽量把**音准**判准,减少不必要的 `review_required`。自然泛音不做自动音准判断。
 
 ### 处理原则
 - 技法只是音准评判模式开关,不向学生展示"这是滑音/揉弦/颤音"。
@@ -202,7 +202,7 @@ M3+ 不做技法名称展示,也不做技法质量评价。它只解决一个产
 ### 优先顺序
 1. 稳态/揉弦/滑音/颤音/装饰音的单声部 f0 行为模式。
 2. 双音 double-stop 的 multi-f0 支持。
-3. 泛音 harmonic 的谱面 sounding pitch 与标记支持。
+3. 自然泛音 harmonic 固定保持 `review_required`;MusicXML 泛音标记解析仅作为谱面兼容能力保留。
 
 ### 通过标准
 - 每个模式单独报告 note-level 音准 precision。
@@ -216,8 +216,8 @@ M3+ 不做技法名称展示,也不做技法质量评价。它只解决一个产
 - 已接入 `npm run western:m3plus-review-import` 与 `npm run western:m3plus-review-status`:标完网页下载 `m3plus-pitch-mode-review.completed.csv` 后导入,状态命令会报告每类 reviewed/scored 缺口。第一轮、第二轮与 first-measure candidate-quality 复核已累计导入,实测 `m3plusModeEvalReady=true`:98 reviewed / 74 scored,每类 reviewed/scored 缺口均为 0。
 - 已接入并运行 `npm run western:m3plus-mode-eval`:当前结果为 `m3plusModeReleaseReady=true`,`releaseReadyModes=["slide-like","trill-like"]`,`controlReadyModes=["stable"]`。这只证明 first-measure + trusted-recording 安全子集中的 slide/trill 音高判法有离线 release 证据;学生端 M3+ 自动反馈仍默认关闭,后续只能做窄范围 monitored pilot,不能广泛打开。
 - 当前默认 student gate 仍为 `studentGateReady=false`。`slide-like` / `trill-like` 已通过 first-measure 受控 pilot 机器审计,但默认运行时不打开;`variable-f0`、双音和装饰音继续 `review_required`。只有新增独立证据再次达到音准 precision≥90%、unsafe=0,才可扩大模式或范围。
-- 2026-07-15 第二轮复验新增 `npm run western:round2-m3plus-eval`,以 Basic Pitch 序列 DTW 对齐谱面音符和真实录音。`r2-06` 的 6 个颤音与其余 17 个长音揉弦已由项目负责人确认实际执行;机器实测滑音 7/12、颤音 0/6、揉弦 1/17、双音 19/24,全部低于 90%。旧报告中的 16 个揉弦分母来自对齐器漏音;现按谱面全集计数,未匹配音不再从分母消失。窗口诊断进一步显示 12/23 音符窗口不合理,受控时值锚定后的最佳单特征训练内 precision/recall 也只有 66.7%/66.7%,因此没有可接生产的阈值改进。这证明 first-measure 的窄范围结果不能外推,而不是证明演奏者没有执行。当前缺负例、独立装饰音和泛音真实样本,所有第二轮模式保持 review-only。符号层已支持 MusicXML 泛音 pitch-role,只有显式 `sounding-pitch` 进入自动音准评分,其余泛音 fail-closed。
-- 为关闭上述数据缺口,已生成 `音频/m3plus-supplemental/` 四份受控单页补录谱,分别提供纯直音负例、独立揉弦/颤音、装饰音对照和自然泛音对照。`score-intent.json` 只描述谱面意图,在真实录音和人工执行确认前固定 `performanceConfirmed=false`。`npm run western:m3plus-supplemental-status` 当前为 0/4 录音就绪;四条录音齐后先机器预检,预检不通过不得交教师。
+- 2026-07-15 第二轮复验新增 `npm run western:round2-m3plus-eval`,以 Basic Pitch 序列 DTW 对齐谱面音符和真实录音。`r2-06` 的 6 个颤音与其余 17 个长音揉弦已由项目负责人确认实际执行;机器实测滑音 7/12、颤音 0/6、揉弦 1/17、双音 19/24,全部低于 90%。旧报告中的 16 个揉弦分母来自对齐器漏音;现按谱面全集计数,未匹配音不再从分母消失。窗口诊断进一步显示 12/23 音符窗口不合理,受控时值锚定后的最佳单特征训练内 precision/recall 也只有 66.7%/66.7%,因此没有可接生产的阈值改进。这证明 first-measure 的窄范围结果不能外推,而不是证明演奏者没有执行。当前缺负例和独立装饰音样本,所有第二轮模式保持 review-only。自然泛音音准检测已取消;符号层保留 MusicXML 泛音 pitch-role 仅作通用兼容。
+- 为关闭上述数据缺口,`音频/m3plus-supplemental/` 四条任务已统一改为“不读谱、固定音符顺序 + 文字要求”:C 大调上行纯直音、独立揉弦/颤音、装饰音/普通音对照、滑音/直音对照。MusicXML/MIDI/谱图仅供机器校验;`score-intent.json` 在真实录音和人工执行确认前固定 `performanceConfirmed=false`。`npm run western:m3plus-supplemental-status` 当前为 0/4 录音就绪;四条录音齐后先机器预检,预检不通过不得交教师。
 - 项目级状态统一入口:`npm run western:project-status` 会同时汇总普通上传候选 gate、普通上传 confidence pilot blind-validation 状态、M3+ 复核标签状态与 M4 OMR benchmark 状态,输出 `data/experiments/western-strings-project-status.json`。该命令只读,用于判断下一批优先级;任何子 gate 未 ready 时 runtime 仍保持 fail-closed。confidence validation 批次命令为 `npm run western:controlled-candidate-confidence-validation-export` + `npm run western:controlled-candidate-confidence-validation-review-pack`,生成 `data/experiments/western-strings-m3/confidence-validation-review/index.html` 供人工盲标。盲标完成后运行 `npm run western:controlled-candidate-confidence-validation-eval`,它只在 fresh completed CSV 上评估冻结模型/阈值,不先合并进累计 labels;即使 `blindValidationPassed=true`,也只是下一阶段 runtime gate wiring 的证据,不自动打开学生端。发布阻断入口为 `npm run western:project-gate`:默认要求 ordinary/m3plus/m4 三条轨道全 ready,未 ready 时非零退出并写 `data/experiments/western-strings-project-gate.json`。回归测试入口为 `npm run test:western-project-gate`,用于防止项目级 gate 漂移,尤其是 M4 自比样本被误算为独立 gold,以及 eval-only confidence pilot 未经 fresh blind batch 就进入 runtime。
 
 ---

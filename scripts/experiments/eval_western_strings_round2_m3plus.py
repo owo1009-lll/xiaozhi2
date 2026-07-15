@@ -275,7 +275,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"| 双音两声部 | {double_stop.get('allPitchesDetectedGroupCount', 0)}/{double_stop.get('expectedGroupCount', 0)} | {'通过' if (double_stop.get('groupRecall') or 0) >= RELEASE_RATE else '未达 90%'} |",
         "",
         "- 当前没有独立负例,不能据此计算 precision 或开放学生端。",
-        "- 装饰音(非 trill)和泛音没有第二轮真实样本,继续 review-only。",
+        "- 装饰音(非 trill)没有第二轮真实样本,继续 review-only。自然泛音音准检测已从 M3+ 范围取消。",
         "- 所有未达标模式保持 fail-closed。",
         "",
     ])
@@ -301,7 +301,6 @@ def build_report(items: list[dict[str, Any]]) -> dict[str, Any]:
     blocking_reasons = [
         "m3plus-round2-negative-controls-missing",
         "m3plus-ornament-real-sample-missing",
-        "m3plus-harmonic-real-sample-missing",
     ]
     if not performance_gold_ready:
         blocking_reasons.append("m3plus-round2-performance-execution-not-human-verified")

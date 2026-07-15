@@ -206,7 +206,7 @@
     "test:western-round2-m3plus-diagnostic": "py -3.11 scripts\\test-western-round2-m3plus-diagnostic.py",
     "test:western-m3plus-supplemental-scores": "py -3.11 scripts\\test-western-m3plus-supplemental-scores.py",
     "test:western-m3plus-supplemental-status": "py -3.11 scripts\\test-western-m3plus-supplemental-status.py",
-    "test:western-m3plus-harmonic": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-western-m3plus-harmonic.py",
+    "test:western-score-harmonic-parsing": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-western-score-harmonic-parsing.py",
     "test:western-m3plus-symbolic-modes": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-western-m3plus-symbolic-modes.py",
     "test:western-bach-violin-dataset-audit": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test_western_bach_violin_dataset_audit.py",
     "test:western-bach-violin-gate-pilot": "python scripts\\test_western_bach_violin_gate_pilot.py",

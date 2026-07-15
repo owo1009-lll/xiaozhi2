@@ -1541,7 +1541,7 @@ function summarizeNextActions(
       action: round2AlignedEval.sourceExists
         ? supplementalIntake.readyForMachineAnalysis
           ? `The four M3+ supplemental takes are ready. Run the machine analysis against the frozen score-intent labels; do not ask a teacher to review until localization and audio decoding pass.`
-          : `The human-confirmed round-two aligned evaluation remains fail-closed. Record the four prepared takes in ${supplementalIntake.instructions || "音频/m3plus-supplemental/README-录音说明.md"}; these provide straight-tone negatives, an independent vibrato/trill take, ornaments, and harmonics. Do not re-review completed rows.`
+          : `The human-confirmed round-two aligned evaluation remains fail-closed. Record the four fixed-note takes in ${supplementalIntake.instructions || "音频/m3plus-supplemental/README-录音说明.md"}; no score reading is required. They provide straight-tone negatives, an independent vibrato/trill take, ornament controls, and slide controls. Natural-harmonic intonation is out of scope. Do not re-review completed rows.`
         : candidateQualityReview.needsReview
         ? `M3+ labels are sufficient and round-2 is imported, but no non-control pitch-behavior mode is release-ready.${mismatchText}${localizationText} The candidate-quality review pack is now restricted to first-measure rows from recordings whose prior review rows were all audio-score matches; later measures are treated as localization-drift risk and excluded.`
         : `M3+ labels are sufficient and round-2 is imported, but no non-control pitch-behavior mode is release-ready.${mismatchText}${localizationText} Keep M3+ review-only and inspect localization groups before changing candidate generation.`,

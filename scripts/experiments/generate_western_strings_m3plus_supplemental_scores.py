@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from music21 import articulations, clef, expressions, key, metadata, meter, note, stream, tempo
+from music21 import clef, expressions, key, metadata, meter, note, stream, tempo
 
 
 REPO = Path(__file__).resolve().parents[2]
@@ -35,6 +35,18 @@ class ScoreSpec:
 def half(pitch: str) -> note.Note:
     value = note.Note(pitch)
     value.quarterLength = 2.0
+    return value
+
+
+def quarter(pitch: str) -> note.Note:
+    value = note.Note(pitch)
+    value.quarterLength = 1.0
+    return value
+
+
+def whole(pitch: str) -> note.Note:
+    value = note.Note(pitch)
+    value.quarterLength = 4.0
     return value
 
 
@@ -64,33 +76,33 @@ def add_measure(part: stream.Part, values: list[note.Note]) -> int:
 
 
 def straight_negative() -> ScoreSpec:
-    score, part = base_score("M3P-01 Straight tones - no vibrato, trill, or slide", bpm=52)
-    pitches = ["G3", "D4", "A4", "E5", "B4", "F#5"] * 4
+    score, part = base_score("M3P-01 C-major ascending straight tones", bpm=60)
+    pitches = ["C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5"]
     labels: list[dict[str, Any]] = []
-    for pair_index in range(0, len(pitches), 2):
-        values = [half(pitches[pair_index]), half(pitches[pair_index + 1])]
-        if pair_index == 0:
-            text_mark(values[0], "senza vibrato - straight tone")
-        measure = add_measure(part, values)
-        for note_index, value in enumerate(values, start=1):
-            labels.append(
-                {
-                    "measure": measure,
-                    "noteIndex": note_index,
-                    "writtenPitch": value.nameWithOctave,
-                    "expectedBehavior": "stable",
-                    "expectedPositiveModes": [],
-                    "expectedNegativeModes": ["slide", "trill", "vibrato", "ornament", "harmonic"],
-                }
-            )
+    for index, pitch in enumerate(pitches):
+        value = whole(pitch)
+        if index == 0:
+            text_mark(value, "straight tone - 4 beats")
+        measure = add_measure(part, [value])
+        labels.append(
+            {
+                "measure": measure,
+                "noteIndex": 1,
+                "writtenPitch": value.nameWithOctave,
+                "expectedBehavior": "stable",
+                "expectedPositiveModes": [],
+                "expectedNegativeModes": ["slide", "trill", "vibrato", "ornament"],
+            }
+        )
     return ScoreSpec(
         "m3p-01",
         "纯直音负例",
-        "为滑音、颤音、揉弦、装饰音和泛音模式提供真实负例。",
+        "为滑音、颤音、揉弦和装饰音模式提供真实直音负例。",
         [
+            "固定顺序：C4、D4、E4、F4、G4、A4、B4、C5，上行一次。",
+            "节拍器 60 BPM；每个音 4 拍，一音一弓。",
             "所有音都拉成平直长音。",
             "禁止揉弦、颤音、滑音和任何装饰音。",
-            "每个音保持到谱面时值结束，音与音之间正常换弓即可。",
         ],
         score,
         labels,
@@ -98,13 +110,14 @@ def straight_negative() -> ScoreSpec:
 
 
 def vibrato_trill_positive() -> ScoreSpec:
-    score, part = base_score("M3P-02 Vibrato then trill in every measure", bpm=50)
-    pairs = [("A4", "B4"), ("D5", "E5"), ("G4", "A4"), ("E5", "F5")] * 2
+    score, part = base_score("M3P-02 Fixed vibrato and trill pairs", bpm=60)
+    pairs = [("D4", "E4"), ("E4", "F4"), ("F4", "G4"), ("G4", "A4")] * 2
     labels: list[dict[str, Any]] = []
-    for vibrato_pitch, trill_pitch in pairs:
-        vibrato_note = text_mark(half(vibrato_pitch), "vib.")
-        trill_note = half(trill_pitch)
+    for base_pitch, upper_pitch in pairs:
+        vibrato_note = text_mark(half(base_pitch), "vibrato - 2 beats")
+        trill_note = half(base_pitch)
         trill_note.expressions.append(expressions.Trill())
+        text_mark(trill_note, f"trill {base_pitch}-{upper_pitch}")
         measure = add_measure(part, [vibrato_note, trill_note])
         labels.extend(
             [
@@ -121,6 +134,7 @@ def vibrato_trill_positive() -> ScoreSpec:
                     "noteIndex": 2,
                     "writtenPitch": trill_note.nameWithOctave,
                     "expectedBehavior": "trill",
+                    "trillUpperPitch": upper_pitch,
                     "expectedPositiveModes": ["trill"],
                     "expectedNegativeModes": ["vibrato", "slide"],
                 },
@@ -131,8 +145,9 @@ def vibrato_trill_positive() -> ScoreSpec:
         "揉弦与颤音独立复验",
         "提供一条独立于 r2-06 的揉弦/颤音正例录音。",
         [
-            "每小节第 1 个音使用连续、明显的揉弦。",
-            "每小节第 2 个音严格演奏谱面颤音，主音和上方音都要清楚。",
+            "固定顺序共 4 组，完整重复一次：D4、E4、F4、G4。",
+            "每组先把主音拉 2 拍并使用连续、明显的揉弦。",
+            "随后在同一主音上做 2 拍颤音；上方音依次为 E4、F4、G4、A4。",
             "不要在两个音之间滑音。",
         ],
         score,
@@ -141,27 +156,14 @@ def vibrato_trill_positive() -> ScoreSpec:
 
 
 def ornament_contrast() -> ScoreSpec:
-    score, part = base_score("M3P-03 Ornament then plain-note contrast", bpm=56)
-    pitches = ["A4", "B4", "C5", "D5", "E5", "D5", "C5", "B4"]
+    score, part = base_score("M3P-03 Fixed mordent and plain-note pairs", bpm=60)
+    pairs = [("D4", "E4"), ("E4", "F4"), ("F4", "G4"), ("G4", "A4")] * 2
     labels: list[dict[str, Any]] = []
-    intro = [text_mark(half("A4"), "plain intro"), half("A4")]
-    intro_measure = add_measure(part, intro)
-    for note_index, value in enumerate(intro, start=1):
-        labels.append(
-            {
-                "measure": intro_measure,
-                "noteIndex": note_index,
-                "writtenPitch": value.nameWithOctave,
-                "expectedBehavior": "stable",
-                "expectedPositiveModes": [],
-                "expectedNegativeModes": ["ornament", "trill", "slide"],
-            }
-        )
-    for index, pitch in enumerate(pitches):
-        ornament_note = half(pitch)
-        ornament_name = "mordent" if index % 2 == 0 else "turn"
-        ornament_note.expressions.append(expressions.Mordent() if ornament_name == "mordent" else expressions.Turn())
-        plain_note = text_mark(half(pitch), "plain")
+    for base_pitch, upper_pitch in pairs:
+        ornament_note = half(base_pitch)
+        ornament_note.expressions.append(expressions.Mordent())
+        text_mark(ornament_note, f"{base_pitch}-{upper_pitch}-{base_pitch}, then hold")
+        plain_note = text_mark(half(base_pitch), "plain - 2 beats")
         measure = add_measure(part, [ornament_note, plain_note])
         labels.extend(
             [
@@ -169,7 +171,8 @@ def ornament_contrast() -> ScoreSpec:
                     "measure": measure,
                     "noteIndex": 1,
                     "writtenPitch": ornament_note.nameWithOctave,
-                    "expectedBehavior": f"ornament-{ornament_name}",
+                    "expectedBehavior": "ornament-upper-mordent",
+                    "ornamentUpperPitch": upper_pitch,
                     "expectedPositiveModes": ["ornament"],
                     "expectedNegativeModes": ["trill", "slide"],
                 },
@@ -188,9 +191,10 @@ def ornament_contrast() -> ScoreSpec:
         "装饰音与普通音对照",
         "让装饰音主音判法拥有真实正例和同音高普通音负例。",
         [
-            "第 1 小节是两个普通准备音，不加装饰。",
-            "从第 2 小节开始，每小节第 1 个音按谱面的波音或回音记号演奏。",
-            "从第 2 小节开始，每小节第 2 个同音高音符不加装饰，保持平直。",
+            "固定顺序共 4 组，完整重复一次：D4、E4、F4、G4。",
+            "每组第 1 个音在开头快速演奏“主音-上方音-主音”一次，再保持主音至 2 拍结束。",
+            "上方音依次为 E4、F4、G4、A4；不要连续反复，避免演成颤音。",
+            "每组第 2 个同音高音符拉 2 拍平直音，不加装饰和揉弦。",
             "不要把第 2 个音也演奏成颤音或揉弦。",
         ],
         score,
@@ -198,54 +202,63 @@ def ornament_contrast() -> ScoreSpec:
     )
 
 
-def harmonic_contrast() -> ScoreSpec:
-    score, part = base_score("M3P-04 Natural harmonics and open-string controls", bpm=48)
-    pairs = [("G4", "G3"), ("D5", "D4"), ("A5", "A4"), ("E6", "E5")] * 2
+def slide_contrast() -> ScoreSpec:
+    score, part = base_score("M3P-04 Fixed slide and straight-tone pairs", bpm=60)
+    pairs = [("C4", "D4"), ("D4", "E4"), ("E4", "F4"), ("F4", "G4")] * 2
     labels: list[dict[str, Any]] = []
-    for sounding_pitch, open_pitch in pairs:
-        harmonic_note = half(sounding_pitch)
-        harmonic = articulations.StringHarmonic()
-        harmonic.harmonicType = "natural"
-        harmonic.pitchType = "sounding"
-        harmonic_note.articulations.append(harmonic)
-        text_mark(harmonic_note, "nat. harm.")
-        ordinary_note = text_mark(half(open_pitch), "open string")
-        measure = add_measure(part, [harmonic_note, ordinary_note])
+    for pair_index, (source_pitch, target_pitch) in enumerate(pairs, start=1):
+        source_note = text_mark(quarter(source_pitch), f"slide to {target_pitch}")
+        target_note = text_mark(quarter(target_pitch), "arrive")
+        ordinary_note = text_mark(half(target_pitch), "plain - 2 beats")
+        measure = add_measure(part, [source_note, target_note, ordinary_note])
         labels.extend(
             [
                 {
                     "measure": measure,
                     "noteIndex": 1,
-                    "writtenPitch": harmonic_note.nameWithOctave,
-                    "expectedBehavior": "natural-harmonic-sounding-pitch",
-                    "expectedPositiveModes": ["harmonic"],
-                    "expectedNegativeModes": [],
+                    "writtenPitch": source_note.nameWithOctave,
+                    "expectedBehavior": "slide-source",
+                    "expectedPositiveModes": ["slide"],
+                    "expectedNegativeModes": ["trill", "vibrato", "ornament"],
+                    "pairId": f"slide-{pair_index:02d}",
+                    "pairRole": "source",
                 },
                 {
                     "measure": measure,
                     "noteIndex": 2,
+                    "writtenPitch": target_note.nameWithOctave,
+                    "expectedBehavior": "slide-arrival",
+                    "expectedPositiveModes": ["slide"],
+                    "expectedNegativeModes": ["trill", "vibrato", "ornament"],
+                    "pairId": f"slide-{pair_index:02d}",
+                    "pairRole": "target",
+                },
+                {
+                    "measure": measure,
+                    "noteIndex": 3,
                     "writtenPitch": ordinary_note.nameWithOctave,
-                    "expectedBehavior": "stable-open-string",
+                    "expectedBehavior": "stable",
                     "expectedPositiveModes": [],
-                    "expectedNegativeModes": ["harmonic"],
+                    "expectedNegativeModes": ["slide", "trill", "vibrato", "ornament"],
                 },
             ]
         )
     return ScoreSpec(
         "m3p-04",
-        "自然泛音与空弦对照",
-        "验证谱面 sounding-pitch 角色和真实自然泛音录音。",
+        "滑音与直音对照",
+        "提供固定滑音正例和同目标音直音负例；自然泛音音准检测已取消。",
         [
-            "每小节第 1 个音演奏自然泛音，谱面写的是实际发声音高。",
-            "依次使用 G、D、A、E 弦的八度自然泛音；第二轮重复一次。",
-            "每小节第 2 个音演奏对应空弦普通音，不加揉弦。",
+            "固定顺序共 4 组，完整重复一次：C4→D4、D4→E4、E4→F4、F4→G4。",
+            "每组第 1 拍拉起点音，第 2 拍连续滑到目标音；滑动中不要出现明显断音。",
+            "随后把同一目标音再拉 2 拍平直音，作为不带滑音的对照。",
+            "全程不加揉弦、颤音或装饰音。",
         ],
         score,
         labels,
     )
 
 
-SPECS = [straight_negative, vibrato_trill_positive, ornament_contrast, harmonic_contrast]
+SPECS = [straight_negative, vibrato_trill_positive, ornament_contrast, slide_contrast]
 
 
 def rasterize_svg(svg_path: Path, png_path: Path) -> None:
@@ -302,13 +315,14 @@ def write_readme(out_dir: Path, specs: list[ScoreSpec]) -> None:
     lines = [
         "# M3+ 最小补录包",
         "",
-        "目的:补齐真实负例、装饰音、泛音和独立揉弦/颤音证据。机器已生成谱面和计划真值;录音前它们不是 performance gold。",
+        "目的:补齐真实负例、装饰音、滑音和独立揉弦/颤音证据。自然泛音音准检测已取消。机器已生成固定音符参考和计划真值;录音前它们不是 performance gold。",
         "",
         "## 录音要求",
         "",
-        "- 每份谱从头到尾录一遍，单独保存为 `m3p-01.m4a` 至 `m3p-04.m4a`。",
+        "- 不需要看谱。严格按下方的固定音符顺序和文字要求演奏即可；MusicXML、MIDI 和谱图只供机器校验。",
+        "- 每条单独保存为 `m3p-01.m4a` 至 `m3p-04.m4a`。",
         "- 只录小提琴，不放伴奏；保持手机位置不变，避免削波和环境噪声。",
-        "- 按谱面速度演奏；开头可留 1–2 秒静音，但不要口头报数。",
+        "- 统一使用节拍器 60 BPM；开头留 1–2 秒静音，但不要口头报数。",
         "- 某处演错时整条重录，不在同一文件内停下重来。",
         "",
     ]

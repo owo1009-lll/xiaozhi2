@@ -10,7 +10,6 @@ if str(EXPERIMENTS) not in sys.path:
     sys.path.insert(0, str(EXPERIMENTS))
 
 from eval_western_strings_m3plus_pitch_modes import (  # noqa: E402
-    is_harmonic_candidate,
     is_ornament_candidate,
     mark_double_stops,
 )
@@ -34,9 +33,6 @@ def main() -> int:
     assert is_ornament_candidate({"techniques": ["trill-mark"], "beatDuration": 1.0}, 1.0) is True
     assert is_ornament_candidate({"techniques": [], "beatDuration": 0.125}, 0.2) is True
     assert is_ornament_candidate({"techniques": [], "beatDuration": 0.5}, 0.4) is False
-    assert is_harmonic_candidate({"techniques": ["harmonic-sounding-pitch"]}) is True
-    assert is_harmonic_candidate({"techniques": []}) is False
-
     print("western M3+ symbolic mode tests passed")
     return 0
 

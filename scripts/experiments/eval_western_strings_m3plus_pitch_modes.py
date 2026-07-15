@@ -295,11 +295,6 @@ def analyze_pitch_window(
     }
 
 
-def is_harmonic_candidate(note: dict[str, Any]) -> bool:
-    text = " ".join(note.get("techniques") or [])
-    return "harmonic" in text or "flageolet" in text
-
-
 def is_ornament_candidate(note: dict[str, Any], duration_seconds: float) -> bool:
     text = " ".join(note.get("techniques") or [])
     if any(token in text for token in ["grace", "trill-mark", "mordent", "turn", "ornament"]):
@@ -349,12 +344,10 @@ def classify_recording(
         flags = list(features.get("flags") or [])
         if note.get("doubleStopCandidate"):
             flags.append("double-stop-candidate")
-        if is_harmonic_candidate(note):
-            flags.append("harmonic-candidate")
         if is_ornament_candidate(note, duration):
             flags.append("ornament-candidate")
         primary = str(features.get("primaryMode") or "variable-f0")
-        for candidate in ["double-stop-candidate", "harmonic-candidate", "trill-like", "vibrato-like", "slide-like", "ornament-candidate"]:
+        for candidate in ["double-stop-candidate", "trill-like", "vibrato-like", "slide-like", "ornament-candidate"]:
             if candidate in flags:
                 primary = candidate
                 break
@@ -419,7 +412,6 @@ def summarize(rows: list[dict[str, Any]], recording_summaries: list[dict[str, An
         "trill-like",
         "ornament-candidate",
         "double-stop-candidate",
-        "harmonic-candidate",
     }
     behavior_candidate_count = sum(
         1

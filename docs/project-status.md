@@ -93,9 +93,9 @@
 - Basic Pitch 序列 DTW 后的机器检出为:滑音 7/12、颤音 0/6、揉弦 1/17、双音 19/24。
 - 新增 `npm run western:round2-m3plus-diagnostic`:23 个音中 1 个未匹配,12/23(`52.2%`)的 DTW 窗口时长不合理。受控时值锚定后的最佳单特征仍只有训练内 precision/recall=`66.7%/66.7%`,未达到 90%;因此不调低阈值、不接学生端。
 - 四项均未达 90%;旧 release-ready 结论只适用于 first-measure 安全子集,不得推广。
-- 泛音 MusicXML `sounding-pitch/base-pitch/touching-pitch` 已能保留;只有显式 sounding pitch 自动评分,缺失角色退复核。
-- 第二轮尚缺真实负例、独立装饰音和泛音样本,因此 `studentGateReady=false` 不变。
-- 已生成最小补录包 `音频/m3plus-supplemental/`:4 份单页谱分别覆盖纯直音负例、独立揉弦/颤音、装饰音/普通音对照、自然泛音/空弦对照,并附 MusicXML、MIDI、谱图、`score-intent.json` 和中文说明。计划真值均明确 `performanceConfirmed=false`,不得在录音前计作性能 gold。
+- 自然泛音音准检测已从 M3+ 当前范围取消,不再要求录音、评测或放行。MusicXML 泛音 pitch-role 解析仅作为通用谱面兼容能力保留,不构成学生端自动音准承诺。
+- 第二轮尚缺真实负例和独立装饰音样本,因此 `studentGateReady=false` 不变。
+- 已生成最小补录包 `音频/m3plus-supplemental/`:4 条均改为“不读谱、固定音符顺序 + 文字要求”,分别覆盖 C 大调上行纯直音负例、独立揉弦/颤音、装饰音/普通音对照、滑音/直音对照。附带的 MusicXML、MIDI、谱图仅供机器校验;`score-intent.json` 仍明确 `performanceConfirmed=false`,不得在录音前计作性能 gold。
 - `npm run western:m3plus-supplemental-status` 当前为 `readyRecordingCount=0/4`,`readyForMachineAnalysis=false`,`humanTask=record-m3plus-supplemental-takes`;只缺 `m3p-01.m4a` 至 `m3p-04.m4a` 四条真实录音。录齐后先由机器验证解码、定位和模式指标,不直接生成教师复核包。
 
 ### M4 OMR benchmark

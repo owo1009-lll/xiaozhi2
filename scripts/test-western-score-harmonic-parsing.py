@@ -55,7 +55,7 @@ UNQUALIFIED_HARMONIC_XML = """<?xml version="1.0" encoding="UTF-8"?>
 
 def request() -> AnalyzeRequest:
     return AnalyzeRequest(
-        participantId="m3plus-harmonic-test",
+        participantId="western-score-harmonic-parser-test",
         piecePack=PiecePack(instrument="violin", meter="4/4", tempo=60),
     )
 
@@ -82,7 +82,7 @@ def main() -> int:
     )
     assert unqualified == []
 
-    print("western M3+ harmonic scoring tests passed")
+    print("western score harmonic parsing tests passed")
     return 0
 
 
