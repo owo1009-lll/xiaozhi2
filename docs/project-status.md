@@ -305,6 +305,8 @@ HF2 Hardanger Fiddle 的 119 对 WAV/MIDI 已完成只读审计，其中 100 条
 
 同日进一步审计发现，真实照片与独立公开源谱存在记谱版本混杂：50 个音高序列完全可比的小节中，绝对四分音符起点仅 16/50 完全一致，但相对 IOI 形状有 34/50 一致，其中 33 小节属于“拍号/记谱尺度不同但节奏比例一致”。因此旧 `onset-quarter=2.2%` 不能单独解释为 OMR 节奏全错。新增 `western:m4-rhythm-candidate-oracle` 能在 common-meter 候选中覆盖 50/50 gold 节奏，但 gold 仅用于 oracle，运行时选择器尚未通过，`runtimeReady=false`。生产导入器已停止把缺失拍号静默写成 `4/4`：显式拍号写入 `meterKnown=true`，缺拍号写入 `meterKnown=false` 并强制节奏复核；同时可从 MusicXML 小节时值众数恢复仅供内部布局的 `measureQuarterSpan`。`6/8` 现在按 3 个四分音符单位计算，不再误算为 6。该修复改善时间轴语义，但不放行任何未知拍号的学生节奏判断。
 
+同日非人工优化补测表明，M4 并非只能停在单引擎 84.7% 音高 precision：`western:m4-engine-consensus` 的自适应多引擎+局部 onset 子集在 5 份独立照片谱上达到 `344/344`、precision=`100%`、gold coverage=`21.98%`，但样本量和部分单谱覆盖仍不足，继续保持 eval-only。普通上传的主要覆盖瓶颈也定位到旧执行器的整曲线性时间映射；默认关闭的 Basic Pitch 事件 + 一对一 gap-penalty DTW + 事件内部 pYIN 稳定窗，在一条正确受控录音前 20 音上把支持从 `0/20` 提升到 `20/20`、中位误差从 `3300c` 降到 `5c`。四类受控录音候选率达到 31.4%–42.4%，但尚缺逐候选独立真值验收，因此该模式仍全部 `review_required`，不得解读为学生端 coverage 已达标。
+
 先预览,确认目标仅为可再生环境、调试目录、构建产物和 Python 缓存:
 
 ```bash

@@ -197,6 +197,114 @@ def extract_f0(audio_path: Path) -> tuple[np.ndarray, np.ndarray, float]:
     return times.astype(np.float64), midi.astype(np.float64), float(y.size / sr)
 
 
+def load_basic_pitch_events(audio_path: Path, cache_dir: Path) -> list[dict[str, Any]]:
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_path = cache_dir / f"{audio_path.stem}.basic-pitch.json"
+    if cache_path.is_file():
+        return read_basic_pitch_events(cache_path)
+    from basic_pitch.inference import predict
+
+    _, _, raw_events = predict(
+        str(audio_path),
+        minimum_frequency=float(librosa.note_to_hz("G3")),
+        maximum_frequency=float(librosa.note_to_hz("A7")),
+        minimum_note_length=80.0,
+    )
+    events = sorted(
+        [
+            {
+                "start": float(start),
+                "end": float(end),
+                "midi": int(pitch),
+                "confidence": float(confidence),
+            }
+            for start, end, pitch, confidence, *_ in raw_events
+        ],
+        key=lambda item: (float(item["start"]), float(item["end"]), int(item["midi"])),
+    )
+    cache_path.write_text(json.dumps(events, ensure_ascii=False, indent=2), encoding="utf-8")
+    return events
+
+
+def read_basic_pitch_events(path: Path) -> list[dict[str, Any]]:
+    return sorted(
+        json.loads(path.read_text(encoding="utf-8")),
+        key=lambda item: (float(item["start"]), float(item["end"]), int(item["midi"])),
+    )
+
+
+def basic_pitch_match_cost(score_midi: int, event_midi: int) -> float:
+    diff = abs(score_midi - event_midi)
+    if diff == 0:
+        return 0.0
+    if diff == 1:
+        return 0.85
+    if diff == 2:
+        return 1.35
+    return min(4.0, 2.2 + diff * 0.18)
+
+
+def assign_basic_pitch_events(
+    notes: list[dict[str, Any]],
+    events: list[dict[str, Any]],
+) -> list[dict[str, Any] | None]:
+    """Assign events one-to-one while allowing explicit score/event gaps."""
+
+    if not notes or not events:
+        return [None for _ in notes]
+    n, m = len(notes), len(events)
+    skip_score_cost = 1.35
+    skip_event_cost = 0.75
+    dp = np.full((n + 1, m + 1), np.inf, dtype=np.float64)
+    back = np.zeros((n + 1, m + 1), dtype=np.uint8)
+    dp[0, 0] = 0.0
+    for i in range(1, n + 1):
+        dp[i, 0] = dp[i - 1, 0] + skip_score_cost
+        back[i, 0] = 2
+    for j in range(1, m + 1):
+        dp[0, j] = dp[0, j - 1] + skip_event_cost
+        back[0, j] = 3
+    for i in range(1, n + 1):
+        score_midi = safe_int(notes[i - 1].get("midi"), 0)
+        for j in range(1, m + 1):
+            event_midi = safe_int(events[j - 1].get("midi"), 0)
+            match_cost = basic_pitch_match_cost(score_midi, event_midi)
+            choices = (
+                dp[i - 1, j - 1] + match_cost + (j * 1e-7),
+                dp[i - 1, j] + skip_score_cost,
+                dp[i, j - 1] + skip_event_cost,
+            )
+            action = int(np.argmin(choices)) + 1
+            dp[i, j] = choices[action - 1]
+            back[i, j] = action
+    assignments: list[dict[str, Any] | None] = [None for _ in notes]
+    i, j = n, m
+    while i > 0 or j > 0:
+        action = int(back[i, j])
+        if action == 1 and i > 0 and j > 0:
+            note = notes[i - 1]
+            event = events[j - 1]
+            target = safe_int(note.get("midi"), 0)
+            event_midi = safe_int(event.get("midi"), 0)
+            assignments[i - 1] = {
+                "eventIndex": j - 1,
+                "time": float(event["start"]),
+                "end": float(event["end"]),
+                "eventMidi": event_midi,
+                "confidence": float(event.get("confidence", 0.0)),
+                "pitchDistanceSemitones": abs(event_midi - target),
+            }
+            i -= 1
+            j -= 1
+        elif action == 2 and i > 0:
+            i -= 1
+        elif action == 3 and j > 0:
+            j -= 1
+        else:
+            break
+    return assignments
+
+
 def cents_error(observed_midi: float, target_midi: int) -> float:
     return float((observed_midi - target_midi) * 100.0)
 
@@ -210,6 +318,8 @@ def build_decisions(
     *,
     audio_start_seconds: float = 0.0,
     audio_end_seconds: float | None = None,
+    timing_assignments: list[dict[str, Any] | None] | None = None,
+    analysis_mode: str = "linear-score-pyin-review-v1",
 ) -> list[dict[str, Any]]:
     if not notes:
         return []
@@ -222,14 +332,36 @@ def build_decisions(
     )
     scale = ((active_end - active_start) / score_span) if score_span > 0 else 0.0
     decisions: list[dict[str, Any]] = []
-    for note in notes[: limit if limit > 0 else len(notes)]:
+    selected_notes = notes[: limit if limit > 0 else len(notes)]
+    for note_index, note in enumerate(selected_notes):
         score_unit = safe_float(note.get("scoreUnit"), 0.0) or 0.0
-        predicted_onset = (
-            max(active_start, min(active_end, active_start + score_unit * scale))
-            if scale > 0
-            else active_start
-        )
-        window = np.abs(times - predicted_onset) <= 0.18
+        assignment = timing_assignments[note_index] if timing_assignments is not None else None
+        if assignment is not None:
+            predicted_onset = float(assignment["time"])
+        elif timing_assignments is not None:
+            predicted_onset = None
+        else:
+            predicted_onset = (
+                max(active_start, min(active_end, active_start + score_unit * scale))
+                if scale > 0
+                else active_start
+            )
+        if assignment is not None:
+            event_start = float(assignment["time"])
+            event_end = max(event_start, float(assignment["end"]))
+            event_duration = event_end - event_start
+            stable_start = event_start + min(0.12, event_duration * 0.25)
+            stable_end = event_end - min(0.08, event_duration * 0.15)
+            if stable_end <= stable_start:
+                stable_start, stable_end = event_start, event_end
+            measurement_time = (stable_start + stable_end) / 2.0
+            window = (times >= stable_start) & (times <= stable_end)
+        elif predicted_onset is not None:
+            measurement_time = predicted_onset
+            window = np.abs(times - predicted_onset) <= 0.18
+        else:
+            measurement_time = None
+            window = np.zeros_like(times, dtype=bool)
         observed = midi_track[window]
         observed = observed[np.isfinite(observed)]
         voiced_frames = int(observed.size)
@@ -244,16 +376,21 @@ def build_decisions(
                 "measureIndex": note["position"].get("measureIndex") or note.get("measureIndex"),
                 "pageNumber": note["position"].get("pageNumber"),
                 "midi": note["midi"],
-                "predictedOnsetSeconds": round(predicted_onset, 4),
+                "predictedOnsetSeconds": round(predicted_onset, 4) if predicted_onset is not None else None,
                 "autoDecision": "review_required",
                 "reviewRequiredReason": "offline-feature-analysis-review-only",
                 "confidenceScore": 0.0,
                 "evidence": {
-                    "analysisMode": "linear-score-pyin-review-v1",
+                    "analysisMode": analysis_mode,
                     "voicedFrameCount": voiced_frames,
                     "medianObservedMidi": round(median_midi, 4) if median_midi is not None else None,
                     "centsError": round(cents, 2) if cents is not None else None,
                     "pitchSupportWithin80Cents": support,
+                    "timingAssignmentAvailable": assignment is not None if timing_assignments is not None else True,
+                    "pitchMeasurementTimeSeconds": round(measurement_time, 4) if measurement_time is not None else None,
+                    "basicPitchEventMidi": assignment.get("eventMidi") if assignment else None,
+                    "basicPitchEventConfidence": round(float(assignment["confidence"]), 6) if assignment else None,
+                    "basicPitchPitchDistanceSemitones": assignment.get("pitchDistanceSemitones") if assignment else None,
                 },
             }
         )
@@ -266,7 +403,11 @@ def build_candidate_rows(decisions: list[dict[str, Any]]) -> list[dict[str, Any]
         evidence = decision.get("evidence") if isinstance(decision.get("evidence"), dict) else {}
         rows.append(
             {
-                "candidateId": f"offline-pyin-linear:{decision.get('noteId', index)}",
+                "candidateId": (
+                    f"offline-basic-pitch-dtw:{decision.get('noteId', index)}"
+                    if evidence.get("analysisMode") == "basic-pitch-dtw-pyin-review-v1"
+                    else f"offline-pyin-linear:{decision.get('noteId', index)}"
+                ),
                 "noteId": decision.get("noteId"),
                 "noteIndex": index,
                 "sectionId": decision.get("sectionId"),
@@ -275,12 +416,21 @@ def build_candidate_rows(decisions: list[dict[str, Any]]) -> list[dict[str, Any]
                 "pageNumber": decision.get("pageNumber"),
                 "midi": decision.get("midi"),
                 "predictedOnsetSeconds": decision.get("predictedOnsetSeconds"),
-                "method": "pyin-linear-score-window",
-                "analysisMode": "linear-score-pyin-review-v1",
+                "method": (
+                    "basic-pitch-dtw-pyin-window"
+                    if evidence.get("analysisMode") == "basic-pitch-dtw-pyin-review-v1"
+                    else "pyin-linear-score-window"
+                ),
+                "analysisMode": evidence.get("analysisMode"),
                 "voicedFrameCount": evidence.get("voicedFrameCount"),
                 "medianObservedMidi": evidence.get("medianObservedMidi"),
                 "centsError": evidence.get("centsError"),
                 "pitchSupportWithin80Cents": bool(evidence.get("pitchSupportWithin80Cents")),
+                "timingAssignmentAvailable": bool(evidence.get("timingAssignmentAvailable")),
+                "pitchMeasurementTimeSeconds": evidence.get("pitchMeasurementTimeSeconds"),
+                "basicPitchEventMidi": evidence.get("basicPitchEventMidi"),
+                "basicPitchEventConfidence": evidence.get("basicPitchEventConfidence"),
+                "basicPitchPitchDistanceSemitones": evidence.get("basicPitchPitchDistanceSemitones"),
                 "autoDecision": "review_required",
                 "reviewRequiredReason": "offline-feature-analysis-review-only",
                 "studentSafeGateReady": False,
@@ -290,15 +440,29 @@ def build_candidate_rows(decisions: list[dict[str, Any]]) -> list[dict[str, Any]
     return rows
 
 
-def summarize(decisions: list[dict[str, Any]], score: dict[str, Any], audio_duration: float, total_notes: int) -> dict[str, Any]:
+def summarize(
+    decisions: list[dict[str, Any]],
+    score: dict[str, Any],
+    audio_duration: float,
+    total_notes: int,
+    analysis_mode: str,
+) -> dict[str, Any]:
     cents_values = [
         abs(float(item["evidence"]["centsError"]))
         for item in decisions
         if item.get("evidence", {}).get("centsError") is not None
     ]
     support_count = sum(1 for item in decisions if item.get("evidence", {}).get("pitchSupportWithin80Cents"))
+    assignment_count = sum(
+        bool(item.get("evidence", {}).get("timingAssignmentAvailable")) for item in decisions
+    )
+    exact_assignment_count = sum(
+        item.get("evidence", {}).get("basicPitchPitchDistanceSemitones") == 0
+        for item in decisions
+        if item.get("evidence", {}).get("timingAssignmentAvailable")
+    )
     return {
-        "analysisMode": "linear-score-pyin-review-v1",
+        "analysisMode": analysis_mode,
         "scoreId": score.get("scoreId"),
         "scoreTitle": score.get("title") or score.get("scoreId"),
         "audioDurationSeconds": round(audio_duration, 4),
@@ -310,6 +474,10 @@ def summarize(decisions: list[dict[str, Any]], score: dict[str, Any], audio_dura
         "reviewOnlyCandidateCount": len(decisions),
         "coverage": 0,
         "pitchSupportWithin80CentsCount": support_count,
+        "timingAssignmentCount": assignment_count,
+        "unassignedNoteCount": len(decisions) - assignment_count,
+        "exactEventPitchAssignmentCount": exact_assignment_count,
+        "eventPitchConflictCount": assignment_count - exact_assignment_count,
         "medianAbsCents": round(statistics.median(cents_values), 2) if cents_values else None,
         "studentSafeGateReady": False,
         "studentFacing": False,
@@ -322,6 +490,17 @@ def main() -> int:
     parser.add_argument("--score-id", required=True)
     parser.add_argument("--audio", required=True)
     parser.add_argument("--limit", type=int, default=20)
+    parser.add_argument(
+        "--timing-mode",
+        choices=("linear", "basic-pitch-dtw"),
+        default=os.getenv("WESTERN_STRINGS_OFFLINE_TIMING_MODE", "linear"),
+    )
+    parser.add_argument(
+        "--basic-pitch-cache",
+        default="data/experiments/western-strings-m3/offline-basic-pitch-cache",
+    )
+    parser.add_argument("--basic-pitch-events", help="Reuse an existing Basic Pitch JSON event cache.")
+    parser.add_argument("--summary-only", action="store_true")
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
@@ -346,10 +525,31 @@ def main() -> int:
     try:
         timeline = build_symbolic_timeline(notes)
         times, midi_track, audio_duration = extract_f0(audio_path)
-        decisions = build_decisions(timeline, times, midi_track, audio_duration, max(0, args.limit))
+        assignments = None
+        analysis_mode = "linear-score-pyin-review-v1"
+        if args.timing_mode == "basic-pitch-dtw":
+            events = (
+                read_basic_pitch_events((repo_root / args.basic_pitch_events).resolve())
+                if args.basic_pitch_events
+                else load_basic_pitch_events(audio_path, repo_root / args.basic_pitch_cache)
+            )
+            assignments = assign_basic_pitch_events(timeline, events)
+            analysis_mode = "basic-pitch-dtw-pyin-review-v1"
+        decisions = build_decisions(
+            timeline,
+            times,
+            midi_track,
+            audio_duration,
+            max(0, args.limit),
+            timing_assignments=assignments,
+            analysis_mode=analysis_mode,
+        )
         candidate_rows = build_candidate_rows(decisions)
-        summary = summarize(decisions, score or {}, audio_duration, len(timeline))
-        print(json.dumps({"ok": True, "summary": summary, "decisions": decisions, "candidateRows": candidate_rows}, ensure_ascii=False))
+        summary = summarize(decisions, score or {}, audio_duration, len(timeline), analysis_mode)
+        payload = {"ok": True, "summary": summary}
+        if not args.summary_only:
+            payload.update({"decisions": decisions, "candidateRows": candidate_rows})
+        print(json.dumps(payload, ensure_ascii=False))
         return 0
     except Exception as exc:
         print(json.dumps({

@@ -39,6 +39,46 @@ def write_tone(path: Path, sample_rate: int = 22050, duration_seconds: float = 0
 
 def main() -> None:
     module = load_module()
+    notes = [{"midi": 60}, {"midi": 62}, {"midi": 64}]
+    events = [
+        {"start": 0.1, "end": 0.4, "midi": 60, "confidence": 0.8},
+        {"start": 0.5, "end": 0.8, "midi": 62, "confidence": 0.7},
+        {"start": 0.9, "end": 1.2, "midi": 65, "confidence": 0.9},
+    ]
+    assignments = module.assign_basic_pitch_events(notes, events)
+    assert [round(item["time"], 3) if item else None for item in assignments] == [0.1, 0.5, 0.9]
+    assert [round(item["end"], 3) if item else None for item in assignments] == [0.4, 0.8, 1.2]
+    assert [item["pitchDistanceSemitones"] if item else None for item in assignments] == [0, 0, 1]
+    timeline_note = {
+        "noteId": "n1",
+        "sectionId": "s1",
+        "sectionTitle": "section 1",
+        "position": {"measureIndex": 1, "pageNumber": 1},
+        "midi": 60,
+        "scoreUnit": 0.0,
+    }
+    decisions = module.build_decisions(
+        [timeline_note],
+        np.asarray([0.0]),
+        np.asarray([60.0]),
+        1.0,
+        1,
+        timing_assignments=[None],
+        analysis_mode="basic-pitch-dtw-pyin-review-v1",
+    )
+    assert decisions[0]["predictedOnsetSeconds"] is None
+    assert decisions[0]["evidence"]["timingAssignmentAvailable"] is False
+    dynamic_rows = module.build_candidate_rows(decisions)
+    assert dynamic_rows[0]["candidateId"] == "offline-basic-pitch-dtw:n1"
+    linear_decisions = module.build_decisions(
+        [timeline_note],
+        np.asarray([0.0]),
+        np.asarray([60.0]),
+        1.0,
+        1,
+    )
+    linear_rows = module.build_candidate_rows(linear_decisions)
+    assert linear_rows[0]["candidateId"] == "offline-pyin-linear:n1"
     ffmpeg = module.resolve_ffmpeg_executable()
     assert ffmpeg, "managed FFmpeg must be available for compressed pilot audio"
     with tempfile.TemporaryDirectory(prefix="western-offline-audio-test-") as temp_dir:
@@ -57,7 +97,7 @@ def main() -> None:
         assert sample_rate == 22050
         assert 0.45 <= waveform.size / sample_rate <= 0.55
         assert float(np.max(np.abs(waveform))) > 0.05
-    print('{"ok": true, "checks": ["managed-ffmpeg-resolved", "m4a-decoded-to-mono-float"]}')
+    print('{"ok": true, "checks": ["basic-pitch-dtw-assignment", "dynamic-timing-fail-closed", "legacy-candidate-id-compatible", "managed-ffmpeg-resolved", "m4a-decoded-to-mono-float"]}')
 
 
 if __name__ == "__main__":

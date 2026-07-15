@@ -94,7 +94,21 @@
 
 结论：相对 IOI 对部分整首候选有排序信号，但没有形成可跨曲泛化的小节级安全选择器；起音并集会引入更多错配。它只能保留为复核界面的辅助证据，不能自动改谱或解锁节奏反馈。
 
-## 6. 当前裁决
+## 6. 2026-07-16 非人工优化补测
+
+### 6.1 M4 多引擎自适应共识
+
+新增 `western:m4-engine-consensus`，以 Audiveris 坐标为锚点，只使用运行时可见的引擎输出做选择，独立 gold 只用于评估。固定策略为：有 Oemer 输出时要求 Audiveris、HOMR、Oemer 三者音高一致且局部 onset 差不超过 0.25 quarter；Oemer 不可用时要求 Audiveris 与 HOMR 满足同样条件。
+
+5 份独立真实照片谱上，该自适应子集为 `344/344` 正确，precision=`100%`，gold coverage=`21.98%`，5/5 谱的 precision 子门均通过。它证明 M4 可以通过更强证据减少错误草稿，但还不能接生产：样本只有 5 份，部分单谱 coverage 低于 20%，运行时坐标适配和更大独立照片集尚未验收，因此 `runtimeReady=false`、`studentGateReady=false` 不变。
+
+### 6.2 普通录音的动态音符定位
+
+旧离线执行器按谱面总时长把音符线性摊到整段录音。受控正确样本的首音因此被放到 0 秒，pYIN 中位误差达到 `3300 cents`。新增默认关闭的 `--timing-mode basic-pitch-dtw`：Basic Pitch 只负责提出音频事件，带 gap penalty 的一对一单调匹配负责圈定谱音时间，pYIN 在事件内部稳定区测连续音高；未匹配音符直接拒判，不回退旧线性时间。
+
+同一正确录音前 20 音从 `0/20` 音高支持提升到 `20/20`，中位绝对误差从 `3300 cents` 降到 `5 cents`。四类已有受控录音的全曲机器补测得到 31.4%–42.4% 的可检查候选率；错音样本仍有音高冲突，漏音样本仍有未匹配项，没有被强行“洗白”。但这些结果尚未逐候选对照独立教师真值，故动态模式仍只输出 `review_required`，`coverage=0` 的学生安全语义保持不变。
+
+## 7. 当前裁决
 
 1. M3+ 路线保留：完成真实补充录音后，按模式做正负标定、三态质量闸门和留一曲验证。
 2. 小节级结果只做教学摘要，不升级逐音安全结论。
@@ -103,7 +117,9 @@
 5. 小节总时值归一化和受限最小编辑均未改善总体准确率，不进入生产。
 6. 相对 IOI 保留为候选排序研究特征；50 小节按曲留一与起音双保险均未过闸，不接生产。
 
-## 7. 可复现命令
+7. M4 多引擎共识与普通录音动态定位均有实质增益，但在独立盲验完成前只作为 review 候选，不自动给学生结论。
+
+## 8. 可复现命令
 
 ```bash
 npm run western:m3plus-supplemental-eval
@@ -111,6 +127,7 @@ npm run western:m4-dual-evidence-audit
 npm run western:measure-policy-audit
 npm run western:m4-measure-duration-probe
 npm run western:m4-audio-rhythm-ranking
+npm run western:m4-engine-consensus
 
 npm run test:western-m3plus-supplemental-eval
 npm run test:western-photo-score
@@ -118,6 +135,8 @@ npm run test:western-m4-dual-evidence
 npm run test:western-measure-policy
 npm run test:western-m4-measure-duration-probe
 npm run test:western-m4-audio-rhythm-ranking
+npm run test:western-m4-engine-consensus
+npm run test:western-offline-feature-audio
 ```
 
 生成报告均位于 `data/experiments/`，默认被 Git 忽略，不作为学生端运行时配置。
