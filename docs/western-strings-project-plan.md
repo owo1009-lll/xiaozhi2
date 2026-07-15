@@ -166,6 +166,8 @@
 - **当前执行状态(2026-07-15):** `npm run western:m4-independent-benchmark-audit` 与 `western:m4-preflight` 已将证据拆开。独立 render/scan/photo 三域达到研究报告下限,故 `m4OmrAccuracyClaimReady=true`;严格逐谱仅 12/32,真实照片独立源谱 gold 严格通过 0/5(P/R=`84.7%/71.5%`),故 `m4OmrAutomaticAdoptionReady=false`,`m4OmrAutoScoreReady=false`。5×3 预处理 sweep 中 `up2` 最好;`up3` 和 Otsu 总体退化,没有可接生产的参数改进。既有 12 条混合 benchmark 中 8 条为人工批准未改草稿、4 条为独立编辑 gold;均无需重复复核。当前 `humanTask=none`,也不能打开自动运行时。实时事实以 `npm run western:m4-preflight` 和 `npm run western:project-status` 为准。
 - **运行时置信探针(2026-07-15):** `npm run western:m4-omr-confidence-probe` 只使用识别规模、页数和 Audiveris 日志等运行时可见特征,按 6 个 BWV 作品留一。LR/RF AUC=0.567/0.800;RF 最佳观察点 precision=0.80、coverage=0.156,没有达到 0.90/0.20 的安全子集。该负结果已接入独立审计,禁止用自报置信绕过逐谱精度门槛。
 - **更强引擎对照(2026-07-15):** `npm run western:m4-oemer-benchmark` 已在同一 5 份真实照片 source-gold、同一 `up2` 输入上评测 Oemer 0.1.8。Oemer 成功输出 4/5,`ex05` 因把单声部误分为 3 tracks 在 MusicXML builder 触发断言而失败;成功 4 份的聚合 P/R=`71.7%/77.0%`,计入引擎失败后的有效 recall=`62.8%`,严格通过 `0/5`。同 4 份 Audiveris 为 P/R=`83.2%/68.5%`:Oemer 提高部分 recall,但 precision 和鲁棒性不足,不能替换 Audiveris。模型训练时 `scikit-learn 1.2.0` 与本机 1.8.0 的兼容性已用精确 1.2.0 复跑排除,同一页输出 SHA-256 完全一致。该比较保持 eval-only、`studentGateReady=false`。
+- **Transformer 引擎对照与闸门修正(2026-07-15):** `npm run western:m4-homr-benchmark` 已用 HOMR 0.7.0 在同一 5 份原始 source 照片评测。5/5 输出,pitch P/R=`89.0%/96.2%`,但 onset-quarter/measure accuracy=`30.7%/79.0%`;pitch-only 可通过 2/5,完整 score gate 为 0/5。`ex05/ex12` 证明音高全对仍可能把时值重建错,所以 M4 自动采用统一要求 pitch precision/recall 与 onset/measure 四项均过线。HOMR 不替换 Audiveris,仍为 eval-only。
+- **Clarity-OMR 对照(2026-07-15):** `npm run western:m4-clarity-benchmark` 已在同一 5 份 source-gold 上运行官方 beam-5 管线。原样截图含播放器黑边,Stage A 在 smoke 中检出 0 个谱表;冻结的通用裁页后 5/5 输出,但 pitch P/R=`72.8%/35.5%`,onset-quarter/measure accuracy=`2.8%/10.1%`,完整严格通过 `0/5`。Clarity 不替换现有引擎,不进入学生端。
 
 ### M5 — 大提琴扩展
 - cello pitch range + onset/pitch 参数 + **专属误差分析** + **重新校准阈值(不复用小提琴)** + **独立 cello M0**。
@@ -435,12 +437,12 @@
 | M0 / M1 / M2(含 M2f)/ M3 core | 100%(闸门通过;**但 M3 core 每类有效错误样本仅 2 个,证据浓度薄**,扩证依赖新增含错录音) |
 | M3 全量(时值/多音) | ~70%(缺样本/口径,review-only) |
 | M3+ 少退复核 | ~55%(滑音/颤音离线证据过;双音对齐器已支持;泛音谱面标注未做;未接运行时) |
-| M4 OMR+落到谱面 | ~90%(独立 render 基准、5 份真实照片 source-gold、分层闸门、谱面锚定、服务端/浏览器照片入口、离线生产管线和 12 条全量回归已成;真实照片严格 0/5、预处理/运行时置信/Oemer 强引擎对照均未找到安全自动子集;后续只允许引入有独立证据的新引擎或扩大外部盲测,默认运行时继续关闭) |
+| M4 OMR+落到谱面 | ~92%(独立 render 基准、5 份真实照片 source-gold、完整 pitch/onset/measure 闸门、谱面锚定、照片入口和离线生产链已成;Audiveris/Oemer/HOMR/Clarity 均完整严格 0/5,HOMR 还证明 pitch-only 会假通过;后续只接受监督适配或新增外部盲测,默认运行时关闭) |
 | M5 大提琴 / V3 | 0% / ~10% |
 
 **V2-release 剩余缺口:** 已完成 5 首/5 条安全受控 pilot 和受控提交流接线;仍需 ① 一条全新独立盲测录音 + 已审 clean score + 谱面显示文件 + 核谱人;② 通过 fresh intake 与机器 precheck;③ 专业盲审和 release 终审。当前 coverage=4% 低于 20% 地板,不得仅因 precision=100% 默认开放。
 
-**本地安全清理:** `npm run western:cleanup` 只预览;`npm run western:cleanup:apply` 仅删除旧 model-bakeoff 虚拟环境、M4 调试目录、`dist/` 和源码树 Python 缓存。脚本拒绝工作区外路径和 `paper/` 目标,不删除正式数据、模型、音频、教师复核、private intake 或论文;执行后必须重跑 `npm run build`。
+**本地安全清理:** `npm run western:cleanup` 只预览;`npm run western:cleanup:apply` 仅删除旧 model-bakeoff/Oemer/HOMR/Clarity 隔离环境、第三方模型源码与 M4 smoke 调试目录、`dist/` 和源码树 Python 缓存。正式 benchmark MusicXML/JSON/CSV 会保留,可在无第三方环境时用 `--reuse-existing` 重算;脚本拒绝工作区外路径和 `paper/` 目标,不删除正式数据、模型、音频、教师复核、private intake 或论文;执行后必须重跑 `npm run build`。
 
 **受阻点记录:MUSC 推理"假死"(2026-07-11,已定位为环境问题,不可复现):**
 - 报告症状:44s 录音推理 30–50 分钟无输出,3s 音频单帧前向亦挂,GPU 5–9%/CPU 20%。

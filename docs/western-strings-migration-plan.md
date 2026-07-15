@@ -245,6 +245,8 @@ OMR 只解决"谱面从哪来",不改变音频诊断逻辑。未过 note-level �
 - 已接入 `npm run western:m4-independent-benchmark-audit`:独立 clean/scan/photo render-gold 分别为 N=32/6/6,平均 P/R 均达到研究下限,所以限定的独立 OMR 准确率报告可用;但严格逐谱 P≥98% 且 R≥95% 仅 12/32。另用公开 Kayser Op.20 LilyPond 源谱建立并校验 5 份真实照片独立 gold,总体 pitch P/R=`84.7%/71.5%`,严格通过 `0/5`,因此 `automaticAdoptionReady=false`,`studentGateReady=false`。既有 12 份未改 Audiveris 草稿仍只作复识一致性,不得混入独立准确率。
 - 已接入 `npm run western:m4-omr-confidence-probe`:仅用运行时可见的识别规模、页数与 Audiveris 日志特征,按 BWV 作品留一。当前 LR/RF AUC=0.567/0.800,RF 最佳观察点 precision=0.80、coverage=0.156,无法达到 0.90/0.20,所以不能用置信模型绕过逐谱门槛。真实照片 gold 的来源缺口已经关闭,但准确率本身未过门槛;5×3 预处理 sweep 也确认 `up2` 最佳、`up3`/Otsu 退化,当前不再要求人工制谱或重复复核。
 - 已接入 `npm run western:m4-oemer-benchmark`:Oemer 0.1.8 在同一 5 份真实照片 source-gold 上仅 4/5 成功输出,成功样本 P/R=`71.7%/77.0%`,计入引擎失败后的 recall=`62.8%`,严格通过 `0/5`;同 4 份 Audiveris P/R=`83.2%/68.5%`。Oemer 只能在个别页提高 recall,整体 precision 与结构鲁棒性更差,因此不替换 Audiveris、不接 runtime。
+- 已接入 `npm run western:m4-homr-benchmark`:HOMR 0.7.0 在 5/5 原始 source 照片上输出,聚合 pitch P/R=`89.0%/96.2%`,但 onset-quarter/measure accuracy 仅 `30.7%/79.0%`。2 份 pitch-perfect 输出实际时值错误;故 M4 外部引擎严格闸门同步要求 pitch+onset+measure,HOMR 完整通过 `0/5`,保持 eval-only。
+- 已接入 `npm run western:m4-clarity-benchmark`:Clarity-OMR 原样截图 Stage A 无谱表输出;通用自动裁页后 5/5 输出,但 pitch P/R=`72.8%/35.5%`,onset-quarter/measure accuracy=`2.8%/10.1%`,完整通过 `0/5`。它只保留为第三方视觉 Transformer 基线,不接 runtime。
 - 浏览器现可在 clean MusicXML/MIDI 与单页谱面照片之间二选一。照片入口只接受经过文件签名验证的 JPG/PNG/WebP,独立缓存照片与录音,在受控队列中显示预览,人工批准后才进入最多 5 条一批的离线照片谱分析。一般批处理与专用 CLI 都调用同一受管 Python 环境;结果固定为 `photo_score_review_ready`,`autoDiagnosisIssued=false`,`studentFacing=false`,并写入独立审计日志。
 - 当前单页照片入口不接受 PDF。多页 PDF 仍只属于 M4 benchmark/草稿流程;在实现逐页转换、页序和定位审计前,不得把 PDF 伪装成单页照片输入。
 

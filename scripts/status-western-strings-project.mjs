@@ -364,6 +364,20 @@ const M4_OEMER_BENCHMARK = path.join(
   "oemer-source-benchmark",
   "oemer-source-benchmark.json",
 );
+const M4_HOMR_BENCHMARK = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "homr-source-benchmark",
+  "homr-source-benchmark.json",
+);
+const M4_CLARITY_BENCHMARK = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "clarity-source-benchmark",
+  "clarity-source-benchmark.json",
+);
 const M4_INDEPENDENT_GOLD_TODO = path.join(
   "data",
   "experiments",
@@ -1249,6 +1263,8 @@ async function buildM4OmrStatus() {
   const benchmark = await readJson(M4_BENCHMARK);
   const independentBenchmark = await readJson(M4_INDEPENDENT_BENCHMARK_AUDIT);
   const oemerBenchmark = await readJson(M4_OEMER_BENCHMARK);
+  const homrBenchmark = await readJson(M4_HOMR_BENCHMARK);
+  const clarityBenchmark = await readJson(M4_CLARITY_BENCHMARK);
   const workspaceAudit = await readJson(M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT);
   const provenanceAudit = await readJson(M4_GOLD_PROVENANCE_AUDIT);
   const readinessReady = Boolean(readiness?.gate?.m4OmrBenchmarkDatasetReady);
@@ -1256,8 +1272,15 @@ async function buildM4OmrStatus() {
   const draftQualityReady = Boolean(benchmark?.gate?.m4OmrDraftQualityReady);
   const independentBenchmarkReady = independentBenchmark?.independentBenchmarkReady === true;
   const automaticAdoptionReady = independentBenchmark?.automaticAdoptionReady === true;
-  const automaticAdoptionBlockingReasons =
-    independentBenchmark?.automaticAdoptionBlockingReasons || ["m4-independent-benchmark-audit-missing"];
+  const automaticAdoptionBlockingReasons = [
+    ...(independentBenchmark?.automaticAdoptionBlockingReasons || ["m4-independent-benchmark-audit-missing"]),
+    ...(!automaticAdoptionReady && oemerBenchmark?.complete === true && oemerBenchmark?.gate?.automaticAdoptionReady !== true
+      ? ["m4-oemer-source-benchmark-below-floor"] : []),
+    ...(!automaticAdoptionReady && homrBenchmark?.complete === true && homrBenchmark?.gate?.automaticAdoptionReady !== true
+      ? ["m4-homr-source-benchmark-below-complete-score-floor"] : []),
+    ...(!automaticAdoptionReady && clarityBenchmark?.complete === true && clarityBenchmark?.gate?.automaticAdoptionReady !== true
+      ? ["m4-clarity-source-benchmark-below-complete-score-floor"] : []),
+  ];
   const provenanceCounts = provenanceAudit?.counts || {};
   const manualGoldRequiredRows = Number(provenanceCounts.manualGoldRequiredRows || 0);
   const independentRealPhotoGoldMissing = automaticAdoptionBlockingReasons.includes(
@@ -1299,6 +1322,10 @@ async function buildM4OmrStatus() {
     m4OmrAutomaticAdoptionReady: automaticAdoptionReady,
     m4OemerBenchmarkComplete: oemerBenchmark?.complete === true,
     m4OemerAutomaticAdoptionReady: oemerBenchmark?.gate?.automaticAdoptionReady === true,
+    m4HomrBenchmarkComplete: homrBenchmark?.complete === true,
+    m4HomrAutomaticAdoptionReady: homrBenchmark?.gate?.automaticAdoptionReady === true,
+    m4ClarityBenchmarkComplete: clarityBenchmark?.complete === true,
+    m4ClarityAutomaticAdoptionReady: clarityBenchmark?.gate?.automaticAdoptionReady === true,
     studentGateReady: false,
     teacherReviewNeeded: false,
     scoreEditorReviewNeeded: humanTask !== "none",
@@ -1323,6 +1350,8 @@ async function buildM4OmrStatus() {
       benchmarkJson: M4_BENCHMARK.replace(/\\/g, "/"),
       independentBenchmarkJson: M4_INDEPENDENT_BENCHMARK_AUDIT.replace(/\\/g, "/"),
       oemerBenchmarkJson: M4_OEMER_BENCHMARK.replace(/\\/g, "/"),
+      homrBenchmarkJson: M4_HOMR_BENCHMARK.replace(/\\/g, "/"),
+      clarityBenchmarkJson: M4_CLARITY_BENCHMARK.replace(/\\/g, "/"),
       independentGoldTodo: M4_INDEPENDENT_GOLD_TODO.replace(/\\/g, "/"),
       independentGoldTodoHtml: M4_INDEPENDENT_GOLD_TODO_HTML.replace(/\\/g, "/"),
       independentGoldWorkspaceAuditJson: M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT.replace(/\\/g, "/"),
@@ -1377,6 +1406,35 @@ async function buildM4OmrStatus() {
       comparison: oemerBenchmark.comparison || {},
     } : {
       source: M4_OEMER_BENCHMARK.replace(/\\/g, "/"),
+      missing: true,
+      complete: false,
+      automaticAdoptionReady: false,
+      studentGateReady: false,
+    },
+    homrBenchmark: homrBenchmark ? {
+      source: M4_HOMR_BENCHMARK.replace(/\\/g, "/"),
+      complete: homrBenchmark.complete === true,
+      automaticAdoptionReady: homrBenchmark?.gate?.automaticAdoptionReady === true,
+      studentGateReady: homrBenchmark?.gate?.studentGateReady === true,
+      runtime: homrBenchmark.runtime || {},
+      comparison: homrBenchmark.comparison || {},
+    } : {
+      source: M4_HOMR_BENCHMARK.replace(/\\/g, "/"),
+      missing: true,
+      complete: false,
+      automaticAdoptionReady: false,
+      studentGateReady: false,
+    },
+    clarityBenchmark: clarityBenchmark ? {
+      source: M4_CLARITY_BENCHMARK.replace(/\\/g, "/"),
+      complete: clarityBenchmark.complete === true,
+      automaticAdoptionReady: clarityBenchmark?.gate?.automaticAdoptionReady === true,
+      studentGateReady: clarityBenchmark?.gate?.studentGateReady === true,
+      runtime: clarityBenchmark.runtime || {},
+      comparison: clarityBenchmark.comparison || {},
+      rawNativeSmoke: clarityBenchmark.rawNativeSmoke || {},
+    } : {
+      source: M4_CLARITY_BENCHMARK.replace(/\\/g, "/"),
       missing: true,
       complete: false,
       automaticAdoptionReady: false,
@@ -1527,20 +1585,26 @@ function summarizeNextActions(
       priority: 3,
       track: "M4 OMR automatic adoption",
       action: realPhotoRows >= 3
-        ? m4Omr.m4OemerBenchmarkComplete
-          ? `Keep OMR draft-only. ${realPhotoRows} independent source-gold photos are available, but 0/${realPhotoRows} pass the strict P>=0.98/R>=0.95 floor. Preprocessing, runtime confidence, and the Oemer stronger-engine comparison all failed to produce a safe production subset. Do not repeat score-editor review or rerun the same engine; only evaluate a genuinely different engine on this frozen benchmark or add external blind photos.`
+        ? m4Omr.m4ClarityBenchmarkComplete
+          ? `Keep OMR draft-only. ${realPhotoRows} independent source-gold photos are available, but 0/${realPhotoRows} pass the complete pitch/onset/measure floor. Audiveris preprocessing, runtime confidence, Oemer, HOMR 0.7.0, and Clarity-OMR all failed to produce a safe production subset. Do not repeat human review or rerun these engines; the next research step must be supervised adaptation or new external blind photos.`
+          : m4Omr.m4HomrBenchmarkComplete
+            ? `Keep OMR draft-only. ${realPhotoRows} independent source-gold photos are available, but 0/${realPhotoRows} pass the complete pitch/onset/measure floor. Audiveris preprocessing, runtime confidence, Oemer, and HOMR 0.7.0 all failed to produce a safe production subset. Do not repeat human review or rerun these engines; the next research step must be a genuinely different model, supervised adaptation, or new external blind photos.`
+          : m4Omr.m4OemerBenchmarkComplete
+            ? `Keep OMR draft-only. ${realPhotoRows} independent source-gold photos are available, but 0/${realPhotoRows} pass the strict P>=0.98/R>=0.95 floor. Preprocessing, runtime confidence, and the Oemer stronger-engine comparison all failed to produce a safe production subset. Do not repeat score-editor review or rerun the same engine; only evaluate a genuinely different engine on this frozen benchmark or add external blind photos.`
           : `Keep OMR draft-only. ${realPhotoRows} independent source-gold photos are now available, but 0/${realPhotoRows} pass the strict P>=0.98/R>=0.95 floor; preprocessing and runtime confidence probes also found no safe production subset. The next machine task is a stronger OMR engine on this frozen benchmark, not more score-editor review.`
         : "Keep OMR draft-only. Runtime-visible confidence features cannot select a 90%-precision/20%-coverage safe subset. Create at least 3 independent real-photo MusicXML references, rerun blind OMR, then rerun the confidence probe and independent benchmark audit.",
       artifact: realPhotoRows >= 3
-        ? m4Omr.m4OemerBenchmarkComplete
-          ? m4Omr.artifacts?.oemerBenchmarkJson
+        ? m4Omr.m4ClarityBenchmarkComplete
+          ? m4Omr.artifacts?.clarityBenchmarkJson
+          : m4Omr.m4HomrBenchmarkComplete
+            ? m4Omr.artifacts?.homrBenchmarkJson
+          : m4Omr.m4OemerBenchmarkComplete
+            ? m4Omr.artifacts?.oemerBenchmarkJson
           : m4Omr.artifacts?.independentBenchmarkJson
         : m4Omr.artifacts?.independentGoldTodoHtml || m4Omr.artifacts?.independentBenchmarkJson,
       humanTask: m4Omr.humanTask,
       scoreEditorReviewNeeded: m4Omr.scoreEditorReviewNeeded,
-      reason: m4Omr.m4OemerBenchmarkComplete
-        ? [...m4Omr.automaticAdoptionBlockingReasons, "m4-oemer-source-benchmark-below-floor"]
-        : m4Omr.automaticAdoptionBlockingReasons,
+      reason: m4Omr.automaticAdoptionBlockingReasons,
     });
   }
   if (!actions.length) {

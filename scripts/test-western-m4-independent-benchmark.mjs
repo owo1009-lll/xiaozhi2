@@ -16,9 +16,9 @@ function summary(count, precision, recall) {
   };
 }
 
-function realPhotoSummary(count, precision, recall) {
+function realPhotoSummary(count, precision, recall, onsetQuarterAccuracy = 1, measureAccuracy = 1) {
   return {
-    counts: { pitchPrecision: precision, pitchRecall: recall },
+    counts: { pitchPrecision: precision, pitchRecall: recall, onsetQuarterAccuracy, measureAccuracy },
     rows: Array.from({ length: count }, (_, index) => ({
       pieceId: `photo-${index + 1}`,
       parseOk: true,
@@ -27,6 +27,8 @@ function realPhotoSummary(count, precision, recall) {
       goldSourceVerified: "yes",
       pitchPrecision: precision,
       pitchRecall: recall,
+      onsetQuarterAccuracy,
+      measureAccuracy,
     })),
   };
 }
@@ -56,6 +58,20 @@ assert.equal(realPhotoPoor.independentRealPhotoRows, 5);
 assert.equal(realPhotoPoor.realPhotoGold.passed, false);
 assert(!realPhotoPoor.automaticAdoptionBlockingReasons.includes("m4-real-photo-independent-gold-missing"));
 assert(realPhotoPoor.automaticAdoptionBlockingReasons.includes("m4-real-photo-independent-benchmark-below-floor"));
+
+const pitchPerfectRhythmBroken = evaluateIndependentBenchmark({
+  clean: summary(32, 0.99, 0.97),
+  scan: summary(6, 0.94, 0.89),
+  photo: summary(6, 0.95, 0.89),
+  realPhotoGold: realPhotoSummary(5, 1, 1, 0.2, 1),
+  confidenceProbe: { safeSubsetReady: true },
+});
+assert.equal(pitchPerfectRhythmBroken.realPhotoGold.passedRows, 0);
+assert.equal(pitchPerfectRhythmBroken.automaticAdoptionReady, false);
+assert(
+  pitchPerfectRhythmBroken.automaticAdoptionBlockingReasons.includes("m4-real-photo-independent-benchmark-below-floor"),
+  "pitch-perfect but rhythmically invalid MusicXML must fail closed",
+);
 
 const missing = evaluateIndependentBenchmark({
   clean: summary(32, 0.97, 0.94),
@@ -103,6 +119,7 @@ console.log(JSON.stringify({ ok: true, checks: [
   "null-metric-fail-closed",
   "real-photo-consistency-not-promoted",
   "independent-real-photo-below-floor-reported",
+  "pitch-perfect-rhythm-broken-fail-closed",
   "runtime-confidence-probe-fail-closed",
   "student-runtime-never-opened",
 ] }, null, 2));

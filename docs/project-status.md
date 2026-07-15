@@ -125,12 +125,14 @@
 - 运行时可见 OMR 置信探针(32 首、按 6 个 BWV 作品留一):LR AUC=`0.567`,RF AUC=`0.800`;RF 最佳观察点 precision=`0.80`、coverage=`0.156`,没有达到 `0.90/0.20` 的安全子集。
 - 真实照片预处理 sweep(5 份×`up2/up3/up2-otsu`):`up2` 最佳,平均 P/R=`85.59%/72.18%`;`up3`=`76.88%/63.52%`;Otsu=`61.72%/50.42%`且一份无输出。按曲事后挑最佳变体仍为严格 `0/5`,因此不把 `up3`/Otsu 接入生产。
 - 更强 OMR 引擎对照已完成:`npm run western:m4-oemer-benchmark` 用 Oemer 0.1.8 在同一 5 份 source-gold 上串行评测。4/5 成功输出,1/5(`ex05`)因错误的 3-track 结构在 MusicXML builder 崩溃;成功 4 份 P/R=`71.70%/76.98%`,计入失败后的有效 recall=`62.81%`,严格通过 `0/5`。同 4 份 Audiveris P/R=`83.17%/68.52%`;Oemer 的 recall 增益不足以抵消 precision 和鲁棒性下降,不接生产。
+- Transformer OMR 对照已完成:`npm run western:m4-homr-benchmark` 用 HOMR 0.7.0 对同一 5 份原始 source 照片串行评测。5/5 均输出,聚合 pitch P/R=`89.00%/96.17%`,onset-quarter/measure accuracy=`30.73%/79.04%`。`ex05/ex12` 若只看音高会成为 `2/5` 假通过,但完整 pitch+onset+measure 严格门槛为 `0/5`;HOMR 因节奏重建错误仍不接生产。
+- 第三方视觉 Transformer 对照已完成:`npm run western:m4-clarity-benchmark` 用 Clarity-OMR 官方 beam-5 管线评测同一 5 份 source-gold。原始截图因播放器黑边/标题栏导致 Stage A 检出 `0` 个谱表;使用冻结的通用行均值裁页后 5/5 均输出,但聚合 pitch P/R=`72.77%/35.53%`,onset-quarter/measure accuracy=`2.81%/10.10%`,完整严格通过 `0/5`。该裁页仅用于公平评测,Clarity 不接生产。
 
 结论:
 
 - M4 已完成可复跑的独立**研究级** OMR 准确率基准,可以报告限定范围内的数字谱/合成退化结果。
-- M4 尚未达到自动采纳:逐谱严格门槛仅 12/32,真实照片独立源谱严格通过 `0/5`,运行时置信特征也筛不出安全子集。OMR 不会进入学生端运行时自动诊断。
-- 当前不需要教师或制谱人员继续操作。新增真实照片 gold 的“证据缺口”已经关闭,Audiveris 预处理/置信筛选与 Oemer 替代引擎也均未达到门槛;继续扩大到更多照片可增强外部效度,但不能用来掩盖当前 0/5。
+- M4 尚未达到自动采纳:逐谱严格门槛仅 12/32,真实照片独立源谱按 pitch+onset+measure 完整门槛严格通过 `0/5`,运行时置信特征也筛不出安全子集。OMR 不会进入学生端运行时自动诊断。
+- 当前不需要教师或制谱人员继续操作。新增真实照片 gold 的证据缺口已经关闭,Audiveris 预处理/置信筛选、Oemer、HOMR 与 Clarity-OMR 均未达到完整门槛;继续扩大照片只增强外部效度,不能掩盖当前 `0/5`。
 - 报告论文/表格时必须将独立 render-gold 与 `human-approved-unchanged-draft` 分开,后者不得伪称独立照片准确率。
 
 照片谱离线生产链现已接通:

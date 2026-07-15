@@ -103,6 +103,20 @@ precision/recall gate on zero of five. This is a machine accuracy limitation,
 not a request for more teacher review. Keep OMR review-only unless a future
 engine passes the same frozen independent benchmark.
 
+HOMR 0.7.0 was then evaluated on the same five sources. It produced all five
+files and improved pitch recall, but two pitch-perfect outputs reconstructed
+the rhythm incorrectly. Automatic adoption therefore requires pitch precision,
+pitch recall, onset-quarter accuracy, and measure accuracy to pass together.
+HOMR passed this complete gate on zero of five. No additional teacher or score
+editor review is requested for this machine limitation.
+
+Clarity-OMR was also evaluated on the same five frozen sources. Native viewer
+screenshots failed Stage-A staff detection; a fixed, gold-independent page trim
+allowed five outputs, but aggregate pitch P/R was 0.7277/0.3553 and
+onset/measure accuracy was 0.0281/0.1010. Complete strict pass remained 0/5.
+This is machine evidence only: do not assign another teacher review or enable
+runtime OMR from it.
+
 Independent gold application has two safety gates:
 
 - the editable MXL/MusicXML file must differ from the Audiveris draft; and

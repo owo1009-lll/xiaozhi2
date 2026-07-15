@@ -57,6 +57,8 @@ DEFAULT_OUT = (
 )
 STRICT_MIN_PRECISION = 0.98
 STRICT_MIN_RECALL = 0.95
+STRICT_MIN_ONSET_QUARTER_ACCURACY = 0.95
+STRICT_MIN_MEASURE_ACCURACY = 0.95
 THREAD_ENV = {
     "OMP_NUM_THREADS": "4",
     "OPENBLAS_NUM_THREADS": "4",
@@ -166,11 +168,25 @@ def aggregate_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
     attempted_gold_notes = sum(int(row.get("goldNotes") or 0) for row in verified_rows)
     draft_notes = sum(int(row.get("draftNotes") or 0) for row in usable)
     pitch_exact = sum(int(row.get("pitchExact") or 0) for row in usable)
-    strict_rows = [
+    onset_exact = sum(
+        round(float(row.get("onsetQuarterAccuracy") or 0) * int(row.get("goldNotes") or 0))
+        for row in usable
+    )
+    measure_exact = sum(
+        round(float(row.get("measureAccuracy") or 0) * int(row.get("goldNotes") or 0))
+        for row in usable
+    )
+    pitch_only_strict_rows = [
         row
         for row in usable
         if float(row.get("pitchPrecision") or 0) >= STRICT_MIN_PRECISION
         and float(row.get("pitchRecall") or 0) >= STRICT_MIN_RECALL
+    ]
+    strict_rows = [
+        row
+        for row in pitch_only_strict_rows
+        if float(row.get("onsetQuarterAccuracy") or 0) >= STRICT_MIN_ONSET_QUARTER_ACCURACY
+        and float(row.get("measureAccuracy") or 0) >= STRICT_MIN_MEASURE_ACCURACY
     ]
     return {
         "rows": len(rows),
@@ -183,6 +199,10 @@ def aggregate_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "pitchPrecision": round(safe_rate(pitch_exact, draft_notes), 6),
         "pitchRecall": round(safe_rate(pitch_exact, gold_notes), 6),
         "pitchRecallIncludingEngineFailures": round(safe_rate(pitch_exact, attempted_gold_notes), 6),
+        "onsetQuarterAccuracy": round(safe_rate(onset_exact, gold_notes), 6),
+        "measureAccuracy": round(safe_rate(measure_exact, gold_notes), 6),
+        "pitchOnlyStrictPassRows": len(pitch_only_strict_rows),
+        "pitchOnlyStrictPassPieceIds": [row.get("pieceId") for row in pitch_only_strict_rows],
         "strictPassRows": len(strict_rows),
         "strictPassPieceIds": [row.get("pieceId") for row in strict_rows],
     }
@@ -274,6 +294,16 @@ def write_report(path: Path, report: dict[str, Any]) -> None:
     path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def read_previous_runtime(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        return {}
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return dict(report.get("runtime") or {})
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--intake", default=str(DEFAULT_INTAKE))
@@ -289,6 +319,7 @@ def main(argv: list[str] | None = None) -> int:
 
     intake_path = Path(args.intake)
     out_root = Path(args.out)
+    report_path = out_root / "oemer-source-benchmark.json"
     python = Path(args.python)
     sklearn_site_packages = Path(args.sklearn_site_packages).resolve() if args.sklearn_site_packages else None
     if not intake_path.is_file():
@@ -306,14 +337,23 @@ def main(argv: list[str] | None = None) -> int:
     if not rows_in:
         raise SystemExit("benchmark intake contains no rows")
     env = build_oemer_env(os.environ, sklearn_site_packages)
-    runtime = runtime_probe(python, env)
-    if args.expected_sklearn and runtime.get("sklearn") != args.expected_sklearn:
+    try:
+        runtime = runtime_probe(python, env)
+        runtime_available = True
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        if not args.reuse_existing:
+            raise SystemExit(f"Oemer runtime probe failed: {error}") from error
+        runtime = read_previous_runtime(report_path)
+        runtime_available = False
+        runtime["reusedExistingOnly"] = True
+    runtime["oemerRuntimeAvailable"] = runtime_available
+    runtime["python"] = str(python)
+    if runtime_available and args.expected_sklearn and runtime.get("sklearn") != args.expected_sklearn:
         raise SystemExit(
             f"scikit-learn version mismatch: expected {args.expected_sklearn}, got {runtime.get('sklearn')}"
         )
 
     out_root.mkdir(parents=True, exist_ok=True)
-    report_path = out_root / "oemer-source-benchmark.json"
     csv_path = out_root / "oemer-source-benchmark.csv"
     results: list[dict[str, Any]] = []
     for index, intake_row in enumerate(rows_in, start=1):
@@ -338,6 +378,8 @@ def main(argv: list[str] | None = None) -> int:
         elif existing_failure:
             exit_code, runtime_seconds, run_error = 1, 0.0, existing_failure
             row["reusedExistingFailure"] = True
+        elif not runtime_available:
+            exit_code, runtime_seconds, run_error = 127, 0.0, "oemer-runtime-missing"
         else:
             exit_code, runtime_seconds, run_error = run_oemer(
                 python,
@@ -376,7 +418,12 @@ def main(argv: list[str] | None = None) -> int:
             "evaluationMode": "independent-source-gold",
             "runtime": runtime,
             "threadLimits": THREAD_ENV,
-            "strictThresholds": {"minPitchPrecision": STRICT_MIN_PRECISION, "minPitchRecall": STRICT_MIN_RECALL},
+            "strictThresholds": {
+                "minPitchPrecision": STRICT_MIN_PRECISION,
+                "minPitchRecall": STRICT_MIN_RECALL,
+                "minOnsetQuarterAccuracy": STRICT_MIN_ONSET_QUARTER_ACCURACY,
+                "minMeasureAccuracy": STRICT_MIN_MEASURE_ACCURACY,
+            },
             "studentGateReady": False,
             "runtimeEffect": "none",
             "comparison": comparison,
@@ -404,7 +451,12 @@ def main(argv: list[str] | None = None) -> int:
         "evaluationMode": "independent-source-gold",
         "runtime": {**runtime, "expectedSklearn": args.expected_sklearn},
         "threadLimits": THREAD_ENV,
-        "strictThresholds": {"minPitchPrecision": STRICT_MIN_PRECISION, "minPitchRecall": STRICT_MIN_RECALL},
+        "strictThresholds": {
+            "minPitchPrecision": STRICT_MIN_PRECISION,
+            "minPitchRecall": STRICT_MIN_RECALL,
+            "minOnsetQuarterAccuracy": STRICT_MIN_ONSET_QUARTER_ACCURACY,
+            "minMeasureAccuracy": STRICT_MIN_MEASURE_ACCURACY,
+        },
         "gate": {
             "name": "western-strings-m4-oemer-source-benchmark",
             "automaticAdoptionReady": automatic_adoption_ready(comparison["oemer"], len(rows_in)),

@@ -246,12 +246,35 @@ assert.equal(m4.independentBenchmark?.independentRealPhotoRows, 5, "M4 must expo
 assert.equal(m4.independentBenchmark?.realPhotoGold?.passedRows, 0, "none of the current real-photo rows may be promoted above the strict floor");
 assert.equal(m4.independentBenchmark?.realPhotoGold?.aggregate?.precision, 0.847086, "M4 must expose the measured real-photo pitch precision");
 assert.equal(m4.independentBenchmark?.realPhotoGold?.aggregate?.recall, 0.715016, "M4 must expose the measured real-photo pitch recall");
+assert.equal(m4.independentBenchmark?.realPhotoGold?.aggregate?.onsetQuarterAccuracy, 0.021725, "M4 must expose real-photo onset accuracy");
+assert.equal(m4.independentBenchmark?.realPhotoGold?.aggregate?.measureAccuracy, 0.438339, "M4 must expose real-photo measure accuracy");
 if (m4.m4OemerBenchmarkComplete) {
   assert.equal(m4.m4OemerAutomaticAdoptionReady, false, "Oemer source-gold comparison must not open automatic adoption");
   assert.equal(m4.oemerBenchmark?.studentGateReady, false, "Oemer eval-only comparison must never open the student gate");
   assert.equal(m4.oemerBenchmark?.comparison?.oemer?.rows, 5, "Oemer comparison must expose all five frozen source-gold rows");
   assert.equal(m4.oemerBenchmark?.comparison?.oemer?.usableRows, 4, "Oemer comparison must expose the one engine failure");
   assert.equal(m4.oemerBenchmark?.comparison?.oemer?.strictPassRows, 0, "Oemer must not be promoted above its measured strict result");
+}
+if (m4.m4HomrBenchmarkComplete) {
+  assert.equal(m4.m4HomrAutomaticAdoptionReady, false, "HOMR comparison must not open automatic adoption");
+  assert.equal(m4.homrBenchmark?.studentGateReady, false, "HOMR eval-only comparison must never open the student gate");
+  assert.equal(m4.homrBenchmark?.comparison?.homr?.rows, 5, "HOMR comparison must expose all frozen rows");
+  assert.equal(m4.homrBenchmark?.comparison?.homr?.usableRows, 5, "HOMR comparison must expose all usable outputs");
+  assert.equal(m4.homrBenchmark?.comparison?.homr?.pitchOnlyStrictPassRows, 2, "HOMR must expose pitch-only false positives");
+  assert.equal(m4.homrBenchmark?.comparison?.homr?.strictPassRows, 0, "HOMR must reject rhythmically invalid MusicXML");
+}
+if (m4.m4ClarityBenchmarkComplete) {
+  assert.equal(m4.m4ClarityAutomaticAdoptionReady, false, "Clarity comparison must not open automatic adoption");
+  assert.equal(m4.clarityBenchmark?.studentGateReady, false, "Clarity eval-only comparison must never open the student gate");
+  assert.equal(m4.clarityBenchmark?.comparison?.clarity?.rows, 5, "Clarity comparison must expose all frozen rows");
+  assert.equal(m4.clarityBenchmark?.comparison?.clarity?.usableRows, 5, "Clarity comparison must expose all usable outputs");
+  assert.equal(m4.clarityBenchmark?.comparison?.clarity?.pitchOnlyStrictPassRows, 0, "Clarity must not pass the pitch-only floor");
+  assert.equal(m4.clarityBenchmark?.comparison?.clarity?.strictPassRows, 0, "Clarity must not pass the complete score floor");
+  assert.equal(m4.clarityBenchmark?.comparison?.clarity?.pitchPrecision, 0.727749, "Clarity precision must match the frozen benchmark");
+  assert.equal(m4.clarityBenchmark?.comparison?.clarity?.pitchRecall, 0.355272, "Clarity recall must match the frozen benchmark");
+  assert.equal(m4.clarityBenchmark?.comparison?.clarity?.onsetQuarterAccuracy, 0.028115, "Clarity onset accuracy must match the frozen benchmark");
+  assert.equal(m4.clarityBenchmark?.comparison?.clarity?.measureAccuracy, 0.100958, "Clarity measure accuracy must match the frozen benchmark");
+  assert.equal(m4.clarityBenchmark?.rawNativeSmoke?.staffCrops, 0, "Clarity must expose the native-photo Stage-A failure");
 }
 assert(
   m4.automaticAdoptionBlockingReasons?.includes("m4-clean-per-piece-strict-pass-rate-too-low"),
@@ -266,6 +289,12 @@ assert(
   m4.automaticAdoptionBlockingReasons?.includes("m4-runtime-safe-subset-not-found"),
   "M4 automatic adoption must report that runtime-visible confidence signals cannot select a safe subset",
 );
+if (m4.m4ClarityBenchmarkComplete) {
+  assert(
+    m4.automaticAdoptionBlockingReasons?.includes("m4-clarity-source-benchmark-below-complete-score-floor"),
+    "M4 automatic adoption must report the Clarity complete-score shortfall",
+  );
+}
 assert.equal(m4.teacherReviewNeeded, false, "M4 independent-gold correction must not be reported as teacher audio review");
 assert.equal(m4.scoreEditorReviewNeeded, false, "M4 must not request more score editing after independent source gold is available");
 assert.equal(
@@ -353,6 +382,10 @@ assert(
 assert(packageJson.scripts?.["test:western-m4-source-gold"], "package.json must expose independent source-gold provenance tests");
 assert(packageJson.scripts?.["western:m4-oemer-benchmark"], "package.json must expose the eval-only Oemer source-gold benchmark");
 assert(packageJson.scripts?.["test:western-m4-oemer-benchmark"], "package.json must expose Oemer benchmark regression tests");
+assert(packageJson.scripts?.["western:m4-homr-benchmark"], "package.json must expose the eval-only HOMR benchmark");
+assert(packageJson.scripts?.["test:western-m4-homr-benchmark"], "package.json must expose HOMR benchmark regression tests");
+assert(packageJson.scripts?.["western:m4-clarity-benchmark"], "package.json must expose the eval-only Clarity benchmark");
+assert(packageJson.scripts?.["test:western-m4-clarity-benchmark"], "package.json must expose Clarity benchmark regression tests");
 assert(packageJson.scripts?.["western:m3plus-supplemental-scores"], "package.json must expose the M3+ supplemental score generator");
 assert(packageJson.scripts?.["western:m3plus-supplemental-status"], "package.json must expose the M3+ supplemental intake status command");
 assert(packageJson.scripts?.["test:western-m3plus-supplemental-status"], "package.json must expose M3+ supplemental fail-closed tests");

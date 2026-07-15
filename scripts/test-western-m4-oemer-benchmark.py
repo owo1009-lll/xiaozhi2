@@ -47,6 +47,8 @@ oemer_rows = [
         "pitchExact": 99,
         "pitchPrecision": 0.99,
         "pitchRecall": 0.99,
+        "onsetQuarterAccuracy": 0.99,
+        "measureAccuracy": 0.99,
         "goldSourceVerified": "yes",
     },
     {
@@ -58,6 +60,8 @@ oemer_rows = [
         "pitchExact": 80,
         "pitchPrecision": 0.64,
         "pitchRecall": 0.8,
+        "onsetQuarterAccuracy": 0.99,
+        "measureAccuracy": 0.99,
         "goldSourceVerified": "yes",
     },
 ]
@@ -71,6 +75,8 @@ audiveris_rows = [
         "pitchExact": 90,
         "pitchPrecision": 0.9,
         "pitchRecall": 0.9,
+        "onsetQuarterAccuracy": 0.9,
+        "measureAccuracy": 0.9,
         "goldSourceVerified": "yes",
     }
 ]
@@ -80,6 +86,9 @@ assert summary["pitchRecall"] == 0.895
 assert summary["strictPassRows"] == 1
 assert summary["engineFailureRows"] == 0
 assert summary["pitchRecallIncludingEngineFailures"] == 0.895
+assert summary["onsetQuarterAccuracy"] == 0.99
+assert summary["measureAccuracy"] == 0.99
+assert summary["pitchOnlyStrictPassRows"] == 1
 assert summary["strictPassPieceIds"] == ["a"]
 comparison = compare_engines(oemer_rows, audiveris_rows)
 assert comparison["perPiece"] == [
@@ -99,5 +108,9 @@ assert comparison["pairedSubset"]["pieceIds"] == ["a"]
 assert automatic_adoption_ready(aggregate_metrics([]), 0) is False
 assert automatic_adoption_ready(summary, 2) is False
 assert automatic_adoption_ready(aggregate_metrics([oemer_rows[0]]), 1) is True
+pitch_only = [{**oemer_rows[0], "onsetQuarterAccuracy": 0.2}]
+assert aggregate_metrics(pitch_only)["pitchOnlyStrictPassRows"] == 1
+assert aggregate_metrics(pitch_only)["strictPassRows"] == 0
+assert automatic_adoption_ready(aggregate_metrics(pitch_only), 1) is False
 
 print('{"ok": true, "checks": ["output-discovery", "failure-classification", "thread-env", "strict-gate", "engine-comparison"]}')

@@ -208,7 +208,7 @@ async function buildReport(args) {
     },
     nextActions: m4OmrBenchmarkDatasetReady
       ? [
-          "M4 OMR benchmark dataset is ready. Run or refresh Audiveris and stronger-engine comparisons against the frozen independent gold before changing any runtime OMR policy.",
+          "M4 OMR benchmark dataset is ready. Compare pitch, onset, and measure structure against frozen independent gold before changing any runtime OMR policy; pitch-only success is insufficient.",
           "Keep OMR out of runtime diagnosis until note-level OMR accuracy gates are implemented and passed.",
         ]
       : [

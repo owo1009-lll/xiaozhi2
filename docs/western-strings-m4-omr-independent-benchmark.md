@@ -4,7 +4,7 @@
 脚本: `scripts/experiments/eval_western_strings_m4_omr_render_gold.py`、`scripts/experiments/eval_western_strings_m4_real_jpg_omr.py`(eval-only)
 产物: `data/experiments/western-strings-m4/render-gold-omr*`、`real-jpg-omr*`(gitignored)
 
-> **当前裁决(2026-07-15):** `npm run western:m4-independent-benchmark-audit` 证明独立 clean/scan/photo render-gold 达到研究报告下限,但严格逐谱 P≥98% 且 R≥95% 仅 12/32(37.5%)。新增 5 份 Kayser Op.20 真实照片独立源谱 gold 后,总体 pitch P/R=`84.7%/71.5%`,严格通过 `0/5`;来源仓库 commit、CC-BY-SA-4.0 许可和 gold SHA-256 均已验证。因此本页后文的 A/B/C、自动仲裁与“全自动”内容均是历史 eval-only 原型结果,不能解释为生产自动采纳。当前 `automaticAdoptionReady=false`,`studentGateReady=false`,`humanTask=none`。
+> **当前裁决(2026-07-15):** `npm run western:m4-independent-benchmark-audit` 证明独立 clean/scan/photo render-gold 达到研究报告下限,但严格逐谱 P≥98% 且 R≥95% 仅 12/32(37.5%)。新增 5 份 Kayser Op.20 真实照片独立源谱 gold 后,Audiveris 总体 pitch P/R=`84.7%/71.5%`,onset-quarter/measure accuracy=`2.2%/43.8%`,完整严格通过 `0/5`;来源仓库 commit、CC-BY-SA-4.0 许可和 gold SHA-256 均已验证。任何只满足 pitch 的 MusicXML 也不得自动采用。当前 `automaticAdoptionReady=false`,`studentGateReady=false`,`humanTask=none`。
 
 运行时置信筛选也已单独证伪:`npm run western:m4-omr-confidence-probe` 仅使用识别谱和 Audiveris 日志中上线可见的 11 个特征,按 BWV 作品留一。LR AUC=0.567,RF AUC=0.800;RF 最佳观察点仅 precision=0.80/coverage=0.156,不存在 precision≥0.90 且 coverage≥0.20 的安全子集。因此不能靠“模型自报高置信”绕过逐谱精度问题。
 
@@ -151,3 +151,14 @@
 - 同一 4 份 Audiveris up2 聚合 P/R=`83.17%/68.52%`。Oemer 在 `ex12` 明显提高 recall,但 `ex09` precision 大幅下降,且存在 1/5 builder 崩溃;不存在可直接采用的固定替换策略。按 gold 事后逐页挑引擎属于 oracle,不得冒充生产选择器。
 - Oemer 的 SVC 产物来自 `scikit-learn 1.2.0`。已用精确 1.2.0 兼容环境复跑,并与 1.2.2/1.8.0 输出逐字节比较;同页 MusicXML SHA-256 完全一致,故低准确率不是 sklearn 版本警告造成。
 - 裁决:`automaticAdoptionReady=false`,`studentGateReady=false`;保留 Oemer 为 eval-only 外部引擎证据,不替换 Audiveris,不进入学生端。
+
+### 8.9 HOMR 0.7.0 transformer 对照与完整谱闸门(2026-07-15)
+- HOMR 是独立的两阶段 OMR:结构分割后使用 transformer 做符号序列识别。隔离 Python 3.11/NumPy 2.4/CPU-only ONNX Runtime、4 线程串行运行,未污染现有 Basic Pitch 环境。
+- 5/5 原始 source 照片均成功输出,聚合 pitch P/R=`89.00%/96.17%`,onset-quarter/measure accuracy=`30.73%/79.04%`。它的 recall 明显优于 Audiveris/Oemer,但节奏结构仍远低于 95% 门槛。
+- `ex05` 与 `ex12` 的 pitch P/R 均为 `1.00`,若沿用旧 pitch-only 判据会出现 `2/5` 假通过;其 onset-quarter accuracy 仅 `0.69%/8.02%`。实查 MusicXML 证实 HOMR 把正确音高序列赋成错误时值,不是评测脚本误差。
+- 因此外部引擎统一采用四项完整闸门:pitch precision≥0.98、pitch recall≥0.95、onset-quarter accuracy≥0.95、measure accuracy≥0.95。HOMR pitch-only 通过 `2/5`,完整通过 `0/5`;`automaticAdoptionReady=false`,`studentGateReady=false`。
+
+### 8.10 Clarity-OMR 视觉 Transformer 对照(2026-07-15)
+- 按[官方 Clarity-OMR 仓库](https://github.com/clquwu/Clarity-OMR)与[官方模型页](https://huggingface.co/clquwu/Clarity-OMR)运行 YOLO 谱表检测 + Transformer 解码管线,使用官方 beam width 5。模型仅作隔离 eval-only 对照,不进入生产依赖。
+- 冻结照片来自播放器截图,原图含黑边和标题栏;原样包装成 PDF 时 Stage A 在 `ex05` 检出 `0` 个谱表。为避免把截图边框误当作模型识谱能力,正式对照统一使用不看 gold 的行均值裁页规则,并把该预处理写入每页证据。
+- 裁页后 5/5 均输出 MusicXML,聚合 pitch P/R=`72.77%/35.53%`,onset-quarter/measure accuracy=`2.81%/10.10%`;pitch-only 与完整严格通过均为 `0/5`。因此模型架构更强不等于当前拍照域可直接采用,Clarity 保持 `automaticAdoptionReady=false`,`studentGateReady=false`。

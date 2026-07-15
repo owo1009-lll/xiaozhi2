@@ -103,10 +103,16 @@ function buildSummary(report) {
     `- strict per-piece pass: ${report.counts.strictPerPiecePassedRows}/${report.counts.strictPerPieceEvaluatedRows}`,
     `- independent real-photo gold rows: ${report.counts.independentRealPhotoRows}`,
     `- independent real-photo strict pass: ${report.counts.realPhotoStrictPassedRows}/${report.counts.realPhotoStrictEvaluatedRows}`,
-    `- independent real-photo aggregate P/R: ${report.counts.realPhotoPitchPrecision ?? "n/a"}/${report.counts.realPhotoPitchRecall ?? "n/a"}`,
+    `- independent real-photo aggregate P/R/onset/measure: ${report.counts.realPhotoPitchPrecision ?? "n/a"}/${report.counts.realPhotoPitchRecall ?? "n/a"}/${report.counts.realPhotoOnsetQuarterAccuracy ?? "n/a"}/${report.counts.realPhotoMeasureAccuracy ?? "n/a"}`,
     `- Oemer source-gold usable/failure rows: ${report.counts.oemerUsableRows}/${report.counts.oemerEngineFailureRows}`,
     `- Oemer source-gold strict pass: ${report.counts.oemerStrictPassedRows}/${report.counts.oemerBenchmarkRows}`,
     `- Oemer source-gold P/effective-R: ${report.counts.oemerPitchPrecision ?? "n/a"}/${report.counts.oemerPitchRecallIncludingEngineFailures ?? "n/a"}`,
+    `- HOMR source-gold usable/failure rows: ${report.counts.homrUsableRows}/${report.counts.homrEngineFailureRows}`,
+    `- HOMR pitch-only/complete strict pass: ${report.counts.homrPitchOnlyStrictPassedRows}/${report.counts.homrStrictPassedRows}`,
+    `- HOMR P/R/onset/measure: ${report.counts.homrPitchPrecision ?? "n/a"}/${report.counts.homrPitchRecall ?? "n/a"}/${report.counts.homrOnsetQuarterAccuracy ?? "n/a"}/${report.counts.homrMeasureAccuracy ?? "n/a"}`,
+    `- Clarity source-gold usable/failure rows: ${report.counts.clarityUsableRows}/${report.counts.clarityEngineFailureRows}`,
+    `- Clarity pitch-only/complete strict pass: ${report.counts.clarityPitchOnlyStrictPassedRows}/${report.counts.clarityStrictPassedRows}`,
+    `- Clarity P/R/onset/measure: ${report.counts.clarityPitchPrecision ?? "n/a"}/${report.counts.clarityPitchRecall ?? "n/a"}/${report.counts.clarityOnsetQuarterAccuracy ?? "n/a"}/${report.counts.clarityMeasureAccuracy ?? "n/a"}`,
     "",
     "## Meaning",
     "",
@@ -126,6 +132,8 @@ function buildSummary(report) {
     `- independentBenchmarkJson: ${report.artifacts.independentBenchmarkJson}`,
     `- independentBenchmarkMd: ${report.artifacts.independentBenchmarkMd}`,
     `- oemerBenchmark: ${report.artifacts.oemerBenchmark}`,
+    `- homrBenchmark: ${report.artifacts.homrBenchmark}`,
+    `- clarityBenchmark: ${report.artifacts.clarityBenchmark}`,
     `- nextActions: ${report.artifacts.nextActions}`,
     "",
     "## Step Results",
@@ -149,6 +157,8 @@ async function main() {
   const workspace = await readJson(path.join("data", "experiments", "western-strings-m4", "independent-gold-workspace-audit.json"));
   const independentBenchmark = await readJson(path.join("data", "experiments", "western-strings-m4", "independent-benchmark-audit.json"));
   const oemerBenchmark = await readJson(path.join("data", "experiments", "western-strings-m4", "oemer-source-benchmark", "oemer-source-benchmark.json"));
+  const homrBenchmark = await readJson(path.join("data", "experiments", "western-strings-m4", "homr-source-benchmark", "homr-source-benchmark.json"));
+  const clarityBenchmark = await readJson(path.join("data", "experiments", "western-strings-m4", "clarity-source-benchmark", "clarity-source-benchmark.json"));
   const status = await readJson(path.join("data", "experiments", "western-strings-project-status.json"));
 
   const m4Status = status?.tracks?.m4Omr || {};
@@ -172,6 +182,8 @@ async function main() {
     realPhotoStrictEvaluatedRows: independentBenchmark?.realPhotoGold?.evaluatedRows ?? 0,
     realPhotoPitchPrecision: independentBenchmark?.realPhotoGold?.aggregate?.precision ?? null,
     realPhotoPitchRecall: independentBenchmark?.realPhotoGold?.aggregate?.recall ?? null,
+    realPhotoOnsetQuarterAccuracy: independentBenchmark?.realPhotoGold?.aggregate?.onsetQuarterAccuracy ?? null,
+    realPhotoMeasureAccuracy: independentBenchmark?.realPhotoGold?.aggregate?.measureAccuracy ?? null,
     oemerBenchmarkRows: oemerBenchmark?.comparison?.oemer?.rows ?? 0,
     oemerUsableRows: oemerBenchmark?.comparison?.oemer?.usableRows ?? 0,
     oemerEngineFailureRows: oemerBenchmark?.comparison?.oemer?.engineFailureRows ?? 0,
@@ -179,6 +191,24 @@ async function main() {
     oemerPitchPrecision: oemerBenchmark?.comparison?.oemer?.pitchPrecision ?? null,
     oemerPitchRecallIncludingEngineFailures:
       oemerBenchmark?.comparison?.oemer?.pitchRecallIncludingEngineFailures ?? null,
+    homrBenchmarkRows: homrBenchmark?.comparison?.homr?.rows ?? 0,
+    homrUsableRows: homrBenchmark?.comparison?.homr?.usableRows ?? 0,
+    homrEngineFailureRows: homrBenchmark?.comparison?.homr?.engineFailureRows ?? 0,
+    homrPitchOnlyStrictPassedRows: homrBenchmark?.comparison?.homr?.pitchOnlyStrictPassRows ?? 0,
+    homrStrictPassedRows: homrBenchmark?.comparison?.homr?.strictPassRows ?? 0,
+    homrPitchPrecision: homrBenchmark?.comparison?.homr?.pitchPrecision ?? null,
+    homrPitchRecall: homrBenchmark?.comparison?.homr?.pitchRecall ?? null,
+    homrOnsetQuarterAccuracy: homrBenchmark?.comparison?.homr?.onsetQuarterAccuracy ?? null,
+    homrMeasureAccuracy: homrBenchmark?.comparison?.homr?.measureAccuracy ?? null,
+    clarityBenchmarkRows: clarityBenchmark?.comparison?.clarity?.rows ?? 0,
+    clarityUsableRows: clarityBenchmark?.comparison?.clarity?.usableRows ?? 0,
+    clarityEngineFailureRows: clarityBenchmark?.comparison?.clarity?.engineFailureRows ?? 0,
+    clarityPitchOnlyStrictPassedRows: clarityBenchmark?.comparison?.clarity?.pitchOnlyStrictPassRows ?? 0,
+    clarityStrictPassedRows: clarityBenchmark?.comparison?.clarity?.strictPassRows ?? 0,
+    clarityPitchPrecision: clarityBenchmark?.comparison?.clarity?.pitchPrecision ?? null,
+    clarityPitchRecall: clarityBenchmark?.comparison?.clarity?.pitchRecall ?? null,
+    clarityOnsetQuarterAccuracy: clarityBenchmark?.comparison?.clarity?.onsetQuarterAccuracy ?? null,
+    clarityMeasureAccuracy: clarityBenchmark?.comparison?.clarity?.measureAccuracy ?? null,
   };
 
   const teacherReviewNeeded = Boolean(m4Status.teacherReviewNeeded || provenance?.teacherReviewNeeded || workspace?.teacherReviewNeeded);
@@ -222,6 +252,8 @@ async function main() {
       independentRealPhotoManifest: "data/experiments/western-strings-m4/independent-real-photo-gold/independent-gold-manifest.json",
       independentRealPhotoBenchmark: "data/experiments/western-strings-m4/independent-source-benchmark/omr-benchmark.json",
       oemerBenchmark: "data/experiments/western-strings-m4/oemer-source-benchmark/oemer-source-benchmark.json",
+      homrBenchmark: "data/experiments/western-strings-m4/homr-source-benchmark/homr-source-benchmark.json",
+      clarityBenchmark: "data/experiments/western-strings-m4/clarity-source-benchmark/clarity-source-benchmark.json",
       nextActions: "data/experiments/western-strings-next-actions.md",
     },
     steps,

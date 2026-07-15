@@ -29,7 +29,13 @@ export const DEFAULT_THRESHOLDS = Object.freeze({
   scan: Object.freeze({ minRows: 5, minMeanPrecision: 0.90, minMeanRecall: 0.85 }),
   photo: Object.freeze({ minRows: 5, minMeanPrecision: 0.90, minMeanRecall: 0.85 }),
   strictPerPiece: Object.freeze({ minPrecision: 0.98, minRecall: 0.95, minPassRate: 0.90 }),
-  realPhoto: Object.freeze({ minPrecision: 0.98, minRecall: 0.95, minPassRate: 0.90 }),
+  realPhoto: Object.freeze({
+    minPrecision: 0.98,
+    minRecall: 0.95,
+    minOnsetQuarterAccuracy: 0.95,
+    minMeasureAccuracy: 0.95,
+    minPassRate: 0.90,
+  }),
   minIndependentRealPhotoRows: 3,
 });
 
@@ -103,11 +109,19 @@ function summarizeIndependentRealPhoto(summary, thresholds, minRows) {
       piece: String(row.pieceId || ""),
       precision: finite(row.pitchPrecision),
       recall: finite(row.pitchRecall ?? row.pitchAccuracy),
+      onsetQuarterAccuracy: finite(row.onsetQuarterAccuracy),
+      measureAccuracy: finite(row.measureAccuracy),
       provenance: String(row.goldProvenance || ""),
     }))
-    .filter((row) => row.precision !== null && row.recall !== null);
+    .filter((row) => row.precision !== null
+      && row.recall !== null
+      && row.onsetQuarterAccuracy !== null
+      && row.measureAccuracy !== null);
   const passedRows = rows.filter(
-    (row) => row.precision >= thresholds.minPrecision && row.recall >= thresholds.minRecall,
+    (row) => row.precision >= thresholds.minPrecision
+      && row.recall >= thresholds.minRecall
+      && row.onsetQuarterAccuracy >= thresholds.minOnsetQuarterAccuracy
+      && row.measureAccuracy >= thresholds.minMeasureAccuracy,
   );
   const passRate = rows.length ? passedRows.length / rows.length : 0;
   const checks = {
@@ -125,6 +139,8 @@ function summarizeIndependentRealPhoto(summary, thresholds, minRows) {
     aggregate: {
       precision: finite(summary?.counts?.pitchPrecision),
       recall: finite(summary?.counts?.pitchRecall ?? summary?.counts?.pitchAccuracy),
+      onsetQuarterAccuracy: finite(summary?.counts?.onsetQuarterAccuracy),
+      measureAccuracy: finite(summary?.counts?.measureAccuracy),
     },
     rows,
   };
@@ -261,7 +277,7 @@ function renderSummary(report, sources) {
     `- strict per-piece pass: ${report.strictPerPiece.passedRows}/${report.strictPerPiece.evaluatedRows} (${(report.strictPerPiece.passRate * 100).toFixed(1)}%)`,
     `- independent real-photo gold rows: ${report.independentRealPhotoRows}`,
     `- independent real-photo strict pass: ${report.realPhotoGold.passedRows}/${report.realPhotoGold.evaluatedRows} (${(report.realPhotoGold.passRate * 100).toFixed(1)}%)`,
-    `- independent real-photo aggregate P/R: ${report.realPhotoGold.aggregate.precision?.toFixed(4) ?? "n/a"}/${report.realPhotoGold.aggregate.recall?.toFixed(4) ?? "n/a"}`,
+    `- independent real-photo aggregate P/R/onset/measure: ${report.realPhotoGold.aggregate.precision?.toFixed(4) ?? "n/a"}/${report.realPhotoGold.aggregate.recall?.toFixed(4) ?? "n/a"}/${report.realPhotoGold.aggregate.onsetQuarterAccuracy?.toFixed(4) ?? "n/a"}/${report.realPhotoGold.aggregate.measureAccuracy?.toFixed(4) ?? "n/a"}`,
     `- runtime confidence safe subset: ${report.confidenceProbe.safeSubsetReady}`,
     `- blockers: ${report.automaticAdoptionBlockingReasons.join(", ") || "none"}`,
     "",

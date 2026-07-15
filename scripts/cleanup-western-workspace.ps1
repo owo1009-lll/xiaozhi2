@@ -37,9 +37,20 @@ function Measure-Target {
 $targets = @(
   (Join-Path $repoRoot "data\experiments\model-bakeoff\.venv"),
   (Join-Path $repoRoot "data\experiments\western-strings-m4\oemer-compat-venv"),
+  (Join-Path $repoRoot "data\experiments\western-strings-m4\homr-compat-venv"),
+  (Join-Path $repoRoot "data\experiments\western-strings-m4\clarity-compat-venv"),
+  (Join-Path $repoRoot "data\experiments\western-strings-m4\clarity-omr-src"),
   (Join-Path $repoRoot "data\experiments\western-strings-m4\_dbg"),
+  (Join-Path $repoRoot "data\experiments\western-strings-m4\homr-smoke"),
+  (Join-Path $repoRoot "data\experiments\western-strings-m4\clarity-smoke"),
   (Join-Path $repoRoot "dist")
 )
+
+$clarityBenchmarkRoot = Join-Path $repoRoot "data\experiments\western-strings-m4\clarity-source-benchmark"
+if (Test-Path -LiteralPath $clarityBenchmarkRoot) {
+  $targets += Get-ChildItem -LiteralPath $clarityBenchmarkRoot -Directory -Force |
+    ForEach-Object { Join-Path $_.FullName "work" }
+}
 
 foreach ($sourceRoot in @("scripts", "python-service", "research-analysis")) {
   $absoluteRoot = Join-Path $repoRoot $sourceRoot
