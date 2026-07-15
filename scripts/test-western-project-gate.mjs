@@ -113,6 +113,11 @@ assert(
   "M3+ status must point to the supplemental recording instructions",
 );
 assert((m3plus.blockingReasons || []).includes("m3plus-supplemental-recordings-not-ready"), "M3+ must remain blocked while supplemental recordings are missing");
+assert.equal(m3plus.supplementalMachineEval?.sourceExists, true, "M3+ status must expose the supplemental machine-eval report");
+assert.equal(m3plus.supplementalMachineEval?.scoreTechniqueIntentReady, true, "M3+ supplemental score markings must match the frozen technique intent before audio review");
+assert.equal(m3plus.supplementalMachineEval?.machineAnalysisComplete, false, "M3+ machine eval must fail closed before recordings exist");
+assert.equal(m3plus.supplementalMachineEval?.teacherReviewAllowed, false, "M3+ machine eval must not request teacher work before passing");
+assert.equal(m3plus.supplementalMachineEval?.studentGateReady, false, "M3+ supplemental evidence must never directly open the student gate");
 if (m3plus.monitoredPilotAudit?.sourceExists) {
   assert.equal(m3plus.monitoredPilotAudit.readyForMonitoredPilot, false, "newer round-two failures must close the old monitored-pilot result");
   assert.equal(m3plus.monitoredPilotAudit.teacherReviewNeeded, false, "M3+ monitored pilot audit must not ask for more review when all auto-pass evidence is already known");
@@ -406,7 +411,9 @@ assert(packageJson.scripts?.["western:m4-clarity-benchmark"], "package.json must
 assert(packageJson.scripts?.["test:western-m4-clarity-benchmark"], "package.json must expose Clarity benchmark regression tests");
 assert(packageJson.scripts?.["western:m3plus-supplemental-scores"], "package.json must expose the M3+ supplemental score generator");
 assert(packageJson.scripts?.["western:m3plus-supplemental-status"], "package.json must expose the M3+ supplemental intake status command");
+assert(packageJson.scripts?.["western:m3plus-supplemental-eval"], "package.json must expose the M3+ supplemental machine evaluation command");
 assert(packageJson.scripts?.["test:western-m3plus-supplemental-status"], "package.json must expose M3+ supplemental fail-closed tests");
+assert(packageJson.scripts?.["test:western-m3plus-supplemental-eval"], "package.json must expose M3+ supplemental machine-eval tests");
 assert(
   packageJson.scripts?.["western:m4-independent-gold-note-summary"],
   "package.json must expose the M4 editable-gold note summary command",

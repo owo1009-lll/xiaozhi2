@@ -34,6 +34,21 @@ with tempfile.TemporaryDirectory() as temporary_directory:
     assert "自然泛音音准检测已取消" in readme
     assert all((out / f"m3p-0{index}.musicxml").exists() for index in range(1, 5))
     assert all((out / f"m3p-0{index}.mid").exists() for index in range(1, 5))
+    score_xml = {
+        recording_id: (out / f"{recording_id}.musicxml").read_text(encoding="utf-8")
+        for recording_id in by_id
+    }
+    assert score_xml["m3p-01"].count("<words>straight tone - 4 beats</words>") == 8
+    assert score_xml["m3p-02"].count("<words>vibrato - 2 beats</words>") == 8
+    assert score_xml["m3p-02"].count("<trill-mark") == 8
+    assert score_xml["m3p-03"].count("<mordent") == 8
+    assert score_xml["m3p-03"].count("<words>plain - 2 beats</words>") == 8
+    assert score_xml["m3p-04"].count("<glissando") == 16
+    assert score_xml["m3p-04"].count("<words>plain - 2 beats</words>") == 8
+    assert all(
+        recording["scoreFile"] == f"{recording_id}.musicxml"
+        for recording_id, recording in by_id.items()
+    )
     assert (out / "README-录音说明.md").exists()
 
-print(json.dumps({"ok": True, "checks": ["four-fixed-sequences", "score-intent", "no-harmonic-mode", "recording-readme"]}))
+print(json.dumps({"ok": True, "checks": ["four-fixed-sequences", "score-intent", "score-markings", "no-harmonic-mode", "recording-readme"]}))

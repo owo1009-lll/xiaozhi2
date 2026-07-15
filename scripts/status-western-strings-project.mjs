@@ -339,6 +339,13 @@ const M3PLUS_SUPPLEMENTAL_STATUS = path.join(
   "western-strings-m3plus",
   "supplemental-intake-status.json",
 );
+const M3PLUS_SUPPLEMENTAL_EVAL = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3plus",
+  "supplemental-machine-eval",
+  "supplemental-machine-eval.json",
+);
 const M4_READINESS = path.join(
   "data",
   "experiments",
@@ -858,6 +865,7 @@ async function buildM3PlusStatus() {
   const round2AlignedEval = await readJson(M3PLUS_ROUND2_ALIGNED_EVAL);
   const round2FeatureDiagnostic = await readJson(M3PLUS_ROUND2_TRILL_VIBRATO_DIAGNOSTIC);
   const supplementalStatus = await readJson(M3PLUS_SUPPLEMENTAL_STATUS);
+  const supplementalEval = await readJson(M3PLUS_SUPPLEMENTAL_EVAL);
   const candidateQualityReviewPageExists = await exists(M3PLUS_CANDIDATE_QUALITY_REVIEW_PAGE);
   const candidateQualityCompletedExists = await exists(M3PLUS_CANDIDATE_QUALITY_COMPLETED);
   const allSourceRows = [...sourceRows];
@@ -923,6 +931,22 @@ async function buildM3PlusStatus() {
   }
   if (!supplementalStatus?.readyForMachineAnalysis) {
     modeEvalBlockingReasons.push("m3plus-supplemental-recordings-not-ready");
+  } else if (!supplementalEval) {
+    modeEvalBlockingReasons.push("m3plus-supplemental-machine-eval-missing");
+  } else if (supplementalEval.machineAnalysisComplete !== true) {
+    modeEvalBlockingReasons.push(...(
+      supplementalEval.blockingReasons || ["m3plus-supplemental-machine-analysis-incomplete"]
+    ));
+  } else {
+    if (supplementalEval.machineModeThresholdPassed !== true) {
+      modeEvalBlockingReasons.push("m3plus-supplemental-mode-threshold-failed");
+    }
+    if (supplementalEval.performanceConfirmedByOwner !== true) {
+      modeEvalBlockingReasons.push("m3plus-supplemental-performance-intent-unconfirmed");
+    }
+  }
+  if (supplementalEval && supplementalEval.scoreTechniqueIntentReady !== true) {
+    modeEvalBlockingReasons.push("m3plus-supplemental-score-technique-intent-invalid");
   }
   const blockingReasons = [...labelBlockingReasons, ...modeEvalBlockingReasons];
   return {
@@ -1024,6 +1048,35 @@ async function buildM3PlusStatus() {
       instructions: "",
       scoreIntent: "",
     },
+    supplementalMachineEval: supplementalEval ? {
+      source: M3PLUS_SUPPLEMENTAL_EVAL.replace(/\\/g, "/"),
+      sourceExists: true,
+      scoreTechniqueIntentReady: supplementalEval.scoreTechniqueIntentReady === true,
+      machineAnalysisComplete: supplementalEval.machineAnalysisComplete === true,
+      machineModeThresholdPassed: supplementalEval.machineModeThresholdPassed === true,
+      performanceConfirmedByOwner: supplementalEval.performanceConfirmedByOwner === true,
+      teacherReviewAllowed: supplementalEval.teacherReviewAllowed === true,
+      studentGateReady: false,
+      humanTask: supplementalEval.humanTask || "none",
+      counts: supplementalEval.counts || {},
+      modeMetrics: supplementalEval.modeMetrics || {},
+      blockingReasons: supplementalEval.blockingReasons || [],
+    } : {
+      source: M3PLUS_SUPPLEMENTAL_EVAL.replace(/\\/g, "/"),
+      sourceExists: false,
+      scoreTechniqueIntentReady: false,
+      machineAnalysisComplete: false,
+      machineModeThresholdPassed: false,
+      performanceConfirmedByOwner: false,
+      teacherReviewAllowed: false,
+      studentGateReady: false,
+      humanTask: supplementalStatus?.readyForMachineAnalysis
+        ? "run-m3plus-supplemental-machine-eval"
+        : "record-m3plus-supplemental-takes",
+      counts: {},
+      modeMetrics: {},
+      blockingReasons: ["m3plus-supplemental-machine-eval-missing"],
+    },
     monitoredPilotAudit: monitoredPilotAudit ? {
       source: M3PLUS_MONITORED_PILOT_AUDIT.replace(/\\/g, "/"),
       sourceExists: true,
@@ -1083,6 +1136,7 @@ async function buildM3PlusStatus() {
       round2AlignedEvalJson: M3PLUS_ROUND2_ALIGNED_EVAL.replace(/\\/g, "/"),
       round2TrillVibratoDiagnosticJson: M3PLUS_ROUND2_TRILL_VIBRATO_DIAGNOSTIC.replace(/\\/g, "/"),
       supplementalStatusJson: M3PLUS_SUPPLEMENTAL_STATUS.replace(/\\/g, "/"),
+      supplementalMachineEvalJson: M3PLUS_SUPPLEMENTAL_EVAL.replace(/\\/g, "/"),
       supplementalInstructions: supplementalStatus?.instructions || "",
       candidateQualityReviewPage: M3PLUS_CANDIDATE_QUALITY_REVIEW_PAGE.replace(/\\/g, "/"),
       candidateQualitySourceCsv: M3PLUS_CANDIDATE_QUALITY_SOURCE.replace(/\\/g, "/"),
@@ -1557,6 +1611,7 @@ function summarizeNextActions(
     const candidateQualityReview = m3plus.candidateQualityReview || {};
     const round2AlignedEval = m3plus.round2AlignedEval || {};
     const supplementalIntake = m3plus.supplementalIntake || {};
+    const supplementalEval = m3plus.supplementalMachineEval || {};
     const mismatchText = counts.rows
       ? ` Current eval has ${counts.match || 0} match, ${counts.mismatch || 0} mismatch, and ${Math.max(0, (counts.rows || 0) - (counts.match || 0) - (counts.mismatch || 0))} uncertain/other rows out of ${counts.rows}; fix score-audio localization/candidate quality before another release attempt.`
       : "";
@@ -1568,13 +1623,21 @@ function summarizeNextActions(
       track: "M3+ pitch behavior modes",
       action: round2AlignedEval.sourceExists
         ? supplementalIntake.readyForMachineAnalysis
-          ? `The four M3+ supplemental takes are ready. Run the machine analysis against the frozen score-intent labels; do not ask a teacher to review until localization and audio decoding pass.`
+          ? !supplementalEval.sourceExists || !supplementalEval.machineAnalysisComplete
+            ? `The four M3+ supplemental takes are ready. Run \`npm run western:m3plus-supplemental-eval\` against the frozen score-intent labels; do not ask a teacher to review until localization and audio decoding pass.`
+            : !supplementalEval.machineModeThresholdPassed
+              ? `The M3+ supplemental recordings decode and localize, but the frozen mode threshold failed. Do not ask a teacher to repeat review; inspect ${supplementalEval.source} and fix candidate features first.`
+              : !supplementalEval.performanceConfirmedByOwner
+                ? `The M3+ supplemental machine gate passed. Confirm that all four recordings followed the fixed written protocol, then rerun \`npm run western:m3plus-supplemental-eval -- --performance-confirmed\` before any professional review.`
+                : `The M3+ supplemental machine gate and performer confirmation passed. A single bounded professional review may now be generated; student feedback remains disabled.`
           : `The human-confirmed round-two aligned evaluation remains fail-closed. Record the four fixed-note takes in ${supplementalIntake.instructions || "音频/m3plus-supplemental/README-录音说明.md"}; no score reading is required. They provide straight-tone negatives, an independent vibrato/trill take, ornament controls, and slide controls. Natural-harmonic intonation is out of scope. Do not re-review completed rows.`
         : candidateQualityReview.needsReview
         ? `M3+ labels are sufficient and round-2 is imported, but no non-control pitch-behavior mode is release-ready.${mismatchText}${localizationText} The candidate-quality review pack is now restricted to first-measure rows from recordings whose prior review rows were all audio-score matches; later measures are treated as localization-drift risk and excluded.`
         : `M3+ labels are sufficient and round-2 is imported, but no non-control pitch-behavior mode is release-ready.${mismatchText}${localizationText} Keep M3+ review-only and inspect localization groups before changing candidate generation.`,
       artifact: round2AlignedEval.sourceExists
-        ? supplementalIntake.instructions || supplementalIntake.source || round2AlignedEval.source
+        ? supplementalIntake.readyForMachineAnalysis && supplementalEval.sourceExists
+          ? supplementalEval.source
+          : supplementalIntake.instructions || supplementalIntake.source || round2AlignedEval.source
         : candidateQualityReview.needsReview
         ? candidateQualityReview.reviewPage
         : (m3plus.reviewArtifacts.localizationDiagnosisGroupsCsv || m3plus.reviewArtifacts.modeEvalCsv || m3plus.reviewArtifacts.modeEvalJson),

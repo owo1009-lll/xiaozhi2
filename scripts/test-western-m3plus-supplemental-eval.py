@@ -1,0 +1,107 @@
+from __future__ import annotations
+
+import json
+import sys
+import tempfile
+from pathlib import Path
+
+import numpy as np
+
+
+EXPERIMENTS = Path(__file__).resolve().parent / "experiments"
+sys.path.insert(0, str(EXPERIMENTS))
+
+from eval_western_strings_m3plus_supplemental import (  # noqa: E402
+    DEFAULT_SOURCE,
+    build_alignment_units,
+    evaluate_track,
+    mode_metrics,
+    run_evaluation,
+    validate_score_technique_intent,
+)
+
+
+def synthetic_track(recording: dict) -> tuple[np.ndarray, np.ndarray, float]:
+    units = build_alignment_units(recording)
+    frames_per_unit = 80
+    frame_seconds = 0.025
+    times: list[float] = []
+    midi: list[float] = []
+    cursor = 0.0
+    for unit in units:
+        base = float(unit["baseMidi"])
+        auxiliary = unit.get("auxiliaryMidi")
+        local_times = np.arange(frames_per_unit, dtype=np.float64) * frame_seconds
+        behavior = str(unit.get("expectedBehavior") or "")
+        if behavior == "vibrato":
+            values = base + 0.35 * np.sin(2.0 * np.pi * 5.0 * local_times)
+        elif behavior == "trill":
+            assert auxiliary is not None
+            values = np.where((np.arange(frames_per_unit) // 4) % 2 == 0, base, float(auxiliary))
+        elif behavior == "ornament-upper-mordent":
+            assert auxiliary is not None
+            values = np.full(frames_per_unit, base, dtype=np.float64)
+            values[6:12] = float(auxiliary)
+        elif behavior == "slide-source":
+            assert auxiliary is not None
+            values = np.linspace(base, float(auxiliary), frames_per_unit)
+        else:
+            values = np.full(frames_per_unit, base, dtype=np.float64)
+        times.extend((cursor + local_times).tolist())
+        midi.extend(values.tolist())
+        cursor += frames_per_unit * frame_seconds
+    return np.asarray(times), np.asarray(midi), cursor
+
+
+def test_synthetic_fixed_sequences_localize_and_separate_modes() -> None:
+    intent = json.loads((DEFAULT_SOURCE / "score-intent.json").read_text(encoding="utf-8"))
+    reports = []
+    for recording in intent["recordings"]:
+        times, midi, duration = synthetic_track(recording)
+        report = evaluate_track(recording, times, midi, duration)
+        assert report["localization"]["ready"] is True, recording["recordingId"]
+        assert report["analyzedUnitCount"] == report["expectedUnitCount"]
+        reports.append(report)
+    metrics = mode_metrics([row for report in reports for row in report["rows"]])
+    assert all(metric["passed"] is True for metric in metrics.values()), metrics
+
+
+def test_score_markings_are_the_source_of_expected_techniques() -> None:
+    intent = json.loads((DEFAULT_SOURCE / "score-intent.json").read_text(encoding="utf-8"))
+    reports = [validate_score_technique_intent(DEFAULT_SOURCE, recording) for recording in intent["recordings"]]
+    assert all(report["ready"] is True for report in reports), reports
+    assert sum(report["checkedLabelCount"] for report in reports) == 64
+
+
+def test_localization_tolerates_realistic_pitch_offset_without_certifying_intonation() -> None:
+    intent = json.loads((DEFAULT_SOURCE / "score-intent.json").read_text(encoding="utf-8"))
+    straight = next(recording for recording in intent["recordings"] if recording["recordingId"] == "m3p-01")
+    times, midi, duration = synthetic_track(straight)
+    within_localization_tolerance = evaluate_track(straight, times, midi + 0.90, duration)
+    outside_localization_tolerance = evaluate_track(straight, times, midi + 1.30, duration)
+    assert within_localization_tolerance["localization"]["ready"] is True
+    assert outside_localization_tolerance["localization"]["ready"] is False
+    assert all(row["studentFacing"] is False for row in within_localization_tolerance["rows"])
+
+
+def test_missing_real_audio_fails_closed_without_fake_gold() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        source = Path(temporary)
+        (source / "score-intent.json").write_text(
+            (DEFAULT_SOURCE / "score-intent.json").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        report = run_evaluation(source, performance_confirmed=False)
+    assert report["machineAnalysisComplete"] is False
+    assert report["studentGateReady"] is False
+    assert report["performanceGoldReady"] is False
+    assert report["humanTask"] == "record-m3plus-supplemental-takes"
+    assert len([reason for reason in report["blockingReasons"] if reason.endswith("audio-missing")]) == 4
+
+
+if __name__ == "__main__":
+    test_synthetic_fixed_sequences_localize_and_separate_modes()
+    test_score_markings_are_the_source_of_expected_techniques()
+    test_localization_tolerates_realistic_pitch_offset_without_certifying_intonation()
+    test_missing_real_audio_fails_closed_without_fake_gold()
+    print("western M3+ supplemental machine-eval tests passed")

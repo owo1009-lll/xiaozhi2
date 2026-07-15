@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from music21 import clef, expressions, key, metadata, meter, note, stream, tempo
+from music21 import clef, expressions, key, metadata, meter, note, spanner, stream, tempo
 
 
 REPO = Path(__file__).resolve().parents[2]
@@ -70,6 +70,13 @@ def text_mark(value: note.Note, text: str) -> note.Note:
 def add_measure(part: stream.Part, values: list[note.Note]) -> int:
     measure = stream.Measure(number=len(part.getElementsByClass(stream.Measure)) + 1)
     for value in values:
+        # A TextExpression attached to Note.expressions is not serialized by
+        # music21. Place it on the measure timeline so it becomes a MusicXML
+        # <direction><words> marking at the note onset.
+        for expression in list(value.expressions):
+            if isinstance(expression, expressions.TextExpression):
+                value.expressions.remove(expression)
+                measure.insert(measure.highestTime, expression)
         measure.append(value)
     part.append(measure)
     return int(measure.number)
@@ -79,10 +86,8 @@ def straight_negative() -> ScoreSpec:
     score, part = base_score("M3P-01 C-major ascending straight tones", bpm=60)
     pitches = ["C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5"]
     labels: list[dict[str, Any]] = []
-    for index, pitch in enumerate(pitches):
-        value = whole(pitch)
-        if index == 0:
-            text_mark(value, "straight tone - 4 beats")
+    for pitch in pitches:
+        value = text_mark(whole(pitch), "straight tone - 4 beats")
         measure = add_measure(part, [value])
         labels.append(
             {
@@ -211,6 +216,7 @@ def slide_contrast() -> ScoreSpec:
         target_note = text_mark(quarter(target_pitch), "arrive")
         ordinary_note = text_mark(half(target_pitch), "plain - 2 beats")
         measure = add_measure(part, [source_note, target_note, ordinary_note])
+        part.insert(0, spanner.Glissando(source_note, target_note))
         labels.extend(
             [
                 {
@@ -332,7 +338,11 @@ def write_readme(out_dir: Path, specs: list[ScoreSpec]) -> None:
         lines.append("")
     lines.extend(
         [
-            "录完后只需把 4 个音频放回本目录。系统会先做机器预检；只有预检通过才会提出一次人工确认，不再让教师反复复核定位错误的包。",
+            "录完后只需把 4 个音频放回本目录。先运行 `npm run western:m3plus-supplemental-status` 确认 4/4 可解码，再运行 `npm run western:m3plus-supplemental-eval` 做固定序列定位和模式指标评测。",
+            "谱面已经真实写入揉弦文字、颤音、装饰音、滑音及普通直音对照。机器先从谱面读取预期技法，再从音频核验是否按谱执行；谱面标了技法不等于演奏已经正确。",
+            "机器定位和模式阈值未通过时先修特征，不交教师。机器通过后，演奏者确认四条均按本说明完成，再运行 `npm run western:m3plus-supplemental-eval -- --performance-confirmed`；之后最多提出一次专业复核。",
+            "定位阶段允许实际演奏音高在目标附近 `±100 cents` 内波动；该范围只用于找到对应音符窗口，不代表系统认定这一音准正确。模式误报 precision 门槛仍保持 90%。",
+            "该评测始终保持 `studentGateReady=false`，不会仅凭录音任务自动开放学生反馈。",
             "",
         ]
     )
@@ -364,6 +374,7 @@ def build(out_dir: Path) -> dict[str, Any]:
         score_intent.append(
             {
                 "recordingId": spec.score_id,
+                "scoreFile": musicxml_path.name,
                 "title": spec.title,
                 "purpose": spec.purpose,
                 "instructions": spec.instructions,
