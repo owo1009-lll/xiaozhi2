@@ -346,7 +346,9 @@ class SymbolicScoreMixin:
         page_number_match = re.search(r"page[-\s]?0*(\d+)", str(getattr(request, "sectionId", "") or getattr(request.piecePack, "sectionId", "") or ""), flags=re.IGNORECASE)
         page_number = int(page_number_match.group(1)) if page_number_match else 1
 
-        for measure_position, measure in enumerate(children(part, "measure"), start=1):
+        measures = children(part, "measure")
+        measure_indices = normalize_musicxml_measure_indices([measure.attrib.get("number") for measure in measures])
+        for measure_position, (measure, measure_index) in enumerate(zip(measures, measure_indices), start=1):
             print_node = child(measure, "print")
             new_system = measure_position == 1
             system_layout = child(print_node, "system-layout") if print_node is not None else None
@@ -399,7 +401,6 @@ class SymbolicScoreMixin:
                     current_clef_octave_change = int(safe_float(octave_change_node.text if octave_change_node is not None else 0, 0))
 
             current_beat = 0.0
-            measure_index = parse_musicxml_measure_index(measure.attrib.get("number"), measure_position)
             clef_reference_diatonic, clef_reference_line = musicxml_clef_reference(
                 current_clef_sign,
                 current_clef_line,

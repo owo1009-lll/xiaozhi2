@@ -5,7 +5,7 @@ from collections.abc import Callable
 from typing import Any
 from xml.etree import ElementTree as ET
 
-from analyzer_utils import musicxml_pitch_to_midi, normalize_part_label, parse_musicxml_measure_index, safe_float, trimmed_median
+from analyzer_utils import musicxml_pitch_to_midi, normalize_part_label, normalize_musicxml_measure_indices, safe_float, trimmed_median
 
 
 def xml_local_tag(node: ET.Element | None) -> str:
@@ -404,12 +404,13 @@ def extract_musicxml_markings(
     divisions = 1.0
     current_tempo = int(default_tempo or 72)
     current_dynamic = ""
-    for measure_position, measure in enumerate(xml_children(part, "measure"), start=1):
+    measures = xml_children(part, "measure")
+    measure_indices = normalize_musicxml_measure_indices([measure.attrib.get("number") for measure in measures])
+    for measure_position, (measure, measure_index) in enumerate(zip(measures, measure_indices), start=1):
         attributes = xml_child(measure, "attributes")
         divisions_node = xml_child(attributes, "divisions")
         if divisions_node is not None and divisions_node.text:
             divisions = max(1.0, safe_float(divisions_node.text, divisions))
-        measure_index = parse_musicxml_measure_index(measure.attrib.get("number"), measure_position)
         for direction in xml_children(measure, "direction"):
             offset_node = xml_child(direction, "offset")
             beat_start = max(0.0, safe_float(offset_node.text if offset_node is not None else 0.0, 0.0) / divisions)

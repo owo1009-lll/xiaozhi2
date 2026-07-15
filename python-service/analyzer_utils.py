@@ -113,6 +113,14 @@ def parse_musicxml_measure_index(value: Any, fallback: int) -> int:
     return fallback_index
 
 
+def normalize_musicxml_measure_indices(values: list[Any]) -> list[int]:
+    """Use document order when MusicXML measure labels repeat or go backwards."""
+    parsed = [parse_musicxml_measure_index(value, index) for index, value in enumerate(values, start=1)]
+    if len(set(parsed)) != len(parsed) or any(current <= previous for previous, current in zip(parsed, parsed[1:])):
+        return list(range(1, len(parsed) + 1))
+    return parsed
+
+
 def trimmed_median(values: list[float], trim_ratio: float = 0.15) -> float:
     cleaned = sorted(float(value) for value in values if math.isfinite(float(value)))
     if not cleaned:

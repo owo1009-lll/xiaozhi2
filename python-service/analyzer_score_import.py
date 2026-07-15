@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
 
-from analyzer_utils import beats_per_measure, parse_musicxml_measure_index, safe_float
+from analyzer_utils import beats_per_measure, normalize_musicxml_measure_indices, safe_float
 from schemas import AnalyzeRequest, MidiImportRequest, MusicXmlImportRequest, NoteEvent, PiecePack, ScoreImportJobResult, ScoreImportRequest
 
 try:
@@ -142,6 +142,7 @@ class ScoreImportMixin:
                 "pieceId": request.jobId,
                 "sectionId": section_id,
                 "title": request.titleHint or request.originalFilename or request.jobId,
+                "instrument": str(getattr(request, "instrument", "") or "").strip().lower() or None,
                 "meter": "4/4",
                 "tempo": detected_tempo,
                 "notes": [],
@@ -240,10 +241,8 @@ class ScoreImportMixin:
         )
         if part is None:
             return []
-        return [
-            parse_musicxml_measure_index(measure.attrib.get("number"), measure_position)
-            for measure_position, measure in enumerate(self._xml_children(part, "measure"), start=1)
-        ]
+        measures = self._xml_children(part, "measure")
+        return normalize_musicxml_measure_indices([measure.attrib.get("number") for measure in measures])
 
     def _apply_pagewise_global_measure_numbers(
         self,
@@ -357,6 +356,11 @@ class ScoreImportMixin:
             section_id = "section-a" if not multiple_sources and index == 1 else f"page-{index:02d}"
             previous_resolved_part = resolved_part
             section_title = "自动识谱段落" if not multiple_sources and index == 1 else f"自动识谱第 {index} 页"
+            preserve_direct_string_polyphony = bool(
+                isinstance(request, MusicXmlImportRequest)
+                and str(getattr(request, "instrument", "") or "").strip().lower()
+                in {"violin", "viola", "cello", "double-bass", "double bass", "contrabass"}
+            )
             section, parts, next_resolved_part, part_candidates, marking_stats = self._parse_musicxml_source_to_section(
                 source_path,
                 request,
@@ -364,7 +368,7 @@ class ScoreImportMixin:
                 section_id,
                 section_title,
                 index,
-                collapse_melody=not multiple_sources,
+                collapse_melody=not multiple_sources and not preserve_direct_string_polyphony,
             )
             for candidate in part_candidates:
                 candidate_key = str(candidate.get("selectionKey") or candidate.get("id") or candidate.get("label") or candidate.get("name") or "").strip()

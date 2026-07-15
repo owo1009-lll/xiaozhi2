@@ -132,6 +132,7 @@ from analyzer_utils import (
     optional_count,
     optional_float,
     optional_ratio,
+    normalize_musicxml_measure_indices,
     parse_musicxml_measure_index,
     percentile,
     safe_float,
