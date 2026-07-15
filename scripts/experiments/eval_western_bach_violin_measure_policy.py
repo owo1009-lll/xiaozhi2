@@ -112,6 +112,8 @@ def measure_policy_metrics(
                 "confirmedNoteCount": confirmed,
                 "confirmedFraction": round(coverage, 6),
                 "autoPass": auto_pass,
+                "measureDecision": "confirmed_clean" if auto_pass else "insufficient_evidence",
+                "studentMessageAllowed": auto_pass,
             }
         )
     target_measures = {
@@ -127,6 +129,11 @@ def measure_policy_metrics(
         "autoPassMeasureCoverage": round(len(auto_pass_measures) / len(by_measure), 6)
         if by_measure
         else 0.0,
+        "decisionCounts": {
+            "confirmed_clean": len(auto_pass_measures),
+            "insufficient_evidence": len(by_measure) - len(auto_pass_measures),
+            "issue_detected": 0,
+        },
         "targetMeasureCount": len(target_measures),
         "unsafeTargetMeasureCount": len(unsafe),
         "unsafeTargetMeasureRate": round(len(unsafe) / len(target_measures), 6)

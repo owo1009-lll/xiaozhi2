@@ -321,6 +321,12 @@ const M3PLUS_LOCALIZATION_ROWS_CSV = path.join(
   "pitch-mode-review-pack",
   "m3plus-localization-diagnosis-rows.csv",
 );
+const M3PLUS_COARSE_STATE_EVAL = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3plus",
+  "m3plus-coarse-state-eval.json",
+);
 const M3PLUS_ROUND2_ALIGNED_EVAL = path.join(
   "data",
   "experiments",
@@ -860,6 +866,7 @@ async function buildM3PlusStatus() {
   const sourceRows = await readCsv(M3PLUS_SOURCE);
   const labelRows = await readCsv(M3PLUS_LABELS);
   const modeEval = await readJson(M3PLUS_MODE_EVAL);
+  const coarseStateEval = await readJson(M3PLUS_COARSE_STATE_EVAL);
   const monitoredPilotAudit = await readJson(M3PLUS_MONITORED_PILOT_AUDIT);
   const localizationDiagnosis = await readJson(M3PLUS_LOCALIZATION_DIAGNOSIS);
   const round2AlignedEval = await readJson(M3PLUS_ROUND2_ALIGNED_EVAL);
@@ -972,6 +979,27 @@ async function buildM3PlusStatus() {
       controlReadyModes: modeEval?.controlReadyModes || [],
       counts: modeEval?.counts || {},
       blockingReasons: modeEval?.blockingReasons || modeEvalBlockingReasons,
+    },
+    coarseStateEval: coarseStateEval ? {
+      source: M3PLUS_COARSE_STATE_EVAL.replace(/\\/g, "/"),
+      sourceExists: true,
+      joinReady: coarseStateEval?.joinDiagnostics?.joinReady === true,
+      eligibleMatchedRows: Number(coarseStateEval?.joinDiagnostics?.eligibleMatchedRows || 0),
+      behaviorCounts: coarseStateEval?.behaviorCounts || {},
+      tasks: coarseStateEval?.tasks || {},
+      coarseStateRuntimeReady: coarseStateEval?.coarseStateRuntimeReady === true,
+      studentGateReady: false,
+      blockingReasons: coarseStateEval?.blockingReasons || [],
+    } : {
+      source: M3PLUS_COARSE_STATE_EVAL.replace(/\\/g, "/"),
+      sourceExists: false,
+      joinReady: false,
+      eligibleMatchedRows: 0,
+      behaviorCounts: {},
+      tasks: {},
+      coarseStateRuntimeReady: false,
+      studentGateReady: false,
+      blockingReasons: ["m3plus-coarse-state-eval-missing"],
     },
     round2AlignedEval: round2AlignedEval ? {
       source: M3PLUS_ROUND2_ALIGNED_EVAL.replace(/\\/g, "/"),
@@ -1125,6 +1153,7 @@ async function buildM3PlusStatus() {
       completedCsv: M3PLUS_COMPLETED.replace(/\\/g, "/"),
       labelsCsv: M3PLUS_LABELS.replace(/\\/g, "/"),
       modeEvalJson: M3PLUS_MODE_EVAL.replace(/\\/g, "/"),
+      coarseStateEvalJson: M3PLUS_COARSE_STATE_EVAL.replace(/\\/g, "/"),
       monitoredPilotAuditJson: M3PLUS_MONITORED_PILOT_AUDIT.replace(/\\/g, "/"),
       modeEvalCsv: M3PLUS_MODE_EVAL_CSV.replace(/\\/g, "/"),
       localizationDiagnosisJson: M3PLUS_LOCALIZATION_DIAGNOSIS.replace(/\\/g, "/"),
