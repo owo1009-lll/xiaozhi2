@@ -321,6 +321,12 @@ const M3PLUS_LOCALIZATION_ROWS_CSV = path.join(
   "pitch-mode-review-pack",
   "m3plus-localization-diagnosis-rows.csv",
 );
+const M3PLUS_ROUND2_ALIGNED_EVAL = path.join(
+  "data",
+  "experiments",
+  "western-strings-round2",
+  "m3plus-aligned-eval.json",
+);
 const M4_READINESS = path.join(
   "data",
   "experiments",
@@ -803,6 +809,7 @@ async function buildM3PlusStatus() {
   const modeEval = await readJson(M3PLUS_MODE_EVAL);
   const monitoredPilotAudit = await readJson(M3PLUS_MONITORED_PILOT_AUDIT);
   const localizationDiagnosis = await readJson(M3PLUS_LOCALIZATION_DIAGNOSIS);
+  const round2AlignedEval = await readJson(M3PLUS_ROUND2_ALIGNED_EVAL);
   const candidateQualityReviewPageExists = await exists(M3PLUS_CANDIDATE_QUALITY_REVIEW_PAGE);
   const candidateQualityCompletedExists = await exists(M3PLUS_CANDIDATE_QUALITY_COMPLETED);
   const allSourceRows = [...sourceRows];
@@ -846,15 +853,25 @@ async function buildM3PlusStatus() {
   }
   const labelReady = labelBlockingReasons.length === 0;
   const modeEvalExists = Boolean(modeEval);
-  const modeReleaseReady = Boolean(modeEval?.m3plusModeReleaseReady);
+  const historicalModeReleaseReady = Boolean(modeEval?.m3plusModeReleaseReady);
+  const round2AlignedEvalExists = Boolean(round2AlignedEval);
+  const round2ReleaseEvidenceReady = round2AlignedEval?.releaseEvidenceReady === true;
+  const modeReleaseReady = historicalModeReleaseReady && round2ReleaseEvidenceReady;
   const modeEvalBlockingReasons = [];
   if (labelReady && !modeEvalExists) {
     modeEvalBlockingReasons.push("m3plus-mode-eval-missing");
-  } else if (labelReady && !modeReleaseReady) {
+  } else if (labelReady && !historicalModeReleaseReady) {
     modeEvalBlockingReasons.push(...(modeEval?.blockingReasons || ["m3plus-no-mode-specific-release-ready"]));
     if (localizationDiagnosis?.summary?.nonMatch) {
       modeEvalBlockingReasons.push("m3plus-localization-candidate-quality-blocker");
     }
+  }
+  if (!round2AlignedEvalExists) {
+    modeEvalBlockingReasons.push("m3plus-round2-aligned-eval-missing");
+  } else if (!round2ReleaseEvidenceReady) {
+    modeEvalBlockingReasons.push(...(
+      round2AlignedEval?.blockingReasons || ["m3plus-round2-release-evidence-not-ready"]
+    ));
   }
   const blockingReasons = [...labelBlockingReasons, ...modeEvalBlockingReasons];
   return {
@@ -862,7 +879,7 @@ async function buildM3PlusStatus() {
     m3plusModeEvalReady: labelReady,
     m3plusModeReleaseReady: modeReleaseReady,
     studentGateReady: false,
-    reason: modeReleaseReady ? "mode-specific-offline-eval-ready" : "mode-specific-review-only",
+    reason: modeReleaseReady ? "round2-mode-release-evidence-ready" : "round2-mode-evidence-fail-closed",
     counts: {
       rowCount: sourceRows.length,
       cumulativeRowCount: allSourceRows.length,
@@ -881,16 +898,45 @@ async function buildM3PlusStatus() {
       counts: modeEval?.counts || {},
       blockingReasons: modeEval?.blockingReasons || modeEvalBlockingReasons,
     },
+    round2AlignedEval: round2AlignedEval ? {
+      source: M3PLUS_ROUND2_ALIGNED_EVAL.replace(/\\/g, "/"),
+      sourceExists: true,
+      humanVerifiedPerformanceGold: round2AlignedEval.humanVerifiedPerformanceGold === true,
+      negativeControlAvailable: round2AlignedEval.negativeControlAvailable === true,
+      releaseThreshold: round2AlignedEval.releaseThreshold ?? null,
+      thresholdChecks: round2AlignedEval.thresholdChecks || {},
+      machineThresholdPassed: round2AlignedEval.machineThresholdPassed === true,
+      releaseEvidenceReady: round2ReleaseEvidenceReady,
+      studentGateReady: round2AlignedEval.studentGateReady === true,
+      blockingReasons: round2AlignedEval.blockingReasons || [],
+    } : {
+      source: M3PLUS_ROUND2_ALIGNED_EVAL.replace(/\\/g, "/"),
+      sourceExists: false,
+      humanVerifiedPerformanceGold: false,
+      negativeControlAvailable: false,
+      releaseThreshold: null,
+      thresholdChecks: {},
+      machineThresholdPassed: false,
+      releaseEvidenceReady: false,
+      studentGateReady: false,
+      blockingReasons: ["m3plus-round2-aligned-eval-missing"],
+    },
     monitoredPilotAudit: monitoredPilotAudit ? {
       source: M3PLUS_MONITORED_PILOT_AUDIT.replace(/\\/g, "/"),
       sourceExists: true,
       ok: monitoredPilotAudit.ok === true,
-      readyForMonitoredPilot: monitoredPilotAudit.readyForMonitoredPilot === true,
+      readyForMonitoredPilot:
+        monitoredPilotAudit.readyForMonitoredPilot === true && round2ReleaseEvidenceReady,
       teacherReviewNeeded: monitoredPilotAudit.teacherReviewNeeded === true,
       defaultM3PlusReadyAfter: monitoredPilotAudit.defaultM3PlusReadyAfter === true,
       releaseModes: monitoredPilotAudit.releaseModes || {},
       blockedModes: monitoredPilotAudit.blockedModes || [],
-      blockingReasons: monitoredPilotAudit.blockingReasons || [],
+      blockingReasons: [
+        ...(monitoredPilotAudit.blockingReasons || []),
+        ...(!round2ReleaseEvidenceReady
+          ? (round2AlignedEval?.blockingReasons || ["m3plus-round2-release-evidence-not-ready"])
+          : []),
+      ],
     } : {
       source: M3PLUS_MONITORED_PILOT_AUDIT.replace(/\\/g, "/"),
       sourceExists: false,
@@ -931,6 +977,7 @@ async function buildM3PlusStatus() {
       round2ReviewPage: M3PLUS_ROUND2_REVIEW_PAGE.replace(/\\/g, "/"),
       round2SourceCsv: M3PLUS_ROUND2_SOURCE.replace(/\\/g, "/"),
       round2CompletedCsv: M3PLUS_ROUND2_COMPLETED.replace(/\\/g, "/"),
+      round2AlignedEvalJson: M3PLUS_ROUND2_ALIGNED_EVAL.replace(/\\/g, "/"),
       candidateQualityReviewPage: M3PLUS_CANDIDATE_QUALITY_REVIEW_PAGE.replace(/\\/g, "/"),
       candidateQualitySourceCsv: M3PLUS_CANDIDATE_QUALITY_SOURCE.replace(/\\/g, "/"),
       candidateQualityCompletedCsv: M3PLUS_CANDIDATE_QUALITY_COMPLETED.replace(/\\/g, "/"),
@@ -1256,6 +1303,7 @@ function summarizeNextActions(
     const counts = m3plus.modeEval?.counts || {};
     const localizationSummary = m3plus.localizationDiagnosis?.summary || {};
     const candidateQualityReview = m3plus.candidateQualityReview || {};
+    const round2AlignedEval = m3plus.round2AlignedEval || {};
     const mismatchText = counts.rows
       ? ` Current eval has ${counts.match || 0} match, ${counts.mismatch || 0} mismatch, and ${Math.max(0, (counts.rows || 0) - (counts.match || 0) - (counts.mismatch || 0))} uncertain/other rows out of ${counts.rows}; fix score-audio localization/candidate quality before another release attempt.`
       : "";
@@ -1265,10 +1313,14 @@ function summarizeNextActions(
     actions.push({
       priority: 2,
       track: "M3+ pitch behavior modes",
-      action: candidateQualityReview.needsReview
+      action: round2AlignedEval.sourceExists
+        ? `The human-confirmed round-two aligned evaluation is fail-closed: slide, trill, vibrato, and double-stop detection are below the 90% floor, and negative controls plus real ornament/harmonic samples are still missing. Keep M3+ review-only; improve the detectors and collect only the listed missing evidence, without re-reviewing the completed rows.`
+        : candidateQualityReview.needsReview
         ? `M3+ labels are sufficient and round-2 is imported, but no non-control pitch-behavior mode is release-ready.${mismatchText}${localizationText} The candidate-quality review pack is now restricted to first-measure rows from recordings whose prior review rows were all audio-score matches; later measures are treated as localization-drift risk and excluded.`
         : `M3+ labels are sufficient and round-2 is imported, but no non-control pitch-behavior mode is release-ready.${mismatchText}${localizationText} Keep M3+ review-only and inspect localization groups before changing candidate generation.`,
-      artifact: candidateQualityReview.needsReview
+      artifact: round2AlignedEval.sourceExists
+        ? round2AlignedEval.source
+        : candidateQualityReview.needsReview
         ? candidateQualityReview.reviewPage
         : (m3plus.reviewArtifacts.localizationDiagnosisGroupsCsv || m3plus.reviewArtifacts.modeEvalCsv || m3plus.reviewArtifacts.modeEvalJson),
       reason: m3plus.blockingReasons,
@@ -1655,6 +1707,7 @@ function printProjectStatus(status, outPath) {
       labelReady: m3plusPitchModes.m3plusModeEvalReady,
       releaseReadyModes: m3plusPitchModes.modeEval?.releaseReadyModes || [],
       controlReadyModes: m3plusPitchModes.modeEval?.controlReadyModes || [],
+      round2AlignedEval: m3plusPitchModes.round2AlignedEval,
       monitoredPilotAudit: m3plusPitchModes.monitoredPilotAudit,
       counts: m3plusPitchModes.counts,
       blockingReasons: m3plusPitchModes.blockingReasons,

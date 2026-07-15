@@ -86,14 +86,24 @@ assert(status.tracks?.m4Omr, "project status must include M4 OMR track");
 
 const m3plus = status.tracks.m3plusPitchModes;
 assert.equal(m3plus.m3plusModeEvalReady, true, "M3+ review labels should be sufficient for offline mode evaluation");
-assert.equal(m3plus.m3plusModeReleaseReady, true, "M3+ should report mode-specific release evidence after the first-measure candidate-quality review passes");
+assert.equal(m3plus.m3plusModeReleaseReady, false, "human-confirmed round-two failures must supersede the old first-measure release evidence");
 assert(m3plus.modeEval?.controlReadyModes?.includes("stable"), "stable should be reported as a control-ready mode");
-assert.deepEqual(m3plus.modeEval?.releaseReadyModes || [], ["slide-like", "trill-like"], "slide-like and trill-like should be reported as release-ready offline modes");
+assert.deepEqual(m3plus.modeEval?.releaseReadyModes || [], ["slide-like", "trill-like"], "historical first-measure release modes should remain visible as scoped evidence");
+assert.equal(m3plus.round2AlignedEval?.sourceExists, true, "M3+ status must read the round-two aligned evaluation");
+assert.equal(m3plus.round2AlignedEval?.humanVerifiedPerformanceGold, true, "M3+ status must expose the confirmed r2-06 performance gold");
+assert.equal(m3plus.round2AlignedEval?.machineThresholdPassed, false, "round-two mode detection must fail below the 90% floor");
+assert.equal(m3plus.round2AlignedEval?.releaseEvidenceReady, false, "missing negatives and failed detection must keep round-two release evidence closed");
+assert.deepEqual(
+  m3plus.round2AlignedEval?.thresholdChecks || {},
+  { slide: false, trill: false, vibrato: false, doubleStop: false },
+  "all four round-two mode checks should remain fail-closed",
+);
 assert.equal(m3plus.localizationDiagnosis?.sourceExists, true, "M3+ localization diagnosis should be generated after round-2 import");
 assert.equal(m3plus.localizationDiagnosis?.summary?.nonMatch, 24, "M3+ localization diagnosis should expose the current non-match row count");
-assert.deepEqual(m3plus.blockingReasons || [], [], "M3+ offline mode evidence should no longer ask for more review after the safe first-measure pack is imported");
+assert((m3plus.blockingReasons || []).includes("m3plus-round2-mode-detection-below-90-percent"), "M3+ status must report the confirmed round-two detector failure");
+assert((m3plus.blockingReasons || []).includes("m3plus-round2-negative-controls-missing"), "M3+ status must report the missing negative controls");
 if (m3plus.monitoredPilotAudit?.sourceExists) {
-  assert.equal(m3plus.monitoredPilotAudit.readyForMonitoredPilot, true, "M3+ monitored pilot audit should pass before the handoff moves on");
+  assert.equal(m3plus.monitoredPilotAudit.readyForMonitoredPilot, false, "newer round-two failures must close the old monitored-pilot result");
   assert.equal(m3plus.monitoredPilotAudit.teacherReviewNeeded, false, "M3+ monitored pilot audit must not ask for more review when all auto-pass evidence is already known");
   assert.equal(m3plus.monitoredPilotAudit.defaultM3PlusReadyAfter, false, "M3+ monitored pilot audit must keep default runtime disabled");
   assert.deepEqual(Object.keys(m3plus.monitoredPilotAudit.releaseModes || {}), ["slide-like", "trill-like"], "M3+ pilot audit should only expose slide/trill release modes");
@@ -205,7 +215,7 @@ if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
 } else if (ordinaryPilotAuditPassed) {
   assert.equal(
     status.nextActions[0]?.artifact,
-    "data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-pitch-mode-eval.json",
+    "data/experiments/western-strings-round2/m3plus-aligned-eval.json",
     "after ordinary pilot audit passes, handoff artifact should point to the next unfinished track",
   );
 } else {
@@ -394,19 +404,26 @@ if (m4.m4OmrDraftQualityReady) {
     !handoff.includes("score-editor independent-gold correction task"),
     "current handoff must not keep stale M4 score-editor instructions after M4 clears",
   );
-  assert(
-    handoff.includes("npm run western:release-review")
-      || handoff.includes("npm run western:controlled-pilot-decision")
-      || handoff.includes("npm run western:controlled-pilot-approval-template")
-      || handoff.includes("npm run western:controlled-pilot-start-preflight")
-      || handoff.includes("Controlled pilot approval")
-      || handoff.includes("Controlled pilot deferred")
-      || handoff.includes("Start monitored pilot")
-      || handoff.includes("Controlled pilot coverage audit")
-      || handoff.includes("Scoped V2-alpha blind audit preparation")
-      || handoff.includes("Controlled pilot completed"),
-    "handoff must route through release-review or the controlled-pilot decision after M4 clears",
-  );
+  if (m3plus.m3plusModeReleaseReady) {
+    assert(
+      handoff.includes("npm run western:release-review")
+        || handoff.includes("npm run western:controlled-pilot-decision")
+        || handoff.includes("npm run western:controlled-pilot-approval-template")
+        || handoff.includes("npm run western:controlled-pilot-start-preflight")
+        || handoff.includes("Controlled pilot approval")
+        || handoff.includes("Controlled pilot deferred")
+        || handoff.includes("Start monitored pilot")
+        || handoff.includes("Controlled pilot coverage audit")
+        || handoff.includes("Scoped V2-alpha blind audit preparation")
+        || handoff.includes("Controlled pilot completed"),
+      "handoff must route through release-review or the controlled-pilot decision after M3+ and M4 clear",
+    );
+  } else {
+    assert(
+      handoff.includes("data/experiments/western-strings-round2/m3plus-aligned-eval.json"),
+      "handoff must point to the newer M3+ round-two failure evidence while that track is blocked",
+    );
+  }
   for (const [label, text] of [["project plan", projectPlan], ["migration plan", migrationPlan]]) {
     assert(
       !text.includes("`usableBenchmarkRows=0`,`selfComparisonRows=12`,`m4OmrDraftQualityReady=false`"),
@@ -491,7 +508,12 @@ assert.equal(
   "ordinary gate failure should point to the current ordinary-gate evidence artifact",
 );
 const m3plusFailure = fullGate.failures.find((failure) => failure.track === "M3+ pitch behavior modes");
-assert.equal(m3plusFailure, undefined, "M3+ should not be a project-gate failure after mode-specific offline evidence passes");
+assert(m3plusFailure, "M3+ should be a project-gate failure after human-confirmed round-two evidence fails");
+assert.equal(
+  m3plusFailure.artifact,
+  "data/experiments/western-strings-round2/m3plus-aligned-eval.json",
+  "M3+ project-gate failure should point to the newest aligned evidence",
+);
 const m4Failure = fullGate.failures.find((failure) => failure.track === "M4 OMR benchmark");
 assert.equal(m4Failure, undefined, "M4 should not be a project-gate failure after clean-score approval is recognized");
 
@@ -502,7 +524,7 @@ console.log(JSON.stringify({
     "public-model-validation-evidence-covered",
     "student-runtime-fail-closed",
     "confidence-pilot-validation-state-covered",
-    "m3plus-first-measure-mode-evidence-covered",
+    "m3plus-round2-human-gold-fail-closed-covered",
     "m4-human-approved-unchanged-gold-clears",
     "m4-checklist-human-readable",
     "handbook-current-status-does-not-reassign-completed-review",
