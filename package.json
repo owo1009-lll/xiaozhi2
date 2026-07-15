@@ -120,6 +120,8 @@
     "test:western-measure-policy": "py -3.11 scripts\\test-western-measure-policy.py",
     "western:m4-measure-duration-probe": "py -3.11 scripts\\experiments\\eval_western_strings_m4_measure_duration_normalization.py",
     "test:western-m4-measure-duration-probe": "py -3.11 scripts\\test-western-m4-measure-duration-normalization.py",
+    "western:m4-rhythm-candidate-oracle": "py -3.11 scripts\\experiments\\eval_western_strings_m4_rhythm_candidate_oracle.py",
+    "test:western-m4-rhythm-candidate-oracle": "py -3.11 scripts\\test-western-m4-rhythm-candidate-oracle.py",
     "western:m4-audio-rhythm-ranking": "py -3.11 scripts\\experiments\\eval_western_strings_m4_audio_rhythm_ranking.py",
     "test:western-m4-audio-rhythm-ranking": "py -3.11 scripts\\test-western-m4-audio-rhythm-ranking.py",
     "western:controlled-batch-candidate-audit": "node scripts\\audit-western-controlled-batch-candidates.mjs",

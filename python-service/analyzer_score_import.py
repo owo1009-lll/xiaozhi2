@@ -105,6 +105,7 @@ class ScoreImportMixin:
         section_title: str,
         sequence_index: int,
         collapse_melody: bool = True,
+        inherited_meter: str | None = None,
     ) -> tuple[dict[str, Any] | None, list[str], str, list[dict[str, Any]], dict[str, Any]]:
         xml_text = self._read_musicxml_source(source_path)
         if not xml_text.strip():
@@ -120,6 +121,22 @@ class ScoreImportMixin:
             resolved_part = self._resolve_selected_part(detected_parts, selected_part_hint)
         if not resolved_part_label:
             resolved_part_label = self._resolve_selected_part(detected_parts, selected_part_hint)
+        detected_meter, meter_known, meter_source = self._extract_musicxml_meter(
+            xml_text,
+            resolved_part_id or resolved_part,
+        )
+        if not meter_known and inherited_meter:
+            detected_meter = inherited_meter
+            meter_known = True
+            meter_source = "inherited-pagewise-musicxml"
+        inferred_measure_span, inferred_span_source = self._infer_musicxml_measure_quarter_span(
+            xml_text,
+            resolved_part_id or resolved_part,
+        )
+        measure_quarter_span = (
+            beats_per_measure(detected_meter) if meter_known else inferred_measure_span
+        )
+        measure_quarter_span_source = meter_source if meter_known else inferred_span_source
         detected_tempo = self._extract_musicxml_tempo(xml_text)
         # If MusicXML has no tempo (Audiveris missed it), try image-based OCR on the page PDF.
         # Typical layout: pagewise/page-NNN/page-NNN.mxl → PDF at pagewise/page-NNN.pdf
@@ -143,7 +160,11 @@ class ScoreImportMixin:
                 "sectionId": section_id,
                 "title": request.titleHint or request.originalFilename or request.jobId,
                 "instrument": str(getattr(request, "instrument", "") or "").strip().lower() or None,
-                "meter": "4/4",
+                "meter": detected_meter,
+                "meterKnown": meter_known,
+                "meterSource": meter_source,
+                "measureQuarterSpan": measure_quarter_span,
+                "measureQuarterSpanSource": measure_quarter_span_source,
                 "tempo": detected_tempo,
                 "notes": [],
                 "scoreSource": {"format": "musicxml", "encoding": "utf-8", "data": xml_text},
@@ -161,6 +182,31 @@ class ScoreImportMixin:
             resolved_part_label = str((resolved_candidate or {}).get("label") or (resolved_candidate or {}).get("name") or resolved_part_label).strip() or resolved_part_label
             resolved_part_id = str((resolved_candidate or {}).get("id") or resolved_part_id).strip() or resolved_part_id
             selected_part_confidence = float((resolved_candidate or {}).get("selectedPartConfidence", selected_part_confidence or 0.0))
+            refined_meter, refined_meter_known, refined_meter_source = self._extract_musicxml_meter(
+                xml_text,
+                resolved_part_id or resolved_part,
+            )
+            if refined_meter_known:
+                detected_meter = refined_meter
+                meter_known = True
+                meter_source = refined_meter_source
+            elif inherited_meter:
+                detected_meter = inherited_meter
+                meter_known = True
+                meter_source = "inherited-pagewise-musicxml"
+            refined_inferred_span, refined_inferred_source = self._infer_musicxml_measure_quarter_span(
+                xml_text,
+                resolved_part_id or resolved_part,
+            )
+            measure_quarter_span = (
+                beats_per_measure(detected_meter) if meter_known else refined_inferred_span
+            )
+            measure_quarter_span_source = meter_source if meter_known else refined_inferred_source
+            temp_request.piecePack.meter = detected_meter
+            temp_request.piecePack.meterKnown = meter_known
+            temp_request.piecePack.meterSource = meter_source
+            temp_request.piecePack.measureQuarterSpan = measure_quarter_span
+            temp_request.piecePack.measureQuarterSpanSource = measure_quarter_span_source
         parsed_notes = self._parse_musicxml_score(xml_text, temp_request, resolved_part, collapse_melody=collapse_melody)
         if not parsed_notes:
             return None, detected_parts, resolved_part, part_candidates, {}
@@ -185,7 +231,11 @@ class ScoreImportMixin:
             "title": section_title,
             **section_metadata,
             "tempo": detected_tempo,
-            "meter": "4/4",
+            "meter": detected_meter,
+            "meterKnown": meter_known,
+            "meterSource": meter_source,
+            "measureQuarterSpan": measure_quarter_span,
+            "measureQuarterSpanSource": measure_quarter_span_source,
             "demoAudio": "",
             "sequenceIndex": sequence_index,
             "notes": [
@@ -340,6 +390,7 @@ class ScoreImportMixin:
         resolved_part_id = ""
         multiple_sources = len(musicxml_sources) > 1
         next_global_measure = 1
+        active_meter: str | None = None
 
         def is_explicit_piano_label(value: str | None) -> bool:
             label = str(value or "").lower()
@@ -369,6 +420,7 @@ class ScoreImportMixin:
                 section_title,
                 index,
                 collapse_melody=not multiple_sources and not preserve_direct_string_polyphony,
+                inherited_meter=active_meter,
             )
             for candidate in part_candidates:
                 candidate_key = str(candidate.get("selectionKey") or candidate.get("id") or candidate.get("label") or candidate.get("name") or "").strip()
@@ -391,6 +443,8 @@ class ScoreImportMixin:
                 candidate_resolved_part = previous_resolved_part
             resolved_part = candidate_resolved_part
             if section:
+                if bool(section.get("meterKnown")) and section.get("meter"):
+                    active_meter = str(section.get("meter"))
                 section_part_label = str(section.get("selectedPart") or "").strip()
                 if not (
                     multiple_sources
@@ -480,7 +534,10 @@ class ScoreImportMixin:
         if len(notes) <= 20:
             return [section]
 
-        measure_beats = beats_per_measure(section.get("meter"))
+        measure_beats = safe_float(
+            section.get("measureQuarterSpan"),
+            beats_per_measure(section.get("meter")),
+        )
         ordered_notes = sorted(
             notes,
             key=lambda note: (

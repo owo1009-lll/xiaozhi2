@@ -303,6 +303,8 @@ HF2 Hardanger Fiddle 的 119 对 WAV/MIDI 已完成只读审计，其中 100 条
 
 2026-07-16 补充：M3+ 评测已改为前半标定/后半 holdout，并加入明确直音控制的会话相对基线。M4 受限最小编辑时值修复仍未改善总体准确率；相对 IOI 对 clean-score 候选排序有信号，但 Basic Pitch 仅 40% 可判，增加 spectral-flux+pYIN 后降至 20%，均未过自动采用闸门。
 
+同日进一步审计发现，真实照片与独立公开源谱存在记谱版本混杂：50 个音高序列完全可比的小节中，绝对四分音符起点仅 16/50 完全一致，但相对 IOI 形状有 34/50 一致，其中 33 小节属于“拍号/记谱尺度不同但节奏比例一致”。因此旧 `onset-quarter=2.2%` 不能单独解释为 OMR 节奏全错。新增 `western:m4-rhythm-candidate-oracle` 能在 common-meter 候选中覆盖 50/50 gold 节奏，但 gold 仅用于 oracle，运行时选择器尚未通过，`runtimeReady=false`。生产导入器已停止把缺失拍号静默写成 `4/4`：显式拍号写入 `meterKnown=true`，缺拍号写入 `meterKnown=false` 并强制节奏复核；同时可从 MusicXML 小节时值众数恢复仅供内部布局的 `measureQuarterSpan`。`6/8` 现在按 3 个四分音符单位计算，不再误算为 6。该修复改善时间轴语义，但不放行任何未知拍号的学生节奏判断。
+
 先预览,确认目标仅为可再生环境、调试目录、构建产物和 Python 缓存:
 
 ```bash

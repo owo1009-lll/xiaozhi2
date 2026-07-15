@@ -43,11 +43,21 @@ def cents_between(frequency: float, reference_frequency: float) -> float:
 
 
 def beats_per_measure(meter: str | None) -> float:
+    """Return the measure span in quarter-note beat units.
+
+    MusicXML durations and ``NoteEvent.beatStart`` are normalized by
+    ``divisions``, so a 6/8 measure spans 3.0 of these units, not 6.0.
+    Unknown or malformed meters retain the internal 4/4 layout fallback; the
+    caller must use ``meterKnown`` before making a student-facing rhythm claim.
+    """
     if not meter:
         return 4.0
     try:
-        numerator = float(str(meter).split("/", 1)[0])
-        return numerator if numerator > 0 else 4.0
+        numerator_text, denominator_text = str(meter).split("/", 1)
+        numerator = float(numerator_text)
+        denominator = float(denominator_text)
+        measure_quarters = numerator * (4.0 / denominator)
+        return measure_quarters if measure_quarters > 0 else 4.0
     except Exception:
         return 4.0
 

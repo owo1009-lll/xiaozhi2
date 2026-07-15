@@ -36,6 +36,10 @@ class PiecePack(BaseModel):
     tempoKnown: bool | None = None
     tempoSource: str | None = None
     meter: str | None = None
+    meterKnown: bool | None = None
+    meterSource: str | None = None
+    measureQuarterSpan: float | None = None
+    measureQuarterSpanSource: str | None = None
     tempo: int = 72
     demoAudio: str | None = None
     sequenceIndex: int | None = None

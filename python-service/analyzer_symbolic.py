@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+from collections import Counter
+
 from analyzer_common import *
 
 
@@ -44,6 +46,125 @@ class SymbolicScoreMixin:
         except Exception:
             pass
         return 72
+
+
+    def _extract_musicxml_meter(
+        self,
+        xml_text: str,
+        selected_part_hint: str | None = None,
+    ) -> tuple[str | None, bool, str]:
+        """Read the first explicit meter from the selected MusicXML part."""
+        if not xml_text.strip():
+            return None, False, "unknown"
+        try:
+            root = ET.fromstring(xml_text)
+        except ET.ParseError:
+            return None, False, "unknown"
+
+        parts = [element for element in root.iter() if self._xml_local_tag(element) == "part"]
+        if not parts:
+            return None, False, "unknown"
+
+        selected_hint = str(selected_part_hint or "").strip()
+        selected_part = next(
+            (
+                part
+                for part in parts
+                if selected_hint and str(part.attrib.get("id") or "").strip() == selected_hint
+            ),
+            None,
+        )
+        if selected_part is None:
+            candidates = self._extract_musicxml_part_candidates(xml_text, selected_hint)
+            selected_candidate, _ = self._resolve_selected_part_from_candidates(candidates, selected_hint)
+            selected_id = str((selected_candidate or {}).get("id") or "").strip()
+            selected_part = next(
+                (part for part in parts if selected_id and str(part.attrib.get("id") or "").strip() == selected_id),
+                parts[0],
+            )
+
+        for measure in self._xml_children(selected_part, "measure"):
+            for attributes in self._xml_children(measure, "attributes"):
+                for time_node in self._xml_children(attributes, "time"):
+                    beats_node = self._xml_child(time_node, "beats")
+                    beat_type_node = self._xml_child(time_node, "beat-type")
+                    try:
+                        numerator = int(str((beats_node.text if beats_node is not None else "") or "").strip())
+                        denominator = int(str((beat_type_node.text if beat_type_node is not None else "") or "").strip())
+                    except (TypeError, ValueError):
+                        continue
+                    if 1 <= numerator <= 32 and denominator in {1, 2, 4, 8, 16, 32}:
+                        return f"{numerator}/{denominator}", True, "musicxml"
+        return None, False, "unknown"
+
+
+    def _infer_musicxml_measure_quarter_span(
+        self,
+        xml_text: str,
+        selected_part_hint: str | None = None,
+    ) -> tuple[float | None, str]:
+        """Infer a layout span from MusicXML durations without claiming a meter."""
+        if not xml_text.strip():
+            return None, "unknown"
+        try:
+            root = ET.fromstring(xml_text)
+        except ET.ParseError:
+            return None, "unknown"
+
+        parts = [element for element in root.iter() if self._xml_local_tag(element) == "part"]
+        if not parts:
+            return None, "unknown"
+        selected_hint = str(selected_part_hint or "").strip()
+        candidates = self._extract_musicxml_part_candidates(xml_text, selected_hint)
+        selected_candidate, _ = self._resolve_selected_part_from_candidates(candidates, selected_hint)
+        selected_id = str((selected_candidate or {}).get("id") or selected_hint).strip()
+        part = next(
+            (item for item in parts if selected_id and str(item.attrib.get("id") or "").strip() == selected_id),
+            parts[0],
+        )
+
+        divisions = 1.0
+        spans: list[float] = []
+        for measure in self._xml_children(part, "measure"):
+            cursor = 0.0
+            previous_onset = 0.0
+            maximum_end = 0.0
+            for item in list(measure):
+                name = self._xml_local_tag(item)
+                if name == "attributes":
+                    divisions_node = self._xml_child(item, "divisions")
+                    try:
+                        divisions = max(1.0, float((divisions_node.text if divisions_node is not None else "") or divisions))
+                    except (TypeError, ValueError):
+                        pass
+                    continue
+                duration_node = self._xml_child(item, "duration")
+                try:
+                    duration = float((duration_node.text if duration_node is not None else "") or 0.0) / divisions
+                except (TypeError, ValueError, ZeroDivisionError):
+                    duration = 0.0
+                if name == "backup":
+                    cursor = max(0.0, cursor - duration)
+                elif name == "forward":
+                    cursor += duration
+                    maximum_end = max(maximum_end, cursor)
+                elif name == "note":
+                    chord = self._xml_child(item, "chord") is not None
+                    grace = self._xml_child(item, "grace") is not None
+                    onset = previous_onset if chord else cursor
+                    maximum_end = max(maximum_end, onset + duration)
+                    previous_onset = onset
+                    if not chord and not grace:
+                        cursor += duration
+            if maximum_end >= 0.25:
+                spans.append(round(maximum_end * 48.0) / 48.0)
+        if not spans:
+            return None, "unknown"
+        counts = Counter(spans)
+        span, support = max(counts.items(), key=lambda item: (item[1], item[0]))
+        if support < 2 and len(spans) > 1:
+            return None, "unknown"
+        return float(span), "musicxml-duration-mode"
 
 
     def _xml_local_tag(self, node: ET.Element | None) -> str:
@@ -233,7 +354,10 @@ class SymbolicScoreMixin:
             if "harmonic" not in set(getattr(note, "techniques", []) or [])
             or "harmonic-sounding-pitch" in set(getattr(note, "techniques", []) or [])
         ]
-        measure_beats = beats_per_measure(request.piecePack.meter)
+        measure_beats = safe_float(
+            request.piecePack.measureQuarterSpan,
+            beats_per_measure(request.piecePack.meter),
+        )
         seconds_per_beat = 60.0 / max(request.piecePack.tempo, 30)
         min_measure_index = min((int(note.measureIndex) for note in notes), default=1)
         hydrated: list[SymbolicNote] = []
@@ -862,7 +986,10 @@ class SymbolicScoreMixin:
         seconds_per_beat = 60.0 / max(request.piecePack.tempo, 30)
         if len(tempi):
             seconds_per_beat = 60.0 / max(float(tempi[0]), 30.0)
-        measure_beats = beats_per_measure(request.piecePack.meter)
+        measure_beats = safe_float(
+            request.piecePack.measureQuarterSpan,
+            beats_per_measure(request.piecePack.meter),
+        )
 
         note_events: list[NoteEvent] = []
         for index, note in enumerate(sorted(instrument.notes, key=lambda item: item.start), start=1):

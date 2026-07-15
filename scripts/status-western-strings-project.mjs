@@ -434,6 +434,20 @@ const M4_GOLD_PROVENANCE_AUDIT_CSV = path.join(
   "western-strings-m4",
   "gold-provenance-audit.csv",
 );
+const M4_RHYTHM_CANDIDATE_ORACLE = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "rhythm-candidate-oracle",
+  "report.json",
+);
+const M4_AUDIO_RHYTHM_RANKING = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "audio-rhythm-ranking",
+  "report.json",
+);
 const RELEASE_REVIEW = path.join(
   "data",
   "experiments",
@@ -1358,6 +1372,8 @@ async function buildM4OmrStatus() {
   const clarityAdaptationBenchmark = await readJson(M4_CLARITY_ADAPTATION_BENCHMARK);
   const workspaceAudit = await readJson(M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT);
   const provenanceAudit = await readJson(M4_GOLD_PROVENANCE_AUDIT);
+  const rhythmCandidateOracle = await readJson(M4_RHYTHM_CANDIDATE_ORACLE);
+  const audioRhythmRanking = await readJson(M4_AUDIO_RHYTHM_RANKING);
   const readinessReady = Boolean(readiness?.gate?.m4OmrBenchmarkDatasetReady);
   const benchmarkEvaluated = Boolean(benchmark?.gate?.m4OmrBenchmarkEvaluated);
   const draftQualityReady = Boolean(benchmark?.gate?.m4OmrDraftQualityReady);
@@ -1423,6 +1439,9 @@ async function buildM4OmrStatus() {
     m4ClarityAutomaticAdoptionReady: clarityBenchmark?.gate?.automaticAdoptionReady === true,
     m4ClarityAdaptationEvaluated: clarityAdaptationBenchmark?.adaptationDecision?.evaluated === true,
     m4ClarityAdaptationRejected: clarityAdaptationBenchmark?.adaptationDecision?.checkpointDisposition === "reject-and-delete",
+    m4RhythmCandidateOracleEvaluated: rhythmCandidateOracle?.summary?.candidateGenerationGatePassed === true,
+    m4RhythmRuntimeReady: rhythmCandidateOracle?.summary?.runtimeReady === true,
+    m4AudioRhythmRankingGatePassed: audioRhythmRanking?.summary?.evalOnlyGatePassed === true,
     studentGateReady: false,
     teacherReviewNeeded: false,
     scoreEditorReviewNeeded: humanTask !== "none",
@@ -1456,6 +1475,8 @@ async function buildM4OmrStatus() {
       independentGoldWorkspaceAuditCsv: M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT_CSV.replace(/\\/g, "/"),
       goldProvenanceAuditJson: M4_GOLD_PROVENANCE_AUDIT.replace(/\\/g, "/"),
       goldProvenanceAuditCsv: M4_GOLD_PROVENANCE_AUDIT_CSV.replace(/\\/g, "/"),
+      rhythmCandidateOracleJson: M4_RHYTHM_CANDIDATE_ORACLE.replace(/\\/g, "/"),
+      audioRhythmRankingJson: M4_AUDIO_RHYTHM_RANKING.replace(/\\/g, "/"),
       readinessCsv: String(readiness?.artifacts?.csv || "data/experiments/western-strings-m4/omr-readiness.csv").replace(/\\/g, "/"),
       benchmarkCsv: String(benchmark?.artifacts?.csv || "data/experiments/western-strings-m4/omr-benchmark.csv").replace(/\\/g, "/"),
     },
@@ -1551,6 +1572,11 @@ async function buildM4OmrStatus() {
       studentGateReady: false,
       adaptationDecision: {},
     },
+    rhythmCandidateOracle: rhythmCandidateOracle?.summary || null,
+    audioRhythmRanking: audioRhythmRanking ? {
+      summary: audioRhythmRanking.summary || null,
+      ensembleSummary: audioRhythmRanking.ensembleSummary || null,
+    } : null,
     independentGoldWorkspaceAudit: workspaceAudit
       ? {
           source: M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT.replace(/\\/g, "/"),

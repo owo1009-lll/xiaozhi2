@@ -291,6 +291,8 @@ class ScoringMixin:
 
 
     def _should_review_coarse_rhythm(self, note: dict[str, Any]) -> bool:
+        if note.get("meterKnown") is False:
+            return True
         if not bool(note.get("scoreCoarse")):
             return False
         max_raw_error = max(abs(float(note.get("onsetErrorMs", 0.0))), abs(float(note.get("durationErrorMs", 0.0))))
@@ -334,6 +336,8 @@ class ScoringMixin:
 
 
     def _classify_note_rhythm(self, note: dict[str, Any]) -> tuple[str, str]:
+        if bool(note.get("rhythmReview")):
+            return "rhythm-ok", self._rhythm_type_label("rhythm-ok")
         onset_error_ms = self._note_scoring_onset_error_ms(note)
         duration_error_ms = self._note_scoring_duration_error_ms(note)
         onset_tolerance_ms = self._onset_tolerance_ms(note)
@@ -792,6 +796,8 @@ class ScoringMixin:
                     "trillLowFrequency": trill_low_frequency,
                     "trillHighFrequency": trill_high_frequency,
                     "trillSwitchCount": trill_switch_count,
+                    "meterKnown": request.piecePack.meterKnown,
+                    "meterSource": request.piecePack.meterSource,
                     "scoreCoarse": bool(section_calibration.get("scoreCoarse")),
                     "importedScoreProfile": bool(section_calibration.get("importedScoreProfile")),
                     "denseImportedScoreProfile": bool(section_calibration.get("denseImportedScoreProfile")),
