@@ -327,6 +327,12 @@ const M3PLUS_ROUND2_ALIGNED_EVAL = path.join(
   "western-strings-round2",
   "m3plus-aligned-eval.json",
 );
+const M3PLUS_ROUND2_TRILL_VIBRATO_DIAGNOSTIC = path.join(
+  "data",
+  "experiments",
+  "western-strings-round2",
+  "m3plus-trill-vibrato-diagnostic.json",
+);
 const M4_READINESS = path.join(
   "data",
   "experiments",
@@ -816,6 +822,7 @@ async function buildM3PlusStatus() {
   const monitoredPilotAudit = await readJson(M3PLUS_MONITORED_PILOT_AUDIT);
   const localizationDiagnosis = await readJson(M3PLUS_LOCALIZATION_DIAGNOSIS);
   const round2AlignedEval = await readJson(M3PLUS_ROUND2_ALIGNED_EVAL);
+  const round2FeatureDiagnostic = await readJson(M3PLUS_ROUND2_TRILL_VIBRATO_DIAGNOSTIC);
   const candidateQualityReviewPageExists = await exists(M3PLUS_CANDIDATE_QUALITY_REVIEW_PAGE);
   const candidateQualityCompletedExists = await exists(M3PLUS_CANDIDATE_QUALITY_COMPLETED);
   const allSourceRows = [...sourceRows];
@@ -927,6 +934,35 @@ async function buildM3PlusStatus() {
       studentGateReady: false,
       blockingReasons: ["m3plus-round2-aligned-eval-missing"],
     },
+    round2FeatureDiagnostic: round2FeatureDiagnostic ? {
+      source: M3PLUS_ROUND2_TRILL_VIBRATO_DIAGNOSTIC.replace(/\\/g, "/"),
+      sourceExists: true,
+      evaluationLevel: round2FeatureDiagnostic.evaluationLevel || "unknown",
+      releaseEvidence: round2FeatureDiagnostic.releaseEvidence === true,
+      studentGateReady: round2FeatureDiagnostic.studentGateReady === true,
+      goldCounts: round2FeatureDiagnostic.goldCounts || {},
+      goldCountConsistent: round2FeatureDiagnostic.goldCountConsistent === true,
+      dtwWindowDiagnostics: {
+        matchedNoteCount: round2FeatureDiagnostic.dtwWindowDiagnostics?.matchedNoteCount ?? null,
+        unmatchedNoteCount: round2FeatureDiagnostic.dtwWindowDiagnostics?.unmatchedNoteCount ?? null,
+        implausibleWindowCount: round2FeatureDiagnostic.dtwWindowDiagnostics?.implausibleWindowCount ?? null,
+        implausibleWindowRate: round2FeatureDiagnostic.dtwWindowDiagnostics?.implausibleWindowRate ?? null,
+      },
+      bestTrainingOnlyFeatures:
+        round2FeatureDiagnostic.featureDiagnostics?.trainingOnlySingleFeatureThresholds?.slice(0, 3) || [],
+      blockingReasons: round2FeatureDiagnostic.blockingReasons || [],
+    } : {
+      source: M3PLUS_ROUND2_TRILL_VIBRATO_DIAGNOSTIC.replace(/\\/g, "/"),
+      sourceExists: false,
+      evaluationLevel: "missing",
+      releaseEvidence: false,
+      studentGateReady: false,
+      goldCounts: {},
+      goldCountConsistent: false,
+      dtwWindowDiagnostics: {},
+      bestTrainingOnlyFeatures: [],
+      blockingReasons: ["m3plus-round2-trill-vibrato-diagnostic-missing"],
+    },
     monitoredPilotAudit: monitoredPilotAudit ? {
       source: M3PLUS_MONITORED_PILOT_AUDIT.replace(/\\/g, "/"),
       sourceExists: true,
@@ -984,6 +1020,7 @@ async function buildM3PlusStatus() {
       round2SourceCsv: M3PLUS_ROUND2_SOURCE.replace(/\\/g, "/"),
       round2CompletedCsv: M3PLUS_ROUND2_COMPLETED.replace(/\\/g, "/"),
       round2AlignedEvalJson: M3PLUS_ROUND2_ALIGNED_EVAL.replace(/\\/g, "/"),
+      round2TrillVibratoDiagnosticJson: M3PLUS_ROUND2_TRILL_VIBRATO_DIAGNOSTIC.replace(/\\/g, "/"),
       candidateQualityReviewPage: M3PLUS_CANDIDATE_QUALITY_REVIEW_PAGE.replace(/\\/g, "/"),
       candidateQualitySourceCsv: M3PLUS_CANDIDATE_QUALITY_SOURCE.replace(/\\/g, "/"),
       candidateQualityCompletedCsv: M3PLUS_CANDIDATE_QUALITY_COMPLETED.replace(/\\/g, "/"),
@@ -1756,6 +1793,7 @@ function printProjectStatus(status, outPath) {
       releaseReadyModes: m3plusPitchModes.modeEval?.releaseReadyModes || [],
       controlReadyModes: m3plusPitchModes.modeEval?.controlReadyModes || [],
       round2AlignedEval: m3plusPitchModes.round2AlignedEval,
+      round2FeatureDiagnostic: m3plusPitchModes.round2FeatureDiagnostic,
       monitoredPilotAudit: m3plusPitchModes.monitoredPilotAudit,
       counts: m3plusPitchModes.counts,
       blockingReasons: m3plusPitchModes.blockingReasons,

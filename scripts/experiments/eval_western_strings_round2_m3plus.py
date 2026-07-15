@@ -135,25 +135,28 @@ def evaluate_trill_vibrato(
     vibrato_rows = []
     for index, note in enumerate(notes):
         event = matched[index]
-        if event is None:
-            continue
-        next_start = next(
-            (float(candidate["start"]) for candidate in matched[index + 1 :] if candidate is not None),
-            float(event["end"]),
-        )
-        features = analyze_pitch_window(
-            times=times,
-            midi_track=midi_track,
-            target_midi=int(note["midi"]),
-            start_seconds=max(0.0, float(event["start"]) - 0.02),
-            end_seconds=max(float(event["end"]), next_start - 0.02),
-        )
-        flags = set(features.get("flags") or [])
+        flags: set[str] = set()
+        features: dict[str, Any] = {}
+        if event is not None:
+            next_start = next(
+                (float(candidate["start"]) for candidate in matched[index + 1 :] if candidate is not None),
+                float(event["end"]),
+            )
+            features = analyze_pitch_window(
+                times=times,
+                midi_track=midi_track,
+                target_midi=int(note["midi"]),
+                start_seconds=max(0.0, float(event["start"]) - 0.02),
+                end_seconds=max(float(event["end"]), next_start - 0.02),
+            )
+            flags = set(features.get("flags") or [])
         row = {
             "measureIndex": int(note.get("measureIndex") or 0),
             "midi": int(note["midi"]),
             "flags": sorted(flags),
             "detected": False,
+            "alignmentStatus": "matched" if event is not None else "unmatched",
+            "matchedEventStartSeconds": round(float(event["start"]), 6) if event is not None else None,
         }
         if "trill-mark" in set(note.get("techniques") or []):
             row["detected"] = "trill-like" in flags
@@ -168,12 +171,14 @@ def evaluate_trill_vibrato(
     return {
         "trill": {
             "expectedNoteCount": len(trill_rows),
+            "matchedNoteCount": sum(row["alignmentStatus"] == "matched" for row in trill_rows),
             "detectedNoteCount": sum(row["detected"] for row in trill_rows),
             "detectionRate": round(sum(row["detected"] for row in trill_rows) / len(trill_rows), 6) if trill_rows else None,
             "rows": trill_rows,
         },
         "vibrato": {
             "instructionExpectedLongNoteCount": len(vibrato_rows),
+            "matchedNoteCount": sum(row["alignmentStatus"] == "matched" for row in vibrato_rows),
             "detectedNoteCount": sum(row["detected"] for row in vibrato_rows),
             "detectionRate": round(sum(row["detected"] for row in vibrato_rows) / len(vibrato_rows), 6) if vibrato_rows else None,
             "rows": vibrato_rows,

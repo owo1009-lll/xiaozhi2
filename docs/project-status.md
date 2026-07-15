@@ -89,7 +89,9 @@
 2026-07-15 第二轮真实对齐复验:
 
 - `r2-06` 的 6 个颤音和其余长音揉弦已经人工确认实际演奏。
-- Basic Pitch 序列 DTW 后的机器检出为:滑音 7/12、颤音 0/6、揉弦 1/16、双音 19/24。
+- 谱面实际含 6 个颤音与 17 个其余长音。旧报告的 16 个揉弦分母来自对齐器漏掉第 2 音;现已修正为未匹配音仍计入漏检。
+- Basic Pitch 序列 DTW 后的机器检出为:滑音 7/12、颤音 0/6、揉弦 1/17、双音 19/24。
+- 新增 `npm run western:round2-m3plus-diagnostic`:23 个音中 1 个未匹配,12/23(`52.2%`)的 DTW 窗口时长不合理。受控时值锚定后的最佳单特征仍只有训练内 precision/recall=`66.7%/66.7%`,未达到 90%;因此不调低阈值、不接学生端。
 - 四项均未达 90%;旧 release-ready 结论只适用于 first-measure 安全子集,不得推广。
 - 泛音 MusicXML `sounding-pitch/base-pitch/touching-pitch` 已能保留;只有显式 sounding pitch 自动评分,缺失角色退复核。
 - 第二轮尚缺真实负例、独立装饰音和泛音样本,因此 `studentGateReady=false` 不变。

@@ -54,6 +54,25 @@ def main() -> int:
     )
     assert unison["expectedGroupCount"] == 0
 
+    technique_notes = [
+        {"measureIndex": 1, "midi": 62, "techniques": ["trill-mark"]},
+        {"measureIndex": 2, "midi": 64, "techniques": []},
+    ]
+    technique_matched = [None, {"start": 0.0, "end": 0.4}]
+    technique_times = np.arange(0.0, 0.41, 0.05)
+    technique_track = np.full_like(technique_times, 64.0)
+    technique = MODULE.evaluate_trill_vibrato(
+        technique_notes,
+        technique_matched,
+        technique_times,
+        technique_track,
+    )
+    assert technique["trill"]["expectedNoteCount"] == 1
+    assert technique["trill"]["matchedNoteCount"] == 0
+    assert technique["trill"]["rows"][0]["alignmentStatus"] == "unmatched"
+    assert technique["vibrato"]["instructionExpectedLongNoteCount"] == 1
+    assert technique["vibrato"]["matchedNoteCount"] == 1
+
     items = [
         {"ok": True, "scenario": "slide", "modeEvidence": {"detectionRate": 1.0}},
         {
