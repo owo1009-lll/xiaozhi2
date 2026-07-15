@@ -15,6 +15,7 @@ const STEPS = [
   "western:m4-independent-gold-todo",
   "western:m4-gold-provenance-audit",
   "western:m4-independent-gold-workspace-audit",
+  "western:m4-independent-benchmark-audit",
   "western:project-status",
   "western:next-actions",
 ];
@@ -78,6 +79,8 @@ function buildSummary(report) {
     "",
     `- machineSelfTestComplete: ${report.machineSelfTestComplete}`,
     `- readyForOmrAccuracyClaim: ${report.readyForOmrAccuracyClaim}`,
+    `- automaticAdoptionReady: ${report.automaticAdoptionReady}`,
+    `- studentGateReady: ${report.studentGateReady}`,
     `- teacherReviewNeeded: ${report.teacherReviewNeeded}`,
     `- humanTask: ${report.humanTask}`,
     "",
@@ -92,12 +95,17 @@ function buildSummary(report) {
     `- provenance independentCandidateRows: ${report.counts.independentCandidateRows}`,
     `- workspace readyToApplyRows: ${report.counts.readyToApplyRows}`,
     `- workspace pendingRows: ${report.counts.pendingRows}`,
+    `- independent clean rows: ${report.counts.independentCleanRows}`,
+    `- independent synthetic scan rows: ${report.counts.independentScanRows}`,
+    `- independent synthetic photo rows: ${report.counts.independentPhotoRows}`,
+    `- strict per-piece pass: ${report.counts.strictPerPiecePassedRows}/${report.counts.strictPerPieceEvaluatedRows}`,
     "",
     "## Meaning",
     "",
     report.humanTask === "score-editor-independent-gold-correction"
       ? "- Machine checks already proved this is not a teacher audio-diagnosis review. The remaining task is score-editor correction of independent gold MXL files against source score images."
-      : "- No score-editor task is currently required by M4 preflight. Same-hash rows are usable here only because the prior clean-score review explicitly approved them; report them as human-approved unchanged gold, not independent edited gold.",
+      : "- No score-editor task is currently required for the existing 12 reviewed rows. Independent render/scan/photo gold supports an eval-only accuracy claim, but strict per-piece accuracy and real-photo independent gold still block automatic adoption and the student runtime gate.",
+    `- automatic-adoption blockers: ${report.automaticAdoptionBlockingReasons.join(", ") || "none"}`,
     "",
     "## Artifacts",
     "",
@@ -107,6 +115,8 @@ function buildSummary(report) {
     `- noteSummaryCsv: ${report.artifacts.noteSummaryCsv}`,
     `- provenanceCsv: ${report.artifacts.provenanceCsv}`,
     `- workspaceAuditCsv: ${report.artifacts.workspaceAuditCsv}`,
+    `- independentBenchmarkJson: ${report.artifacts.independentBenchmarkJson}`,
+    `- independentBenchmarkMd: ${report.artifacts.independentBenchmarkMd}`,
     `- nextActions: ${report.artifacts.nextActions}`,
     "",
     "## Step Results",
@@ -128,6 +138,7 @@ async function main() {
   const benchmark = await readJson(path.join("data", "experiments", "western-strings-m4", "omr-benchmark.json"));
   const provenance = await readJson(path.join("data", "experiments", "western-strings-m4", "gold-provenance-audit.json"));
   const workspace = await readJson(path.join("data", "experiments", "western-strings-m4", "independent-gold-workspace-audit.json"));
+  const independentBenchmark = await readJson(path.join("data", "experiments", "western-strings-m4", "independent-benchmark-audit.json"));
   const status = await readJson(path.join("data", "experiments", "western-strings-project-status.json"));
 
   const m4Status = status?.tracks?.m4Omr || {};
@@ -141,10 +152,19 @@ async function main() {
     independentCandidateRows: provenance?.counts?.independentCandidateRows ?? 0,
     readyToApplyRows: workspace?.counts?.readyToApplyRows ?? 0,
     pendingRows: workspace?.counts?.pendingRows ?? 0,
+    independentCleanRows: independentBenchmark?.domains?.clean?.evaluatedRows ?? 0,
+    independentScanRows: independentBenchmark?.domains?.scan?.evaluatedRows ?? 0,
+    independentPhotoRows: independentBenchmark?.domains?.photo?.evaluatedRows ?? 0,
+    strictPerPiecePassedRows: independentBenchmark?.strictPerPiece?.passedRows ?? 0,
+    strictPerPieceEvaluatedRows: independentBenchmark?.strictPerPiece?.evaluatedRows ?? 0,
   };
 
   const teacherReviewNeeded = Boolean(m4Status.teacherReviewNeeded || provenance?.teacherReviewNeeded || workspace?.teacherReviewNeeded);
-  const readyForOmrAccuracyClaim = Boolean(commandOk && benchmark?.gate?.m4OmrDraftQualityReady && counts.usableBenchmarkRows > 0);
+  const readyForOmrAccuracyClaim = Boolean(
+    commandOk
+      && independentBenchmark?.independentBenchmarkReady === true
+      && counts.independentCleanRows > 0,
+  );
   const humanTask = readyForOmrAccuracyClaim || counts.manualGoldRequiredRows === 0
     ? "none"
     : m4Status.humanTask || provenance?.humanTask || workspace?.humanTask || "unknown";
@@ -152,12 +172,16 @@ async function main() {
   const report = {
     ok: commandOk,
     generatedAt: new Date().toISOString(),
-    machineSelfTestComplete: commandOk && Boolean(readiness && benchmark && provenance && workspace && status),
+    machineSelfTestComplete: commandOk && Boolean(readiness && benchmark && provenance && workspace && independentBenchmark && status),
     readyForOmrAccuracyClaim,
+    automaticAdoptionReady: independentBenchmark?.automaticAdoptionReady === true,
+    studentGateReady: false,
     teacherReviewNeeded,
     humanTask,
     counts,
     blockingReasons: m4Status.blockingReasons || [],
+    automaticAdoptionBlockingReasons:
+      independentBenchmark?.automaticAdoptionBlockingReasons || ["m4-independent-benchmark-audit-missing"],
     artifacts: {
       out: rel(args.out),
       summary: rel(args.summary),
@@ -167,6 +191,8 @@ async function main() {
       noteSummaryCsv: "data/experiments/western-strings-m4/independent-gold-note-summary.csv",
       provenanceCsv: "data/experiments/western-strings-m4/gold-provenance-audit.csv",
       workspaceAuditCsv: "data/experiments/western-strings-m4/independent-gold-workspace-audit.csv",
+      independentBenchmarkJson: "data/experiments/western-strings-m4/independent-benchmark-audit.json",
+      independentBenchmarkMd: "data/experiments/western-strings-m4/independent-benchmark-audit.md",
       nextActions: "data/experiments/western-strings-next-actions.md",
     },
     steps,
@@ -180,6 +206,8 @@ async function main() {
     ok: report.ok,
     machineSelfTestComplete: report.machineSelfTestComplete,
     readyForOmrAccuracyClaim: report.readyForOmrAccuracyClaim,
+    automaticAdoptionReady: report.automaticAdoptionReady,
+    studentGateReady: report.studentGateReady,
     teacherReviewNeeded: report.teacherReviewNeeded,
     humanTask: report.humanTask,
     counts: report.counts,

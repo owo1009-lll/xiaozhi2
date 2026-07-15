@@ -225,6 +225,21 @@ if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
 const m4 = status.tracks.m4Omr;
 assert.equal(m4.m4OmrBenchmarkDatasetReady, true, "M4 intake dataset should be ready for benchmarking");
 assert.equal(m4.m4OmrDraftQualityReady, true, "M4 draft quality may be ready when same-hash gold has explicit clean-score approval");
+assert.equal(m4.m4OmrIndependentBenchmarkReady, true, "M4 independent render/scan/photo benchmark should pass its research floor");
+assert.equal(m4.m4OmrAccuracyClaimReady, true, "M4 should expose the bounded independent accuracy claim");
+assert.equal(m4.m4OmrAutomaticAdoptionReady, false, "M4 automatic adoption must stay closed below the strict per-piece floor and without real-photo gold");
+assert.equal(m4.independentBenchmark?.studentGateReady, false, "M4 benchmark evaluation must never open the student runtime gate");
+assert.equal(m4.independentBenchmark?.strictPerPiece?.passedRows, 12, "current strict M4 benchmark should expose 12 passing pieces");
+assert.equal(m4.independentBenchmark?.strictPerPiece?.evaluatedRows, 32, "current strict M4 benchmark should expose all 32 clean pieces");
+assert.equal(m4.independentBenchmark?.independentRealPhotoRows, 0, "real-photo consistency must not be promoted to independent gold");
+assert(
+  m4.automaticAdoptionBlockingReasons?.includes("m4-clean-per-piece-strict-pass-rate-too-low"),
+  "M4 automatic adoption must report the strict per-piece shortfall",
+);
+assert(
+  m4.automaticAdoptionBlockingReasons?.includes("m4-real-photo-independent-gold-missing"),
+  "M4 automatic adoption must report missing independent real-photo gold",
+);
 assert.equal(m4.teacherReviewNeeded, false, "M4 independent-gold correction must not be reported as teacher audio review");
 assert.equal(
   m4.humanTask,
@@ -299,6 +314,14 @@ const handoff = renderHandoff(status);
 assert(
   packageJson.scripts?.["western:m4-preflight"],
   "package.json must expose the aggregate M4 machine self-test command",
+);
+assert(
+  packageJson.scripts?.["western:m4-independent-benchmark-audit"],
+  "package.json must expose the independent M4 benchmark audit",
+);
+assert(
+  packageJson.scripts?.["test:western-m4-independent-benchmark"],
+  "package.json must expose the independent M4 benchmark regression test",
 );
 assert(
   packageJson.scripts?.["western:m4-independent-gold-note-summary"],
@@ -515,7 +538,7 @@ assert.equal(
   "M3+ project-gate failure should point to the newest aligned evidence",
 );
 const m4Failure = fullGate.failures.find((failure) => failure.track === "M4 OMR benchmark");
-assert.equal(m4Failure, undefined, "M4 should not be a project-gate failure after clean-score approval is recognized");
+assert.equal(m4Failure, undefined, "M4 research benchmark should clear independently while automatic runtime adoption remains closed");
 
 console.log(JSON.stringify({
   ok: true,
@@ -525,7 +548,7 @@ console.log(JSON.stringify({
     "student-runtime-fail-closed",
     "confidence-pilot-validation-state-covered",
     "m3plus-round2-human-gold-fail-closed-covered",
-    "m4-human-approved-unchanged-gold-clears",
+    "m4-independent-research-benchmark-clears-runtime-stays-closed",
     "m4-checklist-human-readable",
     "handbook-current-status-does-not-reassign-completed-review",
     "project-gate-required-tracks-block-release",

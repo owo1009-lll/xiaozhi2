@@ -153,16 +153,16 @@
 ### M4 — PDF/图片谱面识别(OMR,带精度闸门)
 - **动机:** 让学生/教师直接传 PDF 或拍照谱,不必先有干净电子谱。**这是主线诉求,但也正是二胡翻车的坎1**,因此按 M0 同样的纪律:先在数据集上验准确率,再谈信任。
 - **pipeline:** PDF/图片 → Audiveris OMR → MusicXML 草稿 → **note-level 精度评测**(对齐 gold MusicXML,报 pitch 识别正确率 / onset 正确率 / 小节级错误率 / 漏识别率)→ 达标进 score store(`scoreSource=omr`),不达标进人工核对队列(复用 m2f clean-score 流程)。
-- **精度闸门(2026-07-11 已由独立基准定标,分层制):** 独立 render-gold 基准(32 乐章,gold=公版 MusicXML 与 Audiveris 无关)实测:干净渲染 mean pitch P=96.9%/R=93.8%,**P≥98% 仅 14/32**;合成 scan/photo 退化仅再掉 1–2 点;12 张真实练习曲照片呈**双峰**(8 张 92–100%,4 张结构性崩溃且特征自暴露)。结论:**裸 OMR 不设统一 ≥98% 硬线(达不到),改分层闸门**——
-  - **A 层自动采纳(带标记):** 单声部曲目 + 结构自检全过(全页有输出、多预处理变体小节数一致、与学生录音 basic-pitch 事件计数/时长一致)→ 识别谱可作诊断底谱,UI 标明"识别谱,已自动校验"。
-  - **B 层变体赛马+音频仲裁:** 结构自检不一致 → up2/up2-otsu/up3 多变体,由录音事件仲裁选择;仍不一致 → C 层。
-  - **C 层 fail-closed 人工:** 无输出/全变体打架/和弦复调密集 → m2f 人工核谱(一次核对长期复用)。
+- **精度闸门(2026-07-15 独立审计口径):** 独立 render-gold 基准(32 乐章,gold=公版 MusicXML 与 Audiveris 无关)实测:干净渲染 mean pitch P=96.9%/R=93.8%,合成 scan/photo mean P/R 分别为 94.4%/89.2% 与 94.9%/88.5%,达到**研究级平均指标**。但同时满足逐谱 P≥98% 且 R≥95% 的只有 **12/32(37.5%)**,低于自动采纳要求的 90%;12 张真实练习曲照片只有复识一致性对照,没有独立人工 gold。结论:研究基准通过,自动采纳不通过——
+  - **A 层自动采纳:** 当前关闭。只有严格逐谱通过率≥90%,且至少 3 份真照片独立 gold 通过后才可讨论。
+  - **B 层变体赛马+音频仲裁:** 保留为 eval-only 候选生成/失败自检原型,不得把模型间一致或与录音吻合当成独立 OMR 正确率。
+  - **C 层 fail-closed 人工:** 当前真实照片生产口径。无独立 gold、无输出、全变体打架或复调密集均退人工核谱/重拍。
   - **诊断联动:** OMR 谱未经人工核对的小节,**禁用 missing/extra 硬判**(漏音是实测最大短板,防冤枉学生),只留音准/起音。
   详见 `docs/western-strings-m4-omr-independent-benchmark.md`;脚本 `scripts/experiments/eval_western_strings_m4_omr_render_gold.py`、`eval_western_strings_m4_real_jpg_omr.py`。
 - **schema:** score 记录加 `scoreSource=omr`、`omrEngine`、`omrConfidence`、`omrReviewStatus`(draft/human-approved);低置信小节单独标记,判断时该小节降级 review。
 - **与判断层的关系:** OMR 只解决"谱面从哪来";判断仍是音频侧 M2/M3。**谱面错 → 判断全错**,所以 OMR 闸门必须比音频闸门更严,且学生端要明示"此谱由识别得到、是否经人工核对"。
 - **验收:** OMR note 准确率达标闸门通过;不达标谱 100% 走人工;`scoreSource=omr` 全链路可追溯;判断层不读取 `omrReviewStatus≠human-approved` 且未过闸门的谱。
-- **当前执行状态(2026-07-10):** `npm run western:m4-omr-readiness` 已确认 12/12 条图片/PDF 谱面源、gold clean score、人工 `approved` 状态和 score-store `scoreId` 齐备。`npm run western:m4-omr-benchmark` 与 provenance 审计进一步确认:12/12 clean score 虽与 Audiveris 草稿 byte-identical,但每条均已有 M2 clean-score review 的 `approved` + 非空 `cleanScoreReviewedBy` 证据,因此按 `human-approved-unchanged-draft` 报告,不是未复核 self-comparison。当前机器结果为 `usableBenchmarkRows=12`,`humanApprovedUnchangedRows=12`,`selfComparisonRows=0`,`manualGoldRequiredRows=0`,`m4OmrDraftQualityReady=true`,`teacherReviewNeeded=false`。这批证据只支持 eval-only OMR benchmark 和受控 pilot 决策,**不自动打开学生端运行时 OMR**;论文/表格必须把它与 `independent-edited-gold` 分开报告。实时事实以 `npm run western:m4-preflight` 和 `npm run western:project-status` 为准。
+- **当前执行状态(2026-07-15):** `npm run western:m4-independent-benchmark-audit` 与 `western:m4-preflight` 已将证据拆开。独立 render/scan/photo 三域达到研究报告下限,故 `m4OmrAccuracyClaimReady=true`;但严格逐谱仅 12/32,真照片独立 gold=0,故 `m4OmrAutomaticAdoptionReady=false`,`m4OmrAutoScoreReady=false`。既有 12 条人工批准未改草稿只作一致性证据,无需重复复核,也不能打开自动运行时。实时事实以 `npm run western:m4-preflight` 和 `npm run western:project-status` 为准。
 
 ### M5 — 大提琴扩展
 - cello pitch range + onset/pitch 参数 + **专属误差分析** + **重新校准阈值(不复用小提琴)** + **独立 cello M0**。

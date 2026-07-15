@@ -53,11 +53,11 @@ export function evaluateProjectGate(status, requiredTracks) {
         : (m3plus.reviewArtifacts?.round2AlignedEvalJson || m3plus.reviewArtifacts?.localizationDiagnosisGroupsCsv || m3plus.reviewArtifacts?.modeEvalCsv || m3plus.reviewArtifacts?.modeEvalJson || m3plus.reviewArtifacts?.round2ReviewPage || m3plus.reviewArtifacts?.reviewPage || ""),
     });
   }
-  if (requiredTracks.has("m4") && !m4.m4OmrDraftQualityReady) {
+  if (requiredTracks.has("m4") && !m4.m4OmrAccuracyClaimReady) {
     failures.push({
       track: "M4 OMR benchmark",
       reason: m4.blockingReasons || ["m4-omr-gate-not-ready"],
-      artifact: m4.artifacts?.independentGoldTodoHtml || m4.artifacts?.independentGoldTodo || "",
+      artifact: m4.artifacts?.independentBenchmarkJson || m4.artifacts?.independentGoldTodoHtml || m4.artifacts?.independentGoldTodo || "",
     });
   }
   if (

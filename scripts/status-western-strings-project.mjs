@@ -339,6 +339,12 @@ const M4_BENCHMARK = path.join(
   "western-strings-m4",
   "omr-benchmark.json",
 );
+const M4_INDEPENDENT_BENCHMARK_AUDIT = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "independent-benchmark-audit.json",
+);
 const M4_INDEPENDENT_GOLD_TODO = path.join(
   "data",
   "experiments",
@@ -1162,11 +1168,14 @@ async function buildControlledStatus() {
 async function buildM4OmrStatus() {
   const readiness = await readJson(M4_READINESS);
   const benchmark = await readJson(M4_BENCHMARK);
+  const independentBenchmark = await readJson(M4_INDEPENDENT_BENCHMARK_AUDIT);
   const workspaceAudit = await readJson(M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT);
   const provenanceAudit = await readJson(M4_GOLD_PROVENANCE_AUDIT);
   const readinessReady = Boolean(readiness?.gate?.m4OmrBenchmarkDatasetReady);
   const benchmarkEvaluated = Boolean(benchmark?.gate?.m4OmrBenchmarkEvaluated);
   const draftQualityReady = Boolean(benchmark?.gate?.m4OmrDraftQualityReady);
+  const independentBenchmarkReady = independentBenchmark?.independentBenchmarkReady === true;
+  const automaticAdoptionReady = independentBenchmark?.automaticAdoptionReady === true;
   const provenanceCounts = provenanceAudit?.counts || {};
   const manualGoldRequiredRows = Number(provenanceCounts.manualGoldRequiredRows || 0);
   const humanTask = manualGoldRequiredRows > 0 ? "score-editor-independent-gold-correction" : "none";
@@ -1183,10 +1192,20 @@ async function buildM4OmrStatus() {
     if ((benchmark.counts?.selfComparisonRows || 0) > 0) blockingReasons.push("m4-omr-self-comparison-detected");
     if (!draftQualityReady) blockingReasons.push("m4-omr-draft-quality-not-ready");
   }
+  if (!independentBenchmark) {
+    blockingReasons.push("m4-independent-benchmark-audit-missing");
+  } else if (!independentBenchmarkReady) {
+    blockingReasons.push(...(
+      independentBenchmark.evidenceBlockingReasons || ["m4-independent-benchmark-not-ready"]
+    ));
+  }
   return {
     ok: true,
     m4OmrBenchmarkDatasetReady: readinessReady,
     m4OmrDraftQualityReady: draftQualityReady,
+    m4OmrIndependentBenchmarkReady: independentBenchmarkReady,
+    m4OmrAccuracyClaimReady: independentBenchmarkReady,
+    m4OmrAutomaticAdoptionReady: automaticAdoptionReady,
     studentGateReady: false,
     teacherReviewNeeded: false,
     humanTask,
@@ -1204,9 +1223,12 @@ async function buildM4OmrStatus() {
       blockedRows: benchmark?.counts?.blockedRows || 0,
     },
     blockingReasons,
+    automaticAdoptionBlockingReasons:
+      independentBenchmark?.automaticAdoptionBlockingReasons || ["m4-independent-benchmark-audit-missing"],
     artifacts: {
       readinessJson: M4_READINESS.replace(/\\/g, "/"),
       benchmarkJson: M4_BENCHMARK.replace(/\\/g, "/"),
+      independentBenchmarkJson: M4_INDEPENDENT_BENCHMARK_AUDIT.replace(/\\/g, "/"),
       independentGoldTodo: M4_INDEPENDENT_GOLD_TODO.replace(/\\/g, "/"),
       independentGoldTodoHtml: M4_INDEPENDENT_GOLD_TODO_HTML.replace(/\\/g, "/"),
       independentGoldWorkspaceAuditJson: M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT.replace(/\\/g, "/"),
@@ -1215,6 +1237,24 @@ async function buildM4OmrStatus() {
       goldProvenanceAuditCsv: M4_GOLD_PROVENANCE_AUDIT_CSV.replace(/\\/g, "/"),
       readinessCsv: String(readiness?.artifacts?.csv || "data/experiments/western-strings-m4/omr-readiness.csv").replace(/\\/g, "/"),
       benchmarkCsv: String(benchmark?.artifacts?.csv || "data/experiments/western-strings-m4/omr-benchmark.csv").replace(/\\/g, "/"),
+    },
+    independentBenchmark: independentBenchmark ? {
+      source: M4_INDEPENDENT_BENCHMARK_AUDIT.replace(/\\/g, "/"),
+      independentBenchmarkReady,
+      automaticAdoptionReady,
+      studentGateReady: independentBenchmark.studentGateReady === true,
+      domains: independentBenchmark.domains || {},
+      strictPerPiece: independentBenchmark.strictPerPiece || {},
+      independentRealPhotoRows: independentBenchmark.independentRealPhotoRows || 0,
+      evidenceBlockingReasons: independentBenchmark.evidenceBlockingReasons || [],
+      automaticAdoptionBlockingReasons: independentBenchmark.automaticAdoptionBlockingReasons || [],
+      claimScope: independentBenchmark.claimScope || "",
+    } : {
+      source: M4_INDEPENDENT_BENCHMARK_AUDIT.replace(/\\/g, "/"),
+      missing: true,
+      independentBenchmarkReady: false,
+      automaticAdoptionReady: false,
+      studentGateReady: false,
     },
     independentGoldWorkspaceAudit: workspaceAudit
       ? {
@@ -1334,7 +1374,15 @@ function summarizeNextActions(
       reason: ["m3plus-runtime-disabled-by-default", "m3plus-first-measure-scope-only"],
     });
   }
-  if (!m4Omr.m4OmrDraftQualityReady) {
+  if (!m4Omr.m4OmrIndependentBenchmarkReady) {
+    actions.push({
+      priority: 3,
+      track: "M4 OMR independent benchmark",
+      action: "Run `npm run western:m4-independent-benchmark-audit`. Keep automatic adoption and the student runtime closed unless independent render/scan/photo evidence passes; real-photo consistency must never be promoted to independent accuracy.",
+      artifact: m4Omr.artifacts?.independentBenchmarkJson || M4_INDEPENDENT_BENCHMARK_AUDIT.replace(/\\/g, "/"),
+      reason: m4Omr.blockingReasons,
+    });
+  } else if (!m4Omr.m4OmrDraftQualityReady) {
     actions.push({
       priority: 3,
       track: "M4 OMR benchmark",
@@ -1715,11 +1763,16 @@ function printProjectStatus(status, outPath) {
     m4Omr: {
       datasetReady: m4Omr.m4OmrBenchmarkDatasetReady,
       draftQualityReady: m4Omr.m4OmrDraftQualityReady,
+      independentBenchmarkReady: m4Omr.m4OmrIndependentBenchmarkReady,
+      accuracyClaimReady: m4Omr.m4OmrAccuracyClaimReady,
+      automaticAdoptionReady: m4Omr.m4OmrAutomaticAdoptionReady,
       teacherReviewNeeded: m4Omr.teacherReviewNeeded,
       humanTask: m4Omr.humanTask,
       independentGoldWorkspaceAudit: m4Omr.independentGoldWorkspaceAudit,
       goldProvenanceAudit: m4Omr.goldProvenanceAudit,
+      independentBenchmark: m4Omr.independentBenchmark,
       counts: m4Omr.counts,
+      automaticAdoptionBlockingReasons: m4Omr.automaticAdoptionBlockingReasons,
       blockingReasons: m4Omr.blockingReasons,
     },
     nextActions: status.nextActions,

@@ -63,7 +63,7 @@ SAMPLE_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
         <duration>4</duration>
         <notations>
           <articulations><staccato/><accent/></articulations>
-          <technical><harmonic/></technical>
+          <technical><harmonic><sounding-pitch/></harmonic></technical>
           <ornaments><trill-mark/></ornaments>
         </notations>
       </note>
@@ -947,11 +947,11 @@ def main() -> int:
     scanned_fallback_notes = scanned_fallback_section["notes"]
     require(
         len(scanned_fallback_notes) == 9,
-        f"Range fallback should recover monophonic in-range scanned Voice lines, got {len(scanned_fallback_notes)} notes.",
+        f"An explicitly selected monophonic Voice part should preserve all scanned lines, got {len(scanned_fallback_notes)} notes.",
     )
     require(
-        scanned_fallback_section.get("scoreLineStats", {}).get("sourceCounts", {}).get("erhu-range-fallback", 0) >= 6,
-        f"Range fallback should mark lower scanned lines as erhu candidates, got stats {scanned_fallback_section.get('scoreLineStats')}.",
+        scanned_fallback_section.get("scoreLineStats", {}).get("sourceCounts", {}).get("erhu-range-fallback", 0) == 0,
+        "An explicitly selected western Voice part must not be relabeled through the legacy erhu range fallback.",
     )
     require(
         analyzer._should_apply_erhu_range_fallback(
@@ -1005,6 +1005,7 @@ def main() -> int:
     require("staccato" in first_note["articulations"], "Articulation staccato missing.")
     require("accent" in first_note["articulations"], "Articulation accent missing.")
     require("harmonic" in first_note["techniques"], "Technical harmonic missing.")
+    require("harmonic-sounding-pitch" in first_note["techniques"], "Explicit harmonic sounding-pitch role missing.")
     require("trill-mark" in first_note["techniques"], "Ornament trill-mark missing.")
     require(marking_stats.get("tempoChangeCount", 0) >= 1, "Tempo marking missing.")
     require(marking_stats.get("dynamicChangeCount", 0) >= 2, "Dynamic markings missing.")

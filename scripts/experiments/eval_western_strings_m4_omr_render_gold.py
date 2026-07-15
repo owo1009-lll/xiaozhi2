@@ -43,7 +43,7 @@ def read_musicxml_text(mxl_path: Path) -> str:
 
 
 def render_pages_to_pngs(mxl_path: Path, out_dir: Path, scale: int, raster_zoom: float) -> list[Path]:
-    """Verovio SVG pages -> PNG via node @napi-rs/canvas (same rasterizer as repo MuSViT eval)."""
+    """Render Verovio SVG pages to PNG with the repository canvas dependency."""
     import verovio
     tk = verovio.toolkit()
     tk.setOptions({"scale": scale, "footer": "none", "header": "none",

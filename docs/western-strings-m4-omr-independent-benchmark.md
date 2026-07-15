@@ -4,6 +4,8 @@
 脚本: `scripts/experiments/eval_western_strings_m4_omr_render_gold.py`、`scripts/experiments/eval_western_strings_m4_real_jpg_omr.py`(eval-only)
 产物: `data/experiments/western-strings-m4/render-gold-omr*`、`real-jpg-omr*`(gitignored)
 
+> **当前裁决(2026-07-15):** `npm run western:m4-independent-benchmark-audit` 证明独立 clean/scan/photo render-gold 达到研究报告下限,但严格逐谱 P≥98% 且 R≥95% 仅 12/32(37.5%),真实照片独立 gold 为 0。因此本页后文的 A/B/C、自动仲裁与“全自动”内容均是历史 eval-only 原型结果,不能解释为生产自动采纳或真实照片独立准确率。当前 `automaticAdoptionReady=false`,`studentGateReady=false`。
+
 ## 1. 为什么需要这份基准
 
 此前 M4 benchmark 的 gold 与 Audiveris 草稿逐字节相同(自比较),给出的 100% 不可采信。本基准用**独立 gold**:Bach Violin Dataset 的公版 MusicXML(与 Audiveris 无关)经 Verovio 渲染成谱面图,再让 Audiveris **盲识**,music21 逐音比对。指标为音高序列 precision / recall / F1(SequenceMatcher;不含节奏/时值评分)。
@@ -24,13 +26,13 @@
 1. **裸 OMR 达不到 ≥98% 闸门**:干净渲染域也只有 14/32 过线;和弦/复调乐章 91–96%。"识别一步到位 100%"不成立(坎1教训再次量化确认)。
 2. **短板是漏音(recall)**:最差 bwv1004_mov2 P=99.1% 但 R=75.6%。漏音会引发下游"多拉音"误判,是最危险错误类型。
 3. **光学退化不是主要敌人**:合成 scan/photo 只掉 1–2 点;**真照片失败源于版面结构**(多行谱表、谱号识别失败、裁切),不是噪声。
-4. **失败自暴露**:结构性失败特征极明显——无输出、变体间小节数剧烈打架(如 25/10/22)——运行时无需 gold 即可自动检出并 fail-closed。
+4. **失败有时可自暴露,但不能反推正确**:无输出、变体间小节数剧烈打架可自动拒绝;结构自检通过或多模型一致不等于识别正确,仍需独立 gold 校准。
 5. **预处理无银弹、赛马有效**:otsu 救回 ex10(F1 0.55→0.75)、up3 救回 ex11(0.62→0.69),但各自对其他图更糟;跑多变体择优可把 12 张真照片的可用数 8→10。
 6. **单音 vs 和弦分层清晰**:单音快速乐章 99–100%;与产品"单声部小提琴优先"边界吻合。
 
 ## 4. 对 M4 闸门的落地建议(分层)
 
-- **A 层(自动采纳,带标记)**:单声部曲目 + 结构自检通过(全页有输出、多变体小节数一致、与录音 basic-pitch 事件计数/时长一致)→ OMR 谱可直接作诊断底谱,UI 标注"识别谱,已自动校验";疑义小节仍标 review。
+- **A 层(自动采纳,当前关闭)**:原型条件是单声部 + 结构自检通过,但现有独立逐谱通过率和真照片 gold 不足,不能接生产。
 - **B 层(变体赛马 + 音频仲裁)**:结构自检不一致 → 跑 up2/up2-otsu/up3 多变体,用学生录音事件仲裁选择;仲裁后仍不一致 → C 层。
 - **C 层(fail-closed 人工)**:无输出/全变体打架/复调密集 → 退 m2f 人工核谱流程(一次核对,长期复用)。
 - **诊断联动**:凡 OMR 谱未经人工核对的小节,**禁用 extra-note/missing 硬判**(防漏音引发冤枉学生),只留音准/节奏。
@@ -99,7 +101,7 @@
 3. 运行时闸门:沿用 `runtimeStudentGate` fail-closed 机制;`audioAgreementHeard`、confirmed 计数、uncertainMeasures 全部入审计记录。
 4. 残留工作(非阻塞):节奏/时值维度并入对齐代价;多引擎(oemer/homr)纳入变体池;2–3 份真照片人工 gold 校准照片域独立准确率;性能(basic-pitch 每分钟音频约 30–60s,可后台批处理)。
 
-### 8.4 机器全自动模式(2026-07-11,不落专家人工)
+### 8.4 机器全自动模式原型(2026-07-11,历史 eval-only,未获采纳批准)
 把 C 层"人工核谱"重构为两种**机器可处理**出口,人工核谱降级为可选质量升级通道:
 - **C1 重拍引导**:全变体无输出或零音频确认 → 自动提示学生重拍(用户侧重试,非运营人工)。失败自检出:无输出/变体小节数打架都是机器可见信号。
 - **C2 降级反馈**:仲裁胜者存在但证据弱(确认音 <20 或吻合度 <0.6)→ 只显示音频确认的绿色音,其余全部中性——覆盖率降低,指控风险为零。
@@ -108,7 +110,7 @@
 
 **代价(诚实)**:难页反馈变少而非变错;复调/密集页覆盖率仍低;人工核谱仍是把"降级页"升级为"全反馈页"的最佳通道,但不再阻塞任何流程。
 
-### 8.5 生产管线落地 + 12 条全量回归(2026-07-11 第三轮)
+### 8.5 离线生产候选管线 + 12 条一致性回归(2026-07-11 第三轮,不代表独立准确率)
 **生产入口**:`scripts/western_photo_score_pipeline.py`(npm:`western:photo-score`)——单命令完成 照片+录音 → 三变体 OMR(带缓存)→ 录音仲裁 → 标注图 + 审计 JSON;决策枚举 `full-feedback:<variant>` / `degraded-feedback:<variant>`(仅绿)/ `retake-photo`。审计契约:`studentRuntimeTouched=false`、`missingExtraVerdictsEmitted=false`。快速单测 19 项(`test:western-photo-score`,纯逻辑,秒级)。对齐输出新增 `timingDeviationSec`(节奏偏差,信息性,为 M3 onset 维度铺路)。
 
 **12 条真实录音全量回归(经生产入口)**:

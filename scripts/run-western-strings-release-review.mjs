@@ -150,7 +150,7 @@ async function main() {
     && m3plusAudit.teacherReviewNeeded !== true
     && m3plusAudit.defaultM3PlusReadyAfter !== true
     && (m3plusAudit.blockingReasons || []).length === 0;
-  const m4Ready = m4.m4OmrDraftQualityReady === true
+  const m4Ready = m4.m4OmrAccuracyClaimReady === true
     && m4.teacherReviewNeeded !== true
     && (m4.blockingReasons || []).length === 0;
   const runtimeFailClosed = status.runtimeStudentGate?.policy === "fail-closed"
@@ -195,6 +195,7 @@ async function main() {
       },
       m4: {
         readyForOmrAccuracyClaim: m4Ready,
+        automaticAdoptionReady: m4.m4OmrAutomaticAdoptionReady === true,
         teacherReviewNeeded: m4.teacherReviewNeeded === true,
         humanTask: m4.humanTask || "",
         counts: m4.counts || {},

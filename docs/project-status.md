@@ -96,30 +96,29 @@
 
 ### M4 OMR benchmark
 
-当前已修正的关键点:
+当前证据已拆成两层,不可混用:
 
-- 12 条 M4 pair 已 ready。
-- Audiveris 草稿和 clean score byte-identical。
-- 但这 12 条在 M2 clean-score review 中已经有人工审核证据:
-  - `cleanScoreReviewStatus=approved`
-  - `cleanScoreReviewedBy` 非空
-- 因此它们现在被报告为 `human-approved-unchanged-draft`, 不是未复核 self-comparison。
+1. **独立研究基准**:公版 clean MusicXML 独立渲染后交给 Audiveris 盲识别。干净数字谱 32 份 mean pitch P/R=`96.85%/93.78%`;合成 scan 6 份=`94.43%/89.23%`;合成 photo 6 份=`94.88%/88.51%`,三域达到研究报告下限。
+2. **现有真实照片一致性集**:12 条 clean score 有人工 `approved` 证据,但 gold 与 Audiveris 草稿未独立编辑,只能写成 `human-approved-unchanged-draft`,用于复识一致性和失败模式观察,不能当真实照片独立准确率。
 
 当前 `npm run western:m4-preflight` 结果:
 
 - `readyForOmrAccuracyClaim=true`
-- `usableBenchmarkRows=12`
-- `humanApprovedUnchangedRows=12`
-- `selfComparisonRows=0`
-- `manualGoldRequiredRows=0`
+- `independentCleanRows=32`
+- `independentScanRows=6`
+- `independentPhotoRows=6`
+- `strictPerPiecePassedRows=12/32`(`37.5%`)
+- `automaticAdoptionReady=false`
+- `studentGateReady=false`
 - `teacherReviewNeeded=false`
 - `humanTask=none`
 
 结论:
 
-- 当前 M4 不需要继续找教师或清谱人员复核。
-- M4 仍是 eval-only OMR benchmark, 不会打开学生端运行时 OMR 自动诊断。
-- 报告论文/表格时必须把这批写成 `human-approved-unchanged-draft`, 不得伪称为 independent edited gold。
+- M4 已完成可复跑的独立**研究级** OMR 准确率基准,可以报告限定范围内的数字谱/合成退化结果。
+- M4 尚未达到自动采纳:逐谱严格门槛仅 12/32,且真实照片独立人工 gold 为 0。OMR 不会进入学生端运行时自动诊断。
+- 当前不重复复核既有 12 条;若要打开真实照片自动采纳,需要另建至少 3 份与 Audiveris 输出独立的照片 gold,并重新通过严格逐谱闸门。
+- 报告论文/表格时必须将独立 render-gold 与 `human-approved-unchanged-draft` 分开,后者不得伪称独立照片准确率。
 
 照片谱离线生产链现已接通:
 
@@ -127,7 +126,7 @@
 - 人工标记为 batch 后,一般受控批处理会分派到照片谱分析器;每次最多处理 5 条以限制本机负载。
 - 结果固定为 `photo_score_review_ready`,写入 `photo-score-batch-runs.jsonl`;`autoDiagnosisIssued=false`,`studentFacing=false`。
 - multipart、伪造 MIME、缓存越界路径、批处理分派、审计落盘和桌面/移动浏览器交互均有回归验证。
-- 仍缺真照片独立编辑 gold、多引擎交叉验证和默认运行时放行;因此 `m4OmrAutoScoreReady=false` 不变。
+- 仍缺真照片独立编辑 gold,逐谱严格通过率也不足;多引擎/音频仲裁原型不能替代独立准确率证据。因此 `m4OmrAutoScoreReady=false` 不变。
 
 ## 4. 第二轮执行后的下一步
 

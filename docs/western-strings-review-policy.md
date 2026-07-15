@@ -108,7 +108,8 @@ or bytes changed. Use `npm run western:m4-apply-independent-gold-workspace --
 
 Before asking anyone to edit future score files, run
 `npm run western:m4-preflight`. It runs the M4 readiness, benchmark,
-independent-gold todo/workspace, provenance, workspace audit, project status,
+independent-gold todo/workspace, provenance, workspace audit, independent
+render/scan/photo benchmark audit, project status,
 independent-gold note summary, and next-action handoff commands in one machine
 self-test pass. The note summary is only a machine-readable preview of the
 current editable MXL files; it does not replace score-editor correction. If it
