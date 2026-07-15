@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import subprocess
 import sys
@@ -18,7 +19,8 @@ from typing import Any
 
 from PIL import Image
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
 
 from eval_western_strings_m4_omr_benchmark import (  # noqa: E402
     REPO,
@@ -55,17 +57,18 @@ DEFAULT_OUT = (
     / "western-strings-m4"
     / "oemer-source-benchmark"
 )
+OEMER_COORDINATE_RUNNER = SCRIPT_DIR / "run_oemer_with_coordinates.py"
 STRICT_MIN_PRECISION = 0.98
 STRICT_MIN_RECALL = 0.95
 STRICT_MIN_ONSET_QUARTER_ACCURACY = 0.95
 STRICT_MIN_MEASURE_ACCURACY = 0.95
 THREAD_ENV = {
-    "OMP_NUM_THREADS": "4",
-    "OPENBLAS_NUM_THREADS": "4",
-    "MKL_NUM_THREADS": "4",
-    "NUMBA_NUM_THREADS": "4",
-    "TF_NUM_INTRAOP_THREADS": "4",
-    "TF_NUM_INTEROP_THREADS": "2",
+    "OMP_NUM_THREADS": "2",
+    "OPENBLAS_NUM_THREADS": "2",
+    "MKL_NUM_THREADS": "2",
+    "NUMBA_NUM_THREADS": "2",
+    "TF_NUM_INTRAOP_THREADS": "2",
+    "TF_NUM_INTEROP_THREADS": "1",
 }
 
 
@@ -90,6 +93,48 @@ def build_oemer_env(base: dict[str, str], sklearn_site_packages: Path | None = N
 def find_musicxml(output_dir: Path) -> Path | None:
     candidates = sorted(output_dir.rglob("*.musicxml"))
     return candidates[0] if len(candidates) == 1 else None
+
+
+def read_coordinate_sidecar(path: Path) -> dict[str, Any] | None:
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    notes = payload.get("notes")
+    canvas = Path(str(payload.get("coordinateCanvasPath") or ""))
+    if not canvas.is_absolute():
+        canvas = path.parent / canvas
+    dimensions_valid = (
+        isinstance(payload.get("canvasWidth"), (int, float))
+        and isinstance(payload.get("canvasHeight"), (int, float))
+        and float(payload["canvasWidth"]) > 0
+        and float(payload["canvasHeight"]) > 0
+    )
+    note_rows_valid = isinstance(notes, list) and all(
+        isinstance(row, dict)
+        and row.get("xmlPitchedNoteIndex") == index
+        and isinstance(row.get("measureIndex"), int)
+        and row["measureIndex"] >= 1
+        and isinstance(row.get("bboxNormalized"), list)
+        and len(row["bboxNormalized"]) == 4
+        and all(isinstance(value, (int, float)) and math.isfinite(value) for value in row["bboxNormalized"])
+        and 0.0 <= row["bboxNormalized"][0] <= row["bboxNormalized"][2] <= 1.0
+        and 0.0 <= row["bboxNormalized"][1] <= row["bboxNormalized"][3] <= 1.0
+        for index, row in enumerate(notes or [])
+    )
+    if (
+        payload.get("schemaVersion") != 1
+        or payload.get("coordinateSpace") != "oemer-clean-dewarped-canvas"
+        or not dimensions_valid
+        or not note_rows_valid
+        or int(payload.get("coordinateNoteCount") or -1) != len(notes)
+        or int(payload.get("pitchedXmlNoteCount") or -1) != len(notes)
+        or not canvas.is_file()
+    ):
+        return None
+    return payload
 
 
 def classify_oemer_failure(log_path: Path) -> str:
@@ -128,22 +173,23 @@ def run_oemer(
     env: dict[str, str],
     timeout_seconds: int,
     expected_sklearn: str,
+    coordinate_sidecar: Path,
+    coordinate_canvas: Path,
 ) -> tuple[int, float, str]:
     output_dir.mkdir(parents=True, exist_ok=True)
-    version_check = (
-        f"assert sklearn.__version__ == {expected_sklearn!r}, sklearn.__version__; "
-        if expected_sklearn
-        else ""
-    )
-    command_code = f"import onnxruntime, sklearn; {version_check}from oemer.ete import main; main()"
     command = [
         str(python),
-        "-c",
-        command_code,
+        str(OEMER_COORDINATE_RUNNER),
         image.name,
         "-o",
-        output_dir.name,
+        str(output_dir),
+        "--coordinates",
+        str(coordinate_sidecar),
+        "--coordinate-canvas",
+        str(coordinate_canvas),
     ]
+    if expected_sklearn:
+        command.extend(["--expected-sklearn", expected_sklearn])
     started = time.monotonic()
     try:
         with log_path.open("wb") as log_handle:
@@ -156,7 +202,11 @@ def run_oemer(
                 timeout=timeout_seconds,
                 check=False,
             )
-        return completed.returncode, time.monotonic() - started, ""
+        return (
+            completed.returncode,
+            time.monotonic() - started,
+            "" if completed.returncode == 0 else "oemer-coordinate-runner-error",
+        )
     except subprocess.TimeoutExpired:
         return 124, time.monotonic() - started, "oemer-timeout"
 
@@ -315,6 +365,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expected-sklearn", default="")
     parser.add_argument("--timeout", type=int, default=600)
     parser.add_argument("--reuse-existing", action="store_true")
+    parser.add_argument(
+        "--refresh-coordinates",
+        action="store_true",
+        help="rerun reusable Oemer outputs only when their coordinate sidecar is missing",
+    )
     args = parser.parse_args(argv)
 
     intake_path = Path(args.intake)
@@ -363,6 +418,8 @@ def main(argv: list[str] | None = None) -> int:
         image = piece_dir / f"{piece_id}-up2.png"
         omr_dir = piece_dir / "omr-sk120"
         log_path = piece_dir / "oemer-sk120.log"
+        coordinate_sidecar = omr_dir / f"{image.stem}.coordinates.json"
+        coordinate_canvas = omr_dir / f"{image.stem}-coordinate-canvas.png"
         print(json.dumps({"stage": "piece-start", "index": index, "total": len(rows_in), "pieceId": piece_id}), flush=True)
         row: dict[str, Any] = {"pieceId": piece_id, "engine": "oemer", "variant": "up2", "status": ""}
         if not source.is_file():
@@ -372,7 +429,14 @@ def main(argv: list[str] | None = None) -> int:
         prepare_up2(source, image)
         existing = find_musicxml(omr_dir) if args.reuse_existing else None
         existing_failure = classify_oemer_failure(log_path) if args.reuse_existing and existing is None else ""
-        if existing is not None:
+        existing_coordinates = read_coordinate_sidecar(coordinate_sidecar)
+        should_refresh_coordinates = bool(
+            args.refresh_coordinates
+            and existing is not None
+            and existing_coordinates is None
+            and runtime_available
+        )
+        if existing is not None and not should_refresh_coordinates:
             exit_code, runtime_seconds, run_error = 0, 0.0, ""
             row["reusedExisting"] = True
         elif existing_failure:
@@ -389,13 +453,37 @@ def main(argv: list[str] | None = None) -> int:
                 env,
                 args.timeout,
                 args.expected_sklearn,
+                coordinate_sidecar,
+                coordinate_canvas,
             )
             existing = find_musicxml(omr_dir)
+            existing_coordinates = read_coordinate_sidecar(coordinate_sidecar)
         row.update(
             {
                 "oemerExit": exit_code,
                 "runtimeSeconds": round(runtime_seconds, 3),
                 "logPath": str(log_path.relative_to(REPO)) if log_path.is_relative_to(REPO) else str(log_path),
+                "coordinateAdapterReady": existing_coordinates is not None,
+                "coordinateSidecarPath": (
+                    str(coordinate_sidecar.relative_to(REPO))
+                    if existing_coordinates is not None and coordinate_sidecar.is_relative_to(REPO)
+                    else str(coordinate_sidecar) if existing_coordinates is not None else ""
+                ),
+                "coordinateCanvasPath": (
+                    str(coordinate_canvas.relative_to(REPO))
+                    if existing_coordinates is not None and coordinate_canvas.is_relative_to(REPO)
+                    else str(coordinate_canvas) if existing_coordinates is not None else ""
+                ),
+                "coordinateNoteCount": (
+                    int(existing_coordinates.get("coordinateNoteCount") or 0)
+                    if existing_coordinates is not None
+                    else 0
+                ),
+                "coordinateAdapterError": (
+                    ""
+                    if existing_coordinates is not None or not should_refresh_coordinates
+                    else run_error or "coordinate-sidecar-invalid-after-run"
+                ),
             }
         )
         if existing is None:
@@ -463,6 +551,13 @@ def main(argv: list[str] | None = None) -> int:
             "studentGateReady": False,
             "reason": "eval-only-stronger-omr-engine-comparison",
             "runtimeEffect": "none",
+        },
+        "coordinateAdapter": {
+            "runner": str(OEMER_COORDINATE_RUNNER.relative_to(REPO)),
+            "readyRows": sum(bool(row.get("coordinateAdapterReady")) for row in results),
+            "rowCount": len(results),
+            "studentFacing": False,
+            "reason": "coordinates-preserved-for-eval-and-review-only",
         },
         "comparison": comparison,
         "artifacts": {

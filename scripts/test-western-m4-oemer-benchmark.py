@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import sys
 import tempfile
@@ -15,7 +16,9 @@ from eval_western_strings_m4_oemer_benchmark import (  # noqa: E402
     classify_oemer_failure,
     compare_engines,
     find_musicxml,
+    read_coordinate_sidecar,
 )
+from run_oemer_with_coordinates import add_normalized_coordinates, pitched_xml_note_count  # noqa: E402
 
 
 with tempfile.TemporaryDirectory() as temporary_directory:
@@ -30,6 +33,66 @@ with tempfile.TemporaryDirectory() as temporary_directory:
     log = root / "oemer.log"
     log.write_text("assert track_nums == 2, track_nums\nAssertionError: 3\n", encoding="utf-8")
     assert classify_oemer_failure(log) == "oemer-build-track-count-assertion"
+
+    pitched_xml = root / "pitched.musicxml"
+    pitched_xml.write_text(
+        "<score-partwise><part><measure>"
+        "<note><pitch><step>C</step><octave>4</octave></pitch></note>"
+        "<note><rest/></note>"
+        "</measure></part></score-partwise>",
+        encoding="utf-8",
+    )
+    assert pitched_xml_note_count(pitched_xml) == 1
+    coordinate_rows = [{"bboxPixels": [10, 20, 30, 40]}]
+    add_normalized_coordinates(coordinate_rows, 100, 200)
+    assert coordinate_rows[0]["bboxNormalized"] == [0.1, 0.1, 0.3, 0.2]
+    canvas = root / "coordinate-canvas.png"
+    canvas.write_bytes(b"canvas-present")
+    sidecar = root / "coordinates.json"
+    sidecar.write_text(
+        json.dumps(
+            {
+                "schemaVersion": 1,
+                "coordinateSpace": "oemer-clean-dewarped-canvas",
+                "coordinateCanvasPath": canvas.name,
+                "canvasWidth": 100,
+                "canvasHeight": 200,
+                "coordinateNoteCount": 1,
+                "pitchedXmlNoteCount": 1,
+                "notes": [
+                    {
+                        **coordinate_rows[0],
+                        "xmlPitchedNoteIndex": 0,
+                        "measureIndex": 1,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert read_coordinate_sidecar(sidecar) is not None
+    invalid = json.loads(sidecar.read_text(encoding="utf-8"))
+    invalid["pitchedXmlNoteCount"] = 2
+    sidecar.write_text(json.dumps(invalid), encoding="utf-8")
+    assert read_coordinate_sidecar(sidecar) is None
+
+    invalid = json.loads(json.dumps({
+        "schemaVersion": 1,
+        "coordinateSpace": "oemer-clean-dewarped-canvas",
+        "coordinateCanvasPath": canvas.name,
+        "canvasWidth": 100,
+        "canvasHeight": 200,
+        "coordinateNoteCount": 1,
+        "pitchedXmlNoteCount": 1,
+        "notes": [{
+            **coordinate_rows[0],
+            "bboxNormalized": [-0.01, 0.1, 0.3, 0.2],
+            "xmlPitchedNoteIndex": 0,
+            "measureIndex": 1,
+        }],
+    }))
+    sidecar.write_text(json.dumps(invalid), encoding="utf-8")
+    assert read_coordinate_sidecar(sidecar) is None
 
     compat = root / "compat"
     compat.mkdir()
@@ -113,4 +176,4 @@ assert aggregate_metrics(pitch_only)["pitchOnlyStrictPassRows"] == 1
 assert aggregate_metrics(pitch_only)["strictPassRows"] == 0
 assert automatic_adoption_ready(aggregate_metrics(pitch_only), 1) is False
 
-print('{"ok": true, "checks": ["output-discovery", "failure-classification", "thread-env", "strict-gate", "engine-comparison"]}')
+print('{"ok": true, "checks": ["output-discovery", "coordinate-sidecar", "failure-classification", "thread-env", "strict-gate", "engine-comparison"]}')

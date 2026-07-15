@@ -140,7 +140,7 @@
 
 ### 8.7 多引擎救回 ex07 + 第二轮收口(2026-07-11 第五轮)
 - **oemer 0.1.8 已装并实测**:对 ex07(Audiveris 三变体全无输出的九行谱照片)识别出 176 事件/23 小节,**录音交叉验证吻合度 92.0%**(87 对齐中 80 确认)。多引擎变体池成立:**12/12 真实照片全部机器可用**(11 Audiveris + 1 oemer)。
-- **边界**:oemer 输出为 MusicXML 无我方像素坐标链(Audiveris `.omr` 专有),故 ex07 目前只能给"已识谱+音频核对"级反馈,谱面标注需坐标适配(后续);oemer CPU 推理约数分钟/页。
+- **边界(已更新)**:Oemer CLI 默认只输出 MusicXML,但内部 `NoteHead` 实际保留像素 bbox。2026-07-16 已完成非侵入式坐标 sidecar 适配,见 8.9;识谱准确率仍未过闸,故 ex07 只允许可定位复核,不允许学生端自动判定。Oemer CPU 推理约数分钟/页。
 - **⚠️ 依赖坑(运维必读)**:`pip install oemer` 会把 numpy 拉到 2.x,**直接弄坏 basic-pitch/tensorflow/numba**;装后必须 `pip install "numpy<2"` 回 1.26.x,两引擎可共存。
 - **仲裁器结构信号结论**:纯 events 计数排序实测更糟(幻觉小节推高计数,ex10/ex06 反被误选)→ 维持(确认数,吻合度)排序;events 差异作为 `structureSpreadNote` 教师提示保留;ex11 为已度量接受边界。
 - **状态可见性**:`western:project-status` 新增 `photoScoreOfflineChain`;gold 溯源审计排除同引擎复识/评测产物(independentCandidateRows 恢复 0,`test:western-project-gate` 复绿)。
@@ -152,13 +152,19 @@
 - Oemer 的 SVC 产物来自 `scikit-learn 1.2.0`。已用精确 1.2.0 兼容环境复跑,并与 1.2.2/1.8.0 输出逐字节比较;同页 MusicXML SHA-256 完全一致,故低准确率不是 sklearn 版本警告造成。
 - 裁决:`automaticAdoptionReady=false`,`studentGateReady=false`;保留 Oemer 为 eval-only 外部引擎证据,不替换 Audiveris,不进入学生端。
 
-### 8.9 HOMR 0.7.0 transformer 对照与完整谱闸门(2026-07-15)
+### 8.9 Oemer 坐标 sidecar(2026-07-16)
+- 新增 `scripts/experiments/run_oemer_with_coordinates.py`,不修改 site-packages。runner 在 Oemer 真正发射 MusicXML `<note>` 的 `AddNote.perform()` 之后记录同一音头的 bbox,同时保存干净 dewarp 画布。无效音头和超出 A0-C8 的内部动作不会进入 sidecar。
+- 坐标使用独立 JSON schema:XML pitched-note 序号、Oemer note id、measure、track、voice、chord continuation、像素 bbox 和归一化 bbox。读取时要求索引连续、画布存在、尺寸有效、bbox 全部有限且位于 `[0,1]`;任一条件不满足则整页 fail-closed。
+- 真实 `ex08` smoke 得到 `361 XML notes = 361 coordinate notes`;新旧 MusicXML SHA-256 完全一致。正式 5 页基准中 4 个 Oemer 成功页全部一一匹配:`ex09 363/363`,`ex08 361/361`,`ex10 323/323`,`ex12 324/324`;`ex05` 仍维持原 builder 失败。
+- 坐标补齐未改变 Oemer P/R 或严格结论。报告新增 `coordinateAdapter.readyRows=4/5`,`studentFacing=false`;它只解决复核界面的“标在哪里”,不解决 OMR “识别是否正确”,不得用于自动采纳。
+
+### 8.10 HOMR 0.7.0 transformer 对照与完整谱闸门(2026-07-15)
 - HOMR 是独立的两阶段 OMR:结构分割后使用 transformer 做符号序列识别。隔离 Python 3.11/NumPy 2.4/CPU-only ONNX Runtime、4 线程串行运行,未污染现有 Basic Pitch 环境。
 - 5/5 原始 source 照片均成功输出,聚合 pitch P/R=`89.00%/96.17%`,onset-quarter/measure accuracy=`30.73%/79.04%`。它的 recall 明显优于 Audiveris/Oemer,但节奏结构仍远低于 95% 门槛。
 - `ex05` 与 `ex12` 的 pitch P/R 均为 `1.00`,若沿用旧 pitch-only 判据会出现 `2/5` 假通过;其 onset-quarter accuracy 仅 `0.69%/8.02%`。实查 MusicXML 证实 HOMR 把正确音高序列赋成错误时值,不是评测脚本误差。
 - 因此外部引擎统一采用四项完整闸门:pitch precision≥0.98、pitch recall≥0.95、onset-quarter accuracy≥0.95、measure accuracy≥0.95。HOMR pitch-only 通过 `2/5`,完整通过 `0/5`;`automaticAdoptionReady=false`,`studentGateReady=false`。
 
-### 8.10 Clarity-OMR 视觉 Transformer 对照(2026-07-15)
+### 8.11 Clarity-OMR 视觉 Transformer 对照(2026-07-15)
 - 按[官方 Clarity-OMR 仓库](https://github.com/clquwu/Clarity-OMR)与[官方模型页](https://huggingface.co/clquwu/Clarity-OMR)运行 YOLO 谱表检测 + Transformer 解码管线,使用官方 beam width 5。模型仅作隔离 eval-only 对照,不进入生产依赖。
 - 冻结照片来自播放器截图,原图含黑边和标题栏;原样包装成 PDF 时 Stage A 在 `ex05` 检出 `0` 个谱表。为避免把截图边框误当作模型识谱能力,正式对照统一使用不看 gold 的行均值裁页规则,并把该预处理写入每页证据。
 - 裁页后 5/5 均输出 MusicXML,聚合 pitch P/R=`72.77%/35.53%`,onset-quarter/measure accuracy=`2.81%/10.10%`;pitch-only 与完整严格通过均为 `0/5`。因此模型架构更强不等于当前拍照域可直接采用,Clarity 保持 `automaticAdoptionReady=false`,`studentGateReady=false`。
