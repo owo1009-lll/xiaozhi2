@@ -101,12 +101,15 @@ function buildSummary(report) {
     `- independent synthetic scan rows: ${report.counts.independentScanRows}`,
     `- independent synthetic photo rows: ${report.counts.independentPhotoRows}`,
     `- strict per-piece pass: ${report.counts.strictPerPiecePassedRows}/${report.counts.strictPerPieceEvaluatedRows}`,
+    `- independent real-photo gold rows: ${report.counts.independentRealPhotoRows}`,
+    `- independent real-photo strict pass: ${report.counts.realPhotoStrictPassedRows}/${report.counts.realPhotoStrictEvaluatedRows}`,
+    `- independent real-photo aggregate P/R: ${report.counts.realPhotoPitchPrecision ?? "n/a"}/${report.counts.realPhotoPitchRecall ?? "n/a"}`,
     "",
     "## Meaning",
     "",
     report.humanTask === "score-editor-independent-gold-correction"
       ? "- Machine checks already proved this is not a teacher audio-diagnosis review. The remaining task is score-editor correction of independent gold MXL files against source score images."
-      : "- No score-editor task is currently required for the existing 12 reviewed rows. Independent render/scan/photo gold supports an eval-only accuracy claim, but strict per-piece accuracy and real-photo independent gold still block automatic adoption and the student runtime gate.",
+      : "- No score-editor task is currently required. Independent render/scan/photo gold supports an eval-only accuracy claim; independently sourced real-photo gold is measured separately and remains below the automatic-adoption floor.",
     `- automatic-adoption blockers: ${report.automaticAdoptionBlockingReasons.join(", ") || "none"}`,
     "",
     "## Artifacts",
@@ -159,6 +162,11 @@ async function main() {
     independentPhotoRows: independentBenchmark?.domains?.photo?.evaluatedRows ?? 0,
     strictPerPiecePassedRows: independentBenchmark?.strictPerPiece?.passedRows ?? 0,
     strictPerPieceEvaluatedRows: independentBenchmark?.strictPerPiece?.evaluatedRows ?? 0,
+    independentRealPhotoRows: independentBenchmark?.independentRealPhotoRows ?? 0,
+    realPhotoStrictPassedRows: independentBenchmark?.realPhotoGold?.passedRows ?? 0,
+    realPhotoStrictEvaluatedRows: independentBenchmark?.realPhotoGold?.evaluatedRows ?? 0,
+    realPhotoPitchPrecision: independentBenchmark?.realPhotoGold?.aggregate?.precision ?? null,
+    realPhotoPitchRecall: independentBenchmark?.realPhotoGold?.aggregate?.recall ?? null,
   };
 
   const teacherReviewNeeded = Boolean(m4Status.teacherReviewNeeded || provenance?.teacherReviewNeeded || workspace?.teacherReviewNeeded);
@@ -199,6 +207,8 @@ async function main() {
       workspaceAuditCsv: "data/experiments/western-strings-m4/independent-gold-workspace-audit.csv",
       independentBenchmarkJson: "data/experiments/western-strings-m4/independent-benchmark-audit.json",
       independentBenchmarkMd: "data/experiments/western-strings-m4/independent-benchmark-audit.md",
+      independentRealPhotoManifest: "data/experiments/western-strings-m4/independent-real-photo-gold/independent-gold-manifest.json",
+      independentRealPhotoBenchmark: "data/experiments/western-strings-m4/independent-source-benchmark/omr-benchmark.json",
       nextActions: "data/experiments/western-strings-next-actions.md",
     },
     steps,

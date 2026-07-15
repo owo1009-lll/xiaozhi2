@@ -95,13 +95,16 @@
 - 四项均未达 90%;旧 release-ready 结论只适用于 first-measure 安全子集,不得推广。
 - 泛音 MusicXML `sounding-pitch/base-pitch/touching-pitch` 已能保留;只有显式 sounding pitch 自动评分,缺失角色退复核。
 - 第二轮尚缺真实负例、独立装饰音和泛音样本,因此 `studentGateReady=false` 不变。
+- 已生成最小补录包 `音频/m3plus-supplemental/`:4 份单页谱分别覆盖纯直音负例、独立揉弦/颤音、装饰音/普通音对照、自然泛音/空弦对照,并附 MusicXML、MIDI、谱图、`score-intent.json` 和中文说明。计划真值均明确 `performanceConfirmed=false`,不得在录音前计作性能 gold。
+- `npm run western:m3plus-supplemental-status` 当前为 `readyRecordingCount=0/4`,`readyForMachineAnalysis=false`,`humanTask=record-m3plus-supplemental-takes`;只缺 `m3p-01.m4a` 至 `m3p-04.m4a` 四条真实录音。录齐后先由机器验证解码、定位和模式指标,不直接生成教师复核包。
 
 ### M4 OMR benchmark
 
 当前证据已拆成两层,不可混用:
 
 1. **独立研究基准**:公版 clean MusicXML 独立渲染后交给 Audiveris 盲识别。干净数字谱 32 份 mean pitch P/R=`96.85%/93.78%`;合成 scan 6 份=`94.43%/89.23%`;合成 photo 6 份=`94.88%/88.51%`,三域达到研究报告下限。
-2. **现有真实照片一致性集**:12 条 clean score 有人工 `approved` 证据,但 gold 与 Audiveris 草稿未独立编辑,只能写成 `human-approved-unchanged-draft`,用于复识一致性和失败模式观察,不能当真实照片独立准确率。
+2. **现有 12 条照片 benchmark**:8 条是有人工 `approved` 证据但未改动 Audiveris 草稿的 `human-approved-unchanged-draft`,4 条是 `independent-edited-gold`。必须按 provenance 分层,8 条未改草稿只能用于复识一致性和失败模式观察。
+3. **真实照片独立源谱集**:从公开 Kayser Op.20 LilyPond 源谱按照片曲目与可见小节裁出 5 份 MusicXML gold,并校验源仓库 commit、CC-BY-SA-4.0 许可和逐文件 SHA-256。修正 Audiveris 多 movement 合并后,5 份合计 pitch P/R=`84.71%/71.50%`,严格 P≥98% 且 R≥95% 通过 `0/5`。
 
 当前 `npm run western:m4-preflight` 结果:
 
@@ -110,18 +113,23 @@
 - `independentScanRows=6`
 - `independentPhotoRows=6`
 - `strictPerPiecePassedRows=12/32`(`37.5%`)
+- `independentRealPhotoRows=5`
+- `realPhotoStrictPassedRows=0/5`
+- `realPhotoPitchPrecision=0.847086`
+- `realPhotoPitchRecall=0.715016`
 - `automaticAdoptionReady=false`
 - `studentGateReady=false`
 - `teacherReviewNeeded=false`
-- `scoreEditorReviewNeeded=true`
-- `humanTask=score-editor-independent-real-photo-gold`
+- `scoreEditorReviewNeeded=false`
+- `humanTask=none`
 - 运行时可见 OMR 置信探针(32 首、按 6 个 BWV 作品留一):LR AUC=`0.567`,RF AUC=`0.800`;RF 最佳观察点 precision=`0.80`、coverage=`0.156`,没有达到 `0.90/0.20` 的安全子集。
+- 真实照片预处理 sweep(5 份×`up2/up3/up2-otsu`):`up2` 最佳,平均 P/R=`85.59%/72.18%`;`up3`=`76.88%/63.52%`;Otsu=`61.72%/50.42%`且一份无输出。按曲事后挑最佳变体仍为严格 `0/5`,因此不把 `up3`/Otsu 接入生产。
 
 结论:
 
 - M4 已完成可复跑的独立**研究级** OMR 准确率基准,可以报告限定范围内的数字谱/合成退化结果。
-- M4 尚未达到自动采纳:逐谱严格门槛仅 12/32,真实照片独立人工 gold 为 0,运行时置信特征也筛不出安全子集。OMR 不会进入学生端运行时自动诊断。
-- 当前不重复复核既有 12 条;若要打开真实照片自动采纳,需要另建至少 3 份与 Audiveris 输出独立的照片 gold,并重新通过严格逐谱闸门。
+- M4 尚未达到自动采纳:逐谱严格门槛仅 12/32,真实照片独立源谱严格通过 `0/5`,运行时置信特征也筛不出安全子集。OMR 不会进入学生端运行时自动诊断。
+- 当前不需要教师或制谱人员继续操作。新增真实照片 gold 的“证据缺口”已经关闭,剩余问题是识别准确率本身低于门槛;继续扩大到更多照片可增强外部效度,但不能用来掩盖当前 0/5。
 - 报告论文/表格时必须将独立 render-gold 与 `human-approved-unchanged-draft` 分开,后者不得伪称独立照片准确率。
 
 照片谱离线生产链现已接通:
@@ -130,7 +138,7 @@
 - 人工标记为 batch 后,一般受控批处理会分派到照片谱分析器;每次最多处理 5 条以限制本机负载。
 - 结果固定为 `photo_score_review_ready`,写入 `photo-score-batch-runs.jsonl`;`autoDiagnosisIssued=false`,`studentFacing=false`。
 - multipart、伪造 MIME、缓存越界路径、批处理分派、审计落盘和桌面/移动浏览器交互均有回归验证。
-- 仍缺真照片独立编辑 gold,逐谱严格通过率也不足;多引擎/音频仲裁原型不能替代独立准确率证据。因此 `m4OmrAutoScoreReady=false` 不变。
+- 真实照片独立源谱 gold 已有 5 份,但严格通过率为 0/5;多引擎、预处理或音频仲裁原型都不能替代精度门槛。因此 `m4OmrAutoScoreReady=false` 不变。
 
 ## 4. 第二轮执行后的下一步
 

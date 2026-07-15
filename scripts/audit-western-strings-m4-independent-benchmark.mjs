@@ -20,6 +20,7 @@ const DEFAULT_INPUTS = {
   scan: path.join("data", "experiments", "western-strings-m4", "render-gold-omr-scan", "render-gold-omr-summary.json"),
   photo: path.join("data", "experiments", "western-strings-m4", "render-gold-omr-photo", "render-gold-omr-summary.json"),
   realPhotoConsistency: path.join("data", "experiments", "western-strings-m4", "real-jpg-omr", "real-jpg-omr-summary.json"),
+  realPhotoGold: path.join("data", "experiments", "western-strings-m4", "independent-source-benchmark", "omr-benchmark.json"),
   confidenceProbe: path.join("data", "experiments", "western-strings-m4", "omr-confidence-probe.json"),
 };
 
@@ -28,6 +29,7 @@ export const DEFAULT_THRESHOLDS = Object.freeze({
   scan: Object.freeze({ minRows: 5, minMeanPrecision: 0.90, minMeanRecall: 0.85 }),
   photo: Object.freeze({ minRows: 5, minMeanPrecision: 0.90, minMeanRecall: 0.85 }),
   strictPerPiece: Object.freeze({ minPrecision: 0.98, minRecall: 0.95, minPassRate: 0.90 }),
+  realPhoto: Object.freeze({ minPrecision: 0.98, minRecall: 0.95, minPassRate: 0.90 }),
   minIndependentRealPhotoRows: 3,
 });
 
@@ -86,6 +88,48 @@ function summarizeConsistency(summary) {
   };
 }
 
+function summarizeIndependentRealPhoto(summary, thresholds, minRows) {
+  const sourceRows = Array.isArray(summary?.rows) ? summary.rows : [];
+  const rows = sourceRows
+    .filter((row) => {
+      if (row?.parseOk !== true || row?.benchmarkUsable !== true) return false;
+      if (row?.goldProvenance === "independent-source-derived-gold") {
+        return row?.goldSourceVerified === "yes";
+      }
+      return row?.goldProvenance === "independent-edited-gold"
+        && row?.humanVerifiedCleanScore === "yes";
+    })
+    .map((row) => ({
+      piece: String(row.pieceId || ""),
+      precision: finite(row.pitchPrecision),
+      recall: finite(row.pitchRecall ?? row.pitchAccuracy),
+      provenance: String(row.goldProvenance || ""),
+    }))
+    .filter((row) => row.precision !== null && row.recall !== null);
+  const passedRows = rows.filter(
+    (row) => row.precision >= thresholds.minPrecision && row.recall >= thresholds.minRecall,
+  );
+  const passRate = rows.length ? passedRows.length / rows.length : 0;
+  const checks = {
+    enoughRows: rows.length >= minRows,
+    strictPassRate: passRate >= thresholds.minPassRate,
+  };
+  return {
+    sourceAvailable: Boolean(summary),
+    evaluatedRows: rows.length,
+    thresholds: { ...thresholds, minRows },
+    passedRows: passedRows.length,
+    passRate,
+    passed: Object.values(checks).every(Boolean),
+    checks,
+    aggregate: {
+      precision: finite(summary?.counts?.pitchPrecision),
+      recall: finite(summary?.counts?.pitchRecall ?? summary?.counts?.pitchAccuracy),
+    },
+    rows,
+  };
+}
+
 export function evaluateIndependentBenchmark(inputs, thresholds = DEFAULT_THRESHOLDS) {
   const clean = summarizeDomain(inputs?.clean, thresholds.clean);
   const scan = summarizeDomain(inputs?.scan, thresholds.scan);
@@ -96,6 +140,11 @@ export function evaluateIndependentBenchmark(inputs, thresholds = DEFAULT_THRESH
   );
   const strictPassRate = clean.evaluatedRows > 0 ? strictRows.length / clean.evaluatedRows : 0;
   const independentBenchmarkReady = clean.passed && scan.passed && photo.passed;
+  const realPhotoGold = summarizeIndependentRealPhoto(
+    inputs?.realPhotoGold,
+    thresholds.realPhoto,
+    thresholds.minIndependentRealPhotoRows,
+  );
   const evidenceBlockingReasons = [];
   if (!clean.sourceAvailable) evidenceBlockingReasons.push("m4-independent-clean-summary-missing");
   else if (!clean.passed) evidenceBlockingReasons.push("m4-independent-clean-benchmark-below-floor");
@@ -104,9 +153,7 @@ export function evaluateIndependentBenchmark(inputs, thresholds = DEFAULT_THRESH
   if (!photo.sourceAvailable) evidenceBlockingReasons.push("m4-independent-photo-summary-missing");
   else if (!photo.passed) evidenceBlockingReasons.push("m4-independent-photo-benchmark-below-floor");
 
-  // The current real-photo set uses human-approved unchanged Audiveris drafts.
-  // It is consistency evidence, not independent photo-domain accuracy gold.
-  const independentRealPhotoRows = 0;
+  const independentRealPhotoRows = realPhotoGold.evaluatedRows;
   const confidenceProbeReady = inputs?.confidenceProbe?.safeSubsetReady === true;
   const automaticAdoptionBlockingReasons = [];
   if (!independentBenchmarkReady) {
@@ -117,6 +164,8 @@ export function evaluateIndependentBenchmark(inputs, thresholds = DEFAULT_THRESH
   }
   if (independentRealPhotoRows < thresholds.minIndependentRealPhotoRows) {
     automaticAdoptionBlockingReasons.push("m4-real-photo-independent-gold-missing");
+  } else if (!realPhotoGold.passed) {
+    automaticAdoptionBlockingReasons.push("m4-real-photo-independent-benchmark-below-floor");
   }
   if (!confidenceProbeReady) {
     automaticAdoptionBlockingReasons.push(
@@ -127,8 +176,8 @@ export function evaluateIndependentBenchmark(inputs, thresholds = DEFAULT_THRESH
 
   return {
     ok: true,
-    claimScope: "independent render-gold OMR benchmark only; not real-photo accuracy or student runtime approval",
-    goldProvenance: "public clean MusicXML rendered independently, then recognized blind by Audiveris",
+    claimScope: "independent render-gold research benchmark plus independent real-photo adoption boundary; not student runtime approval",
+    goldProvenance: "public clean MusicXML render gold and independently sourced or human-edited real-photo gold",
     independentBenchmarkReady,
     automaticAdoptionReady,
     studentGateReady: false,
@@ -142,6 +191,7 @@ export function evaluateIndependentBenchmark(inputs, thresholds = DEFAULT_THRESH
     },
     minIndependentRealPhotoRows: thresholds.minIndependentRealPhotoRows,
     realPhotoConsistency: summarizeConsistency(inputs?.realPhotoConsistency),
+    realPhotoGold,
     confidenceProbe: inputs?.confidenceProbe ? {
       sourceAvailable: true,
       safeSubsetReady: confidenceProbeReady,
@@ -179,6 +229,8 @@ function parseArgs(argv) {
     else if (arg === "--photo") args.inputs.photo = argv[++index] || args.inputs.photo;
     else if (arg === "--real-photo-consistency") {
       args.inputs.realPhotoConsistency = argv[++index] || args.inputs.realPhotoConsistency;
+    } else if (arg === "--real-photo-gold") {
+      args.inputs.realPhotoGold = argv[++index] || args.inputs.realPhotoGold;
     }
   }
   return args;
@@ -208,10 +260,12 @@ function renderSummary(report, sources) {
     "",
     `- strict per-piece pass: ${report.strictPerPiece.passedRows}/${report.strictPerPiece.evaluatedRows} (${(report.strictPerPiece.passRate * 100).toFixed(1)}%)`,
     `- independent real-photo gold rows: ${report.independentRealPhotoRows}`,
+    `- independent real-photo strict pass: ${report.realPhotoGold.passedRows}/${report.realPhotoGold.evaluatedRows} (${(report.realPhotoGold.passRate * 100).toFixed(1)}%)`,
+    `- independent real-photo aggregate P/R: ${report.realPhotoGold.aggregate.precision?.toFixed(4) ?? "n/a"}/${report.realPhotoGold.aggregate.recall?.toFixed(4) ?? "n/a"}`,
     `- runtime confidence safe subset: ${report.confidenceProbe.safeSubsetReady}`,
     `- blockers: ${report.automaticAdoptionBlockingReasons.join(", ") || "none"}`,
     "",
-    "The real-photo JPG result is re-recognition consistency against human-approved unchanged Audiveris drafts. It is not independent photo-domain accuracy and cannot open the runtime gate.",
+    "The real-photo consistency set remains re-recognition evidence only. The separate realPhotoGold input is counted only when source-derived provenance verifies or a human-approved edited gold is present.",
     "",
     "## Sources",
     "",

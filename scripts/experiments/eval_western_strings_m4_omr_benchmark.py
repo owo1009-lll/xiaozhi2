@@ -5,6 +5,7 @@ import csv
 import hashlib
 import json
 import math
+import re
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -217,15 +218,56 @@ def safe_rate(numerator: int | float, denominator: int | float) -> float:
     return float(numerator) / float(denominator)
 
 
-def find_draft_path(piece_id: str, summary_by_piece: dict[str, dict[str, Any]], draft_root: Path) -> Path | None:
+def movement_number(path: Path) -> int | None:
+    match = re.search(r"\.mvt(\d+)\.mxl$", path.name, flags=re.IGNORECASE)
+    return int(match.group(1)) if match else None
+
+
+def movement_siblings(path: Path) -> list[Path]:
+    number = movement_number(path)
+    if number is None:
+        return []
+    prefix = re.sub(r"\.mvt\d+\.mxl$", "", path.name, flags=re.IGNORECASE)
+    siblings = [candidate for candidate in path.parent.glob(f"{prefix}.mvt*.mxl") if movement_number(candidate)]
+    return sorted(siblings, key=lambda candidate: int(movement_number(candidate) or 0))
+
+
+def find_draft_paths(piece_id: str, summary_by_piece: dict[str, dict[str, Any]], draft_root: Path) -> list[Path]:
     summary = summary_by_piece.get(piece_id) or {}
     raw = str(summary.get("mxl") or "")
     if raw:
         direct = Path(raw)
         if direct.exists():
-            return direct
+            siblings = movement_siblings(direct)
+            return siblings or [direct]
     candidates = sorted((draft_root / f"{piece_id}-audiveris").rglob("*.mxl"))
-    return candidates[0] if candidates else None
+    if not candidates:
+        return []
+    whole_scores = [candidate for candidate in candidates if movement_number(candidate) is None]
+    if whole_scores:
+        return [whole_scores[0]]
+    return sorted(candidates, key=lambda candidate: int(movement_number(candidate) or 0))
+
+
+def parse_notes_many(paths: list[Path]) -> list[Note]:
+    combined: list[Note] = []
+    onset_offset = 0.0
+    measure_offset = 0
+    for path in paths:
+        notes = parse_notes(path)
+        combined.extend(
+            Note(
+                midi=note.midi,
+                onset_quarters=note.onset_quarters + onset_offset,
+                duration_quarters=note.duration_quarters,
+                measure_index=note.measure_index + measure_offset,
+            )
+            for note in notes
+        )
+        if notes:
+            onset_offset += max(note.onset_quarters + note.duration_quarters for note in notes)
+            measure_offset += max(note.measure_index for note in notes)
+    return combined
 
 
 def sha1(path: Path) -> str:
@@ -234,6 +276,45 @@ def sha1(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def verify_source_derived_gold(row: dict[str, str], gold_path: Path) -> tuple[bool, str]:
+    requested = row.get("goldProvenance", "").strip() == "independent-source-derived-gold"
+    if not requested:
+        return False, ""
+    manifest_value = row.get("goldSourceManifest", "").strip()
+    if not manifest_value:
+        return False, "source-manifest-missing"
+    manifest_path = repo_path(manifest_value)
+    if not manifest_path.is_file():
+        return False, "source-manifest-not-found"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False, "source-manifest-invalid"
+    if manifest.get("license") != "CC-BY-SA-4.0":
+        return False, "source-license-not-allowed"
+    if not str(manifest.get("sourceCommit") or "").strip():
+        return False, "source-commit-missing"
+    piece_id = row.get("pieceId", "").strip()
+    gold_rows = [item for item in manifest.get("photoGold", []) if item.get("pieceId") == piece_id]
+    if len(gold_rows) != 1:
+        return False, "source-piece-manifest-row-missing"
+    gold_row = gold_rows[0]
+    manifest_gold_path = (manifest_path.parent / str(gold_row.get("path") or "")).resolve()
+    if manifest_gold_path != gold_path.resolve():
+        return False, "source-gold-path-mismatch"
+    if str(gold_row.get("sha256") or "").lower() != sha256(gold_path):
+        return False, "source-gold-hash-mismatch"
+    return True, ""
 
 
 def evaluate_pair(
@@ -245,19 +326,26 @@ def evaluate_pair(
     piece_id = row.get("pieceId", "").strip()
     recording_id = row.get("recordingId", "").strip()
     gold_path = repo_path(row.get("requiredCleanScorePath", ""))
-    draft_path = find_draft_path(piece_id, summary_by_piece, draft_root)
+    draft_paths = find_draft_paths(piece_id, summary_by_piece, draft_root)
     clean_score_review_status = row.get("cleanScoreReviewStatus", "").strip().lower()
     clean_score_reviewed_by = row.get("cleanScoreReviewedBy", "").strip()
     human_verified_clean_score = clean_score_review_status == "approved" and bool(clean_score_reviewed_by)
+    source_gold_requested = row.get("goldProvenance", "").strip() == "independent-source-derived-gold"
     result: dict[str, Any] = {
         "recordingId": recording_id,
         "pieceId": piece_id,
         "goldPath": str(gold_path.relative_to(REPO)) if gold_path.exists() else str(gold_path),
-        "draftPath": str(draft_path.relative_to(REPO)) if draft_path and draft_path.exists() else "",
+        "draftPath": "|".join(
+            str(path.relative_to(REPO)) if path.is_relative_to(REPO) else str(path)
+            for path in draft_paths
+        ),
+        "draftMovementCount": len(draft_paths),
         "parseOk": False,
         "benchmarkUsable": False,
         "goldEqualsDraftHash": "",
         "goldProvenance": "",
+        "goldSourceManifest": row.get("goldSourceManifest", "").strip(),
+        "goldSourceVerified": "",
         "cleanScoreReviewStatus": row.get("cleanScoreReviewStatus", "").strip(),
         "cleanScoreReviewedBy": clean_score_reviewed_by,
         "humanVerifiedCleanScore": "yes" if human_verified_clean_score else "",
@@ -266,23 +354,31 @@ def evaluate_pair(
     if not gold_path.exists():
         result["blockingReason"] = "gold-clean-score-missing"
         return result
-    if draft_path is None or not draft_path.exists():
+    if not draft_paths or any(not path.exists() for path in draft_paths):
         result["blockingReason"] = "audiveris-draft-missing"
         return result
     gold_hash = sha1(gold_path)
-    draft_hash = sha1(draft_path)
-    gold_equals_draft = gold_hash == draft_hash
-    gold_provenance = (
-        "human-approved-unchanged-draft"
-        if gold_equals_draft and human_verified_clean_score
-        else "self-comparison-unverified"
-        if gold_equals_draft
-        else "independent-edited-gold"
-    )
-    benchmark_usable = (not gold_equals_draft) or human_verified_clean_score
+    gold_equals_draft = len(draft_paths) == 1 and gold_hash == sha1(draft_paths[0])
+    source_gold_verified, source_gold_error = verify_source_derived_gold(row, gold_path)
+    if source_gold_requested:
+        gold_provenance = (
+            "independent-source-derived-gold"
+            if source_gold_verified and not gold_equals_draft
+            else "independent-source-derived-gold-invalid"
+        )
+        benchmark_usable = source_gold_verified and not gold_equals_draft
+    elif gold_equals_draft and human_verified_clean_score:
+        gold_provenance = "human-approved-unchanged-draft"
+        benchmark_usable = True
+    elif gold_equals_draft:
+        gold_provenance = "self-comparison-unverified"
+        benchmark_usable = False
+    else:
+        gold_provenance = "independent-edited-gold"
+        benchmark_usable = True
     try:
         gold_notes = parse_notes(gold_path)
-        draft_notes = parse_notes(draft_path)
+        draft_notes = parse_notes_many(draft_paths)
         pairs = align_notes(gold_notes, draft_notes)
     except Exception as exc:  # pragma: no cover - batch report should continue
         result["blockingReason"] = f"parse-error:{type(exc).__name__}:{str(exc)[:120]}"
@@ -319,8 +415,11 @@ def evaluate_pair(
             "benchmarkUsable": benchmark_usable,
             "goldEqualsDraftHash": "yes" if gold_equals_draft else "",
             "goldProvenance": gold_provenance,
+            "goldSourceVerified": "yes" if source_gold_verified else "",
             "blockingReason": ""
             if benchmark_usable
+            else f"independent-source-provenance-invalid:{source_gold_error}"
+            if source_gold_requested
             else "gold-clean-score-identical-to-audiveris-draft-without-human-review",
             "goldNotes": gold_count,
             "draftNotes": draft_count,
@@ -330,6 +429,8 @@ def evaluate_pair(
             "missingNotes": missing,
             "extraNotes": extra,
             "pitchAccuracy": round(safe_rate(pitch_exact, gold_count), 6),
+            "pitchPrecision": round(safe_rate(pitch_exact, draft_count), 6),
+            "pitchRecall": round(safe_rate(pitch_exact, gold_count), 6),
             "missingRate": round(safe_rate(missing, gold_count), 6),
             "extraRate": round(safe_rate(extra, gold_count), 6),
             "onsetQuarterAccuracy": round(safe_rate(onset_exact, gold_count), 6),
@@ -369,6 +470,8 @@ def summarize(rows: list[dict[str, Any]], thresholds: dict[str, float]) -> dict[
     gold_total = totals["goldNotes"]
     aggregate = {
         "pitchAccuracy": round(safe_rate(totals["pitchExact"], gold_total), 6),
+        "pitchPrecision": round(safe_rate(totals["pitchExact"], totals["draftNotes"]), 6),
+        "pitchRecall": round(safe_rate(totals["pitchExact"], gold_total), 6),
         "missingRate": round(safe_rate(totals["missingNotes"], gold_total), 6),
         "extraRate": round(safe_rate(totals["extraNotes"], gold_total), 6),
         "onsetQuarterAccuracy": round(safe_rate(totals["onsetExact"], gold_total), 6),
@@ -442,6 +545,9 @@ def main() -> int:
         "minMeasureAccuracy": float(args.min_measure_accuracy),
     }
     summary = summarize(rows, thresholds)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    json_out = out_dir / "omr-benchmark.json"
+    csv_out = out_dir / "omr-benchmark.csv"
     report = {
         "ok": True,
         "gate": {
@@ -457,20 +563,18 @@ def main() -> int:
         "artifacts": {
             "intake": str(intake_path.relative_to(REPO)) if intake_path.is_relative_to(REPO) else str(intake_path),
             "audiverisSummary": str(summary_path.relative_to(REPO)) if summary_path.is_relative_to(REPO) else str(summary_path),
-            "json": "data/experiments/western-strings-m4/omr-benchmark.json",
-            "csv": "data/experiments/western-strings-m4/omr-benchmark.csv",
+            "json": str(json_out.relative_to(REPO)) if json_out.is_relative_to(REPO) else str(json_out),
+            "csv": str(csv_out.relative_to(REPO)) if csv_out.is_relative_to(REPO) else str(csv_out),
         },
         "notes": [
             "This is an eval-only OMR draft-vs-gold benchmark. It does not approve OMR output for runtime diagnosis.",
             "Pitch/onset/measure metrics are sequence-alignment proxies; release thresholds must be calibrated before any student-facing use.",
             "Byte-identical rows are usable only when cleanScoreReviewStatus=approved and cleanScoreReviewedBy is present; otherwise they remain self-comparison-unverified and blocked.",
             "human-approved-unchanged-draft rows must be reported separately from independent-edited-gold rows.",
+            "independent-source-derived-gold rows are usable only when their manifest path, CC-BY-SA-4.0 license, source commit, file path, and SHA-256 all verify.",
         ],
         "rows": rows,
     }
-    out_dir.mkdir(parents=True, exist_ok=True)
-    json_out = out_dir / "omr-benchmark.json"
-    csv_out = out_dir / "omr-benchmark.csv"
     json_out.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     write_csv(
         csv_out,
@@ -482,6 +586,8 @@ def main() -> int:
             "benchmarkUsable",
             "goldEqualsDraftHash",
             "goldProvenance",
+            "goldSourceManifest",
+            "goldSourceVerified",
             "cleanScoreReviewStatus",
             "cleanScoreReviewedBy",
             "humanVerifiedCleanScore",
@@ -493,6 +599,8 @@ def main() -> int:
             "missingNotes",
             "extraNotes",
             "pitchAccuracy",
+            "pitchPrecision",
+            "pitchRecall",
             "missingRate",
             "extraRate",
             "onsetQuarterAccuracy",
@@ -501,6 +609,7 @@ def main() -> int:
             "blockingReason",
             "goldPath",
             "draftPath",
+            "draftMovementCount",
         ],
     )
     print(json.dumps({key: report[key] for key in ["ok", "gate", "counts", "artifacts"]}, indent=2, ensure_ascii=False))

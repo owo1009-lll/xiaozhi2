@@ -16,6 +16,21 @@ function summary(count, precision, recall) {
   };
 }
 
+function realPhotoSummary(count, precision, recall) {
+  return {
+    counts: { pitchPrecision: precision, pitchRecall: recall },
+    rows: Array.from({ length: count }, (_, index) => ({
+      pieceId: `photo-${index + 1}`,
+      parseOk: true,
+      benchmarkUsable: true,
+      goldProvenance: "independent-source-derived-gold",
+      goldSourceVerified: "yes",
+      pitchPrecision: precision,
+      pitchRecall: recall,
+    })),
+  };
+}
+
 const good = evaluateIndependentBenchmark({
   clean: summary(32, 0.97, 0.94),
   scan: summary(6, 0.94, 0.89),
@@ -29,6 +44,18 @@ assert.equal(good.studentGateReady, false, "an eval-only benchmark must never op
 assert(good.automaticAdoptionBlockingReasons.includes("m4-real-photo-independent-gold-missing"));
 assert(good.automaticAdoptionBlockingReasons.includes("m4-runtime-safe-subset-not-found"));
 assert.equal(good.realPhotoConsistency.independentAccuracyEvidence, false);
+
+const realPhotoPoor = evaluateIndependentBenchmark({
+  clean: summary(32, 0.97, 0.94),
+  scan: summary(6, 0.94, 0.89),
+  photo: summary(6, 0.95, 0.89),
+  realPhotoGold: realPhotoSummary(5, 0.86, 0.63),
+  confidenceProbe: { safeSubsetReady: true },
+});
+assert.equal(realPhotoPoor.independentRealPhotoRows, 5);
+assert.equal(realPhotoPoor.realPhotoGold.passed, false);
+assert(!realPhotoPoor.automaticAdoptionBlockingReasons.includes("m4-real-photo-independent-gold-missing"));
+assert(realPhotoPoor.automaticAdoptionBlockingReasons.includes("m4-real-photo-independent-benchmark-below-floor"));
 
 const missing = evaluateIndependentBenchmark({
   clean: summary(32, 0.97, 0.94),
@@ -60,9 +87,10 @@ const strict = evaluateIndependentBenchmark(
     clean: strictRows,
     scan: summary(6, 0.94, 0.89),
     photo: summary(6, 0.95, 0.89),
+    realPhotoGold: realPhotoSummary(3, 0.99, 0.97),
     confidenceProbe: { safeSubsetReady: true, validation: "leave-one-work-out", runtimeFeatureOnly: true },
   },
-  { ...DEFAULT_THRESHOLDS, minIndependentRealPhotoRows: 0 },
+  DEFAULT_THRESHOLDS,
 );
 assert.equal(strict.strictPerPiece.passRate, 1);
 assert.equal(strict.automaticAdoptionReady, true, "the evaluator should expose the adoption condition when all configured evidence is present");
@@ -74,6 +102,7 @@ console.log(JSON.stringify({ ok: true, checks: [
   "poor-metric-fail-closed",
   "null-metric-fail-closed",
   "real-photo-consistency-not-promoted",
+  "independent-real-photo-below-floor-reported",
   "runtime-confidence-probe-fail-closed",
   "student-runtime-never-opened",
 ] }, null, 2));

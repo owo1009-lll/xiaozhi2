@@ -45,12 +45,17 @@ export function evaluateProjectGate(status, requiredTracks) {
     });
   }
   if (requiredTracks.has("m3plus") && !m3plus.m3plusModeReleaseReady) {
+    const supplementalArtifact = m3plus.supplementalIntake?.sourceExists
+      ? (m3plus.supplementalIntake.readyForMachineAnalysis
+        ? m3plus.supplementalIntake.source
+        : (m3plus.supplementalIntake.instructions || m3plus.supplementalIntake.source))
+      : "";
     failures.push({
       track: "M3+ pitch behavior modes",
       reason: m3plus.blockingReasons || ["m3plus-gate-not-ready"],
-      artifact: m3plus.candidateQualityReview?.needsReview
+      artifact: supplementalArtifact || (m3plus.candidateQualityReview?.needsReview
         ? m3plus.candidateQualityReview.reviewPage
-        : (m3plus.reviewArtifacts?.round2AlignedEvalJson || m3plus.reviewArtifacts?.localizationDiagnosisGroupsCsv || m3plus.reviewArtifacts?.modeEvalCsv || m3plus.reviewArtifacts?.modeEvalJson || m3plus.reviewArtifacts?.round2ReviewPage || m3plus.reviewArtifacts?.reviewPage || ""),
+        : (m3plus.reviewArtifacts?.round2AlignedEvalJson || m3plus.reviewArtifacts?.localizationDiagnosisGroupsCsv || m3plus.reviewArtifacts?.modeEvalCsv || m3plus.reviewArtifacts?.modeEvalJson || m3plus.reviewArtifacts?.round2ReviewPage || m3plus.reviewArtifacts?.reviewPage || "")),
     });
   }
   if (requiredTracks.has("m4") && !m4.m4OmrAccuracyClaimReady) {

@@ -333,6 +333,12 @@ const M3PLUS_ROUND2_TRILL_VIBRATO_DIAGNOSTIC = path.join(
   "western-strings-round2",
   "m3plus-trill-vibrato-diagnostic.json",
 );
+const M3PLUS_SUPPLEMENTAL_STATUS = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3plus",
+  "supplemental-intake-status.json",
+);
 const M4_READINESS = path.join(
   "data",
   "experiments",
@@ -823,6 +829,7 @@ async function buildM3PlusStatus() {
   const localizationDiagnosis = await readJson(M3PLUS_LOCALIZATION_DIAGNOSIS);
   const round2AlignedEval = await readJson(M3PLUS_ROUND2_ALIGNED_EVAL);
   const round2FeatureDiagnostic = await readJson(M3PLUS_ROUND2_TRILL_VIBRATO_DIAGNOSTIC);
+  const supplementalStatus = await readJson(M3PLUS_SUPPLEMENTAL_STATUS);
   const candidateQualityReviewPageExists = await exists(M3PLUS_CANDIDATE_QUALITY_REVIEW_PAGE);
   const candidateQualityCompletedExists = await exists(M3PLUS_CANDIDATE_QUALITY_COMPLETED);
   const allSourceRows = [...sourceRows];
@@ -885,6 +892,9 @@ async function buildM3PlusStatus() {
     modeEvalBlockingReasons.push(...(
       round2AlignedEval?.blockingReasons || ["m3plus-round2-release-evidence-not-ready"]
     ));
+  }
+  if (!supplementalStatus?.readyForMachineAnalysis) {
+    modeEvalBlockingReasons.push("m3plus-supplemental-recordings-not-ready");
   }
   const blockingReasons = [...labelBlockingReasons, ...modeEvalBlockingReasons];
   return {
@@ -963,6 +973,29 @@ async function buildM3PlusStatus() {
       bestTrainingOnlyFeatures: [],
       blockingReasons: ["m3plus-round2-trill-vibrato-diagnostic-missing"],
     },
+    supplementalIntake: supplementalStatus ? {
+      source: M3PLUS_SUPPLEMENTAL_STATUS.replace(/\\/g, "/"),
+      sourceExists: true,
+      recordingCount: supplementalStatus.recordingCount ?? 0,
+      readyRecordingCount: supplementalStatus.readyRecordingCount ?? 0,
+      missingRecordingCount: supplementalStatus.missingRecordingCount ?? 0,
+      readyForMachineAnalysis: supplementalStatus.readyForMachineAnalysis === true,
+      humanTask: supplementalStatus.humanTask || "record-m3plus-supplemental-takes",
+      blockingReasons: supplementalStatus.blockingReasons || [],
+      instructions: supplementalStatus.instructions || "",
+      scoreIntent: supplementalStatus.scoreIntent || "",
+    } : {
+      source: M3PLUS_SUPPLEMENTAL_STATUS.replace(/\\/g, "/"),
+      sourceExists: false,
+      recordingCount: 0,
+      readyRecordingCount: 0,
+      missingRecordingCount: 4,
+      readyForMachineAnalysis: false,
+      humanTask: "generate-and-record-m3plus-supplemental-takes",
+      blockingReasons: ["m3plus-supplemental-status-missing"],
+      instructions: "",
+      scoreIntent: "",
+    },
     monitoredPilotAudit: monitoredPilotAudit ? {
       source: M3PLUS_MONITORED_PILOT_AUDIT.replace(/\\/g, "/"),
       sourceExists: true,
@@ -1021,6 +1054,8 @@ async function buildM3PlusStatus() {
       round2CompletedCsv: M3PLUS_ROUND2_COMPLETED.replace(/\\/g, "/"),
       round2AlignedEvalJson: M3PLUS_ROUND2_ALIGNED_EVAL.replace(/\\/g, "/"),
       round2TrillVibratoDiagnosticJson: M3PLUS_ROUND2_TRILL_VIBRATO_DIAGNOSTIC.replace(/\\/g, "/"),
+      supplementalStatusJson: M3PLUS_SUPPLEMENTAL_STATUS.replace(/\\/g, "/"),
+      supplementalInstructions: supplementalStatus?.instructions || "",
       candidateQualityReviewPage: M3PLUS_CANDIDATE_QUALITY_REVIEW_PAGE.replace(/\\/g, "/"),
       candidateQualitySourceCsv: M3PLUS_CANDIDATE_QUALITY_SOURCE.replace(/\\/g, "/"),
       candidateQualityCompletedCsv: M3PLUS_CANDIDATE_QUALITY_COMPLETED.replace(/\\/g, "/"),
@@ -1295,6 +1330,7 @@ async function buildM4OmrStatus() {
       strictPerPiece: independentBenchmark.strictPerPiece || {},
       independentRealPhotoRows: independentBenchmark.independentRealPhotoRows || 0,
       minIndependentRealPhotoRows: independentBenchmark.minIndependentRealPhotoRows || 0,
+      realPhotoGold: independentBenchmark.realPhotoGold || {},
       confidenceProbe: independentBenchmark.confidenceProbe ? {
         sourceAvailable: independentBenchmark.confidenceProbe.sourceAvailable === true,
         safeSubsetReady: independentBenchmark.confidenceProbe.safeSubsetReady === true,
@@ -1409,6 +1445,7 @@ function summarizeNextActions(
     const localizationSummary = m3plus.localizationDiagnosis?.summary || {};
     const candidateQualityReview = m3plus.candidateQualityReview || {};
     const round2AlignedEval = m3plus.round2AlignedEval || {};
+    const supplementalIntake = m3plus.supplementalIntake || {};
     const mismatchText = counts.rows
       ? ` Current eval has ${counts.match || 0} match, ${counts.mismatch || 0} mismatch, and ${Math.max(0, (counts.rows || 0) - (counts.match || 0) - (counts.mismatch || 0))} uncertain/other rows out of ${counts.rows}; fix score-audio localization/candidate quality before another release attempt.`
       : "";
@@ -1419,12 +1456,14 @@ function summarizeNextActions(
       priority: 2,
       track: "M3+ pitch behavior modes",
       action: round2AlignedEval.sourceExists
-        ? `The human-confirmed round-two aligned evaluation is fail-closed: slide, trill, vibrato, and double-stop detection are below the 90% floor, and negative controls plus real ornament/harmonic samples are still missing. Keep M3+ review-only; improve the detectors and collect only the listed missing evidence, without re-reviewing the completed rows.`
+        ? supplementalIntake.readyForMachineAnalysis
+          ? `The four M3+ supplemental takes are ready. Run the machine analysis against the frozen score-intent labels; do not ask a teacher to review until localization and audio decoding pass.`
+          : `The human-confirmed round-two aligned evaluation remains fail-closed. Record the four prepared takes in ${supplementalIntake.instructions || "音频/m3plus-supplemental/README-录音说明.md"}; these provide straight-tone negatives, an independent vibrato/trill take, ornaments, and harmonics. Do not re-review completed rows.`
         : candidateQualityReview.needsReview
         ? `M3+ labels are sufficient and round-2 is imported, but no non-control pitch-behavior mode is release-ready.${mismatchText}${localizationText} The candidate-quality review pack is now restricted to first-measure rows from recordings whose prior review rows were all audio-score matches; later measures are treated as localization-drift risk and excluded.`
         : `M3+ labels are sufficient and round-2 is imported, but no non-control pitch-behavior mode is release-ready.${mismatchText}${localizationText} Keep M3+ review-only and inspect localization groups before changing candidate generation.`,
       artifact: round2AlignedEval.sourceExists
-        ? round2AlignedEval.source
+        ? supplementalIntake.instructions || supplementalIntake.source || round2AlignedEval.source
         : candidateQualityReview.needsReview
         ? candidateQualityReview.reviewPage
         : (m3plus.reviewArtifacts.localizationDiagnosisGroupsCsv || m3plus.reviewArtifacts.modeEvalCsv || m3plus.reviewArtifacts.modeEvalJson),
@@ -1447,7 +1486,7 @@ function summarizeNextActions(
       artifact: m4Omr.artifacts?.independentBenchmarkJson || M4_INDEPENDENT_BENCHMARK_AUDIT.replace(/\\/g, "/"),
       reason: m4Omr.blockingReasons,
     });
-  } else if (!m4Omr.m4OmrDraftQualityReady) {
+  } else if (!m4Omr.m4OmrDraftQualityReady && m4Omr.humanTask !== "none") {
     actions.push({
       priority: 3,
       track: "M4 OMR benchmark",
@@ -1458,11 +1497,16 @@ function summarizeNextActions(
       reason: m4Omr.blockingReasons,
     });
   } else if (!m4Omr.m4OmrAutomaticAdoptionReady) {
+    const realPhotoRows = Number(m4Omr.independentBenchmark?.independentRealPhotoRows || 0);
     actions.push({
       priority: 3,
       track: "M4 OMR automatic adoption",
-      action: "Keep OMR draft-only. Runtime-visible confidence features cannot select a 90%-precision/20%-coverage safe subset. Create at least 3 independent real-photo MusicXML references, rerun blind OMR, then rerun the confidence probe and independent benchmark audit.",
-      artifact: m4Omr.artifacts?.independentGoldTodoHtml || m4Omr.artifacts?.independentBenchmarkJson,
+      action: realPhotoRows >= 3
+        ? `Keep OMR draft-only. ${realPhotoRows} independent source-gold photos are now available, but 0/${realPhotoRows} pass the strict P>=0.98/R>=0.95 floor; preprocessing and runtime confidence probes also found no safe production subset. The next machine task is a stronger OMR engine on this frozen benchmark, not more score-editor review.`
+        : "Keep OMR draft-only. Runtime-visible confidence features cannot select a 90%-precision/20%-coverage safe subset. Create at least 3 independent real-photo MusicXML references, rerun blind OMR, then rerun the confidence probe and independent benchmark audit.",
+      artifact: realPhotoRows >= 3
+        ? m4Omr.artifacts?.independentBenchmarkJson
+        : m4Omr.artifacts?.independentGoldTodoHtml || m4Omr.artifacts?.independentBenchmarkJson,
       humanTask: m4Omr.humanTask,
       scoreEditorReviewNeeded: m4Omr.scoreEditorReviewNeeded,
       reason: m4Omr.automaticAdoptionBlockingReasons,

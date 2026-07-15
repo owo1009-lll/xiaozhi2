@@ -102,6 +102,17 @@ assert.equal(m3plus.localizationDiagnosis?.sourceExists, true, "M3+ localization
 assert.equal(m3plus.localizationDiagnosis?.summary?.nonMatch, 24, "M3+ localization diagnosis should expose the current non-match row count");
 assert((m3plus.blockingReasons || []).includes("m3plus-round2-mode-detection-below-90-percent"), "M3+ status must report the confirmed round-two detector failure");
 assert((m3plus.blockingReasons || []).includes("m3plus-round2-negative-controls-missing"), "M3+ status must report the missing negative controls");
+assert.equal(m3plus.supplementalIntake?.sourceExists, true, "M3+ status must expose the prepared supplemental intake");
+assert.equal(m3plus.supplementalIntake?.recordingCount, 4, "M3+ supplemental intake must contain four targeted recordings");
+assert.equal(m3plus.supplementalIntake?.readyRecordingCount, 0, "M3+ supplemental intake must not invent recordings before they exist");
+assert.equal(m3plus.supplementalIntake?.missingRecordingCount, 4, "M3+ supplemental intake must report all four missing recordings");
+assert.equal(m3plus.supplementalIntake?.readyForMachineAnalysis, false, "M3+ supplemental intake must fail closed before audio is recorded");
+assert.equal(m3plus.supplementalIntake?.humanTask, "record-m3plus-supplemental-takes", "M3+ status must name the exact remaining human task");
+assert(
+  String(m3plus.supplementalIntake?.instructions || "").replaceAll("\\", "/").endsWith("音频/m3plus-supplemental/README-录音说明.md"),
+  "M3+ status must point to the supplemental recording instructions",
+);
+assert((m3plus.blockingReasons || []).includes("m3plus-supplemental-recordings-not-ready"), "M3+ must remain blocked while supplemental recordings are missing");
 if (m3plus.monitoredPilotAudit?.sourceExists) {
   assert.equal(m3plus.monitoredPilotAudit.readyForMonitoredPilot, false, "newer round-two failures must close the old monitored-pilot result");
   assert.equal(m3plus.monitoredPilotAudit.teacherReviewNeeded, false, "M3+ monitored pilot audit must not ask for more review when all auto-pass evidence is already known");
@@ -215,7 +226,7 @@ if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
 } else if (ordinaryPilotAuditPassed) {
   assert.equal(
     status.nextActions[0]?.artifact,
-    "data/experiments/western-strings-round2/m3plus-aligned-eval.json",
+    m3plus.supplementalIntake.instructions,
     "after ordinary pilot audit passes, handoff artifact should point to the next unfinished track",
   );
 } else {
@@ -224,32 +235,36 @@ if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
 
 const m4 = status.tracks.m4Omr;
 assert.equal(m4.m4OmrBenchmarkDatasetReady, true, "M4 intake dataset should be ready for benchmarking");
-assert.equal(m4.m4OmrDraftQualityReady, true, "M4 draft quality may be ready when same-hash gold has explicit clean-score approval");
+assert.equal(m4.m4OmrDraftQualityReady, false, "independent source gold must expose that current photo OMR draft quality is below the floor");
 assert.equal(m4.m4OmrIndependentBenchmarkReady, true, "M4 independent render/scan/photo benchmark should pass its research floor");
 assert.equal(m4.m4OmrAccuracyClaimReady, true, "M4 should expose the bounded independent accuracy claim");
-assert.equal(m4.m4OmrAutomaticAdoptionReady, false, "M4 automatic adoption must stay closed below the strict per-piece floor and without real-photo gold");
+assert.equal(m4.m4OmrAutomaticAdoptionReady, false, "M4 automatic adoption must stay closed below the strict per-piece and real-photo floors");
 assert.equal(m4.independentBenchmark?.studentGateReady, false, "M4 benchmark evaluation must never open the student runtime gate");
 assert.equal(m4.independentBenchmark?.strictPerPiece?.passedRows, 12, "current strict M4 benchmark should expose 12 passing pieces");
 assert.equal(m4.independentBenchmark?.strictPerPiece?.evaluatedRows, 32, "current strict M4 benchmark should expose all 32 clean pieces");
-assert.equal(m4.independentBenchmark?.independentRealPhotoRows, 0, "real-photo consistency must not be promoted to independent gold");
+assert.equal(m4.independentBenchmark?.independentRealPhotoRows, 5, "M4 must expose all independent source-gold real-photo rows");
+assert.equal(m4.independentBenchmark?.realPhotoGold?.passedRows, 0, "none of the current real-photo rows may be promoted above the strict floor");
+assert.equal(m4.independentBenchmark?.realPhotoGold?.aggregate?.precision, 0.847086, "M4 must expose the measured real-photo pitch precision");
+assert.equal(m4.independentBenchmark?.realPhotoGold?.aggregate?.recall, 0.715016, "M4 must expose the measured real-photo pitch recall");
 assert(
   m4.automaticAdoptionBlockingReasons?.includes("m4-clean-per-piece-strict-pass-rate-too-low"),
   "M4 automatic adoption must report the strict per-piece shortfall",
 );
 assert(
-  m4.automaticAdoptionBlockingReasons?.includes("m4-real-photo-independent-gold-missing"),
-  "M4 automatic adoption must report missing independent real-photo gold",
+  m4.automaticAdoptionBlockingReasons?.includes("m4-real-photo-independent-benchmark-below-floor"),
+  "M4 automatic adoption must report the independent real-photo accuracy shortfall",
 );
+assert(!m4.automaticAdoptionBlockingReasons?.includes("m4-real-photo-independent-gold-missing"), "M4 must not request already-completed real-photo gold work");
 assert(
   m4.automaticAdoptionBlockingReasons?.includes("m4-runtime-safe-subset-not-found"),
   "M4 automatic adoption must report that runtime-visible confidence signals cannot select a safe subset",
 );
 assert.equal(m4.teacherReviewNeeded, false, "M4 independent-gold correction must not be reported as teacher audio review");
-assert.equal(m4.scoreEditorReviewNeeded, true, "M4 automatic adoption should expose the independent real-photo score-editor task");
+assert.equal(m4.scoreEditorReviewNeeded, false, "M4 must not request more score editing after independent source gold is available");
 assert.equal(
   m4.humanTask,
-  "score-editor-independent-real-photo-gold",
-  "M4 should distinguish the new independent real-photo gold task from the already-approved unchanged drafts",
+  "none",
+  "M4 should expose that the next accuracy improvement is a machine task, not another human gold task",
 );
 assert.equal(
   m4.independentGoldWorkspaceAudit?.source,
@@ -275,7 +290,7 @@ if (!m4.goldProvenanceAudit?.missing) {
   );
   assert.equal(
     m4.goldProvenanceAudit.counts?.humanApprovedUnchangedDraftRows,
-    12,
+    8,
     "current M4 fixture should expose human-approved unchanged draft rows",
   );
   assert.equal(
@@ -290,7 +305,7 @@ assert.equal(
   "M4 independent-gold workspace must not be apply-ready before checked score edits",
 );
 assert.equal(m4.counts.usableBenchmarkRows, 12, "human-approved unchanged gold rows should count as usable OMR benchmark rows");
-assert.equal(m4.counts.humanApprovedUnchangedRows, 12, "current M4 fixture should expose all human-approved unchanged rows");
+assert.equal(m4.counts.humanApprovedUnchangedRows, 8, "current M4 fixture should distinguish approved unchanged rows from independent source-gold rows");
 assert.equal(m4.counts.selfComparisonRows, 0, "approved unchanged rows must not be reported as unverified self-comparisons");
 assert(!m4.blockingReasons.includes("m4-omr-self-comparison-detected"), "M4 must not block human-approved unchanged rows as self-comparison");
 assert(!m4.blockingReasons.includes("m4-omr-no-independent-gold"), "M4 must not block when human-approved unchanged gold is usable");
@@ -328,6 +343,10 @@ assert(
   packageJson.scripts?.["test:western-m4-independent-benchmark"],
   "package.json must expose the independent M4 benchmark regression test",
 );
+assert(packageJson.scripts?.["test:western-m4-source-gold"], "package.json must expose independent source-gold provenance tests");
+assert(packageJson.scripts?.["western:m3plus-supplemental-scores"], "package.json must expose the M3+ supplemental score generator");
+assert(packageJson.scripts?.["western:m3plus-supplemental-status"], "package.json must expose the M3+ supplemental intake status command");
+assert(packageJson.scripts?.["test:western-m3plus-supplemental-status"], "package.json must expose M3+ supplemental fail-closed tests");
 assert(
   packageJson.scripts?.["western:m4-independent-gold-note-summary"],
   "package.json must expose the M4 editable-gold note summary command",
@@ -427,7 +446,7 @@ for (const [label, text] of [["review policy", reviewPolicy]]) {
     `M4 ${label} must require workspace audit before apply`,
   );
 }
-if (m4.m4OmrDraftQualityReady) {
+if (m4.m4OmrIndependentBenchmarkReady) {
   assert(
     !handoff.includes("score-editor independent-gold correction task"),
     "current handoff must not keep stale M4 score-editor instructions after M4 clears",
@@ -448,8 +467,8 @@ if (m4.m4OmrDraftQualityReady) {
     );
   } else {
     assert(
-      handoff.includes("data/experiments/western-strings-round2/m3plus-aligned-eval.json"),
-      "handoff must point to the newer M3+ round-two failure evidence while that track is blocked",
+      handoff.includes("m3plus-supplemental") && handoff.includes("README-"),
+      "handoff must point to the exact M3+ supplemental recording task while that track is blocked",
     );
   }
   for (const [label, text] of [["project plan", projectPlan], ["migration plan", migrationPlan]]) {
@@ -539,8 +558,8 @@ const m3plusFailure = fullGate.failures.find((failure) => failure.track === "M3+
 assert(m3plusFailure, "M3+ should be a project-gate failure after human-confirmed round-two evidence fails");
 assert.equal(
   m3plusFailure.artifact,
-  "data/experiments/western-strings-round2/m3plus-aligned-eval.json",
-  "M3+ project-gate failure should point to the newest aligned evidence",
+  m3plus.supplementalIntake.instructions,
+  "M3+ project-gate failure should point to the exact current supplemental recording task",
 );
 const m4Failure = fullGate.failures.find((failure) => failure.track === "M4 OMR benchmark");
 assert.equal(m4Failure, undefined, "M4 research benchmark should clear independently while automatic runtime adoption remains closed");
