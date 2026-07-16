@@ -26,6 +26,11 @@ assert.ok(status.publicModelValidation, "public model validation status must alw
 assert.ok(status.measureFeedbackAudit, "project status must expose the measure-feedback safety audit");
 assert.equal(status.measureFeedbackAudit.measureAggregationReleaseReady, false, "measure aggregation must stay closed when safe coverage is below 20%");
 assert.equal(status.measureFeedbackAudit.studentGateReady, false, "eval-only measure aggregation must never directly open student feedback");
+assert.equal(status.measureFeedbackAudit.jointEvidence?.missing, undefined, "joint pitch/IOI/energy measure audit must be present");
+assert.equal(status.measureFeedbackAudit.jointEvidence?.measureJointEvidenceReleaseReady, false, "joint measure evidence must remain closed below the safe coverage floor");
+assert.equal(status.measureFeedbackAudit.jointEvidence?.bestSafeCandidate?.minimumCleanMeasureCoverage, 0.026071, "status must expose the zero-unsafe oracle coverage ceiling");
+assert.equal(status.measureFeedbackAudit.jointEvidence?.bestCoverageFloorTradeoff?.allFoldUnsafeTargetMeasureCount, 24, "status must expose the unsafe cost of crossing 20% coverage");
+assert.equal(status.measureFeedbackAudit.jointEvidence?.productionPolicyChanged, false, "eval-only joint measure evidence must not change production policy");
 const dynamicConfirmation = status.dynamicEvidenceAudit?.combinedWeakConfirmation;
 if (dynamicConfirmation && !dynamicConfirmation.missing) {
   assert.equal(
@@ -129,12 +134,34 @@ assert(status.tracks?.m3plusPitchModes, "project status must include M3+ pitch-m
 assert(status.tracks?.m4Omr, "project status must include M4 OMR track");
 
 const m3plus = status.tracks.m3plusPitchModes;
-assert.equal(m3plus.m3plusModeEvalReady, true, "M3+ review labels should be sufficient for offline mode evaluation");
+assert.equal(m3plus.m3plusModeEvalReady, true, "M3+ rescope report should be available for offline pitch-safety evaluation");
+assert.equal(m3plus.m3plusPitchSafetyReady, true, "M3+ rescope pitch-safety gate should pass on the frozen holdout evidence");
+assert.equal(m3plus.m3plusModeReleaseReady, true, "legacy release alias should follow the authoritative rescope gate");
+assert.equal(m3plus.studentGateReady, false, "offline M3+ pitch-safety evidence must not open the student runtime");
+assert.equal(m3plus.rescopeGate?.sourceExists, true, "M3+ status must expose the authoritative rescope report");
+assert.equal(m3plus.rescopeGate?.releaseGateReady, true, "M3+ rescope report should pass its four frozen safety zones");
+assert.equal(m3plus.rescopeGate?.studentGateReady, false, "M3+ rescope evaluation must remain offline-only");
+assert.equal(m3plus.rescopeGate?.sourceEvidence?.round2MarkedGoldCount, 6, "M3+ rescope gate must validate non-empty marked human-gold content");
+assert.equal(m3plus.rescopeGate?.sourceEvidence?.round2UnscoredVibratoGoldCount, 17, "M3+ rescope gate must expose the seventeen unscored legacy vibrato units");
+assert.equal(m3plus.rescopeGate?.zones?.unmarkedStraight?.decisionCount, 8, "straight-tone zone must retain eight holdout decisions");
+assert.equal(m3plus.rescopeGate?.zones?.unmarkedStraight?.precision, 1, "straight-tone center-pitch precision must remain perfect on frozen decisions");
+assert.equal(m3plus.rescopeGate?.zones?.unmarkedStraight?.unsafeAccusationCount, 0, "straight-tone zone must have zero unsafe accusations");
+assert.equal(m3plus.rescopeGate?.zones?.scoreMarkedNeutral?.totalProtectedCount, 14, "score-marked neutralization must protect all fourteen frozen marked units");
+assert.equal(m3plus.rescopeGate?.zones?.scoreMarkedNeutral?.accusationCount, 0, "score-marked regions must issue zero pitch accusations");
+assert.equal(m3plus.rescopeGate?.zones?.techniqueCenter?.decisionCount, 3, "human-gold vibrato/slide center zone must retain three supported decisions");
+assert.equal(m3plus.rescopeGate?.zones?.techniqueCenter?.precision, 1, "supported technique-center decisions must remain precise");
+assert.equal(m3plus.rescopeGate?.zones?.techniqueCenter?.unsafeAccusationCount, 0, "technique-center zone must have zero unsafe accusations");
+assert.equal(m3plus.rescopeGate?.zones?.unstableFailClosed?.testedCount, 3, "dispersion fallback must retain three frozen stress cases");
+assert.equal(m3plus.rescopeGate?.zones?.unstableFailClosed?.insufficientEvidenceCount, 3, "every unstable stress case must become insufficient evidence");
+assert.equal(m3plus.rescopeGate?.zones?.unstableFailClosed?.accusationCount, 0, "unstable stress cases must issue zero accusations");
+assert.deepEqual(m3plus.blockingReasons || [], [], "retired detector failures must not block the new M3+ release definition");
 assert.equal(m3plus.coarseStateEval?.sourceExists, true, "M3+ status must expose the teacher-style coarse-state probe");
 assert.equal(m3plus.coarseStateEval?.joinReady, true, "all reviewed M3+ rows must join their frozen window features exactly");
 assert.equal(m3plus.coarseStateEval?.eligibleMatchedRows, 74, "coarse-state probe must use the 74 matched, known-behavior rows");
 assert.equal(m3plus.coarseStateEval?.coarseStateRuntimeReady, false, "exploratory coarse states must stay out of runtime");
-assert.equal(m3plus.m3plusModeReleaseReady, false, "human-confirmed round-two failures must supersede the old first-measure release evidence");
+assert.equal(m3plus.modeEval?.researchOnly, true, "legacy technique detector evaluation must be marked research-only");
+assert.equal(m3plus.modeEval?.releaseAuthority, false, "legacy technique detector evaluation must not decide release");
+assert.equal(m3plus.modeEval?.m3plusModeReleaseReady, false, "historical detector release result should remain visible without controlling the new gate");
 assert(m3plus.modeEval?.controlReadyModes?.includes("stable"), "stable should be reported as a control-ready mode");
 assert.deepEqual(m3plus.modeEval?.releaseReadyModes || [], ["slide-like", "trill-like"], "historical first-measure release modes should remain visible as scoped evidence");
 assert.equal(m3plus.round2AlignedEval?.sourceExists, true, "M3+ status must read the round-two aligned evaluation");
@@ -148,25 +175,84 @@ assert.deepEqual(
 );
 assert.equal(m3plus.localizationDiagnosis?.sourceExists, true, "M3+ localization diagnosis should be generated after round-2 import");
 assert.equal(m3plus.localizationDiagnosis?.summary?.nonMatch, 24, "M3+ localization diagnosis should expose the current non-match row count");
-assert((m3plus.blockingReasons || []).includes("m3plus-round2-mode-detection-below-90-percent"), "M3+ status must report the confirmed round-two detector failure");
-assert((m3plus.blockingReasons || []).includes("m3plus-round2-negative-controls-missing"), "M3+ status must report the missing negative controls");
+assert(!(m3plus.blockingReasons || []).includes("m3plus-round2-mode-detection-below-90-percent"), "retired round-two detector failure must not remain a top-level blocker");
+assert((m3plus.researchOnlyDetectorBlockingReasons || []).includes("m3plus-round2-mode-detection-below-90-percent"), "retired round-two detector failure must remain visible as research evidence");
+assert(!(m3plus.blockingReasons || []).includes("m3plus-round2-negative-controls-missing"), "M3+ status must clear the stale negative-control blocker once m3p-01 passes");
 assert.equal(m3plus.supplementalIntake?.sourceExists, true, "M3+ status must expose the prepared supplemental intake");
 assert.equal(m3plus.supplementalIntake?.recordingCount, 4, "M3+ supplemental intake must contain four targeted recordings");
-assert.equal(m3plus.supplementalIntake?.readyRecordingCount, 0, "M3+ supplemental intake must not invent recordings before they exist");
-assert.equal(m3plus.supplementalIntake?.missingRecordingCount, 4, "M3+ supplemental intake must report all four missing recordings");
-assert.equal(m3plus.supplementalIntake?.readyForMachineAnalysis, false, "M3+ supplemental intake must fail closed before audio is recorded");
-assert.equal(m3plus.supplementalIntake?.humanTask, "record-m3plus-supplemental-takes", "M3+ status must name the exact remaining human task");
+assert.equal(m3plus.supplementalIntake?.readyRecordingCount, 4, "M3+ supplemental intake must expose all four recorded takes");
+assert.equal(m3plus.supplementalIntake?.missingRecordingCount, 0, "M3+ supplemental intake must not keep stale missing-recording counts");
+assert.equal(m3plus.supplementalIntake?.readyForMachineAnalysis, true, "M3+ supplemental intake must be ready once all four audio files exist");
+assert.equal(m3plus.supplementalIntake?.humanTask, "none", "M3+ intake must not request recordings that already exist");
 assert(
   String(m3plus.supplementalIntake?.instructions || "").replaceAll("\\", "/").endsWith("音频/m3plus-supplemental/README-录音说明.md"),
   "M3+ status must point to the supplemental recording instructions",
 );
-assert((m3plus.blockingReasons || []).includes("m3plus-supplemental-recordings-not-ready"), "M3+ must remain blocked while supplemental recordings are missing");
+assert(!(m3plus.blockingReasons || []).includes("m3plus-supplemental-recordings-not-ready"), "M3+ must clear the stale missing-recordings blocker");
 assert.equal(m3plus.supplementalMachineEval?.sourceExists, true, "M3+ status must expose the supplemental machine-eval report");
 assert(["crepe", "pyin"].includes(m3plus.supplementalMachineEval?.f0Backend), "M3+ status must expose the actual bounded frame-F0 backend");
 assert.equal(m3plus.supplementalMachineEval?.scoreTechniqueIntentReady, true, "M3+ supplemental score markings must match the frozen technique intent before audio review");
-assert.equal(m3plus.supplementalMachineEval?.machineAnalysisComplete, false, "M3+ machine eval must fail closed before recordings exist");
+assert.equal(m3plus.supplementalMachineEval?.machineAnalysisComplete, false, "M3+ machine eval must fail closed while three takes do not fully localize");
 assert.equal(m3plus.supplementalMachineEval?.teacherReviewAllowed, false, "M3+ machine eval must not request teacher work before passing");
 assert.equal(m3plus.supplementalMachineEval?.studentGateReady, false, "M3+ supplemental evidence must never directly open the student gate");
+assert.equal(m3plus.supplementalMachineEval?.straightNegativeControlReady, true, "m3p-01 must count as the real straight-tone negative control");
+assert.equal(m3plus.supplementalMachineEval?.ornamentRealSamplePresent, true, "m3p-03 must be recognized as a real ornament sample even while validation remains closed");
+assert(!(m3plus.blockingReasons || []).includes("m3plus-ornament-real-sample-missing"), "M3+ must not claim that the existing ornament recording is missing");
+assert(!(m3plus.blockingReasons || []).includes("m3plus-ornament-real-sample-not-validated"), "retired ornament detector evidence must not block the respecified release gate");
+assert((m3plus.researchOnlyDetectorBlockingReasons || []).includes("m3plus-ornament-real-sample-not-validated"), "present-but-unvalidated ornament evidence must remain visible in research-only diagnostics");
+assert.deepEqual(
+  m3plus.supplementalMachineEval?.recordings?.map((recording) => [
+    recording.recordingId,
+    recording.localizationReady,
+    recording.readyUnitCount,
+    recording.unitCount,
+    recording.scoreTransposeSemitones,
+  ]),
+  [
+    ["m3p-01", true, 8, 8, 12],
+    ["m3p-02", false, 10, 16, 12],
+    ["m3p-03", false, 14, 16, 12],
+    ["m3p-04", false, 13, 16, 12],
+  ],
+  "M3+ status must expose the high-octave localization result for every take",
+);
+assert.equal(m3plus.supplementalProtocolDiagnostic?.sourceExists, true, "M3+ status must expose the protocol-order diagnostic");
+assert.equal(m3plus.supplementalProtocolDiagnostic?.postHocProtocolInference, true, "M3+ must label the inferred protocol order as post-hoc");
+assert.equal(m3plus.supplementalProtocolDiagnostic?.bestLocalizationCandidate, "observed-same-pitch-repeat", "M3+ must expose the 16/16 m3p-02 localization candidate");
+assert.deepEqual(
+  m3plus.supplementalProtocolDiagnostic?.scoreAdherenceSummary,
+  {
+    expectedTrillUnitCount: 8,
+    trillUnitsWithExecutionEvidence: 7,
+    issueCandidateCount: 1,
+    formalMetricRelabeled: false,
+    ownerConfirmationRequired: true,
+  },
+  "M3+ must isolate the one likely performance miss without rewriting the formal metric",
+);
+assert.equal(m3plus.supplementalProtocolDiagnostic?.scoreAdherenceIssueCandidates?.length, 1, "M3+ must expose exactly one score-adherence issue candidate");
+assert.equal(m3plus.supplementalProtocolDiagnostic?.scoreAdherenceIssueCandidates?.[0]?.measure, 8, "M3+ issue candidate must remain localized to the last holdout trill");
+assert.equal(m3plus.supplementalProtocolDiagnostic?.multivariateAudit?.heldoutGatePassed, false, "M3+ fixed multivariate audit must remain held-out and fail-closed");
+assert.equal(m3plus.supplementalProtocolDiagnostic?.boundaryRefinementAudit?.multivariateAudit?.heldoutGatePassed, false, "M3+ boundary-refined multivariate audit must not be promoted when recall remains low");
+assert.equal(m3plus.supplementalFeatureAudit?.sourceExists, true, "M3+ status must expose held-out feature separability evidence");
+assert.equal(m3plus.supplementalFeatureAudit?.anyFeaturePassesHeldoutGate, false, "M3+ feature audit must remain fail-closed");
+assert.equal(m3plus.supplementalBackendConsensus?.sourceExists, true, "M3+ status must expose cross-backend holdout evidence");
+assert.equal(m3plus.supplementalBackendConsensus?.independentReleaseModesReady, false, "cross-backend holdout must override stale review-set release claims");
+assert.equal(m3plus.supplementalBackendConsensus?.modes?.slide?.physicalThresholdAudit?.holdout?.precision, 1, "slide holdout precision must remain visible");
+assert.equal(m3plus.supplementalBackendConsensus?.modes?.slide?.physicalThresholdAudit?.holdout?.recall, 0.75, "slide holdout recall must remain visible");
+const m3p03Repair = m3plus.supplementalMachineEval?.repairPlans?.find((item) => item.recordingId === "m3p-03");
+assert.equal(m3p03Repair?.retainedUnitCount, 14, "m3p-03 must retain its fourteen reliable units");
+assert.equal(m3p03Repair?.fullRerecordRequired, false, "m3p-03 must not request a full rerecord for two local failures");
+assert.deepEqual(m3p03Repair?.unresolvedUnits?.map((item) => item.measure), [1, 5], "m3p-03 repair must target the two D5 ornament groups");
+const m3p04Repair = m3plus.supplementalMachineEval?.repairPlans?.find((item) => item.recordingId === "m3p-04");
+assert.equal(m3p04Repair?.retainedUnitCount, 13, "m3p-04 must retain its thirteen reliable units");
+assert.equal(m3p04Repair?.fullRerecordRequired, false, "m3p-04 must not request a full rerecord for local failures");
+assert.deepEqual(m3p04Repair?.unresolvedUnits?.map((item) => item.measure), [7, 8, 8], "m3p-04 repair plan must expose the marginal measure-7 control and final failed group");
+const m3plusNextAction = status.nextActions.find((action) => action.track === "M3+ pitch safety rescope");
+assert(m3plusNextAction?.action.includes("offline pitch-safety gate passes"), "M3+ handoff must report that the respecified offline gate passed");
+assert(m3plusNextAction?.action.includes("student runtime disabled"), "M3+ handoff must keep runtime wiring separate from offline evidence");
+assert(m3plusNextAction?.action.includes("Legacy technique detectors remain research-only"), "M3+ handoff must keep retired detectors out of the release chain");
+assert(m3plusNextAction?.artifact.endsWith("rescope-gate/report.json"), "M3+ handoff must point to the authoritative rescope report");
 assert.equal(status.tracks.m4Omr.m4MeasureAudioRhythmRankingGatePassed, false, "M4 measure-level audio rhythm ranking must remain below the eval-only gate");
 assert.equal(status.tracks.m4Omr.audioRhythmRanking?.measureLevel?.runtimeReady, false, "M4 measure-level audio rhythm evidence must never directly edit a score");
 if (m3plus.monitoredPilotAudit?.sourceExists) {
@@ -175,6 +261,10 @@ if (m3plus.monitoredPilotAudit?.sourceExists) {
   assert.equal(m3plus.monitoredPilotAudit.defaultM3PlusReadyAfter, false, "M3+ monitored pilot audit must keep default runtime disabled");
   assert.deepEqual(Object.keys(m3plus.monitoredPilotAudit.releaseModes || {}), ["slide-like", "trill-like"], "M3+ pilot audit should only expose slide/trill release modes");
   assert((m3plus.monitoredPilotAudit.blockedModes || []).includes("variable-f0"), "unsafe variable-f0 must remain blocked by the M3+ audit");
+  assert((m3plus.monitoredPilotAudit.blockedModes || []).includes("slide-like"), "independent slide failure must block the old release mode");
+  assert((m3plus.monitoredPilotAudit.blockedModes || []).includes("trill-like"), "missing independent trill evidence must block the old release mode");
+  assert((m3plus.monitoredPilotAudit.blockingReasons || []).includes("m3plus-independent-mode-not-ready:slide-like"), "M3+ audit must expose the independent slide blocker");
+  assert((m3plus.monitoredPilotAudit.blockingReasons || []).includes("m3plus-independent-mode-not-ready:trill-like"), "M3+ audit must expose the failed independent trill blocker");
 }
 
 const controlled = status.tracks.controlledCandidate;
@@ -235,7 +325,7 @@ if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
 } else if (ordinaryPilotAuditPassed) {
   assert.equal(
     status.nextActions[0]?.track,
-    "M3+ pitch behavior modes",
+    "M3+ pitch safety rescope",
     "after ordinary pilot audit passes, handoff should move to the next unfinished track while release stays fail-closed",
   );
 } else {
@@ -282,7 +372,7 @@ if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
 } else if (ordinaryPilotAuditPassed) {
   assert.equal(
     status.nextActions[0]?.artifact,
-    m3plus.supplementalIntake.instructions,
+    m3plus.rescopeGate?.source,
     "after ordinary pilot audit passes, handoff artifact should point to the next unfinished track",
   );
 } else {
@@ -346,6 +436,22 @@ if (m4.m4HomrBenchmarkComplete) {
   assert.equal(m4.homrBenchmark?.comparison?.homr?.usableRows, 5, "HOMR comparison must expose all usable outputs");
   assert.equal(m4.homrBenchmark?.comparison?.homr?.pitchOnlyStrictPassRows, 2, "HOMR must expose pitch-only false positives");
   assert.equal(m4.homrBenchmark?.comparison?.homr?.strictPassRows, 0, "HOMR must reject rhythmically invalid MusicXML");
+}
+if (m4.m4SameEditionBenchmarkEvaluated) {
+  assert.equal(m4.m4SameEditionHomrStrictPositive, true, "same-edition human gold should expose the observed HOMR strict pass");
+  assert.equal(m4.m4SameEditionAutomaticAdoptionReady, false, "one same-edition page must not authorize automatic adoption");
+  assert.equal(m4.sameEditionBenchmark?.studentGateReady, false, "same-edition comparison must remain eval-only");
+  assert.equal(m4.sameEditionBenchmark?.candidate?.observedIndependentRows, 1, "same-edition comparison must report its actual one-page sample size");
+  assert.equal(m4.sameEditionBenchmark?.candidate?.minimumIndependentRows, 5, "same-edition adoption gate must require at least five independent pages");
+  assert.equal(m4.sameEditionBenchmark?.engines?.homr?.strictPassRows, 1, "HOMR strict-positive evidence must remain visible without being promoted");
+}
+if (m4.m4Op45ExternalPitchReferenceEvaluated) {
+  assert.equal(m4.m4Op45ExternalPitchExactRunObserved, true, "Op.45 should expose the independent exact pitch-order run");
+  assert.equal(m4.op45PublicReference?.pitchOrderAlignment?.exactMatches, 150, "Op.45 exact run length must remain reproducible");
+  assert.equal(m4.op45PublicReference?.pitchOrderAlignment?.substitutions, 0, "Op.45 exact run must not hide pitch substitutions");
+  assert.equal(m4.op45PublicReference?.gate?.sameEditionHumanGold, false, "public performance MIDI must not be promoted to same-edition human gold");
+  assert.equal(m4.op45PublicReference?.gate?.rhythmEvaluated, false, "performance MIDI probe must not claim notated-rhythm accuracy");
+  assert.equal(m4.op45PublicReference?.gate?.automaticAdoptionReady, false, "external pitch corroboration must not open automatic OMR adoption");
 }
 if (m4.m4ClarityBenchmarkComplete) {
   assert.equal(m4.m4ClarityAutomaticAdoptionReady, false, "Clarity comparison must not open automatic adoption");
@@ -486,6 +592,12 @@ assert(packageJson.scripts?.["western:m4-oemer-benchmark"], "package.json must e
 assert(packageJson.scripts?.["test:western-m4-oemer-benchmark"], "package.json must expose Oemer benchmark regression tests");
 assert(packageJson.scripts?.["western:m4-homr-benchmark"], "package.json must expose the eval-only HOMR benchmark");
 assert(packageJson.scripts?.["test:western-m4-homr-benchmark"], "package.json must expose HOMR benchmark regression tests");
+assert(packageJson.scripts?.["western:m4-op45-public-reference"], "package.json must expose the Op.45 external pitch-reference probe");
+assert(packageJson.scripts?.["test:western-m4-op45-public-reference"], "package.json must expose the Op.45 external pitch-reference regression test");
+assert(packageJson.scripts?.["western:m4-op45-promote-gold"], "package.json must expose fail-closed Op.45 gold promotion");
+assert(packageJson.scripts?.["test:western-m4-op45-gold-promotion"], "package.json must expose Op.45 gold-promotion regression tests");
+assert(packageJson.scripts?.["western:m4-op45-finalize-benchmark"], "package.json must expose one-command Op.45 benchmark finalization");
+assert(packageJson.scripts?.["test:western-m4-op45-finalize-benchmark"], "package.json must expose Op.45 benchmark-finalization regression tests");
 assert(packageJson.scripts?.["western:m4-clarity-benchmark"], "package.json must expose the eval-only Clarity benchmark");
 assert(packageJson.scripts?.["test:western-m4-clarity-benchmark"], "package.json must expose Clarity benchmark regression tests");
 assert(packageJson.scripts?.["western:m3plus-supplemental-scores"], "package.json must expose the M3+ supplemental score generator");
@@ -493,6 +605,12 @@ assert(packageJson.scripts?.["western:m3plus-supplemental-status"], "package.jso
 assert(packageJson.scripts?.["western:m3plus-supplemental-eval"], "package.json must expose the M3+ supplemental machine evaluation command");
 assert(packageJson.scripts?.["test:western-m3plus-supplemental-status"], "package.json must expose M3+ supplemental fail-closed tests");
 assert(packageJson.scripts?.["test:western-m3plus-supplemental-eval"], "package.json must expose M3+ supplemental machine-eval tests");
+assert(packageJson.scripts?.["western:m3plus-protocol-order-diagnostic"], "package.json must expose the M3+ protocol-order diagnostic");
+assert(packageJson.scripts?.["test:western-m3plus-protocol-order-diagnostic"], "package.json must expose protocol-order regression tests");
+assert(packageJson.scripts?.["western:m3plus-feature-separability"], "package.json must expose held-out M3+ feature audit");
+assert(packageJson.scripts?.["test:western-m3plus-feature-separability"], "package.json must expose M3+ feature-audit regression tests");
+assert(packageJson.scripts?.["western:m3plus-rescope-gate"], "package.json must expose the authoritative M3+ pitch-safety rescope gate");
+assert(packageJson.scripts?.["test:western-m3plus-rescope-gate"], "package.json must expose M3+ rescope-gate regression tests");
 assert(
   packageJson.scripts?.["western:m4-independent-gold-note-summary"],
   "package.json must expose the M4 editable-gold note summary command",
@@ -597,7 +715,7 @@ if (m4.m4OmrIndependentBenchmarkReady) {
     !handoff.includes("score-editor independent-gold correction task"),
     "current handoff must not keep stale M4 score-editor instructions after M4 clears",
   );
-  if (m3plus.m3plusModeReleaseReady) {
+  if (m3plus.studentGateReady) {
     assert(
       handoff.includes("npm run western:release-review")
         || handoff.includes("npm run western:controlled-pilot-decision")
@@ -613,8 +731,10 @@ if (m4.m4OmrIndependentBenchmarkReady) {
     );
   } else {
     assert(
-      handoff.includes("m3plus-supplemental") && handoff.includes("README-"),
-      "handoff must point to the exact M3+ supplemental recording task while that track is blocked",
+      handoff.includes("M3+ pitch safety rescope")
+        && handoff.includes("offline pitch-safety gate passes")
+        && handoff.includes("research-only"),
+      "handoff must report the passed offline rescope gate while keeping runtime disabled and old detectors research-only",
     );
   }
   for (const [label, text] of [["project plan", projectPlan], ["migration plan", migrationPlan]]) {
@@ -700,15 +820,19 @@ assert.equal(
   expectedOrdinaryArtifact,
   "ordinary gate failure should point to the current ordinary-gate evidence artifact",
 );
-const m3plusFailure = fullGate.failures.find((failure) => failure.track === "M3+ pitch behavior modes");
-assert(m3plusFailure, "M3+ should be a project-gate failure after human-confirmed round-two evidence fails");
-assert.equal(
-  m3plusFailure.artifact,
-  m3plus.supplementalIntake.instructions,
-  "M3+ project-gate failure should point to the exact current supplemental recording task",
+const m3plusFailure = fullGate.failures.find((failure) => failure.track === "M3+ pitch safety rescope");
+assert.equal(m3plusFailure, undefined, "passed M3+ pitch-safety rescope evidence must no longer fail the project gate");
+const m4Failure = fullGate.failures.find((failure) => failure.track === "M4 OMR automatic adoption");
+assert(m4Failure, "M4 automatic adoption must remain a project-gate failure below its strict multi-page floor");
+assert(
+  m4Failure.reason.includes("m4-same-edition-homr-independent-page-count-below-floor"),
+  "M4 project failure must preserve the same-edition page-count blocker",
 );
-const m4Failure = fullGate.failures.find((failure) => failure.track === "M4 OMR benchmark");
-assert.equal(m4Failure, undefined, "M4 research benchmark should clear independently while automatic runtime adoption remains closed");
+assert.equal(
+  m4Failure.artifact,
+  m4.artifacts.sameEditionBenchmarkJson,
+  "M4 page-count failure should point to the same-edition benchmark",
+);
 
 console.log(JSON.stringify({
   ok: true,
@@ -717,8 +841,8 @@ console.log(JSON.stringify({
     "public-model-validation-evidence-covered",
     "student-runtime-fail-closed",
     "confidence-pilot-validation-state-covered",
-    "m3plus-round2-human-gold-fail-closed-covered",
-    "m4-independent-research-benchmark-clears-runtime-stays-closed",
+    "m3plus-rescope-offline-pass-runtime-fail-closed-covered",
+    "m4-research-claim-separated-from-automatic-adoption-gate",
     "m4-checklist-human-readable",
     "handbook-current-status-does-not-reassign-completed-review",
     "project-gate-required-tracks-block-release",

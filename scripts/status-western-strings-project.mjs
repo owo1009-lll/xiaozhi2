@@ -352,6 +352,34 @@ const M3PLUS_SUPPLEMENTAL_EVAL = path.join(
   "supplemental-machine-eval",
   "supplemental-machine-eval.json",
 );
+const M3PLUS_PROTOCOL_ORDER_DIAGNOSTIC = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3plus",
+  "protocol-order-diagnostic",
+  "protocol-order-diagnostic.json",
+);
+const M3PLUS_FEATURE_SEPARABILITY_AUDIT = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3plus",
+  "feature-separability-audit",
+  "feature-separability-audit.json",
+);
+const M3PLUS_BACKEND_CONSENSUS = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3plus",
+  "backend-consensus",
+  "report.json",
+);
+const M3PLUS_RESCOPE_GATE = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3plus",
+  "rescope-gate",
+  "report.json",
+);
 const M4_READINESS = path.join(
   "data",
   "experiments",
@@ -383,6 +411,27 @@ const M4_HOMR_BENCHMARK = path.join(
   "western-strings-m4",
   "homr-source-benchmark",
   "homr-source-benchmark.json",
+);
+const M4_SAME_EDITION_BENCHMARK = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "beijing-same-edition-benchmark",
+  "same-edition-engine-comparison.json",
+);
+const M4_SAME_EDITION_MULTIPAGE_BENCHMARK = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "same-edition-multipage-benchmark",
+  "same-edition-engine-comparison.json",
+);
+const M4_OP45_PUBLIC_REFERENCE = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "op45-34-public-reference",
+  "op45-34-public-reference-comparison.json",
 );
 const M4_CLARITY_BENCHMARK = path.join(
   "data",
@@ -441,6 +490,48 @@ const M4_RHYTHM_CANDIDATE_ORACLE = path.join(
   "rhythm-candidate-oracle",
   "report.json",
 );
+const M4_P0_STRUCTURE_GATE = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "p0-structure-gate",
+  "report.json",
+);
+const M4_DUAL_EVIDENCE_GOLD_AUDIT = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "dual-evidence-gold-audit",
+  "report.json",
+);
+const M4_P0_FEEDBACK_IMPACT = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "p0-feedback-impact",
+  "report.json",
+);
+const M4_GREEN_SAFETY_AUDIT = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "green-safety-audit",
+  "report.json",
+);
+const M4_ADAPTIVE_INTERLINE_PROBE = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "adaptive-interline-probe",
+  "report.json",
+);
+const M4_FOCUSED_SYMBOL_GOLD = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "focused-symbol-gold",
+  "report.json",
+);
 const M4_AUDIO_RHYTHM_RANKING = path.join(
   "data",
   "experiments",
@@ -467,6 +558,13 @@ const MEASURE_POLICY_AUDIT = path.join(
   "experiments",
   "western-strings-m3",
   "measure-policy-audit",
+  "report.json",
+);
+const MEASURE_JOINT_EVIDENCE_AUDIT = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "measure-joint-evidence-audit",
   "report.json",
 );
 const DYNAMIC_PERTURBATION_GATE = path.join(
@@ -929,6 +1027,71 @@ async function buildM3PlusStatus() {
   const round2FeatureDiagnostic = await readJson(M3PLUS_ROUND2_TRILL_VIBRATO_DIAGNOSTIC);
   const supplementalStatus = await readJson(M3PLUS_SUPPLEMENTAL_STATUS);
   const supplementalEval = await readJson(M3PLUS_SUPPLEMENTAL_EVAL);
+  const supplementalProtocolDiagnostic = await readJson(M3PLUS_PROTOCOL_ORDER_DIAGNOSTIC);
+  const supplementalFeatureAudit = await readJson(M3PLUS_FEATURE_SEPARABILITY_AUDIT);
+  const supplementalBackendConsensus = await readJson(M3PLUS_BACKEND_CONSENSUS);
+  const rescopeGate = await readJson(M3PLUS_RESCOPE_GATE);
+  const supplementalRecordings = Array.isArray(supplementalEval?.recordings)
+    ? supplementalEval.recordings
+    : [];
+  const straightControlRecording = supplementalRecordings.find(
+    (recording) => recording?.recordingId === "m3p-01",
+  );
+  const straightControlRows = Array.isArray(straightControlRecording?.rows)
+    ? straightControlRecording.rows
+    : [];
+  const straightNegativeControlReady = Boolean(
+    straightControlRecording?.status === "ok"
+    && straightControlRecording?.localization?.ready === true
+    && straightControlRows.length >= 4
+    && straightControlRows.every((row) => (
+      row?.expectedBehavior === "stable"
+      && row?.localizationUnitReady === true
+      && row?.modeDiagnostics?.f0QualityReady === true
+      && (row?.predictedModes || []).length === 0
+    )),
+  );
+  const ornamentRealSamplePresent = supplementalRecordings.some((recording) => (
+    Array.isArray(recording?.rows)
+    && recording.rows.some((row) => (row?.expectedPositiveModes || []).includes("ornament"))
+  ));
+  const normalizeCurrentM3PlusReasons = (reasons) => [...new Set(
+    (reasons || [])
+      .filter((reason) => !(
+        reason === "m3plus-round2-negative-controls-missing"
+        && straightNegativeControlReady
+      ))
+      .map((reason) => (
+        reason === "m3plus-ornament-real-sample-missing" && ornamentRealSamplePresent
+          ? "m3plus-ornament-real-sample-not-validated"
+          : reason
+      )),
+  )];
+  const supplementalRepairPlans = supplementalRecordings.map((recording) => {
+    const rows = Array.isArray(recording?.rows) ? recording.rows : [];
+    const unresolvedUnits = rows
+      .filter((row) => (
+        row?.localizationUnitReady !== true
+        || row?.modeDiagnostics?.f0QualityReady !== true
+      ))
+      .map((row) => ({
+        unitNumber: Number(row?.unitIndex ?? -1) + 1,
+        measure: Number(row?.measure || 0) || null,
+        evaluationSplit: row?.evaluationSplit || "unknown",
+        expectedBehavior: row?.expectedBehavior || "unknown",
+        localizationReady: row?.localizationUnitReady === true,
+        f0QualityReady: row?.modeDiagnostics?.f0QualityReady === true,
+      }));
+    return {
+      recordingId: recording?.recordingId || "unknown",
+      retainedUnitCount: Math.max(0, rows.length - unresolvedUnits.length),
+      unresolvedUnitCount: unresolvedUnits.length,
+      unresolvedUnits,
+      fullRerecordRequired: recording?.status === "audio-missing"
+        || recording?.status === "analysis-failed",
+      targetedRepairOnly: rows.length > 0 && unresolvedUnits.length > 0,
+    };
+  });
   const candidateQualityReviewPageExists = await exists(M3PLUS_CANDIDATE_QUALITY_REVIEW_PAGE);
   const candidateQualityCompletedExists = await exists(M3PLUS_CANDIDATE_QUALITY_COMPLETED);
   const allSourceRows = [...sourceRows];
@@ -975,7 +1138,15 @@ async function buildM3PlusStatus() {
   const historicalModeReleaseReady = Boolean(modeEval?.m3plusModeReleaseReady);
   const round2AlignedEvalExists = Boolean(round2AlignedEval);
   const round2ReleaseEvidenceReady = round2AlignedEval?.releaseEvidenceReady === true;
-  const modeReleaseReady = historicalModeReleaseReady && round2ReleaseEvidenceReady;
+  const independentModeEvidenceReady = ["slide", "trill"].every(
+    (mode) => supplementalBackendConsensus?.modes?.[mode]?.releaseReady === true,
+  );
+  const historicalCombinedModeReleaseReady = historicalModeReleaseReady
+    && round2ReleaseEvidenceReady
+    && independentModeEvidenceReady;
+  const rescopeGateExists = Boolean(rescopeGate);
+  const rescopeGateReady = rescopeGate?.releaseGateReady === true;
+  const modeReleaseReady = rescopeGateReady;
   const modeEvalBlockingReasons = [];
   if (labelReady && !modeEvalExists) {
     modeEvalBlockingReasons.push("m3plus-mode-eval-missing");
@@ -991,6 +1162,18 @@ async function buildM3PlusStatus() {
     modeEvalBlockingReasons.push(...(
       round2AlignedEval?.blockingReasons || ["m3plus-round2-release-evidence-not-ready"]
     ));
+  }
+  if (!supplementalBackendConsensus) {
+    modeEvalBlockingReasons.push("m3plus-independent-backend-consensus-missing");
+  } else {
+    for (const mode of ["slide", "trill"]) {
+      const evidence = supplementalBackendConsensus?.modes?.[mode];
+      if (!evidence) {
+        modeEvalBlockingReasons.push(`m3plus-independent-mode-evidence-missing:${mode}`);
+      } else if (evidence.releaseReady !== true) {
+        modeEvalBlockingReasons.push(`m3plus-independent-mode-not-ready:${mode}`);
+      }
+    }
   }
   if (!supplementalStatus?.readyForMachineAnalysis) {
     modeEvalBlockingReasons.push("m3plus-supplemental-recordings-not-ready");
@@ -1011,13 +1194,19 @@ async function buildM3PlusStatus() {
   if (supplementalEval && supplementalEval.scoreTechniqueIntentReady !== true) {
     modeEvalBlockingReasons.push("m3plus-supplemental-score-technique-intent-invalid");
   }
-  const blockingReasons = [...labelBlockingReasons, ...modeEvalBlockingReasons];
+  const currentModeEvalBlockingReasons = normalizeCurrentM3PlusReasons(modeEvalBlockingReasons);
+  const blockingReasons = rescopeGateExists
+    ? [...new Set(rescopeGate?.blockingReasons || [])]
+    : ["m3plus-rescope-gate-missing"];
   return {
     ok: true,
-    m3plusModeEvalReady: labelReady,
+    m3plusModeEvalReady: rescopeGateExists,
+    m3plusPitchSafetyReady: rescopeGateReady,
     m3plusModeReleaseReady: modeReleaseReady,
     studentGateReady: false,
-    reason: modeReleaseReady ? "round2-mode-release-evidence-ready" : "round2-mode-evidence-fail-closed",
+    reason: modeReleaseReady
+      ? "m3plus-rescope-pitch-safety-ready"
+      : "m3plus-rescope-pitch-safety-fail-closed",
     counts: {
       rowCount: sourceRows.length,
       cumulativeRowCount: allSourceRows.length,
@@ -1027,14 +1216,42 @@ async function buildM3PlusStatus() {
       missingLabelRows: Math.max(0, allSourceRows.length - labelKeys.size),
     },
     perMode,
+    rescopeGate: rescopeGate ? {
+      source: M3PLUS_RESCOPE_GATE.replace(/\\/g, "/"),
+      sourceExists: true,
+      evalOnly: rescopeGate.evalOnly === true,
+      releaseGateReady: rescopeGateReady,
+      studentGateReady: false,
+      productionPolicyChanged: rescopeGate.productionPolicyChanged === true,
+      thresholds: rescopeGate.thresholds || {},
+      sourceEvidence: rescopeGate.sourceEvidence || {},
+      zones: rescopeGate.zones || {},
+      blockingReasons: rescopeGate.blockingReasons || [],
+    } : {
+      source: M3PLUS_RESCOPE_GATE.replace(/\\/g, "/"),
+      sourceExists: false,
+      evalOnly: true,
+      releaseGateReady: false,
+      studentGateReady: false,
+      productionPolicyChanged: false,
+      thresholds: {},
+      sourceEvidence: {},
+      zones: {},
+      blockingReasons: ["m3plus-rescope-gate-missing"],
+    },
     modeEval: {
       source: M3PLUS_MODE_EVAL.replace(/\\/g, "/"),
       sourceExists: modeEvalExists,
-      m3plusModeReleaseReady: modeReleaseReady,
+      researchOnly: true,
+      releaseAuthority: false,
+      m3plusModeReleaseReady: historicalCombinedModeReleaseReady,
       releaseReadyModes: modeEval?.releaseReadyModes || [],
       controlReadyModes: modeEval?.controlReadyModes || [],
       counts: modeEval?.counts || {},
-      blockingReasons: modeEval?.blockingReasons || modeEvalBlockingReasons,
+      blockingReasons: [...new Set([
+        ...(modeEval?.blockingReasons || []),
+        ...modeEvalBlockingReasons,
+      ])],
     },
     coarseStateEval: coarseStateEval ? {
       source: M3PLUS_COARSE_STATE_EVAL.replace(/\\/g, "/"),
@@ -1145,6 +1362,19 @@ async function buildM3PlusStatus() {
       humanTask: supplementalEval.humanTask || "none",
       counts: supplementalEval.counts || {},
       modeMetrics: supplementalEval.modeMetrics || {},
+      recordings: Array.isArray(supplementalEval.recordings)
+        ? supplementalEval.recordings.map((recording) => ({
+          recordingId: recording?.recordingId || "unknown",
+          status: recording?.status || "unknown",
+          localizationReady: recording?.localization?.ready === true,
+          readyUnitCount: recording?.localization?.readyUnitCount ?? 0,
+          unitCount: recording?.localization?.unitCount ?? 0,
+          scoreTransposeSemitones: recording?.localization?.scoreTransposeSemitones ?? null,
+        }))
+        : [],
+      straightNegativeControlReady,
+      ornamentRealSamplePresent,
+      repairPlans: supplementalRepairPlans,
       blockingReasons: supplementalEval.blockingReasons || [],
     } : {
       source: M3PLUS_SUPPLEMENTAL_EVAL.replace(/\\/g, "/"),
@@ -1161,14 +1391,81 @@ async function buildM3PlusStatus() {
         : "record-m3plus-supplemental-takes",
       counts: {},
       modeMetrics: {},
+      recordings: [],
+      straightNegativeControlReady: false,
+      ornamentRealSamplePresent: false,
+      repairPlans: [],
       blockingReasons: ["m3plus-supplemental-machine-eval-missing"],
+    },
+    supplementalProtocolDiagnostic: supplementalProtocolDiagnostic ? {
+      source: M3PLUS_PROTOCOL_ORDER_DIAGNOSTIC.replace(/\\/g, "/"),
+      sourceExists: true,
+      postHocProtocolInference: supplementalProtocolDiagnostic.postHocProtocolInference === true,
+      bestLocalizationCandidate: supplementalProtocolDiagnostic.bestLocalizationCandidate || "unknown",
+      decision: supplementalProtocolDiagnostic.decision || "unknown",
+      candidates: supplementalProtocolDiagnostic.candidates || [],
+      featureAudit: supplementalProtocolDiagnostic.featureAudit || {},
+      multivariateAudit: supplementalProtocolDiagnostic.multivariateAudit || {},
+      boundaryRefinementAudit:
+        supplementalProtocolDiagnostic.boundaryRefinementAudit || {},
+      sessionPitchBaseline: supplementalProtocolDiagnostic.sessionPitchBaseline || {},
+      scoreAdherenceSummary: supplementalProtocolDiagnostic.scoreAdherenceSummary || {},
+      scoreAdherenceIssueCandidates:
+        supplementalProtocolDiagnostic.scoreAdherenceIssueCandidates || [],
+    } : {
+      source: M3PLUS_PROTOCOL_ORDER_DIAGNOSTIC.replace(/\\/g, "/"),
+      sourceExists: false,
+      postHocProtocolInference: false,
+      bestLocalizationCandidate: "unknown",
+      decision: "protocol-order-diagnostic-missing",
+      candidates: [],
+      featureAudit: {},
+      multivariateAudit: {},
+      boundaryRefinementAudit: {},
+      sessionPitchBaseline: {},
+      scoreAdherenceSummary: {},
+      scoreAdherenceIssueCandidates: [],
+    },
+    supplementalFeatureAudit: supplementalFeatureAudit ? {
+      source: M3PLUS_FEATURE_SEPARABILITY_AUDIT.replace(/\\/g, "/"),
+      sourceExists: true,
+      minimumPerClassPerSplit: supplementalFeatureAudit.minimumPerClassPerSplit ?? 4,
+      anyFeaturePassesHeldoutGate: supplementalFeatureAudit.anyFeaturePassesHeldoutGate === true,
+      decision: supplementalFeatureAudit.decision || "unknown",
+      modes: supplementalFeatureAudit.modes || {},
+    } : {
+      source: M3PLUS_FEATURE_SEPARABILITY_AUDIT.replace(/\\/g, "/"),
+      sourceExists: false,
+      minimumPerClassPerSplit: 4,
+      anyFeaturePassesHeldoutGate: false,
+      decision: "feature-separability-audit-missing",
+      modes: {},
+    },
+    supplementalBackendConsensus: supplementalBackendConsensus ? {
+      source: M3PLUS_BACKEND_CONSENSUS.replace(/\\/g, "/"),
+      sourceExists: true,
+      anyModeReleaseReady: supplementalBackendConsensus.anyModeReleaseReady === true,
+      studentFacing: supplementalBackendConsensus.studentFacing === true,
+      productionPolicyChanged: supplementalBackendConsensus.productionPolicyChanged === true,
+      modes: supplementalBackendConsensus.modes || {},
+      independentReleaseModesReady: independentModeEvidenceReady,
+    } : {
+      source: M3PLUS_BACKEND_CONSENSUS.replace(/\\/g, "/"),
+      sourceExists: false,
+      anyModeReleaseReady: false,
+      studentFacing: false,
+      productionPolicyChanged: false,
+      modes: {},
+      independentReleaseModesReady: false,
     },
     monitoredPilotAudit: monitoredPilotAudit ? {
       source: M3PLUS_MONITORED_PILOT_AUDIT.replace(/\\/g, "/"),
       sourceExists: true,
       ok: monitoredPilotAudit.ok === true,
       readyForMonitoredPilot:
-        monitoredPilotAudit.readyForMonitoredPilot === true && round2ReleaseEvidenceReady,
+        monitoredPilotAudit.readyForMonitoredPilot === true
+        && round2ReleaseEvidenceReady
+        && independentModeEvidenceReady,
       teacherReviewNeeded: monitoredPilotAudit.teacherReviewNeeded === true,
       defaultM3PlusReadyAfter: monitoredPilotAudit.defaultM3PlusReadyAfter === true,
       releaseModes: monitoredPilotAudit.releaseModes || {},
@@ -1176,7 +1473,12 @@ async function buildM3PlusStatus() {
       blockingReasons: [
         ...(monitoredPilotAudit.blockingReasons || []),
         ...(!round2ReleaseEvidenceReady
-          ? (round2AlignedEval?.blockingReasons || ["m3plus-round2-release-evidence-not-ready"])
+          ? normalizeCurrentM3PlusReasons(
+            round2AlignedEval?.blockingReasons || ["m3plus-round2-release-evidence-not-ready"],
+          )
+          : []),
+        ...(!independentModeEvidenceReady
+          ? modeEvalBlockingReasons.filter((reason) => reason.startsWith("m3plus-independent-"))
           : []),
       ],
     } : {
@@ -1205,6 +1507,10 @@ async function buildM3PlusStatus() {
       needsReview: candidateQualityReviewPageExists && !candidateQualityCompletedExists,
     },
     labelBlockingReasons,
+    researchOnlyDetectorBlockingReasons: [
+      ...labelBlockingReasons,
+      ...currentModeEvalBlockingReasons,
+    ],
     blockingReasons,
     reviewArtifacts: {
       reviewPage: M3PLUS_REVIEW_PAGE.replace(/\\/g, "/"),
@@ -1224,6 +1530,8 @@ async function buildM3PlusStatus() {
       round2TrillVibratoDiagnosticJson: M3PLUS_ROUND2_TRILL_VIBRATO_DIAGNOSTIC.replace(/\\/g, "/"),
       supplementalStatusJson: M3PLUS_SUPPLEMENTAL_STATUS.replace(/\\/g, "/"),
       supplementalMachineEvalJson: M3PLUS_SUPPLEMENTAL_EVAL.replace(/\\/g, "/"),
+      supplementalBackendConsensusJson: M3PLUS_BACKEND_CONSENSUS.replace(/\\/g, "/"),
+      rescopeGateJson: M3PLUS_RESCOPE_GATE.replace(/\\/g, "/"),
       supplementalInstructions: supplementalStatus?.instructions || "",
       candidateQualityReviewPage: M3PLUS_CANDIDATE_QUALITY_REVIEW_PAGE.replace(/\\/g, "/"),
       candidateQualitySourceCsv: M3PLUS_CANDIDATE_QUALITY_SOURCE.replace(/\\/g, "/"),
@@ -1412,11 +1720,23 @@ async function buildM4OmrStatus() {
   const independentBenchmark = await readJson(M4_INDEPENDENT_BENCHMARK_AUDIT);
   const oemerBenchmark = await readJson(M4_OEMER_BENCHMARK);
   const homrBenchmark = await readJson(M4_HOMR_BENCHMARK);
+  const sameEditionMultipageBenchmark = await readJson(M4_SAME_EDITION_MULTIPAGE_BENCHMARK);
+  const sameEditionBenchmark = sameEditionMultipageBenchmark || await readJson(M4_SAME_EDITION_BENCHMARK);
+  const sameEditionBenchmarkSource = sameEditionMultipageBenchmark
+    ? M4_SAME_EDITION_MULTIPAGE_BENCHMARK
+    : M4_SAME_EDITION_BENCHMARK;
+  const op45PublicReference = await readJson(M4_OP45_PUBLIC_REFERENCE);
   const clarityBenchmark = await readJson(M4_CLARITY_BENCHMARK);
   const clarityAdaptationBenchmark = await readJson(M4_CLARITY_ADAPTATION_BENCHMARK);
   const workspaceAudit = await readJson(M4_INDEPENDENT_GOLD_WORKSPACE_AUDIT);
   const provenanceAudit = await readJson(M4_GOLD_PROVENANCE_AUDIT);
   const rhythmCandidateOracle = await readJson(M4_RHYTHM_CANDIDATE_ORACLE);
+  const p0StructureGate = await readJson(M4_P0_STRUCTURE_GATE);
+  const dualEvidenceGoldAudit = await readJson(M4_DUAL_EVIDENCE_GOLD_AUDIT);
+  const p0FeedbackImpact = await readJson(M4_P0_FEEDBACK_IMPACT);
+  const greenSafetyAudit = await readJson(M4_GREEN_SAFETY_AUDIT);
+  const adaptiveInterlineProbe = await readJson(M4_ADAPTIVE_INTERLINE_PROBE);
+  const focusedSymbolGold = await readJson(M4_FOCUSED_SYMBOL_GOLD);
   const audioRhythmRanking = await readJson(M4_AUDIO_RHYTHM_RANKING);
   const engineConsensus = await readJson(M4_ENGINE_CONSENSUS);
   const engineConsensusToleranceSweep = await readJson(M4_ENGINE_CONSENSUS_TOLERANCE_SWEEP);
@@ -1431,6 +1751,10 @@ async function buildM4OmrStatus() {
       ? ["m4-oemer-source-benchmark-below-floor"] : []),
     ...(!automaticAdoptionReady && homrBenchmark?.complete === true && homrBenchmark?.gate?.automaticAdoptionReady !== true
       ? ["m4-homr-source-benchmark-below-complete-score-floor"] : []),
+    ...(!automaticAdoptionReady
+      && sameEditionBenchmark?.candidate?.observedStrictPass === true
+      && sameEditionBenchmark?.candidate?.automaticAdoptionReady !== true
+      ? ["m4-same-edition-homr-independent-page-count-below-floor"] : []),
     ...(!automaticAdoptionReady && clarityBenchmark?.complete === true && clarityBenchmark?.gate?.automaticAdoptionReady !== true
       ? ["m4-clarity-source-benchmark-below-complete-score-floor"] : []),
     ...(!automaticAdoptionReady
@@ -1481,11 +1805,41 @@ async function buildM4OmrStatus() {
     m4OemerAutomaticAdoptionReady: oemerBenchmark?.gate?.automaticAdoptionReady === true,
     m4HomrBenchmarkComplete: homrBenchmark?.complete === true,
     m4HomrAutomaticAdoptionReady: homrBenchmark?.gate?.automaticAdoptionReady === true,
+    m4SameEditionBenchmarkEvaluated: sameEditionBenchmark?.goldIdentity?.sameGoldVerified === true,
+    m4SameEditionHomrStrictPositive:
+      sameEditionBenchmark?.candidate?.engine === "homr"
+      && sameEditionBenchmark?.candidate?.observedStrictPass === true,
+    m4SameEditionAutomaticAdoptionReady:
+      sameEditionBenchmark?.candidate?.automaticAdoptionReady === true,
+    m4Op45ExternalPitchReferenceEvaluated:
+      op45PublicReference?.purpose === "independent-public-pitch-order-corroboration",
+    m4Op45ExternalPitchExactRunObserved:
+      op45PublicReference?.interpretation?.strictExactRunObserved === true,
     m4ClarityBenchmarkComplete: clarityBenchmark?.complete === true,
     m4ClarityAutomaticAdoptionReady: clarityBenchmark?.gate?.automaticAdoptionReady === true,
     m4ClarityAdaptationEvaluated: clarityAdaptationBenchmark?.adaptationDecision?.evaluated === true,
     m4ClarityAdaptationRejected: clarityAdaptationBenchmark?.adaptationDecision?.checkpointDisposition === "reject-and-delete",
-    m4RhythmCandidateOracleEvaluated: rhythmCandidateOracle?.summary?.candidateGenerationGatePassed === true,
+    m4RhythmCandidateOracleEvaluated: Boolean(rhythmCandidateOracle?.summary),
+    m4RhythmCandidateGenerationGatePassed:
+      rhythmCandidateOracle?.summary?.candidateGenerationGatePassed === true,
+    m4P0StructureGateEvaluated: Boolean(p0StructureGate?.summary),
+    m4P0StructureReady: p0StructureGate?.summary?.p0ReadyCount > 0,
+    m4GreenSequenceGatePassed:
+      dualEvidenceGoldAudit?.summary?.evalOnlyGatePassed === true,
+    m4GreenFeedbackRecommendedForProduction:
+      p0FeedbackImpact?.summary?.greenOnlyRecommendedForProduction === true,
+    m4GreenFreshValidationCandidateFound:
+      greenSafetyAudit?.summary?.freshValidationCandidateFound === true,
+    m4GreenReleaseGateCandidateFound:
+      greenSafetyAudit?.summary?.releaseGateCandidateFound === true,
+    m4GreenProductionPolicyChanged:
+      greenSafetyAudit?.summary?.productionPolicyChanged === true,
+    m4AdaptiveInterlineProbeEvaluated:
+      Array.isArray(adaptiveInterlineProbe?.rows) && adaptiveInterlineProbe.rows.length > 0,
+    m4AdaptiveInterlineProductionPolicyChanged:
+      adaptiveInterlineProbe?.productionPolicyChanged === true,
+    m4FocusedSymbolGoldBuilt: Boolean(focusedSymbolGold?.summary),
+    m4CoordinateGoldReady: focusedSymbolGold?.summary?.coordinateGoldReady === true,
     m4RhythmRuntimeReady: rhythmCandidateOracle?.summary?.runtimeReady === true,
     m4AudioRhythmRankingGatePassed: audioRhythmRanking?.summary?.evalOnlyGatePassed === true,
     m4MeasureAudioRhythmRankingGatePassed:
@@ -1518,6 +1872,8 @@ async function buildM4OmrStatus() {
       independentBenchmarkJson: M4_INDEPENDENT_BENCHMARK_AUDIT.replace(/\\/g, "/"),
       oemerBenchmarkJson: M4_OEMER_BENCHMARK.replace(/\\/g, "/"),
       homrBenchmarkJson: M4_HOMR_BENCHMARK.replace(/\\/g, "/"),
+      sameEditionBenchmarkJson: sameEditionBenchmarkSource.replace(/\\/g, "/"),
+      op45PublicReferenceJson: M4_OP45_PUBLIC_REFERENCE.replace(/\\/g, "/"),
       clarityBenchmarkJson: M4_CLARITY_BENCHMARK.replace(/\\/g, "/"),
       clarityAdaptationBenchmarkJson: M4_CLARITY_ADAPTATION_BENCHMARK.replace(/\\/g, "/"),
       independentGoldTodo: M4_INDEPENDENT_GOLD_TODO.replace(/\\/g, "/"),
@@ -1527,6 +1883,10 @@ async function buildM4OmrStatus() {
       goldProvenanceAuditJson: M4_GOLD_PROVENANCE_AUDIT.replace(/\\/g, "/"),
       goldProvenanceAuditCsv: M4_GOLD_PROVENANCE_AUDIT_CSV.replace(/\\/g, "/"),
       rhythmCandidateOracleJson: M4_RHYTHM_CANDIDATE_ORACLE.replace(/\\/g, "/"),
+      dualEvidenceGoldAuditJson: M4_DUAL_EVIDENCE_GOLD_AUDIT.replace(/\\/g, "/"),
+      p0FeedbackImpactJson: M4_P0_FEEDBACK_IMPACT.replace(/\\/g, "/"),
+      greenSafetyAuditJson: M4_GREEN_SAFETY_AUDIT.replace(/\\/g, "/"),
+      adaptiveInterlineProbeJson: M4_ADAPTIVE_INTERLINE_PROBE.replace(/\\/g, "/"),
       audioRhythmRankingJson: M4_AUDIO_RHYTHM_RANKING.replace(/\\/g, "/"),
       engineConsensusJson: M4_ENGINE_CONSENSUS.replace(/\\/g, "/"),
       engineConsensusToleranceSweepJson: M4_ENGINE_CONSENSUS_TOLERANCE_SWEEP.replace(/\\/g, "/"),
@@ -1626,6 +1986,34 @@ async function buildM4OmrStatus() {
       automaticAdoptionReady: false,
       studentGateReady: false,
     },
+    sameEditionBenchmark: sameEditionBenchmark ? {
+      source: sameEditionBenchmarkSource.replace(/\\/g, "/"),
+      evalOnly: sameEditionBenchmark.evalOnly === true,
+      studentGateReady: sameEditionBenchmark.studentGateReady === true,
+      goldIdentity: sameEditionBenchmark.goldIdentity || {},
+      candidate: sameEditionBenchmark.candidate || {},
+      engines: sameEditionBenchmark.engines || {},
+    } : {
+      source: sameEditionBenchmarkSource.replace(/\\/g, "/"),
+      missing: true,
+      studentGateReady: false,
+      candidate: { automaticAdoptionReady: false },
+    },
+    op45PublicReference: op45PublicReference ? {
+      source: M4_OP45_PUBLIC_REFERENCE.replace(/\\/g, "/"),
+      evalOnly: op45PublicReference.evalOnly === true,
+      studentFacing: op45PublicReference.studentFacing === true,
+      counts: op45PublicReference.counts || {},
+      pitchOrderAlignment: op45PublicReference.pitchOrderAlignment || {},
+      interpretation: op45PublicReference.interpretation || {},
+      gate: op45PublicReference.gate || {},
+    } : {
+      source: M4_OP45_PUBLIC_REFERENCE.replace(/\\/g, "/"),
+      missing: true,
+      evalOnly: true,
+      studentFacing: false,
+      gate: { automaticAdoptionReady: false },
+    },
     clarityBenchmark: clarityBenchmark ? {
       source: M4_CLARITY_BENCHMARK.replace(/\\/g, "/"),
       complete: clarityBenchmark.complete === true,
@@ -1655,6 +2043,28 @@ async function buildM4OmrStatus() {
       adaptationDecision: {},
     },
     rhythmCandidateOracle: rhythmCandidateOracle?.summary || null,
+    p0StructureGate: p0StructureGate?.summary || null,
+    adaptiveInterlineProbe: adaptiveInterlineProbe ? {
+      source: M4_ADAPTIVE_INTERLINE_PROBE.replace(/\\/g, "/"),
+      rowCount: Array.isArray(adaptiveInterlineProbe.rows)
+        ? adaptiveInterlineProbe.rows.length
+        : 0,
+      independentGoldRowCount: Array.isArray(adaptiveInterlineProbe.rows)
+        ? adaptiveInterlineProbe.rows.filter((row) => row?.independentGoldAvailable === true).length
+        : 0,
+      independentGoldComparisons: Array.isArray(adaptiveInterlineProbe.rows)
+        ? adaptiveInterlineProbe.rows
+            .filter((row) => row?.independentGold)
+            .map((row) => ({
+              piece: row.piece,
+              baselineUp2: row.independentGold.baselineUp2 || null,
+              adaptiveInterline: row.independentGold.adaptiveInterline || null,
+              adaptiveMinusBaseline: row.independentGold.adaptiveMinusBaseline || null,
+            }))
+        : [],
+      productionPolicyChanged: adaptiveInterlineProbe.productionPolicyChanged === true,
+    } : null,
+    focusedSymbolGold: focusedSymbolGold?.summary || null,
     audioRhythmRanking: audioRhythmRanking ? {
       summary: audioRhythmRanking.summary || null,
       ensembleSummary: audioRhythmRanking.ensembleSummary || null,
@@ -1716,11 +2126,6 @@ function summarizeNextActions(
     && (ordinaryPilotAudit.blockingReasons || []).length === 0;
   const ordinaryOnlyDefaultDisabled = ordinaryBlockers.length > 0
     && ordinaryBlockers.every((reason) => reason === "ordinary-auto-gate-disabled-by-default");
-  const m3plusAudit = m3plus.monitoredPilotAudit || {};
-  const m3plusPilotEvidencePassed = m3plusAudit.readyForMonitoredPilot === true
-    && m3plusAudit.teacherReviewNeeded !== true
-    && m3plusAudit.defaultM3PlusReadyAfter !== true
-    && (m3plusAudit.blockingReasons || []).length === 0;
   if (!controlled.studentSafeCandidateGateReady && !(ordinaryPilotEvidencePassed && ordinaryOnlyDefaultDisabled)) {
     const ordinaryArtifact = (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-context-validation-needed")
       ? (controlled.reviewArtifacts.recalibrationContextValidationReviewPage || controlled.confidenceRecalibration?.contextValidation?.reviewPage)
@@ -1746,56 +2151,26 @@ function summarizeNextActions(
   if (!m3plus.m3plusModeEvalReady) {
     actions.push({
       priority: 2,
-      track: "M3+ pitch behavior modes",
-      action: "Finish M3+ pitch behavior labels, import them, then evaluate per-mode precision separately.",
-      artifact: m3plus.reviewArtifacts.reviewPage,
+      track: "M3+ pitch safety rescope",
+      action: "Run `npm run western:m3plus-rescope-gate`. It evaluates straight-tone safety, score-marked neutralization, center-pitch evidence, and the fail-closed dispersion guard without requiring technique classification.",
+      artifact: m3plus.reviewArtifacts.rescopeGateJson,
       reason: m3plus.blockingReasons,
     });
-  } else if (!m3plus.m3plusModeReleaseReady) {
-    const counts = m3plus.modeEval?.counts || {};
-    const localizationSummary = m3plus.localizationDiagnosis?.summary || {};
-    const candidateQualityReview = m3plus.candidateQualityReview || {};
-    const round2AlignedEval = m3plus.round2AlignedEval || {};
-    const supplementalIntake = m3plus.supplementalIntake || {};
-    const supplementalEval = m3plus.supplementalMachineEval || {};
-    const mismatchText = counts.rows
-      ? ` Current eval has ${counts.match || 0} match, ${counts.mismatch || 0} mismatch, and ${Math.max(0, (counts.rows || 0) - (counts.match || 0) - (counts.mismatch || 0))} uncertain/other rows out of ${counts.rows}; fix score-audio localization/candidate quality before another release attempt.`
-      : "";
-    const localizationText = localizationSummary.total
-      ? ` Localization diagnosis reports ${localizationSummary.nonMatch || 0}/${localizationSummary.total} non-match rows (${Math.round((localizationSummary.nonMatchRate || 0) * 100)}%).`
-      : "";
+  } else if (!m3plus.m3plusPitchSafetyReady) {
     actions.push({
       priority: 2,
-      track: "M3+ pitch behavior modes",
-      action: round2AlignedEval.sourceExists
-        ? supplementalIntake.readyForMachineAnalysis
-          ? !supplementalEval.sourceExists || !supplementalEval.machineAnalysisComplete
-            ? `The four M3+ supplemental takes are ready. Run \`npm run western:m3plus-supplemental-eval\` against the frozen score-intent labels; do not ask a teacher to review until localization and audio decoding pass.`
-            : !supplementalEval.machineModeThresholdPassed
-              ? `The M3+ supplemental recordings decode and localize, but the frozen mode threshold failed. Do not ask a teacher to repeat review; inspect ${supplementalEval.source} and fix candidate features first.`
-              : !supplementalEval.performanceConfirmedByOwner
-                ? `The M3+ supplemental machine gate passed. Confirm that all four recordings followed the fixed written protocol, then rerun \`npm run western:m3plus-supplemental-eval -- --performance-confirmed\` before any professional review.`
-                : `The M3+ supplemental machine gate and performer confirmation passed. A single bounded professional review may now be generated; student feedback remains disabled.`
-          : `The human-confirmed round-two aligned evaluation remains fail-closed. Record the four fixed-note takes in ${supplementalIntake.instructions || "音频/m3plus-supplemental/README-录音说明.md"}; no score reading is required. They provide straight-tone negatives, an independent vibrato/trill take, ornament controls, and slide controls. Natural-harmonic intonation is out of scope. Do not re-review completed rows.`
-        : candidateQualityReview.needsReview
-        ? `M3+ labels are sufficient and round-2 is imported, but no non-control pitch-behavior mode is release-ready.${mismatchText}${localizationText} The candidate-quality review pack is now restricted to first-measure rows from recordings whose prior review rows were all audio-score matches; later measures are treated as localization-drift risk and excluded.`
-        : `M3+ labels are sufficient and round-2 is imported, but no non-control pitch-behavior mode is release-ready.${mismatchText}${localizationText} Keep M3+ review-only and inspect localization groups before changing candidate generation.`,
-      artifact: round2AlignedEval.sourceExists
-        ? supplementalIntake.readyForMachineAnalysis && supplementalEval.sourceExists
-          ? supplementalEval.source
-          : supplementalIntake.instructions || supplementalIntake.source || round2AlignedEval.source
-        : candidateQualityReview.needsReview
-        ? candidateQualityReview.reviewPage
-        : (m3plus.reviewArtifacts.localizationDiagnosisGroupsCsv || m3plus.reviewArtifacts.modeEvalCsv || m3plus.reviewArtifacts.modeEvalJson),
+      track: "M3+ pitch safety rescope",
+      action: "The respecified M3+ offline gate failed. Inspect the zone-level precision, unsafe accusation, and insufficient-evidence counts. Keep score-marked regions neutral and do not revive trill/ornament audio detectors to force a pass.",
+      artifact: m3plus.rescopeGate?.source || m3plus.reviewArtifacts.rescopeGateJson,
       reason: m3plus.blockingReasons,
     });
-  } else if (!m3plus.studentGateReady && !m3plusPilotEvidencePassed) {
+  } else if (!m3plus.studentGateReady) {
     actions.push({
       priority: 2,
-      track: "M3+ pitch behavior modes",
-      action: `M3+ first-measure offline evidence now passes for ${(m3plus.modeEval?.releaseReadyModes || []).join(", ") || "mode-specific"} pitch-judgement modes. Run npm run western:m3plus-monitored-pilot-audit before any product pilot; keep default runtime fail-closed and do not request more M3+ review for the current pack unless the audit reports unknown or unsafe rows.`,
-      artifact: m3plus.reviewArtifacts.monitoredPilotAuditJson || m3plus.reviewArtifacts.modeEvalJson || m3plus.reviewArtifacts.modeEvalCsv,
-      reason: ["m3plus-runtime-disabled-by-default", "m3plus-first-measure-scope-only"],
+      track: "M3+ pitch safety rescope",
+      action: "The respecified offline pitch-safety gate passes. Keep the student runtime disabled until score-marked neutralization, center-pitch decisions, and insufficient-evidence fallbacks are wired and separately audited. Legacy technique detectors remain research-only.",
+      artifact: m3plus.rescopeGate?.source || m3plus.reviewArtifacts.rescopeGateJson,
+      reason: ["m3plus-runtime-disabled-by-default", "m3plus-rescope-runtime-not-wired"],
     });
   }
   if (!m4Omr.m4OmrIndependentBenchmarkReady) {
@@ -1980,13 +2355,18 @@ async function readPhotoScoreChainStatus() {
       try { return JSON.parse(line); } catch { return null; }
     }).filter(Boolean);
     const decisions = {};
+    let legacyPreP0RunCount = 0;
     for (const row of rows) {
-      const key = row.status === "ok" ? String(row.decision || "").split(":")[0] || "ok" : `failed:${row.reason || "unknown"}`;
+      const legacy = row.status === "ok" && Number(row.p0StructureGateVersion || 0) < 1;
+      if (legacy) legacyPreP0RunCount += 1;
+      const key = row.status === "ok"
+        ? `${legacy ? "legacy-pre-p0:" : ""}${String(row.decision || "").split(":")[0] || "ok"}`
+        : `failed:${row.reason || "unknown"}`;
       decisions[key] = (decisions[key] || 0) + 1;
     }
-    return { ...base, batchRuns: rows.length, decisions };
+    return { ...base, batchRuns: rows.length, legacyPreP0RunCount, decisions };
   } catch {
-    return { ...base, batchRuns: 0, decisions: {} };
+    return { ...base, batchRuns: 0, legacyPreP0RunCount: 0, decisions: {} };
   }
 }
 
@@ -2006,6 +2386,7 @@ export async function buildProjectStatus(args = {}) {
     muscFresh,
     violinMidiAudit,
     measurePolicyAudit,
+    measureJointEvidenceAudit,
     dynamicPerturbationGate,
     dynamicWeakCombinedGate,
     dynamicWeakCombinedConfirmation,
@@ -2024,6 +2405,7 @@ export async function buildProjectStatus(args = {}) {
     readJson(MUSC_FRESH_REPORT),
     readJson(VIOLIN_MIDI_AUDIT),
     readJson(MEASURE_POLICY_AUDIT),
+    readJson(MEASURE_JOINT_EVIDENCE_AUDIT),
     readJson(DYNAMIC_PERTURBATION_GATE),
     readJson(DYNAMIC_WEAK_COMBINED_GATE),
     readJson(DYNAMIC_WEAK_COMBINED_CONFIRMATION),
@@ -2082,11 +2464,37 @@ export async function buildProjectStatus(args = {}) {
       safety: measurePolicyAudit.safety || {},
       eventConfidenceFloorSweep:
         measurePolicyAudit.eventConfidenceFloorSweep || {},
+      jointEvidence: measureJointEvidenceAudit ? {
+        source: MEASURE_JOINT_EVIDENCE_AUDIT.replace(/\\/g, "/"),
+        evalOnly: measureJointEvidenceAudit.evalOnly === true,
+        evaluatedCandidateCount: measureJointEvidenceAudit.evaluatedCandidateCount ?? 0,
+        safeCandidateCount: measureJointEvidenceAudit.safeCandidateCount ?? 0,
+        releaseCandidateCount: measureJointEvidenceAudit.releaseCandidateCount ?? 0,
+        bestSafeCandidate: measureJointEvidenceAudit.bestSafeCandidate || null,
+        bestCoverageFloorTradeoff:
+          measureJointEvidenceAudit.bestCoverageFloorTradeoff || null,
+        measureJointEvidenceReleaseReady:
+          measureJointEvidenceAudit.measureJointEvidenceReleaseReady === true,
+        productionPolicyChanged:
+          measureJointEvidenceAudit.productionPolicyChanged === true,
+        blockingReasons: measureJointEvidenceAudit.blockingReasons || [],
+      } : {
+        source: MEASURE_JOINT_EVIDENCE_AUDIT.replace(/\\/g, "/"),
+        missing: true,
+        measureJointEvidenceReleaseReady: false,
+        productionPolicyChanged: false,
+      },
       studentGateReady: false,
     } : {
       source: MEASURE_POLICY_AUDIT.replace(/\\/g, "/"),
       missing: true,
       measureAggregationReleaseReady: false,
+      jointEvidence: {
+        source: MEASURE_JOINT_EVIDENCE_AUDIT.replace(/\\/g, "/"),
+        missing: true,
+        measureJointEvidenceReleaseReady: false,
+        productionPolicyChanged: false,
+      },
       studentGateReady: false,
     },
     dynamicEvidenceAudit: dynamicPerturbationGate ? {
@@ -2281,12 +2689,15 @@ function printProjectStatus(status, outPath) {
       blockingReasons: controlledCandidate.blockingReasons,
     },
     m3plusPitchModes: {
-      ready: m3plusPitchModes.m3plusModeReleaseReady,
-      labelReady: m3plusPitchModes.m3plusModeEvalReady,
-      releaseReadyModes: m3plusPitchModes.modeEval?.releaseReadyModes || [],
-      controlReadyModes: m3plusPitchModes.modeEval?.controlReadyModes || [],
+      ready: m3plusPitchModes.m3plusPitchSafetyReady,
+      rescopeGate: m3plusPitchModes.rescopeGate,
+      legacyDetectorEvidenceResearchOnly: true,
       round2AlignedEval: m3plusPitchModes.round2AlignedEval,
       round2FeatureDiagnostic: m3plusPitchModes.round2FeatureDiagnostic,
+      supplementalIntake: m3plusPitchModes.supplementalIntake,
+      supplementalMachineEval: m3plusPitchModes.supplementalMachineEval,
+      supplementalProtocolDiagnostic: m3plusPitchModes.supplementalProtocolDiagnostic,
+      supplementalFeatureAudit: m3plusPitchModes.supplementalFeatureAudit,
       monitoredPilotAudit: m3plusPitchModes.monitoredPilotAudit,
       counts: m3plusPitchModes.counts,
       blockingReasons: m3plusPitchModes.blockingReasons,
@@ -2297,6 +2708,19 @@ function printProjectStatus(status, outPath) {
       independentBenchmarkReady: m4Omr.m4OmrIndependentBenchmarkReady,
       accuracyClaimReady: m4Omr.m4OmrAccuracyClaimReady,
       automaticAdoptionReady: m4Omr.m4OmrAutomaticAdoptionReady,
+      greenSequenceGatePassed: m4Omr.m4GreenSequenceGatePassed,
+      greenFeedbackRecommendedForProduction: m4Omr.m4GreenFeedbackRecommendedForProduction,
+      greenFreshValidationCandidateFound: m4Omr.m4GreenFreshValidationCandidateFound,
+      greenReleaseGateCandidateFound: m4Omr.m4GreenReleaseGateCandidateFound,
+      greenProductionPolicyChanged: m4Omr.m4GreenProductionPolicyChanged,
+      adaptiveInterlineProbeEvaluated: m4Omr.m4AdaptiveInterlineProbeEvaluated,
+      adaptiveInterlineProductionPolicyChanged:
+        m4Omr.m4AdaptiveInterlineProductionPolicyChanged,
+      adaptiveInterlineProbe: m4Omr.adaptiveInterlineProbe,
+      sameEditionBenchmark: m4Omr.sameEditionBenchmark,
+      sameEditionBenchmarkEvaluated: m4Omr.m4SameEditionBenchmarkEvaluated,
+      sameEditionHomrStrictPositive: m4Omr.m4SameEditionHomrStrictPositive,
+      sameEditionAutomaticAdoptionReady: m4Omr.m4SameEditionAutomaticAdoptionReady,
       teacherReviewNeeded: m4Omr.teacherReviewNeeded,
       scoreEditorReviewNeeded: m4Omr.scoreEditorReviewNeeded,
       humanTask: m4Omr.humanTask,

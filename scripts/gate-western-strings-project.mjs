@@ -44,25 +44,22 @@ export function evaluateProjectGate(status, requiredTracks) {
       artifact: ordinaryArtifact || "",
     });
   }
-  if (requiredTracks.has("m3plus") && !m3plus.m3plusModeReleaseReady) {
-    const supplementalArtifact = m3plus.supplementalIntake?.sourceExists
-      ? (m3plus.supplementalIntake.readyForMachineAnalysis
-        ? m3plus.supplementalIntake.source
-        : (m3plus.supplementalIntake.instructions || m3plus.supplementalIntake.source))
-      : "";
+  if (requiredTracks.has("m3plus") && !m3plus.m3plusPitchSafetyReady) {
     failures.push({
-      track: "M3+ pitch behavior modes",
-      reason: m3plus.blockingReasons || ["m3plus-gate-not-ready"],
-      artifact: supplementalArtifact || (m3plus.candidateQualityReview?.needsReview
-        ? m3plus.candidateQualityReview.reviewPage
-        : (m3plus.reviewArtifacts?.round2AlignedEvalJson || m3plus.reviewArtifacts?.localizationDiagnosisGroupsCsv || m3plus.reviewArtifacts?.modeEvalCsv || m3plus.reviewArtifacts?.modeEvalJson || m3plus.reviewArtifacts?.round2ReviewPage || m3plus.reviewArtifacts?.reviewPage || "")),
+      track: "M3+ pitch safety rescope",
+      reason: m3plus.blockingReasons || ["m3plus-rescope-gate-not-ready"],
+      artifact: m3plus.rescopeGate?.source || m3plus.reviewArtifacts?.rescopeGateJson || "",
     });
   }
-  if (requiredTracks.has("m4") && !m4.m4OmrAccuracyClaimReady) {
+  if (requiredTracks.has("m4") && !m4.m4OmrAutomaticAdoptionReady) {
+    const reasons = m4.automaticAdoptionBlockingReasons || m4.blockingReasons || ["m4-omr-automatic-adoption-not-ready"];
+    const artifact = reasons.includes("m4-same-edition-homr-independent-page-count-below-floor")
+      ? m4.artifacts?.sameEditionBenchmarkJson
+      : m4.artifacts?.independentBenchmarkJson;
     failures.push({
-      track: "M4 OMR benchmark",
-      reason: m4.blockingReasons || ["m4-omr-gate-not-ready"],
-      artifact: m4.artifacts?.independentBenchmarkJson || m4.artifacts?.independentGoldTodoHtml || m4.artifacts?.independentGoldTodo || "",
+      track: "M4 OMR automatic adoption",
+      reason: reasons,
+      artifact: artifact || m4.artifacts?.independentGoldTodoHtml || m4.artifacts?.independentGoldTodo || "",
     });
   }
   if (

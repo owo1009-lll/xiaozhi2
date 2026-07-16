@@ -1,6 +1,6 @@
 # M3+ 范围重定决定(2026-07-17,项目负责人拍板)
 
-> 本文是待并入 `western-strings-project-plan.md` M3+ 节的正式修订。在收口合并前,以本文为 M3+ 目标与闸门的权威口径。历史执行状态段落全部保留,不删改。
+> 本决定已于 2026-07-17 并入 `western-strings-project-plan.md` 与 `western-strings-migration-plan.md` 的 M3+ 权威段落。本文继续作为范围变更记录;历史执行状态段落保留,不删改。
 
 ## 决定
 

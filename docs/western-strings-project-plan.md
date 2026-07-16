@@ -5,7 +5,7 @@
 >
 > **范围变更(2026-07-09):** PDF/图片谱面 **OMR 识别**由原"Out(避免坎1)"上调为**主线路线内里程碑 M4**(详见第 3、6 章)。**判断层不变**(音高/节奏诊断仍是音频侧 M2/M3);OMR 只解决"谱面从哪来",且必须先过**note-level 精度闸门**才被信任,不达标的识别谱一律 fail-closed 退人工核对,**绝不直接进判断**——这是从二胡坎1吸取的纪律。
 >
-> **路线重构(2026-07-09,2026-07-15 更新):** 原"技巧识别 M4(技法名称展示)"**已删除**——技法不再作为独立展示功能,而是并入 **M3+ 少退复核延伸**:识别技法只为把该区的**音准**判对(揉弦判中心音高、滑音判起止、颤音判两目标、双音需 multi-f0),**不展示技法名、不降音准标准、拿不准仍退复核**。自然泛音音准检测已取消,不进入 M3+ 自动判定。里程碑重编号:**OMR = M4(提前)、大提琴 = M5(最后)**。目标次序:先 M3+ 判准小提琴音准 → 再 M4 OMR 识谱+落到谱面 → 大提琴最后。
+> **路线重构(2026-07-09,2026-07-17 更新):** 原"技巧识别 M4(技法名称展示)"**已删除**。M3+ 不再要求颤音/装饰音音频分类,而改为**音高指控安全**:平拉和人工 gold 揉弦/滑音只在稳定中心证据充分时判断;谱面标记的 tr/装饰音/泛音区零指控;高离散度一律 `insufficient_evidence`。**不展示技法名、不降音准标准、拿不准仍退复核**。双音 multi-f0 独立支线保留。里程碑重编号:**OMR = M4(提前)、大提琴 = M5(最后)**。
 >
 > **受控 pilot 决策包(2026-07-10):** `npm run western:release-review` 之后必须运行 `npm run western:controlled-pilot-decision`。当前机器自测结果为 `readyForControlledPilotDecision=true`,`readyToStartControlledPilot=false`,`approvalPresent=false`;下一步不是继续教师/专业人员复核,而是产品负责人是否批准一个单独受控 pilot。可用 `npm run western:controlled-pilot-approval-template` 生成模板;无明确批准文件时默认保持 review-only / fail-closed。若负责人决定暂缓/不启动,运行 `npm run western:controlled-pilot-record-decision -- --decision defer --by <负责人>`;若负责人批准,运行 `npm run western:controlled-pilot-record-decision -- --decision approve --by <负责人> --confirm-separate-monitored-pilot --confirm-default-runtime-fail-closed`。批准后还必须运行 `npm run western:controlled-pilot-start-preflight`,通过后才可执行 `npm run western:controlled-pilot-run -- --execute --limit 1`。该 runner 是一次性离线进程,不会启动公开学生服务器;未知 auto-pass 暂停定向复核,已知错误 auto-pass 立即中止,默认 runtime 全程保持 fail-closed。
 >
@@ -29,7 +29,7 @@
 | **V2-release** | 基础诊断 core(音准/起音/漏音)对高置信开放;时值/多音 review-only | 高置信音的诊断+谱面定位;低置信"需复核" | 复核+回流 | M3 core 完成 + 教师闭环 |
 | **V3-beta** | 覆盖率提升,多曲稳定 | 更多自动诊断 | 同上 | 500 真值/10 曲、coverage≥30%、precision≥90% |
 | **V3-release** | 大部分常规段自动,散板/复杂仍复核 | 大部分常规段自动 | 同上 | coverage≥40-60%、unsupported 稳定拒绝 |
-| (M3+ 少退复核) | 技法感知音准:揉弦/滑音/颤音/装饰音换判法,双音 multi-f0 | 更多音准诊断、更少"需复核" | 同上 | 各模式音准 precision≥90%;自然泛音不自动判断;拿不准仍退复核 |
+| (M3+ 音高安全) | 平拉/人工 gold 技法段中心音高;谱面标记区零指控;双音 multi-f0 | 安全减少误指控 | 同上 | 可判区 precision≥90%、unsafe=0;标记区零指控;不稳证据 100% 退复核 |
 | (谱面 M4) | PDF/图片谱 OMR 识别入口 | 上传 PDF/拍照谱→自动识别成可判断谱 | 识别草稿+置信+人工核对 | note-level OMR 准确率达标(见 M4);不达标退人工核谱 |
 | (大提琴 M5) | 弓弦家族扩展 | 同小提琴 | 同 | cello 独立 M0 + 重校准 |
 
@@ -65,7 +65,7 @@
 
 ## 3. 西洋弦乐迁移范围(in / out)
 **In(第一版,谱面侧先用干净谱):** 小提琴;输入 = 音频 + **MusicXML/MIDI/dataset-score**;note 对齐 + 基础诊断 core(音准/起音/漏音);时值/extra-note 多音 review-only;四态置信门;教师复核回流。
-**In(M3+ 少退复核):** 技法感知的音准判断——揉弦/滑音/颤音/装饰音换判法、双音 multi-f0;目的是把技法区的音准判对、减少退复核,**不展示技法名、不降音准标准、拿不准仍退复核**。自然泛音音准不在当前自动检测范围。
+**In(M3+ 音高指控安全):** 平拉和人工 gold 揉弦/滑音区只在稳定中心证据充分时判断;谱面标记 tr/装饰音/泛音区零指控;高离散度输出 `insufficient_evidence`;双音 multi-f0 独立验证。**不展示技法名、不降音准标准、拿不准仍退复核**。
 **In(路线内,M4 谱面侧):** PDF/图片谱面 **OMR 识别**为主入口——但**带精度闸门**:OMR→MusicXML 草稿先在带 gold 谱的数据集上验 note-level 准确率,达标才可直接喂判断;不达标退 Audiveris 草稿 + 人工核对(复用现有 m2f clean-score 流程)。**绝不让未过闸门的 OMR 谱直接进判断(坎1纪律)。**
 **Out(后续):** 技法名称展示/技法质量评价、大提琴(M5)、散板/重 rubato 曲目自动判(直接 reject_unsupported)。
 
@@ -134,24 +134,22 @@
 - **frontend(学生端):** 高置信音诊断 + 谱面定位;低置信"需复核";reject 段明确提示。
 - **验收:** note-level 反馈落到谱面位置;低置信不反馈;教师复核可用 + 回流。
 
-### M3+ — 少退复核延伸(技法感知的音准判断)
-- **目的:** 让 M3 尽量少退复核——把原本因技法/多声部而退复核的音尽量判出音准来;**但绝不降音准标准**(precision≥90% 不变,拿不准仍退复核)。技法在这里只是**音准评判模式的开关**,不展示技法名(原技法展示里程碑已删)。
-- **单声部音高模式(靠 f0 行为识别,红利最大,先做):**
-  - 稳态 → 常规 ±35c 判定。
-  - 揉弦 vibrato → 判**中心音高**,不看瞬时(f0 调制频率 4–8Hz/幅度识别)。
-  - 滑音 glissando → 判**起止目标**或不点判(f0 单调滑移识别)。
-  - 颤音 trill → 判**两个交替目标**(f0 双稳态识别,与揉弦区分)。
-  - 装饰音 ornament → **主音单独判**,倚音分开/忽略。
-- **多声部/特殊(能力组件,按曲目需要再上,未上前保持 review):**
-  - 双音 double-stop → 需 **multi-f0(多基频)** 才能同时判两音。
-- **明确排除:** 自然泛音 harmonic 不做自动音准检测;遇到谱面泛音记号保持 `review_required`。解析器仍保留 MusicXML pitch-role,仅用于谱面兼容,不得解释为已具备自动评分能力。
-- **fail-closed 不变:** 模式拿不准 → 退复核,不硬判。
-- **验收:** 各模式下 note-level **音准 precision≥90%**(指标是"技法区里音准判得对不对",不是技法分类 AUC);技法区 review 率相对 M3 core 下降;音准误判不上升。
+### M3+ — 少退复核延伸(音高指控安全)
+- **目的(2026-07-17 重定):** M3+ 发布链只回答“现有证据是否足以安全指控音准问题”,不再要求机器识别或展示揉弦、滑音、颤音、装饰音名称。旧技法检测器和粗状态分类器保留为研究证据,不再决定发布。
+- **无标记平拉区:** 对齐、帧级 f0 质量与音内离散度均合格时,用稳定段 f0 中位数判断中心音高;不满足证据要求则输出 `insufficient_evidence`。
+- **谱面标记区:** `tr`、装饰音和泛音区域一律中性处理,不得生成音准指控;只允许 `review_required` / `insufficient_evidence`。此规则依赖谱面划区,不依赖颤音或装饰音音频检测器。
+- **人工 gold 技法区:** 揉弦用稳定中心 f0 中位数判断;滑音只在目标尾段支持和中心证据均充分时判断目标音高。窗口定位、f0 质量或稳定性不足时一律不指控。
+- **不稳兜底:** 音内 f0 离散度超过冻结阈值时,100% 输出 `insufficient_evidence`,指控数必须为 0。
+- **多声部支线不变:** 双音 double-stop 仍需 **multi-f0(多基频)** 独立验证;未通过前保持 `review_required`。
+- **明确退出发布链:** 颤音/装饰音音频检测、窗边界继续调参、粗状态分类器不再作为 M3+ 发布前置;自然泛音仍不做自动音准检测。历史脚本和报告仅用于说明边界。
+- **验收:** ①无标记平拉区音准 precision≥90% 且 unsafe=0;②谱面标记的 tr/装饰音/泛音区指控数=0;③人工 gold 揉弦/滑音区中心音高 precision≥90%;④不稳定样本 100% 落 `insufficient_evidence` 且零指控;⑤节奏/起音继续沿用 M3 core 闸门,不在 M3+ 重定义。
+- **统一离线入口:** `npm run western:m3plus-rescope-gate`。通过只表示新口径的离线证据成立,不自动打开学生端运行时。
 - **当前执行状态(2026-07-09):** 已新增 eval-only 清点命令 `npm run western:m3plus-pitch-modes`。全量跑通 12 条真实/准真实录音、2588 个谱面音符,输出 `data/experiments/western-strings-m3plus/m3plus-pitch-mode-inventory.csv` 与 `m3plus-pitch-mode-summary.json`;其中 1269 个音符被标为需关注的 pitch-behavior 候选(以 `slide-like`、`variable-f0` 为主)。已新增 `npm run western:m3plus-review-pack`,从 inventory 抽样生成本地人工复核包 `data/experiments/western-strings-m3plus/pitch-mode-review-pack/index.html`:共 48 条,`slide-like` / `trill-like` / `double-stop-candidate` / `ornament-candidate` / `stable` / `variable-f0` 各 8 条,并附本地短 WAV 与对应五线谱图片(`score-images/`,按 piece/page/measure/note 定位)。复核页已改为正常中文说明,提供单条"匹配且音准正确/不确定/不匹配"快捷按钮,也提供"未标全部设为匹配且正确/不确定"批量按钮;批量按钮只填未标项,不得替代听辨。第一轮 48 条与第二轮 36 条补强样本已累计导入,`npm run western:m3plus-review-status` 实测 `m3plusModeEvalReady=true`:98 reviewed / 74 scored,每类 reviewed/scored 缺口均为 0。已新增并运行 `npm run western:m3plus-mode-eval`:结果为 `m3plusModeReleaseReady=true`,`releaseReadyModes=[slide-like,trill-like]`,`controlReadyModes=["stable"]`;说明标签足够做评估,但已有 first-measure slide/trill 离线证据,但不能广泛打开。累计复核还显示 74 match / 19 mismatch / 5 uncertain-or-other,谱面-录音定位不准是当前候选质量 blocker。学生端 M3+ 仍全部 `review_required`;若要继续,必须先改定位/候选生成,再生成新的 targeted eval pack 重跑 per-mode precision/unsafe 评估。
 - **第二轮真实对齐复验(2026-07-15):** 新增 `npm run western:round2-m3plus-eval`,用 Basic Pitch 序列 DTW 替代旧线性时间窗。项目负责人已确认 `r2-06` 实际演奏了谱面标出的 6 个颤音,其余 17 个长音使用揉弦;确认记录保存在 `docs/western-strings-round2-m3plus-human-gold.json`。实测滑音 7/12(58.3%)、颤音 0/6、揉弦 1/17(5.9%)、双音两声部完整识别 19/24(79.2%),四项均未达 90%。旧报告中的 16 个揉弦分母来自对齐器漏掉第 2 音;现已改为以谱面全集计数,未匹配音按漏检保留。新增 `npm run western:round2-m3plus-diagnostic` 后确认 12/23(`52.2%`)音符窗口不合理;即使用受控时值锚定窗口,最佳训练内单特征也仅 precision/recall=`66.7%/66.7%`,不能靠重排阈值达到 90%。旧 `releaseReadyModes` 只能解释为 first-measure 安全子集证据,不能推广到第二轮整段真实录音。当前无足够真实负例,不得靠降阈值凑 recall;所有模式继续 fail-closed。自然泛音音准检测已取消;解析器保留泛音 pitch-role 仅用于通用 MusicXML 兼容。
-- **M3+ 最小补证入口(2026-07-15/16):** `npm run western:m3plus-supplemental-scores` 生成 `音频/m3plus-supplemental/` 四条固定音符受控任务:①C4–C5 上行 8 个纯直音负例;②8 个揉弦+8 个颤音独立正例;③8 个装饰音+8 个同音高普通音对照;④8 组滑音+8 个同目标音直音对照。演奏者不需要看谱,只按 README 的固定顺序和文字要求演奏;生成 MusicXML 已真实写入 `vibrato` 文字、`trill-mark`、`mordent`、`glissando` 及 straight/plain 对照。评测改为“谱面技法意图驱动 + 音频执行核验”:逐音 score-intent 固定 `performanceConfirmed=false`,谱面写了技法不等于录音已经正确执行。`npm run western:m3plus-supplemental-status` 当前报告 0/4 录音就绪;录齐后运行 `npm run western:m3plus-supplemental-eval`,先校验谱面标记,再以单调 F0 序列对齐替代线性切窗。该命令通过共享低负载 Python 启动器运行,默认优先使用未平滑的 CREPE tiny 帧级 F0,缺少 `torchcrepe` 时回退 pYIN;报告必须记录实际后端。定位允许目标附近 `±100 cents` 的真实演奏偏差,但该容忍只用于找窗口,不等于音准合格;后端变化也不改变模式闸门:每类 precision>=0.90、recall>=0.80、coverage>=0.80、正负例各>=4。机器定位或模式阈值不过时先修特征,不得交教师;机器通过且演奏者确认执行要求后才允许一次有界专业复核,学生端始终 fail-closed。
+- **M3+ 最小补证入口(2026-07-15/16):** `npm run western:m3plus-supplemental-scores` 生成 `音频/m3plus-supplemental/` 四条固定音符受控任务:①C4–C5 上行 8 个纯直音负例;②8 个揉弦+8 个颤音独立正例;③8 个装饰音+8 个同音高普通音对照;④8 组滑音+8 个同目标音直音对照。四条录音已到位,并确认整体高八度;定位层固定使用 `+12` 半音,但音准与技法闸门不放宽。真实 CREPE 评测中 `m3p-01` 的 `8/8` 已成为有效直音负对照；`m3p-02/03/04` 冻结结果分别为 `10/16`、`14/16`、`13/16`,因此 `machineAnalysisComplete=false`,`teacherReviewAllowed=false`。状态工具保留已通过单元并给出局部 `repairPlans`，不再把少数错误放大为整条重录要求。评测仍以前 1-4 组仅标定、后 5-8 组 holdout 为冻结规则;模式闸门仍为每类 precision>=0.90、recall>=0.80、coverage>=0.80、正负例各>=4。机器通过且演奏者确认执行要求后才允许一次有界专业复核,学生端始终 fail-closed。
 - **教师式粗状态与小节三态复验(2026-07-16):** 新增 `npm run western:m3plus-coarse-state-eval`,将三份复核包的 98 条历史窗口特征与 98 条标签完整一一连接。排除音频谱面不匹配后有 74 条、11 份录音可评估;按录音留一时,旧窗口聚合特征对 `straight/active` 均找不到同时满足 precision>=90%、recall>=80% 的操作点。`slide/trill` 各只有 5 个正例且仅覆盖 2/3 份正例录音,证据不足。粗状态保持 review-only,真实补录仍使用新版 pYIN 帧级+直音控制+holdout。小节反馈采用 `issue_detected / confirmed_clean / insufficient_evidence` 三态;未知不得改写成正确。真实波形扰动下,80% 确认阈值的 clean 小节覆盖仅 13.22%,扩展扰动仍有 3 个危险 clean 判定,故小节摘要不用于扩大自动放行。完整证据见 [western-strings-coarse-state-measure-evidence-2026-07-16.md](western-strings-coarse-state-measure-evidence-2026-07-16.md)。
-- **M4 小节级相对 IOI 复验(2026-07-16):** 在 50 个 gold/draft 音高序列完全相同的单声部小节上,用 Basic Pitch 对齐音频后比较相对 IOI。默认 60% 区间覆盖门槛只得到 precision=66.67%、coverage=6%;放宽到 30% 也只有 80%/10%。加入 spectral-flux+pYIN 起音并集后默认 precision=0%、coverage=4%。两种方法按曲留一都找不到 precision>=90% 的 margin,因此 `runtimeReady=false`:只保留 review/reranking 研究特征,禁止自动修改 OMR 节奏。
+- **M4 小节级相对 IOI 复验(2026-07-16):** 在 50 个 gold/draft 音高序列完全相同的单声部小节上,用 Basic Pitch 对齐音频后比较相对 IOI。默认 60% 区间覆盖门槛只得到 precision=66.67%、coverage=6%;放宽到 30% 也只有 80%/10%。加入 spectral-flux+pYIN 起音并集后默认 precision=0%、coverage=4%。后续已将有界视觉候选 oracle 从 `44/50` 补到 `49/50`,并用 `top-k=512` 实际保留 `48/50`正确候选;但 Basic Pitch 仅 `14/50` 小节有足够 IOI 证据,连续 pYIN F0 形状只有 `11/50`,两者固定 margin 与按曲留一均选择 `0/50`。其中 `33/50` 小节只是整体时值按同一比例缩放,未知速度时音频相对 IOI 理论上就不能判断拍号;必须由 P0 独立证据确定拍号。因此 `runtimeReady=false`:只保留 review/reranking 研究特征,禁止自动修改 OMR 节奏。
+- **M4 P0 与自适应预处理复验(2026-07-16):** raw Audiveris 结构解析补齐了无 `shape` 的 key 与 `time-whole`,冻结 5 张照片 P0 由 `0/5` 提到 `1/5`,且保持证据冲突时 fail-closed。《北京的金山上》人工 MusicXML 独立 gold 显示 `up2` pitch P/R/F1=`87.14%/35.47%/50.41%`,修正实验对比度链后的自适应谱线间距缩放=`28.28%/16.28%/20.66%`;因三项退化,自适应变体不接生产。
 
 ### M4 — PDF/图片谱面识别(OMR,带精度闸门)
 - **动机:** 让学生/教师直接传 PDF 或拍照谱,不必先有干净电子谱。**这是主线诉求,但也正是二胡翻车的坎1**,因此按 M0 同样的纪律:先在数据集上验准确率,再谈信任。
@@ -160,7 +158,7 @@
   - **A 层自动采纳:** 当前关闭。只有严格逐谱通过率≥90%,且至少 3 份真照片独立 gold 通过后才可讨论。
   - **B 层变体赛马+音频仲裁:** 保留为 eval-only 候选生成/失败自检原型,不得把模型间一致或与录音吻合当成独立 OMR 正确率。
   - **C 层 fail-closed 人工:** 当前真实照片生产口径。独立 gold 评测未达标、无输出、全变体打架或复调密集均退人工核谱/重拍。
-  - **诊断联动:** OMR 谱未经人工核对的小节,**禁用 missing/extra 硬判**(漏音是实测最大短板,防冤枉学生),只留音准/起音。
+  - **诊断联动:** OMR 谱未经人工核对的小节,禁用 pitch/onset/duration/missing/extra 学生硬判;只允许展示“录音与谱面此处不一致,需复核”,防止 OMR 错谱冤枉学生。
   详见 `docs/western-strings-m4-omr-independent-benchmark.md`;脚本 `scripts/experiments/eval_western_strings_m4_omr_render_gold.py`、`eval_western_strings_m4_real_jpg_omr.py`。
 - **schema:** score 记录加 `scoreSource=omr`、`omrEngine`、`omrConfidence`、`omrReviewStatus`(draft/human-approved);低置信小节单独标记,判断时该小节降级 review。
 - **与判断层的关系:** OMR 只解决"谱面从哪来";判断仍是音频侧 M2/M3。**谱面错 → 判断全错**,所以 OMR 闸门必须比音频闸门更严,且学生端要明示"此谱由识别得到、是否经人工核对"。
@@ -171,6 +169,7 @@
 - **运行时置信探针(2026-07-15):** `npm run western:m4-omr-confidence-probe` 只使用识别规模、页数和 Audiveris 日志等运行时可见特征,按 6 个 BWV 作品留一。LR/RF AUC=0.567/0.800;RF 最佳观察点 precision=0.80、coverage=0.156,没有达到 0.90/0.20 的安全子集。该负结果已接入独立审计,禁止用自报置信绕过逐谱精度门槛。
 - **更强引擎对照(2026-07-16 更新):** `npm run western:m4-oemer-benchmark` 已在同一 5 份真实照片 source-gold 上评测 Oemer 0.1.8。`ex05` 的播放器黑边曾导致错误 3 tracks/builder 断言；仅对该明确失败采用固定行均值裁边重试后，Oemer 达到 5/5 输出。全 5 份 P/R=`71.9%/76.2%`、onset/measure=`5.4%/18.2%`,严格通过 `0/5`;同 5 份 Audiveris 为 P/R=`85.5%/72.1%`。fallback 解决崩溃和坐标缺失，但 precision/节奏结构不足，不能替换 Audiveris。模型训练时 `scikit-learn 1.2.0` 与本机 1.8.0 的兼容性已用精确 1.2.0 复跑排除。该比较保持 eval-only、`studentGateReady=false`。
 - **Transformer 引擎对照与闸门修正(2026-07-15):** `npm run western:m4-homr-benchmark` 已用 HOMR 0.7.0 在同一 5 份原始 source 照片评测。5/5 输出,pitch P/R=`89.0%/96.2%`,但 onset-quarter/measure accuracy=`30.7%/79.0%`;pitch-only 可通过 2/5,完整 score gate 为 0/5。`ex05/ex12` 证明音高全对仍可能把时值重建错,所以 M4 自动采用统一要求 pitch precision/recall 与 onset/measure 四项均过线。HOMR 不替换 Audiveris,仍为 eval-only。
+- **同版人工 gold 与照片域复验(2026-07-17 修正):** 《北京的金山上》172 音人工 MusicXML 与三引擎输出已统一复算；HOMR 的 P/R=`98.84%/98.84%`、onset/measure=`100%/100%`。全新目录非复用重跑得到逐字节相同的 HOMR MusicXML，故该页结果可重复；但输入是已拉直、无透视和手写干扰的干净谱页图，不是原始弯曲手机照片，证据域必须标为 clean-page/scan，不能外推为照片域。冻结 5 张独立 source-gold 照片以当前 ONNX Runtime 1.27.0 fresh 重跑为 pitch P/R=`88.33%/95.78%`、onset/measure=`30.03%/79.04%`、严格 `0/5`。因此 M4 照片域仍未过关，`automaticAdoptionReady=false`,`studentGateReady=false`；只有拿原始手机照片配同版独立 gold 复测，才可计入照片域采纳样本。
 - **拍号/节奏尺子修正(2026-07-16):** 生产 MusicXML 导入器不再把缺失拍号静默改成 `4/4`;显式拍号才写 `meterKnown=true`,缺失时保留 `meterKnown=false` 并使节奏输出 fail-closed。内部时值统一为四分音符单位,`6/8` 小节跨度修正为 3.0;拍号漏识时允许从小节时值众数得到仅供布局/对齐的 `measureQuarterSpan`,不得据此宣称拍号已识别。独立 gold 还存在照片版与公开源谱的等价记谱差异:50 个精确音高配对小节中绝对起点一致 16 个、相对 IOI 形状一致 34 个,33 个被标记为 notation-scale confound。common-meter oracle 能覆盖 50/50,但运行时选择仍未解决;Basic Pitch 相对 IOI 排序只在 2/5 曲目安全作出选择,所以 M4 仍不接学生端。
 - **Clarity-OMR 对照(2026-07-15):** `npm run western:m4-clarity-benchmark` 已在同一 5 份 source-gold 上运行官方 beam-5 管线。原样截图含播放器黑边,Stage A 在 smoke 中检出 0 个谱表;冻结的通用裁页后 5/5 输出,但 pitch P/R=`72.8%/35.5%`,onset-quarter/measure accuracy=`2.8%/10.1%`,完整严格通过 `0/5`。Clarity 不替换现有引擎,不进入学生端。
 - **Clarity 监督适配闭环与停止裁决(2026-07-15):** 数据前置已从单页扩为 32/32 个 Bach movement,得到 592 个原始/296 个去重 staff-token 对,按作品划分为 train/validation/synthetic-test=`199/39/58` 条且无盲测泄漏。64-step bf16+DoRA 峰值 reserved 显存约 `1.21 GiB`,held-out teacher-forced/自回归指标均提高;随后用 Stage-A CPU、Stage-B GPU 的兼容启动器在冻结 5 张真实照片上重跑完整闸门。候选 5/5 输出,pitch P/R=`80.00%/31.44%`,onset-quarter/measure accuracy=`2.04%/6.26%`,严格通过 `0/5`;相较官方 Clarity 基线只提高 precision,其余三项退化。按“完整四指标不得退化且至少一项提升,或严格通过数增加”的预设规则,决策为 `reject-and-delete`;候选不接生产,不再靠增加训练步数追数。
@@ -271,7 +270,7 @@
 | M2d/M2e sequence support gate | 当前音 + 邻近音的 Basic Pitch 事件序列支持;再用学生式事件扰动复验 | 基准 precision≥90%、coverage≥20%,且 correlated drift / 错音 / 漏音 / 弱起音目标 0 auto-pass | 未过则 `studentSafe=1` 全量 review |
 | M2f real-student recording gate | 真实/准真实学生录音 manifest + results;覆盖正确、错音、漏音、节奏偏移、弱起音、噪声/手机录音 | 真实输入 precision≥90%, unsafe target auto-pass=0,录音/授权/场景完整 | 未过则不得开放 `/api/strings/analyze` |
 | M3 diagnosis | pitch/onset/missing core 评测表;duration/extra 可选扩展 | 当前 release 只要求音准、起音、漏音分别 precision≥90% 且 unsafe=0;extra-note 需补人工确认样本;duration 需补可量化时值样本。未通过前二者保持 review-only;低置信不反馈;回流可导出 | 仅显示对齐,不显示诊断 |
-| M3+ pitch-behavior modes | 揉弦/滑音/颤音/装饰音/双音分模式音准评测 | 各模式 note-level 音准 precision≥90%、unsafe=0;技法区 review 率下降但音准误判不上升 | 未达标模式保持 `review_required`;自然泛音不自动判断;不展示技法名 |
+| M3+ pitch-safety rescope | 平拉/人工 gold 中心音高、谱面标记区中性化、离散度兜底、双音独立支线 | 可判区 precision≥90%、unsafe=0;标记区指控=0;不稳样本 100% `insufficient_evidence` | 离线通过不自动开运行时;旧技法检测器仅作研究证据 |
 | M4 OMR gate | OMR 草稿 vs gold MusicXML note-level 评测;人工核谱状态审计 | pitch/onset/measure/漏识别达到 M4 闸门;未过闸门 100% 退人工核谱 | OMR 只作草稿,不得进入判断层 |
 | 全程 | `check-server-p0` / `test:teacher-validation` / `test:western-project-gate` / `build` | eval-only 脚本不写生产;数据不进仓库;feature flag 关时学生端零自动输出;项目级 gate 必须保持 fail-closed,且 M4 自比样本不得误判为独立 gold | 阻断发布 |
 
@@ -303,13 +302,13 @@
 | M1 干净谱接入 | ✅ 已完成 |
 | M2 V2 置信门 | teacher-only preview + synthetic gate + M2f 真实录音 gate 已通过;学生端开放前进入 M3 基础诊断与 API 审查 |
 | M3 基础诊断 core | ✅ 已完成(pitch/onset/missing) |
-| M3+ 少退复核延伸 | pitch-behavior 模式 1-2 周;multi-f0 双音按需;自然泛音不做自动检测 |
+| M3+ 音高指控安全延伸 | 离线新口径已通过;运行时中性化/中心音高接线与审计待做;multi-f0 双音按需 |
 | M4 PDF 谱面 OMR | 2-4 周(Audiveris 接入 + 精度评测闸门 + 人工核对闭环) |
 | M5 大提琴 | 1-2 周(+独立 M0) |
 
 **停止条件(kill criteria):**
 - M2 在真实输入上 auto_pass precision <90% 且补数据/调特征仍上不去 → 降级 review-only,不给学生自动反馈。
-- M3+ 某音高行为模式(揉弦/滑音/颤音/装饰音/双音)达不到音准 precision≥90% → 该模式保持退复核,不硬判(不拿降音准标准换覆盖率)。自然泛音固定不进入自动检测。
+- M3+ 平拉/人工 gold 中心音高达不到 precision≥90% 或 unsafe>0 → 不接运行时;谱面标记区出现任何指控、或高离散样本没有 100% 退 `insufficient_evidence` → 立即关闭该路径。双音仍按独立 multi-f0 闸门。
 - M4 OMR note 准确率在数据集上达不到闸门且调参/换引擎仍上不去 → OMR 只作草稿、永久走人工核谱,不自动进判断(退回坎1前的干净谱路线)。
 - M5 cello 独立 M0 不过 → cello 暂缓。
 - 任何阶段:数据许可证不清 → 不公开、不进仓库。
@@ -321,7 +320,7 @@
 | 置信门覆盖率过低无产品价值 | 定"最低可上线覆盖率";auto 段须有教学价值,非只覆盖简单音 |
 | 重引 OMR → 坎1 重现 | OMR 独立精度闸门(M4);未过闸门/未人工核对的谱 fail-closed 退人工;判断层只读达标或 human-approved 的谱 |
 | 数据许可证 | 不进仓库、公开前核实 |
-| 为少退复核而降音准标准 | 只能靠补能力(M3+ pitch 模式/multi-f0)减少 review;自然泛音不自动判断;拿不准仍退复核,音准 precision≥90% 硬门槛不动 |
+| 为减少复核而降低音准标准 | M3+ 只能通过稳定中心证据或中性化减少误指控;旧技法分类器不得强行放行;拿不准仍退复核,precision≥90% 与 unsafe=0 不动 |
 
 ---
 
@@ -401,6 +400,12 @@
 - Runtime remains fail-closed: `m3plusAutoFeedbackReady=false`. Any product use must be a separate monitored pilot scoped to first-measure, trusted-recording, slide/trill rows; default runtime must stay off.
 - This supersedes older handbook statements from before the first-measure candidate-quality import. No more M3+ manual review is currently requested.
 
+# 2026-07-17 M3+ independent-holdout supersession
+
+- The historical first-measure review result remains useful as a diagnostic snapshot, but it no longer authorizes a monitored pilot.
+- Cross-backend CREPE tiny/full + pYIN holdout now uses mode-specific physical evidence. Precision/recall is vibrato `0.60/0.75`, trill `null/0.00`, ornament `null/0.00` with insufficient reliable positives, and slide `1.00/0.75`.
+- At that historical detector checkpoint, `npm run western:m3plus-monitored-pilot-audit` returned `readyForMonitoredPilot=false` and the detector-scoped release field was false. This remains failure evidence for the retired detector route; the 2026-07-17 pitch-safety rescope above is now the release authority, while the student runtime remains off.
+
 # 2026-07-10 公开 Bach 语料扩展验证
 
 - 公开专业录音现在作为主开发集与压力测试集,不是学生域发布替代品。完整报告见 `docs/western-strings-public-bach-validation.md`。
@@ -410,6 +415,7 @@
 - rawv2 原始波形注入表明漏音、+2 半音错音、迟到 800ms 的严格策略在 development/holdout 均为 0 危险放行;弱音仍无法跨演奏者安全自动判。
 - 产品范围据此固定:公开专业录音核心三类可作为 V2/V3 研究原型;weak-note、extra-note 和学生域默认发布继续 fail-closed。
 - 2026-07-16 三阶段安全子集确认进一步提高了研究覆盖:能量模型只在 development 拟合，策略只在 development+已消耗 rank-0 选择，rank-1 去除重叠后用 4 个新演奏者一次确认。加入重复同音高谱音 `0.5` 四分音符隔离闸后，clean precision/coverage=`97.91%/36.00%`，弱音=`97.88%/35.35%`，每类 32 个合成错误目标均 0 危险放行。该结果仅说明公开专业录音+合成波形扰动的研究 gate 过线；真实学生逐音真值仍缺，`m3plusAutoFeedbackReady=false` 不变。
+- 同一逐音策略升到小节单位后，对“音高确认比例 + 相对 IOI + 因果能量”做了 `192` 点 oracle 上限测试。跨 development/rank-0/fresh rank-1 全部零危险的最低 clean coverage 仅 `2.61%`；达到 20% 覆盖的最佳点累计放行 `24` 个危险小节。`measureJointEvidenceReleaseReady=false`，小节汇总只作展示摘要，不能扩大 auto-pass。
 - “完美”不是开发口号。只有独立人工逐音 gold、最终盲测、alignment/recognition precision 与 coverage/recall 均至少 99% 才可讨论近乎完美;当前未达到。
 
 # 2026-07-10 PHENICX 人工 gold 阶段
@@ -443,8 +449,8 @@
 |---|---|
 | M0 / M1 / M2(含 M2f)/ M3 core | 100%(闸门通过;**但 M3 core 每类有效错误样本仅 2 个,证据浓度薄**,扩证依赖新增含错录音) |
 | M3 全量(时值/多音) | ~70%(缺样本/口径,review-only) |
-| M3+ 少退复核 | ~55%(滑音/颤音离线证据过;双音对齐器已支持;自然泛音已取消;未接运行时) |
-| M4 OMR+落到谱面 | ~92%(独立 render 基准、5 份真实照片 source-gold、完整 pitch/onset/measure 闸门、谱面锚定、照片入口和离线生产链已成;Audiveris/Oemer/HOMR/Clarity 均完整严格 0/5,HOMR 还证明 pitch-only 会假通过;后续只接受监督适配或新增外部盲测,默认运行时关闭) |
+| M3+ 音高指控安全 | ~70%(新口径离线四区闸门已通过;旧技法检测器退出发布链;17 个 round2 揉弦单元缺稳定中心数值未计分;双音独立;运行时未接线) |
+| M4 OMR+落到谱面 | ~92%(独立 render 基准、5 份真实照片 source-gold、完整 pitch/onset/measure 闸门、谱面锚定、照片入口和离线生产链已成;Audiveris/Oemer/HOMR/Clarity 均完整严格 0/5,HOMR 还证明 pitch-only 会假通过;Bach 和 DoReMi 两次监督适配均在真照片结构指标上退化,后续只接受拍照域+结构级监督或新增外部盲测,默认运行时关闭) |
 | M5 大提琴 / V3 | 0% / ~10% |
 
 **V2-release 剩余缺口:** 已完成 5 首/5 条安全受控 pilot 和受控提交流接线;仍需 ① 一条全新独立盲测录音 + 已审 clean score + 谱面显示文件 + 核谱人;② 通过 fresh intake 与机器 precheck;③ 专业盲审和 release 终审。当前 coverage=4% 低于 20% 地板,不得仅因 precision=100% 默认开放。

@@ -125,6 +125,15 @@ function commandForAction(action) {
       "Then run npm run western:project-status",
     ];
   }
+  if (track === "M3+ pitch safety rescope") {
+    return [
+      "Open data/experiments/western-strings-m3plus/rescope-gate/report.json.",
+      "Keep score-marked trill, ornament, and harmonic regions neutral; do not use the archived audio technique detectors as release authority.",
+      "Use stable F0 center evidence only where localization and dispersion guards pass; all other rows remain insufficient_evidence.",
+      "The offline gate does not enable student feedback. Runtime wiring requires a separate monitored audit and must remain fail-closed by default.",
+      "After any runtime change, rerun npm run western:m3plus-rescope-gate, npm run test:western-project-gate, and npm run build.",
+    ];
+  }
   if (track === "M3+ pitch behavior modes") {
     if (hasReason(action, "m3plus-runtime-disabled-by-default")) {
       return [
