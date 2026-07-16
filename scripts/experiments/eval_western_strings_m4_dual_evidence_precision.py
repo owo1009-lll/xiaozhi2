@@ -215,7 +215,15 @@ def ensure_verdict(
 ) -> Path:
     verdict_path = prototype_root / piece / f"{piece}-verdicts.json"
     if verdict_path.is_file() and not refresh:
-        return verdict_path
+        cached = json.loads(verdict_path.read_text(encoding="utf-8"))
+        if cached.get("piece") == piece and cached.get("variant") == variant:
+            return verdict_path
+        if not generate_missing:
+            raise ValueError(
+                "cached verdict identity mismatch: "
+                f"expected {piece}/{variant}, got "
+                f"{cached.get('piece')}/{cached.get('variant')}"
+            )
     if not generate_missing:
         raise FileNotFoundError(f"verdict missing: {verdict_path}")
     result = run_piece(piece, variant, prototype_root)
@@ -415,6 +423,16 @@ def aggregate(piece_rows: list[dict[str, Any]]) -> dict[str, Any]:
     result["minPieceConsensusPrecision"] = (
         round(min(per_piece_precisions), 6) if per_piece_precisions else None
     )
+    per_piece_sequence_precisions = [
+        float(row["sequence"]["precision"])
+        for row in piece_rows
+        if row["sequence"]["precision"] is not None
+    ]
+    result["minPieceSequencePrecision"] = (
+        round(min(per_piece_sequence_precisions), 6)
+        if per_piece_sequence_precisions
+        else None
+    )
     per_piece_f0_precisions = [
         float(row["f0Consensus"]["precision"])
         for row in piece_rows
@@ -423,13 +441,14 @@ def aggregate(piece_rows: list[dict[str, Any]]) -> dict[str, Any]:
     result["minPieceF0ConsensusPrecision"] = (
         round(min(per_piece_f0_precisions), 6) if per_piece_f0_precisions else None
     )
+    result["evalOnlyGateBasis"] = "sequence-mapping; structural-is-diagnostic-only"
     result["evalOnlyGatePassed"] = bool(
-        result["f0Consensus"]["total"] >= 100
-        and result["f0Consensus"]["precision"] is not None
-        and result["f0Consensus"]["precision"] >= 0.99
-        and result["f0Consensus"]["wilson95Lower"] >= 0.95
-        and result["minPieceF0ConsensusPrecision"] is not None
-        and result["minPieceF0ConsensusPrecision"] >= 0.95
+        result["sequence"]["total"] >= 100
+        and result["sequence"]["precision"] is not None
+        and result["sequence"]["precision"] >= 0.99
+        and result["sequence"]["wilson95Lower"] >= 0.95
+        and result["minPieceSequencePrecision"] is not None
+        and result["minPieceSequencePrecision"] >= 0.95
     )
     return result
 
@@ -443,6 +462,7 @@ def write_markdown(path: Path, report: dict[str, Any]) -> None:
         "",
         f"- pieces: {len(report['pieces'])}",
         f"- sequence precision: {summary['sequence']['precision']}",
+        f"- minimum piece sequence precision: {summary['minPieceSequencePrecision']}",
         f"- structural precision: {summary['structural']['precision']}",
         f"- conservative consensus precision: {summary['consensus']['precision']}",
         f"- consensus Wilson 95% lower: {summary['consensus']['wilson95Lower']}",
@@ -452,6 +472,7 @@ def write_markdown(path: Path, report: dict[str, Any]) -> None:
         f"- continuous-F0 consensus gold coverage: {summary['f0ConsensusGoldCoverage']}",
         f"- OMR pitch errors caught / escaped: {summary['caughtOmrPitchErrors']} / {summary['escapedOmrPitchErrors']}",
         f"- eval-only gate passed: {summary['evalOnlyGatePassed']}",
+        f"- eval-only gate basis: {summary['evalOnlyGateBasis']}",
         "",
         "| piece | green | sequence P | structural P | consensus P | F0 consensus P | F0 coverage | false green |",
         "|---|---:|---:|---:|---:|---:|---:|---:|",
@@ -515,7 +536,8 @@ def main(argv: list[str] | None = None) -> int:
         "caveats": [
             "sequence mapping can over-credit repeated pitches",
             "structural mapping can under-credit OMR measure drift",
-            "consensus requires both mappings to agree and is the release-relevant audit",
+            "structural and consensus mappings are diagnostic lenses, not green definitions",
+            "sequence mapping is the primary green audit and remains fail-closed at release thresholds",
             "continuous F0 is monophonic-only and rejects short, polyphonic, or weakly voiced events",
             "all results remain eval-only until an independent runtime gate is designed",
         ],

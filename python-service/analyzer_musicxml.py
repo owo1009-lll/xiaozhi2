@@ -418,6 +418,21 @@ def extract_musicxml_markings(
             sound_node = xml_child(direction, "sound")
             sound_tempo = sound_node.attrib.get("tempo") if sound_node is not None else None
             sound_dynamic = sound_node.attrib.get("dynamics") if sound_node is not None else None
+            if sound_node is not None:
+                for route_key in ("dacapo", "dalsegno", "tocoda", "fine", "segno", "coda"):
+                    route_value = str(sound_node.attrib.get(route_key) or "").strip()
+                    if route_value:
+                        repeat_structure.append(
+                            {
+                                "type": route_key,
+                                "value": route_value,
+                                "measureIndex": measure_index,
+                                "beatStart": beat_start,
+                                "pageNumber": page_number,
+                                "sectionId": section_id,
+                                "requiresReview": True,
+                            }
+                        )
             for direction_type in xml_children(direction, "direction-type"):
                 words_node = xml_child(direction_type, "words")
                 if words_node is not None and (words_node.text or "").strip():
@@ -510,6 +525,19 @@ def extract_musicxml_markings(
                     markings.append({**change, "text": dynamic_label})
 
         for barline in xml_children(measure, "barline"):
+            ending = xml_child(barline, "ending")
+            if ending is not None:
+                repeat_structure.append(
+                    {
+                        "type": "ending",
+                        "number": ending.attrib.get("number", ""),
+                        "endingType": ending.attrib.get("type", ""),
+                        "measureIndex": measure_index,
+                        "pageNumber": page_number,
+                        "sectionId": section_id,
+                        "requiresReview": True,
+                    }
+                )
             repeat = xml_child(barline, "repeat")
             if repeat is not None:
                 repeat_structure.append(
@@ -520,6 +548,7 @@ def extract_musicxml_markings(
                         "measureIndex": measure_index,
                         "pageNumber": page_number,
                         "sectionId": section_id,
+                        "requiresReview": True,
                     }
                 )
 
@@ -533,6 +562,8 @@ def extract_musicxml_markings(
             "tempoChangeCount": len(tempo_changes),
             "dynamicChangeCount": len(dynamic_changes),
             "repeatCount": len(repeat_structure),
+            "repeatRouteReady": not repeat_structure,
+            "repeatRouteReason": "" if not repeat_structure else "repeat-route-review-required",
         },
     }
 

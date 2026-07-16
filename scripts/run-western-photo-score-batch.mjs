@@ -54,7 +54,13 @@ for (const sub of queue) {
     const line = (res.stdout || "").split(/\r?\n/).filter((l) => l.startsWith("{")).pop();
     let parsed = null; try { parsed = line ? JSON.parse(line) : null; } catch { /* keep null */ }
     record = parsed
-      ? { ...record, status: "ok", decision: parsed.decision, audit: parsed.audit }
+      ? {
+        ...record,
+        status: "ok",
+        decision: parsed.decision,
+        audit: parsed.audit,
+        p0StructureGateVersion: parsed.p0StructureGateVersion || 0,
+      }
       : { ...record, status: "failed", reason: `pipeline-exit-${res.status}` };
   }
   items.push(record);

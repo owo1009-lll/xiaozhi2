@@ -63,6 +63,7 @@ STRICT_MIN_PRECISION = 0.98
 STRICT_MIN_RECALL = 0.95
 STRICT_MIN_ONSET_QUARTER_ACCURACY = 0.95
 STRICT_MIN_MEASURE_ACCURACY = 0.95
+MIN_AUTOMATIC_ADOPTION_ROWS = 5
 THREAD_ENV = {
     "OMP_NUM_THREADS": "2",
     "OPENBLAS_NUM_THREADS": "2",
@@ -237,7 +238,18 @@ def run_oemer(
 
 def aggregate_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
     usable = [row for row in rows if row.get("benchmarkUsable") and row.get("parseOk")]
-    verified_rows = [row for row in rows if row.get("goldSourceVerified") == "yes"]
+    engine_failures = [row for row in rows if not row.get("parseOk")]
+    unusable_evidence = [
+        row
+        for row in rows
+        if row.get("parseOk") and not row.get("benchmarkUsable")
+    ]
+    verified_rows = [
+        row
+        for row in rows
+        if row.get("goldSourceVerified") == "yes"
+        or row.get("humanVerifiedCleanScore") == "yes"
+    ]
     gold_notes = sum(int(row.get("goldNotes") or 0) for row in usable)
     attempted_gold_notes = sum(int(row.get("goldNotes") or 0) for row in verified_rows)
     draft_notes = sum(int(row.get("draftNotes") or 0) for row in usable)
@@ -265,13 +277,15 @@ def aggregate_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "rows": len(rows),
         "usableRows": len(usable),
-        "engineFailureRows": len(rows) - len(usable),
+        "engineFailureRows": len(engine_failures),
+        "unusableEvidenceRows": len(unusable_evidence),
         "goldNotes": gold_notes,
         "attemptedGoldNotes": attempted_gold_notes,
         "draftNotes": draft_notes,
         "pitchExact": pitch_exact,
         "pitchPrecision": round(safe_rate(pitch_exact, draft_notes), 6),
         "pitchRecall": round(safe_rate(pitch_exact, gold_notes), 6),
+        "pitchMissRate": round(1.0 - safe_rate(pitch_exact, gold_notes), 6),
         "pitchRecallIncludingEngineFailures": round(safe_rate(pitch_exact, attempted_gold_notes), 6),
         "onsetQuarterAccuracy": round(safe_rate(onset_exact, gold_notes), 6),
         "measureAccuracy": round(safe_rate(measure_exact, gold_notes), 6),
@@ -282,14 +296,24 @@ def aggregate_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def automatic_adoption_ready(summary: dict[str, Any], expected_rows: int) -> bool:
+def automatic_adoption_ready(
+    summary: dict[str, Any],
+    expected_rows: int,
+    minimum_rows: int = MIN_AUTOMATIC_ADOPTION_ROWS,
+) -> bool:
     return (
-        expected_rows > 0
+        expected_rows >= minimum_rows
         and summary.get("rows") == expected_rows
         and summary.get("usableRows") == expected_rows
         and summary.get("engineFailureRows") == 0
+        and summary.get("unusableEvidenceRows") == 0
         and summary.get("strictPassRows") == expected_rows
     )
+
+
+def resolve_output_root(value: str) -> Path:
+    """Freeze a caller path before Oemer switches to the image directory."""
+    return Path(value).resolve()
 
 
 def audiveris_up2_rows(path: Path) -> list[dict[str, Any]]:
@@ -402,7 +426,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     intake_path = Path(args.intake)
-    out_root = Path(args.out)
+    # Oemer runs with the prepared image directory as its working directory.
+    # Resolve the output root up front so a caller-provided relative --out is
+    # not appended to that working directory a second time.
+    out_root = resolve_output_root(args.out)
     report_path = out_root / "oemer-source-benchmark.json"
     python = Path(args.python)
     sklearn_site_packages = Path(args.sklearn_site_packages).resolve() if args.sklearn_site_packages else None

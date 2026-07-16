@@ -39,6 +39,7 @@ sys.path.insert(0, str(REPO / "scripts" / "experiments"))
 from eval_western_strings_m4_real_jpg_omr import preprocess  # noqa: E402
 from eval_western_strings_m4_omr_render_gold import run_audiveris, DEFAULT_AUDIVERIS  # noqa: E402
 import proto_western_strings_score_anchored_feedback as anchor  # noqa: E402
+from western_m4_omr_structure import evaluate_p0_structure  # noqa: E402
 
 VARIANTS = ["up2", "up2-otsu", "up3"]
 MIN_CONFIRMED = 20
@@ -61,6 +62,17 @@ def decide(cands: list[dict]) -> str:
     winner = max(scored, key=lambda c: (c["confirmed"], c["agreement"]), default=None)
     if winner is None or winner["confirmed"] <= 0:
         return "retake-photo"
+    structurally_ready = [
+        candidate
+        for candidate in scored
+        if (candidate.get("scoreStructureGate") or {}).get("ready") is True
+    ]
+    if not structurally_ready:
+        return "score-structure-review-required"
+    winner = max(
+        structurally_ready,
+        key=lambda c: (c["confirmed"], c["agreement"]),
+    )
     if winner["confirmed"] >= MIN_CONFIRMED and winner["agreement"] >= MIN_AGREEMENT:
         return f"full-feedback:{winner['variant']}"
     return f"degraded-feedback:{winner['variant']}"
@@ -97,12 +109,26 @@ def main(argv=None) -> int:
         try:
             vdir = recognize_variant(photo, variant, work, Path(args.audiveris), args.timeout)
             r = _run_variant(name, photo, audio, vdir, out_root, aev)
+            omr_files = sorted((vdir / "omr").glob("*.omr"))
+            mxl_files = sorted((vdir / "omr").glob("*.mxl"))
+            structure_gate = (
+                evaluate_p0_structure(omr_files[0], mxl_files)
+                if omr_files
+                else {
+                    "ready": False,
+                    "clefReady": False,
+                    "keyReady": False,
+                    "meterReady": False,
+                    "reasons": ["omr-archive-missing"],
+                }
+            )
             row.update({"status": r.get("status", "ok"),
                         "confirmed": (r.get("verdictCounts") or {}).get("confirmed", 0),
                         "agreement": r.get("audioAgreementHeard", 0.0),
                         "pieceGate": r.get("pieceGate"),
                         "annotated": r.get("annotated"),
-                        "verdictCounts": r.get("verdictCounts")})
+                        "verdictCounts": r.get("verdictCounts"),
+                        "scoreStructureGate": structure_gate})
         except Exception as exc:
             row.update({"status": f"error: {exc}"[:200], "confirmed": 0, "agreement": 0.0})
         cands.append(row)
@@ -111,7 +137,8 @@ def main(argv=None) -> int:
     winner_variant = decision.split(":", 1)[1] if ":" in decision else None
     audit = {
         "createdAt": datetime.now(timezone.utc).isoformat(),
-        "pipeline": "western-photo-score-v1",
+        "pipeline": "western-photo-score-v2-p0",
+        "p0StructureGateVersion": 2,
         "photo": str(photo), "audio": str(audio),
         "decision": decision,
         "winnerVariant": winner_variant,
@@ -119,10 +146,12 @@ def main(argv=None) -> int:
         "thresholds": {"minConfirmed": MIN_CONFIRMED, "minAgreement": MIN_AGREEMENT},
         "failClosed": {"studentRuntimeTouched": False,
                        "missingExtraVerdictsEmitted": False,
-                       "accusationsRequireBothNeighborConfidence": True},
+                       "accusationsRequireBothNeighborConfidence": True,
+                       "scoreStructureRequiresClefKeyMeter": True},
     }
     (out_root / "audit.json").write_text(json.dumps(audit, ensure_ascii=False, indent=1), encoding="utf-8")
     print(json.dumps({"decision": decision, "audit": str(out_root / "audit.json"),
+                      "p0StructureGateVersion": 2,
                       "candidates": [{k: c.get(k) for k in ("variant", "status", "confirmed", "agreement")}
                                      for c in cands]}, ensure_ascii=False))
     return 0

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -22,6 +23,12 @@ from eval_western_strings_m4_oemer_benchmark import (  # noqa: E402
 from prepare_western_strings_m4_clarity_adaptation_dataset import (  # noqa: E402
     M4_ROOT,
     validate_managed_output_root,
+)
+from prepare_western_strings_m4_doremi_pilot import (  # noqa: E402
+    BLIND_GOLD_ROOT,
+    group_staff_lines,
+    split_page_musicxml,
+    validate_output_root,
 )
 from train_western_strings_m4_clarity_adaptation_pilot import (  # noqa: E402
     validate_dataset_splits,
@@ -75,7 +82,7 @@ def test_complete_gate_accepts_only_all_strict_rows() -> None:
     rows = [benchmark_row(pieceId="a"), benchmark_row(pieceId="b")]
     summary = aggregate_metrics(rows)
     assert summary["strictPassRows"] == 2
-    assert automatic_adoption_ready(summary, 2) is True
+    assert automatic_adoption_ready(summary, 2, minimum_rows=2) is True
 
 
 def test_custom_pipeline_uses_absolute_paths_and_cpu_stage_a() -> None:
@@ -225,6 +232,71 @@ def test_adaptation_dataset_guards_reset_and_cross_split_leakage() -> None:
             raise AssertionError("image leakage across splits must fail closed")
 
 
+def test_doremi_adapter_guards_output_roots() -> None:
+    for unsafe in (M4_ROOT, BLIND_GOLD_ROOT / "leak"):
+        try:
+            validate_output_root(unsafe.resolve())
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError(f"unsafe DoReMi output root must fail closed: {unsafe}")
+
+    validate_output_root((M4_ROOT / "doremi-adapter-test-output").resolve())
+
+
+def test_doremi_adapter_requires_complete_staff_line_groups() -> None:
+    rows = [
+        {
+            "class_name": "kStaffLine",
+            "top": top,
+            "left": 10,
+            "width": 100,
+            "height": 1,
+        }
+        for top in range(20)
+    ]
+    groups = group_staff_lines(rows)
+    assert len(groups) == 4
+    assert all(len(group) == 5 for group in groups)
+
+    try:
+        group_staff_lines(rows[:-1])
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("incomplete staff-line groups must fail closed")
+
+
+def test_doremi_adapter_slices_musicxml_and_carries_attributes() -> None:
+    source_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Violin I</part-name></score-part>
+    <score-part id="P2"><part-name>Violin II</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1"><attributes><divisions>2</divisions></attributes></measure>
+    <measure number="2"/><measure number="3"/><measure number="4"/>
+  </part>
+  <part id="P2">
+    <measure number="1"><attributes><divisions>2</divisions></attributes></measure>
+    <measure number="2"/><measure number="3"/><measure number="4"/>
+  </part>
+</score-partwise>
+"""
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        source = root / "source.musicxml"
+        output = root / "page.musicxml"
+        source.write_text(source_xml, encoding="utf-8")
+        split_page_musicxml(source, output, start_index=1, count=2)
+        parsed = ET.parse(output).getroot()
+        for part in parsed.findall("part"):
+            measures = part.findall("measure")
+            assert [measure.get("number") for measure in measures] == ["2", "3"]
+            assert measures[0].find("attributes/divisions").text == "2"
+
+
 if __name__ == "__main__":
     test_auto_trim_page()
     test_complete_gate_rejects_structure_errors()
@@ -234,4 +306,7 @@ if __name__ == "__main__":
     test_adaptation_fails_closed_on_missing_or_incomplete_metrics()
     test_adaptation_retains_only_complete_non_regressive_improvement()
     test_adaptation_dataset_guards_reset_and_cross_split_leakage()
+    test_doremi_adapter_guards_output_roots()
+    test_doremi_adapter_requires_complete_staff_line_groups()
+    test_doremi_adapter_slices_musicxml_and_carries_attributes()
     print("western M4 Clarity benchmark tests passed")

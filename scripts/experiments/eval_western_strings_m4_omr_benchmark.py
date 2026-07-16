@@ -334,7 +334,19 @@ def evaluate_pair(
     result: dict[str, Any] = {
         "recordingId": recording_id,
         "pieceId": piece_id,
-        "goldPath": str(gold_path.relative_to(REPO)) if gold_path.exists() else str(gold_path),
+        "inputDomain": str(row.get("inputDomain") or "").strip() or "unspecified",
+        "cameraPhotoDomainEligible": (
+            "yes"
+            if str(row.get("cameraPhotoDomainEligible") or "").strip().lower()
+            in {"1", "true", "yes"}
+            else ""
+        ),
+        "inputDomainEvidence": str(row.get("inputDomainEvidence") or "").strip(),
+        "goldPath": (
+            str(gold_path.relative_to(REPO))
+            if gold_path.exists() and gold_path.is_relative_to(REPO)
+            else str(gold_path)
+        ),
         "draftPath": "|".join(
             str(path.relative_to(REPO)) if path.is_relative_to(REPO) else str(path)
             for path in draft_paths
@@ -367,15 +379,19 @@ def evaluate_pair(
             else "independent-source-derived-gold-invalid"
         )
         benchmark_usable = source_gold_verified and not gold_equals_draft
-    elif gold_equals_draft and human_verified_clean_score:
-        gold_provenance = "human-approved-unchanged-draft"
+    elif human_verified_clean_score:
+        gold_provenance = (
+            "human-approved-unchanged-draft"
+            if gold_equals_draft
+            else "independent-edited-gold"
+        )
         benchmark_usable = True
     elif gold_equals_draft:
         gold_provenance = "self-comparison-unverified"
         benchmark_usable = False
     else:
-        gold_provenance = "independent-edited-gold"
-        benchmark_usable = True
+        gold_provenance = "different-draft-unverified"
+        benchmark_usable = False
     try:
         gold_notes = parse_notes(gold_path)
         draft_notes = parse_notes_many(draft_paths)
@@ -420,7 +436,7 @@ def evaluate_pair(
             if benchmark_usable
             else f"independent-source-provenance-invalid:{source_gold_error}"
             if source_gold_requested
-            else "gold-clean-score-identical-to-audiveris-draft-without-human-review",
+            else "gold-clean-score-not-human-approved",
             "goldNotes": gold_count,
             "draftNotes": draft_count,
             "pairedNotes": len(paired),
@@ -431,6 +447,7 @@ def evaluate_pair(
             "pitchAccuracy": round(safe_rate(pitch_exact, gold_count), 6),
             "pitchPrecision": round(safe_rate(pitch_exact, draft_count), 6),
             "pitchRecall": round(safe_rate(pitch_exact, gold_count), 6),
+            "pitchMissRate": round(1.0 - safe_rate(pitch_exact, gold_count), 6),
             "missingRate": round(safe_rate(missing, gold_count), 6),
             "extraRate": round(safe_rate(extra, gold_count), 6),
             "onsetQuarterAccuracy": round(safe_rate(onset_exact, gold_count), 6),
@@ -472,6 +489,7 @@ def summarize(rows: list[dict[str, Any]], thresholds: dict[str, float]) -> dict[
         "pitchAccuracy": round(safe_rate(totals["pitchExact"], gold_total), 6),
         "pitchPrecision": round(safe_rate(totals["pitchExact"], totals["draftNotes"]), 6),
         "pitchRecall": round(safe_rate(totals["pitchExact"], gold_total), 6),
+        "pitchMissRate": round(1.0 - safe_rate(totals["pitchExact"], gold_total), 6),
         "missingRate": round(safe_rate(totals["missingNotes"], gold_total), 6),
         "extraRate": round(safe_rate(totals["extraNotes"], gold_total), 6),
         "onsetQuarterAccuracy": round(safe_rate(totals["onsetExact"], gold_total), 6),
@@ -599,8 +617,9 @@ def main() -> int:
             "missingNotes",
             "extraNotes",
             "pitchAccuracy",
-            "pitchPrecision",
             "pitchRecall",
+            "pitchMissRate",
+            "pitchPrecision",
             "missingRate",
             "extraRate",
             "onsetQuarterAccuracy",

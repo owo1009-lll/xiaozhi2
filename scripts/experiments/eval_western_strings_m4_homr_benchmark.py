@@ -33,6 +33,7 @@ from eval_western_strings_m4_oemer_benchmark import (  # noqa: E402
     STRICT_MIN_ONSET_QUARTER_ACCURACY,
     STRICT_MIN_PRECISION,
     STRICT_MIN_RECALL,
+    MIN_AUTOMATIC_ADOPTION_ROWS,
     THREAD_ENV,
     add_verified_gold_context,
     aggregate_metrics,
@@ -392,6 +393,9 @@ def main(argv: list[str] | None = None) -> int:
         "gate": {
             "name": "western-strings-m4-homr-source-benchmark",
             "automaticAdoptionReady": automatic_adoption_ready(comparison["homr"], len(rows_in)),
+            "minimumIndependentRows": MIN_AUTOMATIC_ADOPTION_ROWS,
+            "observedIndependentRows": len(rows_in),
+            "sampleSizeReady": len(rows_in) >= MIN_AUTOMATIC_ADOPTION_ROWS,
             "studentGateReady": False,
             "reason": "eval-only-transformer-omr-engine-comparison",
             "runtimeEffect": "none",

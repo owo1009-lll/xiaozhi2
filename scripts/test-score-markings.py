@@ -72,12 +72,12 @@ SAMPLE_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
         <duration>4</duration>
         <notations><slur type="start" number="1"/></notations>
       </note>
-      <barline location="right"><repeat direction="forward"/></barline>
+      <barline location="right"><ending number="1" type="start"/><repeat direction="forward"/></barline>
     </measure>
     <measure number="2" width="420">
       <direction placement="below">
         <direction-type><dynamics><p/></dynamics><wedge type="stop"/></direction-type>
-        <sound dynamics="45"/>
+        <sound dynamics="45" dalsegno="segno-1" tocoda="coda-1"/>
       </direction>
       <note default-x="80">
         <pitch><step>F</step><alter>1</alter><octave>5</octave></pitch>
@@ -1010,6 +1010,20 @@ def main() -> int:
     require(marking_stats.get("tempoChangeCount", 0) >= 1, "Tempo marking missing.")
     require(marking_stats.get("dynamicChangeCount", 0) >= 2, "Dynamic markings missing.")
     require(marking_stats.get("repeatCount", 0) >= 2, "Repeat structure missing.")
+    require(marking_stats.get("repeatRouteReady") is False, "Non-trivial repeats must remain review-only.")
+    require(
+        marking_stats.get("repeatRouteReason") == "repeat-route-review-required",
+        f"Repeat route reason missing: {marking_stats}",
+    )
+    repeat_types = {item.get("type") for item in section.get("repeatStructure", [])}
+    require(
+        {"repeat", "ending", "dalsegno", "tocoda"}.issubset(repeat_types),
+        f"Repeat route symbols were not preserved: {repeat_types}",
+    )
+    require(
+        all(item.get("requiresReview") is True for item in section.get("repeatStructure", [])),
+        "All detected repeat-route symbols must fail closed until route gold exists.",
+    )
 
     print(
         json.dumps(

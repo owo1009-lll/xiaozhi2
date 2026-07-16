@@ -77,6 +77,12 @@ STANDARD_DURATIONS = (
 class RhythmToken:
     duration_quarters: float
     sounding_note: bool
+    notation_type: str = ""
+    dot_count: int = 0
+    beam_count: int = 0
+    tie_start: bool = False
+    tie_stop: bool = False
+    is_rest: bool = False
 
 
 @dataclass(frozen=True)
@@ -137,7 +143,33 @@ def _best_part_measures(path: Path, measure_offset: int = 0) -> list[MeasureRhyt
                     midi = pitch_to_midi(item)
                     sounding = midi is not None and child(item, "rest") is None
                     if not is_chord:
-                        tokens.append(RhythmToken(duration, sounding))
+                        notation_type = child_text(item, "type")
+                        dot_count = sum(
+                            1 for value in list(item) if local_name(str(value.tag)) == "dot"
+                        )
+                        beam_count = sum(
+                            1
+                            for value in list(item)
+                            if local_name(str(value.tag)) == "beam"
+                            and (value.text or "").strip() not in {"", "none"}
+                        )
+                        tie_types = {
+                            value.attrib.get("type", "")
+                            for value in list(item)
+                            if local_name(str(value.tag)) == "tie"
+                        }
+                        tokens.append(
+                            RhythmToken(
+                                duration,
+                                sounding,
+                                notation_type=notation_type,
+                                dot_count=dot_count,
+                                beam_count=beam_count,
+                                tie_start="start" in tie_types,
+                                tie_stop="stop" in tie_types,
+                                is_rest=child(item, "rest") is not None,
+                            )
+                        )
                     if sounding:
                         notes.append((int(midi), onset))
                     previous_onset = onset
@@ -188,10 +220,166 @@ def candidate_duration_ticks(duration_quarters: float) -> tuple[int, ...]:
     return tuple(sorted(values))
 
 
+NOTATION_QUARTERS = {
+    "128th": 1 / 32,
+    "64th": 1 / 16,
+    "32nd": 1 / 8,
+    "16th": 1 / 4,
+    "eighth": 1 / 2,
+    "quarter": 1.0,
+    "half": 2.0,
+    "whole": 4.0,
+    "breve": 8.0,
+}
+
+
+def visual_candidate_duration_ticks(token: RhythmToken) -> tuple[int, ...]:
+    """Return bounded duration candidates supported by visible notation classes.
+
+    The original exported duration remains a candidate, but unlike the legacy
+    oracle this function never enumerates every standard note value.  Black
+    notehead ambiguity is limited to eighth/quarter, dots can be retained or
+    removed, and explicit rests use the same bounded duration family.
+    """
+
+    original = max(1, int(round(token.duration_quarters * TICKS_PER_QUARTER)))
+    values = {original}
+    base = NOTATION_QUARTERS.get(token.notation_type)
+    if base is None:
+        return (original,)
+
+    families = {base}
+    if token.notation_type in {"eighth", "quarter"}:
+        families.update({0.5, 1.0})
+    for value in families:
+        values.add(max(1, int(round(value * TICKS_PER_QUARTER))))
+        if token.dot_count > 0:
+            values.add(max(1, int(round(value * 1.5 * TICKS_PER_QUARTER))))
+
+    return tuple(sorted(values))
+
+
+def build_visual_candidate_provider(measure: MeasureRhythm):
+    """Add bounded candidates supported by beam and local tuplet context.
+
+    A missing or extra beam changes a note by one duration class, so only the
+    adjacent beam classes are added.  Tuplet duration is propagated only when
+    at least three matching tokens already expose the same 3:2 timing inside
+    the measure.  Both signals are available in the draft MusicXML and do not
+    use gold timing.
+    """
+
+    triplet_eighth_count = sum(
+        token.notation_type == "eighth"
+        and math.isclose(token.duration_quarters, 1 / 3, abs_tol=1e-6)
+        for token in measure.tokens
+    )
+    triplet_sixteenth_count = sum(
+        token.notation_type == "16th"
+        and math.isclose(token.duration_quarters, 1 / 6, abs_tol=1e-6)
+        for token in measure.tokens
+    )
+
+    def provider(token: RhythmToken) -> tuple[int, ...]:
+        values = set(visual_candidate_duration_ticks(token))
+        if token.beam_count > 0:
+            beam_quarters = 1 / (2**token.beam_count)
+            values.update(
+                max(1, int(round(value * TICKS_PER_QUARTER)))
+                for value in (beam_quarters / 2, beam_quarters, beam_quarters * 2)
+            )
+            if (
+                triplet_eighth_count >= 3
+                and token.notation_type in {"eighth", "16th"}
+            ):
+                values.add(int(round(TICKS_PER_QUARTER / 3)))
+            if (
+                triplet_sixteenth_count >= 3
+                and token.notation_type in {"eighth", "16th", "32nd"}
+            ):
+                values.add(int(round(TICKS_PER_QUARTER / 6)))
+        return tuple(sorted(values))
+
+    return provider
+
+
+def generate_visual_rhythm_candidates(
+    draft: MeasureRhythm,
+    target_ticks: int,
+    *,
+    top_k: int = 16,
+) -> list[dict[str, Any]]:
+    """Generate low-edit measure rhythms without consulting gold timing."""
+
+    if (
+        draft.has_backup
+        or target_ticks <= 0
+        or top_k <= 0
+        or any(token.duration_quarters <= 0.0 for token in draft.tokens)
+    ):
+        return []
+    provider = build_visual_candidate_provider(draft)
+    # cumulative ticks -> bounded alternatives (cost, changed, durations)
+    states: dict[int, list[tuple[float, int, tuple[int, ...]]]] = {
+        0: [(0.0, 0, ())]
+    }
+    for token in draft.tokens:
+        original = max(1, int(round(token.duration_quarters * TICKS_PER_QUARTER)))
+        next_states: dict[int, list[tuple[float, int, tuple[int, ...]]]] = defaultdict(list)
+        for total, alternatives in states.items():
+            for cost, changed, durations in alternatives:
+                for ticks in provider(token):
+                    new_total = total + ticks
+                    if new_total > target_ticks:
+                        continue
+                    edit_cost = (
+                        0.0
+                        if ticks == original
+                        else 1.0 + 0.25 * abs(math.log2(ticks / original))
+                    )
+                    next_states[new_total].append(
+                        (
+                            cost + edit_cost,
+                            changed + int(ticks != original),
+                            durations + (int(ticks),),
+                        )
+                    )
+        states = {}
+        for total, alternatives in next_states.items():
+            unique: dict[tuple[int, ...], tuple[float, int, tuple[int, ...]]] = {}
+            for candidate in alternatives:
+                previous = unique.get(candidate[2])
+                if previous is None or candidate[:2] < previous[:2]:
+                    unique[candidate[2]] = candidate
+            states[total] = sorted(unique.values(), key=lambda item: item[:2])[:top_k]
+        if not states:
+            return []
+
+    results: list[dict[str, Any]] = []
+    for cost, changed, durations in states.get(target_ticks, []):
+        cursor = 0
+        note_onsets: list[int] = []
+        for token, ticks in zip(draft.tokens, durations):
+            if token.sounding_note:
+                note_onsets.append(cursor)
+            cursor += ticks
+        results.append(
+            {
+                "targetTicks": int(target_ticks),
+                "durationTicks": list(durations),
+                "noteOnsetTicks": note_onsets,
+                "cost": round(float(cost), 6),
+                "changed": int(changed),
+            }
+        )
+    return results
+
+
 def reachable_gold_rhythm(
     draft: MeasureRhythm,
     gold_onset_ticks: tuple[int, ...],
     target_ticks: int,
+    candidate_provider=None,
 ) -> dict[str, Any]:
     """Return the lowest-edit exact-meter path that meets all gold checkpoints."""
 
@@ -217,7 +405,12 @@ def reachable_gold_rhythm(
         original = max(1, int(round(token.duration_quarters * TICKS_PER_QUARTER)))
         next_states: dict[int, tuple[float, int]] = {}
         for total, (cost, changed) in states.items():
-            for ticks in candidate_duration_ticks(token.duration_quarters):
+            candidates = (
+                candidate_provider(token)
+                if candidate_provider is not None
+                else candidate_duration_ticks(token.duration_quarters)
+            )
+            for ticks in candidates:
                 new_total = total + ticks
                 if new_total > target_ticks:
                     continue
@@ -356,6 +549,28 @@ def evaluate_piece(source: dict[str, Any]) -> dict[str, Any]:
         counts["currentMeterReachableMeasures"] += int(current["reachable"])
         counts["goldMeterReachableMeasures"] += int(gold_meter["reachable"])
         counts["commonMeterReachableMeasures"] += int(bool(reachable_common))
+        visual_candidate_provider = build_visual_candidate_provider(draft)
+        visual_current = reachable_gold_rhythm(
+            draft,
+            gold.note_onset_ticks,
+            draft.expected_ticks,
+            candidate_provider=visual_candidate_provider,
+        )
+        visual_gold = reachable_gold_rhythm(
+            draft,
+            gold.note_onset_ticks,
+            gold.expected_ticks,
+            candidate_provider=visual_candidate_provider,
+        )
+        counts["visualCurrentMeterReachableMeasures"] += int(visual_current["reachable"])
+        counts["visualGoldMeterReachableMeasures"] += int(visual_gold["reachable"])
+        counts["visualCandidateTokens"] += len(draft.tokens)
+        counts["visualAmbiguousTokens"] += sum(
+            len(visual_candidate_duration_ticks(token)) > 1 for token in draft.tokens
+        )
+        counts["visualRestTokens"] += sum(token.is_rest for token in draft.tokens)
+        counts["visualDotTokens"] += sum(token.dot_count > 0 for token in draft.tokens)
+        counts["visualTieEdgeCandidates"] += sum(token.tie_start or token.tie_stop for token in draft.tokens)
         if gold_meter["reachable"] and gold_meter["changed"] is not None:
             changed_counts.append(int(gold_meter["changed"]))
         details.append(
@@ -375,6 +590,11 @@ def evaluate_piece(source: dict[str, Any]) -> dict[str, Any]:
                 "reachableCommonMeterQuarters": [
                     target / TICKS_PER_QUARTER for target, _ in reachable_common
                 ],
+                "visualCurrentMeterReachable": visual_current["reachable"],
+                "visualGoldMeterReachable": visual_gold["reachable"],
+                "visualCandidateSetSizes": [
+                    len(visual_candidate_provider(token)) for token in draft.tokens
+                ],
             }
         )
 
@@ -391,6 +611,12 @@ def evaluate_piece(source: dict[str, Any]) -> dict[str, Any]:
         "currentMeterCandidateRecall": _rate(counts["currentMeterReachableMeasures"], comparable),
         "goldMeterCandidateRecall": _rate(counts["goldMeterReachableMeasures"], comparable),
         "commonMeterCandidateRecall": _rate(counts["commonMeterReachableMeasures"], comparable),
+        "visualCurrentMeterCandidateRecall": _rate(
+            counts["visualCurrentMeterReachableMeasures"], comparable
+        ),
+        "visualGoldMeterCandidateRecall": _rate(
+            counts["visualGoldMeterReachableMeasures"], comparable
+        ),
         "medianChangedTokensAtGoldMeter": (
             float(sorted(changed_counts)[len(changed_counts) // 2]) if changed_counts else None
         ),
@@ -419,6 +645,13 @@ def main() -> int:
             "currentMeterReachableMeasures",
             "goldMeterReachableMeasures",
             "commonMeterReachableMeasures",
+            "visualCurrentMeterReachableMeasures",
+            "visualGoldMeterReachableMeasures",
+            "visualCandidateTokens",
+            "visualAmbiguousTokens",
+            "visualRestTokens",
+            "visualDotTokens",
+            "visualTieEdgeCandidates",
         ):
             totals[key] += int(row.get(key) or 0)
     comparable = totals["comparableMeasures"]
@@ -434,14 +667,24 @@ def main() -> int:
         "currentMeterCandidateRecall": _rate(totals["currentMeterReachableMeasures"], comparable),
         "goldMeterCandidateRecall": _rate(totals["goldMeterReachableMeasures"], comparable),
         "commonMeterCandidateRecall": _rate(totals["commonMeterReachableMeasures"], comparable),
+        "visualCurrentMeterCandidateRecall": _rate(
+            totals["visualCurrentMeterReachableMeasures"], comparable
+        ),
+        "visualGoldMeterCandidateRecall": _rate(
+            totals["visualGoldMeterReachableMeasures"], comparable
+        ),
         "candidateGenerationGatePassed": (
             comparable >= 30
-            and _rate(totals["commonMeterReachableMeasures"], comparable) >= 0.95
+            and _rate(totals["visualGoldMeterReachableMeasures"], comparable) >= 0.95
+        ),
+        "selectorTrainingAllowed": (
+            comparable >= 30
+            and _rate(totals["visualGoldMeterReachableMeasures"], comparable) >= 0.95
         ),
         "runtimeReady": False,
     }
     report = {
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "evalOnly": True,
         "studentFacing": False,
         "purpose": "candidate-generation oracle; gold timing is never a runtime feature",
@@ -452,6 +695,8 @@ def main() -> int:
             "Only exact-pitch monophonic measure pairs are comparable, so pitch omissions do not masquerade as rhythm errors.",
             "Relative IOI shape is invariant to a uniform notation scale; meter-mismatched measures with an exact relative shape are reported as edition/notation confounds, not raw OMR rhythm failures.",
             "A high common-meter oracle recall proves candidate generation is possible; it does not prove the correct meter can be selected automatically.",
+            "The release gate uses only bounded visual candidates from note type, adjacent beam-count ambiguity, repeated in-measure tuplet context, dots, rests, and tie evidence. Broad standard-duration enumeration is retained as a diagnostic upper bound only.",
+            "Selector training is forbidden unless the bounded visual oracle reaches 95% recall on at least 30 comparable measures.",
             "The selector must use independent visual or calibrated audio evidence and pass a separate holdout gate before runtime use.",
         ],
     }
@@ -474,19 +719,22 @@ def main() -> int:
         f"- notation-scale confounded measures: {totals['notationScaleConfoundedMeasures']}",
         f"- current-meter candidate recall: {summary['currentMeterCandidateRecall']}",
         f"- common-meter candidate recall: {summary['commonMeterCandidateRecall']}",
+        f"- bounded visual candidate recall (current meter): {summary['visualCurrentMeterCandidateRecall']}",
+        f"- bounded visual candidate recall (gold meter oracle): {summary['visualGoldMeterCandidateRecall']}",
         f"- candidate-generation gate: {summary['candidateGenerationGatePassed']}",
+        f"- selector training allowed: {summary['selectorTrainingAllowed']}",
         f"- runtime ready: {summary['runtimeReady']}",
         "",
-        "| piece | measures | notes | meter match | baseline exact | relative IOI | scale-confounded | current meter | common meters |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| piece | measures | notes | meter match | baseline exact | relative IOI | scale-confounded | broad common | visual current | visual gold-meter |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in rows:
         lines.append(
             f"| {row['pieceId']} | {row.get('comparableMeasures', 0)} | "
             f"{row.get('comparableNotes', 0)} | {row['meterMatchRate']} | "
             f"{row['baselineExactMeasureRate']} | {row['relativeShapeExactMeasureRate']} | "
-            f"{row.get('notationScaleConfoundedMeasures', 0)} | {row['currentMeterCandidateRecall']} | "
-            f"{row['commonMeterCandidateRecall']} |"
+            f"{row.get('notationScaleConfoundedMeasures', 0)} | {row['commonMeterCandidateRecall']} | "
+            f"{row['visualCurrentMeterCandidateRecall']} | {row['visualGoldMeterCandidateRecall']} |"
         )
     (out / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(json.dumps({"ok": True, "summary": summary, "out": str(out)}, indent=2))

@@ -18,6 +18,7 @@ from eval_western_strings_m4_oemer_benchmark import (  # noqa: E402
     find_musicxml,
     prepare_viewer_trim,
     read_coordinate_sidecar,
+    resolve_output_root,
 )
 from run_oemer_with_coordinates import add_normalized_coordinates, pitched_xml_note_count  # noqa: E402
 
@@ -111,6 +112,8 @@ with tempfile.TemporaryDirectory() as temporary_directory:
     env = build_oemer_env({"PYTHONPATH": "existing"}, compat)
     assert env["PYTHONPATH"] == str(compat) + os.pathsep + "existing"
     assert all(env[key] == value for key, value in THREAD_ENV.items())
+    relative_output = Path("data") / "relative-oemer-output"
+    assert resolve_output_root(str(relative_output)) == (Path.cwd() / relative_output).resolve()
 
 oemer_rows = [
     {
@@ -158,8 +161,10 @@ audiveris_rows = [
 summary = aggregate_metrics(oemer_rows)
 assert summary["pitchPrecision"] == round(179 / 225, 6)
 assert summary["pitchRecall"] == 0.895
+assert summary["pitchMissRate"] == 0.105
 assert summary["strictPassRows"] == 1
 assert summary["engineFailureRows"] == 0
+assert summary["unusableEvidenceRows"] == 0
 assert summary["pitchRecallIncludingEngineFailures"] == 0.895
 assert summary["onsetQuarterAccuracy"] == 0.99
 assert summary["measureAccuracy"] == 0.99
@@ -182,10 +187,40 @@ assert comparison["oemer"]["strictPassRows"] == 1
 assert comparison["pairedSubset"]["pieceIds"] == ["a"]
 assert automatic_adoption_ready(aggregate_metrics([]), 0) is False
 assert automatic_adoption_ready(summary, 2) is False
-assert automatic_adoption_ready(aggregate_metrics([oemer_rows[0]]), 1) is True
+assert automatic_adoption_ready(aggregate_metrics([oemer_rows[0]]), 1) is False
+five_strict_rows = [{**oemer_rows[0], "pieceId": f"strict-{index}"} for index in range(5)]
+assert automatic_adoption_ready(aggregate_metrics(five_strict_rows), 5) is True
 pitch_only = [{**oemer_rows[0], "onsetQuarterAccuracy": 0.2}]
 assert aggregate_metrics(pitch_only)["pitchOnlyStrictPassRows"] == 1
 assert aggregate_metrics(pitch_only)["strictPassRows"] == 0
 assert automatic_adoption_ready(aggregate_metrics(pitch_only), 1) is False
+
+human_verified = [{**oemer_rows[0], "goldSourceVerified": "", "humanVerifiedCleanScore": "yes"}]
+assert aggregate_metrics(human_verified)["attemptedGoldNotes"] == 100
+assert aggregate_metrics(human_verified)["pitchRecallIncludingEngineFailures"] == 0.99
+
+unverified = [{
+    **oemer_rows[0],
+    "benchmarkUsable": False,
+    "goldSourceVerified": "",
+    "humanVerifiedCleanScore": "",
+    "blockingReason": "gold-clean-score-not-human-approved",
+}]
+unverified_summary = aggregate_metrics(unverified)
+assert unverified_summary["engineFailureRows"] == 0
+assert unverified_summary["unusableEvidenceRows"] == 1
+assert automatic_adoption_ready(unverified_summary, 1) is False
+
+engine_failure = [{
+    **oemer_rows[0],
+    "parseOk": False,
+    "benchmarkUsable": False,
+    "goldSourceVerified": "",
+    "humanVerifiedCleanScore": "",
+    "blockingReason": "oemer-runtime-error",
+}]
+engine_failure_summary = aggregate_metrics(engine_failure)
+assert engine_failure_summary["engineFailureRows"] == 1
+assert engine_failure_summary["unusableEvidenceRows"] == 0
 
 print('{"ok": true, "checks": ["output-discovery", "coordinate-sidecar", "failure-classification", "thread-env", "strict-gate", "engine-comparison"]}')

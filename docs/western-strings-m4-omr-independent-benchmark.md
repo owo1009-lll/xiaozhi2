@@ -10,7 +10,7 @@
 
 ## 1. 为什么需要这份基准
 
-此前 M4 benchmark 的 gold 与 Audiveris 草稿逐字节相同(自比较),给出的 100% 不可采信。本基准用**独立 gold**:Bach Violin Dataset 的公版 MusicXML(与 Audiveris 无关)经 Verovio 渲染成谱面图,再让 Audiveris **盲识**,music21 逐音比对。指标为音高序列 precision / recall / F1(SequenceMatcher;不含节奏/时值评分)。
+此前 M4 benchmark 的 gold 与 Audiveris 草稿逐字节相同(自比较),给出的 100% 不可采信。本基准用**独立 gold**:Bach Violin Dataset 的公版 MusicXML(与 Audiveris 无关)经 Verovio 渲染成谱面图,再让 Audiveris **盲识**,music21 逐音比对。指标按 recall / 漏识率 / precision / F1 顺序报告(SequenceMatcher;不含节奏/时值评分),因为真实照片当前的首要失败模式是漏音。
 
 ## 2. 结果总览
 
@@ -38,7 +38,7 @@
 - **A 层(自动采纳,当前关闭)**:原型条件是单声部 + 结构自检通过,但现有独立逐谱通过率和真照片 gold 不足,不能接生产。
 - **B 层(变体赛马 + 音频仲裁)**:结构自检不一致 → 跑 up2/up2-otsu/up3 多变体,用学生录音事件仲裁选择;仲裁后仍不一致 → C 层。
 - **C 层(fail-closed 人工)**:无输出/全变体打架/复调密集 → 退 m2f 人工核谱流程(一次核对,长期复用)。
-- **诊断联动**:凡 OMR 谱未经人工核对的小节,**禁用 extra-note/missing 硬判**(防漏音引发冤枉学生),只留音准/节奏。
+- **诊断联动**:凡 OMR 谱未经人工核对的小节,禁用 pitch/onset/duration/missing/extra 学生硬判;只允许展示“录音与谱面此处不一致,需复核”,防止 OMR 错谱冤枉学生。
 
 ## 5. 诚实边界
 
@@ -124,6 +124,8 @@
 | retake-photo | 1/12 | ex07(全变体无输出,自检出) |
 | 专家人工 / 误指控出口 | **0 / 0** | |
 
+> **2026-07-16 P0 安全闸更新:** 上表是 P0 结构闸加入前的历史可用性结果。新版闸门允许显式符号或结构佐证、冲突仍拒绝；对同一 12 份三变体缓存重放后，`0/12` 存在完整 P0-ready 变体，严格策略为 `11 review + 1 retake`。仅保留双证绿色可在 11 份中保留 870 音且不输出指控，但独立 gold 审计最差单曲 precision 仅 80%，故该出口尚未恢复到学生端。重放报告由 `npm run western:m4-p0-feedback-impact` 生成。
+
 **缺陷/边界清单(如实)**:
 1. basic-pitch 对快速连奏欠检出 → 黄区偏大、红灵敏度保守(precision-first 取舍);
 2. 弱起音/低吻合录音(ex05)只能降级,节奏维度尚未参与判定(数据已输出);
@@ -168,3 +170,51 @@
 - 按[官方 Clarity-OMR 仓库](https://github.com/clquwu/Clarity-OMR)与[官方模型页](https://huggingface.co/clquwu/Clarity-OMR)运行 YOLO 谱表检测 + Transformer 解码管线,使用官方 beam width 5。模型仅作隔离 eval-only 对照,不进入生产依赖。
 - 冻结照片来自播放器截图,原图含黑边和标题栏;原样包装成 PDF 时 Stage A 在 `ex05` 检出 `0` 个谱表。为避免把截图边框误当作模型识谱能力,正式对照统一使用不看 gold 的行均值裁页规则,并把该预处理写入每页证据。
 - 裁页后 5/5 均输出 MusicXML,聚合 pitch P/R=`72.77%/35.53%`,onset-quarter/measure accuracy=`2.81%/10.10%`;pitch-only 与完整严格通过均为 `0/5`。因此模型架构更强不等于当前拍照域可直接采用,Clarity 保持 `automaticAdoptionReady=false`,`studentGateReady=false`。
+
+### 8.12 DoReMi 公开谱面监督适配 pilot(2026-07-16)
+- 数据来自[DoReMi v1](https://github.com/steinbergmedia/DoReMi/releases/tag/v1.0)的页图、页级 OMR XML 和 MusicXML。只解压 3 部弦乐四重奏的有界子集,按作品划分 train/validation/synthetic-test=`96/48/48` 个谱表对;作品、图像 hash 均无交叉,5 份冻结照片 gold 不在训练路径中。由于存档未附可机读的数据集许可文件,当前仅限本地 eval-only,不再分发。
+- 32-step bf16+DoRA 在按作品隔离的数字谱上提高了 teacher-forced token accuracy:validation `56.89% -> 66.02%`,synthetic-test `62.65% -> 72.96%`。这仅证明适配器学会了 DoReMi 数字谱域,不是真实 OMR 验收。
+- 在冻结 5 份真照片上,适配候选 pitch P/R=`75.94%/36.10%`,onset-quarter/measure accuracy=`5.18%/6.65%`,严格通过 `0/5`。相比官方 Clarity 基线,音高 P/R 和 onset 略升,但 measure accuracy 从 `10.10%` 退化到 `6.65%`。
+- 预声明的适配闸门要求 pitch precision/recall、onset 和 measure 四项都不退化,且至少一项改善;该候选因此被 `reject-and-delete`。公开干净谱可以提高数字谱域指标,但不能单独修复真照片的休止、符杠/符尾、附点和小节结构。后续仅在有拍照域退化+结构级标注时再开启监督训练。
+- 识别对象、安全闸门和 P0-P3 优先级见 [M4 OMR 识别需求与验收规范](western-strings-m4-omr-recognition-spec.md)。
+## 2026-07-16/17 同输入图同版本人工 gold 补充
+
+《北京的金山上》已完成负责人人工 MusicXML 誊写，gold 与 OMR 输入来自同一谱页、同一版本，不再受公开源谱版本差异影响。`npm run western:m4-same-edition-benchmark` 只读取已有输出并验证三引擎引用同一 gold SHA-256。这里的“同输入图”不等于“手机照片”：当前北京输入是已拉直的干净页图，其域标签已在 2026-07-17 复验中修正。
+
+| 引擎 | Pitch precision | Pitch recall | Onset-quarter | Measure | 严格通过 |
+|---|---:|---:|---:|---:|---:|
+| Audiveris up2 | 80.56% | 33.72% | 0% | 0% | 0/1 |
+| Oemer 0.1.8 | 85.07% | 33.14% | 0% | 0% | 0/1 |
+| HOMR 0.7.0 | 98.84% | 98.84% | 100% | 100% | 1/1 |
+
+HOMR 仅在第 7、35 小节各有一个 `C#5 -> B4` 替换，其余 170/172 音和全部节奏、小节结构与人工 gold 一致。2026-07-17 已在全新输出目录从同一输入重新运行 HOMR；新旧 MusicXML 的 SHA-256 完全一致，事件级复算仍为上述两个替换，证明该单页结果可重复。
+
+但输入审计同时修正了证据域：`beijing-jinshan-score.png` 是已拉直、无透视和手写干扰的干净谱页图，并非负责人展示的弯曲手机照片。因此 `98.84%` 只能作为“干净页图/扫描域单页阳性”，不能表述成真实手机照片域准确率。当前 ONNX Runtime 1.27.0 对冻结 5 张独立 source-gold 照片的 fresh 汇总为 pitch P/R=`88.33%/95.78%`、onset-quarter=`30.03%`、measure=`79.04%`、严格通过 `0/5`；照片域仍未通过。统一自动采纳函数继续保持 `automaticAdoptionReady=false`，学生端 fail-closed。fresh 报告位于 `data/experiments/western-strings-m4/beijing-homr-fresh-revalidation-20260717/` 和 `data/experiments/western-strings-m4/homr-fresh-sourcegold-revalidation-20260717/`。
+
+### 8.13 Op.45 No.34 独立公开演奏 MIDI 音高顺序佐证(2026-07-16)
+
+- 对 `练习曲 Op.45 No.34` 真实照片运行 HOMR 0.7.0，初始得到 `198` 个音、`32` 小节。人工同版复核确认第 2/3 小节之间漏线，按 6/8 时值边界局部拆分后为 `198` 个音、`33` 小节；音高与记号未改。独立参考来自 [MTG violin-transcription](https://github.com/MTG/violin-transcription/) 的公开 performance-aligned MPE MIDI，共 `331` 个 note-on。
+- 合并 MPE 多轨并做仅音高的局部序列对齐后，HOMR 草稿第 `49-198` 音与参考前 `150` 音连续完全一致：`150` exact matches、`0` substitutions、`0` draft gaps、`0` reference gaps。照片版本前 `48` 音是公开演奏版本没有的 8 小节准备段，因此未强行参与匹配。
+- 这是独立来源对 HOMR 主体音高顺序的强佐证，但不是该照片的同版本人工 MusicXML gold。performance MIDI 的拍号/时值由演奏对齐表示，不能作为印刷节奏或小节结构真值；本实验明确 `rhythmEvaluated=false`,`sameEditionHumanGold=false`,`automaticAdoptionReady=false`。
+- 复跑命令：`npm run western:m4-op45-public-reference`；回归测试：`npm run test:western-m4-op45-public-reference`；报告：`data/experiments/western-strings-m4/op45-34-public-reference/op45-34-public-reference-comparison.json`。该证据不改变同版严格闸门的 `1/5` 计数。
+
+### 8.14 Op.45 同版人工复核与安全导入(2026-07-16)
+
+- 并排复核页：`data/experiments/western-strings-m4/op45-34-same-edition-gold-candidate/index.html`。页面要求四类记谱元素全部通过，并强制填写复核人姓名。
+- 下载 JSON 固定携带原始照片和候选 MusicXML 的 SHA-256。安全导入命令为 `npm run western:m4-op45-promote-gold -- --review <下载的json>`；姓名缺失、任一检查未通过或任一文件哈希变化都会 fail-closed，且不会覆盖已有的不同 gold。
+- 推荐直接使用 `npm run western:m4-op45-finalize-benchmark -- --review <下载的json>`：该命令包含上述安全提升，并复用已冻结的 Audiveris/Oemer/HOMR 输出生成两页三引擎报告，不会重新跑重模型。由 HOMR 候选经人工逐项校对得到的 Op.45 页会保留为 human-reviewed evidence，但标记 `candidateEngineBiasRisk=true`，不计入 HOMR 自动采纳所需的独立页数。
+- 同版三引擎汇总器已支持多页：每个引擎必须引用完全相同、无重复的 gold SHA 集合，`observedIndependentRows` 才按不同页数增长。缺页、错页或混入不同 gold 会拒绝整个汇总。
+- 这些改动只保证金标导入和计数不被污染。当前尚无 Op.45 人工复核 JSON，也尚未基于该 gold 完成三引擎盲测，所以严格门槛仍是 `1/5`，不能提前记为第 2 页。
+
+### 8.15 自适应谱线缩放根因复核(2026-07-17)
+
+- Op.45 的谱线估计没有失效：原图 interline=`5px`、请求/实际倍率=`4×`、最终 interline=`20px`，未触发 1800 万像素上限。旧自适应路径只识别 17 事件的根因是 `autocontrast cutoff=0`，而手动 4× 使用 `cutoff=1%`。
+- 修正后自适应生成图与手动 4× 图 SHA-256 完全一致，Audiveris 同样恢复 `101` 个事件和 4 行谱；P0 通过谱号与调号，只因拍号结构证据不足保持 review-only。
+- 同一参数在《北京的金山上》独立 gold 上并不泛化：pitch R/Miss/P/F1=`16.28%/83.72%/28.28%/20.66%`，低于 up2 的 `35.47%/64.53%/87.14%/50.41%`。因此只修复实验实现，不把 `cutoff=1%` 或自适应路径接入生产。正式报告：`data/experiments/western-strings-m4/adaptive-interline-probe/report.json`。
+
+### 8.16 反复路线取证(2026-07-17)
+
+- 《北京的金山上》同版人工 gold 不含反复记号，不能用于测试反复展开。
+- 带反复线且有公开逐音对齐真值的 Bach `BWV1005 mov4` 中，未展开谱与演奏真值均为 `1196` 个事件；盲目展开为 `2392`，绝对计数误差增加 `1196`。
+- 反复记号只说明印刷路线存在，不证明某次演奏实际执行反复。生产策略继续 fail-closed：检测到非平凡路线后输出 `repeat-route-review-required`，只有后续音频路线证据支持时才允许选择展开版本。报告：`data/experiments/western-strings-m4/repeat-route-probe/report.json`。
+- Op.45 的 `52.56%` 音频吻合率也不能归因于反复：修正后的同版候选与独立公开参考各有 `198` 个音，二者的 MusicXML 都没有反复方向标记。当前证据只支持“反复假设不成立/不可用”，不支持为提高吻合率而展开谱面。

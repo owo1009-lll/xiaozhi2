@@ -26,6 +26,9 @@ from eval_western_strings_m4_omr_benchmark import evaluate_pair  # noqa: E402
 
 PRIVATE = REPO / "data" / "private" / "western-strings-m2"
 DEFAULT_OUT = REPO / "data" / "experiments" / "western-strings-m4" / "real-jpg-omr"
+ADAPTIVE_TARGET_INTERLINE_PX = 20.0
+ADAPTIVE_MAX_PIXELS = 18_000_000
+ADAPTIVE_CONTRAST_CUTOFF_PERCENT = 1.0
 
 
 def load_intake(path: Path | None) -> dict[str, dict[str, str]]:
@@ -41,9 +44,66 @@ def repo_path(raw: str) -> Path:
     return path if path.is_absolute() else REPO / path
 
 
+def estimate_staff_interline(img) -> tuple[float | None, float]:
+    """Estimate the dominant staff-line spacing from horizontal ink periodicity."""
+    import numpy as np
+    from PIL import ImageOps
+
+    gray = ImageOps.autocontrast(img.convert("L"))
+    ink_projection = (255.0 - np.asarray(gray, dtype=np.float32)).mean(axis=1)
+    if ink_projection.size < 16 or float(ink_projection.std()) < 1e-6:
+        return None, 0.0
+    projection = (ink_projection - ink_projection.mean()) / ink_projection.std()
+    max_lag = min(40, projection.size // 4)
+    scores = []
+    for lag in range(3, max_lag + 1):
+        score = float(np.mean(projection[:-lag] * projection[lag:]))
+        scores.append((lag, score))
+    if not scores:
+        return None, 0.0
+    local_peaks = [
+        item
+        for index, item in enumerate(scores)
+        if item[1] >= (scores[index - 1][1] if index else float("-inf"))
+        and item[1] >= (scores[index + 1][1] if index + 1 < len(scores) else float("-inf"))
+    ]
+    lag, score = max(local_peaks or scores, key=lambda item: item[1])
+    return (float(lag), score) if score >= 0.2 else (None, score)
+
+
+def adaptive_interline_plan(img, target: float = ADAPTIVE_TARGET_INTERLINE_PX,
+                            max_pixels: int = ADAPTIVE_MAX_PIXELS) -> dict:
+    interline, confidence = estimate_staff_interline(img)
+    if interline is None:
+        raise ValueError(f"staff interline not measurable (autocorrelation={confidence:.3f})")
+    requested_scale = target / interline
+    pixel_cap_scale = (max_pixels / float(img.width * img.height)) ** 0.5
+    scale = max(0.5, min(requested_scale, pixel_cap_scale, 6.0))
+    width = max(1, round(img.width * scale))
+    height = max(1, round(img.height * scale))
+    return {
+        "sourceSize": [img.width, img.height],
+        "sourcePixels": img.width * img.height,
+        "estimatedInterlinePx": round(interline, 3),
+        "autocorrelation": round(confidence, 6),
+        "targetInterlinePx": target,
+        "requestedScale": round(requested_scale, 6),
+        "pixelCapScale": round(pixel_cap_scale, 6),
+        "maxPixels": max_pixels,
+        "appliedScale": round(scale, 6),
+        "achievedInterlinePx": round(interline * scale, 3),
+        "pixelCapApplied": scale + 1e-9 < requested_scale,
+        "preparedSize": [width, height],
+        "preparedPixels": width * height,
+        "contrastNormalization": "autocontrast-cutoff",
+        "contrastCutoffPercent": ADAPTIVE_CONTRAST_CUTOFF_PERCENT,
+    }
+
+
 def preprocess(jpg: Path, out_png: Path, variant: str) -> Path:
     from PIL import Image
     import numpy as np
+    out_png.parent.mkdir(parents=True, exist_ok=True)
     img = Image.open(jpg).convert("L")
     if variant == "up2":
         img = img.resize((img.width * 2, img.height * 2), Image.Resampling.LANCZOS)
@@ -67,7 +127,20 @@ def preprocess(jpg: Path, out_png: Path, variant: str) -> Path:
             if var > best_var:
                 best_var, best_t = var, t
         img = Image.fromarray(((arr > best_t) * 255).astype("uint8"))
-    out_png.parent.mkdir(parents=True, exist_ok=True)
+    elif variant == "adaptive-interline":
+        from PIL import ImageOps
+        plan = adaptive_interline_plan(img)
+        img = ImageOps.autocontrast(
+            img,
+            cutoff=ADAPTIVE_CONTRAST_CUTOFF_PERCENT,
+        ).resize(
+            tuple(plan["preparedSize"]), Image.Resampling.LANCZOS
+        )
+        out_png.with_suffix(".preprocess.json").write_text(
+            json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+    else:
+        raise ValueError(f"unknown preprocessing variant: {variant}")
     img.convert("RGB").save(out_png, dpi=(300, 300))
     return out_png
 

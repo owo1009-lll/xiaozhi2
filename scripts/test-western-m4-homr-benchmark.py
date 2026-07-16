@@ -13,6 +13,7 @@ from eval_western_strings_m4_homr_benchmark import (  # noqa: E402
     find_musicxml,
     strict_thresholds,
 )
+from eval_western_strings_m4_oemer_benchmark import automatic_adoption_ready  # noqa: E402
 
 
 with tempfile.TemporaryDirectory() as temporary_directory:
@@ -61,6 +62,8 @@ assert strict_thresholds() == {
     "minOnsetQuarterAccuracy": 0.95,
     "minMeasureAccuracy": 0.95,
 }
+strict_homr = [{**homr_rows[0], "onsetQuarterAccuracy": 1.0}]
+assert automatic_adoption_ready(compare_engines(strict_homr, [], [])["homr"], 1) is False
 
 print(
     '{"ok": true, "checks": ["output-discovery", "failure-classification", '

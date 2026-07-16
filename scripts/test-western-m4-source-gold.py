@@ -9,6 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.experiments.eval_western_strings_m4_omr_benchmark import (
+    evaluate_pair,
     movement_siblings,
     parse_notes_many,
     verify_source_derived_gold,
@@ -79,6 +80,37 @@ with tempfile.TemporaryDirectory() as temporary_directory:
     assert [note.onset_quarters for note in notes] == [0.0, 1.0]
     assert [note.measure_index for note in notes] == [1, 2]
 
+    unreviewed_gold = root / "unreviewed-gold.musicxml"
+    unreviewed_draft = root / "unreviewed-draft.musicxml"
+    write_single_note_score(unreviewed_gold, "C", 4)
+    write_single_note_score(unreviewed_draft, "D", 4)
+    pending_row = {
+        "pieceId": "pending-piece",
+        "recordingId": "pending-recording",
+        "requiredCleanScorePath": str(unreviewed_gold),
+        "cleanScoreReviewStatus": "pending",
+        "cleanScoreReviewedBy": "",
+    }
+    pending_result = evaluate_pair(
+        pending_row,
+        {"pending-piece": {"mxl": str(unreviewed_draft)}},
+        root,
+        onset_tolerance_quarters=0.25,
+    )
+    assert pending_result["parseOk"] is True
+    assert pending_result["benchmarkUsable"] is False
+    assert pending_result["goldProvenance"] == "different-draft-unverified"
+    assert pending_result["blockingReason"] == "gold-clean-score-not-human-approved"
+
+    approved_result = evaluate_pair(
+        {**pending_row, "cleanScoreReviewStatus": "approved", "cleanScoreReviewedBy": "teacher-a"},
+        {"pending-piece": {"mxl": str(unreviewed_draft)}},
+        root,
+        onset_tolerance_quarters=0.25,
+    )
+    assert approved_result["benchmarkUsable"] is True
+    assert approved_result["goldProvenance"] == "independent-edited-gold"
+
 print(
     json.dumps(
         {
@@ -88,6 +120,8 @@ print(
                 "hash-mismatch",
                 "license-fail-closed",
                 "movement-order-and-concatenation",
+                "unreviewed-different-gold-rejected",
+                "approved-different-gold-accepted",
             ],
         }
     )

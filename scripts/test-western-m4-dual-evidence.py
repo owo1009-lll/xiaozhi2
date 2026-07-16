@@ -47,7 +47,10 @@ def test_aggregate_gate_is_strict_and_eval_only() -> None:
         }
     ]
     summary = aggregate(rows)
+    assert summary["sequence"]["precision"] == 0.99
+    assert summary["minPieceSequencePrecision"] == 0.99
     assert summary["consensus"]["precision"] == 0.99
+    assert summary["evalOnlyGateBasis"] == "sequence-mapping; structural-is-diagnostic-only"
     assert summary["omrPitchErrorCatchRate"] == 0.9
     assert summary["evalOnlyGatePassed"] is False
     assert wilson_lower_bound(99, 100) < 0.95
