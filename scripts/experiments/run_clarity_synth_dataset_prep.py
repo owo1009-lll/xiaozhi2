@@ -19,8 +19,15 @@ sys.path.insert(0, str(REPO / "scripts" / "experiments"))
 
 import prepare_western_strings_m4_clarity_adaptation_dataset as prep  # noqa: E402
 
-MANIFEST = (REPO / "data" / "experiments" / "western-strings-m4"
-            / "clarity-synthetic-corpus" / "clarity-synthetic-merged-split.jsonl")
+import argparse
+_ap = argparse.ArgumentParser()
+_ap.add_argument("--manifest", default=str(REPO / "data" / "experiments" / "western-strings-m4"
+                                           / "clarity-synthetic-corpus" / "clarity-synthetic-merged-split.jsonl"))
+_ap.add_argument("--out", default=str(REPO / "data" / "experiments" / "western-strings-m4"
+                                      / "clarity-adaptation-dataset-synth"))
+_args = _ap.parse_args()
+MANIFEST = Path(_args.manifest)
+OUT_ROOT = Path(_args.out)
 
 rows = [json.loads(line) for line in MANIFEST.read_text(encoding="utf-8").splitlines() if line.strip()]
 counts: dict[str, int] = {}
@@ -38,7 +45,6 @@ print(json.dumps({"overriddenExpectedCounts": counts, "holdoutFrozen": True}, en
 
 sys.argv = [sys.argv[0],
             "--split-manifest", str(MANIFEST),
-            "--out", str(REPO / "data" / "experiments" / "western-strings-m4"
-                         / "clarity-adaptation-dataset-synth"),
+            "--out", str(OUT_ROOT),
             "--reset-output"]
 sys.exit(prep.main())

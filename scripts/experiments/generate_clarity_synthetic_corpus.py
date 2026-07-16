@@ -57,11 +57,11 @@ def _clamp_walk(midi: int, step: int) -> int:
     return nxt
 
 
-def compose_piece(seed: int):
+def compose_piece(seed: int, dense: bool = False):
     rng = random.Random(seed)
     ks_fifths = rng.choice(KEY_FIFTHS)
     ts = rng.choice(METERS)
-    n_measures = rng.randint(8, 14)
+    n_measures = rng.randint(14, 22) if dense else rng.randint(8, 14)
     beats_per_measure = {"4/4": 4.0, "3/4": 3.0, "2/4": 2.0, "6/8": 3.0}[ts]
 
     # per-piece rhythm vocabulary (quarterLength values)
@@ -72,11 +72,13 @@ def compose_piece(seed: int):
         [0.5, 0.25],                # eighths + sixteenths
         [1.0, 0.5, 2.0],
     ]
+    if dense:
+        vocab_pool = [[0.5, 0.25], [0.25, 0.5], [0.5, 0.25, 1.0]]
     vocab = rng.choice(vocab_pool)
     if ts == "6/8":
-        vocab = [0.5, 1.0, 1.5]
+        vocab = [0.25, 0.5, 1.0] if dense else [0.5, 1.0, 1.5]
 
-    p_rest = rng.uniform(0.03, 0.10)
+    p_rest = rng.uniform(0.01, 0.04) if dense else rng.uniform(0.03, 0.10)
     p_accidental = rng.uniform(0.02, 0.12)
     p_double_stop = rng.choice([0.0, 0.0, 0.0, rng.uniform(0.05, 0.2)])
     p_slur = rng.uniform(0.0, 0.25)
@@ -149,7 +151,7 @@ def compose_piece(seed: int):
             remaining -= d
         part.append(m)
     s.append(part)
-    meta = {"fifths": ks_fifths, "meter": ts, "measures": n_measures,
+    meta = {"fifths": ks_fifths, "meter": ts, "measures": n_measures, "dense": dense,
             "vocab": vocab, "pDoubleStop": round(p_double_stop, 3)}
     return s, meta
 
@@ -157,6 +159,7 @@ def compose_piece(seed: int):
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--count", type=int, default=300)
+    ap.add_argument("--dense", action="store_true", help="16th-note-heavy long pieces (sequence-length lever)")
     ap.add_argument("--master-seed", type=int, default=20260717)
     ap.add_argument("--val-ratio", type=float, default=0.1)
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
@@ -183,7 +186,7 @@ def main(argv=None) -> int:
         if sample_id in base_ids:
             continue
         try:
-            score, meta = compose_piece(seed)
+            score, meta = compose_piece(seed, dense=args.dense)
             xml_path = corpus_dir / f"{sample_id}.musicxml"
             score.write("musicxml", fp=str(xml_path))
         except Exception as exc:  # keep the factory running
