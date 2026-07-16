@@ -13,11 +13,13 @@ sys.path.insert(0, str(EXPERIMENTS))
 
 from eval_western_strings_m3plus_supplemental import (  # noqa: E402
     DEFAULT_SOURCE,
+    align_units_to_track,
     attach_session_pitch_baseline,
     build_alignment_units,
     evaluate_track,
     infer_modes,
     mode_metrics,
+    periodic_pitch_features,
     resolve_f0_backend,
     run_evaluation,
     validate_score_technique_intent,
@@ -98,6 +100,48 @@ def test_localization_tolerates_realistic_pitch_offset_without_certifying_intona
     assert all(row["studentFacing"] is False for row in within_localization_tolerance["rows"])
 
 
+def test_declared_octave_transposition_is_localization_only() -> None:
+    intent = json.loads((DEFAULT_SOURCE / "score-intent.json").read_text(encoding="utf-8"))
+    straight = next(
+        recording
+        for recording in intent["recordings"]
+        if recording["recordingId"] == "m3p-01"
+    )
+    times, midi, duration = synthetic_track(straight)
+    without_transposition = evaluate_track(straight, times, midi + 12.0, duration)
+    with_transposition = evaluate_track(
+        straight,
+        times,
+        midi + 12.0,
+        duration,
+        score_transpose_semitones=12.0,
+    )
+    assert without_transposition["localization"]["ready"] is False
+    assert with_transposition["localization"]["ready"] is True
+    assert with_transposition["localization"]["scoreTransposeSemitones"] == 12.0
+    assert all(row["studentFacing"] is False for row in with_transposition["rows"])
+
+
+def test_repeated_units_keep_nontrivial_frame_runs() -> None:
+    units = [
+        {"baseMidi": 60.0, "auxiliaryMidi": None, "unitIndex": index}
+        for index in range(8)
+    ]
+    times = np.arange(0.0, 8.0, 0.01, dtype=np.float64)
+    midi = np.full(times.size, 60.0, dtype=np.float64)
+    alignment = align_units_to_track(units, times, midi)
+    assert alignment["localizationReady"] is True
+    assert alignment["minUnitFrames"] >= 4
+    assert (
+        min(unit["assignedVoicedFrameCount"] for unit in alignment["units"])
+        >= alignment["minUnitFrames"]
+    )
+    assert (
+        max(unit["assignedVoicedFrameCount"] for unit in alignment["units"])
+        <= alignment["maxUnitFrames"]
+    )
+
+
 def test_borderline_modulation_is_uncertain_instead_of_forced_binary() -> None:
     times = np.arange(0.0, 1.0, 0.01, dtype=np.float64)
     midi = 60.0 + 0.15 * np.sin(2.0 * np.pi * 5.0 * times)
@@ -112,6 +156,15 @@ def test_borderline_modulation_is_uncertain_instead_of_forced_binary() -> None:
     assert decisions["vibrato"] == "uncertain"
     assert "vibrato" not in predicted
     assert 4.0 <= diagnostics["periodicDominantRateHz"] <= 8.0
+
+
+def test_periodic_pitch_features_expose_vibrato_autocorrelation() -> None:
+    times = np.arange(0.0, 1.2, 0.01, dtype=np.float64)
+    midi = 60.0 + 0.30 * np.sin(2.0 * np.pi * 5.0 * times)
+    features = periodic_pitch_features(times, midi, center_midi=60.0)
+    assert features["periodicAutocorrelationPeak4To8Hz"] is not None
+    assert float(features["periodicAutocorrelationPeak4To8Hz"]) > 0.80
+    assert 4.5 <= float(features["periodicAutocorrelationRateHz"]) <= 5.5
 
 
 def test_uncertain_rows_reduce_gate_coverage_and_positive_recall() -> None:
@@ -177,13 +230,46 @@ def test_f0_backend_selection_is_explicit_and_bounded() -> None:
         raise AssertionError("unsupported F0 backends must fail closed")
 
 
+def test_crepe_model_defaults_to_bounded_tiny_model() -> None:
+    import inspect
+
+    assert inspect.signature(run_evaluation).parameters["crepe_model"].default == "tiny"
+    assert (
+        inspect.signature(run_evaluation)
+        .parameters["crepe_periodicity_threshold"]
+        .default
+        == 0.30
+    )
+    with tempfile.TemporaryDirectory() as temporary:
+        try:
+            run_evaluation(Path(temporary), performance_confirmed=False, crepe_model="unknown")
+        except ValueError as error:
+            assert str(error) == "unsupported-crepe-model:unknown"
+        else:
+            raise AssertionError("unsupported CREPE models must fail closed")
+        try:
+            run_evaluation(
+                Path(temporary),
+                performance_confirmed=False,
+                crepe_periodicity_threshold=1.1,
+            )
+        except ValueError as error:
+            assert str(error) == "crepe_periodicity_threshold must be between 0 and 1"
+        else:
+            raise AssertionError("invalid CREPE periodicity thresholds must fail closed")
+
+
 if __name__ == "__main__":
     test_synthetic_fixed_sequences_localize_and_separate_modes()
     test_score_markings_are_the_source_of_expected_techniques()
     test_localization_tolerates_realistic_pitch_offset_without_certifying_intonation()
+    test_declared_octave_transposition_is_localization_only()
+    test_repeated_units_keep_nontrivial_frame_runs()
     test_borderline_modulation_is_uncertain_instead_of_forced_binary()
+    test_periodic_pitch_features_expose_vibrato_autocorrelation()
     test_uncertain_rows_reduce_gate_coverage_and_positive_recall()
     test_dirty_f0_is_review_only_not_false_absence()
     test_missing_real_audio_fails_closed_without_fake_gold()
     test_f0_backend_selection_is_explicit_and_bounded()
+    test_crepe_model_defaults_to_bounded_tiny_model()
     print("western M3+ supplemental machine-eval tests passed")

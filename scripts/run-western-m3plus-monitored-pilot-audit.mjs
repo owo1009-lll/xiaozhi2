@@ -31,10 +31,21 @@ const DEFAULT_CANDIDATE_QUALITY_COMPLETED = path.join(
   "pitch-mode-review-pack-candidate-quality",
   "m3plus-pitch-mode-review.completed.csv",
 );
+const DEFAULT_BACKEND_CONSENSUS = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3plus",
+  "backend-consensus",
+  "report.json",
+);
 
 const RELEASE_MODES = ["slide-like", "trill-like"];
 const CONTROL_MODES = ["stable"];
 const EXPECTED_BEHAVIOR = {
+  "slide-like": "slide",
+  "trill-like": "trill",
+};
+const INDEPENDENT_MODE_KEYS = {
   "slide-like": "slide",
   "trill-like": "trill",
 };
@@ -46,6 +57,7 @@ function parseArgs(argv) {
     minModeSpecificScored: 3,
     maxMeasureIndex: 1,
     minReviewConfidence: 1,
+    backendConsensus: DEFAULT_BACKEND_CONSENSUS,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -54,6 +66,7 @@ function parseArgs(argv) {
     if (arg === "--min-mode-specific-scored") args.minModeSpecificScored = Number(argv[++index] || args.minModeSpecificScored);
     if (arg === "--max-measure-index") args.maxMeasureIndex = Number(argv[++index] || args.maxMeasureIndex);
     if (arg === "--min-review-confidence") args.minReviewConfidence = Number(argv[++index] || args.minReviewConfidence);
+    if (arg === "--backend-consensus") args.backendConsensus = argv[++index] || args.backendConsensus;
   }
   return args;
 }
@@ -162,6 +175,34 @@ function releaseEvidenceRows(labels, candidateQualityKeys, args) {
   });
 }
 
+export function evaluateIndependentReleaseEvidence(backendConsensus, releaseModes = RELEASE_MODES) {
+  const blockingReasons = [];
+  const perMode = {};
+  for (const mode of releaseModes) {
+    const evidenceKey = INDEPENDENT_MODE_KEYS[mode];
+    const evidence = backendConsensus?.modes?.[evidenceKey] || null;
+    if (!evidence) {
+      blockingReasons.push(`m3plus-independent-mode-evidence-missing:${mode}`);
+    } else if (evidence.releaseReady !== true) {
+      blockingReasons.push(`m3plus-independent-mode-not-ready:${mode}`);
+    }
+    perMode[mode] = {
+      evidenceKey,
+      sourceExists: Boolean(evidence),
+      releaseReady: evidence?.releaseReady === true,
+      sampleGatePassed: evidence?.sampleGatePassed === true,
+      physicalThreshold: evidence?.physicalThreshold ?? null,
+      holdoutPrecision: evidence?.physicalThresholdAudit?.holdout?.precision ?? null,
+      holdoutRecall: evidence?.physicalThresholdAudit?.holdout?.recall ?? null,
+    };
+  }
+  return {
+    ready: blockingReasons.length === 0,
+    perMode,
+    blockingReasons,
+  };
+}
+
 function renderMarkdown(report) {
   const releaseLines = Object.entries(report.releaseModes).flatMap(([mode, item]) => [
     `### ${mode}`,
@@ -221,6 +262,7 @@ export async function runM3PlusMonitoredPilotAudit(args = {}) {
   const labelsRead = await readCsv(DEFAULT_LABELS);
   const candidateSourceRead = await readCsv(DEFAULT_CANDIDATE_QUALITY_SOURCE);
   const candidateCompletedRead = await readCsv(DEFAULT_CANDIDATE_QUALITY_COMPLETED);
+  const backendConsensusRead = await readJson(options.backendConsensus);
   const modeEval = modeEvalRead.value;
   const perMode = modeByName(modeEval);
   const candidateQualityKeys = new Set(candidateSourceRead.rows.map(key));
@@ -228,11 +270,14 @@ export async function runM3PlusMonitoredPilotAudit(args = {}) {
   const evidenceRows = releaseEvidenceRows(labelsRead.rows, candidateQualityKeys, options);
   const evidenceByMode = new Map(RELEASE_MODES.map((mode) => [mode, evidenceRows.filter((row) => row.candidateMode === mode)]));
   const blockingReasons = [];
+  const independentEvidence = evaluateIndependentReleaseEvidence(backendConsensusRead.value);
 
   if (!modeEvalRead.exists) blockingReasons.push("m3plus-mode-eval-missing");
   if (!labelsRead.exists) blockingReasons.push("m3plus-labels-missing");
   if (!candidateSourceRead.exists) blockingReasons.push("m3plus-candidate-quality-source-missing");
   if (!candidateCompletedRead.exists) blockingReasons.push("m3plus-candidate-quality-completed-missing");
+  if (!backendConsensusRead.exists) blockingReasons.push("m3plus-independent-backend-consensus-missing");
+  blockingReasons.push(...independentEvidence.blockingReasons);
   if (modeEval?.ok !== true) blockingReasons.push("m3plus-mode-eval-not-ok");
   if (modeEval?.studentGateReady === true || modeEval?.runtimeEffect !== "none") {
     blockingReasons.push("m3plus-runtime-not-fail-closed");
@@ -287,13 +332,15 @@ export async function runM3PlusMonitoredPilotAudit(args = {}) {
         && Number.isFinite(modeSpecificPrecision)
         && modeSpecificPrecision >= options.minPrecision
         && modeSpecificUnsafe === 0
-        && rows.length >= options.minModeSpecificScored,
+        && rows.length >= options.minModeSpecificScored
+        && independentEvidence.perMode[mode]?.releaseReady === true,
       modeSpecificScored,
       modeSpecificPrecision: Number.isFinite(modeSpecificPrecision) ? modeSpecificPrecision : null,
       modeSpecificUnsafe,
       evidenceRows: rows.length,
       recordingIds: [...new Set(rows.map((row) => row.recordingId).filter(Boolean))].sort(),
       rowIds: rows.map((row) => row.rowId || key(row)),
+      independentEvidence: independentEvidence.perMode[mode],
     };
   }
 
@@ -303,6 +350,9 @@ export async function runM3PlusMonitoredPilotAudit(args = {}) {
     if (RELEASE_MODES.includes(mode) || CONTROL_MODES.includes(mode)) continue;
     blockedModes.push(mode);
     if (item.releaseReady === true) blockingReasons.push(`m3plus-nonrelease-mode-ready:${mode}`);
+  }
+  for (const mode of RELEASE_MODES) {
+    if (releaseModes[mode]?.ready !== true) blockedModes.push(mode);
   }
 
   const uniqueBlockingReasons = [...new Set(blockingReasons)];
@@ -325,6 +375,7 @@ export async function runM3PlusMonitoredPilotAudit(args = {}) {
       labels: DEFAULT_LABELS.replace(/\\/g, "/"),
       candidateQualitySource: DEFAULT_CANDIDATE_QUALITY_SOURCE.replace(/\\/g, "/"),
       candidateQualityCompleted: DEFAULT_CANDIDATE_QUALITY_COMPLETED.replace(/\\/g, "/"),
+      backendConsensus: String(options.backendConsensus).replace(/\\/g, "/"),
     },
     counts: {
       labelRows: labelsRead.rows.length,
@@ -333,7 +384,7 @@ export async function runM3PlusMonitoredPilotAudit(args = {}) {
       releaseEvidenceRows: evidenceRows.length,
     },
     releaseModes,
-    blockedModes,
+    blockedModes: [...new Set(blockedModes)].sort(),
     blockingReasons: uniqueBlockingReasons,
   };
 

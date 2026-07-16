@@ -44,6 +44,9 @@ CALIBRATION_MAX_MEASURE = 4
 MIN_SESSION_STRAIGHT_CONTROLS = 4
 DEFAULT_LOCALIZATION_PITCH_TOLERANCE_CENTS = 100.0
 DEFAULT_MAX_NORMALIZED_PATH_COST = 1.20
+DEFAULT_MIN_UNIT_FRAME_RATIO = 0.45
+DEFAULT_MAX_UNIT_FRAME_RATIO = 1.80
+DEFAULT_CREPE_PERIODICITY_THRESHOLD = 0.30
 ORNAMENT_TAGS = {
     "trill-mark": "trill",
     "mordent": "ornament",
@@ -285,6 +288,8 @@ def align_units_to_track(
     *,
     pitch_tolerance_cents: float = DEFAULT_LOCALIZATION_PITCH_TOLERANCE_CENTS,
     max_normalized_path_cost: float = DEFAULT_MAX_NORMALIZED_PATH_COST,
+    min_unit_frame_ratio: float = DEFAULT_MIN_UNIT_FRAME_RATIO,
+    max_unit_frame_ratio: float = DEFAULT_MAX_UNIT_FRAME_RATIO,
 ) -> dict[str, Any]:
     valid = np.isfinite(times) & np.isfinite(midi_track)
     voiced_times = np.asarray(times[valid], dtype=np.float64)
@@ -314,33 +319,88 @@ def align_units_to_track(
         position_cost = 0.4 * np.abs(frame_positions - expected_position)
         costs[unit_index] = spectral_cost + position_cost
 
-    infinity = np.inf
-    scores = np.full((unit_count, frame_count), infinity, dtype=np.float64)
-    advanced = np.zeros((unit_count, frame_count), dtype=np.bool_)
-    scores[0, 0] = costs[0, 0]
-    for frame_index in range(1, frame_count):
-        scores[0, frame_index] = scores[0, frame_index - 1] + costs[0, frame_index]
-        max_unit = min(unit_count - 1, frame_index)
-        for unit_index in range(1, max_unit + 1):
-            stay_score = scores[unit_index, frame_index - 1]
-            advance_score = scores[unit_index - 1, frame_index - 1]
-            if advance_score < stay_score:
-                scores[unit_index, frame_index] = advance_score + costs[unit_index, frame_index]
-                advanced[unit_index, frame_index] = True
-            else:
-                scores[unit_index, frame_index] = stay_score + costs[unit_index, frame_index]
+    if not math.isfinite(min_unit_frame_ratio) or not 0.05 <= min_unit_frame_ratio <= 0.90:
+        raise ValueError("min_unit_frame_ratio must be between 0.05 and 0.90")
+    if (
+        not math.isfinite(max_unit_frame_ratio)
+        or not 1.10 <= max_unit_frame_ratio <= 4.00
+        or max_unit_frame_ratio <= min_unit_frame_ratio
+    ):
+        raise ValueError(
+            "max_unit_frame_ratio must be between 1.10 and 4.00 and exceed the minimum"
+        )
+    expected_frames_per_unit = frame_count / unit_count
+    min_unit_frames = max(
+        4,
+        int(math.floor(expected_frames_per_unit * min_unit_frame_ratio)),
+    )
+    max_unit_frames = max(
+        min_unit_frames,
+        int(math.ceil(expected_frames_per_unit * max_unit_frame_ratio)),
+    )
+    if frame_count < unit_count * min_unit_frames:
+        raise ValueError(
+            "insufficient voiced frames for constrained alignment: "
+            f"{frame_count} < {unit_count * min_unit_frames}"
+        )
+
+    # Every unit must own a non-trivial frame run. The old frame-wise Viterbi
+    # could assign one frame to repeated adjacent notes, producing 0.01 s
+    # windows that were monotonic but unusable for technique analysis.
+    prefix = np.concatenate(
+        [np.zeros((unit_count, 1), dtype=np.float64), np.cumsum(costs, axis=1)],
+        axis=1,
+    )
+    scores = np.full((unit_count, frame_count), np.inf, dtype=np.float64)
+    predecessor = np.full((unit_count, frame_count), -1, dtype=np.int32)
+    first_max_end = min(frame_count - 1, max_unit_frames - 1)
+    scores[0, min_unit_frames - 1 : first_max_end + 1] = prefix[
+        0, min_unit_frames : first_max_end + 2
+    ]
+    for unit_index in range(1, unit_count):
+        minimum_end = (unit_index + 1) * min_unit_frames - 1
+        for frame_index in range(minimum_end, frame_count):
+            first_previous_end = max(
+                unit_index * min_unit_frames - 1,
+                frame_index - max_unit_frames,
+            )
+            last_previous_end = frame_index - min_unit_frames
+            if first_previous_end > last_previous_end:
+                continue
+            previous_ends = np.arange(
+                first_previous_end,
+                last_previous_end + 1,
+                dtype=np.int32,
+            )
+            candidate_values = (
+                scores[unit_index - 1, previous_ends]
+                - prefix[unit_index, previous_ends + 1]
+            )
+            best_offset = int(np.argmin(candidate_values))
+            best_value = float(candidate_values[best_offset])
+            if not math.isfinite(best_value):
+                continue
+            best_previous_end = int(previous_ends[best_offset])
+            scores[unit_index, frame_index] = (
+                prefix[unit_index, frame_index + 1] + best_value
+            )
+            predecessor[unit_index, frame_index] = best_previous_end
     final_score = float(scores[-1, -1])
     if not math.isfinite(final_score):
         raise ValueError("no monotonic path covers every supplemental unit")
 
     assignments = np.empty(frame_count, dtype=np.int32)
-    unit_index = unit_count - 1
-    for frame_index in range(frame_count - 1, -1, -1):
-        assignments[frame_index] = unit_index
-        if frame_index > 0 and unit_index > 0 and advanced[unit_index, frame_index]:
-            unit_index -= 1
-    if unit_index != 0:
-        raise ValueError("alignment backtrack did not reach the first unit")
+    segment_end = frame_count - 1
+    for unit_index in range(unit_count - 1, -1, -1):
+        previous_end = (
+            int(predecessor[unit_index, segment_end]) if unit_index > 0 else -1
+        )
+        if unit_index > 0 and previous_end < 0:
+            raise ValueError("alignment backtrack did not reach the first unit")
+        assignments[previous_end + 1 : segment_end + 1] = unit_index
+        segment_end = previous_end
+    if segment_end != -1:
+        raise ValueError("alignment backtrack left unassigned frames")
 
     aligned_units: list[dict[str, Any]] = []
     for index, unit in enumerate(units):
@@ -405,6 +465,10 @@ def align_units_to_track(
         "medianPitchSupportRate": float(np.median(support_rates)),
         "pitchToleranceCents": float(pitch_tolerance_cents),
         "maxNormalizedPathCost": float(max_normalized_path_cost),
+        "minUnitFrameRatio": float(min_unit_frame_ratio),
+        "minUnitFrames": int(min_unit_frames),
+        "maxUnitFrameRatio": float(max_unit_frame_ratio),
+        "maxUnitFrames": int(max_unit_frames),
         "localizationReady": localization_ready,
     }
 
@@ -433,6 +497,8 @@ def periodic_pitch_features(
             "periodicAmplitudeCents": None,
             "periodicDominantRateHz": None,
             "periodicBandEnergyRatio4To8Hz": None,
+            "periodicAutocorrelationPeak4To8Hz": None,
+            "periodicAutocorrelationRateHz": None,
             "periodicCycleCount": 0.0,
         }
     order = np.argsort(times)
@@ -447,6 +513,8 @@ def periodic_pitch_features(
             "periodicAmplitudeCents": None,
             "periodicDominantRateHz": None,
             "periodicBandEnergyRatio4To8Hz": None,
+            "periodicAutocorrelationPeak4To8Hz": None,
+            "periodicAutocorrelationRateHz": None,
             "periodicCycleCount": 0.0,
         }
     duration = float(times[-1] - times[0])
@@ -457,6 +525,8 @@ def periodic_pitch_features(
             "periodicAmplitudeCents": None,
             "periodicDominantRateHz": None,
             "periodicBandEnergyRatio4To8Hz": None,
+            "periodicAutocorrelationPeak4To8Hz": None,
+            "periodicAutocorrelationRateHz": None,
             "periodicCycleCount": 0.0,
         }
 
@@ -475,6 +545,8 @@ def periodic_pitch_features(
             "periodicAmplitudeCents": amplitude,
             "periodicDominantRateHz": None,
             "periodicBandEnergyRatio4To8Hz": 0.0,
+            "periodicAutocorrelationPeak4To8Hz": 0.0,
+            "periodicAutocorrelationRateHz": None,
             "periodicCycleCount": 0.0,
         }
 
@@ -489,11 +561,35 @@ def periodic_pitch_features(
     if np.any(reference):
         indexes = np.flatnonzero(reference)
         dominant_rate = float(frequencies[indexes[int(np.argmax(spectrum[reference]))]])
+
+    centered = residual - np.mean(residual)
+    minimum_lag = max(1, int(math.ceil(1.0 / (8.0 * frame_step))))
+    maximum_lag = min(
+        centered.size - 2,
+        int(math.floor(1.0 / (4.0 * frame_step))),
+    )
+    autocorrelation_peak: float | None = None
+    autocorrelation_rate: float | None = None
+    if minimum_lag <= maximum_lag:
+        correlations: list[tuple[float, int]] = []
+        for lag in range(minimum_lag, maximum_lag + 1):
+            left = centered[:-lag]
+            right = centered[lag:]
+            denominator = float(np.linalg.norm(left) * np.linalg.norm(right))
+            if denominator <= 1e-9:
+                continue
+            correlations.append((float(np.dot(left, right) / denominator), lag))
+        if correlations:
+            autocorrelation_peak, peak_lag = max(correlations, key=lambda item: item[0])
+            autocorrelation_peak = float(np.clip(autocorrelation_peak, -1.0, 1.0))
+            autocorrelation_rate = 1.0 / (peak_lag * frame_step)
     return {
         "periodicDurationSeconds": duration,
         "periodicAmplitudeCents": amplitude,
         "periodicDominantRateHz": dominant_rate,
         "periodicBandEnergyRatio4To8Hz": band_ratio,
+        "periodicAutocorrelationPeak4To8Hz": autocorrelation_peak,
+        "periodicAutocorrelationRateHz": autocorrelation_rate,
         "periodicCycleCount": (dominant_rate or 0.0) * duration,
     }
 
@@ -763,8 +859,17 @@ def evaluate_track(
     *,
     pitch_tolerance_cents: float = DEFAULT_LOCALIZATION_PITCH_TOLERANCE_CENTS,
     max_normalized_path_cost: float = DEFAULT_MAX_NORMALIZED_PATH_COST,
+    score_transpose_semitones: float = 0.0,
 ) -> dict[str, Any]:
     units = build_alignment_units(recording)
+    for unit in units:
+        unit["writtenBaseMidi"] = float(unit["baseMidi"])
+        unit["baseMidi"] = float(unit["baseMidi"]) + float(score_transpose_semitones)
+        if unit.get("auxiliaryMidi") is not None:
+            unit["writtenAuxiliaryMidi"] = float(unit["auxiliaryMidi"])
+            unit["auxiliaryMidi"] = float(unit["auxiliaryMidi"]) + float(
+                score_transpose_semitones
+            )
     alignment = align_units_to_track(
         units,
         times,
@@ -818,6 +923,11 @@ def evaluate_track(
             ),
             "pitchToleranceCents": alignment["pitchToleranceCents"],
             "maxNormalizedPathCost": alignment["maxNormalizedPathCost"],
+            "minUnitFrameRatio": alignment["minUnitFrameRatio"],
+            "minUnitFrames": alignment["minUnitFrames"],
+            "maxUnitFrameRatio": alignment["maxUnitFrameRatio"],
+            "maxUnitFrames": alignment["maxUnitFrames"],
+            "scoreTransposeSemitones": float(score_transpose_semitones),
         },
         "rows": rows,
     }
@@ -858,8 +968,17 @@ def attach_session_pitch_baseline(recording_reports: list[dict[str, Any]]) -> di
         for row in controls
         if (row.get("modeDiagnostics") or {}).get("periodicBandEnergyRatio4To8Hz") is not None
     ]
+    autocorrelation_values = [
+        float((row.get("modeDiagnostics") or {}).get("periodicAutocorrelationPeak4To8Hz"))
+        for row in controls
+        if (row.get("modeDiagnostics") or {}).get("periodicAutocorrelationPeak4To8Hz")
+        is not None
+    ]
     amplitude_center, amplitude_scale = robust_center_scale(amplitude_values)
     band_center, band_scale = robust_center_scale(band_values)
+    autocorrelation_center, autocorrelation_scale = robust_center_scale(
+        autocorrelation_values
+    )
     ready = bool(
         len(controls) >= MIN_SESSION_STRAIGHT_CONTROLS
         and amplitude_center is not None
@@ -874,6 +993,16 @@ def attach_session_pitch_baseline(recording_reports: list[dict[str, Any]]) -> di
         "amplitudeRobustScaleCents": round(amplitude_scale, 6) if amplitude_scale is not None else None,
         "bandEnergyMedian4To8Hz": round(band_center, 6) if band_center is not None else None,
         "bandEnergyRobustScale4To8Hz": round(band_scale, 6) if band_scale is not None else None,
+        "autocorrelationPeakMedian4To8Hz": (
+            round(autocorrelation_center, 6)
+            if autocorrelation_center is not None
+            else None
+        ),
+        "autocorrelationPeakRobustScale4To8Hz": (
+            round(autocorrelation_scale, 6)
+            if autocorrelation_scale is not None
+            else None
+        ),
         "decisionUse": "diagnostic-only-until-heldout-validation",
     }
     for row in rows:
@@ -894,6 +1023,11 @@ def attach_session_pitch_baseline(recording_reports: list[dict[str, Any]]) -> di
         band_margin = max(0.10, 3.0 * local_band_scale)
         diagnostics["relativeAmplitudeDeltaCents"] = round(amplitude - float(amplitude_center), 6)
         diagnostics["relativeBandEnergyDelta4To8Hz"] = round(band_ratio - float(band_center), 6)
+        autocorrelation_peak = diagnostics.get("periodicAutocorrelationPeak4To8Hz")
+        if autocorrelation_peak is not None and autocorrelation_center is not None:
+            diagnostics["relativeAutocorrelationPeakDelta4To8Hz"] = round(
+                float(autocorrelation_peak) - float(autocorrelation_center), 6
+            )
         if amplitude <= float(amplitude_center) + amp_margin and band_ratio <= float(band_center) + band_margin:
             diagnostics["relativePitchActivityState"] = "straight"
         elif amplitude >= float(amplitude_center) + amp_margin and band_ratio >= float(band_center) + band_margin:
@@ -934,7 +1068,12 @@ def _extract_pyin_f0(audio_path: Path) -> tuple[np.ndarray, np.ndarray, float]:
     return times.astype(np.float64), midi_track, float(waveform.size / sample_rate)
 
 
-def _extract_crepe_f0(audio_path: Path) -> tuple[np.ndarray, np.ndarray, float]:
+def _extract_crepe_f0(
+    audio_path: Path,
+    *,
+    model: str = "tiny",
+    periodicity_threshold: float = DEFAULT_CREPE_PERIODICITY_THRESHOLD,
+) -> tuple[np.ndarray, np.ndarray, float]:
     """Extract an unsmoothed frame-level F0 track for technique evidence.
 
     Median/Viterbi smoothing is deliberately omitted because it can erase the
@@ -949,6 +1088,8 @@ def _extract_crepe_f0(audio_path: Path) -> tuple[np.ndarray, np.ndarray, float]:
     except ImportError as error:
         raise RuntimeError("torchcrepe-unavailable") from error
 
+    if not math.isfinite(periodicity_threshold) or not 0.0 <= periodicity_threshold <= 1.0:
+        raise ValueError("crepe_periodicity_threshold must be between 0 and 1")
     sample_rate = 16000
     hop_length = 160
     waveform, _ = load_audio_mono(audio_path, target_sr=sample_rate)
@@ -965,7 +1106,7 @@ def _extract_crepe_f0(audio_path: Path) -> tuple[np.ndarray, np.ndarray, float]:
             hop_length,
             130.0,
             2000.0,
-            model="tiny",
+            model=model,
             batch_size=1024,
             device=device,
             return_periodicity=True,
@@ -979,7 +1120,7 @@ def _extract_crepe_f0(audio_path: Path) -> tuple[np.ndarray, np.ndarray, float]:
         np.isfinite(f0_values)
         & (f0_values > 0.0)
         & np.isfinite(periodicity_values)
-        & (periodicity_values >= 0.30)
+        & (periodicity_values >= periodicity_threshold)
     )
     midi_track = np.full_like(f0_values, np.nan, dtype=np.float64)
     midi_track[valid] = librosa.hz_to_midi(f0_values[valid])
@@ -990,10 +1131,16 @@ def extract_f0(
     audio_path: Path,
     *,
     backend: str = "pyin",
+    crepe_model: str = "tiny",
+    crepe_periodicity_threshold: float = DEFAULT_CREPE_PERIODICITY_THRESHOLD,
 ) -> tuple[np.ndarray, np.ndarray, float]:
     resolved = resolve_f0_backend(backend)
     if resolved == "crepe":
-        return _extract_crepe_f0(audio_path)
+        return _extract_crepe_f0(
+            audio_path,
+            model=crepe_model,
+            periodicity_threshold=crepe_periodicity_threshold,
+        )
     return _extract_pyin_f0(audio_path)
 
 
@@ -1103,9 +1250,19 @@ def run_evaluation(
     *,
     performance_confirmed: bool,
     f0_backend: str = "auto",
+    crepe_model: str = "tiny",
+    crepe_periodicity_threshold: float = DEFAULT_CREPE_PERIODICITY_THRESHOLD,
     pitch_tolerance_cents: float = DEFAULT_LOCALIZATION_PITCH_TOLERANCE_CENTS,
     max_normalized_path_cost: float = DEFAULT_MAX_NORMALIZED_PATH_COST,
+    score_transpose_semitones: float | None = None,
 ) -> dict[str, Any]:
+    if crepe_model not in {"tiny", "full"}:
+        raise ValueError(f"unsupported-crepe-model:{crepe_model}")
+    if (
+        not math.isfinite(crepe_periodicity_threshold)
+        or not 0.0 <= crepe_periodicity_threshold <= 1.0
+    ):
+        raise ValueError("crepe_periodicity_threshold must be between 0 and 1")
     intent_path = source / "score-intent.json"
     if not intent_path.is_file():
         raise FileNotFoundError(f"score intent not found: {intent_path}")
@@ -1137,9 +1294,16 @@ def run_evaluation(
             blockers.append(f"{recording_id}:audio-missing")
             continue
         try:
+            recording_transpose = float(
+                score_transpose_semitones
+                if score_transpose_semitones is not None
+                else recording.get("localizationTransposeSemitones", 0.0)
+            )
             times, midi_track, duration = extract_f0(
                 audio_path,
                 backend=resolved_f0_backend,
+                crepe_model=crepe_model,
+                crepe_periodicity_threshold=crepe_periodicity_threshold,
             )
             recording_report = evaluate_track(
                 recording,
@@ -1148,9 +1312,11 @@ def run_evaluation(
                 duration,
                 pitch_tolerance_cents=pitch_tolerance_cents,
                 max_normalized_path_cost=max_normalized_path_cost,
+                score_transpose_semitones=recording_transpose,
             )
             recording_report["audioPath"] = str(audio_path)
             recording_report["f0Backend"] = resolved_f0_backend
+            recording_report["crepeModel"] = crepe_model if resolved_f0_backend == "crepe" else None
             recording_report["scoreTechniqueIntent"] = score_intent_report
             reports.append(recording_report)
             if recording_report["status"] != "ok":
@@ -1211,7 +1377,7 @@ def run_evaluation(
     )
     status_counts = Counter(str(report.get("status") or "unknown") for report in reports)
     return {
-        "schemaVersion": 3,
+        "schemaVersion": 4,
         "purpose": "M3+ score-conditioned fixed-sequence audio verification",
         "evalOnly": True,
         "studentFacing": False,
@@ -1220,6 +1386,12 @@ def run_evaluation(
         "performanceGoldReady": False,
         "scoreTechniqueIntentReady": score_intent_ready,
         "f0Backend": resolved_f0_backend,
+        "crepeModel": crepe_model if resolved_f0_backend == "crepe" else None,
+        "crepePeriodicityThreshold": (
+            float(crepe_periodicity_threshold)
+            if resolved_f0_backend == "crepe"
+            else None
+        ),
         "machineAnalysisComplete": machine_complete,
         "machineModeThresholdPassed": mode_gate_passed,
         "machineReleaseReadyModes": release_ready_modes,
@@ -1245,9 +1417,17 @@ def run_evaluation(
             "minNegativesPerMode": MIN_NEGATIVES_PER_MODE,
             "localizationPitchToleranceCents": float(pitch_tolerance_cents),
             "maxNormalizedPathCost": float(max_normalized_path_cost),
+            "scoreTransposeSemitones": (
+                float(score_transpose_semitones)
+                if score_transpose_semitones is not None
+                else "per-recording-score-intent"
+            ),
+            "minUnitFrameRatio": DEFAULT_MIN_UNIT_FRAME_RATIO,
+            "maxUnitFrameRatio": DEFAULT_MAX_UNIT_FRAME_RATIO,
             "intonationRule": "localization-only; does not certify intonation accuracy",
             "evaluationPolicy": "measures-1-to-4-calibration; measures-5-to-8-holdout",
             "f0BackendPolicy": "CREPE tiny preferred when installed; pYIN is the bounded fallback",
+            "crepePeriodicityThreshold": float(crepe_periodicity_threshold),
         },
         "counts": {
             "recordingCount": len(reports),
@@ -1278,6 +1458,18 @@ def parse_args() -> argparse.Namespace:
         help="frame-level F0 backend; auto prefers CREPE and falls back to pYIN",
     )
     parser.add_argument(
+        "--crepe-model",
+        choices=("tiny", "full"),
+        default="tiny",
+        help="CREPE network size for eval-only comparison; default remains tiny",
+    )
+    parser.add_argument(
+        "--crepe-periodicity-threshold",
+        type=float,
+        default=DEFAULT_CREPE_PERIODICITY_THRESHOLD,
+        help="eval-only CREPE voiced-frame threshold; default 0.30",
+    )
+    parser.add_argument(
         "--pitch-tolerance-cents",
         type=float,
         default=DEFAULT_LOCALIZATION_PITCH_TOLERANCE_CENTS,
@@ -1286,6 +1478,12 @@ def parse_args() -> argparse.Namespace:
         "--max-normalized-path-cost",
         type=float,
         default=DEFAULT_MAX_NORMALIZED_PATH_COST,
+    )
+    parser.add_argument(
+        "--score-transpose-semitones",
+        type=float,
+        default=None,
+        help="optional performed-pitch offset used only for score-to-audio localization",
     )
     return parser.parse_args()
 
@@ -1296,16 +1494,31 @@ def main() -> int:
     output = args.out.resolve()
     pitch_tolerance_cents = float(args.pitch_tolerance_cents)
     max_normalized_path_cost = float(args.max_normalized_path_cost)
+    score_transpose_semitones = args.score_transpose_semitones
+    crepe_periodicity_threshold = float(args.crepe_periodicity_threshold)
     if not math.isfinite(pitch_tolerance_cents) or pitch_tolerance_cents < 10.0:
         raise SystemExit("--pitch-tolerance-cents must be a finite number >= 10")
     if not math.isfinite(max_normalized_path_cost) or max_normalized_path_cost <= 0.0:
         raise SystemExit("--max-normalized-path-cost must be a finite number > 0")
+    if score_transpose_semitones is not None and (
+        not math.isfinite(float(score_transpose_semitones))
+        or abs(float(score_transpose_semitones)) > 24.0
+    ):
+        raise SystemExit("--score-transpose-semitones must be finite and within +/-24")
+    if (
+        not math.isfinite(crepe_periodicity_threshold)
+        or not 0.0 <= crepe_periodicity_threshold <= 1.0
+    ):
+        raise SystemExit("--crepe-periodicity-threshold must be between 0 and 1")
     report = run_evaluation(
         source,
         performance_confirmed=bool(args.performance_confirmed),
         f0_backend=str(args.f0_backend),
+        crepe_model=str(args.crepe_model),
+        crepe_periodicity_threshold=crepe_periodicity_threshold,
         pitch_tolerance_cents=pitch_tolerance_cents,
         max_normalized_path_cost=max_normalized_path_cost,
+        score_transpose_semitones=score_transpose_semitones,
     )
     output.mkdir(parents=True, exist_ok=True)
     report_path = output / "supplemental-machine-eval.json"

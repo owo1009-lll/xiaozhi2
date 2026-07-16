@@ -14,9 +14,13 @@
 
 补充录音集并非只有正样本：直音控制和无目标技法窗口可作为已知负例。但未标记的旧录音不能自动视为负例，因为演奏者可能自然使用揉弦。
 
-当前仍缺真实 `m3p-01...04` 补充录音，因此尚不能声称 precision/recall 达标，也不应把该批交给教师复核。正确顺序是先完成机器评估，再只送真正需要人工裁决的少量样本。
+2026-07-16 更新：`m3p-01...04` 已到位，并按演奏高八度的事实在定位层加 `+12` 半音。该偏移只用于找窗口。真实 CREPE 评测中 `m3p-01` 通过 `8/8` 并形成真实直音负对照；其余三条未完整通过，机器评测仍未完成，不能声称 precision/recall 达标，也不应把该批交给教师复核。失败已按单元隔离：`m3p-03` 保留 `14/16`，`m3p-04` 保留 `13/16`，只补失败组而非整条重录。
+
+同日的协议候选诊断进一步区分了两个问题。`m3p-02` 采用同一音高完成两轮后再换音的实际顺序时可从 `10/16` 恢复为 `16/16`,说明该条定位失败来自排列而非缺音。8 个预期颤音中,7 个有上方音或音高交替证据；唯一异常是 holdout 第 8 组约 `15.915-16.900s`,帧级 F0 与 chroma 均未发现上方音或交替,因此先作为单个演奏偏差候选等待确认。正式 holdout 指标在确认前仍保持 precision=`1.00`、recall=`0.75`,不得通过改标签或降阈值制造通过。揉弦对照已覆盖 CREPE tiny/full、pYIN、同会话直音基线、FFT、自相关、独立谐波 ridge、chroma/onset、上方音边界重切及固定 L2 logistic；CREPE tiny 最好,但固定多特征模型的原窗/重切窗 holdout 均只有 precision=`1.00`、recall=`0.25`,无一路达到 release gate。CREPE full 下,装饰音 calibration/holdout 可靠正例均只有 `3`,滑音 holdout 可靠正例也只有 `3`,未达到冻结的每类每 split 至少 `4` 条。结论是“错误集中在局部,可靠单元全部保留；演奏偏差与检测失败分开计账”,不能将 post-hoc 顺序、分类器过拟合或放宽阈值用于学生端。
 
 为防止同一批数据调参后自证通过，评测现已冻结为：第 1-4 组仅用于标定，第 5-8 组作为 holdout，正式模式闸门只读取 holdout。明确要求直音的标定单元会建立会话级中位数/MAD 基线，输出 `straight / active / uncertain` 相对状态；在真实 holdout 证明增益之前，该状态仅作诊断特征，不参与放行。
+
+2026-07-17 的跨后端复验进一步把窗口与单后端偶然性纳入闸门。CREPE tiny/full 与 pYIN 至少两路边界一致后，按技法语义分别检查揉弦 4-8 Hz 周期能量、颤音上下音切换、装饰音开头短促上方音回归和滑音源到目标净移动。holdout precision/recall 分别为揉弦 `0.60/0.75`、颤音 `null/0.00`、装饰音 `null/0.00`、滑音 `1.00/0.75`；装饰音样本门亦未过。标定集拟合出的极低滑音阈值虽能制造 `1.00/1.00`，但低于物理最小量，已明确拒绝。`anyModeReleaseReady=false`，监控试点审计现按独立证据 fail-closed。
 
 ## 2. 小节级反馈验证
 
@@ -39,6 +43,8 @@
 因此置信度守门可以换取安全，却不能扩大覆盖；小节聚合仍只能作为展示层摘要，不能作为新的 auto-pass 单位。
 
 相对 IOI 可降低整体速度和 rubato 对绝对毫秒误差的影响，适合作为节奏辅助特征；它不能证明音高正确，也不能单独证明漏音不存在。起音多检测器并联应先做独立增益评估，不能直接把“并集”当真值。
+
+为检验“音高 + 相对 IOI + 能量”能否在小节单位扩大覆盖，又对 `192` 个运行时可见组合做了 oracle 上限 sweep。跨 development/rank-0/fresh rank-1 全部零危险的最佳点最低 clean coverage 仅 `2.61%`；达到 20% 覆盖地板的最佳点最低 coverage=`24.39%`，但累计危险放行 `24` 个目标小节（漏音 `13`、晚起 `10`、错音 `1`）。因此 `measureJointEvidenceReleaseReady=false`，不再继续调同一特征网格。
 
 ## 3. M4 OMR 与音频双证
 
@@ -134,7 +140,7 @@ Oemer 内部音头原本带 bbox,但 CLI 丢弃坐标。新增隔离 runner 在�
 
 ## 7. 当前裁决
 
-1. M3+ 路线保留：完成真实补充录音后，按模式做正负标定、三态质量闸门和留一曲验证。
+1. M3+ 路线保留为研究/复核候选：独立跨后端 holdout 已否决当前滑音与装饰音放行，颤音独立证据缺失；不得再用历史 first-measure 结果开启试点。
 2. 小节级结果只做教学摘要，不升级逐音安全结论。
 3. M4 坚持双车道：clean score 可进入诊断；OMR 草稿仅用于复核、校对和候选提示。
 4. “OMR 与音频一致”不等于真值，学生端仍保持关闭。
@@ -145,13 +151,17 @@ Oemer 内部音头原本带 bbox,但 CLI 丢弃坐标。新增隔离 runner 在�
 8. 公开波形核心扰动上动态音高+相对 IOI 达到 98.77% precision / 25.89% coverage 且核心错误零漏放；弱音与真实学生逐音真值未过闸，故不改变默认关闭状态。
 9. 因果弱音窗在旧冻结动态点上只有 15.79% clean coverage；重新按 development 拟合、development+已消耗 rank-0 选策略、4 个新 rank-1 演奏者一次确认后，clean precision/coverage=`97.91%/36.00%`，弱音=`97.88%/35.35%`，每类 32 个弱音/漏音/错音/晚起音均 0 危险放行。该结果只通过公开合成扰动研究闸门，真实学生逐音真值仍缺，学生端不自动放行。
 10. 坐标化 M4 共识可直接画框 213 音且定位覆盖 100%，但 gold coverage 仅 13.61%、完整单页仅 1/5。双/三引擎 × 9 个统一局部 onset 容差共 18 组 sweep 没有一个同时通过逐页 precision≥98% 与 coverage≥20%；不做页面特判，M4 继续只用于复核。
+11. 小节联合 oracle 的零危险安全覆盖上限仅 2.61%；跨过 20% 覆盖会放行 24 个危险小节。小节反馈保持摘要层，不升级为 auto-pass。
 
 ## 8. 可复现命令
 
 ```bash
 npm run western:m3plus-supplemental-eval
+npm run western:m3plus-backend-consensus
+npm run western:m3plus-monitored-pilot-audit
 npm run western:m4-dual-evidence-audit
 npm run western:measure-policy-audit
+npm run western:measure-joint-evidence-audit
 npm run western:m4-measure-duration-probe
 npm run western:m4-audio-rhythm-ranking
 npm run western:m4-engine-consensus
@@ -162,9 +172,12 @@ npm run western:dynamic-weak-combined-confirmation
 npm run western:m4-consensus-tolerance-sweep
 
 npm run test:western-m3plus-supplemental-eval
+npm run test:western-m3plus-backend-consensus
+npm run test:western-m3plus-monitored-pilot-audit
 npm run test:western-photo-score
 npm run test:western-m4-dual-evidence
 npm run test:western-measure-policy
+npm run test:western-measure-joint-evidence
 npm run test:western-m4-measure-duration-probe
 npm run test:western-m4-audio-rhythm-ranking
 npm run test:western-m4-engine-consensus
