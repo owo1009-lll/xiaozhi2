@@ -526,6 +526,7 @@ def main() -> int:
     report = {
         "ok": True,
         "evidenceType": f"{split}-public-waveform-perturbation",
+        "selectionRank": int(args.selection_rank),
         "perturbationVersion": PERTURBATION_VERSION,
         "selectedUnits": sorted(selected_units),
         "targetCount": len(targets),

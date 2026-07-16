@@ -184,6 +184,8 @@ def load_or_build_energy_features(
 
 def dynamic_selected(row: dict[str, Any], point: dict[str, Any]) -> bool:
     relative_floor = point.get("minRelativeEventConfidence")
+    same_pitch_floor = point.get("minSamePitchScoreDistanceQuarters")
+    nearest_same_pitch = row.get("nearestSamePitchScoreDistanceQuarters")
     return bool(
         row.get("pitchDistanceSemitones") == 0
         and row.get("eventConfidence") is not None
@@ -192,6 +194,16 @@ def dynamic_selected(row: dict[str, Any], point: dict[str, Any]) -> bool:
         and float(row["relativeIoiDeviationRatio"]) <= float(point["deviationLimit"])
         and row.get("eventDurationSeconds") is not None
         and float(row["eventDurationSeconds"]) >= float(point["minEventDurationSeconds"])
+        and (
+            same_pitch_floor is None
+            or (
+                "nearestSamePitchScoreDistanceQuarters" in row
+                and (
+                    nearest_same_pitch is None
+                    or float(nearest_same_pitch) >= float(same_pitch_floor)
+                )
+            )
+        )
         and (
             relative_floor is None
             or (
@@ -316,6 +328,7 @@ def build_fold(
     recognition: dict[str, Any],
     event_gate: dict[str, Any],
     all_rows: list[dict[str, Any]],
+    selection_rank: int = 0,
 ) -> dict[str, Any]:
     event_filter = ((recognition.get("eventFilterCalibration") or {}).get("selected") or {})
     inputs = dynamic.build_fold_inputs(
@@ -327,14 +340,20 @@ def build_fold(
         min_duration=float(event_filter.get("minDurationSeconds", 0.08)),
         neighbor_threshold=float(event_gate.get("selectedThresholdSeconds") or 0.30),
         neighbor_radius=int(event_gate.get("neighborRadius") or 2),
+        selection_rank=selection_rank,
     )
     grouped, targets, events_by_scenario = inputs
     sources = {
         str(row["unit"]): row
-        for row in select_split_units(audit["rows"], split)
+        for row in select_split_units(audit["rows"], split, selection_rank)
     }
     keys, clean_features, weak_features, cache_hit = load_or_build_energy_features(
-        cache_dir / f"{split}-all-note-energy-features.json",
+        cache_dir
+        / (
+            f"{split}-all-note-energy-features.json"
+            if selection_rank == 0
+            else f"{split}-rank{selection_rank}-all-note-energy-features.json"
+        ),
         grouped,
         events_by_scenario,
         sources,

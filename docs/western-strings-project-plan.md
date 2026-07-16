@@ -165,6 +165,7 @@
 - **schema:** score 记录加 `scoreSource=omr`、`omrEngine`、`omrConfidence`、`omrReviewStatus`(draft/human-approved);低置信小节单独标记,判断时该小节降级 review。
 - **与判断层的关系:** OMR 只解决"谱面从哪来";判断仍是音频侧 M2/M3。**谱面错 → 判断全错**,所以 OMR 闸门必须比音频闸门更严,且学生端要明示"此谱由识别得到、是否经人工核对"。
 - **验收:** OMR note 准确率达标闸门通过;不达标谱 100% 走人工;`scoreSource=omr` 全链路可追溯;判断层不读取 `omrReviewStatus≠human-approved` 且未过闸门的谱。
+- **多引擎统一阈值扩展审计(2026-07-16):** `npm run western:m4-consensus-tolerance-sweep` 对 Audiveris+HOMR 与 Audiveris+HOMR+Oemer 两种策略、9 个局部 onset 容差共 18 组做统一跨页评测。双引擎最好总 precision/coverage=`98.62%/45.69%`，但最差页 precision=`94.33%`；三引擎保持总 precision=`100%`，最高 coverage=`13.61%`。没有任何配置同时通过逐页 precision≥98% 与 coverage≥20%，故 `expansionCandidateFound=false`；不得按页面身份特判，也不接学生端。
 - **当前执行状态(2026-07-15):** `npm run western:m4-independent-benchmark-audit` 与 `western:m4-preflight` 已将证据拆开。独立 render/scan/photo 三域达到研究报告下限,故 `m4OmrAccuracyClaimReady=true`;严格逐谱仅 12/32,真实照片独立源谱 gold 严格通过 0/5(P/R=`84.7%/71.5%`),故 `m4OmrAutomaticAdoptionReady=false`,`m4OmrAutoScoreReady=false`。5×3 预处理 sweep 中 `up2` 最好;`up3` 和 Otsu 总体退化,没有可接生产的参数改进。既有 12 条混合 benchmark 中 8 条为人工批准未改草稿、4 条为独立编辑 gold;均无需重复复核。当前 `humanTask=none`,也不能打开自动运行时。实时事实以 `npm run western:m4-preflight` 和 `npm run western:project-status` 为准。
 - **运行时置信探针(2026-07-15):** `npm run western:m4-omr-confidence-probe` 只使用识别规模、页数和 Audiveris 日志等运行时可见特征,按 6 个 BWV 作品留一。LR/RF AUC=0.567/0.800;RF 最佳观察点 precision=0.80、coverage=0.156,没有达到 0.90/0.20 的安全子集。该负结果已接入独立审计,禁止用自报置信绕过逐谱精度门槛。
 - **更强引擎对照(2026-07-16 更新):** `npm run western:m4-oemer-benchmark` 已在同一 5 份真实照片 source-gold 上评测 Oemer 0.1.8。`ex05` 的播放器黑边曾导致错误 3 tracks/builder 断言；仅对该明确失败采用固定行均值裁边重试后，Oemer 达到 5/5 输出。全 5 份 P/R=`71.9%/76.2%`、onset/measure=`5.4%/18.2%`,严格通过 `0/5`;同 5 份 Audiveris 为 P/R=`85.5%/72.1%`。fallback 解决崩溃和坐标缺失，但 precision/节奏结构不足，不能替换 Audiveris。模型训练时 `scikit-learn 1.2.0` 与本机 1.8.0 的兼容性已用精确 1.2.0 复跑排除。该比较保持 eval-only、`studentGateReady=false`。
@@ -407,6 +408,7 @@
 - Basic Pitch 独立识别经 development 阈值冻结后,holdout precision=90.50%、recall=77.67%,只够 V2-alpha 高精度子集。
 - rawv2 原始波形注入表明漏音、+2 半音错音、迟到 800ms 的严格策略在 development/holdout 均为 0 危险放行;弱音仍无法跨演奏者安全自动判。
 - 产品范围据此固定:公开专业录音核心三类可作为 V2/V3 研究原型;weak-note、extra-note 和学生域默认发布继续 fail-closed。
+- 2026-07-16 三阶段安全子集确认进一步提高了研究覆盖:能量模型只在 development 拟合，策略只在 development+已消耗 rank-0 选择，rank-1 去除重叠后用 4 个新演奏者一次确认。加入重复同音高谱音 `0.5` 四分音符隔离闸后，clean precision/coverage=`97.91%/36.00%`，弱音=`97.88%/35.35%`，每类 32 个合成错误目标均 0 危险放行。该结果仅说明公开专业录音+合成波形扰动的研究 gate 过线；真实学生逐音真值仍缺，`m3plusAutoFeedbackReady=false` 不变。
 - “完美”不是开发口号。只有独立人工逐音 gold、最终盲测、alignment/recognition precision 与 coverage/recall 均至少 99% 才可讨论近乎完美;当前未达到。
 
 # 2026-07-10 PHENICX 人工 gold 阶段

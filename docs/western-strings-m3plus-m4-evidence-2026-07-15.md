@@ -143,7 +143,8 @@ Oemer 内部音头原本带 bbox,但 CLI 丢弃坐标。新增隔离 runner 在�
 
 7. M4 多引擎共识与普通录音动态定位均有实质增益，但在独立盲验完成前只作为 review 候选，不自动给学生结论。
 8. 公开波形核心扰动上动态音高+相对 IOI 达到 98.77% precision / 25.89% coverage 且核心错误零漏放；弱音与真实学生逐音真值未过闸，故不改变默认关闭状态。
-9. 因果弱音窗可在冻结动态点上清零公开合成扰动漏放，但 clean coverage 仅 15.79%（弱音扰动 15.57%），低于发布地板；坐标化 M4 共识可直接画框 213 音且定位覆盖 100%，但 gold coverage 仅 13.61%、完整单页仅 1/5。两者均不自动放行。
+9. 因果弱音窗在旧冻结动态点上只有 15.79% clean coverage；重新按 development 拟合、development+已消耗 rank-0 选策略、4 个新 rank-1 演奏者一次确认后，clean precision/coverage=`97.91%/36.00%`，弱音=`97.88%/35.35%`，每类 32 个弱音/漏音/错音/晚起音均 0 危险放行。该结果只通过公开合成扰动研究闸门，真实学生逐音真值仍缺，学生端不自动放行。
+10. 坐标化 M4 共识可直接画框 213 音且定位覆盖 100%，但 gold coverage 仅 13.61%、完整单页仅 1/5。双/三引擎 × 9 个统一局部 onset 容差共 18 组 sweep 没有一个同时通过逐页 precision≥98% 与 coverage≥20%；不做页面特判，M4 继续只用于复核。
 
 ## 8. 可复现命令
 
@@ -157,6 +158,8 @@ npm run western:m4-engine-consensus
 npm run western:offline-dynamic-timing-audit
 npm run western:dynamic-perturbation-gate
 npm run western:dynamic-weak-combined-gate
+npm run western:dynamic-weak-combined-confirmation
+npm run western:m4-consensus-tolerance-sweep
 
 npm run test:western-m3plus-supplemental-eval
 npm run test:western-photo-score
@@ -168,6 +171,8 @@ npm run test:western-m4-engine-consensus
 npm run test:western-offline-feature-audio
 npm run test:western-offline-dynamic-timing
 npm run test:western-dynamic-perturbation-gate
+npm run test:western-dynamic-weak-combined-confirmation
+npm run test:western-m4-consensus-tolerance-sweep
 ```
 
 生成报告均位于 `data/experiments/`，默认被 Git 忽略，不作为学生端运行时配置。

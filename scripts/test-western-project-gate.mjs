@@ -26,6 +26,47 @@ assert.ok(status.publicModelValidation, "public model validation status must alw
 assert.ok(status.measureFeedbackAudit, "project status must expose the measure-feedback safety audit");
 assert.equal(status.measureFeedbackAudit.measureAggregationReleaseReady, false, "measure aggregation must stay closed when safe coverage is below 20%");
 assert.equal(status.measureFeedbackAudit.studentGateReady, false, "eval-only measure aggregation must never directly open student feedback");
+const dynamicConfirmation = status.dynamicEvidenceAudit?.combinedWeakConfirmation;
+if (dynamicConfirmation && !dynamicConfirmation.missing) {
+  assert.equal(
+    dynamicConfirmation.freshPublicSyntheticConfirmationReady,
+    true,
+    "fresh public performers should confirm the wider research gate",
+  );
+  assert.equal(
+    dynamicConfirmation.releaseCoverageReady,
+    true,
+    "fresh public confirmation should exceed the research coverage floor",
+  );
+  assert.equal(
+    dynamicConfirmation.confirmationRank1?.freshUnits?.length,
+    4,
+    "rank-1 confirmation must exclude overlap and retain four fresh performers",
+  );
+  assert.equal(
+    dynamicConfirmation.confirmationRank1?.excludedOverlapUnits?.length,
+    2,
+    "rank-1 confirmation must report the two excluded rank-0 overlaps",
+  );
+  assert.equal(
+    dynamicConfirmation.confirmationRank1?.allErrorUnsafeTargetAutoPassCount,
+    0,
+    "fresh public confirmation must not auto-pass synthetic error targets",
+  );
+  assert.ok(
+    dynamicConfirmation.confirmationRank1?.clean?.precisionWithin300ms >= 0.90,
+    "fresh public confirmation must retain at least 90% clean precision",
+  );
+  assert.ok(
+    dynamicConfirmation.confirmationRank1?.clean?.coverage >= 0.20,
+    "fresh public confirmation must retain at least 20% clean coverage",
+  );
+  assert.equal(
+    dynamicConfirmation.studentGateReady,
+    false,
+    "public synthetic confirmation must never directly open student feedback",
+  );
+}
 assert.equal(
   status.publicModelValidation.gates.studentReleaseEligible,
   false,
@@ -280,6 +321,23 @@ if (m4.m4EngineConsensusPilotSafeSubsetFound) {
   assert.equal(coordinateConsensus?.selectedNotes, 213, "every frozen consensus note must carry a review locator");
   assert.equal(m4.engineConsensus?.coordinatePolicy?.reviewLocatorCoverage, 1, "M4 review-locator coverage must be complete for the selected subset");
   assert.equal(m4.engineConsensus?.runtimeReady, false, "M4 consensus must remain eval-only below per-piece coverage floors");
+}
+if (!m4.engineConsensusToleranceSweep?.missing) {
+  assert.equal(
+    m4.engineConsensusToleranceSweep?.configurationCount,
+    18,
+    "M4 tolerance audit must cover both engine policies across nine tolerances",
+  );
+  assert.equal(
+    m4.engineConsensusToleranceSweep?.expansionCandidateFound,
+    false,
+    "no uniform onset-consensus tolerance may be promoted from the five-page audit",
+  );
+  assert.equal(
+    m4.engineConsensusToleranceSweep?.studentGateReady,
+    false,
+    "M4 tolerance exploration must remain eval-only",
+  );
 }
 if (m4.m4HomrBenchmarkComplete) {
   assert.equal(m4.m4HomrAutomaticAdoptionReady, false, "HOMR comparison must not open automatic adoption");

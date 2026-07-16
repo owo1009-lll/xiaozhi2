@@ -455,6 +455,13 @@ const M4_ENGINE_CONSENSUS = path.join(
   "engine-consensus",
   "report.json",
 );
+const M4_ENGINE_CONSENSUS_TOLERANCE_SWEEP = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "engine-consensus-tolerance-sweep",
+  "report.json",
+);
 const MEASURE_POLICY_AUDIT = path.join(
   "data",
   "experiments",
@@ -474,6 +481,13 @@ const DYNAMIC_WEAK_COMBINED_GATE = path.join(
   "experiments",
   "western-strings-m3",
   "dynamic-weak-combined-gate",
+  "report.json",
+);
+const DYNAMIC_WEAK_COMBINED_CONFIRMATION = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "dynamic-weak-combined-gate-confirmation",
   "report.json",
 );
 const RELEASE_REVIEW = path.join(
@@ -1405,6 +1419,7 @@ async function buildM4OmrStatus() {
   const rhythmCandidateOracle = await readJson(M4_RHYTHM_CANDIDATE_ORACLE);
   const audioRhythmRanking = await readJson(M4_AUDIO_RHYTHM_RANKING);
   const engineConsensus = await readJson(M4_ENGINE_CONSENSUS);
+  const engineConsensusToleranceSweep = await readJson(M4_ENGINE_CONSENSUS_TOLERANCE_SWEEP);
   const readinessReady = Boolean(readiness?.gate?.m4OmrBenchmarkDatasetReady);
   const benchmarkEvaluated = Boolean(benchmark?.gate?.m4OmrBenchmarkEvaluated);
   const draftQualityReady = Boolean(benchmark?.gate?.m4OmrDraftQualityReady);
@@ -1514,6 +1529,7 @@ async function buildM4OmrStatus() {
       rhythmCandidateOracleJson: M4_RHYTHM_CANDIDATE_ORACLE.replace(/\\/g, "/"),
       audioRhythmRankingJson: M4_AUDIO_RHYTHM_RANKING.replace(/\\/g, "/"),
       engineConsensusJson: M4_ENGINE_CONSENSUS.replace(/\\/g, "/"),
+      engineConsensusToleranceSweepJson: M4_ENGINE_CONSENSUS_TOLERANCE_SWEEP.replace(/\\/g, "/"),
       readinessCsv: String(readiness?.artifacts?.csv || "data/experiments/western-strings-m4/omr-readiness.csv").replace(/\\/g, "/"),
       benchmarkCsv: String(benchmark?.artifacts?.csv || "data/experiments/western-strings-m4/omr-benchmark.csv").replace(/\\/g, "/"),
     },
@@ -1578,6 +1594,21 @@ async function buildM4OmrStatus() {
     } : {
       source: M4_ENGINE_CONSENSUS.replace(/\\/g, "/"),
       missing: true,
+      runtimeReady: false,
+      studentGateReady: false,
+    },
+    engineConsensusToleranceSweep: engineConsensusToleranceSweep ? {
+      source: M4_ENGINE_CONSENSUS_TOLERANCE_SWEEP.replace(/\\/g, "/"),
+      configurationCount: engineConsensusToleranceSweep.configurationCount || 0,
+      expansionCandidateFound:
+        engineConsensusToleranceSweep.expansionCandidateFound === true,
+      runtimeReady: false,
+      blockingReasons: engineConsensusToleranceSweep.blockingReasons || [],
+      studentGateReady: false,
+    } : {
+      source: M4_ENGINE_CONSENSUS_TOLERANCE_SWEEP.replace(/\\/g, "/"),
+      missing: true,
+      expansionCandidateFound: false,
       runtimeReady: false,
       studentGateReady: false,
     },
@@ -1977,6 +2008,7 @@ export async function buildProjectStatus(args = {}) {
     measurePolicyAudit,
     dynamicPerturbationGate,
     dynamicWeakCombinedGate,
+    dynamicWeakCombinedConfirmation,
   ] = await Promise.all([
     buildControlledStatus(),
     buildM3PlusStatus(),
@@ -1994,6 +2026,7 @@ export async function buildProjectStatus(args = {}) {
     readJson(MEASURE_POLICY_AUDIT),
     readJson(DYNAMIC_PERTURBATION_GATE),
     readJson(DYNAMIC_WEAK_COMBINED_GATE),
+    readJson(DYNAMIC_WEAK_COMBINED_CONFIRMATION),
   ]);
   const controlledPilotSession = controlledPilotSessions.find((session) => session.executionPerformed === true)
     || controlledPilotSessions[0]
@@ -2075,6 +2108,25 @@ export async function buildProjectStatus(args = {}) {
       } : {
         source: DYNAMIC_WEAK_COMBINED_GATE.replace(/\\/g, "/"),
         missing: true,
+        releaseCoverageReady: false,
+        studentGateReady: false,
+      },
+      combinedWeakConfirmation: dynamicWeakCombinedConfirmation ? {
+        source: DYNAMIC_WEAK_COMBINED_CONFIRMATION.replace(/\\/g, "/"),
+        freshPublicSyntheticConfirmationReady:
+          dynamicWeakCombinedConfirmation.freshPublicSyntheticConfirmationReady === true,
+        releaseCoverageReady:
+          dynamicWeakCombinedConfirmation.releaseCoverageReady === true,
+        selectedPolicy: dynamicWeakCombinedConfirmation.selectedPolicy || null,
+        confirmationRank1:
+          dynamicWeakCombinedConfirmation.confirmationRank1 || {},
+        blockingReasons:
+          dynamicWeakCombinedConfirmation.blockingReasons || [],
+        studentGateReady: false,
+      } : {
+        source: DYNAMIC_WEAK_COMBINED_CONFIRMATION.replace(/\\/g, "/"),
+        missing: true,
+        freshPublicSyntheticConfirmationReady: false,
         releaseCoverageReady: false,
         studentGateReady: false,
       },

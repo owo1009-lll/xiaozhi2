@@ -33,6 +33,7 @@ class CombinedDynamicWeakGateTest(unittest.TestCase):
             "relativeIoiDeviationRatio": 0.1,
             "relativeEventConfidence": 0.7,
             "eventDurationSeconds": 0.2,
+            "nearestSamePitchScoreDistanceQuarters": None,
             "onsetErrorSeconds": 0.05,
             "target": False,
         }
@@ -61,6 +62,24 @@ class CombinedDynamicWeakGateTest(unittest.TestCase):
         )
         self.assertEqual(metrics["selectedCount"], 1)
         self.assertEqual(metrics["correctWithin300msCount"], 1)
+
+    def test_nearby_repeated_pitch_can_be_forced_to_review(self) -> None:
+        point = {**self.point, "minSamePitchScoreDistanceQuarters": 0.5}
+        missing_evidence = self.row()
+        missing_evidence.pop("nearestSamePitchScoreDistanceQuarters")
+        self.assertFalse(MODULE.dynamic_selected(missing_evidence, point))
+        self.assertFalse(
+            MODULE.dynamic_selected(
+                self.row(nearestSamePitchScoreDistanceQuarters=0.25),
+                point,
+            )
+        )
+        self.assertTrue(
+            MODULE.dynamic_selected(
+                self.row(nearestSamePitchScoreDistanceQuarters=0.5),
+                point,
+            )
+        )
 
     def test_unmatched_note_remains_in_coverage_denominator(self) -> None:
         rows = [self.row(), self.row(noteIndex=2, eventConfidence=None)]

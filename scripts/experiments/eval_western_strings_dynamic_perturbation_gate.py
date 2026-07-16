@@ -11,6 +11,7 @@ import argparse
 import itertools
 import json
 import sys
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -65,8 +66,9 @@ def build_fold_inputs(
     min_duration: float,
     neighbor_threshold: float,
     neighbor_radius: int,
+    selection_rank: int = 0,
 ) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]], dict[str, dict[str, list[dict[str, Any]]]]]:
-    sources = select_split_units(audit["rows"], split, 0)
+    sources = select_split_units(audit["rows"], split, selection_rank)
     units = {str(source["unit"]) for source in sources}
     grouped = rows_by_unit([row for row in all_rows if str(row["unit"]) in units])
     original_cache = REPO / "data/experiments/western-strings-bach-violin-basic-pitch-cache"
@@ -122,6 +124,21 @@ def evaluate_scenario(
     rows: list[dict[str, Any]] = []
     for unit in sorted(grouped):
         score_rows = grouped[unit]
+        score_positions_by_pitch: dict[int, list[tuple[float, int]]] = defaultdict(list)
+        for score_row in score_rows:
+            score_positions_by_pitch[int(score_row["midi"])].append(
+                (float(score_row["scoreTime"]), int(score_row["noteIndex"]))
+            )
+        nearest_same_pitch_distance: dict[int, float | None] = {}
+        for positions in score_positions_by_pitch.values():
+            positions.sort()
+            for position_index, (score_time, note_index) in enumerate(positions):
+                distances = []
+                if position_index > 0:
+                    distances.append(score_time - positions[position_index - 1][0])
+                if position_index + 1 < len(positions):
+                    distances.append(positions[position_index + 1][0] - score_time)
+                nearest_same_pitch_distance[note_index] = min(distances) if distances else None
         notes = [
             {
                 "midi": int(row["midi"]),
@@ -181,6 +198,9 @@ def evaluate_scenario(
                         round(max(0.0, float(assignment["end"]) - float(assignment["time"])), 6)
                         if assignment
                         else None
+                    ),
+                    "nearestSamePitchScoreDistanceQuarters": nearest_same_pitch_distance.get(
+                        int(row["noteIndex"])
                     ),
                     "relativeEventConfidence": round(relative_confidence, 6) if relative_confidence is not None else None,
                     "relativeIoiDeviationRatio": ioi.get("relativeIoiDeviationRatio"),

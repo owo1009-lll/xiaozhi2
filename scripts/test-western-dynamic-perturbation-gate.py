@@ -49,6 +49,17 @@ def main() -> int:
     assert clean["precisionWithin300ms"] == 1.0
     assert clean["targetSelectedCount"] == 1
     assert clean["rows"][2]["eventDurationSeconds"] == 0.5
+    assert clean["rows"][2]["nearestSamePitchScoreDistanceQuarters"] is None
+    repeated_rows = [dict(row) for row in rows]
+    repeated_rows[3]["midi"] = repeated_rows[2]["midi"]
+    repeated = evaluate_scenario(
+        {"u1": repeated_rows},
+        targets,
+        {"u1": events()},
+        deviation_limit=0.2,
+        min_event_confidence=0.4,
+    )
+    assert repeated["rows"][2]["nearestSamePitchScoreDistanceQuarters"] == 1.0
     late = evaluate_scenario(grouped, targets, {"u1": events(target_time=2.8)}, deviation_limit=0.2, min_event_confidence=0.4)
     assert late["targetSelectedCount"] == 0
     wrong = evaluate_scenario(grouped, targets, {"u1": events(target_midi=70)}, deviation_limit=0.2, min_event_confidence=0.4)

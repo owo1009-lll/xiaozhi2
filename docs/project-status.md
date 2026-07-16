@@ -314,7 +314,11 @@ HF2 Hardanger Fiddle 的 119 对 WAV/MIDI 已完成只读审计，其中 100 条
 
 随后将弱音特征改为起音后的因果窗（30–80ms、30–150ms），避免上一音/连奏能量污染，并只作为此前已冻结动态点的否决器。5 个浅层能量模型全部同意时，未见演奏者的 48 弱音、48 漏音、48 错音和 48 晚起音均为 0 危险放行；clean precision=`98.05%`、coverage=`15.79%`，弱音扰动后的 coverage=`15.57%`。这证明安全回退子集可以清零合成错误漏放，但 clean coverage 仍低于 20% 发布地板，且参考时间/错误均非真实学生真值；因此 `releaseCoverageReady=false`、`studentGateReady=false`。
 
+在上述历史冻结点之后，新增三阶段联合确认：能量模型只用 development 演奏者拟合，动态阈值只用 development + 已消耗的 rank-0 holdout 选择，最终 rank-1 排除 2 个重叠演奏者后只评估 4 个新演奏者一次。统一策略为 deviation=`0.15`、event confidence=`0.4`、relative confidence=`0.8`、duration=`0.08s`，并新增“相邻同音高谱音距离至少 `0.5` 四分音符”的运行时隔离闸，避免重复音归属歧义。最终 clean precision=`97.91%`、coverage=`36.00%`，弱音 precision=`97.88%`、coverage=`35.35%`；每类 32 个弱音/漏音/错音/晚起音目标均为 0 危险放行。因此公开合成扰动的**研究覆盖闸门**已过（`releaseCoverageReady=true`），但参考时间仍为估计值、错误仍为合成波形且没有真实学生逐音真值，故 `studentGateReady=false`，不得直接接学生端。
+
 M4 共识候选也已接入 Oemer 音头坐标 sidecar。`ex05` 的受控黑边裁切 fallback 补齐坐标后，5 页统一三引擎+局部 onset 子集为 `213/213` 正确、gold coverage=`13.61%`，且 `213/213` 均携带可验证的 dewarp bbox，`reviewLocatorCoverage=100%`。坐标链已完整，但只有 1/5 页达到完整单页通过条件，故总 `runtimeReady=false`、学生端仍关闭。
+
+M4 又对两种统一引擎策略（Audiveris+HOMR、Audiveris+HOMR+Oemer）和 9 个局部 onset 容差（0–0.25 四分音符）做了 18 组 eval-only sweep。双引擎最好总 precision=`98.62%`、gold coverage=`45.69%`，但 `violin-ex08` 单页 precision 仅 `94.33%`；三引擎全部保持 `100%` 总 precision，但最高 gold coverage 仅 `13.61%`，每页覆盖门槛未过。没有任何统一配置同时满足逐页 precision≥98% 与 coverage≥20%，因此 `expansionCandidateFound=false`；禁止按已知页面做特判，M4 仍只提供复核候选。
 
 先预览,确认目标仅为可再生环境、调试目录、构建产物和 Python 缓存:
 
