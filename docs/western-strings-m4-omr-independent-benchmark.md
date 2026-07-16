@@ -236,6 +236,8 @@ HOMR 仅在第 7、35 小节各有一个 `C#5 -> B4` 替换，其余 170/172 音
 | 纯 Audiveris 池(P0 v2) | 3/12 | 8 | 1(ex07) |
 | **+HOMR 池(v3)** | **9/12**(homr 胜 8,up2 胜 1) | 3(ex04/07/08) | 0 |
 
-HOMR 只在自身结构证据自洽时获胜(8/12 过 MusicXML-only 闸):ex03 里 HOMR 货币最高(112/0.98)但拍号一致率不足被闸下,正确回落 `full-feedback:up2`;ex07(Audiveris 全变体无输出)由 retake 升为 review(57 confirmed@0.85,拍号证据不足不出反馈)。节奏车道纪律不变(OMR 谱不做节奏硬判),严格自动采纳继续关,`m4OmrAutoFeedbackReady` 仍 false。审计 `pipeline: western-photo-score-v3-homr-pool`,增 `winnerEngine`/`winnerAnnotationStyle`/`enginePool` 字段。
+HOMR 只在自身结构证据自洽时获胜(8/12 过 MusicXML-only 闸):ex03 里 HOMR 货币最高(112/0.98)但调号证据冲突(exportedKeyFifths=[-1,2])加拍号一致率不足被闸下,正确回落 `full-feedback:up2`;ex07(Audiveris 全变体无输出)由 retake 升为 review(57 confirmed@0.85,拍号证据不足不出反馈);ex04/08 进 review 是 Audiveris 各变体被 P0 v2 拦下**且** HOMR 自身拍号结构闸也未过的合取结果(消融验证:纯 Audiveris 池同为 review,故非接线引入的回归)。
+
+运维/治理警示(2026-07-17 审查补记):(1) HOMR 0.7.0 许可证为 **AGPL-3.0**(venv METADATA 一手),按 MUSC 先例(AGPL 审查完成前不得接生产)需补一份正式许可证审查记录;当前以独立子进程方式调用未修改的公开发行版,属 arm's-length 集成,但结论须以正式审查为准。(2) 生产管线 `DEFAULT_HOMR` 指向 gitignored 的 `data/experiments/.../homr-compat-venv`,venv 缺失时池静默退化为纯 Audiveris(机器可用 9/12→3/12),部署时必须固化该 venv 或在部署清单中加启动自检。(3) 主环境 `numpy<2`(basic-pitch/TF 约束)与 HOMR venv `numpy>=2.4` 互斥,依赖 venv 隔离共存,不可合并环境。(4) Route B 报告 §5 "Audiveris 主引擎 + oemer 救援"的架构描述相对 v3 已过时:oemer 不在 v3 生产池中,仅保留 eval 基准与坐标 sidecar 角色。节奏车道纪律不变(OMR 谱不做节奏硬判),严格自动采纳继续关,`m4OmrAutoFeedbackReady` 仍 false。审计 `pipeline: western-photo-score-v3-homr-pool`,增 `winnerEngine`/`winnerAnnotationStyle`/`enginePool` 字段。
 
 同轮产线化波形错误注入工具 `inject_waveform_errors.py`(错音/漏音/多音/拖拍四型,15ms crossfade 手术,种子确定性,标签含期望判定):r2-01/r2-08 各 ×3 种子共 6 套、每套 19 处注入,输出于 `data/experiments/western-strings-injected-errors/`,按家规仅作前置闸证据,不单独解锁学生端。
