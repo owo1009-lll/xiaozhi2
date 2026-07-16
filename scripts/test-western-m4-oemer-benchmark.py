@@ -16,6 +16,7 @@ from eval_western_strings_m4_oemer_benchmark import (  # noqa: E402
     classify_oemer_failure,
     compare_engines,
     find_musicxml,
+    prepare_viewer_trim,
     read_coordinate_sidecar,
 )
 from run_oemer_with_coordinates import add_normalized_coordinates, pitched_xml_note_count  # noqa: E402
@@ -75,6 +76,17 @@ with tempfile.TemporaryDirectory() as temporary_directory:
     invalid["pitchedXmlNoteCount"] = 2
     sidecar.write_text(json.dumps(invalid), encoding="utf-8")
     assert read_coordinate_sidecar(sidecar) is None
+
+    source = root / "viewer.png"
+    from PIL import Image, ImageDraw
+
+    viewer = Image.new("RGB", (100, 100), "black")
+    ImageDraw.Draw(viewer).rectangle((0, 20, 99, 79), fill="white")
+    viewer.save(source)
+    trimmed = root / "trimmed.png"
+    trim = prepare_viewer_trim(source, trimmed)
+    assert trim["crop"] == [0, 20, 100, 80]
+    assert Image.open(trimmed).size == (100, 60)
 
     invalid = json.loads(json.dumps({
         "schemaVersion": 1,

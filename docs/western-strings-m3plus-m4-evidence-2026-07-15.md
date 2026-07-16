@@ -100,7 +100,7 @@
 
 新增 `western:m4-engine-consensus`，以 Audiveris 坐标为锚点，只使用运行时可见的引擎输出做选择，独立 gold 只用于评估。固定策略为：有 Oemer 输出时要求 Audiveris、HOMR、Oemer 三者音高一致且局部 onset 差不超过 0.25 quarter；Oemer 不可用时要求 Audiveris 与 HOMR 满足同样条件。
 
-5 份独立真实照片谱上，该自适应子集为 `344/344` 正确，precision=`100%`，gold coverage=`21.98%`，5/5 谱的 precision 子门均通过。它证明 M4 可以通过更强证据减少错误草稿，但还不能接生产：样本只有 5 份，部分单谱 coverage 低于 20%，运行时坐标适配和更大独立照片集尚未验收，因此 `runtimeReady=false`、`studentGateReady=false` 不变。
+早期 5 份独立真实照片谱中，`ex05` 缺 Oemer 输出，因此两/三引擎自适应子集为 `344/344`。补齐 Oemer 后统一要求三引擎音高一致+局部 onset，最终子集为 `213/213` 正确，precision=`100%`，gold coverage=`13.61%`。候选数降低来自证据口径收紧；只有 1/5 页满足完整单页门槛，因此 `runtimeReady=false`、`studentGateReady=false` 不变。
 
 ### 6.2 普通录音的动态音符定位
 
@@ -124,9 +124,9 @@
 
 ### 6.4 Oemer 坐标链
 
-Oemer 内部音头原本带 bbox,但 CLI 丢弃坐标。新增隔离 runner 在真正写入 MusicXML 音符后输出坐标 sidecar 与干净 dewarp 画布。正式 5 页照片基准中 4 个成功页均实现 XML 音符与坐标一一对应(`363/363`,`361/361`,`323/323`,`324/324`),`ex05` 仍为原 builder 失败；坐标读取采用逐音 fail-closed 校验。该改动只补足复核定位能力,没有改善 Oemer 的 P/R,报告固定 `studentFacing=false`。
+Oemer 内部音头原本带 bbox,但 CLI 丢弃坐标。新增隔离 runner 在真正写入 MusicXML 音符后输出坐标 sidecar 与干净 dewarp 画布。正式 5 页照片基准中，4 个原成功页与新增裁边 fallback 页均实现 XML 音符和坐标一一对应；`ex05` 为 `289/289`。坐标读取采用逐音 fail-closed 校验。该改动只补足复核定位能力,没有让 Oemer 的 P/R 达到采用门槛,报告固定 `studentFacing=false`。
 
-进一步把 Oemer 索引通过跨引擎序列映射接到多引擎共识候选。344 个共识音中 152 个取得可验证的 `canvasPath+bboxNormalized`，坐标化子集对独立 gold 为 `152/152`、precision=`100%`、gold coverage=`9.71%`；剩余 192 个均在 Oemer 失败页 `ex05`，显式保留 `reviewLocatorReady=false`。定位覆盖 `44.19%` 尚不足运行时接入，但教师复核可只消费这 152 个有框候选。
+进一步把 Oemer 索引通过跨引擎序列映射接到多引擎共识候选。受控裁边补齐 `ex05` 后，统一三引擎子集对独立 gold 为 `213/213`、precision=`100%`、gold coverage=`13.61%`；213 个候选全部取得可验证的 `canvasPath+bboxNormalized`，定位覆盖 `100%`。但只有 1/5 页达到完整单页门槛，所以它仍只供研究/教师复核，不能自动采用。
 
 ### 6.5 动态证据与弱音因果窗联合闸门
 
@@ -143,7 +143,7 @@ Oemer 内部音头原本带 bbox,但 CLI 丢弃坐标。新增隔离 runner 在�
 
 7. M4 多引擎共识与普通录音动态定位均有实质增益，但在独立盲验完成前只作为 review 候选，不自动给学生结论。
 8. 公开波形核心扰动上动态音高+相对 IOI 达到 98.77% precision / 25.89% coverage 且核心错误零漏放；弱音与真实学生逐音真值未过闸，故不改变默认关闭状态。
-9. 因果弱音窗可在冻结动态点上清零公开合成扰动漏放，但 clean coverage 仅 15.79%（弱音扰动 15.57%），低于发布地板；坐标化 M4 共识可直接画框 152 音，但只覆盖 44.19% 共识候选。两者均不自动放行。
+9. 因果弱音窗可在冻结动态点上清零公开合成扰动漏放，但 clean coverage 仅 15.79%（弱音扰动 15.57%），低于发布地板；坐标化 M4 共识可直接画框 213 音且定位覆盖 100%，但 gold coverage 仅 13.61%、完整单页仅 1/5。两者均不自动放行。
 
 ## 8. 可复现命令
 

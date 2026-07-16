@@ -125,8 +125,8 @@
 - `humanTask=none`
 - 运行时可见 OMR 置信探针(32 首、按 6 个 BWV 作品留一):LR AUC=`0.567`,RF AUC=`0.800`;RF 最佳观察点 precision=`0.80`、coverage=`0.156`,没有达到 `0.90/0.20` 的安全子集。
 - 真实照片预处理 sweep(5 份×`up2/up3/up2-otsu`):`up2` 最佳,平均 P/R=`85.59%/72.18%`;`up3`=`76.88%/63.52%`;Otsu=`61.72%/50.42%`且一份无输出。按曲事后挑最佳变体仍为严格 `0/5`,因此不把 `up3`/Otsu 接入生产。
-- 更强 OMR 引擎对照已完成:`npm run western:m4-oemer-benchmark` 用 Oemer 0.1.8 在同一 5 份 source-gold 上串行评测。4/5 成功输出,1/5(`ex05`)因错误的 3-track 结构在 MusicXML builder 崩溃;成功 4 份 P/R=`71.70%/76.98%`,计入失败后的有效 recall=`62.81%`,严格通过 `0/5`。同 4 份 Audiveris P/R=`83.17%/68.52%`;Oemer 的 recall 增益不足以抵消 precision 和鲁棒性下降,不接生产。
-- Oemer 坐标适配已完成但保持 review-only:`run_oemer_with_coordinates.py` 从实际发射 MusicXML 的 `AddNote` 动作保存音头 bbox 和干净 dewarp 画布,不修改第三方包。4 个成功页坐标数与 XML 音符数分别为 `363/363`,`361/361`,`323/323`,`324/324`,新旧 `ex08` MusicXML SHA-256 相同;失败页仍失败。正式报告为 `coordinateAdapter.readyRows=4/5`,`studentFacing=false`,坐标可画不改变 OMR 严格 `0/5`。
+- 更强 OMR 引擎对照已完成:`npm run western:m4-oemer-benchmark` 用 Oemer 0.1.8 在同一 5 份 source-gold 上串行评测。`ex05` 原始截图的播放器黑边曾诱发错误 3-track 结构；现在只对该明确失败执行固定行均值裁边重试，Oemer 由 4/5 提升为 5/5 可输出。全 5 份 P/R=`71.87%/76.23%`、onset-quarter/measure accuracy=`5.43%/18.21%`，严格仍为 `0/5`；同 5 份 Audiveris P/R=`85.47%/72.14%`。fallback 解决的是引擎崩溃和坐标缺失，不足以让 Oemer 替换 Audiveris 或进入生产。
+- Oemer 坐标适配已完成但保持 review-only:`run_oemer_with_coordinates.py` 从实际发射 MusicXML 的 `AddNote` 动作保存音头 bbox 和干净 dewarp 画布,不修改第三方包。5 个输出页的坐标数均与 XML 音符数一致，新增裁边页为 `289/289`；正式报告为 `coordinateAdapter.readyRows=5/5`,`studentFacing=false`。坐标可画不改变 OMR 严格 `0/5`。
 - Transformer OMR 对照已完成:`npm run western:m4-homr-benchmark` 用 HOMR 0.7.0 对同一 5 份原始 source 照片串行评测。5/5 均输出,聚合 pitch P/R=`89.00%/96.17%`,onset-quarter/measure accuracy=`30.73%/79.04%`。`ex05/ex12` 若只看音高会成为 `2/5` 假通过,但完整 pitch+onset+measure 严格门槛为 `0/5`;HOMR 因节奏重建错误仍不接生产。
 - 第三方视觉 Transformer 对照已完成:`npm run western:m4-clarity-benchmark` 用 Clarity-OMR 官方 beam-5 管线评测同一 5 份 source-gold。原始截图因播放器黑边/标题栏导致 Stage A 检出 `0` 个谱表;使用冻结的通用行均值裁页后 5/5 均输出,但聚合 pitch P/R=`72.77%/35.53%`,onset-quarter/measure accuracy=`2.81%/10.10%`,完整严格通过 `0/5`。该裁页仅用于公平评测,Clarity 不接生产。
 - Clarity 监督适配的非人工前置已跑通:`npm run western:m4-clarity-adaptation-data-probe` 从一页独立 Bach MusicXML 生成 8 个去重谱表图像/标签对,无盲测照片混入;`npm run western:m4-clarity-adaptation-split` 按 BWV 作品拆成 train/validation/synthetic-test=`21/4/7`,5 份真实照片 gold 冻结在训练集之外。
@@ -306,7 +306,7 @@ HF2 Hardanger Fiddle 的 119 对 WAV/MIDI 已完成只读审计，其中 100 条
 
 同日进一步审计发现，真实照片与独立公开源谱存在记谱版本混杂：50 个音高序列完全可比的小节中，绝对四分音符起点仅 16/50 完全一致，但相对 IOI 形状有 34/50 一致，其中 33 小节属于“拍号/记谱尺度不同但节奏比例一致”。因此旧 `onset-quarter=2.2%` 不能单独解释为 OMR 节奏全错。新增 `western:m4-rhythm-candidate-oracle` 能在 common-meter 候选中覆盖 50/50 gold 节奏，但 gold 仅用于 oracle，运行时选择器尚未通过，`runtimeReady=false`。生产导入器已停止把缺失拍号静默写成 `4/4`：显式拍号写入 `meterKnown=true`，缺拍号写入 `meterKnown=false` 并强制节奏复核；同时可从 MusicXML 小节时值众数恢复仅供内部布局的 `measureQuarterSpan`。`6/8` 现在按 3 个四分音符单位计算，不再误算为 6。该修复改善时间轴语义，但不放行任何未知拍号的学生节奏判断。
 
-同日非人工优化补测表明，M4 并非只能停在单引擎 84.7% 音高 precision：`western:m4-engine-consensus` 的自适应多引擎+局部 onset 子集在 5 份独立照片谱上达到 `344/344`、precision=`100%`、gold coverage=`21.98%`，但样本量和部分单谱覆盖仍不足，继续保持 eval-only。普通上传的主要覆盖瓶颈也定位到旧执行器的整曲线性时间映射；默认关闭的 Basic Pitch 事件 + 一对一 gap-penalty DTW + 事件内部 pYIN 稳定窗，在一条正确受控录音前 20 音上把支持从 `0/20` 提升到 `20/20`、中位误差从 `3300c` 降到 `5c`。完整 12 录音机器审计覆盖 2588 个谱音，时间分配率 44.63%、稳定音高支持率 37.40%；但 correct 与 wrong_pitch 组支持率分别为 35.49%/35.97%，支持率本身没有类别判别力，且当前只有录音级 scenario、没有逐音错误位置。因此该模式仍全部 `review_required`，不得解读为学生端 coverage 已达标。
+同日非人工优化补测表明，M4 并非只能停在单引擎 84.7% 音高 precision。早期 `western:m4-engine-consensus` 在 Oemer 缺失 `ex05` 时采用两/三引擎自适应口径，得到 `344/344`；补齐 Oemer 后改为 5 页统一三引擎+局部 onset 口径，最终为 `213/213`、precision=`100%`、gold coverage=`13.61%`。候选数降低是证据要求收紧，不是回归；样本量和单谱覆盖仍不足，继续保持 eval-only。普通上传的主要覆盖瓶颈也定位到旧执行器的整曲线性时间映射；默认关闭的 Basic Pitch 事件 + 一对一 gap-penalty DTW + 事件内部 pYIN 稳定窗，在一条正确受控录音前 20 音上把支持从 `0/20` 提升到 `20/20`、中位误差从 `3300c` 降到 `5c`。完整 12 录音机器审计覆盖 2588 个谱音，时间分配率 44.63%、稳定音高支持率 37.40%；但 correct 与 wrong_pitch 组支持率分别为 35.49%/35.97%，支持率本身没有类别判别力，且当前只有录音级 scenario、没有逐音错误位置。因此该模式仍全部 `review_required`，不得解读为学生端 coverage 已达标。
 
 同日继续实现局部相对 IOI 和小节级零矛盾聚合。12 条受控录音的 296 小节中，音高证据就绪 14.86%、节奏证据就绪 2.70%、两者同时就绪 1.69%，没有产生预期的覆盖跃升。随后使用开发演奏者调阈值、未见演奏者锁定评测的公开波形扰动真值：动态一对一音高分配 + 相对 IOI 在 clean 折达到 `2572/2604`、precision=`98.77%`、coverage=`25.89%`，并对 48 漏音、48 错音、48 晚起音做到 0 危险放行；但弱音仍漏放 12/48，参考时间为估计对齐且错误为合成波形扰动。因此这只证明研究级核心错误候选有明显增益，`studentGateReady=false` 不变，真实学生逐音盲验仍是上线前置。Numba 等价 DP 与 SHA-1 f0 缓存把 12 录音复跑从约 109 秒降到约 1.85 秒。
 
@@ -314,7 +314,7 @@ HF2 Hardanger Fiddle 的 119 对 WAV/MIDI 已完成只读审计，其中 100 条
 
 随后将弱音特征改为起音后的因果窗（30–80ms、30–150ms），避免上一音/连奏能量污染，并只作为此前已冻结动态点的否决器。5 个浅层能量模型全部同意时，未见演奏者的 48 弱音、48 漏音、48 错音和 48 晚起音均为 0 危险放行；clean precision=`98.05%`、coverage=`15.79%`，弱音扰动后的 coverage=`15.57%`。这证明安全回退子集可以清零合成错误漏放，但 clean coverage 仍低于 20% 发布地板，且参考时间/错误均非真实学生真值；因此 `releaseCoverageReady=false`、`studentGateReady=false`。
 
-M4 共识候选也已接入 Oemer 音头坐标 sidecar。原 `344/344` 高精度共识候选中，152 个可严格映射到干净 dewarp 画布上的 bbox，坐标化子集仍为 `152/152` 正确、gold coverage=`9.71%`；其余 192 个来自 Oemer builder 失败的 `ex05`，保持 `reviewLocatorReady=false`，不伪造坐标。坐标定位覆盖为 `44.19%`，可用于研究/教师复核候选，但 `runtimeCoordinateAdapterReady=false`、学生端仍关闭。
+M4 共识候选也已接入 Oemer 音头坐标 sidecar。`ex05` 的受控黑边裁切 fallback 补齐坐标后，5 页统一三引擎+局部 onset 子集为 `213/213` 正确、gold coverage=`13.61%`，且 `213/213` 均携带可验证的 dewarp bbox，`reviewLocatorCoverage=100%`。坐标链已完整，但只有 1/5 页达到完整单页通过条件，故总 `runtimeReady=false`、学生端仍关闭。
 
 先预览,确认目标仅为可再生环境、调试目录、构建产物和 Python 缓存:
 

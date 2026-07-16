@@ -267,8 +267,19 @@ if (m4.m4OemerBenchmarkComplete) {
   assert.equal(m4.m4OemerAutomaticAdoptionReady, false, "Oemer source-gold comparison must not open automatic adoption");
   assert.equal(m4.oemerBenchmark?.studentGateReady, false, "Oemer eval-only comparison must never open the student gate");
   assert.equal(m4.oemerBenchmark?.comparison?.oemer?.rows, 5, "Oemer comparison must expose all five frozen source-gold rows");
-  assert.equal(m4.oemerBenchmark?.comparison?.oemer?.usableRows, 4, "Oemer comparison must expose the one engine failure");
+  assert.equal(m4.oemerBenchmark?.comparison?.oemer?.usableRows, 5, "Oemer viewer-trim fallback must recover all five frozen rows");
+  assert.equal(m4.oemerBenchmark?.comparison?.oemer?.engineFailureRows, 0, "Oemer benchmark must expose no remaining engine failure");
+  assert.equal(m4.oemerBenchmark?.coordinateAdapter?.readyRows, 5, "Oemer coordinate sidecars must cover all frozen rows");
   assert.equal(m4.oemerBenchmark?.comparison?.oemer?.strictPassRows, 0, "Oemer must not be promoted above its measured strict result");
+}
+if (m4.m4EngineConsensusPilotSafeSubsetFound) {
+  const consensus = m4.engineConsensus?.summaries?.allAvailablePitchLocalOnset25;
+  const coordinateConsensus = m4.engineConsensus?.summaries?.coordinateReadyAllAvailablePitchLocalOnset25;
+  assert.equal(consensus?.selectedNotes, 213, "M4 consensus must expose the frozen strict three-engine subset");
+  assert.equal(consensus?.wrongNotes, 0, "M4 consensus subset must retain zero measured wrong notes");
+  assert.equal(coordinateConsensus?.selectedNotes, 213, "every frozen consensus note must carry a review locator");
+  assert.equal(m4.engineConsensus?.coordinatePolicy?.reviewLocatorCoverage, 1, "M4 review-locator coverage must be complete for the selected subset");
+  assert.equal(m4.engineConsensus?.runtimeReady, false, "M4 consensus must remain eval-only below per-piece coverage floors");
 }
 if (m4.m4HomrBenchmarkComplete) {
   assert.equal(m4.m4HomrAutomaticAdoptionReady, false, "HOMR comparison must not open automatic adoption");

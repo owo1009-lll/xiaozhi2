@@ -448,7 +448,7 @@ def main(argv: list[str] | None = None) -> int:
         read_report(Path(args.homr_report)),
         read_report(Path(args.oemer_report)),
     )
-    out = Path(args.out)
+    out = Path(args.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
     report_path = out / "report.json"
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

@@ -1560,6 +1560,7 @@ async function buildM4OmrStatus() {
       studentGateReady: oemerBenchmark?.gate?.studentGateReady === true,
       runtime: oemerBenchmark.runtime || {},
       comparison: oemerBenchmark.comparison || {},
+      coordinateAdapter: oemerBenchmark.coordinateAdapter || {},
     } : {
       source: M4_OEMER_BENCHMARK.replace(/\\/g, "/"),
       missing: true,

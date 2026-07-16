@@ -96,7 +96,7 @@
     "western:m4-independent-gold-workspace-audit": "node scripts\\audit-western-strings-m4-independent-gold-workspace.mjs",
     "western:m4-gold-provenance-audit": "node scripts\\audit-western-strings-m4-gold-provenance.mjs",
     "western:m4-omr-confidence-probe": "py -3.11 scripts\\experiments\\eval_western_strings_m4_omr_confidence_probe.py",
-    "western:m4-oemer-benchmark": "py -3.11 scripts\\experiments\\eval_western_strings_m4_oemer_benchmark.py --reuse-existing",
+    "western:m4-oemer-benchmark": "py -3.11 scripts\\experiments\\eval_western_strings_m4_oemer_benchmark.py --reuse-existing --retry-viewer-trim",
     "western:m4-homr-benchmark": "py -3.11 scripts\\experiments\\eval_western_strings_m4_homr_benchmark.py --reuse-existing",
     "western:m4-engine-consensus": "py -3.11 scripts\\experiments\\eval_western_strings_m4_engine_consensus.py",
     "western:m4-clarity-benchmark": "py -3.11 scripts\\experiments\\eval_western_strings_m4_clarity_benchmark.py --reuse-existing",

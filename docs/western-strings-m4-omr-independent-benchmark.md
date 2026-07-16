@@ -147,16 +147,16 @@
 
 ### 8.8 Oemer 独立 source-gold 对照(2026-07-15)
 - 8.7 的 `92.0%` 是与录音的交叉吻合,不能替代独立 MusicXML gold 准确率。现用 `npm run western:m4-oemer-benchmark` 在冻结的 5 份真实照片 source-gold 上补齐公平对照,输入预处理固定为与 Audiveris 相同的 `up2`。
-- Oemer 0.1.8 成功输出 4/5;`ex05` 将单声部误建为 3 tracks,在 `build_system.py` 的双轨断言处失败。成功 4 份聚合 pitch P/R=`71.70%/76.98%`;将失败页的 gold notes 计入分母后 recall=`62.81%`;严格 P≥98% 且 R≥95% 通过 `0/5`。
-- 同一 4 份 Audiveris up2 聚合 P/R=`83.17%/68.52%`。Oemer 在 `ex12` 明显提高 recall,但 `ex09` precision 大幅下降,且存在 1/5 builder 崩溃;不存在可直接采用的固定替换策略。按 gold 事后逐页挑引擎属于 oracle,不得冒充生产选择器。
+- Oemer 0.1.8 原先成功输出 4/5；`ex05` 的播放器黑边诱发错误 3-track 结构和 builder 断言。新增仅对该明确失败生效的固定行均值裁边重试后，5/5 均可输出。全 5 份聚合 pitch P/R=`71.87%/76.23%`、onset-quarter/measure accuracy=`5.43%/18.21%`；严格 P≥98%、R≥95%、节奏两项≥95% 仍通过 `0/5`。
+- 同一 5 份 Audiveris up2 聚合 P/R=`85.47%/72.14%`。Oemer 在 `ex12` 明显提高 recall,但 `ex09` precision 大幅下降；裁边只修复输入域崩溃，不解决识别准确率，不存在可直接采用的固定替换策略。按 gold 事后逐页挑引擎属于 oracle,不得冒充生产选择器。
 - Oemer 的 SVC 产物来自 `scikit-learn 1.2.0`。已用精确 1.2.0 兼容环境复跑,并与 1.2.2/1.8.0 输出逐字节比较;同页 MusicXML SHA-256 完全一致,故低准确率不是 sklearn 版本警告造成。
 - 裁决:`automaticAdoptionReady=false`,`studentGateReady=false`;保留 Oemer 为 eval-only 外部引擎证据,不替换 Audiveris,不进入学生端。
 
 ### 8.9 Oemer 坐标 sidecar(2026-07-16)
 - 新增 `scripts/experiments/run_oemer_with_coordinates.py`,不修改 site-packages。runner 在 Oemer 真正发射 MusicXML `<note>` 的 `AddNote.perform()` 之后记录同一音头的 bbox,同时保存干净 dewarp 画布。无效音头和超出 A0-C8 的内部动作不会进入 sidecar。
 - 坐标使用独立 JSON schema:XML pitched-note 序号、Oemer note id、measure、track、voice、chord continuation、像素 bbox 和归一化 bbox。读取时要求索引连续、画布存在、尺寸有效、bbox 全部有限且位于 `[0,1]`;任一条件不满足则整页 fail-closed。
-- 真实 `ex08` smoke 得到 `361 XML notes = 361 coordinate notes`;新旧 MusicXML SHA-256 完全一致。正式 5 页基准中 4 个 Oemer 成功页全部一一匹配:`ex09 363/363`,`ex08 361/361`,`ex10 323/323`,`ex12 324/324`;`ex05` 仍维持原 builder 失败。
-- 坐标补齐未改变 Oemer P/R 或严格结论。报告新增 `coordinateAdapter.readyRows=4/5`,`studentFacing=false`;它只解决复核界面的“标在哪里”,不解决 OMR “识别是否正确”,不得用于自动采纳。
+- 真实 `ex08` smoke 得到 `361 XML notes = 361 coordinate notes`;新旧 MusicXML SHA-256 完全一致。正式 5 页基准中 5 个 Oemer 输出页全部实现 MusicXML 与 sidecar 一一匹配；新增裁边页为 `ex05 289/289`，其余 4 页保持原计数。
+- 坐标补齐未改变 Oemer 的严格结论。报告为 `coordinateAdapter.readyRows=5/5`,`studentFacing=false`;它只解决复核界面的“标在哪里”,不解决 OMR “识别是否正确”,不得用于自动采纳。
 
 ### 8.10 HOMR 0.7.0 transformer 对照与完整谱闸门(2026-07-15)
 - HOMR 是独立的两阶段 OMR:结构分割后使用 transformer 做符号序列识别。隔离 Python 3.11/NumPy 2.4/CPU-only ONNX Runtime、4 线程串行运行,未污染现有 Basic Pitch 环境。

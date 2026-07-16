@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 from PIL import Image
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -79,6 +80,29 @@ def prepare_up2(source: Path, destination: Path) -> Path:
         destination.parent.mkdir(parents=True, exist_ok=True)
         image.convert("RGB").save(destination, dpi=(300, 300))
     return destination
+
+
+def prepare_viewer_trim(source: Path, destination: Path, threshold: int = 100) -> dict[str, Any]:
+    """Remove only full-width dark viewer bars before an Oemer retry."""
+
+    with Image.open(source) as opened:
+        image = opened.convert("RGB")
+        grayscale = np.asarray(image.convert("L"), dtype=np.float32)
+        page_rows = np.flatnonzero(grayscale.mean(axis=1) >= threshold)
+        if page_rows.size == 0:
+            raise ValueError("no-page-like-rows")
+        top = int(page_rows[0])
+        bottom = int(page_rows[-1]) + 1
+        cropped = image.crop((0, top, image.width, bottom))
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        cropped.save(destination, dpi=(300, 300))
+        return {
+            "method": "row-mean-viewer-trim",
+            "threshold": threshold,
+            "crop": [0, top, image.width, bottom],
+            "sourceSize": [image.width, image.height],
+            "outputSize": [cropped.width, cropped.height],
+        }
 
 
 def build_oemer_env(base: dict[str, str], sklearn_site_packages: Path | None = None) -> dict[str, str]:
@@ -370,6 +394,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="rerun reusable Oemer outputs only when their coordinate sidecar is missing",
     )
+    parser.add_argument(
+        "--retry-viewer-trim",
+        action="store_true",
+        help="retry a track-count build failure after removing full-width dark viewer bars",
+    )
     args = parser.parse_args(argv)
 
     intake_path = Path(args.intake)
@@ -458,6 +487,63 @@ def main(argv: list[str] | None = None) -> int:
             )
             existing = find_musicxml(omr_dir)
             existing_coordinates = read_coordinate_sidecar(coordinate_sidecar)
+        effective_failure = (
+            existing_failure
+            or (classify_oemer_failure(log_path) if existing is None else "")
+            or run_error
+        )
+        if (
+            existing is None
+            and args.retry_viewer_trim
+            and effective_failure == "oemer-build-track-count-assertion"
+            and runtime_available
+        ):
+            trimmed_image = piece_dir / f"{piece_id}-up2-trimmed.png"
+            trimmed_omr_dir = piece_dir / "omr-sk120-trimmed"
+            trimmed_log_path = piece_dir / "oemer-sk120-trimmed.log"
+            trimmed_coordinate_sidecar = trimmed_omr_dir / f"{trimmed_image.stem}.coordinates.json"
+            trimmed_coordinate_canvas = trimmed_omr_dir / f"{trimmed_image.stem}-coordinate-canvas.png"
+            trim_metadata = prepare_viewer_trim(image, trimmed_image)
+            trimmed_existing = find_musicxml(trimmed_omr_dir) if args.reuse_existing else None
+            trimmed_coordinates = read_coordinate_sidecar(trimmed_coordinate_sidecar)
+            if trimmed_existing is not None and trimmed_coordinates is not None:
+                retry_exit, retry_seconds, retry_error = 0, 0.0, ""
+                row["reusedViewerTrimFallback"] = True
+            else:
+                retry_exit, retry_seconds, retry_error = run_oemer(
+                    python,
+                    trimmed_image,
+                    trimmed_omr_dir,
+                    trimmed_log_path,
+                    env,
+                    args.timeout,
+                    args.expected_sklearn,
+                    trimmed_coordinate_sidecar,
+                    trimmed_coordinate_canvas,
+                )
+                trimmed_existing = find_musicxml(trimmed_omr_dir)
+                trimmed_coordinates = read_coordinate_sidecar(trimmed_coordinate_sidecar)
+            exit_code = retry_exit
+            runtime_seconds += retry_seconds
+            run_error = retry_error or (
+                "oemer-viewer-trim-output-missing-or-ambiguous"
+                if trimmed_existing is None
+                else ""
+            )
+            existing = trimmed_existing
+            existing_coordinates = trimmed_coordinates
+            image = trimmed_image
+            omr_dir = trimmed_omr_dir
+            log_path = trimmed_log_path
+            coordinate_sidecar = trimmed_coordinate_sidecar
+            coordinate_canvas = trimmed_coordinate_canvas
+            row.update(
+                {
+                    "variant": "up2-trimmed",
+                    "fallbackFrom": effective_failure,
+                    "preprocessFallback": trim_metadata,
+                }
+            )
         row.update(
             {
                 "oemerExit": exit_code,
@@ -481,8 +567,13 @@ def main(argv: list[str] | None = None) -> int:
                 ),
                 "coordinateAdapterError": (
                     ""
-                    if existing_coordinates is not None or not should_refresh_coordinates
-                    else run_error or "coordinate-sidecar-invalid-after-run"
+                    if existing_coordinates is not None
+                    else run_error
+                    or (
+                        "coordinate-sidecar-missing-or-invalid"
+                        if existing is not None
+                        else ""
+                    )
                 ),
             }
         )
