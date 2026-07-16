@@ -177,6 +177,53 @@ COLORS = {"confirmed": (46, 160, 67), "pitch-mismatch": (220, 38, 38),
           "no-audio-evidence": (250, 204, 21), "beyond-recording": (156, 163, 175),
           "anchor-uncertain": (59, 130, 246)}
 
+
+def compute_verdicts(events: list[dict], aev: list[dict],
+                     uncertain_flags: list[bool]) -> tuple[list[str], list[int | None],
+                                                           list[float] | None, float, str]:
+    """Shared fail-closed verdict discipline: recording-coverage end, strict
+    pitch greens, piece gate on RAW agreement, both-neighbor red rule.
+    uncertain_flags[i] True -> anchor-uncertain (pixel-anchor count mismatch);
+    engines without pixel anchors (e.g. HOMR MusicXML-only) pass all-False.
+    Returns (verdicts, match, time_pred, agreement, piece_gate)."""
+    match, time_pred = align(events, aev)
+    # recording-coverage end = last index whose local (+-6) match density >= 0.5;
+    # a short recording covers a prefix of the page — beyond it is neutral, not an error
+    W = 6
+    cover_end = -1
+    for i in range(len(match)):
+        lo, hi = max(0, i - W), min(len(match), i + W + 1)
+        dens = sum(1 for k in range(lo, hi) if match[k] is not None) / (hi - lo)
+        if dens >= 0.5:
+            cover_end = i
+    verdicts = []
+    for i, mi in enumerate(match):
+        if uncertain_flags[i]:
+            verdicts.append("anchor-uncertain")
+        elif mi is None:
+            # neutral: detector miss and player miss are indistinguishable here -> never accuse
+            verdicts.append("no-audio-evidence" if i <= cover_end else "beyond-recording")
+        else:
+            verdicts.append(strict_audio_verdict(events[i]["midis"], aev[mi]["midis"]))
+    # piece gate uses RAW alignment agreement (pre-demotion) — an unreliable
+    # alignment must never accuse, and demotion must not re-open the gate.
+    heard_raw = [v for v in verdicts if v in ("confirmed", "pitch-mismatch")]
+    agree = (verdicts.count("confirmed") / len(heard_raw)) if heard_raw else 0.0
+    piece_gate = "ok" if agree >= 0.6 else "low-agreement-review"
+    if piece_gate != "ok":
+        verdicts = ["no-audio-evidence" if v == "pitch-mismatch" else v for v in verdicts]
+    else:
+        # neighbor-context rule: a red is only trustworthy when the alignment is
+        # locally reliable on BOTH sides; drift zones demote to neutral.
+        for i, v in enumerate(verdicts):
+            if v == "pitch-mismatch":
+                left_ok = i > 0 and verdicts[i - 1] == "confirmed"
+                right_ok = i + 1 < len(verdicts) and verdicts[i + 1] == "confirmed"
+                if not (left_ok and right_ok):
+                    verdicts[i] = "no-audio-evidence"
+    return verdicts, match, time_pred, agree, piece_gate
+
+
 def run_piece(piece: str, variant: str, out_root: Path,
               omr_root: Path | None = None, aev: list[dict] | None = None,
               photo_path: Path | None = None, audio_path: Path | None = None) -> dict:
@@ -212,26 +259,11 @@ def run_piece(piece: str, variant: str, out_root: Path,
                                  "measure": meas, "uncertain": True})
     per_note.sort(key=lambda r: r["i"])
 
-    match, time_pred = align(events, aev)
-    # recording-coverage end = last index whose local (+-6) match density >= 0.5;
-    # a short recording covers a prefix of the page — beyond it is neutral, not an error
-    W = 6
-    cover_end = -1
-    for i in range(len(match)):
-        lo, hi = max(0, i - W), min(len(match), i + W + 1)
-        dens = sum(1 for k in range(lo, hi) if match[k] is not None) / (hi - lo)
-        if dens >= 0.5:
-            cover_end = i
-    verdicts = []
-    for i, mi in enumerate(match):
-        if per_note[i]["uncertain"]:
-            verdicts.append("anchor-uncertain")
-        elif mi is None:
-            # neutral: detector miss and player miss are indistinguishable here -> never accuse
-            verdicts.append("no-audio-evidence" if i <= cover_end else "beyond-recording")
-        else:
-            verdicts.append(strict_audio_verdict(events[i]["midis"], aev[mi]["midis"]))
+    verdicts, match, time_pred, agree, piece_gate = compute_verdicts(
+        events, aev, [rec["uncertain"] for rec in per_note])
 
+    # draw AFTER gate demotions so the overlay never shows an accusation the
+    # verdicts JSON has already demoted (fail-closed: image == emitted verdicts)
     im = Image.open(photo).convert("RGB")
     dr = ImageDraw.Draw(im)
     sc = 0.5 if variant in ("up2", "up2-otsu") else (1 / 3 if variant == "up3" else 0.5)
@@ -246,22 +278,6 @@ def run_piece(piece: str, variant: str, out_root: Path,
     annotated = out_dir / f"{piece}-annotated.jpg"
     im.save(annotated, quality=90)
 
-    # piece gate uses RAW alignment agreement (pre-demotion) — an unreliable
-    # alignment must never accuse, and demotion must not re-open the gate.
-    heard_raw = [v for v in verdicts if v in ("confirmed", "pitch-mismatch")]
-    agree = (verdicts.count("confirmed") / len(heard_raw)) if heard_raw else 0.0
-    piece_gate = "ok" if agree >= 0.6 else "low-agreement-review"
-    if piece_gate != "ok":
-        verdicts = ["no-audio-evidence" if v == "pitch-mismatch" else v for v in verdicts]
-    else:
-        # neighbor-context rule: a red is only trustworthy when the alignment is
-        # locally reliable on BOTH sides; drift zones demote to neutral.
-        for i, v in enumerate(verdicts):
-            if v == "pitch-mismatch":
-                left_ok = i > 0 and verdicts[i - 1] == "confirmed"
-                right_ok = i + 1 < len(verdicts) and verdicts[i + 1] == "confirmed"
-                if not (left_ok and right_ok):
-                    verdicts[i] = "no-audio-evidence"
     counts = {v: verdicts.count(v) for v in COLORS}
     row = {"piece": piece, "variant": variant, "events": len(events), "audioNotes": len(aev),
            "uncertainMeasures": uncertain_measures, "verdictCounts": counts,
