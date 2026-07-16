@@ -16,9 +16,11 @@ from western_photo_score_pipeline import decide, MIN_CONFIRMED, MIN_AGREEMENT  #
 from proto_western_strings_score_anchored_feedback import (  # noqa: E402
     _pitch_cost,
     align,
+    compute_verdicts,
     strict_audio_verdict,
 )
 from western_m4_omr_structure import (  # noqa: E402
+    evaluate_musicxml_only_structure,
     evaluate_p0_records,
     extract_musicxml_structure,
     extract_raw_structure,
@@ -51,6 +53,20 @@ check("decide-structure-review-failed-gate",
 best = {**ok, "variant": "up3", "confirmed": 80}
 check("decide-picks-max-confirmed", decide([ok, best]) == "full-feedback:up3")
 check("decide-thresholds-documented", MIN_CONFIRMED == 20 and abs(MIN_AGREEMENT - 0.6) < 1e-9)
+
+# ---- decide(): HOMR joins the pool with the same currency + gate rules ----
+homr_ok = {"status": "ok", "variant": "homr", "engine": "homr", "confirmed": 90,
+           "agreement": 0.95, "scoreStructureGate": ready_structure}
+check("decide-homr-wins-on-currency", decide([ok, homr_ok]) == "full-feedback:homr")
+homr_gate_failed = {**homr_ok, "scoreStructureGate": {"ready": False}}
+check("decide-homr-gate-outranks-currency", decide([ok, homr_gate_failed]) == "full-feedback:up2")
+homr_unavailable = {"status": "homr-unavailable", "variant": "homr", "engine": "homr",
+                    "confirmed": 0, "agreement": 0.0}
+check("decide-homr-unavailable-degrades-to-audiveris",
+      decide([ok, homr_unavailable]) == "full-feedback:up2")
+homr_weak = {**homr_ok, "confirmed": 55, "agreement": 0.5}
+check("decide-homr-degraded-below-agreement",
+      decide([homr_weak]) == "degraded-feedback:homr")
 
 # ---- P0 score structure: explicit OR corroborated evidence, conflicts still fail ----
 raw_ready = {
@@ -146,6 +162,58 @@ check("p0-extract-key-without-shape", raw_extracted["keys"][0]["fifths"] == 3
 check("p0-extract-time-whole", raw_extracted["meters"][0]["beats"] == 4
       and raw_extracted["meters"][0]["beatType"] == 4)
 
+# ---- MusicXML-only structure gate (HOMR: no .omr raw evidence exists) ----
+import tempfile
+
+MXL_TEMPLATE = """<score-partwise><part id="P1"><measure number="1"><attributes>
+<divisions>1</divisions><key><fifths>{fifths}</fifths></key>{time}
+<clef><sign>{sign}</sign><line>{line}</line></clef></attributes>
+<note><pitch><step>G</step><octave>{octave}</octave></pitch><duration>1</duration></note>
+<note><pitch><step>A</step><octave>{octave}</octave></pitch><duration>1</duration></note>
+<note><pitch><step>B</step><octave>{octave}</octave></pitch><duration>1</duration></note>
+<note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+</measure></part></score-partwise>"""
+
+def write_mxl(tmp, name, **kw):
+    params = {"fifths": 0, "time": "<time><beats>4</beats><beat-type>4</beat-type></time>",
+              "sign": "G", "line": 2, "octave": 3}
+    params.update(kw)
+    p = Path(tmp) / name
+    p.write_text(MXL_TEMPLATE.format(**params), encoding="utf-8")
+    return p
+
+with tempfile.TemporaryDirectory() as tmp:
+    gate = evaluate_musicxml_only_structure([write_mxl(tmp, "ready.musicxml")])
+    check("mxlgate-ready", gate["ready"] is True
+          and gate["evidenceSource"] == "musicxml-only"
+          and gate["evidence"]["keyEvidenceMode"] == "structural")
+    gate_no_meter = evaluate_musicxml_only_structure([write_mxl(tmp, "nometer.musicxml", time="")])
+    check("mxlgate-missing-meter-fails", gate_no_meter["ready"] is False
+          and "meter-structural-evidence-insufficient" in gate_no_meter["reasons"])
+    gate_bass = evaluate_musicxml_only_structure(
+        [write_mxl(tmp, "bass.musicxml", sign="F", line=4)])
+    check("mxlgate-non-treble-clef-fails", gate_bass["ready"] is False
+          and "clef-structural-evidence-insufficient" in gate_bass["reasons"])
+    gate_low = evaluate_musicxml_only_structure([write_mxl(tmp, "low.musicxml", octave=2)])
+    check("mxlgate-out-of-violin-range-fails", gate_low["ready"] is False
+          and gate_low["clefReady"] is False)
+check("mxlgate-empty-fails", evaluate_musicxml_only_structure([])["ready"] is False)
+
+# ---- compute_verdicts(): shared fail-closed discipline (anchors optional) ----
+cv_score = [{"midis": [m]} for m in [60, 62, 64, 65, 67, 69, 71, 72, 74, 76]]
+cv_audio = [{"start": i * 0.5, "midis": [m]}
+            for i, m in enumerate([60, 62, 64, 65, 66, 69, 71, 72, 74, 76])]
+verdicts, match, _, agree, gate = compute_verdicts(cv_score, cv_audio, [False] * 10)
+check("cv-isolated-red-kept", verdicts[4] == "pitch-mismatch" and gate == "ok")
+check("cv-greens-strict", verdicts.count("confirmed") == 9 and abs(agree - 0.9) < 1e-9)
+verdicts_u, *_ = compute_verdicts(cv_score, cv_audio, [False] * 4 + [True] + [False] * 5)
+check("cv-uncertain-flag-blue", verdicts_u[4] == "anchor-uncertain")
+cv_audio_bad = [{"start": i * 0.5, "midis": [m + 1]} for i, m in
+                enumerate([60, 62, 64, 65, 67, 69, 71, 72, 74, 76])]
+verdicts_bad, _, _, agree_bad, gate_bad = compute_verdicts(cv_score, cv_audio_bad, [False] * 10)
+check("cv-low-agreement-demotes-all-reds", gate_bad == "low-agreement-review"
+      and verdicts_bad.count("pitch-mismatch") == 0 and agree_bad == 0.0)
+
 # ---- _pitch_cost(): octave fold + chord awareness ----
 check("cost-exact-zero", _pitch_cost([60], [60]) == 0.0)
 check("cost-octave-half", _pitch_cost([60], [72]) == 0.5)
@@ -170,7 +238,8 @@ check("align-timepred-fitted", time_pred is not None and abs(time_pred[1] - time
 src = (REPO / "scripts" / "western_photo_score_pipeline.py").read_text(encoding="utf-8")
 for token in ("studentRuntimeTouched", "missingExtraVerdictsEmitted", "retake-photo", "degraded-feedback",
               "score-structure-review-required", "scoreStructureRequiresClefKeyMeter",
-              "western-photo-score-v2-p0", "p0StructureGateVersion"):
+              "western-photo-score-v3-homr-pool", "p0StructureGateVersion",
+              "homr-unavailable", "annotationStyle", "enginePool"):
     check(f"audit-contract-{token}", token in src)
 
 print(json.dumps({"ok": True, "checks": checks}, ensure_ascii=False))

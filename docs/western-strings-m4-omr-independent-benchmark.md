@@ -218,3 +218,24 @@ HOMR 仅在第 7、35 小节各有一个 `C#5 -> B4` 替换，其余 170/172 音
 - 带反复线且有公开逐音对齐真值的 Bach `BWV1005 mov4` 中，未展开谱与演奏真值均为 `1196` 个事件；盲目展开为 `2392`，绝对计数误差增加 `1196`。
 - 反复记号只说明印刷路线存在，不证明某次演奏实际执行反复。生产策略继续 fail-closed：检测到非平凡路线后输出 `repeat-route-review-required`，只有后续音频路线证据支持时才允许选择展开版本。报告：`data/experiments/western-strings-m4/repeat-route-probe/report.json`。
 - Op.45 的 `52.56%` 音频吻合率也不能归因于反复：修正后的同版候选与独立公开参考各有 `198` 个音，二者的 MusicXML 都没有反复方向标记。当前证据只支持“反复假设不成立/不可用”，不支持为提高吻合率而展开谱面。
+
+### 8.17 HOMR 接入生产变体池(v3,2026-07-17)
+
+按照片域复验结论(HOMR 真照片 P=88.3%/R=95.8%,四项全面领先 Audiveris)把 HOMR 接入 `western_photo_score_pipeline.py` 作第四池候选,走既有 B 层音频仲裁,学生端运行时闸门零改动:
+
+- **仲裁货币不变**:HOMR 候选与 up2/up2-otsu/up3 同用 `(confirmed, agreement)`,同一 `compute_verdicts` 判定纪律(覆盖端、严格绿判、曲级闸、双邻红判规则,自 `proto_western_strings_score_anchored_feedback.py` 抽出共用)。
+- **结构闸按引擎分证据源**:Audiveris 走 P0 v2(`.omr` 原始符号 + 导出双证);HOMR 无 `.omr`,新增 `evaluate_musicxml_only_structure`(全 G2 谱号 + violin 音域 ≥95% + 单一调号/隐式 C 大调 + 拍号存在且小节时值一致率 ≥90%),审计里 `evidenceSource: musicxml-only` 明示证据更弱。
+- **HOMR 胜出时无像素坐标**:输出 list 式逐小节判定 JSON(`annotationStyle: score-list`),不产标注照片;坐标适配器未建成前这是有意的降级形态。
+- **HOMR venv 缺失时**:候选记 `homr-unavailable`,池自动退化为纯 Audiveris 行为,决策永不因此阻塞。
+- **一致性修复**:标注图改为在曲级闸/双邻降级**之后**绘制——此前图上可能出现判定 JSON 已降为中性的红框,与 `accusationsRequireBothNeighborConfidence` 合同不一致。
+
+12 条 m2f 真件回归(缓存引擎输出,决策对照;P0 v2 严格闸生效):
+
+| 口径 | full/degraded(机器可用) | review | retake |
+|---|---|---|---|
+| 纯 Audiveris 池(P0 v2) | 3/12 | 8 | 1(ex07) |
+| **+HOMR 池(v3)** | **9/12**(homr 胜 8,up2 胜 1) | 3(ex04/07/08) | 0 |
+
+HOMR 只在自身结构证据自洽时获胜(8/12 过 MusicXML-only 闸):ex03 里 HOMR 货币最高(112/0.98)但拍号一致率不足被闸下,正确回落 `full-feedback:up2`;ex07(Audiveris 全变体无输出)由 retake 升为 review(57 confirmed@0.85,拍号证据不足不出反馈)。节奏车道纪律不变(OMR 谱不做节奏硬判),严格自动采纳继续关,`m4OmrAutoFeedbackReady` 仍 false。审计 `pipeline: western-photo-score-v3-homr-pool`,增 `winnerEngine`/`winnerAnnotationStyle`/`enginePool` 字段。
+
+同轮产线化波形错误注入工具 `inject_waveform_errors.py`(错音/漏音/多音/拖拍四型,15ms crossfade 手术,种子确定性,标签含期望判定):r2-01/r2-08 各 ×3 种子共 6 套、每套 19 处注入,输出于 `data/experiments/western-strings-injected-errors/`,按家规仅作前置闸证据,不单独解锁学生端。

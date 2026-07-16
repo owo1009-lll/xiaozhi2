@@ -636,6 +636,103 @@ def evaluate_p0_structure(
         }
 
 
+def evaluate_musicxml_only_structure(
+    musicxml_paths: Iterable[Path],
+    min_violin_range_rate: float = 0.95,
+    min_meter_consistency_rate: float = 0.9,
+) -> dict[str, Any]:
+    """Structure gate for engines that emit MusicXML only (no ``.omr`` graph).
+
+    Export-side counterpart of :func:`evaluate_p0_records`'s *structural*
+    evidence modes: without raw symbol grades or staff coverage, every
+    dimension must earn readiness from corroborated notation evidence alone
+    (all-G2 clefs + violin pitch range; single consistent key or implicit
+    zero; meter present + measure-duration consistency).  Weaker evidence
+    than the raw-corroborated P0 gate — tagged via ``evidenceSource``.
+    """
+    failure = {
+        "ready": False,
+        "clefReady": False,
+        "keyReady": False,
+        "meterReady": False,
+        "evidenceSource": "musicxml-only",
+    }
+    paths = list(musicxml_paths)
+    if not paths:
+        return {**failure, "reasons": ["musicxml-output-missing"]}
+    try:
+        exported = extract_musicxml_structure(_read_musicxml_root(path) for path in paths)
+    except Exception as exc:
+        return {
+            **failure,
+            "reasons": [f"structure-evidence-error:{type(exc).__name__}"],
+            "error": str(exc)[:300],
+            "musicxmlPaths": [str(path) for path in paths],
+        }
+    reasons: list[str] = []
+
+    exported_clefs = list(exported.get("clefs") or [])
+    violin_range_rate = exported.get("pitchInViolinRangeRate")
+    clef_ready = bool(
+        exported_clefs
+        and all(value == ("G", "2") for value in exported_clefs)
+        and isinstance(violin_range_rate, (int, float))
+        and violin_range_rate >= min_violin_range_rate
+    )
+    if not clef_ready:
+        reasons.append("clef-structural-evidence-insufficient")
+
+    exported_key_values = list(dict.fromkeys(exported.get("keys") or []))
+    # A single consistent exported key is corroborated notation evidence; an
+    # empty export in an otherwise clef-ready treble part is the C-major /
+    # A-minor implicit zero (same exception evaluate_p0_records grants).
+    key_ready = bool(len(exported_key_values) == 1 or (not exported_key_values and clef_ready))
+    if not key_ready:
+        reasons.append("key-signature-evidence-insufficient")
+
+    exported_meter_sequence = list(dict.fromkeys(tuple(value) for value in exported.get("meters") or []))
+    meter_consistency_rate = exported.get("measureDurationConsistencyRate")
+    meter_comparable_count = int(exported.get("measureDurationComparableCount") or 0)
+    meter_ready = bool(
+        exported_meter_sequence
+        and isinstance(meter_consistency_rate, (int, float))
+        and meter_comparable_count > 0
+        and meter_consistency_rate >= min_meter_consistency_rate
+    )
+    if not meter_ready:
+        reasons.append("meter-structural-evidence-insufficient")
+
+    return {
+        "ready": bool(clef_ready and key_ready and meter_ready),
+        "clefReady": clef_ready,
+        "keyReady": key_ready,
+        "meterReady": meter_ready,
+        "reasons": reasons,
+        "evidenceSource": "musicxml-only",
+        "thresholds": {
+            "minViolinRangeRate": min_violin_range_rate,
+            "minMeterConsistencyRate": min_meter_consistency_rate,
+        },
+        "evidence": {
+            "exportedClefs": [list(value) for value in dict.fromkeys(exported_clefs)],
+            "exportedKeyFifths": exported_key_values,
+            "keyEvidenceMode": (
+                "structural" if len(exported_key_values) == 1
+                else "implicit-zero-export-default" if key_ready
+                else "none"
+            ),
+            "exportedMeters": [list(value) for value in exported_meter_sequence],
+            "pitchMinMidi": exported.get("pitchMinMidi"),
+            "pitchMaxMidi": exported.get("pitchMaxMidi"),
+            "pitchInViolinRangeRate": violin_range_rate,
+            "measureDurationConsistencyRate": meter_consistency_rate,
+            "measureDurationComparableCount": meter_comparable_count,
+            "measureDurationMatchCount": exported.get("measureDurationMatchCount"),
+        },
+        "musicxmlPaths": [str(path) for path in paths],
+    }
+
+
 def read_omr_structure(path: Path) -> dict[str, Any]:
     """Public read-only adapter used by eval and focused-gold scripts."""
     return extract_raw_structure(_read_omr_roots(path))

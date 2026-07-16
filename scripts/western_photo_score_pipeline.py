@@ -4,14 +4,19 @@
 
 Single entry point for the M4 photo-score flow (layered gate, machine-only):
   1. Run Audiveris on preprocessing variants (up2 / up2-otsu / up3) of the photo
-     (cached per variant; skips variants already recognized).
-  2. Arbitrate variants with the student's recording (basic-pitch events):
+     (cached per variant; skips variants already recognized), plus HOMR on the
+     original photo as a fourth pool candidate (cached; skipped when the HOMR
+     venv is absent — the pool then degrades to Audiveris-only behavior).
+  2. Arbitrate candidates with the student's recording (basic-pitch events):
      winner needs >= MIN_CONFIRMED audio-confirmed notes and >= MIN_AGREEMENT
-     alignment agreement.
+     alignment agreement, and must pass its score-structure gate (Audiveris:
+     P0 raw+export evidence; HOMR: MusicXML-only export evidence).
   3. Emit decision:
        full-feedback:<variant>      annotated photo, greens/reds active
        degraded-feedback:<variant>  greens-only annotation, zero accusations
        retake-photo                 nothing recognizable / zero audio support
+     HOMR emits no pixel coordinates, so a HOMR winner ships list-style
+     per-measure feedback (verdicts JSON), not an annotated photo.
   4. Write an audit JSON (all candidates, metrics, decision, artifact paths).
 
 Fail-closed guarantees (manual M4 layered gate):
@@ -29,6 +34,7 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -39,9 +45,15 @@ sys.path.insert(0, str(REPO / "scripts" / "experiments"))
 from eval_western_strings_m4_real_jpg_omr import preprocess  # noqa: E402
 from eval_western_strings_m4_omr_render_gold import run_audiveris, DEFAULT_AUDIVERIS  # noqa: E402
 import proto_western_strings_score_anchored_feedback as anchor  # noqa: E402
-from western_m4_omr_structure import evaluate_p0_structure  # noqa: E402
+from western_m4_omr_structure import (  # noqa: E402
+    evaluate_musicxml_only_structure,
+    evaluate_p0_structure,
+)
 
 VARIANTS = ["up2", "up2-otsu", "up3"]
+HOMR_VARIANT = "homr"
+DEFAULT_HOMR = (REPO / "data" / "experiments" / "western-strings-m4"
+                / "homr-compat-venv" / "Scripts" / "homr.exe")
 MIN_CONFIRMED = 20
 MIN_AGREEMENT = 0.6
 
@@ -55,6 +67,53 @@ def recognize_variant(photo: Path, variant: str, work: Path, audiveris: Path, ti
     prep = preprocess(photo, vdir / f"{photo.stem}-{variant}.png", variant)
     run_audiveris(audiveris, prep, omr_dir, timeout)
     return vdir
+
+
+def recognize_homr(photo: Path, work: Path, homr_exe: Path, timeout: int) -> Path | None:
+    """HOMR the original photo (cached); returns the MusicXML path or None."""
+    vdir = work / HOMR_VARIANT
+    vdir.mkdir(parents=True, exist_ok=True)
+    got = sorted(vdir.glob("*.musicxml")) + sorted(vdir.glob("*.mxl"))
+    if got:
+        return got[0]
+    local = vdir / photo.name
+    if not local.is_file():
+        shutil.copyfile(photo, local)
+    with (vdir / "homr.log").open("wb") as log:
+        subprocess.run([str(homr_exe), local.name], cwd=vdir, stdout=log,
+                       stderr=subprocess.STDOUT, timeout=timeout, check=False)
+    got = sorted(vdir.glob("*.musicxml")) + sorted(vdir.glob("*.mxl"))
+    return got[0] if got else None
+
+
+def run_homr_candidate(name: str, mxl: Path, out_root: Path, aev: list[dict]) -> dict:
+    """Score a HOMR MusicXML with the SAME arbitration currency and verdict
+    discipline as the Audiveris variants. No pixel anchors exist, so feedback
+    is a per-measure verdict list (JSON), never an annotated photo."""
+    events = anchor.mxl_events(mxl)
+    verdicts, match, time_pred, agree, piece_gate = anchor.compute_verdicts(
+        events, aev, [False] * len(events))
+    counts = {v: verdicts.count(v) for v in anchor.COLORS}
+    out_dir = out_root / "annotated" / name
+    out_dir.mkdir(parents=True, exist_ok=True)
+    listing = out_dir / f"{name}-homr-verdicts.json"
+    listing.write_text(json.dumps(
+        {"piece": name, "variant": HOMR_VARIANT, "annotationStyle": "score-list",
+         "events": len(events), "audioNotes": len(aev),
+         "verdictCounts": counts, "audioAgreementHeard": round(agree, 4),
+         "pieceGate": piece_gate,
+         "perNote": [{"i": i, "measure": events[i]["measure"], "verdict": verdicts[i],
+                      "scoreMidis": events[i]["midis"],
+                      "audioMidis": aev[match[i]]["midis"] if match[i] is not None else None,
+                      "timingDeviationSec": (round(aev[match[i]]["start"] - time_pred[i], 3)
+                                             if match[i] is not None and time_pred is not None
+                                             else None)}
+                     for i in range(len(events))]},
+        ensure_ascii=False, indent=1), encoding="utf-8")
+    return {"status": "ok", "confirmed": counts["confirmed"],
+            "agreement": round(agree, 4), "pieceGate": piece_gate,
+            "annotated": None, "annotationStyle": "score-list",
+            "verdictListing": str(listing), "verdictCounts": counts}
 
 
 def decide(cands: list[dict]) -> str:
@@ -85,6 +144,7 @@ def main(argv=None) -> int:
     ap.add_argument("--piece", help="M2f shortcut: violin-exNN resolves photo/audio from data/private")
     ap.add_argument("--out", default=str(REPO / "data" / "analysis-photo-score"))
     ap.add_argument("--audiveris", default=str(DEFAULT_AUDIVERIS))
+    ap.add_argument("--homr", default=str(DEFAULT_HOMR))
     ap.add_argument("--timeout", type=int, default=420)
     args = ap.parse_args(argv)
 
@@ -105,7 +165,7 @@ def main(argv=None) -> int:
 
     cands = []
     for variant in VARIANTS:
-        row = {"variant": variant}
+        row = {"variant": variant, "engine": "audiveris"}
         try:
             vdir = recognize_variant(photo, variant, work, Path(args.audiveris), args.timeout)
             r = _run_variant(name, photo, audio, vdir, out_root, aev)
@@ -133,15 +193,37 @@ def main(argv=None) -> int:
             row.update({"status": f"error: {exc}"[:200], "confirmed": 0, "agreement": 0.0})
         cands.append(row)
 
+    homr_row = {"variant": HOMR_VARIANT, "engine": "homr"}
+    homr_exe = Path(args.homr)
+    if not homr_exe.is_file():
+        # missing venv degrades the pool to Audiveris-only; never blocks a decision
+        homr_row.update({"status": "homr-unavailable", "confirmed": 0, "agreement": 0.0})
+    else:
+        try:
+            mxl = recognize_homr(photo, work, homr_exe, args.timeout)
+            if mxl is None:
+                homr_row.update({"status": "omr-no-output", "confirmed": 0, "agreement": 0.0})
+            else:
+                homr_row.update(run_homr_candidate(name, mxl, out_root, aev))
+                homr_row["scoreStructureGate"] = evaluate_musicxml_only_structure([mxl])
+        except Exception as exc:
+            homr_row.update({"status": f"error: {exc}"[:200], "confirmed": 0, "agreement": 0.0})
+    cands.append(homr_row)
+
     decision = decide(cands)
     winner_variant = decision.split(":", 1)[1] if ":" in decision else None
+    winner_row = next((c for c in cands if c.get("variant") == winner_variant), None)
     audit = {
         "createdAt": datetime.now(timezone.utc).isoformat(),
-        "pipeline": "western-photo-score-v2-p0",
+        "pipeline": "western-photo-score-v3-homr-pool",
         "p0StructureGateVersion": 2,
+        "enginePool": [f"audiveris:{v}" for v in VARIANTS] + [HOMR_VARIANT],
         "photo": str(photo), "audio": str(audio),
         "decision": decision,
         "winnerVariant": winner_variant,
+        "winnerEngine": (winner_row or {}).get("engine"),
+        "winnerAnnotationStyle": (winner_row or {}).get("annotationStyle",
+                                                        "pixel-anchored" if winner_row else None),
         "candidates": cands,
         "thresholds": {"minConfirmed": MIN_CONFIRMED, "minAgreement": MIN_AGREEMENT},
         "failClosed": {"studentRuntimeTouched": False,
@@ -152,7 +234,7 @@ def main(argv=None) -> int:
     (out_root / "audit.json").write_text(json.dumps(audit, ensure_ascii=False, indent=1), encoding="utf-8")
     print(json.dumps({"decision": decision, "audit": str(out_root / "audit.json"),
                       "p0StructureGateVersion": 2,
-                      "candidates": [{k: c.get(k) for k in ("variant", "status", "confirmed", "agreement")}
+                      "candidates": [{k: c.get(k) for k in ("variant", "engine", "status", "confirmed", "agreement")}
                                      for c in cands]}, ensure_ascii=False))
     return 0
 
