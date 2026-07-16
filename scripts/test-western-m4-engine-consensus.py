@@ -10,6 +10,7 @@ sys.path.insert(0, str(EXPERIMENTS))
 from eval_western_strings_m4_engine_consensus import (  # noqa: E402
     Note,
     evaluate_selection,
+    read_oemer_coordinates,
     select_anchor_indexes,
 )
 
@@ -19,6 +20,15 @@ def note(midi: int, onset: float, measure: int = 1) -> Note:
 
 
 def main() -> int:
+    coordinates, canvas = read_oemer_coordinates({}, 0)
+    assert coordinates == {}
+    assert canvas == ""
+    coordinates, canvas = read_oemer_coordinates(
+        {"coordinateAdapterReady": True},
+        1,
+    )
+    assert coordinates == {}
+    assert canvas == ""
     anchor = [note(60, 0), note(62, 1), note(64, 2)]
     homr = [note(60, 0), note(62, 1.1), note(65, 2)]
     mapping = {0: 0, 1: 1, 2: 2}

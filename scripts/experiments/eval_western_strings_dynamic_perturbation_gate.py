@@ -169,6 +169,9 @@ def evaluate_scenario(
                 {
                     "unit": unit,
                     "noteIndex": int(row["noteIndex"]),
+                    "midi": int(row["midi"]),
+                    "goldTime": round(float(row["goldTime"]), 6),
+                    "predictedTime": round(float(assignment["time"]), 6) if assignment else None,
                     "target": key in target_keys,
                     "selected": is_selected,
                     "onsetErrorSeconds": round(onset_error, 6) if onset_error is not None else None,

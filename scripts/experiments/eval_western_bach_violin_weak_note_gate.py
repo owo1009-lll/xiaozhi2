@@ -52,6 +52,11 @@ FEATURE_NAMES = (
     "rms100VsLocalDb",
     "rms250VsLocalDb",
     "peak100VsUnitDb",
+    "post30To80RmsVsUnitDb",
+    "post30To80RmsVsLocalDb",
+    "post30To150RmsVsUnitDb",
+    "post30To150RmsVsLocalDb",
+    "post30To80PeakVsUnitDb",
     "eventConfidence",
     "eventDurationSeconds",
     "eventStartDeltaSeconds",
@@ -78,6 +83,17 @@ def centered_segment(
     start = max(0, int(round((center_seconds - half) * sample_rate)))
     end = min(len(waveform), int(round((center_seconds + half) * sample_rate)))
     return waveform[start:end]
+
+
+def bounded_segment(
+    waveform: np.ndarray,
+    sample_rate: int,
+    start_seconds: float,
+    end_seconds: float,
+) -> np.ndarray:
+    start = max(0, int(round(start_seconds * sample_rate)))
+    end = min(len(waveform), int(round(end_seconds * sample_rate)))
+    return waveform[start:max(start, end)]
 
 
 def frame_rms_values(
@@ -111,15 +127,19 @@ def extract_features(
     sample_rate: int,
     row: dict[str, Any],
     events: list[dict[str, Any]],
+    *,
+    unit_rms: float | None = None,
+    event_index: dict[Any, Any] | None = None,
 ) -> list[float]:
     predicted_time = float(row["predictedTime"])
-    unit_values = frame_rms_values(
-        waveform,
-        sample_rate,
-        0.0,
-        len(waveform) / sample_rate,
-    )
-    unit_rms = float(np.median(unit_values)) if unit_values else rms(waveform)
+    if unit_rms is None:
+        unit_values = frame_rms_values(
+            waveform,
+            sample_rate,
+            0.0,
+            len(waveform) / sample_rate,
+        )
+        unit_rms = float(np.median(unit_values)) if unit_values else rms(waveform)
     local_values = frame_rms_values(
         waveform,
         sample_rate,
@@ -134,8 +154,25 @@ def extract_features(
     rms100 = rms(segment100)
     rms250 = rms(segment250)
     peak100 = float(np.max(np.abs(segment100))) if len(segment100) else 0.0
+    post30_to_80 = bounded_segment(
+        waveform,
+        sample_rate,
+        predicted_time + 0.03,
+        predicted_time + 0.08,
+    )
+    post30_to_150 = bounded_segment(
+        waveform,
+        sample_rate,
+        predicted_time + 0.03,
+        predicted_time + 0.15,
+    )
+    post30_to_80_rms = rms(post30_to_80)
+    post30_to_150_rms = rms(post30_to_150)
+    post30_to_80_peak = (
+        float(np.max(np.abs(post30_to_80))) if len(post30_to_80) else 0.0
+    )
 
-    event_index = build_event_index(events)
+    event_index = event_index if event_index is not None else build_event_index(events)
     candidates = nearby_event_indices(
         event_index,
         int(row["midi"]),
@@ -161,6 +198,11 @@ def extract_features(
         safe_db_ratio(rms100, local_rms),
         safe_db_ratio(rms250, local_rms),
         safe_db_ratio(peak100, unit_rms),
+        safe_db_ratio(post30_to_80_rms, unit_rms),
+        safe_db_ratio(post30_to_80_rms, local_rms),
+        safe_db_ratio(post30_to_150_rms, unit_rms),
+        safe_db_ratio(post30_to_150_rms, local_rms),
+        safe_db_ratio(post30_to_80_peak, unit_rms),
         event_confidence,
         event_duration,
         event_delta,
@@ -267,6 +309,22 @@ def load_split_examples(
         )
         if sample_rate != weak_sample_rate:
             raise RuntimeError(f"sample-rate-mismatch:{unit}")
+        clean_unit_values = frame_rms_values(
+            clean_waveform,
+            sample_rate,
+            0.0,
+            len(clean_waveform) / sample_rate,
+        )
+        clean_unit_rms = float(np.median(clean_unit_values)) if clean_unit_values else rms(clean_waveform)
+        weak_unit_values = frame_rms_values(
+            weak_waveform,
+            weak_sample_rate,
+            0.0,
+            len(weak_waveform) / weak_sample_rate,
+        )
+        weak_unit_rms = float(np.median(weak_unit_values)) if weak_unit_values else rms(weak_waveform)
+        clean_event_index = build_event_index(clean_events[unit])
+        weak_event_index = build_event_index(weak_events[unit])
         for target in targets:
             if str(target["unit"]) != unit:
                 continue
@@ -285,6 +343,8 @@ def load_split_examples(
                         sample_rate,
                         target,
                         clean_events[unit],
+                        unit_rms=clean_unit_rms,
+                        event_index=clean_event_index,
                     ),
                 }
             )
@@ -300,6 +360,8 @@ def load_split_examples(
                         weak_sample_rate,
                         target,
                         weak_events[unit],
+                        unit_rms=weak_unit_rms,
+                        event_index=weak_event_index,
                     ),
                 }
             )
@@ -403,7 +465,7 @@ def build_models() -> dict[str, Any]:
             min_samples_leaf=4,
             class_weight="balanced",
             random_state=7,
-            n_jobs=-1,
+            n_jobs=2,
         ),
         "extra-trees": ExtraTreesClassifier(
             n_estimators=500,
@@ -411,7 +473,7 @@ def build_models() -> dict[str, Any]:
             min_samples_leaf=4,
             class_weight="balanced",
             random_state=7,
-            n_jobs=-1,
+            n_jobs=2,
         ),
         "hist-gradient-boosting": HistGradientBoostingClassifier(
             max_depth=2,

@@ -312,6 +312,10 @@ HF2 Hardanger Fiddle 的 119 对 WAV/MIDI 已完成只读审计，其中 100 条
 
 同日继续对弱音缺口做 `2016` 个联合操作点 sweep（相对 IOI、事件置信度、相对邻音置信度、事件时长）。开发集不存在“全部错误零漏放且 coverage>=20%”的点；最佳零漏放点 coverage=`16.57%`，冻结到未见演奏者后 precision=`97.88%`、coverage=`15.95%`，仍漏放弱音 `2/48`。结论是这些运行时阈值可以把弱音漏放从 `12/48` 压到 `2/48`，但不能在产品覆盖地板之上清零；不再靠继续调同一组阈值假装解决。
 
+随后将弱音特征改为起音后的因果窗（30–80ms、30–150ms），避免上一音/连奏能量污染，并只作为此前已冻结动态点的否决器。5 个浅层能量模型全部同意时，未见演奏者的 48 弱音、48 漏音、48 错音和 48 晚起音均为 0 危险放行；clean precision=`98.05%`、coverage=`15.79%`，弱音扰动后的 coverage=`15.57%`。这证明安全回退子集可以清零合成错误漏放，但 clean coverage 仍低于 20% 发布地板，且参考时间/错误均非真实学生真值；因此 `releaseCoverageReady=false`、`studentGateReady=false`。
+
+M4 共识候选也已接入 Oemer 音头坐标 sidecar。原 `344/344` 高精度共识候选中，152 个可严格映射到干净 dewarp 画布上的 bbox，坐标化子集仍为 `152/152` 正确、gold coverage=`9.71%`；其余 192 个来自 Oemer builder 失败的 `ex05`，保持 `reviewLocatorReady=false`，不伪造坐标。坐标定位覆盖为 `44.19%`，可用于研究/教师复核候选，但 `runtimeCoordinateAdapterReady=false`、学生端仍关闭。
+
 先预览,确认目标仅为可再生环境、调试目录、构建产物和 Python 缓存:
 
 ```bash

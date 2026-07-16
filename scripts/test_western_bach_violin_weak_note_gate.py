@@ -48,6 +48,11 @@ class BachViolinWeakNoteGateTest(unittest.TestCase):
     def test_safe_db_ratio_is_finite_at_silence(self) -> None:
         self.assertTrue(np.isfinite(MODULE.safe_db_ratio(0.0, 0.0)))
 
+    def test_bounded_segment_uses_only_post_onset_samples(self) -> None:
+        waveform = np.arange(20, dtype=np.float64)
+        segment = MODULE.bounded_segment(waveform, 10, 0.3, 0.8)
+        np.testing.assert_array_equal(segment, np.arange(3, 8, dtype=np.float64))
+
 
 if __name__ == "__main__":
     unittest.main()

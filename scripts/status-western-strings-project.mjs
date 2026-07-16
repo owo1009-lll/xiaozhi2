@@ -448,6 +448,13 @@ const M4_AUDIO_RHYTHM_RANKING = path.join(
   "audio-rhythm-ranking",
   "report.json",
 );
+const M4_ENGINE_CONSENSUS = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "engine-consensus",
+  "report.json",
+);
 const MEASURE_POLICY_AUDIT = path.join(
   "data",
   "experiments",
@@ -460,6 +467,13 @@ const DYNAMIC_PERTURBATION_GATE = path.join(
   "experiments",
   "western-strings-m3",
   "dynamic-perturbation-gate",
+  "report.json",
+);
+const DYNAMIC_WEAK_COMBINED_GATE = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "dynamic-weak-combined-gate",
   "report.json",
 );
 const RELEASE_REVIEW = path.join(
@@ -1390,6 +1404,7 @@ async function buildM4OmrStatus() {
   const provenanceAudit = await readJson(M4_GOLD_PROVENANCE_AUDIT);
   const rhythmCandidateOracle = await readJson(M4_RHYTHM_CANDIDATE_ORACLE);
   const audioRhythmRanking = await readJson(M4_AUDIO_RHYTHM_RANKING);
+  const engineConsensus = await readJson(M4_ENGINE_CONSENSUS);
   const readinessReady = Boolean(readiness?.gate?.m4OmrBenchmarkDatasetReady);
   const benchmarkEvaluated = Boolean(benchmark?.gate?.m4OmrBenchmarkEvaluated);
   const draftQualityReady = Boolean(benchmark?.gate?.m4OmrDraftQualityReady);
@@ -1460,6 +1475,9 @@ async function buildM4OmrStatus() {
     m4AudioRhythmRankingGatePassed: audioRhythmRanking?.summary?.evalOnlyGatePassed === true,
     m4MeasureAudioRhythmRankingGatePassed:
       audioRhythmRanking?.measureLevel?.leaveOnePieceOut?.evalOnlyGatePassed === true,
+    m4EngineConsensusPilotSafeSubsetFound:
+      engineConsensus?.pilotSafeSubsetFound === true,
+    m4EngineConsensusRuntimeReady: engineConsensus?.runtimeReady === true,
     studentGateReady: false,
     teacherReviewNeeded: false,
     scoreEditorReviewNeeded: humanTask !== "none",
@@ -1495,6 +1513,7 @@ async function buildM4OmrStatus() {
       goldProvenanceAuditCsv: M4_GOLD_PROVENANCE_AUDIT_CSV.replace(/\\/g, "/"),
       rhythmCandidateOracleJson: M4_RHYTHM_CANDIDATE_ORACLE.replace(/\\/g, "/"),
       audioRhythmRankingJson: M4_AUDIO_RHYTHM_RANKING.replace(/\\/g, "/"),
+      engineConsensusJson: M4_ENGINE_CONSENSUS.replace(/\\/g, "/"),
       readinessCsv: String(readiness?.artifacts?.csv || "data/experiments/western-strings-m4/omr-readiness.csv").replace(/\\/g, "/"),
       benchmarkCsv: String(benchmark?.artifacts?.csv || "data/experiments/western-strings-m4/omr-benchmark.csv").replace(/\\/g, "/"),
     },
@@ -1546,6 +1565,19 @@ async function buildM4OmrStatus() {
       missing: true,
       complete: false,
       automaticAdoptionReady: false,
+      studentGateReady: false,
+    },
+    engineConsensus: engineConsensus ? {
+      source: M4_ENGINE_CONSENSUS.replace(/\\/g, "/"),
+      pilotSafeSubsetFound: engineConsensus.pilotSafeSubsetFound === true,
+      runtimeReady: engineConsensus.runtimeReady === true,
+      summaries: engineConsensus.summaries || {},
+      coordinatePolicy: engineConsensus.coordinatePolicy || {},
+      studentGateReady: false,
+    } : {
+      source: M4_ENGINE_CONSENSUS.replace(/\\/g, "/"),
+      missing: true,
+      runtimeReady: false,
       studentGateReady: false,
     },
     homrBenchmark: homrBenchmark ? {
@@ -1943,6 +1975,7 @@ export async function buildProjectStatus(args = {}) {
     violinMidiAudit,
     measurePolicyAudit,
     dynamicPerturbationGate,
+    dynamicWeakCombinedGate,
   ] = await Promise.all([
     buildControlledStatus(),
     buildM3PlusStatus(),
@@ -1959,6 +1992,7 @@ export async function buildProjectStatus(args = {}) {
     readJson(VIOLIN_MIDI_AUDIT),
     readJson(MEASURE_POLICY_AUDIT),
     readJson(DYNAMIC_PERTURBATION_GATE),
+    readJson(DYNAMIC_WEAK_COMBINED_GATE),
   ]);
   const controlledPilotSession = controlledPilotSessions.find((session) => session.executionPerformed === true)
     || controlledPilotSessions[0]
@@ -2029,6 +2063,20 @@ export async function buildProjectStatus(args = {}) {
       publicAllPerturbationGateReady:
         dynamicPerturbationGate.publicAllPerturbationGateReady === true,
       jointSafetyProbe: dynamicPerturbationGate.jointSafetyProbe || {},
+      combinedWeakGate: dynamicWeakCombinedGate ? {
+        source: DYNAMIC_WEAK_COMBINED_GATE.replace(/\\/g, "/"),
+        exploratorySafeFallbackHoldoutPassed:
+          dynamicWeakCombinedGate.exploratorySafeFallbackHoldoutPassed === true,
+        releaseCoverageReady: dynamicWeakCombinedGate.releaseCoverageReady === true,
+        holdout: dynamicWeakCombinedGate.holdout || {},
+        blockingReasons: dynamicWeakCombinedGate.blockingReasons || [],
+        studentGateReady: false,
+      } : {
+        source: DYNAMIC_WEAK_COMBINED_GATE.replace(/\\/g, "/"),
+        missing: true,
+        releaseCoverageReady: false,
+        studentGateReady: false,
+      },
       blockingReasons: dynamicPerturbationGate.blockingReasons || [],
       studentGateReady: false,
     } : {

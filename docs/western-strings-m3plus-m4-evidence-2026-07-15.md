@@ -126,6 +126,12 @@
 
 Oemer 内部音头原本带 bbox,但 CLI 丢弃坐标。新增隔离 runner 在真正写入 MusicXML 音符后输出坐标 sidecar 与干净 dewarp 画布。正式 5 页照片基准中 4 个成功页均实现 XML 音符与坐标一一对应(`363/363`,`361/361`,`323/323`,`324/324`),`ex05` 仍为原 builder 失败；坐标读取采用逐音 fail-closed 校验。该改动只补足复核定位能力,没有改善 Oemer 的 P/R,报告固定 `studentFacing=false`。
 
+进一步把 Oemer 索引通过跨引擎序列映射接到多引擎共识候选。344 个共识音中 152 个取得可验证的 `canvasPath+bboxNormalized`，坐标化子集对独立 gold 为 `152/152`、precision=`100%`、gold coverage=`9.71%`；剩余 192 个均在 Oemer 失败页 `ex05`，显式保留 `reviewLocatorReady=false`。定位覆盖 `44.19%` 尚不足运行时接入，但教师复核可只消费这 152 个有框候选。
+
+### 6.5 动态证据与弱音因果窗联合闸门
+
+弱音模型原先使用以起音为中心的 100/250ms 窗，连奏中会把上一音能量计入目标音。新增起音后 30–80ms、30–150ms 因果窗，并固定使用上一轮开发集已冻结的动态参数，不允许能量模型重新放宽错音/节奏门槛。5 个浅层模型全部通过才保留候选；未见演奏者上 192 个合成错误目标（弱音/漏音/升高两半音/晚起各 48）均为 0 危险放行，clean precision=`98.05%`、coverage=`15.79%`，弱音扰动后的 coverage=`15.57%`。安全性改善成立，但 clean coverage 低于 20% 发布地板，且仍缺真实学生逐音盲验，故只记为 eval-only 安全回退。
+
 ## 7. 当前裁决
 
 1. M3+ 路线保留：完成真实补充录音后，按模式做正负标定、三态质量闸门和留一曲验证。
@@ -137,6 +143,7 @@ Oemer 内部音头原本带 bbox,但 CLI 丢弃坐标。新增隔离 runner 在�
 
 7. M4 多引擎共识与普通录音动态定位均有实质增益，但在独立盲验完成前只作为 review 候选，不自动给学生结论。
 8. 公开波形核心扰动上动态音高+相对 IOI 达到 98.77% precision / 25.89% coverage 且核心错误零漏放；弱音与真实学生逐音真值未过闸，故不改变默认关闭状态。
+9. 因果弱音窗可在冻结动态点上清零公开合成扰动漏放，但 clean coverage 仅 15.79%（弱音扰动 15.57%），低于发布地板；坐标化 M4 共识可直接画框 152 音，但只覆盖 44.19% 共识候选。两者均不自动放行。
 
 ## 8. 可复现命令
 
@@ -149,6 +156,7 @@ npm run western:m4-audio-rhythm-ranking
 npm run western:m4-engine-consensus
 npm run western:offline-dynamic-timing-audit
 npm run western:dynamic-perturbation-gate
+npm run western:dynamic-weak-combined-gate
 
 npm run test:western-m3plus-supplemental-eval
 npm run test:western-photo-score

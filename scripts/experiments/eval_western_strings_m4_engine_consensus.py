@@ -76,6 +76,53 @@ def read_notes(value: Any) -> list[Note]:
     return parse_notes_many(paths)
 
 
+def read_oemer_coordinates(
+    row: dict[str, Any],
+    expected_note_count: int,
+) -> tuple[dict[int, dict[str, Any]], str]:
+    if row.get("coordinateAdapterReady") is not True:
+        return {}, ""
+    sidecar_value = row.get("coordinateSidecarPath")
+    canvas_value = row.get("coordinateCanvasPath")
+    if not sidecar_value or not canvas_value:
+        return {}, ""
+    sidecar = repo_path(sidecar_value)
+    canvas = repo_path(canvas_value)
+    if not sidecar.is_file() or not canvas.is_file():
+        return {}, ""
+    payload = read_report(sidecar)
+    notes = payload.get("notes") or []
+    if (
+        payload.get("coordinateSpace") != "oemer-clean-dewarped-canvas"
+        or int(payload.get("coordinateNoteCount") or -1) != expected_note_count
+        or len(notes) != expected_note_count
+    ):
+        return {}, ""
+    coordinates: dict[int, dict[str, Any]] = {}
+    for note in notes:
+        index = note.get("xmlPitchedNoteIndex")
+        bbox = note.get("bboxNormalized")
+        center = note.get("centerPixels")
+        if (
+            not isinstance(index, int)
+            or not isinstance(bbox, list)
+            or len(bbox) != 4
+            or not all(isinstance(value, (int, float)) for value in bbox)
+            or not isinstance(center, list)
+            or len(center) != 2
+            or not all(isinstance(value, (int, float)) for value in center)
+        ):
+            return {}, ""
+        coordinates[index] = {
+            "bboxNormalized": [round(float(value), 8) for value in bbox],
+            "centerPixels": [round(float(value), 3) for value in center],
+            "measureIndex": int(note.get("measureIndex") or 0),
+        }
+    if set(coordinates) != set(range(expected_note_count)):
+        return {}, ""
+    return coordinates, str(canvas.relative_to(REPO)).replace("\\", "/")
+
+
 def local_onsets(notes: list[Note]) -> list[float]:
     starts: dict[int, float] = {}
     for note in notes:
@@ -232,6 +279,10 @@ def build_report(
             for name, notes in engines.items()
             if notes
         }
+        oemer_coordinates, oemer_canvas = read_oemer_coordinates(
+            oemer_rows.get(piece_id, {}),
+            len(engines.get("oemer") or []),
+        )
         mode_specs = {
             "audiverisHomrPitch": (("homr",), None),
             "audiverisHomrPitchLocalOnset25": (("homr",), 0.25),
@@ -243,6 +294,7 @@ def build_report(
             ),
         }
         mode_results: dict[str, Any] = {}
+        coordinate_ready_selected: list[int] = []
         for mode, (required, onset_tolerance) in mode_specs.items():
             if not all(name in engines and engines[name] for name in required):
                 selected: list[int] = []
@@ -257,14 +309,34 @@ def build_report(
             mode_results[mode] = evaluate_selection(gold, anchor, selected)
             if mode == "allAvailablePitchLocalOnset25":
                 for anchor_index in selected:
-                    selected_notes.append(
-                        {
-                            "pieceId": piece_id,
-                            "audiverisNoteIndex": anchor_index,
-                            "midi": anchor[anchor_index].midi,
-                            "measureIndex": anchor[anchor_index].measure_index,
-                        }
-                    )
+                    candidate = {
+                        "pieceId": piece_id,
+                        "audiverisNoteIndex": anchor_index,
+                        "midi": anchor[anchor_index].midi,
+                        "measureIndex": anchor[anchor_index].measure_index,
+                        "reviewLocatorReady": False,
+                    }
+                    oemer_index = maps.get("oemer", {}).get(anchor_index)
+                    coordinate = oemer_coordinates.get(oemer_index) if oemer_index is not None else None
+                    if coordinate is not None and oemer_canvas:
+                        candidate.update(
+                            {
+                                "reviewLocatorReady": True,
+                                "reviewLocator": {
+                                    "engine": "oemer",
+                                    "oemerNoteIndex": oemer_index,
+                                    "canvasPath": oemer_canvas,
+                                    **coordinate,
+                                },
+                            }
+                        )
+                        coordinate_ready_selected.append(anchor_index)
+                    selected_notes.append(candidate)
+        mode_results["coordinateReadyAllAvailablePitchLocalOnset25"] = evaluate_selection(
+            gold,
+            anchor,
+            coordinate_ready_selected,
+        )
         per_piece.append(
             {
                 "pieceId": piece_id,
@@ -282,9 +354,13 @@ def build_report(
         "audiverisOemerPitch",
         "allThreePitch",
         "allAvailablePitchLocalOnset25",
+        "coordinateReadyAllAvailablePitchLocalOnset25",
     ]
     summaries = {mode: aggregate(per_piece, mode) for mode in modes}
     candidate = summaries["allAvailablePitchLocalOnset25"]
+    coordinate_candidate = summaries["coordinateReadyAllAvailablePitchLocalOnset25"]
+    locator_ready_count = sum(bool(row.get("reviewLocatorReady")) for row in selected_notes)
+    locator_coverage = locator_ready_count / len(selected_notes) if selected_notes else 0.0
     pilot_safe_subset_found = bool(
         candidate["precision"] is not None
         and candidate["precision"] >= MIN_PRECISION
@@ -297,6 +373,7 @@ def build_report(
         and candidate["goldCoverage"] >= MIN_GOLD_COVERAGE
         and candidate["allPiecesPassed"]
         and all(row["audiverisOmrPath"] for row in per_piece)
+        and locator_coverage == 1.0
     )
     return {
         "createdAt": datetime.now(timezone.utc).isoformat(),
@@ -309,13 +386,18 @@ def build_report(
         },
         "anchorEngine": "audiveris-up2",
         "coordinatePolicy": {
-            "candidateSource": "audiveris .omr",
+            "candidateSource": "audiveris anchor plus mapped Oemer bbox sidecar",
             "selectedRowsCarryAudiverisNoteIndex": True,
-            "runtimeCoordinateAdapterReady": runtime_ready,
+            "selectedRowsCarryReviewLocator": True,
+            "reviewLocatorReadyCount": locator_ready_count,
+            "selectedCandidateCount": len(selected_notes),
+            "reviewLocatorCoverage": round(locator_coverage, 6),
+            "coordinateReadySubset": coordinate_candidate,
+            "runtimeCoordinateAdapterReady": bool(selected_notes and locator_coverage == 1.0),
             "reason": (
                 "all-per-piece-consensus-gates-passed"
                 if runtime_ready
-                else "consensus-subset-not-safe-on-every-piece"
+                else "consensus-or-review-locator-gate-not-passed-on-every-piece"
             ),
         },
         "summaries": summaries,
