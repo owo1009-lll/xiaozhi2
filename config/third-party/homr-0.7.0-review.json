@@ -110,10 +110,12 @@
     }
   ],
   "modelLicenseReview": {
-    "status": "unresolved",
-    "basis": "The required runtime contains three HOMR checkpoint files and three RapidOCR ONNX files. No named reviewer has yet recorded a license basis covering the complete six-file runtime model set.",
-    "controlledOfflineUseConfirmedByReviewer": false,
-    "redistributionAllowed": false
+    "status": "reviewer-confirmed-for-controlled-offline-use",
+    "basis": "Six-file runtime model set reviewed against upstream sources. (1) homr checkpoints segnet_308-3296ccd4.onnx, encoder_pytorch_model_396-f6feedb4.onnx, decoder_pytorch_model_396-f6feedb4.onnx: distributed via the homr GitHub release 'onnx_checkpoints' inside the AGPL-3.0 repository github.com/liebharc/homr; the release page states only 'Pretrained onnx models for homr' with no separate license, so the repository AGPL-3.0 LICENSE (local copy hash-bound in this record) governs. (2) rapidocr models ch_ppocr_mobile_v2.0_cls_mobile.onnx, PP-OCRv6_det_small.onnx, PP-OCRv6_rec_small.onnx: shipped with the Apache-2.0 RapidOCR project (github.com/RapidAI/RapidOCR) as ONNX conversions of Baidu PaddleOCR models; the PaddleOCR repository is Apache-2.0 and the RapidOCR README states OCR model copyright is held by Baidu with no separate model license published. Both AGPL-3.0 and Apache-2.0 permit controlled offline execution of unmodified artifacts; because the model weights carry no independent license text, redistribution stays prohibited and the approved scope is controlled-offline-review-only via the unmodified external CLI subprocess contract.",
+    "controlledOfflineUseConfirmedByReviewer": true,
+    "redistributionAllowed": false,
+    "reviewedBy": "guanxingzhi (project owner; evidence review delegated to Claude agent, 2026-07-17)",
+    "reviewedAt": "2026-07-17T08:01:15.992Z"
   },
   "deployment": {
     "status": "host-ready-governance-pending",
@@ -127,20 +129,90 @@
     "notes": "The tracked offline setup and preflight target data/tools/homr-0.7.0-ort1.27.0 and a separate audio interpreter. The current host passes audio, Audiveris, HOMR, dependency, provider, complete wheel RECORD, METADATA, LICENSE, retained-wheel, and six-model checks; full deployment remains closed because the named license/model review and approval binding are pending. Local wheelhouse, models, and runtimes remain gitignored deployment artifacts."
   },
   "decision": {
-    "status": "pending",
-    "reviewedBy": "",
-    "reviewedAt": "",
-    "approvedScopes": [],
-    "controlledOfflineReviewApproved": false,
+    "status": "approved-with-conditions",
+    "reviewedBy": "guanxingzhi (project owner; evidence review delegated to Claude agent, 2026-07-17)",
+    "reviewedAt": "2026-07-17T08:01:15.992Z",
+    "approvedScopes": [
+      "controlled-offline-review-only"
+    ],
+    "controlledOfflineReviewApproved": true,
     "studentFacingNetworkUseApproved": false,
     "redistributionApproved": false,
-    "notes": "No reviewer decision has been recorded. This record must remain fail-closed until a named reviewer explicitly confirms the bounded offline scope and model-license basis.",
+    "notes": "AGPL-3.0 network-interaction obligations (section 13) re-trigger this review before any student-facing network use; invalidatedBy already enumerates that trigger. Evidence verified 2026-07-17 against live upstream pages and local hash-bound artifacts.",
     "confirmations": {
-      "controlledOfflineOnly": false,
-      "modelLicenseBasisReviewed": false,
-      "noModelRedistribution": false
+      "controlledOfflineOnly": true,
+      "modelLicenseBasisReviewed": true,
+      "noModelRedistribution": true
     },
-    "approvalBinding": null
+    "approvalBinding": {
+      "bindingVersion": 2,
+      "componentVersion": "0.7.0",
+      "integrationContractVersion": 1,
+      "executable": {
+        "bindingMode": "record-verified-console-entry-point",
+        "relativePath": "Scripts/homr.exe",
+        "recordEntry": "../../Scripts/homr.exe",
+        "consoleEntryPoint": "homr=homr.main:main"
+      },
+      "wheelArchive": {
+        "bytes": 94436,
+        "sha256": "84c6028df06e60b1aff158c9049d1876b22137144e319b61bacc41518842c4a9"
+      },
+      "portableRecord": {
+        "algorithm": "sha256-normalized-lf-excluding-path-sensitive-launcher-row-v1",
+        "excludedEntry": "../../Scripts/homr.exe",
+        "lineCount": 87,
+        "sha256": "80cb776b0778c8cc292aa1cfe781f49bf3a15c73a2fe4fd40a336970a82389ec",
+        "hashedFileCount": 49
+      },
+      "metadataSha256": "9b70e2414638f2d7ebb994942e2c42ac3b4b156fc31191d952d58e37e31ca8c3",
+      "licenseSha256": "a6de0dc64ada3b5141517c0167b109dfc2adb3d1d8b27ff1745f337331b2a5f4",
+      "deploymentTargetRuntimeRoot": "data/tools/homr-0.7.0-ort1.27.0",
+      "modelArtifacts": [
+        {
+          "package": "homr",
+          "relativePath": "segmentation/segnet_308-3296ccd40960f90ca6ab9c035cca945675d30a0f.onnx",
+          "name": "segnet_308-3296ccd40960f90ca6ab9c035cca945675d30a0f.onnx",
+          "bytes": 57311361,
+          "sha256": "6ed36640db4ef5d223098b6d5efe4eda97c66b24a2c72faab8a018c749003a8d"
+        },
+        {
+          "package": "homr",
+          "relativePath": "transformer/decoder_pytorch_model_396-f6feedb42ff90087d898b0941a55d040fa6b2903.onnx",
+          "name": "decoder_pytorch_model_396-f6feedb42ff90087d898b0941a55d040fa6b2903.onnx",
+          "bytes": 47299551,
+          "sha256": "3e10fd5ae52d0b86792721922fcd954c283a7ed365de7446425bdabe38f3e57d"
+        },
+        {
+          "package": "homr",
+          "relativePath": "transformer/encoder_pytorch_model_396-f6feedb42ff90087d898b0941a55d040fa6b2903.onnx",
+          "name": "encoder_pytorch_model_396-f6feedb42ff90087d898b0941a55d040fa6b2903.onnx",
+          "bytes": 52861122,
+          "sha256": "4c16df852b3789f2676b0d49f0545dab0740e4005f7b472c5252add642f5d5eb"
+        },
+        {
+          "package": "rapidocr",
+          "relativePath": "models/ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+          "name": "ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+          "bytes": 585532,
+          "sha256": "e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c"
+        },
+        {
+          "package": "rapidocr",
+          "relativePath": "models/PP-OCRv6_det_small.onnx",
+          "name": "PP-OCRv6_det_small.onnx",
+          "bytes": 9929594,
+          "sha256": "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f"
+        },
+        {
+          "package": "rapidocr",
+          "relativePath": "models/PP-OCRv6_rec_small.onnx",
+          "name": "PP-OCRv6_rec_small.onnx",
+          "bytes": 21234383,
+          "sha256": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884"
+        }
+      ]
+    }
   },
   "invalidatedBy": [
     "homr-version-change",

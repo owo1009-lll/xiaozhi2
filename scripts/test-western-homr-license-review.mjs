@@ -19,16 +19,38 @@ function check(name, condition) {
   checks.push(name);
 }
 
-check("authoritative-record-remains-pending", authoritative.decision?.status === "pending");
-check("pending-record-has-no-reviewer", authoritative.decision?.reviewedBy === "");
-check("pending-record-approves-no-scope", authoritative.decision?.controlledOfflineReviewApproved === false);
+const decisionStatus = authoritative.decision?.status;
+check("authoritative-decision-status-is-known",
+  ["pending", "approved-with-conditions", "deferred"].includes(decisionStatus));
+if (decisionStatus === "pending") {
+  check("pending-record-has-no-reviewer", authoritative.decision?.reviewedBy === "");
+  check("pending-record-approves-no-scope", authoritative.decision?.controlledOfflineReviewApproved === false);
+} else if (decisionStatus === "approved-with-conditions") {
+  check("approved-record-names-reviewer", String(authoritative.decision?.reviewedBy || "").trim() !== "");
+  check("approved-scope-is-controlled-offline-only",
+    Array.isArray(authoritative.decision?.approvedScopes)
+    && authoritative.decision.approvedScopes.length === 1
+    && authoritative.decision.approvedScopes[0] === "controlled-offline-review-only");
+  check("approved-record-never-opens-network-use", authoritative.decision?.studentFacingNetworkUseApproved === false);
+  check("approved-record-never-opens-redistribution", authoritative.decision?.redistributionApproved === false);
+  check("approved-record-carries-binding-v2", authoritative.decision?.approvalBinding?.bindingVersion === 2
+    && authoritative.decision.approvalBinding?.modelArtifacts?.length === 6);
+  check("approved-model-review-is-reviewer-confirmed",
+    authoritative.modelLicenseReview?.status === "reviewer-confirmed-for-controlled-offline-use"
+    && authoritative.modelLicenseReview?.controlledOfflineUseConfirmedByReviewer === true
+    && authoritative.modelLicenseReview?.redistributionAllowed === false);
+} else {
+  check("deferred-record-names-reviewer", String(authoritative.decision?.reviewedBy || "").trim() !== "");
+  check("deferred-record-approves-no-scope", authoritative.decision?.controlledOfflineReviewApproved === false);
+}
 check("reviewed-runtime-is-stable-target", authoritative.evidence?.localDistribution?.runtimeRoot === authoritative.deployment?.targetRuntimeRoot);
 check("portable-record-binding-is-path-independent", authoritative.evidence?.localDistribution?.executable?.observedHostSha256IsApprovalBinding === false);
 check("complete-runtime-model-set-is-recorded", authoritative.modelArtifacts?.length === 6);
 
 const currentAudit = auditHomrBoundary({ root: repoRoot });
-check("boundary-audit-passes-while-pending", currentAudit.ok === true);
-check("pending-review-is-not-ready", currentAudit.licenseReviewReady === false);
+check("boundary-audit-passes", currentAudit.ok === true);
+check("license-review-readiness-matches-decision",
+  currentAudit.licenseReviewReady === (decisionStatus === "approved-with-conditions"));
 check("mainline-remains-non-executable", currentAudit.homrExecutesInMainline === false);
 check("offline-v3-boundary-is-visible", currentAudit.homrOfflineV3Executable === true);
 

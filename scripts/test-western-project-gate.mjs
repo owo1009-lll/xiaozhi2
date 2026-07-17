@@ -442,8 +442,21 @@ if (m4.m4HomrBenchmarkComplete) {
   assert.equal(m4.homrBenchmark?.comparison?.homr?.pitchRecall, 0.957827, "status must expose fresh HOMR recall");
 }
 assert.equal(m4.m4HomrMainlineExecutable, false, "formal analyzer mainline must not execute HOMR");
-assert.equal(m4.m4HomrLicenseReviewReady, false, "pending named review must fail closed");
-assert.equal(m4.m4HomrProductionPoolReady, false, "pending governance must keep the deployment pool closed");
+const homrReviewRecord = JSON.parse(
+  await fs.readFile("config/third-party/homr-0.7.0-review.json", "utf8"),
+);
+const homrReviewApproved = homrReviewRecord?.decision?.status === "approved-with-conditions";
+if (homrReviewApproved) {
+  assert.notEqual(String(homrReviewRecord.decision?.reviewedBy || "").trim(), "", "approved review must carry a named reviewer");
+  assert.deepEqual(homrReviewRecord.decision?.approvedScopes, ["controlled-offline-review-only"], "approval scope must stay controlled offline review only");
+  assert.equal(homrReviewRecord.decision?.studentFacingNetworkUseApproved, false, "approval must never open student-facing network use");
+  assert.equal(homrReviewRecord.decision?.redistributionApproved, false, "approval must never open redistribution");
+}
+assert.equal(m4.m4HomrLicenseReviewReady, homrReviewApproved, "license readiness must mirror the named review decision");
+if (!homrReviewApproved) {
+  assert.equal(m4.m4HomrProductionPoolReady, false, "pending governance must keep the deployment pool closed");
+}
+assert(m4.m4HomrProductionPoolReady === false || homrReviewApproved, "deployment pool must never be ready without an approved named review");
 assert.equal(m4.homrGovernance?.studentFacing, false, "governance must not open the student runtime");
 if (m4.m4SameEditionBenchmarkEvaluated) {
   assert.equal(m4.m4SameEditionHomrStrictPositive, true, "same-edition human gold should expose the observed HOMR strict pass");
@@ -847,12 +860,20 @@ assert.equal(
 const m4DeploymentFailure = fullGate.failures.find(
   (failure) => failure.track === "M4 photo-score deployment/governance",
 );
-assert(m4DeploymentFailure, "pending HOMR governance must be an independent project-gate failure");
-assert.equal(
-  m4DeploymentFailure.artifact,
-  m4.artifacts.photoScoreDeploymentPreflightJson,
-  "deployment failure should point to the machine-readable preflight",
-);
+if (homrReviewApproved && m4.m4HomrProductionPoolReady === true) {
+  assert.equal(
+    m4DeploymentFailure,
+    undefined,
+    "approved governance with a ready deployment must clear the deployment gate failure",
+  );
+} else {
+  assert(m4DeploymentFailure, "pending HOMR governance must be an independent project-gate failure");
+  assert.equal(
+    m4DeploymentFailure.artifact,
+    m4.artifacts.photoScoreDeploymentPreflightJson,
+    "deployment failure should point to the machine-readable preflight",
+  );
+}
 
 console.log(JSON.stringify({
   ok: true,

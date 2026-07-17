@@ -214,8 +214,34 @@ const changedTarget = evaluate({ review: changedTargetReview });
 assert.equal(changedTarget.governanceReady, false);
 assert(changedTarget.governance.blockingReasons.includes("homr-approval-binding-target-mismatch"));
 
-const pending = evaluate({ review: authoritativeReview });
-assert.equal(authoritativeReview.decision.status, "pending", "authoritative license record should remain pending until named approval");
+const pendingReview = clone(authoritativeReview);
+pendingReview.modelLicenseReview = {
+  status: "unresolved",
+  basis: "",
+  controlledOfflineUseConfirmedByReviewer: false,
+  redistributionAllowed: false,
+};
+pendingReview.decision = {
+  status: "pending",
+  reviewedBy: "",
+  reviewedAt: "",
+  approvedScopes: [],
+  controlledOfflineReviewApproved: false,
+  studentFacingNetworkUseApproved: false,
+  redistributionApproved: false,
+  notes: "",
+  confirmations: {
+    controlledOfflineOnly: false,
+    modelLicenseBasisReviewed: false,
+    noModelRedistribution: false,
+  },
+  approvalBinding: null,
+};
+const pending = evaluate({ review: pendingReview });
+assert(
+  ["pending", "approved-with-conditions", "deferred"].includes(authoritativeReview.decision.status),
+  "authoritative license record must carry a known decision status",
+);
 assert.equal(pending.governanceReady, false);
 assert.equal(pending.hostReady, true, "pending governance must not erase independently valid host evidence");
 assert.equal(pending.deploymentReady, false);
