@@ -93,7 +93,9 @@ function buildSummary(report) {
     "",
     `- ordinary monitored pilot evidence: ${report.tracks.ordinary.readyForControlledPilot}`,
     `- M3+ monitored pilot evidence: ${report.tracks.m3plus.readyForControlledPilot}`,
-    `- M4 OMR benchmark evidence: ${report.tracks.m4.readyForOmrAccuracyClaim}`,
+    `- M4 OMR benchmark evidence: ${report.tracks.m4.readyForOmrAccuracyClaim}`
+      + " (decoupled from controlled-pilot readiness by owner decision 2026-07-17;"
+      + " still required for default student release)",
     `- public professional monophonic V2 candidate: ${report.tracks.publicValidation.publicProfessionalMonophonicV2CandidateReady}`,
     `- public professional monophonic V3: ${report.tracks.publicValidation.publicProfessionalMonophonicV3Ready}`,
     `- public double-stop auto feedback: ${report.tracks.publicValidation.doubleStopAutoFeedbackReady}`,
@@ -163,10 +165,15 @@ async function main() {
   const teacherReviewNeeded = ordinaryAudit.teacherReviewNeeded === true
     || m3plusAudit.teacherReviewNeeded === true
     || m4.teacherReviewNeeded === true;
+  // Owner decision 2026-07-17: the M4 photo-OMR accuracy claim is DECOUPLED
+  // from audio-lane controlled-pilot readiness. The pilot never touches photo
+  // scores, and the M4 strict real-photo floor (0/5 by design) must not hold
+  // it hostage. M4 stays a required track for the default-student-release
+  // project gate and keeps automatic adoption closed; m4Ready is still
+  // computed and reported below.
   const readyForControlledPilot = commandOk
     && ordinaryReady
     && m3plusReady
-    && m4Ready
     && runtimeFailClosed
     && !teacherReviewNeeded;
   const readyForDefaultStudentRelease = projectGate.projectReleaseReady === true
@@ -177,6 +184,8 @@ async function main() {
     machineChecksComplete: commandOk,
     readyForControlledPilot,
     readyForDefaultStudentRelease,
+    m4DecoupledFromControlledPilot: true,
+    m4DecouplingNote: "Owner decision 2026-07-17: controlled-pilot readiness no longer requires the M4 photo-OMR accuracy claim; M4 remains a required track for default student release and automatic adoption stays closed.",
     teacherReviewNeeded,
     runtimeFailClosed,
     projectGate,

@@ -3,7 +3,11 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const DEFAULT_OUT = path.join("data", "experiments", "western-strings-controlled-pilot-approval.json");
-const DEFAULT_SCOPE = "ordinary candidate-evidence auto_pass only; optional first-measure slide/trill M3+ subset";
+// Contract version the approval binds to. Bumping this (e.g. after the
+// 2026-07-17 M3+ rescope superseded the first-measure slide/trill contract)
+// invalidates every earlier approval and forces a fresh owner decision.
+export const SCOPE_CONTRACT = "m3plus-rescope-four-zone-v1";
+const DEFAULT_SCOPE = "ordinary candidate-evidence auto_pass only; M3+ four-zone pitch-safety scope (rescope contract) only if explicitly included in the pilot";
 
 function parseArgs(argv) {
   const args = {
@@ -79,6 +83,7 @@ export async function writeControlledPilotApprovalDecision(args = {}) {
     approvedBy: String(resolved.by || "").trim(),
     approvedAt: resolved.at || new Date().toISOString(),
     scope: resolved.scope,
+    scopeContract: SCOPE_CONTRACT,
     notes: resolved.notes || (
       decision === "approve"
         ? "Owner explicitly approved a separate monitored pilot. Default production/student runtime remains fail-closed."

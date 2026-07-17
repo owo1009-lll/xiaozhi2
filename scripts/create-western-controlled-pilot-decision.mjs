@@ -45,10 +45,16 @@ function bulletList(items) {
   return values.length ? values.map((item) => `- ${item}`).join("\n") : "- none";
 }
 
+// The approval must bind to the CURRENT pilot scope contract. Approvals from
+// the superseded first-measure slide/trill era carry no scopeContract (or an
+// older value) and must not start a pilot under the rescope contract.
+const REQUIRED_SCOPE_CONTRACT = "m3plus-rescope-four-zone-v1";
+
 function approvalIsValid(approval) {
   return approval?.pilotApproved === true
     && String(approval?.approvedBy || "").trim() !== ""
-    && String(approval?.approvedAt || "").trim() !== "";
+    && String(approval?.approvedAt || "").trim() !== ""
+    && approval?.scopeContract === REQUIRED_SCOPE_CONTRACT;
 }
 
 function approvalIsExplicitNoGo(approval) {
@@ -69,7 +75,13 @@ function buildBlockingReasons({ status, releaseReview, approval }) {
   if (status.runtimeStudentGate?.m3plusAutoFeedbackReady !== false) reasons.push("m3plus-default-runtime-enabled");
   if (status.runtimeStudentGate?.m4OmrAutoScoreReady !== false) reasons.push("m4-default-runtime-enabled");
   if (approvalIsExplicitNoGo(approval)) reasons.push("controlled-pilot-explicitly-deferred");
-  else if (!approvalIsValid(approval)) reasons.push("controlled-pilot-approval-missing");
+  else if (!approvalIsValid(approval)) {
+    reasons.push(
+      approval?.pilotApproved === true
+        ? "controlled-pilot-approval-scope-contract-superseded"
+        : "controlled-pilot-approval-missing",
+    );
+  }
   return reasons;
 }
 
@@ -152,8 +164,9 @@ function renderMarkdown(decision) {
     JSON.stringify({
       pilotApproved: true,
       approvedBy: "owner-name",
-      approvedAt: "2026-07-10T00:00:00+08:00",
-      scope: "ordinary candidate-evidence auto_pass only; optional first-measure slide/trill M3+ subset",
+      approvedAt: "2026-07-17T00:00:00+08:00",
+      scope: "ordinary candidate-evidence auto_pass only; M3+ four-zone pitch-safety scope (rescope contract) only if explicitly included in the pilot",
+      scopeContract: REQUIRED_SCOPE_CONTRACT,
       notes: "Default runtime remains fail-closed.",
     }, null, 2),
     "```",
@@ -195,14 +208,15 @@ export async function buildControlledPilotDecision(args = {}) {
     runtimeFailClosed,
     allowedScope: [
       "ordinary upload candidate-evidence auto_pass only inside a separate monitored pilot process",
-      "M3+ first-measure, trusted-recording, slide-like/trill-like pitch-judgement subset only if explicitly included in the pilot",
+      "M3+ four-zone pitch-safety scope (rescope contract: straight-tone/center-pitch decisions with score-marked and unstable regions neutralized) only if explicitly included in the pilot",
       "M4 OMR remains eval-only and may be reported as benchmark evidence, not runtime score ingestion",
       "all rejected, unsupported, or low-confidence rows remain review_required",
     ],
+    scopeContract: REQUIRED_SCOPE_CONTRACT,
     notAllowed: [
       "do not enable default production/student runtime",
       "do not commit WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1",
-      "do not broaden M3+ to later measures, non-trusted recordings, variable-f0, double-stop, or ornament modes",
+      "do not revive audio technique-mode detection (slide/trill/ornament/variable-f0 classifiers stay research-only) and do not accuse inside score-marked or unstable zones",
       "do not display technique names as a product feature",
       "do not let OMR output enter runtime diagnosis",
       "do not request teacher review unless a machine precheck reports unknown auto-pass rows",

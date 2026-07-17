@@ -150,8 +150,9 @@ assert.equal(recordedApproval.pilotApproved, true, "recorded approval should app
 await fs.writeFile(VALID_APPROVAL_PATH, `${JSON.stringify({
   pilotApproved: true,
   approvedBy: "test-owner",
-  approvedAt: "2026-07-10T00:00:00+08:00",
-  scope: "ordinary candidate-evidence auto_pass only; optional first-measure slide/trill M3+ subset",
+  approvedAt: "2026-07-17T00:00:00+08:00",
+  scope: "ordinary candidate-evidence auto_pass only; M3+ four-zone pitch-safety scope (rescope contract) only if explicitly included in the pilot",
+  scopeContract: "m3plus-rescope-four-zone-v1",
   notes: "Test-only approval file under data/experiments; production/default runtime remains fail-closed.",
 }, null, 2)}\n`, "utf8");
 
@@ -162,6 +163,24 @@ assert.equal(decisionWithApproval.approvalPresent, true, "valid approval should 
 assert.equal(decisionWithApproval.runtimeFailClosed, true, "valid approval must not change default runtime state");
 assert.equal(decisionWithApproval.readyToStartControlledPilot, true, "valid approval plus green machine evidence should make a monitored pilot startable");
 assert.deepEqual(decisionWithApproval.blockingReasons, [], "valid approval path should have no blocking reasons");
+
+const STALE_APPROVAL_PATH = path.join(TEST_DIR, "approval.stale-scope.json");
+await fs.writeFile(STALE_APPROVAL_PATH, `${JSON.stringify({
+  pilotApproved: true,
+  approvedBy: "test-owner",
+  approvedAt: "2026-07-09T00:00:00+08:00",
+  scope: "ordinary candidate-evidence auto_pass only; optional first-measure slide/trill M3+ subset",
+  notes: "Superseded-era approval without a scope contract binding.",
+}, null, 2)}\n`, "utf8");
+const decisionWithStaleApproval = await buildControlledPilotDecision({
+  approval: STALE_APPROVAL_PATH,
+});
+assert.equal(decisionWithStaleApproval.approvalPresent, false, "superseded-era approval must not count as a present approval");
+assert.equal(decisionWithStaleApproval.readyToStartControlledPilot, false, "superseded-era approval must not start a pilot under the rescope contract");
+assert(
+  decisionWithStaleApproval.blockingReasons.includes("controlled-pilot-approval-scope-contract-superseded"),
+  "stale approval must be reported as scope-contract superseded, forcing a fresh owner decision",
+);
 
 const preflightWithApproval = await buildControlledPilotStartPreflight({
   approval: VALID_APPROVAL_PATH,
@@ -215,8 +234,9 @@ try {
   await fs.writeFile(DEFAULT_APPROVAL_PATH, `${JSON.stringify({
     pilotApproved: true,
     approvedBy: "test-owner",
-    approvedAt: "2026-07-10T00:00:00+08:00",
+    approvedAt: "2026-07-17T00:00:00+08:00",
     scope: "ordinary candidate-evidence auto_pass only",
+    scopeContract: "m3plus-rescope-four-zone-v1",
     notes: "Test-only approval. Default runtime remains fail-closed.",
   }, null, 2)}\n`, "utf8");
   const defaultApprovedDecision = await buildControlledPilotDecision();
@@ -272,12 +292,23 @@ try {
   const statusWithCompletedPilot = await buildProjectStatus({
     controlledPilotSessionsRoot: completedSessionRoot,
   });
-  assert.equal(statusWithCompletedPilot.nextActions?.[0]?.track, "Controlled pilot completed");
+  const completedTrack = statusWithCompletedPilot.nextActions?.[0]?.track;
+  assert(
+    [
+      "Fresh blind machine precheck",
+      "Scoped V2-alpha blind audit preparation",
+      "Controlled pilot coverage audit",
+      "Controlled pilot completed",
+    ].includes(completedTrack),
+    `a completed safe session must route the handoff into the post-pilot flow, got ${completedTrack}`,
+  );
   assert.equal(statusWithCompletedPilot.controlledPilotSession?.sessionId, "pilot-completed");
   assert.equal(statusWithCompletedPilot.controlledPilotEvidence?.completedSafeSessionCount, 1);
   assert.equal(statusWithCompletedPilot.controlledPilotEvidence?.safeDistinctRecordingCount, 1);
   const completedHandoff = renderHandoff(statusWithCompletedPilot);
-  assert(completedHandoff.includes("Do not rerun the same recording"));
+  if (completedTrack === "Controlled pilot completed") {
+    assert(completedHandoff.includes("Do not rerun the same recording"));
+  }
   assert(!completedHandoff.includes("western:controlled-pilot-run -- --execute"));
 } finally {
   await restoreText(DEFAULT_APPROVAL_PATH, originalApproval);
@@ -299,6 +330,7 @@ console.log(JSON.stringify({
     "project-status-defers-explicit-no-go-without-review",
     "handoff-defers-explicit-no-go-without-review",
     "decision-passes-with-valid-temp-approval",
+    "stale-scope-approval-requires-fresh-owner-decision",
     "preflight-passes-with-valid-temp-approval",
     "default-runtime-remains-fail-closed",
     "approved-handoff-points-to-one-shot-pilot-runner",
