@@ -15,13 +15,16 @@ const DEFAULT_OUT = path.join("data", "experiments", "western-strings-round2", "
 const DEFAULT_MARKDOWN = path.join("data", "experiments", "western-strings-round2", "machine-analysis.md");
 
 function parseArgs(argv) {
-  const args = { manifest: DEFAULT_MANIFEST, out: DEFAULT_OUT, markdown: DEFAULT_MARKDOWN, limit: 0 };
+  const args = { manifest: DEFAULT_MANIFEST, out: DEFAULT_OUT, markdown: DEFAULT_MARKDOWN, limit: 0,
+    expectedRows: 8, dataset: "western-strings-round2" };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--manifest") args.manifest = argv[++index] || args.manifest;
     else if (arg === "--out") args.out = argv[++index] || args.out;
     else if (arg === "--markdown") args.markdown = argv[++index] || args.markdown;
     else if (arg === "--limit") args.limit = Math.max(0, Math.round(Number(argv[++index] || 0)));
+    else if (arg === "--expected-rows") args.expectedRows = Math.max(1, Math.round(Number(argv[++index] || 8)));
+    else if (arg === "--dataset") args.dataset = argv[++index] || args.dataset;
   }
   return args;
 }
@@ -119,6 +122,8 @@ export async function runRound2MachineAnalysis({
   outPath = DEFAULT_OUT,
   markdownPath = DEFAULT_MARKDOWN,
   noteLimit = 0,
+  expectedRows = 8,
+  dataset = "western-strings-round2",
 } = {}, dependencies = {}) {
   const buildAnalysis = dependencies.buildAnalysis || buildWesternStudentAnalysis;
   const listSubmissions = dependencies.listSubmissions || listWesternControlledSubmissions;
@@ -127,7 +132,7 @@ export async function runRound2MachineAnalysis({
   const resolvedManifest = path.resolve(repoRoot, manifestPath);
   const rows = parseCsv(await fs.readFile(resolvedManifest, "utf8"));
   const blockers = [];
-  if (rows.length !== 8) blockers.push(`round2-manifest-row-count:${rows.length}:8`);
+  if (rows.length !== expectedRows) blockers.push(`round2-manifest-row-count:${rows.length}:${expectedRows}`);
   for (const row of rows) {
     if (!String(row.recordingId || "").trim()) blockers.push("round2-recording-id-missing");
     if (!String(row.scoreId || "").trim()) blockers.push(`round2-score-id-missing:${row.recordingId || "unknown"}`);
@@ -178,7 +183,7 @@ export async function runRound2MachineAnalysis({
           audioPath,
           audioHash,
           audioSubmission: { name: path.basename(audioPath), source: "round2-private-intake" },
-          dataset: "western-strings-round2",
+          dataset,
           piece: row.pieceId,
           recordingId: row.recordingId,
           instrument: "violin",
@@ -287,6 +292,8 @@ async function main() {
     outPath: args.out,
     markdownPath: args.markdown,
     noteLimit: args.limit,
+    expectedRows: args.expectedRows,
+    dataset: args.dataset,
   });
   console.log(JSON.stringify({
     ok: report.ok,
