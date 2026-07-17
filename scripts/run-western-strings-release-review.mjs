@@ -52,6 +52,9 @@ function runNpmScript(script) {
     cwd: process.cwd(),
     encoding: "utf8",
     shell: false,
+    // western:project-status prints a multi-megabyte JSON; the 1MB default
+    // buffer turns it into a spurious ENOBUFS step failure
+    maxBuffer: 64 * 1024 * 1024,
   });
   return {
     script,

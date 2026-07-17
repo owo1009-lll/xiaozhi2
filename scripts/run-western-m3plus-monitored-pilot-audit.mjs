@@ -3,125 +3,47 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const DEFAULT_OUT_DIR = path.join("data", "experiments", "western-strings-m3plus", "monitored-pilot");
-const DEFAULT_MODE_EVAL = path.join(
+const DEFAULT_RESCOPE_GATE = path.join(
   "data",
   "experiments",
   "western-strings-m3plus",
-  "pitch-mode-review-pack",
-  "m3plus-pitch-mode-eval.json",
-);
-const DEFAULT_LABELS = path.join(
-  "data",
-  "experiments",
-  "western-strings-m3plus",
-  "pitch-mode-review-pack",
-  "m3plus-pitch-mode-review-labels.csv",
-);
-const DEFAULT_CANDIDATE_QUALITY_SOURCE = path.join(
-  "data",
-  "experiments",
-  "western-strings-m3plus",
-  "pitch-mode-review-pack-candidate-quality",
-  "m3plus-pitch-mode-review.csv",
-);
-const DEFAULT_CANDIDATE_QUALITY_COMPLETED = path.join(
-  "data",
-  "experiments",
-  "western-strings-m3plus",
-  "pitch-mode-review-pack-candidate-quality",
-  "m3plus-pitch-mode-review.completed.csv",
-);
-const DEFAULT_BACKEND_CONSENSUS = path.join(
-  "data",
-  "experiments",
-  "western-strings-m3plus",
-  "backend-consensus",
+  "rescope-gate",
   "report.json",
 );
 
-const RELEASE_MODES = ["slide-like", "trill-like"];
-const CONTROL_MODES = ["stable"];
-const EXPECTED_BEHAVIOR = {
-  "slide-like": "slide",
-  "trill-like": "trill",
-};
-const INDEPENDENT_MODE_KEYS = {
-  "slide-like": "slide",
-  "trill-like": "trill",
-};
+export const CONTRACT = "m3plus-rescope-four-zone-v1";
+export const SUPERSEDED_CONTRACT = "first-measure-slide-trill-candidate-quality"
+  + " (superseded by the 2026-07-17 M3+ rescope decision; audio technique-mode"
+  + " detection is retired, not pending repair)";
+export const RELEASE_ZONES = [
+  "unmarkedStraight",
+  "scoreMarkedNeutral",
+  "techniqueCenter",
+  "unstableFailClosed",
+];
+export const INHERITED_ZONES = { rhythmOnset: "inherits-m3-core-gate-unchanged" };
 
 function parseArgs(argv) {
   const args = {
     outDir: DEFAULT_OUT_DIR,
+    rescopeGate: DEFAULT_RESCOPE_GATE,
     minPrecision: 0.9,
-    minModeSpecificScored: 3,
-    maxMeasureIndex: 1,
-    minReviewConfidence: 1,
-    backendConsensus: DEFAULT_BACKEND_CONSENSUS,
+    maxPitchToleranceCents: 50,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--out-dir") args.outDir = argv[++index] || args.outDir;
+    if (arg === "--rescope-gate") args.rescopeGate = argv[++index] || args.rescopeGate;
     if (arg === "--min-precision") args.minPrecision = Number(argv[++index] || args.minPrecision);
-    if (arg === "--min-mode-specific-scored") args.minModeSpecificScored = Number(argv[++index] || args.minModeSpecificScored);
-    if (arg === "--max-measure-index") args.maxMeasureIndex = Number(argv[++index] || args.maxMeasureIndex);
-    if (arg === "--min-review-confidence") args.minReviewConfidence = Number(argv[++index] || args.minReviewConfidence);
-    if (arg === "--backend-consensus") args.backendConsensus = argv[++index] || args.backendConsensus;
+    if (arg === "--max-pitch-tolerance-cents") {
+      args.maxPitchToleranceCents = Number(argv[++index] || args.maxPitchToleranceCents);
+    }
   }
   return args;
 }
 
 function rel(filePath) {
   return path.relative(process.cwd(), filePath).replace(/\\/g, "/");
-}
-
-function splitCsvLine(line) {
-  const cols = [];
-  let current = "";
-  let quoted = false;
-  for (let index = 0; index < line.length; index += 1) {
-    const char = line[index];
-    if (quoted) {
-      if (char === '"' && line[index + 1] === '"') {
-        current += '"';
-        index += 1;
-      } else if (char === '"') {
-        quoted = false;
-      } else {
-        current += char;
-      }
-    } else if (char === '"') {
-      quoted = true;
-    } else if (char === ",") {
-      cols.push(current);
-      current = "";
-    } else {
-      current += char;
-    }
-  }
-  cols.push(current);
-  return cols;
-}
-
-async function readCsv(filePath) {
-  let text = "";
-  try {
-    text = await fs.readFile(path.resolve(process.cwd(), filePath), "utf8");
-  } catch {
-    return { exists: false, rows: [] };
-  }
-  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter((line) => line.trim() !== "");
-  if (!lines.length) return { exists: true, rows: [] };
-  const headers = splitCsvLine(lines.shift());
-  const rows = lines.map((line) => {
-    const cols = splitCsvLine(line);
-    const row = {};
-    headers.forEach((header, index) => {
-      row[header] = cols[index] || "";
-    });
-    return row;
-  });
-  return { exists: true, rows };
 }
 
 async function readJson(filePath) {
@@ -132,91 +54,160 @@ async function readJson(filePath) {
   }
 }
 
-function key(row = {}) {
-  return [
-    row.recordingId,
-    row.scenario,
-    row.noteIndex,
-    row.noteId,
-    row.candidateMode,
-    row.flags,
-    row.predictedOnsetSeconds,
-  ].map((value) => String(value || "").trim()).join("\u001f");
-}
-
-function modeByName(modeEval) {
-  return new Map((modeEval?.perMode || []).map((item) => [String(item.candidateMode || ""), item]));
-}
-
-function numberValue(value, fallback = 0) {
+function finiteNumber(value) {
   const num = Number(value);
-  return Number.isFinite(num) ? num : fallback;
+  return Number.isFinite(num) ? num : null;
 }
 
-function exactSet(actual, expected) {
-  const actualSorted = [...new Set(actual || [])].sort();
-  const expectedSorted = [...expected].sort();
-  return actualSorted.length === expectedSorted.length
-    && actualSorted.every((item, index) => item === expectedSorted[index]);
-}
-
-function releaseEvidenceRows(labels, candidateQualityKeys, args) {
-  return labels.filter((row) => {
-    const mode = String(row.candidateMode || "").trim();
-    if (!RELEASE_MODES.includes(mode)) return false;
-    if (!candidateQualityKeys.has(key(row))) return false;
-    if (String(row.audioScoreMatch || "").trim() !== "match") return false;
-    if (String(row.pitchJudgeable || "").trim() !== "yes") return false;
-    if (String(row.observedPitchBehavior || "").trim() !== EXPECTED_BEHAVIOR[mode]) return false;
-    if (!["in-tune", "sharp", "flat", "wrong-note"].includes(String(row.pitchAccuracyLabel || "").trim())) return false;
-    if (numberValue(row.measureIndex, Number.POSITIVE_INFINITY) > args.maxMeasureIndex) return false;
-    if (numberValue(row.reviewConfidence, 0) < args.minReviewConfidence) return false;
-    return true;
-  });
-}
-
-export function evaluateIndependentReleaseEvidence(backendConsensus, releaseModes = RELEASE_MODES) {
+export function evaluateRescopeContract(gate, options = {}) {
+  const minPrecision = Number.isFinite(options.minPrecision) ? options.minPrecision : 0.9;
+  const maxPitchToleranceCents = Number.isFinite(options.maxPitchToleranceCents)
+    ? options.maxPitchToleranceCents
+    : 50;
   const blockingReasons = [];
-  const perMode = {};
-  for (const mode of releaseModes) {
-    const evidenceKey = INDEPENDENT_MODE_KEYS[mode];
-    const evidence = backendConsensus?.modes?.[evidenceKey] || null;
-    if (!evidence) {
-      blockingReasons.push(`m3plus-independent-mode-evidence-missing:${mode}`);
-    } else if (evidence.releaseReady !== true) {
-      blockingReasons.push(`m3plus-independent-mode-not-ready:${mode}`);
-    }
-    perMode[mode] = {
-      evidenceKey,
-      sourceExists: Boolean(evidence),
-      releaseReady: evidence?.releaseReady === true,
-      sampleGatePassed: evidence?.sampleGatePassed === true,
-      physicalThreshold: evidence?.physicalThreshold ?? null,
-      holdoutPrecision: evidence?.physicalThresholdAudit?.holdout?.precision ?? null,
-      holdoutRecall: evidence?.physicalThresholdAudit?.holdout?.recall ?? null,
+  const zones = {};
+
+  if (!gate || typeof gate !== "object") {
+    return {
+      ready: false,
+      zones,
+      blockingReasons: ["m3plus-rescope-gate-missing"],
     };
   }
-  return {
-    ready: blockingReasons.length === 0,
-    perMode,
-    blockingReasons,
+
+  if (gate.evalOnly !== true) blockingReasons.push("m3plus-rescope-gate-not-eval-only");
+  if (gate.productionPolicyChanged !== false) {
+    blockingReasons.push("m3plus-rescope-gate-production-policy-changed");
+  }
+  if (gate.studentGateReady !== false) blockingReasons.push("m3plus-rescope-student-gate-not-fail-closed");
+  if (gate.studentFacing !== false) blockingReasons.push("m3plus-rescope-student-facing-not-false");
+  if (gate.releaseGateReady !== true) blockingReasons.push("m3plus-rescope-release-gate-not-ready");
+  for (const reason of gate.blockingReasons || []) {
+    blockingReasons.push(`m3plus-rescope-gate-blocking:${reason}`);
+  }
+
+  const thresholds = gate.thresholds || {};
+  const gateMinPrecision = finiteNumber(thresholds.minimumPrecision);
+  const gateTolerance = finiteNumber(thresholds.pitchToleranceCents);
+  if (gateMinPrecision === null || gateMinPrecision < minPrecision) {
+    blockingReasons.push("m3plus-threshold-precision-below-floor");
+  }
+  if (gateTolerance === null || gateTolerance > maxPitchToleranceCents) {
+    blockingReasons.push("m3plus-threshold-tolerance-above-ceiling");
+  }
+  if (thresholds.evaluationSplit !== "holdout-only") {
+    blockingReasons.push("m3plus-evaluation-split-not-holdout-only");
+  }
+
+  const zone = (name) => (gate.zones || {})[name] || null;
+
+  const straight = zone("unmarkedStraight");
+  const straightPrecision = finiteNumber(straight?.precision);
+  const straightFloor = finiteNumber(thresholds.minimumStraightDecisions) ?? 4;
+  const straightReady = Boolean(
+    straight
+    && straight.gatePassed === true
+    && straightPrecision !== null
+    && straightPrecision >= minPrecision
+    && straight.unsafeAccusationCount === 0
+    && finiteNumber(straight.decisionCount) !== null
+    && straight.decisionCount >= straightFloor,
+  );
+  if (!straightReady) blockingReasons.push("m3plus-zone-not-ready:unmarkedStraight");
+  zones.unmarkedStraight = {
+    ready: straightReady,
+    gatePassed: straight?.gatePassed === true,
+    decisionCount: finiteNumber(straight?.decisionCount),
+    precision: straightPrecision,
+    unsafeAccusationCount: finiteNumber(straight?.unsafeAccusationCount),
+    insufficientEvidenceCount: finiteNumber(straight?.insufficientEvidenceCount),
+    decisionCoverage: finiteNumber(straight?.decisionCoverage),
   };
+
+  const neutral = zone("scoreMarkedNeutral");
+  const neutralProtected = finiteNumber(neutral?.totalProtectedCount);
+  const neutralReady = Boolean(
+    neutral
+    && neutral.gatePassed === true
+    && neutral.accusationCount === 0
+    && neutralProtected !== null
+    && neutralProtected > 0
+    && finiteNumber(neutral.insufficientEvidenceCount) === neutralProtected,
+  );
+  if (!neutralReady) blockingReasons.push("m3plus-zone-not-ready:scoreMarkedNeutral");
+  zones.scoreMarkedNeutral = {
+    ready: neutralReady,
+    gatePassed: neutral?.gatePassed === true,
+    totalProtectedCount: neutralProtected,
+    accusationCount: finiteNumber(neutral?.accusationCount),
+    insufficientEvidenceCount: finiteNumber(neutral?.insufficientEvidenceCount),
+  };
+
+  const center = zone("techniqueCenter");
+  const centerPrecision = finiteNumber(center?.precision);
+  const centerFloor = finiteNumber(thresholds.minimumTechniqueCenterDecisions) ?? 2;
+  const centerReady = Boolean(
+    center
+    && center.gatePassed === true
+    && centerPrecision !== null
+    && centerPrecision >= minPrecision
+    && center.unsafeAccusationCount === 0
+    && finiteNumber(center.decisionCount) !== null
+    && center.decisionCount >= centerFloor,
+  );
+  if (!centerReady) blockingReasons.push("m3plus-zone-not-ready:techniqueCenter");
+  zones.techniqueCenter = {
+    ready: centerReady,
+    gatePassed: center?.gatePassed === true,
+    decisionCount: finiteNumber(center?.decisionCount),
+    precision: centerPrecision,
+    unsafeAccusationCount: finiteNumber(center?.unsafeAccusationCount),
+    insufficientEvidenceCount: finiteNumber(center?.insufficientEvidenceCount),
+    decisionCoverage: finiteNumber(center?.decisionCoverage),
+  };
+
+  const unstable = zone("unstableFailClosed");
+  const unstableTested = finiteNumber(unstable?.testedCount);
+  const unstableReady = Boolean(
+    unstable
+    && unstable.gatePassed === true
+    && unstable.accusationCount === 0
+    && unstableTested !== null
+    && unstableTested > 0
+    && finiteNumber(unstable.insufficientEvidenceCount) === unstableTested,
+  );
+  if (!unstableReady) blockingReasons.push("m3plus-zone-not-ready:unstableFailClosed");
+  zones.unstableFailClosed = {
+    ready: unstableReady,
+    gatePassed: unstable?.gatePassed === true,
+    testedCount: unstableTested,
+    accusationCount: finiteNumber(unstable?.accusationCount),
+    insufficientEvidenceCount: finiteNumber(unstable?.insufficientEvidenceCount),
+  };
+
+  const rhythm = zone("rhythmOnset");
+  if (rhythm && rhythm.gatePassed === false) {
+    blockingReasons.push("m3plus-zone-regressed:rhythmOnset");
+  }
+  zones.rhythmOnset = {
+    ready: !(rhythm && rhythm.gatePassed === false),
+    inherited: INHERITED_ZONES.rhythmOnset,
+    gatePassed: rhythm?.gatePassed ?? null,
+  };
+
+  const unique = [...new Set(blockingReasons)];
+  return { ready: unique.length === 0, zones, blockingReasons: unique };
 }
 
 function renderMarkdown(report) {
-  const releaseLines = Object.entries(report.releaseModes).flatMap(([mode, item]) => [
-    `### ${mode}`,
+  const zoneLines = Object.entries(report.zones).flatMap(([name, item]) => [
+    `### ${name}`,
     "",
-    `- ready: ${item.ready}`,
-    `- modeSpecificScored: ${item.modeSpecificScored}`,
-    `- modeSpecificPrecision: ${item.modeSpecificPrecision}`,
-    `- modeSpecificUnsafe: ${item.modeSpecificUnsafe}`,
-    `- evidenceRows: ${item.evidenceRows}`,
-    `- recordings: ${item.recordingIds.join(", ") || "none"}`,
+    ...Object.entries(item).map(([key, value]) => `- ${key}: ${value === null ? "n/a" : value}`),
     "",
   ]);
   return [
-    "# M3+ Monitored Pilot Audit",
+    "# M3+ Monitored Pilot Audit (rescope four-zone contract)",
     "",
     `Generated: ${report.generatedAt}`,
     "",
@@ -227,21 +218,20 @@ function renderMarkdown(report) {
     `- teacherReviewNeeded: ${report.teacherReviewNeeded}`,
     `- defaultM3PlusReadyAfter: ${report.defaultM3PlusReadyAfter}`,
     "",
-    "## Scope",
+    "## Contract",
     "",
-    `- allowedReleaseModes: ${report.scope.allowedReleaseModes.join(", ")}`,
-    `- controlModes: ${report.scope.controlModes.join(", ")}`,
-    `- maxMeasureIndex: ${report.scope.maxMeasureIndex}`,
-    "- Release evidence must come from the completed candidate-quality pack.",
-    "- Later measures and non-release modes remain review_required.",
+    `- contract: ${report.contract}`,
+    `- supersedes: ${report.supersededContract}`,
+    `- releaseZones: ${report.scope.releaseZones.join(", ")}`,
+    `- inheritedZones: rhythmOnset (${report.scope.inheritedZones.rhythmOnset})`,
+    `- minPrecision: ${report.scope.minPrecision}`,
+    `- maxPitchToleranceCents: ${report.scope.maxPitchToleranceCents}`,
+    "- Release evidence is the frozen holdout rescope-gate report; no audio",
+    "  technique-mode classification is required or displayed.",
     "",
-    "## Release Modes",
+    "## Zones",
     "",
-    ...releaseLines,
-    "## Blocked Modes",
-    "",
-    ...(report.blockedModes.length ? report.blockedModes.map((mode) => `- ${mode}`) : ["- none"]),
-    "",
+    ...zoneLines,
     "## Blocking Reasons",
     "",
     ...(report.blockingReasons.length ? report.blockingReasons.map((reason) => `- ${reason}`) : ["- none"]),
@@ -249,8 +239,9 @@ function renderMarkdown(report) {
     "## Safety Notes",
     "",
     "- This audit does not enable the default student runtime.",
-    "- This is not technique-name display; it only validates pitch-judgement modes.",
-    "- If any unknown or unsafe evidence appears, stop and keep M3+ review-only.",
+    "- Score-marked regions and unstable notes must stay insufficient_evidence.",
+    "- Any accusation from a protected zone stops the pilot immediately.",
+    "- Owner approval still runs through the existing explicit command chain.",
     "",
   ].join("\n");
 }
@@ -258,101 +249,11 @@ function renderMarkdown(report) {
 export async function runM3PlusMonitoredPilotAudit(args = {}) {
   const options = { ...parseArgs([]), ...args };
   const outDir = path.resolve(process.cwd(), options.outDir);
-  const modeEvalRead = await readJson(DEFAULT_MODE_EVAL);
-  const labelsRead = await readCsv(DEFAULT_LABELS);
-  const candidateSourceRead = await readCsv(DEFAULT_CANDIDATE_QUALITY_SOURCE);
-  const candidateCompletedRead = await readCsv(DEFAULT_CANDIDATE_QUALITY_COMPLETED);
-  const backendConsensusRead = await readJson(options.backendConsensus);
-  const modeEval = modeEvalRead.value;
-  const perMode = modeByName(modeEval);
-  const candidateQualityKeys = new Set(candidateSourceRead.rows.map(key));
-  const completedQualityKeys = new Set(candidateCompletedRead.rows.map(key));
-  const evidenceRows = releaseEvidenceRows(labelsRead.rows, candidateQualityKeys, options);
-  const evidenceByMode = new Map(RELEASE_MODES.map((mode) => [mode, evidenceRows.filter((row) => row.candidateMode === mode)]));
-  const blockingReasons = [];
-  const independentEvidence = evaluateIndependentReleaseEvidence(backendConsensusRead.value);
-
-  if (!modeEvalRead.exists) blockingReasons.push("m3plus-mode-eval-missing");
-  if (!labelsRead.exists) blockingReasons.push("m3plus-labels-missing");
-  if (!candidateSourceRead.exists) blockingReasons.push("m3plus-candidate-quality-source-missing");
-  if (!candidateCompletedRead.exists) blockingReasons.push("m3plus-candidate-quality-completed-missing");
-  if (!backendConsensusRead.exists) blockingReasons.push("m3plus-independent-backend-consensus-missing");
-  blockingReasons.push(...independentEvidence.blockingReasons);
-  if (modeEval?.ok !== true) blockingReasons.push("m3plus-mode-eval-not-ok");
-  if (modeEval?.studentGateReady === true || modeEval?.runtimeEffect !== "none") {
-    blockingReasons.push("m3plus-runtime-not-fail-closed");
-  }
-  if (!exactSet(modeEval?.releaseReadyModes || [], RELEASE_MODES)) {
-    blockingReasons.push(`m3plus-release-modes-unexpected:${(modeEval?.releaseReadyModes || []).join("|")}`);
-  }
-  if (!CONTROL_MODES.every((mode) => (modeEval?.controlReadyModes || []).includes(mode))) {
-    blockingReasons.push("m3plus-control-mode-missing");
-  }
-
-  for (const row of candidateSourceRead.rows) {
-    if (numberValue(row.measureIndex, Number.POSITIVE_INFINITY) > options.maxMeasureIndex) {
-      blockingReasons.push(`m3plus-candidate-quality-non-first-measure:${row.rowId || key(row)}`);
-    }
-    if (![...RELEASE_MODES, "variable-f0"].includes(String(row.candidateMode || "").trim())) {
-      blockingReasons.push(`m3plus-candidate-quality-unexpected-mode:${row.candidateMode || "blank"}`);
-    }
-  }
-  for (const row of candidateCompletedRead.rows) {
-    const match = String(row.audioScoreMatch || "").trim();
-    if (match !== "match") {
-      blockingReasons.push(`m3plus-candidate-quality-nonmatch:${row.rowId || key(row)}:${match || "blank"}`);
-    }
-    if (!candidateQualityKeys.has(key(row))) {
-      blockingReasons.push(`m3plus-candidate-quality-completed-unknown-row:${row.rowId || key(row)}`);
-    }
-  }
-  for (const row of candidateSourceRead.rows) {
-    if (!completedQualityKeys.has(key(row))) {
-      blockingReasons.push(`m3plus-candidate-quality-unreviewed-row:${row.rowId || key(row)}`);
-    }
-  }
-
-  const releaseModes = {};
-  for (const mode of RELEASE_MODES) {
-    const item = perMode.get(mode) || {};
-    const rows = evidenceByMode.get(mode) || [];
-    const modeSpecificScored = numberValue(item.modeSpecificScored, 0);
-    const modeSpecificPrecision = Number(item.modeSpecificPrecision);
-    const modeSpecificUnsafe = numberValue(item.modeSpecificUnsafe, 0);
-    if (item.releaseReady !== true) blockingReasons.push(`m3plus-release-mode-not-ready:${mode}`);
-    if (modeSpecificScored < options.minModeSpecificScored) blockingReasons.push(`m3plus-release-mode-scored-too-low:${mode}`);
-    if (!Number.isFinite(modeSpecificPrecision) || modeSpecificPrecision < options.minPrecision) {
-      blockingReasons.push(`m3plus-release-mode-precision-too-low:${mode}`);
-    }
-    if (modeSpecificUnsafe !== 0) blockingReasons.push(`m3plus-release-mode-unsafe:${mode}`);
-    if (rows.length < options.minModeSpecificScored) blockingReasons.push(`m3plus-release-mode-evidence-rows-too-low:${mode}`);
-    releaseModes[mode] = {
-      ready: item.releaseReady === true
-        && modeSpecificScored >= options.minModeSpecificScored
-        && Number.isFinite(modeSpecificPrecision)
-        && modeSpecificPrecision >= options.minPrecision
-        && modeSpecificUnsafe === 0
-        && rows.length >= options.minModeSpecificScored
-        && independentEvidence.perMode[mode]?.releaseReady === true,
-      modeSpecificScored,
-      modeSpecificPrecision: Number.isFinite(modeSpecificPrecision) ? modeSpecificPrecision : null,
-      modeSpecificUnsafe,
-      evidenceRows: rows.length,
-      recordingIds: [...new Set(rows.map((row) => row.recordingId).filter(Boolean))].sort(),
-      rowIds: rows.map((row) => row.rowId || key(row)),
-      independentEvidence: independentEvidence.perMode[mode],
-    };
-  }
-
-  const blockedModes = [];
-  for (const item of modeEval?.perMode || []) {
-    const mode = String(item.candidateMode || "");
-    if (RELEASE_MODES.includes(mode) || CONTROL_MODES.includes(mode)) continue;
-    blockedModes.push(mode);
-    if (item.releaseReady === true) blockingReasons.push(`m3plus-nonrelease-mode-ready:${mode}`);
-  }
-  for (const mode of RELEASE_MODES) {
-    if (releaseModes[mode]?.ready !== true) blockedModes.push(mode);
+  const gateRead = await readJson(options.rescopeGate);
+  const contract = evaluateRescopeContract(gateRead.value, options);
+  const blockingReasons = [...contract.blockingReasons];
+  if (!gateRead.exists) {
+    blockingReasons.unshift("m3plus-rescope-gate-report-missing");
   }
 
   const uniqueBlockingReasons = [...new Set(blockingReasons)];
@@ -362,29 +263,22 @@ export async function runM3PlusMonitoredPilotAudit(args = {}) {
     readyForMonitoredPilot: uniqueBlockingReasons.length === 0,
     teacherReviewNeeded: false,
     defaultM3PlusReadyAfter: false,
+    contract: CONTRACT,
+    supersededContract: SUPERSEDED_CONTRACT,
     scope: {
-      allowedReleaseModes: RELEASE_MODES,
-      controlModes: CONTROL_MODES,
-      maxMeasureIndex: options.maxMeasureIndex,
+      releaseZones: RELEASE_ZONES,
+      inheritedZones: INHERITED_ZONES,
       minPrecision: options.minPrecision,
-      minModeSpecificScored: options.minModeSpecificScored,
-      minReviewConfidence: options.minReviewConfidence,
+      maxPitchToleranceCents: options.maxPitchToleranceCents,
+      evaluationSplit: "holdout-only",
     },
     inputs: {
-      modeEval: DEFAULT_MODE_EVAL.replace(/\\/g, "/"),
-      labels: DEFAULT_LABELS.replace(/\\/g, "/"),
-      candidateQualitySource: DEFAULT_CANDIDATE_QUALITY_SOURCE.replace(/\\/g, "/"),
-      candidateQualityCompleted: DEFAULT_CANDIDATE_QUALITY_COMPLETED.replace(/\\/g, "/"),
-      backendConsensus: String(options.backendConsensus).replace(/\\/g, "/"),
+      rescopeGate: String(options.rescopeGate).replace(/\\/g, "/"),
+      rescopeGateExists: gateRead.exists,
     },
-    counts: {
-      labelRows: labelsRead.rows.length,
-      candidateQualityRows: candidateSourceRead.rows.length,
-      completedCandidateQualityRows: candidateCompletedRead.rows.length,
-      releaseEvidenceRows: evidenceRows.length,
-    },
-    releaseModes,
-    blockedModes: [...new Set(blockedModes)].sort(),
+    zones: contract.zones,
+    releaseModes: {},
+    blockedModes: [],
     blockingReasons: uniqueBlockingReasons,
   };
 
@@ -404,8 +298,8 @@ async function main() {
     readyForMonitoredPilot: report.readyForMonitoredPilot,
     teacherReviewNeeded: report.teacherReviewNeeded,
     defaultM3PlusReadyAfter: report.defaultM3PlusReadyAfter,
-    releaseModes: report.releaseModes,
-    blockedModes: report.blockedModes,
+    contract: report.contract,
+    zones: Object.fromEntries(Object.entries(report.zones).map(([name, item]) => [name, item.ready])),
     blockingReasons: report.blockingReasons,
     out: {
       json: rel(jsonPath),

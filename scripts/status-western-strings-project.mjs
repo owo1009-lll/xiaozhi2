@@ -1508,24 +1508,20 @@ async function buildM3PlusStatus() {
       source: M3PLUS_MONITORED_PILOT_AUDIT.replace(/\\/g, "/"),
       sourceExists: true,
       ok: monitoredPilotAudit.ok === true,
+      // rescope contract: readiness follows the authoritative four-zone gate,
+      // not the superseded first-measure slide/trill evidence chain
       readyForMonitoredPilot:
         monitoredPilotAudit.readyForMonitoredPilot === true
-        && round2ReleaseEvidenceReady
-        && independentModeEvidenceReady,
+        && rescopeGateReady,
       teacherReviewNeeded: monitoredPilotAudit.teacherReviewNeeded === true,
       defaultM3PlusReadyAfter: monitoredPilotAudit.defaultM3PlusReadyAfter === true,
+      contract: monitoredPilotAudit.contract || null,
+      zones: monitoredPilotAudit.zones || {},
       releaseModes: monitoredPilotAudit.releaseModes || {},
       blockedModes: monitoredPilotAudit.blockedModes || [],
       blockingReasons: [
         ...(monitoredPilotAudit.blockingReasons || []),
-        ...(!round2ReleaseEvidenceReady
-          ? normalizeCurrentM3PlusReasons(
-            round2AlignedEval?.blockingReasons || ["m3plus-round2-release-evidence-not-ready"],
-          )
-          : []),
-        ...(!independentModeEvidenceReady
-          ? modeEvalBlockingReasons.filter((reason) => reason.startsWith("m3plus-independent-"))
-          : []),
+        ...(!rescopeGateReady ? blockingReasons : []),
       ],
     } : {
       source: M3PLUS_MONITORED_PILOT_AUDIT.replace(/\\/g, "/"),
@@ -1534,6 +1530,8 @@ async function buildM3PlusStatus() {
       readyForMonitoredPilot: false,
       teacherReviewNeeded: false,
       defaultM3PlusReadyAfter: false,
+      contract: null,
+      zones: {},
       releaseModes: {},
       blockedModes: [],
       blockingReasons: ["m3plus-monitored-pilot-audit-missing"],
@@ -2327,7 +2325,15 @@ function summarizeNextActions(
       reason: m4Omr.automaticAdoptionBlockingReasons,
     });
   }
-  if (!actions.length) {
+  // Once BOTH monitored-pilot audits pass, the release chain (release review ->
+  // controlled pilot decision -> owner approval) becomes the top action even
+  // while research-only tracks (e.g. M4 automatic adoption) stay blocked.
+  const m3plusPilotAudit = m3plus.monitoredPilotAudit || {};
+  const m3plusPilotEvidencePassed = m3plusPilotAudit.readyForMonitoredPilot === true
+    && m3plusPilotAudit.teacherReviewNeeded !== true
+    && m3plusPilotAudit.defaultM3PlusReadyAfter !== true
+    && (m3plusPilotAudit.blockingReasons || []).length === 0;
+  if (!actions.length || (ordinaryPilotEvidencePassed && m3plusPilotEvidencePassed)) {
     if (releaseReview?.readyForControlledPilot === true
       && releaseReview?.teacherReviewNeeded !== true
       && releaseReview?.runtimeFailClosed === true) {
@@ -2435,7 +2441,8 @@ function summarizeNextActions(
       });
     }
   }
-  return actions;
+  // stable sort: the release chain (priority 1) precedes pending-track notes
+  return actions.sort((left, right) => (left.priority ?? 99) - (right.priority ?? 99));
 }
 
 const PHOTO_SCORE_BATCH_RUNS = path.join(

@@ -256,15 +256,35 @@ assert(m3plusNextAction?.artifact.endsWith("rescope-gate/report.json"), "M3+ han
 assert.equal(status.tracks.m4Omr.m4MeasureAudioRhythmRankingGatePassed, false, "M4 measure-level audio rhythm ranking must remain below the eval-only gate");
 assert.equal(status.tracks.m4Omr.audioRhythmRanking?.measureLevel?.runtimeReady, false, "M4 measure-level audio rhythm evidence must never directly edit a score");
 if (m3plus.monitoredPilotAudit?.sourceExists) {
-  assert.equal(m3plus.monitoredPilotAudit.readyForMonitoredPilot, false, "newer round-two failures must close the old monitored-pilot result");
+  assert.equal(
+    m3plus.monitoredPilotAudit.contract,
+    "m3plus-rescope-four-zone-v1",
+    "M3+ pilot audit must run the rescope four-zone contract, not the superseded slide/trill contract",
+  );
+  assert.equal(
+    m3plus.monitoredPilotAudit.readyForMonitoredPilot,
+    m3plus.rescopeGate?.releaseGateReady === true,
+    "monitored-pilot readiness must mirror the authoritative rescope gate",
+  );
   assert.equal(m3plus.monitoredPilotAudit.teacherReviewNeeded, false, "M3+ monitored pilot audit must not ask for more review when all auto-pass evidence is already known");
   assert.equal(m3plus.monitoredPilotAudit.defaultM3PlusReadyAfter, false, "M3+ monitored pilot audit must keep default runtime disabled");
-  assert.deepEqual(Object.keys(m3plus.monitoredPilotAudit.releaseModes || {}), ["slide-like", "trill-like"], "M3+ pilot audit should only expose slide/trill release modes");
-  assert((m3plus.monitoredPilotAudit.blockedModes || []).includes("variable-f0"), "unsafe variable-f0 must remain blocked by the M3+ audit");
-  assert((m3plus.monitoredPilotAudit.blockedModes || []).includes("slide-like"), "independent slide failure must block the old release mode");
-  assert((m3plus.monitoredPilotAudit.blockedModes || []).includes("trill-like"), "missing independent trill evidence must block the old release mode");
-  assert((m3plus.monitoredPilotAudit.blockingReasons || []).includes("m3plus-independent-mode-not-ready:slide-like"), "M3+ audit must expose the independent slide blocker");
-  assert((m3plus.monitoredPilotAudit.blockingReasons || []).includes("m3plus-independent-mode-not-ready:trill-like"), "M3+ audit must expose the failed independent trill blocker");
+  for (const zoneName of ["unmarkedStraight", "scoreMarkedNeutral", "techniqueCenter", "unstableFailClosed"]) {
+    assert.equal(
+      m3plus.monitoredPilotAudit.zones?.[zoneName]?.ready,
+      true,
+      `${zoneName} zone must be ready on the frozen holdout evidence`,
+    );
+  }
+  assert.equal(
+    m3plus.monitoredPilotAudit.zones?.rhythmOnset?.inherited,
+    "inherits-m3-core-gate-unchanged",
+    "rhythm/onset lane must stay inherited from the unchanged M3 core gate",
+  );
+  assert.deepEqual(
+    m3plus.monitoredPilotAudit.blockingReasons || [],
+    [],
+    "rescope audit must be unblocked on the frozen evidence",
+  );
 }
 
 const controlled = status.tracks.controlledCandidate;

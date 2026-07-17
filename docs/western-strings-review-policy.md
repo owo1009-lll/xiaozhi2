@@ -74,18 +74,29 @@ evidence blocks staging and professional review.
 The ordinary precheck must use `--recording-id <fresh recordingId>` so accepted
 historical submissions cannot be selected by list order.
 
-### M3+ Pitch Behavior Modes
+### M3+ Pitch Safety (rescope four-zone contract)
 
 `npm run western:m3plus-monitored-pilot-audit` must pass before any M3+
-monitored pilot. The current audit passes only for the narrow first-measure
-candidate-quality subset:
+monitored pilot. Since the 2026-07-17 rescope decision the audit no longer
+scores audio technique-mode detection; it audits the frozen holdout
+rescope-gate report (`npm run western:m3plus-rescope-gate`) against the
+four-zone pitch-safety contract (`m3plus-rescope-four-zone-v1`):
 
-- allowed release modes: `slide-like`, `trill-like`
-- control mode: `stable`
-- blocked modes: `double-stop-candidate`, `ornament-candidate`, `variable-f0`
-- default student runtime remains disabled
+- unmarked straight-tone zone: center-pitch precision >= 90%, zero unsafe
+  accusations
+- score-marked zone (tr/ornament/harmonic): zero accusations; every protected
+  unit stays `insufficient_evidence`
+- vibrato/slide zone (human-gold confirmed): center-pitch precision >= 90%,
+  zero unsafe accusations
+- unstable fallback: every high-dispersion stress case becomes
+  `insufficient_evidence`, zero accusations
+- rhythm/onset lane: inherits the unchanged M3 core gate (not re-scored here)
 
-This is not a broad M3+ release and not a technique-name display feature.
+The retired first-measure `slide-like`/`trill-like` candidate-quality contract
+is superseded, not pending repair. Passing this audit authorizes preparing a
+monitored pilot only; the default student runtime stays disabled and the
+owner's explicit approval command chain is still required. This is not a
+technique-name display feature.
 
 ### M4 OMR
 
