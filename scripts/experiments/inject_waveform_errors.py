@@ -100,6 +100,13 @@ def main(argv=None) -> int:
     ap.add_argument("--missing", type=int, default=5)
     ap.add_argument("--extra", type=int, default=5)
     ap.add_argument("--drag", type=int, default=4)
+    ap.add_argument("--pre-onset-extend", type=float, default=0.0,
+                    help="extend wrong/missing surgery windows this many seconds "
+                         "before the basic-pitch onset (bounded by the previous "
+                         "note's event start +0.15s). basic-pitch onsets lag true "
+                         "attacks on slow legato playing, so without this the "
+                         "note's real beginning survives the surgery and leaks "
+                         "as injection-artifact evidence")
     args = ap.parse_args(argv)
 
     import random
@@ -121,12 +128,17 @@ def main(argv=None) -> int:
 
     labels = []
     for kind, idx, t0, t1 in sites:
+        if kind in ("wrong", "missing") and args.pre_onset_extend > 0:
+            prev_start = (aev[match[idx - 1]]["start"]
+                          if idx > 0 and match[idx - 1] is not None else 0.0)
+            t0 = max(prev_start + 0.15, t0 - args.pre_onset_extend, 0.0)
         s, e = int(t0 * SR), int(t1 * SR)
         seg = y[s:e].copy()
         entry = {"type": kind, "scoreEventIndex": idx,
                  "measure": events[idx]["measure"],
                  "goldMidi": events[idx]["midis"][0],
-                 "windowSec": [round(t0, 3), round(t1, 3)]}
+                 "windowSec": [round(t0, 3), round(t1, 3)],
+                 "preOnsetExtendSec": args.pre_onset_extend if kind in ("wrong", "missing") else 0.0}
         if kind == "wrong":
             steps = rng.choice([-2, -1, 1, 2])
             seg2 = librosa.effects.pitch_shift(y=seg, sr=SR, n_steps=steps).astype(np.float32)

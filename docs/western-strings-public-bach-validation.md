@@ -158,3 +158,13 @@ npm run western:bach-violin-v2-audit
 - 任何未覆盖或低置信样本稳定进入复核,无危险硬反馈。
 
 当前公开语料已经把系统推进到“公开专业录音 V2-alpha + 核心错误原型”,尚未达到上述条件。
+
+## 10. 学生域注入预考:动态闸迁移证据(2026-07-17)
+
+Bach 三阶段确认(97.91%/36.00%)的两条硬伤是参考时间为估计值、错误为合成波形。本节把注入协议延伸到**真实学生域录音**(r2-01/r2-08 负责人实录,真实房间/设备),用逐音注入真值预考冻结动态闸策略(0.15/0.4/0.8/0.08s/0.5q),回避估计参考时间(按事件下标 join,无需 gold 时刻)。
+
+- **注入工具修复**:v1 手术窗从 basic-pitch onset 开切,而 bp onset 在慢速连奏上滞后真实起音 0.5–0.9s,音头留在窗外形成"删掉的音开头还在响"的伪影——v1 的 12 处漏放解剖后全部属此类(被借事件恰结束于注入窗起点)。`inject_waveform_errors.py` 增加 `--pre-onset-extend 0.9`(wrong/missing 窗口前扩,受前音事件起点+0.15s 保护),重生成 v2 六套(同种子)。
+- **v2 预考(`eval_western_strings_injected_errors_dynamic_gate.py`)**:冻结策略原样——漏音 0/30 漏放、错音 1/30(真同音高借音:0.22s 碎片冒充 1.6s 期望音,时长比 0.14)、干净覆盖 91.0%/92.1%(r2-01/r2-08,**远高于 Bach 的 36%**,曲目更简单是主因)。
+- **护栏扫描(`sweep_western_strings_injected_gate_guards.py`,dev=r2-01 选、holdout=r2-08 一次验)**:`minEventDurationRatio >= 0.15`(事件时长 ≥ 期望音长的 15%,期望音长=谱面 IOI×局部中位 tempo)零覆盖代价关死最后一个借音;终值 **wrong+missing 0/60 漏放、干净覆盖 91.0%/92.1%**。产物:`data/experiments/western-strings-injected-errors/dynamic-gate-preexam/{report,guard-sweep}.json`。
+- **已知边界(如实)**:drag(拖拍)目标 4–5/24 过音高闸——闸只主张音高+对齐,时值车道仍 review-only,符合产品纪律;extra 目标音本身确被演奏,多拉音检测同为 review-only;能量否决层未参加(dB 基准与锚定时间跨域未验,Bach 上核心错误场景本就只靠动态闸)。
+- **纪律**:labels 自带 `preGateOnly=true`,本预考是前置闸校准证据,**不得单独开启学生端**;终考仍是 fresh-blind 真实学生录音(真错误+真参考时间)。r2-08 旧 RF 三个被抑制候选(cents −1465/null/−350 却给 0.83–0.92 置信)在本闸的 `pitchDistance==0` 下全部即刻被拒,佐证迁移方向。
