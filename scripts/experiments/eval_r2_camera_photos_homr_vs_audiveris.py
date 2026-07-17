@@ -35,8 +35,8 @@ from eval_western_strings_m4_real_jpg_omr import preprocess  # noqa: E402
 
 PHOTOS = REPO / "data" / "private" / "western-strings-round2"
 GOLD = REPO / "音频" / "round2-谱子"
-HOMR_EXE = (REPO / "data" / "experiments" / "western-strings-m4"
-            / "homr-compat-venv" / "Scripts" / "homr.exe")
+HOMR_EXE = (REPO / "data" / "tools" / "homr-0.7.0-ort1.27.0"
+            / "Scripts" / "homr.exe")  # governed runtime (P0 review binding)
 DEFAULT_OUT = REPO / "data" / "experiments" / "western-strings-m4" / "r2-camera-photo-benchmark"
 
 
@@ -77,7 +77,7 @@ def compare(gold_ev, rec_ev):
             "onsetQuarterAccuracy": round(onset_q, 4), "onsetPairs": tot}
 
 
-def domain_audit(img_path: Path) -> dict:
+def domain_audit(img_path: Path, domain_label: str) -> dict:
     import numpy as np
     from PIL import Image
     im = Image.open(img_path).convert("L")
@@ -85,7 +85,7 @@ def domain_audit(img_path: Path) -> dict:
     return {"width": im.width, "height": im.height,
             "meanLuma": round(float(arr.mean()), 1),
             "lumaStd": round(float(arr.std()), 1),
-            "domainLabel": "owner-captured-print (pending input-domain gate classification)"}
+            "domainLabel": domain_label}
 
 
 def run_homr(photo: Path, work: Path, timeout_s: int) -> Path | None:
@@ -120,17 +120,22 @@ def main(argv=None) -> int:
     ap.add_argument("--pieces", nargs="+", default=[f"r2-{i:02d}" for i in range(1, 9)])
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
     ap.add_argument("--timeout", type=int, default=900)
+    ap.add_argument("--photo-suffix", default=".png",
+                    help="photo filename suffix appended to the piece id "
+                         "(e.g. '-screenphoto.jpg' for the owner-captured screen photos)")
+    ap.add_argument("--domain-label",
+                    default="owner-captured-print (pending input-domain gate classification)")
     args = ap.parse_args(argv)
     out_root = args.out.resolve(); out_root.mkdir(parents=True, exist_ok=True)
 
     rows = []
     for piece in args.pieces:
-        photo = PHOTOS / f"{piece}.png"
+        photo = PHOTOS / f"{piece}{args.photo_suffix}"
         gold = GOLD / f"{piece}.musicxml"
         row = {"piece": piece, "photo": str(photo), "gold": str(gold)}
         if not photo.is_file() or not gold.is_file():
             row["status"] = "missing-input"; rows.append(row); print(json.dumps(row)); continue
-        row["domainAudit"] = domain_audit(photo)
+        row["domainAudit"] = domain_audit(photo, args.domain_label)
         gold_ev, gold_meas = score_events(gold)
         row["goldMeasures"] = gold_meas
         for engine, runner in (("homr", run_homr), ("audiverisUp2", run_audiveris_up2)):

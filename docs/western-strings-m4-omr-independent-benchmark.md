@@ -243,3 +243,18 @@ HOMR 只在自身结构证据自洽时获胜(8/12 过 MusicXML-only 闸):ex03 �
 P0 治理工程现已落地:机器权威审查记录为 `config/third-party/homr-0.7.0-review.json`,部署清单和两套隔离运行时锁定在 `config/western-photo-score-deployment.json` 与 `config/western-photo-score-homr-runtime.lock.txt`,启动检查为 `npm run western:photo-score-deployment-preflight`。HOMR 0.7.0 及其上游仓库声明 **AGPL-3.0**;独立子进程、未修改发行版和本地图片→MusicXML 协议是已记录的工程事实,不替代法律判断。当前决定仍为 `pending`:在具名负责人确认受控离线范围、模型许可依据和不再分发前,`m4HomrLicenseReviewReady=false`,`m4HomrProductionPoolReady=false`,项目 gate 独立阻断部署治理。音频环境保持 NumPy 1.26.4,HOMR 环境保持 NumPy 2.4.6,不得合并。
 
 同轮产线化波形错误注入工具 `inject_waveform_errors.py`(错音/漏音/多音/拖拍四型,15ms crossfade 手术,种子确定性,标签含期望判定):r2-01/r2-08 各 ×3 种子共 6 套、每套 19 处注入,输出于 `data/experiments/western-strings-injected-errors/`,按家规仅作前置闸证据,不单独解锁学生端。
+
+### 8.18 屏拍域首测:负责人定义的产品主场景(2026-07-17)
+
+负责人拍摄了 8 张真实照片并明确产品主场景:**学生拿到的谱多为 PDF 在屏幕上显示,拍屏而非拍纸**。8 张为手机拍摄显示器上的 r2 谱页(24.5MP,微信传输,含摩尔纹彩带/屏幕背光/取景器可见标题栏与鼠标指针),域标签 `screen-photo-of-pdf`,与纸拍域分开计数,输入域分类闸的正式归类仍待跑。gold 依旧构造级(页面内容渲染自 r2-NN.musicxml)。
+
+| 引擎(8 张屏拍,vs 构造 gold) | pitch P | pitch R | onset-q | 小节数全对 |
+|---|---|---|---|---|
+| **HOMR(治理版运行时)** | **89.9%** | **94.1%** | **51.8%** | 1/8 |
+| Audiveris up2 | 0/8 无输出(up2 上采样后 98MP 超 20MP 上限,已知约束) | | | |
+
+- **音高质量与纸拍域持平**(纸拍 5 页:88.3/95.8),摩尔纹没有击穿 HOMR;**onset-quarter 51.8% 反而显著高于纸拍的 30.0%**(屏幕显示平整、无纸张阴影透视),其中 r2-04/r2-05 两页 onset-quarter=100%。
+- 弱点分布符合既有认知:装饰记号密集页最差(r2-06 颤音/揉弦页 P=69.0%,r2-05 滑音页 R=68.0%);**小节数普遍偏多**(如 26/21,HOMR 幻切小节线),节奏车道禁硬判纪律继续成立。
+- **严格自动采纳阈值(98/95/95/95)仍 0/8**,`m4OmrAutoScoreReady=false` 不变;本测只扩证据域,不改任何决策。真实拍摄域证据行:纸拍 5 + 屏拍 8 = 13(分域计数,合并口径待输入域分类闸)。
+- 产物:`data/experiments/western-strings-m4/r2-screen-photo-benchmark/r2-camera-photo-benchmark.json`;评测脚本增 `--photo-suffix/--domain-label` 参数,HOMR 路径改指治理版运行时 `data/tools/homr-0.7.0-ort1.27.0`。
+- 产品含义:双证据池(HOMR 候选 + 录音仲裁)在屏拍域的音高侧证据基础与纸拍域相当或更好——负责人主场景下 v3 池的可用性预期成立,待受控 batch 在屏拍提交上实测。
