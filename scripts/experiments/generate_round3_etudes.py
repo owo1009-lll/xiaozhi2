@@ -24,7 +24,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from music21 import clef, key, metadata, meter, note, stream, tempo
+from music21 import clef, expressions, key, metadata, meter, note, stream, tempo
 
 REPO = Path(__file__).resolve().parents[2]
 OUT = REPO / "音频" / "round3-谱子"
@@ -159,12 +159,12 @@ def etude_r3_04():
 
 
 R3_04_ERRORS = [
-    ("wrong", 2, 1, "G4", "把本小节第 1 拍的 G4 拉成 A4(高一个全音),时值不变"),
-    ("wrong", 8, 3, "B4", "把本小节第 3 拍的 B4 拉成 Bb4(低半音),时值不变"),
-    ("missing", 5, 2, "G4", "完全跳过本小节第 2 拍的 G4(直接留一拍空,不要用别的音填)"),
-    ("extra", 9, 1, "D5", "把本小节第 1 拍的 D5 连拉两次(各约半拍),再继续后面的音"),
-    ("drag", 4, 1, "B4", "把本小节的二分音符 B4 拖长到约 3 拍,后面的 G4 顺延缩短"),
-    ("drag", 11, 2, "A4", "把本小节第 2 拍的 A4 拖长到约 2 拍,之后追回节拍"),
+    ("wrong", 2, 1, "G4", "错音:改拉A4", "把本小节第 1 拍的 G4 拉成 A4(高一个全音),时值不变"),
+    ("wrong", 8, 3, "B4", "错音:改拉bB4", "把本小节第 3 拍的 B4 拉成 Bb4(低半音),时值不变"),
+    ("missing", 5, 2, "G4", "漏音:跳过不拉", "完全跳过本小节第 2 拍的 G4(直接留一拍空,不要用别的音填)"),
+    ("extra", 9, 1, "D5", "多拉:连拉两次", "把本小节第 1 拍的 D5 连拉两次(各约半拍),再继续后面的音"),
+    ("drag", 4, 1, "B4", "拖拍:拖到约3拍", "把本小节的二分音符 B4 拖长到约 3 拍,后面的 G4 顺延缩短"),
+    ("drag", 11, 2, "A4", "拖拍:拖到约2拍", "把本小节第 2 拍的 A4 拖长到约 2 拍,之后追回节拍"),
 ]
 
 
@@ -189,19 +189,19 @@ def etude_r3_05():
 
 
 R3_05_ERRORS = [
-    ("wrong", 3, 3, "D5", "把本小节第 3 拍的 D5 拉成 C#5(低半音),时值不变"),
-    ("missing", 6, 2, "G4", "完全跳过本小节第 2 拍的 G4(留空,不补别的音)"),
-    ("missing", 11, 3, "G4", "完全跳过本小节第 3 拍的 G4"),
-    ("extra", 8, 4, "D5", "把本小节第 4 拍的 D5 连拉两次(各约半拍)"),
-    ("extra", 10, 3, "A4", "把本小节第 3-4 拍的 A4 拉成两个一拍的 A4(重复一次)"),
-    ("drag", 12, 1, "F#4", "把本小节的二分音符 F#4 拖长到约 3 拍,后面的 A4 顺延缩短"),
+    ("wrong", 3, 3, "D5", "错音:改拉#C5", "把本小节第 3 拍的 D5 拉成 C#5(低半音),时值不变"),
+    ("missing", 6, 2, "G4", "漏音:跳过不拉", "完全跳过本小节第 2 拍的 G4(留空,不补别的音)"),
+    ("missing", 11, 3, "G4", "漏音:跳过不拉", "完全跳过本小节第 3 拍的 G4"),
+    ("extra", 8, 4, "D5", "多拉:连拉两次", "把本小节第 4 拍的 D5 连拉两次(各约半拍)"),
+    ("extra", 10, 3, "A4", "多拉:重复成两个一拍", "把本小节第 3-4 拍的 A4 拉成两个一拍的 A4(重复一次)"),
+    ("drag", 12, 1, "F#4", "拖拍:拖到约3拍", "把本小节的二分音符 F#4 拖长到约 3 拍,后面的 A4 顺延缩短"),
 ]
 
 
 def verify_errors(score: stream.Score, entries, name: str):
     """Construction-gold check: each entry's (measure, beat, pitch) must match."""
     part = score.parts[0]
-    for kind, measure_number, beat, pitch, _text in entries:
+    for kind, measure_number, beat, pitch, _short, _text in entries:
         m = part.measure(measure_number)
         if m is None:
             raise SystemExit(f"{name}: measure {measure_number} missing")
@@ -218,11 +218,34 @@ def verify_errors(score: stream.Score, entries, name: str):
 
 def checklist_md(name: str, entries) -> str:
     lines = [f"### {name} 错误清单(共 {len(entries)} 处,其余全部按谱正确演奏)", ""]
-    for index, (kind, measure_number, beat, pitch, text) in enumerate(entries, start=1):
+    for index, (kind, measure_number, beat, pitch, _short, text) in enumerate(entries, start=1):
         kind_cn = {"wrong": "错音", "missing": "漏音", "extra": "多拉", "drag": "拖拍"}[kind]
         lines.append(f"{index}. **[{kind_cn}] 第 {measure_number} 小节,第 {beat} 拍({pitch})**:{text}")
     lines.append("")
     return "\n".join(lines)
+
+
+CIRCLED = "①②③④⑤⑥⑦⑧⑨"
+
+
+def annotated_copy(build_fn, entries, title_suffix="(错误标注版,仅供演奏参考)"):
+    """Performer edition: the same piece with red Chinese markers above each
+    planted-error note. The CLEAN file stays the evaluation gold; this copy is
+    for the music stand only and must not be photographed for the OMR set."""
+    score = build_fn()
+    score.metadata.title = f"{score.metadata.title} {title_suffix}"
+    part = score.parts[0]
+    for index, (kind, measure_number, beat, pitch, short, _text) in enumerate(entries, start=1):
+        m = part.measure(measure_number)
+        text = expressions.TextExpression(f"{CIRCLED[index - 1]}{short}")
+        text.placement = "above"
+        try:
+            text.style.color = "#CC0000"
+            text.style.fontSize = 11
+        except Exception:
+            pass
+        m.insert(float(beat) - 1.0, text)
+    return score
 
 
 README = """# Round-3 录音任务:演奏要求
@@ -245,6 +268,8 @@ README = """# Round-3 录音任务:演奏要求
 ## B 组:r3-04 / r3-05(按清单故意出错,真值采集用)
 
 先把曲子按谱练顺,然后**严格按下面清单在指定位置制造错误**,清单外的所有音都要拉对。每处错误做完就正常继续,不要停顿或重来。
+
+演奏时可用**错误标注版**(`r3-04-marked.pdf` / `r3-05-marked.pdf`,红字①-⑥直接标在对应音符上方,编号与下表一致)。注意:**打印拍照任务必须用干净版**(标注版的红字会污染照片域样本)。
 
 {checklist_04}
 {checklist_05}
@@ -272,6 +297,12 @@ def main() -> int:
         path = OUT / f"{name}.musicxml"
         score.write("musicxml", fp=str(path))
         print(f"{name}: {len(list(score.parts[0].recurse().notes))} notes -> {path.name}")
+    for name, build_fn, errors in (("r3-04", etude_r3_04, R3_04_ERRORS),
+                                   ("r3-05", etude_r3_05, R3_05_ERRORS)):
+        marked = annotated_copy(build_fn, errors)
+        marked_path = OUT / f"{name}-marked.musicxml"
+        marked.write("musicxml", fp=str(marked_path))
+        print(f"{name}-marked: {len(errors)} in-score markers -> {marked_path.name}")
     readme = README.format(checklist_04=checklist_md("r3-04", R3_04_ERRORS),
                            checklist_05=checklist_md("r3-05", R3_05_ERRORS))
     (OUT / "README-演奏要求.md").write_text(readme, encoding="utf-8")
