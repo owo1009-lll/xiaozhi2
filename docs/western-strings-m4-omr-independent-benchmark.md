@@ -1,10 +1,10 @@
 # M4 OMR 独立基准(render-gold + 退化域 + 真照片)
 
-更新时间: 2026-07-15
+更新时间: 2026-07-17
 脚本: `scripts/experiments/eval_western_strings_m4_omr_render_gold.py`、`scripts/experiments/eval_western_strings_m4_real_jpg_omr.py`(eval-only)
 产物: `data/experiments/western-strings-m4/render-gold-omr*`、`real-jpg-omr*`(gitignored)
 
-> **当前裁决(2026-07-15):** `npm run western:m4-independent-benchmark-audit` 证明独立 clean/scan/photo render-gold 达到研究报告下限,但严格逐谱 P≥98% 且 R≥95% 仅 12/32(37.5%)。新增 5 份 Kayser Op.20 真实照片独立源谱 gold 后,Audiveris 总体 pitch P/R=`84.7%/71.5%`,onset-quarter/measure accuracy=`2.2%/43.8%`,完整严格通过 `0/5`;来源仓库 commit、CC-BY-SA-4.0 许可和 gold SHA-256 均已验证。任何只满足 pitch 的 MusicXML 也不得自动采用。当前 `automaticAdoptionReady=false`,`studentGateReady=false`,`humanTask=none`。
+> **历史裁决(2026-07-15, Audiveris 阶段):** `npm run western:m4-independent-benchmark-audit` 证明独立 clean/scan/photo render-gold 达到研究报告下限,但严格逐谱 P≥98% 且 R≥95% 仅 12/32(37.5%)。新增 5 份 Kayser Op.20 真实照片独立源谱 gold 后,Audiveris 总体 pitch P/R=`84.7%/71.5%`,onset-quarter/measure accuracy=`2.2%/43.8%`,完整严格通过 `0/5`;来源仓库 commit、CC-BY-SA-4.0 许可和 gold SHA-256 均已验证。任何只满足 pitch 的 MusicXML 也不得自动采用。HOMR fresh 复验与当前三层裁决见 §8.17；`automaticAdoptionReady=false`,`studentGateReady=false`,`humanTask=none` 仍不变。
 
 运行时置信筛选也已单独证伪:`npm run western:m4-omr-confidence-probe` 仅使用识别谱和 Audiveris 日志中上线可见的 11 个特征,按 BWV 作品留一。LR AUC=0.567,RF AUC=0.800;RF 最佳观察点仅 precision=0.80/coverage=0.156,不存在 precision≥0.90 且 coverage≥0.20 的安全子集。因此不能靠“模型自报高置信”绕过逐谱精度问题。
 
@@ -30,7 +30,7 @@
 2. **短板是漏音(recall)**:最差 bwv1004_mov2 P=99.1% 但 R=75.6%。漏音会引发下游"多拉音"误判,是最危险错误类型。
 3. **光学退化不是主要敌人**:合成 scan/photo 只掉 1–2 点;**真照片失败源于版面结构**(多行谱表、谱号识别失败、裁切),不是噪声。
 4. **失败有时可自暴露,但不能反推正确**:无输出、变体间小节数剧烈打架可自动拒绝;结构自检通过或多模型一致不等于识别正确,仍需独立 gold 校准。
-5. **预处理无银弹,旧“赛马有效”不能升级为准确率结论**:在 12 张自一致性集里 Otsu/up3 曾改善个别图;但 5 张独立 gold 的完整 sweep 显示 `up2` 最好(P/R=`85.6%/72.2%`),`up3`=`76.9%/63.5%`,Otsu=`61.7%/50.4%`且一份无输出。按曲事后挑最佳变体仍严格 `0/5`,所以生产继续固定 `up2`,其它变体只保留研究证据。
+5. **预处理无银弹,旧“赛马有效”不能升级为准确率结论**:在 12 张自一致性集里 Otsu/up3 曾改善个别图;但 5 张独立 gold 的完整 sweep 显示 `up2` 最好(P/R=`85.6%/72.2%`),`up3`=`76.9%/63.5%`,Otsu=`61.7%/50.4%`且一份无输出。按曲事后挑最佳变体仍严格 `0/5`;“固定 up2”是当时 Audiveris-only 路线的结论,现已由 §8.17 的 Audiveris+HOMR v3 候选池取代。
 6. **单音 vs 和弦分层清晰**:单音快速乐章 99–100%;与产品"单声部小提琴优先"边界吻合。
 
 ## 4. 对 M4 闸门的落地建议(分层)
@@ -113,8 +113,8 @@
 
 **代价(诚实)**:难页反馈变少而非变错;复调/密集页覆盖率仍低;人工核谱仍是把"降级页"升级为"全反馈页"的最佳通道,但不再阻塞任何流程。
 
-### 8.5 离线生产候选管线 + 12 条一致性回归(2026-07-11 第三轮,不代表独立准确率)
-**生产入口**:`scripts/western_photo_score_pipeline.py`(npm:`western:photo-score`)——单命令完成 照片+录音 → 三变体 OMR(带缓存)→ 录音仲裁 → 标注图 + 审计 JSON;决策枚举 `full-feedback:<variant>` / `degraded-feedback:<variant>`(仅绿)/ `retake-photo`。审计契约:`studentRuntimeTouched=false`、`missingExtraVerdictsEmitted=false`。快速单测 19 项(`test:western-photo-score`,纯逻辑,秒级)。对齐输出新增 `timingDeviationSec`(节奏偏差,信息性,为 M3 onset 维度铺路)。
+### 8.5 离线生产候选管线 + 12 条一致性回归(2026-07-11 第三轮历史状态,不代表独立准确率)
+**当时入口**:`scripts/western_photo_score_pipeline.py`(npm:`western:photo-score`)——单命令完成 照片+录音 → 三变体 OMR(带缓存)→ 录音仲裁 → 标注图 + 审计 JSON;决策枚举 `full-feedback:<variant>` / `degraded-feedback:<variant>`(仅绿)/ `retake-photo`。2026-07-17 起同一 npm 命令先走精确运行时 wrapper 和部署预检,当前机制见 §8.17。审计契约:`studentRuntimeTouched=false`、`missingExtraVerdictsEmitted=false`。快速单测 19 项(`test:western-photo-score`,纯逻辑,秒级)。对齐输出新增 `timingDeviationSec`(节奏偏差,信息性,为 M3 onset 维度铺路)。
 
 **12 条真实录音全量回归(经生产入口)**:
 | 出口 | 数量 | 明细 |
@@ -140,8 +140,8 @@
 - **E2E 实证**:入口→审核→批处理→审计 一条真数据(violin-ex12 照片+录音)走通,decision=`full-feedback:up3`。
 - **测试**:`test:western-photo-score-intake`(入口 fail-closed 4 项)通过;`test:western-feature-flags`、`test:western-alignment-preview` 回归无破坏。学生端运行时闸门全程未动。
 
-### 8.7 多引擎救回 ex07 + 第二轮收口(2026-07-11 第五轮)
-- **oemer 0.1.8 已装并实测**:对 ex07(Audiveris 三变体全无输出的九行谱照片)识别出 176 事件/23 小节,**录音交叉验证吻合度 92.0%**(87 对齐中 80 确认)。多引擎变体池成立:**12/12 真实照片全部机器可用**(11 Audiveris + 1 oemer)。
+### 8.7 多引擎救回 ex07 + 第二轮收口(2026-07-11 第五轮历史架构)
+- **oemer 0.1.8 已装并实测**:对 ex07(Audiveris 三变体全无输出的九行谱照片)识别出 176 事件/23 小节,**录音交叉验证吻合度 92.0%**(87 对齐中 80 确认)。这建立的是当时的研究性救回证据:**12/12 真实照片全部机器可用**(11 Audiveris + 1 oemer);Oemer 未进入当前 v3 池,当前架构见 §8.17。
 - **边界(已更新)**:Oemer CLI 默认只输出 MusicXML,但内部 `NoteHead` 实际保留像素 bbox。2026-07-16 已完成非侵入式坐标 sidecar 适配,见 8.9;识谱准确率仍未过闸,故 ex07 只允许可定位复核,不允许学生端自动判定。Oemer CPU 推理约数分钟/页。
 - **⚠️ 依赖坑(运维必读)**:`pip install oemer` 会把 numpy 拉到 2.x,**直接弄坏 basic-pitch/tensorflow/numba**;装后必须 `pip install "numpy<2"` 回 1.26.x,两引擎可共存。
 - **仲裁器结构信号结论**:纯 events 计数排序实测更糟(幻觉小节推高计数,ex10/ex06 反被误选)→ 维持(确认数,吻合度)排序;events 差异作为 `structureSpreadNote` 教师提示保留;ex11 为已度量接受边界。
@@ -162,7 +162,7 @@
 
 ### 8.10 HOMR 0.7.0 transformer 对照与完整谱闸门(2026-07-15)
 - HOMR 是独立的两阶段 OMR:结构分割后使用 transformer 做符号序列识别。隔离 Python 3.11/NumPy 2.4/CPU-only ONNX Runtime、4 线程串行运行,未污染现有 Basic Pitch 环境。
-- 5/5 原始 source 照片均成功输出,聚合 pitch P/R=`89.00%/96.17%`,onset-quarter/measure accuracy=`30.73%/79.04%`。它的 recall 明显优于 Audiveris/Oemer,但节奏结构仍远低于 95% 门槛。
+- 07-15 首跑的 5/5 原始 source 照片聚合值为 pitch P/R=`89.00%/96.17%`,onset-quarter/measure=`30.73%/79.04%`;该组数值保留为历史运行记录。当前权威口径是 07-17 以 ONNX Runtime 1.27.0 从零复验的 pitch P/R=`88.33%/95.78%`,onset-quarter/measure=`30.03%/79.04%`,完整严格通过仍为 `0/5`。机读证据已冻结在 `docs/evidence/western-strings-homr-sourcegold-20260717.json`,状态与 M4 preflight 不再读取旧首跑报告。
 - `ex05` 与 `ex12` 的 pitch P/R 均为 `1.00`,若沿用旧 pitch-only 判据会出现 `2/5` 假通过;其 onset-quarter accuracy 仅 `0.69%/8.02%`。实查 MusicXML 证实 HOMR 把正确音高序列赋成错误时值,不是评测脚本误差。
 - 因此外部引擎统一采用四项完整闸门:pitch precision≥0.98、pitch recall≥0.95、onset-quarter accuracy≥0.95、measure accuracy≥0.95。HOMR pitch-only 通过 `2/5`,完整通过 `0/5`;`automaticAdoptionReady=false`,`studentGateReady=false`。
 
@@ -219,14 +219,14 @@ HOMR 仅在第 7、35 小节各有一个 `C#5 -> B4` 替换，其余 170/172 音
 - 反复记号只说明印刷路线存在，不证明某次演奏实际执行反复。生产策略继续 fail-closed：检测到非平凡路线后输出 `repeat-route-review-required`，只有后续音频路线证据支持时才允许选择展开版本。报告：`data/experiments/western-strings-m4/repeat-route-probe/report.json`。
 - Op.45 的 `52.56%` 音频吻合率也不能归因于反复：修正后的同版候选与独立公开参考各有 `198` 个音，二者的 MusicXML 都没有反复方向标记。当前证据只支持“反复假设不成立/不可用”，不支持为提高吻合率而展开谱面。
 
-### 8.17 HOMR 接入生产变体池(v3,2026-07-17)
+### 8.17 HOMR 离线 v3 候选池与部署边界(2026-07-17)
 
 按照片域复验结论(HOMR 真照片 P=88.3%/R=95.8%,四项全面领先 Audiveris)把 HOMR 接入 `western_photo_score_pipeline.py` 作第四池候选,走既有 B 层音频仲裁,学生端运行时闸门零改动:
 
 - **仲裁货币不变**:HOMR 候选与 up2/up2-otsu/up3 同用 `(confirmed, agreement)`,同一 `compute_verdicts` 判定纪律(覆盖端、严格绿判、曲级闸、双邻红判规则,自 `proto_western_strings_score_anchored_feedback.py` 抽出共用)。
 - **结构闸按引擎分证据源**:Audiveris 走 P0 v2(`.omr` 原始符号 + 导出双证);HOMR 无 `.omr`,新增 `evaluate_musicxml_only_structure`(全 G2 谱号 + violin 音域 ≥95% + 单一调号/隐式 C 大调 + 拍号存在且小节时值一致率 ≥90%),审计里 `evidenceSource: musicxml-only` 明示证据更弱。
 - **HOMR 胜出时无像素坐标**:输出 list 式逐小节判定 JSON(`annotationStyle: score-list`),不产标注照片;坐标适配器未建成前这是有意的降级形态。
-- **HOMR venv 缺失时**:候选记 `homr-unavailable`,池自动退化为纯 Audiveris 行为,决策永不因此阻塞。
+- **HOMR runtime 缺失时**:未带生产 guard 的直接研究运行仍可显式记 `homr-unavailable` 并审计为 degraded pool;受控 batch、服务端和 `npm run western:photo-score` 统一经过精确 wrapper,先跑许可证/依赖/模型哈希 preflight,再强制 `--require-complete-engine-pool`。生产入口缺 Audiveris 或 HOMR 时在音频与 OMR 前非零退出,不再静默把 9/12 退回 3/12。
 - **一致性修复**:标注图改为在曲级闸/双邻降级**之后**绘制——此前图上可能出现判定 JSON 已降为中性的红框,与 `accusationsRequireBothNeighborConfidence` 合同不一致。
 
 12 条 m2f 真件回归(缓存引擎输出,决策对照;P0 v2 严格闸生效):
@@ -238,6 +238,8 @@ HOMR 仅在第 7、35 小节各有一个 `C#5 -> B4` 替换，其余 170/172 音
 
 HOMR 只在自身结构证据自洽时获胜(8/12 过 MusicXML-only 闸):ex03 里 HOMR 货币最高(112/0.98)但调号证据冲突(exportedKeyFifths=[-1,2])加拍号一致率不足被闸下,正确回落 `full-feedback:up2`;ex07(Audiveris 全变体无输出)由 retake 升为 review(57 confirmed@0.85,拍号证据不足不出反馈);ex04/08 进 review 是 Audiveris 各变体被 P0 v2 拦下**且** HOMR 自身拍号结构闸也未过的合取结果(消融验证:纯 Audiveris 池同为 review,故非接线引入的回归)。
 
-运维/治理警示(2026-07-17 审查补记):(1) HOMR 0.7.0 许可证为 **AGPL-3.0**(venv METADATA 一手),按 MUSC 先例(AGPL 审查完成前不得接生产)需补一份正式许可证审查记录;当前以独立子进程方式调用未修改的公开发行版,属 arm's-length 集成,但结论须以正式审查为准。(2) 生产管线 `DEFAULT_HOMR` 指向 gitignored 的 `data/experiments/.../homr-compat-venv`,venv 缺失时池静默退化为纯 Audiveris(机器可用 9/12→3/12),部署时必须固化该 venv 或在部署清单中加启动自检。(3) 主环境 `numpy<2`(basic-pitch/TF 约束)与 HOMR venv `numpy>=2.4` 互斥,依赖 venv 隔离共存,不可合并环境。(4) Route B 报告 §5 "Audiveris 主引擎 + oemer 救援"的架构描述相对 v3 已过时:oemer 不在 v3 生产池中,仅保留 eval 基准与坐标 sidecar 角色。节奏车道纪律不变(OMR 谱不做节奏硬判),严格自动采纳继续关,`m4OmrAutoFeedbackReady` 仍 false。审计 `pipeline: western-photo-score-v3-homr-pool`,增 `winnerEngine`/`winnerAnnotationStyle`/`enginePool` 字段。
+三层边界必须分别报告:(1) 离线 v3 管线内,HOMR 与 Audiveris 同权仲裁,胜出后机器直接给出 full/degraded 裁决;(2) 受控 batch 只处理人工标记 `accepted_for_batch` 的提交,产物固定 `studentFacing=false`,`autoDiagnosisIssued=false`,只进内部复核;(3) 正式 analyzer 主线继续 `mainlineExecutable=false`,学生端发布和自动采纳均关闭。因此“管线机制已有机器出口”不等于“发布授权已打开”。机读发布字段仍为 `m4OmrAutoScoreReady=false`,`m4OmrAutomaticAdoptionReady=false`,`m4HomrAutomaticAdoptionReady=false`。
+
+P0 治理工程现已落地:机器权威审查记录为 `config/third-party/homr-0.7.0-review.json`,部署清单和两套隔离运行时锁定在 `config/western-photo-score-deployment.json` 与 `config/western-photo-score-homr-runtime.lock.txt`,启动检查为 `npm run western:photo-score-deployment-preflight`。HOMR 0.7.0 及其上游仓库声明 **AGPL-3.0**;独立子进程、未修改发行版和本地图片→MusicXML 协议是已记录的工程事实,不替代法律判断。当前决定仍为 `pending`:在具名负责人确认受控离线范围、模型许可依据和不再分发前,`m4HomrLicenseReviewReady=false`,`m4HomrProductionPoolReady=false`,项目 gate 独立阻断部署治理。音频环境保持 NumPy 1.26.4,HOMR 环境保持 NumPy 2.4.6,不得合并。
 
 同轮产线化波形错误注入工具 `inject_waveform_errors.py`(错音/漏音/多音/拖拍四型,15ms crossfade 手术,种子确定性,标签含期望判定):r2-01/r2-08 各 ×3 种子共 6 套、每套 19 处注入,输出于 `data/experiments/western-strings-injected-errors/`,按家规仅作前置闸证据,不单独解锁学生端。

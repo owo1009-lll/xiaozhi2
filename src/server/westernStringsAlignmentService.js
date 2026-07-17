@@ -909,15 +909,13 @@ async function runOfflinePhotoScoreAnalyzer(repoRoot, submission) {
   const scorePhotoPath = safeString(submission.scorePhotoPath).trim();
   const audioPath = safeString(submission.audioPath).trim();
   const submissionId = safeString(submission.submissionId, "photo-score").trim();
-  const scriptPath = path.join(SOURCE_ROOT, "scripts", "western_photo_score_pipeline.py");
-  const runnerPath = path.join(SOURCE_ROOT, "scripts", "run-python.ps1");
+  const runnerPath = path.join(SOURCE_ROOT, "scripts", "run-western-photo-score-python.ps1");
   const outputRoot = path.join(repoRoot, "data", "analysis-photo-score", "controlled-submissions", submissionId);
   const args = [
     "-ExecutionPolicy",
     "Bypass",
     "-File",
     runnerPath,
-    scriptPath,
     "--photo",
     scorePhotoPath,
     "--audio",

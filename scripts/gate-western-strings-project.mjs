@@ -62,6 +62,16 @@ export function evaluateProjectGate(status, requiredTracks) {
       artifact: artifact || m4.artifacts?.independentGoldTodoHtml || m4.artifacts?.independentGoldTodo || "",
     });
   }
+  if (requiredTracks.has("m4") && !m4.m4HomrProductionPoolReady) {
+    failures.push({
+      track: "M4 photo-score deployment/governance",
+      reason: m4.homrGovernance?.blockingReasons || ["homr-production-pool-not-ready"],
+      artifact:
+        m4.artifacts?.photoScoreDeploymentPreflightJson
+        || m4.artifacts?.homrReviewRecordJson
+        || "",
+    });
+  }
   if (
     requiredTracks.has("public")
     && publicValidation.gates?.publicProfessionalMonophonicV2CandidateReady !== true

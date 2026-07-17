@@ -13,12 +13,42 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const subsPath = path.join(repoRoot, "data", "experiments", "western-strings-m3", "controlled-submissions.jsonl");
 const reviewsPath = path.join(repoRoot, "data", "experiments", "western-strings-m3", "controlled-submission-reviews.jsonl");
 const outJsonl = path.join(repoRoot, "data", "experiments", "western-strings-m4", "photo-score-batch-runs.jsonl");
-const pipeline = path.join(repoRoot, "scripts", "western_photo_score_pipeline.py");
-const pythonRunner = path.join(repoRoot, "scripts", "run-python.ps1");
+const photoScoreRunner = path.join(repoRoot, "scripts", "run-western-photo-score-python.ps1");
+const deploymentPreflight = path.join(repoRoot, "scripts", "preflight-western-photo-score-deployment.mjs");
 
 function readJsonl(p) {
   if (!fs.existsSync(p)) return [];
   return fs.readFileSync(p, "utf8").split(/\r?\n/).filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+}
+
+function parseLastJson(text) {
+  const lines = String(text || "").split(/\r?\n/).filter(Boolean);
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    try { return JSON.parse(lines[index]); } catch { /* continue */ }
+  }
+  return null;
+}
+
+// Check governance and both isolated runtimes before looking at accepted work.
+// A failed preflight therefore writes no batch row and consumes no submission.
+const preflightResult = spawnSync(process.execPath, [deploymentPreflight, "--quiet"], {
+  cwd: repoRoot,
+  encoding: "utf8",
+  timeout: 2 * 60 * 1000,
+  env: process.env,
+});
+if (preflightResult.status !== 0) {
+  const report = parseLastJson(preflightResult.stderr) || parseLastJson(preflightResult.stdout);
+  console.log(JSON.stringify({
+    ok: false,
+    queued: 0,
+    ran: 0,
+    reason: "photo-score-deployment-preflight-failed",
+    blockingReasons: report?.blockingReasons || [`preflight-exit-${preflightResult.status}`],
+    studentFacing: false,
+    autoDiagnosisIssued: false,
+  }));
+  process.exit(1);
 }
 
 const limit = Math.max(0, Math.round(Number(process.argv[2] || 5)));
@@ -26,7 +56,10 @@ const submissions = readJsonl(subsPath).filter((s) => s.kind === "photo-score");
 const reviews = readJsonl(reviewsPath);
 const latestAction = new Map();
 for (const r of reviews) latestAction.set(r.submissionId, r.action);
-const alreadyRun = new Set(readJsonl(outJsonl).map((r) => r.submissionId));
+// Dependency or governance failures must remain retryable after remediation.
+const alreadyRun = new Set(
+  readJsonl(outJsonl).filter((r) => r.status === "ok").map((r) => r.submissionId),
+);
 
 const queue = submissions.filter((s) => latestAction.get(s.submissionId) === "accepted_for_batch" && !alreadyRun.has(s.submissionId)).slice(0, limit);
 const items = [];
@@ -38,8 +71,8 @@ for (const sub of queue) {
     record = { ...record, status: "failed", reason: "photo-or-audio-missing" };
   } else {
     const res = spawnSync("powershell.exe", [
-      "-ExecutionPolicy", "Bypass", "-File", pythonRunner,
-      pipeline, "--photo", photo, "--audio", audio,
+      "-ExecutionPolicy", "Bypass", "-File", photoScoreRunner,
+      "--photo", photo, "--audio", audio,
     ], {
       cwd: repoRoot,
       encoding: "utf8",
@@ -53,7 +86,7 @@ for (const sub of queue) {
     });
     const line = (res.stdout || "").split(/\r?\n/).filter((l) => l.startsWith("{")).pop();
     let parsed = null; try { parsed = line ? JSON.parse(line) : null; } catch { /* keep null */ }
-    record = parsed
+    record = res.status === 0 && parsed
       ? {
         ...record,
         status: "ok",
@@ -61,7 +94,11 @@ for (const sub of queue) {
         audit: parsed.audit,
         p0StructureGateVersion: parsed.p0StructureGateVersion || 0,
       }
-      : { ...record, status: "failed", reason: `pipeline-exit-${res.status}` };
+      : {
+        ...record,
+        status: "failed",
+        reason: parsed?.reason || `pipeline-exit-${res.status}`,
+      };
   }
   items.push(record);
   fs.mkdirSync(path.dirname(outJsonl), { recursive: true });

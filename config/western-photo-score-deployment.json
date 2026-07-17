@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "pipelineId": "western-photo-score-v3-homr-pool",
+  "deploymentScope": "controlled-offline-review-only",
+  "policy": {
+    "studentFacing": false,
+    "automaticAdoptionAuthorized": false,
+    "requiredEnginePool": [
+      "audiveris",
+      "homr"
+    ],
+    "allowMissingRequiredEngine": false,
+    "requiredPipelineFlag": "--require-complete-engine-pool"
+  },
+  "governance": {
+    "homr": {
+      "component": "homr",
+      "version": "0.7.0",
+      "licenseSpdx": "AGPL-3.0-only",
+      "declaredLicense": "AGPL-3.0",
+      "reviewRecord": "config/third-party/homr-0.7.0-review.json",
+      "reviewDocument": "docs/western-strings-homr-license-deployment-review.md",
+      "requiredDecisionStatus": "approved-with-conditions",
+      "requiredApprovedScope": "controlled-offline-review-only",
+      "requiredIntegrationMode": "unmodified-external-cli-subprocess",
+      "requiredIntegrationContractVersion": 1
+    }
+  },
+  "runtime": {
+    "audioPython": {
+      "pathEnv": "WESTERN_PHOTO_SCORE_PYTHON_EXE",
+      "defaultRelativePath": "data/tools/western-photo-score-audio-py311/Scripts/python.exe",
+      "pythonVersion": "3.11.9",
+      "requiredPackages": {
+        "basic-pitch": "0.4.0",
+        "numpy": "1.26.4",
+        "tensorflow": "2.15.0",
+        "Pillow": "12.2.0",
+        "music21": "9.1.0"
+      }
+    },
+    "audiveris": {
+      "pathEnv": "ERHU_AUDIVERIS_CLI",
+      "defaultRelativePath": "data/tools/audiveris/extracted/Audiveris/Audiveris.exe",
+      "version": "5.10.2",
+      "commit": "1b7cf44088c68f4168801822a613751d1bb1b584"
+    },
+    "homr": {
+      "pathEnv": "ERHU_HOMR_CLI",
+      "runtimeRootDefaultRelativePath": "data/tools/homr-0.7.0-ort1.27.0",
+      "defaultRelativePath": "data/tools/homr-0.7.0-ort1.27.0/Scripts/homr.exe",
+      "pythonRelativeToExecutable": "python.exe",
+      "lockFile": "config/western-photo-score-homr-runtime.lock.txt",
+      "offlineWheelhouseDefaultRelativePath": "data/tools/wheelhouse/western-photo-score-homr",
+      "offlineModelBundleDefaultRelativePath": "data/tools/wheelhouse/western-photo-score-homr/models",
+      "requiredPackages": {
+        "homr": "0.7.0",
+        "numpy": "2.4.6",
+        "onnxruntime": "1.27.0",
+        "rapidocr": "3.9.1"
+      },
+      "requiredOnnxProviders": [
+        "CPUExecutionProvider"
+      ],
+      "models": [
+        {
+          "package": "homr",
+          "relativePath": "segmentation/segnet_308-3296ccd40960f90ca6ab9c035cca945675d30a0f.onnx",
+          "bytes": 57311361,
+          "sha256": "6ed36640db4ef5d223098b6d5efe4eda97c66b24a2c72faab8a018c749003a8d"
+        },
+        {
+          "package": "homr",
+          "relativePath": "transformer/decoder_pytorch_model_396-f6feedb42ff90087d898b0941a55d040fa6b2903.onnx",
+          "bytes": 47299551,
+          "sha256": "3e10fd5ae52d0b86792721922fcd954c283a7ed365de7446425bdabe38f3e57d"
+        },
+        {
+          "package": "homr",
+          "relativePath": "transformer/encoder_pytorch_model_396-f6feedb42ff90087d898b0941a55d040fa6b2903.onnx",
+          "bytes": 52861122,
+          "sha256": "4c16df852b3789f2676b0d49f0545dab0740e4005f7b472c5252add642f5d5eb"
+        },
+        {
+          "package": "rapidocr",
+          "relativePath": "models/ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+          "bytes": 585532,
+          "sha256": "e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c"
+        },
+        {
+          "package": "rapidocr",
+          "relativePath": "models/PP-OCRv6_det_small.onnx",
+          "bytes": 9929594,
+          "sha256": "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f"
+        },
+        {
+          "package": "rapidocr",
+          "relativePath": "models/PP-OCRv6_rec_small.onnx",
+          "bytes": 21234383,
+          "sha256": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884"
+        }
+      ]
+    }
+  },
+  "preflight": {
+    "audioProbeTimeoutSeconds": 60,
+    "audiverisProbeTimeoutSeconds": 30,
+    "homrProbeTimeoutSeconds": 30
+  }
+}

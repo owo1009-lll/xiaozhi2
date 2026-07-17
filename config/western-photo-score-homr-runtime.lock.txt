@@ -1,0 +1,29 @@
+# Offline HOMR runtime lock captured from the validated 2026-07-17 environment.
+# Install only from an authorized local wheelhouse with pip --no-index.
+antlr4-python3-runtime==4.9.3
+certifi==2026.6.17
+charset-normalizer==3.4.9
+colorama==0.4.6
+colorlog==6.10.1
+flatbuffers==25.12.19
+homr==0.7.0
+idna==3.18
+musicxml==1.4
+numpy==2.4.6
+omegaconf==2.3.1
+onnxruntime==1.27.0
+opencv-python==5.0.0.93
+opencv-python-headless==4.13.0.92
+packaging==26.2
+pillow==12.3.0
+protobuf==7.35.1
+pyclipper==1.4.0
+PyYAML==6.0.3
+rapidocr==3.9.1
+requests==2.34.2
+shapely==2.1.2
+six==1.17.0
+tqdm==4.68.4
+types-Pillow==10.2.0.20240822
+typing_extensions==4.16.0
+urllib3==2.7.0

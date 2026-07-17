@@ -97,18 +97,33 @@ task: compare the source score image/PDF against editable MusicXML/MXL. A music
 teacher should not be asked to judge intonation, rhythm, or student performance
 for this gate.
 
-The stronger-engine machine comparison is also complete. Oemer 0.1.8 failed to
-produce MusicXML for one of five frozen source-gold photos and passed the strict
-precision/recall gate on zero of five. This is a machine accuracy limitation,
-not a request for more teacher review. Keep OMR review-only unless a future
-engine passes the same frozen independent benchmark.
+The Oemer-era stronger-engine comparison is also complete. Oemer 0.1.8 failed
+to produce MusicXML for one of five frozen source-gold photos and passed the
+strict precision/recall gate on zero of five. This is a machine accuracy
+limitation, not a request for more teacher review. That result keeps automatic
+adoption and student release off; it does not prohibit an explicitly bounded
+offline machine pipeline.
 
-HOMR 0.7.0 was then evaluated on the same five sources. It produced all five
-files and improved pitch recall, but two pitch-perfect outputs reconstructed
-the rhythm incorrectly. Automatic adoption therefore requires pitch precision,
-pitch recall, onset-quarter accuracy, and measure accuracy to pass together.
-HOMR passed this complete gate on zero of five. No additional teacher or score
-editor review is requested for this machine limitation.
+HOMR 0.7.0 was then evaluated on the same five sources. The current 2026-07-17
+fresh authority uses ONNX Runtime 1.27.0 and reports P/R=0.883324/0.957827,
+onset-quarter=0.300319, measure=0.790415, and complete strict pass 0/5. The
+tracked aggregate and per-page hashes are in
+`docs/evidence/western-strings-homr-sourcegold-20260717.json`; project status and
+M4 preflight must read this manifest, not the 2026-07-15 first-run report.
+
+Do not collapse three different boundaries. Inside the offline v3 function,
+HOMR is a peer arbitration candidate and a winner directly produces a machine
+full/degraded decision. The controlled batch still requires a prior human
+`accepted_for_batch` action and writes review-only artifacts with
+`studentFacing=false`. The formal analyzer mainline remains
+`mainlineExecutable=false`, and student release/automatic adoption remain off.
+
+HOMR licensing and deployment are an independent gate, not an accuracy metric.
+Run `npm run western:photo-score-deployment-preflight` before any controlled
+batch. Until the named AGPL/model review is recorded and both isolated runtimes,
+the dependency lock, local models, and engine pool all pass, the preflight and
+project gate must fail closed. A pending license decision is not a teacher or
+score-editor review task and must never be filled with a fabricated reviewer.
 
 Clarity-OMR was also evaluated on the same five frozen sources. Native viewer
 screenshots failed Stage-A staff detection; a fixed, gold-independent page trim
@@ -137,11 +152,13 @@ or bytes changed. Use `npm run western:m4-apply-independent-gold-workspace --
 --dry-run` before applying changes.
 
 Before asking anyone to edit future score files, run
-`npm run western:m4-preflight`. It runs the M4 readiness, benchmark,
+`npm run western:m4-preflight`. It runs the M4 evidence readiness, benchmark,
 independent-gold todo/workspace, provenance, workspace audit, independent
 render/scan/photo benchmark audit, project status,
 independent-gold note summary, and next-action handoff commands in one machine
-self-test pass. The note summary is only a machine-readable preview of the
+self-test pass. This evidence preflight is not a photo-score deployment proof;
+the latter is the separate fail-closed command
+`npm run western:photo-score-deployment-preflight`. The note summary is only a machine-readable preview of the
 current editable MXL files; it does not replace score-editor correction. If it
 reports `humanTask=score-editor-independent-gold-correction`, then the
 project has already exhausted the current automatic checks and the remaining

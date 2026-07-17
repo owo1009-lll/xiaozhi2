@@ -1,0 +1,284 @@
+{
+  "schemaVersion": 1,
+  "evidenceId": "western-strings-homr-sourcegold-20260717",
+  "authority": "current-frozen-homr-sourcegold-baseline",
+  "sourceCreatedAt": "2026-07-16T18:56:48.111006+00:00",
+  "evaluationMode": "independent-source-gold",
+  "freshRun": {
+    "reuseExisting": false,
+    "executedRows": 5,
+    "evidence": "every row has homrExit=0, runtimeSeconds>0, and no reusedExisting flag"
+  },
+  "freezer": {
+    "repoPath": "scripts/freeze-western-strings-homr-evidence.mjs",
+    "normalizedBytes": 24003,
+    "sha256": "e1c2108884233d537041631a8c46241f1a1156cb51fd654b74d22598001bbb89",
+    "hashMode": "utf8-lf-normalized"
+  },
+  "evaluator": {
+    "repoPath": "scripts/experiments/eval_western_strings_m4_homr_benchmark.py",
+    "normalizedBytes": 15268,
+    "sha256": "78b810c2b60c90bd7d57c8c04ca916e5dc36d683d36f022b6ed8b34da2d97238",
+    "hashMode": "utf8-lf-normalized"
+  },
+  "intake": {
+    "repoPath": "data/experiments/western-strings-m4/independent-real-photo-gold/independent-source-benchmark-intake.csv",
+    "bytes": 4166,
+    "sha256": "76e3ead1130aedfc790c03b09c396a5d8a8e548765a669dca3b7ce9913261f3c"
+  },
+  "goldManifest": {
+    "repoPath": "data/experiments/western-strings-m4/independent-real-photo-gold/independent-gold-manifest.json",
+    "bytes": 7407,
+    "sha256": "b2f0f6df3b91ef19915323bf7b37b8469b88cec15702833dfe160cc298aa178d",
+    "sourceRepository": "https://codeberg.org/pbuettgen/music-scores",
+    "sourceCommit": "64daba9d3b2ac4f216f37459d93fee622d085007",
+    "license": "CC-BY-SA-4.0"
+  },
+  "runtime": {
+    "homr": "0.7.0",
+    "numpy": "2.4.6",
+    "onnxruntime": "1.27.0",
+    "providers": [
+      "AzureExecutionProvider",
+      "CPUExecutionProvider"
+    ],
+    "license": "AGPL-3.0"
+  },
+  "threadLimits": {
+    "OMP_NUM_THREADS": "2",
+    "OPENBLAS_NUM_THREADS": "2",
+    "MKL_NUM_THREADS": "2",
+    "NUMBA_NUM_THREADS": "2",
+    "TF_NUM_INTRAOP_THREADS": "2",
+    "TF_NUM_INTEROP_THREADS": "1"
+  },
+  "strictThresholds": {
+    "minPitchPrecision": 0.98,
+    "minPitchRecall": 0.95,
+    "minOnsetQuarterAccuracy": 0.95,
+    "minMeasureAccuracy": 0.95
+  },
+  "aggregate": {
+    "rows": 5,
+    "usableRows": 5,
+    "engineFailureRows": 0,
+    "unusableEvidenceRows": 0,
+    "goldNotes": 1565,
+    "attemptedGoldNotes": 1565,
+    "draftNotes": 1697,
+    "pitchExact": 1499,
+    "pitchPrecision": 0.883324,
+    "pitchRecall": 0.957827,
+    "pitchMissRate": 0.042173,
+    "pitchRecallIncludingEngineFailures": 0.957827,
+    "onsetQuarterAccuracy": 0.300319,
+    "measureAccuracy": 0.790415,
+    "pitchOnlyStrictPassRows": 2,
+    "pitchOnlyStrictPassPieceIds": [
+      "violin-ex05",
+      "violin-ex12"
+    ],
+    "strictPassRows": 0,
+    "strictPassPieceIds": [],
+    "automaticAdoptionReady": false,
+    "studentGateReady": false
+  },
+  "rows": [
+    {
+      "pieceId": "violin-ex05",
+      "sourceImage": {
+        "repoPath": "data/private/western-strings-m2/violin-ex05-score.jpg",
+        "bytes": 260661,
+        "sha256": "7ea8edfa25a3c885c8f821e0ce4cbd442ceec9a8cda8f9f009ec3e3255899974"
+      },
+      "homrInputCopy": {
+        "repoPath": "data/experiments/western-strings-m4/homr-fresh-sourcegold-revalidation-20260717/violin-ex05/input.jpg",
+        "bytes": 260661,
+        "sha256": "7ea8edfa25a3c885c8f821e0ce4cbd442ceec9a8cda8f9f009ec3e3255899974"
+      },
+      "gold": {
+        "repoPath": "data/experiments/western-strings-m4/independent-real-photo-gold/violin-ex05.independent-source-gold.musicxml",
+        "bytes": 107060,
+        "sha256": "a3121645d9273f6ad1ac3c9d15e3893375953d745c002b8444c7dbab20f4056c",
+        "provenance": "independent-source-derived-gold",
+        "reviewStatus": "approved"
+      },
+      "homrOutput": {
+        "repoPath": "data/experiments/western-strings-m4/homr-fresh-sourcegold-revalidation-20260717/violin-ex05/input.musicxml",
+        "bytes": 132093,
+        "sha256": "11fc039dd655a1da0ef18c8799f9078f867ab7d97266888d8319f1a27761bc70"
+      },
+      "metrics": {
+        "goldNotes": 288,
+        "draftNotes": 288,
+        "pitchExact": 288,
+        "pitchPrecision": 1,
+        "pitchRecall": 1,
+        "onsetQuarterAccuracy": 0.006944,
+        "measureAccuracy": 1,
+        "pitchOnlyStrictPass": true,
+        "strictPass": false
+      }
+    },
+    {
+      "pieceId": "violin-ex08",
+      "sourceImage": {
+        "repoPath": "data/private/western-strings-m2/violin-ex08-score.jpg",
+        "bytes": 312307,
+        "sha256": "69010078c10d16b71c97f3c9832f0f82f5d3edfd8bd679295fa324bb4d1fc0c7"
+      },
+      "homrInputCopy": {
+        "repoPath": "data/experiments/western-strings-m4/homr-fresh-sourcegold-revalidation-20260717/violin-ex08/input.jpg",
+        "bytes": 312307,
+        "sha256": "69010078c10d16b71c97f3c9832f0f82f5d3edfd8bd679295fa324bb4d1fc0c7"
+      },
+      "gold": {
+        "repoPath": "data/experiments/western-strings-m4/independent-real-photo-gold/violin-ex08.independent-source-gold.musicxml",
+        "bytes": 237850,
+        "sha256": "b717c246f6921b747bf610a020f3bc56596b2bbe057e21c90e3810e26a8cfa82",
+        "provenance": "independent-source-derived-gold",
+        "reviewStatus": "approved"
+      },
+      "homrOutput": {
+        "repoPath": "data/experiments/western-strings-m4/homr-fresh-sourcegold-revalidation-20260717/violin-ex08/input.musicxml",
+        "bytes": 154438,
+        "sha256": "92e13b1af1053979e959a32ff654adbd6a34ca3e909a38ad7f5751fe8086b437"
+      },
+      "metrics": {
+        "goldNotes": 341,
+        "draftNotes": 373,
+        "pitchExact": 292,
+        "pitchPrecision": 0.782842,
+        "pitchRecall": 0.856305,
+        "onsetQuarterAccuracy": 0.032258,
+        "measureAccuracy": 0.043988,
+        "pitchOnlyStrictPass": false,
+        "strictPass": false
+      }
+    },
+    {
+      "pieceId": "violin-ex09",
+      "sourceImage": {
+        "repoPath": "data/private/western-strings-m2/violin-ex09-score.jpg",
+        "bytes": 357919,
+        "sha256": "02350714ac2e7928ccd94d5c7cf5cc6c86c9cb0bc5f26aa0a0046d017adfa90b"
+      },
+      "homrInputCopy": {
+        "repoPath": "data/experiments/western-strings-m4/homr-fresh-sourcegold-revalidation-20260717/violin-ex09/input.jpg",
+        "bytes": 357919,
+        "sha256": "02350714ac2e7928ccd94d5c7cf5cc6c86c9cb0bc5f26aa0a0046d017adfa90b"
+      },
+      "gold": {
+        "repoPath": "data/experiments/western-strings-m4/independent-real-photo-gold/violin-ex09.independent-source-gold.musicxml",
+        "bytes": 107860,
+        "sha256": "09c5c994f8f33aab93394ce60c4a396c7cba3e10a0332cebe31b981328bbc041",
+        "provenance": "independent-source-derived-gold",
+        "reviewStatus": "approved"
+      },
+      "homrOutput": {
+        "repoPath": "data/experiments/western-strings-m4/homr-fresh-sourcegold-revalidation-20260717/violin-ex09/input.musicxml",
+        "bytes": 108262,
+        "sha256": "b5842eceb912036f5d5fda5e6744bc6bff58e9221f33a41e07b663bef2f2813c"
+      },
+      "metrics": {
+        "goldNotes": 288,
+        "draftNotes": 386,
+        "pitchExact": 288,
+        "pitchPrecision": 0.746114,
+        "pitchRecall": 1,
+        "onsetQuarterAccuracy": 0.996528,
+        "measureAccuracy": 0.996528,
+        "pitchOnlyStrictPass": false,
+        "strictPass": false
+      }
+    },
+    {
+      "pieceId": "violin-ex10",
+      "sourceImage": {
+        "repoPath": "data/private/western-strings-m2/violin-ex10-score.jpg",
+        "bytes": 326898,
+        "sha256": "eb72eda7e9fa4fc42b26d6455e1eda456eb0faca9029abe0d98a8372e9f11aa1"
+      },
+      "homrInputCopy": {
+        "repoPath": "data/experiments/western-strings-m4/homr-fresh-sourcegold-revalidation-20260717/violin-ex10/input.jpg",
+        "bytes": 326898,
+        "sha256": "eb72eda7e9fa4fc42b26d6455e1eda456eb0faca9029abe0d98a8372e9f11aa1"
+      },
+      "gold": {
+        "repoPath": "data/experiments/western-strings-m4/independent-real-photo-gold/violin-ex10.independent-source-gold.musicxml",
+        "bytes": 126696,
+        "sha256": "27e3588754f58e7da12c6a9d63a4a379531cc8291545598f14e4c501704c3e19",
+        "provenance": "independent-source-derived-gold",
+        "reviewStatus": "approved"
+      },
+      "homrOutput": {
+        "repoPath": "data/experiments/western-strings-m4/homr-fresh-sourcegold-revalidation-20260717/violin-ex10/input.musicxml",
+        "bytes": 91799,
+        "sha256": "c53395f8b646f4d3020f0e3cf1dcac9aa5da03cde79a3b208e580294740e6ea3"
+      },
+      "metrics": {
+        "goldNotes": 324,
+        "draftNotes": 326,
+        "pitchExact": 307,
+        "pitchPrecision": 0.941718,
+        "pitchRecall": 0.947531,
+        "onsetQuarterAccuracy": 0.444444,
+        "measureAccuracy": 0.996914,
+        "pitchOnlyStrictPass": false,
+        "strictPass": false
+      }
+    },
+    {
+      "pieceId": "violin-ex12",
+      "sourceImage": {
+        "repoPath": "data/private/western-strings-m2/violin-ex12-score.jpg",
+        "bytes": 203219,
+        "sha256": "ffdfc3c32824c5ced176445259fb4495eb3ccccc720c02abf44ba56faf217e21"
+      },
+      "homrInputCopy": {
+        "repoPath": "data/experiments/western-strings-m4/homr-fresh-sourcegold-revalidation-20260717/violin-ex12/input.jpg",
+        "bytes": 203219,
+        "sha256": "ffdfc3c32824c5ced176445259fb4495eb3ccccc720c02abf44ba56faf217e21"
+      },
+      "gold": {
+        "repoPath": "data/experiments/western-strings-m4/independent-real-photo-gold/violin-ex12.independent-source-gold.musicxml",
+        "bytes": 229188,
+        "sha256": "a4b328ec0922a78195f01ef550346e74d5d3763f1416d6f6345e57dc4e25bc82",
+        "provenance": "independent-source-derived-gold",
+        "reviewStatus": "approved"
+      },
+      "homrOutput": {
+        "repoPath": "data/experiments/western-strings-m4/homr-fresh-sourcegold-revalidation-20260717/violin-ex12/input.musicxml",
+        "bytes": 146496,
+        "sha256": "aceb10f24a709e9630e5f0c45ea33c4433a91fe2566e0fb287f3aeb3bb8713aa"
+      },
+      "metrics": {
+        "goldNotes": 324,
+        "draftNotes": 324,
+        "pitchExact": 324,
+        "pitchPrecision": 1,
+        "pitchRecall": 1,
+        "onsetQuarterAccuracy": 0.080247,
+        "measureAccuracy": 1,
+        "pitchOnlyStrictPass": true,
+        "strictPass": false
+      }
+    }
+  ],
+  "sourceArtifacts": {
+    "report": {
+      "repoPath": "data/experiments/western-strings-m4/homr-fresh-sourcegold-revalidation-20260717/homr-source-benchmark.json",
+      "bytes": 14186,
+      "sha256": "3a01c80505330f154c5dc8685e6197902af8f498b5ce78f9c5ac6cace69364a4"
+    },
+    "csv": {
+      "repoPath": "data/experiments/western-strings-m4/homr-fresh-sourcegold-revalidation-20260717/homr-source-benchmark.csv",
+      "bytes": 3677,
+      "sha256": "4fa53cd91dddf57b4829108bd6ac65ce908509b89bcce3723b90bb90a5a928a2"
+    }
+  },
+  "limitations": [
+    "Raw photos, gold, engine outputs, and the source report remain local gitignored artifacts; this tracked manifest freezes their paths and SHA-256 values.",
+    "This evidence is an eval-only accuracy baseline and does not authorize automatic adoption or student-facing feedback."
+  ]
+}

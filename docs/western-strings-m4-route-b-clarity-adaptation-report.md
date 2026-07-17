@@ -2,11 +2,13 @@
 
 ## 裁决
 
-**在当前真实照片域,Audiveris 仍是最强识别引擎。** 自训 Clarity 适配经 6 轮训练、4 个独立假设、4 次真照片大考后:pitch precision 追平 Audiveris(84.8–85.3% vs 85.5%),但 **pitch recall 钉死在 22–24%**(Audiveris 72.1%,oemer 76.2%),根因已定位且超出"适配"范畴(见 §3)。
+> 本节是 Clarity 训练完成时的历史裁决；同日 HOMR fresh 复验已经 supersede “Audiveris 最强”这一横向排名，当前结论见文末勘误。
+
+**在当时已完成的 Audiveris/Oemer/Clarity 比较中,Audiveris 是最强识别引擎。** 自训 Clarity 适配经 6 轮训练、4 个独立假设、4 次真照片大考后:pitch precision 追平 Audiveris(84.8–85.3% vs 85.5%),但 **pitch recall 钉死在 22–24%**(Audiveris 72.1%,oemer 76.2%),根因已定位且超出"适配"范畴(见 §3)。
 
 | 引擎(5 张 source-gold 真照片) | pitch P | pitch R | onset-q | measure |
 |---|---|---|---|---|
-| **Audiveris up2(现产品)** | **85.5%** | **72.1%** | 2.7% | 30.0% |
+| **Audiveris up2(当时产品基线)** | **85.5%** | **72.1%** | 2.7% | 30.0% |
 | oemer | 71.9% | 76.2% | 5.4% | 18.2% |
 | Clarity 官方 | 72.8% | 35.5% | 2.8% | 10.1% |
 | Clarity 自训 R6c | 84.8% | 22.4% | 1.4% | 3.6% |
@@ -43,15 +45,15 @@
 
 ## 5. 对 M4 生产线的结论
 
-维持现行架构不变:**Audiveris 主引擎 + oemer 救援 + 音频仲裁 + fail-closed 分层闸门**。Route B 不改变任何生产决策;若未来采纳 R6c 作校验投票者,须走既有受控闸门流程。
+Route B 不改变当前离线 v3 架构:**Audiveris up2/up2-otsu/up3 + HOMR 候选池 + 音频仲裁 + fail-closed 分层闸门**。Oemer 不在 v3 池中,仅保留为 eval 基准与坐标 sidecar 先例;若未来采纳 R6c 作校验投票者,须走既有受控闸门流程。
 
 ## 勘误(2026-07-17 HOMR 照片域复验后)
 
-本报告"Audiveris 仍是最强照片引擎"的结论**已过时**。同日 HOMR 在 5 张真实手机照片上的复验结果:
+本报告"Audiveris 仍是最强照片引擎"的结论**已过时**。同日 HOMR 在 5 张 source-gold 真照片上的复验结果:
 
 | 引擎(同 5 张真照片) | pitch P | pitch R | onset-q | measure |
 |---|---|---|---|---|
-| **HOMR** | **88.3%** | **95.8%** | **30.0%** | **79.0%** |
+| **HOMR(07-17 fresh,ORT 1.27.0)** | **88.33%** | **95.78%** | **30.03%** | **79.04%** |
 | Audiveris up2 | 85.5% | 72.1% | 2.7% | 30.0% |
 
-**HOMR 四项全面领先**(recall +23.7、onset ×11、measure ×2.6)。修正后的结论:**照片域最强识别引擎是 HOMR**;严格自动采纳仍 0/5(阈值 98/95/95/95),学生端保持关闭正确。本报告关于 Clarity 自训的裁决(停止合成训练、根因=视觉密度失配)**不受影响**——Clarity 输给的对象从 Audiveris 换成了更强的 HOMR,输得更彻底。
+**HOMR 四项全面领先**(recall +23.7、onset ×11、measure ×2.6)。修正后的结论:**照片域最强识别引擎是 HOMR**;严格自动采纳仍 0/5(阈值 98/95/95/95),学生端保持关闭。当前权威聚合与逐页哈希见 `docs/evidence/western-strings-homr-sourcegold-20260717.json`。本报告关于 Clarity 自训的裁决(停止合成训练、根因=视觉密度失配)**不受影响**——Clarity 输给的对象从 Audiveris 换成了更强的 HOMR,输得更彻底。

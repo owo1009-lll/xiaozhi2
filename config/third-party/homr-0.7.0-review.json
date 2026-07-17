@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "recordType": "third-party-license-and-deployment-review",
+  "component": {
+    "name": "homr",
+    "version": "0.7.0",
+    "repository": "https://github.com/liebharc/homr",
+    "distribution": "Python wheel installed by pip",
+    "declaredLicense": "AGPL-3.0"
+  },
+  "evidence": {
+    "upstreamLicense": "https://github.com/liebharc/homr/blob/main/LICENSE",
+    "checkpointRelease": "https://github.com/liebharc/homr/releases/tag/onnx_checkpoints",
+    "localDistribution": {
+      "runtimeRoot": "data/tools/homr-0.7.0-ort1.27.0",
+      "metadataPath": "data/tools/homr-0.7.0-ort1.27.0/Lib/site-packages/homr-0.7.0.dist-info/METADATA",
+      "metadataSha256": "9b70e2414638f2d7ebb994942e2c42ac3b4b156fc31191d952d58e37e31ca8c3",
+      "licensePath": "data/tools/homr-0.7.0-ort1.27.0/Lib/site-packages/homr-0.7.0.dist-info/licenses/LICENSE",
+      "licenseSha256": "a6de0dc64ada3b5141517c0167b109dfc2adb3d1d8b27ff1745f337331b2a5f4",
+      "executable": {
+        "bindingMode": "record-verified-console-entry-point",
+        "relativePath": "Scripts/homr.exe",
+        "recordEntry": "../../Scripts/homr.exe",
+        "consoleEntryPoint": "homr=homr.main:main",
+        "observedHostSha256": "45ecc696326ecc6f843e119e643f8c837ca5ea73165a45220dc0ba7ab91f2382",
+        "observedHostSha256IsApprovalBinding": false,
+        "pathSensitivityNote": "The pip-generated Windows launcher embeds its interpreter path. Its host hash is observed and verified against the local RECORD entry, while approval binds the path-independent RECORD digest and console entry-point contract."
+      },
+      "wheelArchive": {
+        "path": "data/tools/wheelhouse/western-photo-score-homr/homr-0.7.0-py3-none-any.whl",
+        "bytes": 94436,
+        "sha256": "84c6028df06e60b1aff158c9049d1876b22137144e319b61bacc41518842c4a9"
+      },
+      "recordPath": "data/tools/homr-0.7.0-ort1.27.0/Lib/site-packages/homr-0.7.0.dist-info/RECORD",
+      "portableRecord": {
+        "algorithm": "sha256-normalized-lf-excluding-path-sensitive-launcher-row-v1",
+        "excludedEntry": "../../Scripts/homr.exe",
+        "lineCount": 87,
+        "sha256": "80cb776b0778c8cc292aa1cfe781f49bf3a15c73a2fe4fd40a336970a82389ec"
+      },
+      "wheelRecordHashedFileCount": 49,
+      "wheelRecordVerifiedHashedFileCount": 49,
+      "wheelRecordMismatchCount": 0,
+      "provenanceCaveat": "The retained local wheel archive and installed distribution are bound by exact hashes. No independently published upstream wheel checksum was located; approval must therefore state the review basis for this retained artifact."
+    }
+  },
+  "integration": {
+    "contractVersion": 1,
+    "mode": "unmodified-external-cli-subprocess",
+    "entryPoint": "scripts/western_photo_score_pipeline.py",
+    "inputContract": "local image file copied into a per-run working directory",
+    "outputContract": "MusicXML file plus a captured stdout/stderr log",
+    "sourceModified": false,
+    "packageImportedInProjectProcess": false,
+    "mainlineExecutable": false,
+    "offlineV3PoolExecutable": true,
+    "controlledBatchRequiresAcceptedForBatch": true,
+    "controlledBatchStudentFacing": false,
+    "controlledBatchAutoDiagnosisIssued": false,
+    "controlledProductionRequiresCompleteEnginePool": true,
+    "controlledProductionWrapper": "scripts/run-western-photo-score-python.ps1",
+    "controlledProductionRequiredFlag": "--require-complete-engine-pool",
+    "missingExecutableBehavior": {
+      "controlledProductionWrapper": "fail-before-analysis-with-required-engine-pool-incomplete",
+      "directResearchRunWithoutRequiredFlag": "audiveris-only-degraded-pool-with-explicit-audit"
+    }
+  },
+  "modelArtifacts": [
+    {
+      "package": "homr",
+      "relativePath": "segmentation/segnet_308-3296ccd40960f90ca6ab9c035cca945675d30a0f.onnx",
+      "name": "segnet_308-3296ccd40960f90ca6ab9c035cca945675d30a0f.onnx",
+      "bytes": 57311361,
+      "sha256": "6ed36640db4ef5d223098b6d5efe4eda97c66b24a2c72faab8a018c749003a8d"
+    },
+    {
+      "package": "homr",
+      "relativePath": "transformer/decoder_pytorch_model_396-f6feedb42ff90087d898b0941a55d040fa6b2903.onnx",
+      "name": "decoder_pytorch_model_396-f6feedb42ff90087d898b0941a55d040fa6b2903.onnx",
+      "bytes": 47299551,
+      "sha256": "3e10fd5ae52d0b86792721922fcd954c283a7ed365de7446425bdabe38f3e57d"
+    },
+    {
+      "package": "homr",
+      "relativePath": "transformer/encoder_pytorch_model_396-f6feedb42ff90087d898b0941a55d040fa6b2903.onnx",
+      "name": "encoder_pytorch_model_396-f6feedb42ff90087d898b0941a55d040fa6b2903.onnx",
+      "bytes": 52861122,
+      "sha256": "4c16df852b3789f2676b0d49f0545dab0740e4005f7b472c5252add642f5d5eb"
+    },
+    {
+      "package": "rapidocr",
+      "relativePath": "models/ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+      "name": "ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+      "bytes": 585532,
+      "sha256": "e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c"
+    },
+    {
+      "package": "rapidocr",
+      "relativePath": "models/PP-OCRv6_det_small.onnx",
+      "name": "PP-OCRv6_det_small.onnx",
+      "bytes": 9929594,
+      "sha256": "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f"
+    },
+    {
+      "package": "rapidocr",
+      "relativePath": "models/PP-OCRv6_rec_small.onnx",
+      "name": "PP-OCRv6_rec_small.onnx",
+      "bytes": 21234383,
+      "sha256": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884"
+    }
+  ],
+  "modelLicenseReview": {
+    "status": "unresolved",
+    "basis": "The required runtime contains three HOMR checkpoint files and three RapidOCR ONNX files. No named reviewer has yet recorded a license basis covering the complete six-file runtime model set.",
+    "controlledOfflineUseConfirmedByReviewer": false,
+    "redistributionAllowed": false
+  },
+  "deployment": {
+    "status": "host-ready-governance-pending",
+    "targetRuntimeRoot": "data/tools/homr-0.7.0-ort1.27.0",
+    "environmentPathTracked": false,
+    "offlineRebuildScript": "scripts/setup-western-photo-score-runtime.ps1",
+    "dependencyLockTracked": true,
+    "startupPreflightReady": true,
+    "modelAutoDownloadRisk": true,
+    "modelAutoDownloadBlockedByPreflight": true,
+    "notes": "The tracked offline setup and preflight target data/tools/homr-0.7.0-ort1.27.0 and a separate audio interpreter. The current host passes audio, Audiveris, HOMR, dependency, provider, complete wheel RECORD, METADATA, LICENSE, retained-wheel, and six-model checks; full deployment remains closed because the named license/model review and approval binding are pending. Local wheelhouse, models, and runtimes remain gitignored deployment artifacts."
+  },
+  "decision": {
+    "status": "pending",
+    "reviewedBy": "",
+    "reviewedAt": "",
+    "approvedScopes": [],
+    "controlledOfflineReviewApproved": false,
+    "studentFacingNetworkUseApproved": false,
+    "redistributionApproved": false,
+    "notes": "No reviewer decision has been recorded. This record must remain fail-closed until a named reviewer explicitly confirms the bounded offline scope and model-license basis.",
+    "confirmations": {
+      "controlledOfflineOnly": false,
+      "modelLicenseBasisReviewed": false,
+      "noModelRedistribution": false
+    },
+    "approvalBinding": null
+  },
+  "invalidatedBy": [
+    "homr-version-change",
+    "wheel-or-model-artifact-hash-change",
+    "portable-wheel-record-change",
+    "console-entry-point-contract-change",
+    "in-process-import-or-linking",
+    "homr-source-modification",
+    "integration-contract-version-change",
+    "student-facing-network-use",
+    "redistribution-model-change"
+  ]
+}

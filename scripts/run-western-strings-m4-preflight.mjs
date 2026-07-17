@@ -47,6 +47,10 @@ function runNpmScript(script) {
     cwd: process.cwd(),
     encoding: "utf8",
     shell: false,
+    // Project status intentionally emits the complete evidence object. Keep
+    // the preflight from mistaking Node's small default stdout buffer for a
+    // failed status check as that evidence grows.
+    maxBuffer: 64 * 1024 * 1024,
   });
   return {
     script,
@@ -78,8 +82,13 @@ function buildSummary(report) {
     "",
     "## Verdict",
     "",
-    `- machineSelfTestComplete: ${report.machineSelfTestComplete}`,
+    `- evidenceSelfTestComplete: ${report.evidenceSelfTestComplete}`,
     `- readyForOmrAccuracyClaim: ${report.readyForOmrAccuracyClaim}`,
+    `- photoScoreMachineExitImplemented: ${report.photoScoreMachineExitImplemented}`,
+    `- photoScoreGovernanceReady: ${report.photoScoreGovernanceReady}`,
+    `- photoScoreRuntimeReady: ${report.photoScoreRuntimeReady}`,
+    `- photoScoreDeploymentReady: ${report.photoScoreDeploymentReady}`,
+    `- photoScoreProductionPoolReady: ${report.photoScoreProductionPoolReady}`,
     `- automaticAdoptionReady: ${report.automaticAdoptionReady}`,
     `- studentGateReady: ${report.studentGateReady}`,
     `- teacherReviewNeeded: ${report.teacherReviewNeeded}`,
@@ -122,6 +131,7 @@ function buildSummary(report) {
       ? "- Machine checks already proved this is not a teacher audio-diagnosis review. The remaining task is score-editor correction of independent gold MXL files against source score images."
       : "- No score-editor task is currently required. Independent render/scan/photo gold supports an eval-only accuracy claim; independently sourced real-photo gold is measured separately and remains below the automatic-adoption floor.",
     `- automatic-adoption blockers: ${report.automaticAdoptionBlockingReasons.join(", ") || "none"}`,
+    `- photo-score deployment blockers: ${report.photoScoreBlockingReasons.join(", ") || "none"}`,
     "",
     "## Artifacts",
     "",
@@ -135,6 +145,7 @@ function buildSummary(report) {
     `- independentBenchmarkMd: ${report.artifacts.independentBenchmarkMd}`,
     `- oemerBenchmark: ${report.artifacts.oemerBenchmark}`,
     `- homrBenchmark: ${report.artifacts.homrBenchmark}`,
+    `- photoScoreDeploymentPreflight: ${report.artifacts.photoScoreDeploymentPreflight}`,
     `- clarityBenchmark: ${report.artifacts.clarityBenchmark}`,
     `- clarityAdaptationBenchmark: ${report.artifacts.clarityAdaptationBenchmark}`,
     `- nextActions: ${report.artifacts.nextActions}`,
@@ -160,12 +171,14 @@ async function main() {
   const workspace = await readJson(path.join("data", "experiments", "western-strings-m4", "independent-gold-workspace-audit.json"));
   const independentBenchmark = await readJson(path.join("data", "experiments", "western-strings-m4", "independent-benchmark-audit.json"));
   const oemerBenchmark = await readJson(path.join("data", "experiments", "western-strings-m4", "oemer-source-benchmark", "oemer-source-benchmark.json"));
-  const homrBenchmark = await readJson(path.join("data", "experiments", "western-strings-m4", "homr-source-benchmark", "homr-source-benchmark.json"));
+  const homrEvidence = await readJson(path.join("docs", "evidence", "western-strings-homr-sourcegold-20260717.json"));
+  const homrAggregate = homrEvidence?.aggregate || {};
   const clarityBenchmark = await readJson(path.join("data", "experiments", "western-strings-m4", "clarity-source-benchmark", "clarity-source-benchmark.json"));
   const clarityAdaptationBenchmark = await readJson(path.join("data", "experiments", "western-strings-m4", "clarity-adaptation-photo-benchmark", "clarity-source-benchmark.json"));
   const status = await readJson(path.join("data", "experiments", "western-strings-project-status.json"));
 
   const m4Status = status?.tracks?.m4Omr || {};
+  const photoScoreOfflineChain = status?.photoScoreOfflineChain || {};
   const counts = {
     pairReadyRows: readiness?.counts?.pairReadyRows ?? 0,
     usableBenchmarkRows: benchmark?.counts?.usableBenchmarkRows ?? 0,
@@ -195,15 +208,15 @@ async function main() {
     oemerPitchPrecision: oemerBenchmark?.comparison?.oemer?.pitchPrecision ?? null,
     oemerPitchRecallIncludingEngineFailures:
       oemerBenchmark?.comparison?.oemer?.pitchRecallIncludingEngineFailures ?? null,
-    homrBenchmarkRows: homrBenchmark?.comparison?.homr?.rows ?? 0,
-    homrUsableRows: homrBenchmark?.comparison?.homr?.usableRows ?? 0,
-    homrEngineFailureRows: homrBenchmark?.comparison?.homr?.engineFailureRows ?? 0,
-    homrPitchOnlyStrictPassedRows: homrBenchmark?.comparison?.homr?.pitchOnlyStrictPassRows ?? 0,
-    homrStrictPassedRows: homrBenchmark?.comparison?.homr?.strictPassRows ?? 0,
-    homrPitchPrecision: homrBenchmark?.comparison?.homr?.pitchPrecision ?? null,
-    homrPitchRecall: homrBenchmark?.comparison?.homr?.pitchRecall ?? null,
-    homrOnsetQuarterAccuracy: homrBenchmark?.comparison?.homr?.onsetQuarterAccuracy ?? null,
-    homrMeasureAccuracy: homrBenchmark?.comparison?.homr?.measureAccuracy ?? null,
+    homrBenchmarkRows: homrAggregate.rows ?? 0,
+    homrUsableRows: homrAggregate.usableRows ?? 0,
+    homrEngineFailureRows: homrAggregate.engineFailureRows ?? 0,
+    homrPitchOnlyStrictPassedRows: homrAggregate.pitchOnlyStrictPassRows ?? 0,
+    homrStrictPassedRows: homrAggregate.strictPassRows ?? 0,
+    homrPitchPrecision: homrAggregate.pitchPrecision ?? null,
+    homrPitchRecall: homrAggregate.pitchRecall ?? null,
+    homrOnsetQuarterAccuracy: homrAggregate.onsetQuarterAccuracy ?? null,
+    homrMeasureAccuracy: homrAggregate.measureAccuracy ?? null,
     clarityBenchmarkRows: clarityBenchmark?.comparison?.clarity?.rows ?? 0,
     clarityUsableRows: clarityBenchmark?.comparison?.clarity?.usableRows ?? 0,
     clarityEngineFailureRows: clarityBenchmark?.comparison?.clarity?.engineFailureRows ?? 0,
@@ -242,8 +255,15 @@ async function main() {
   const report = {
     ok: commandOk,
     generatedAt: new Date().toISOString(),
-    machineSelfTestComplete: commandOk && Boolean(readiness && benchmark && provenance && workspace && independentBenchmark && status),
+    evidenceSelfTestComplete: commandOk && Boolean(readiness && benchmark && provenance && workspace && independentBenchmark && homrEvidence && status),
+    machineSelfTestComplete: commandOk && Boolean(readiness && benchmark && provenance && workspace && independentBenchmark && homrEvidence && status),
     readyForOmrAccuracyClaim,
+    photoScoreMachineExitImplemented: photoScoreOfflineChain.codeWired === true,
+    photoScoreGovernanceReady: photoScoreOfflineChain.governanceConfiguredReady === true,
+    photoScoreRuntimeReady: photoScoreOfflineChain.runtimeReady === true,
+    photoScoreDeploymentReady: photoScoreOfflineChain.deploymentReady === true,
+    photoScoreProductionPoolReady: photoScoreOfflineChain.productionPoolReady === true,
+    photoScoreBlockingReasons: photoScoreOfflineChain.blockingReasons || ["photo-score-chain-status-missing"],
     automaticAdoptionReady: independentBenchmark?.automaticAdoptionReady === true,
     studentGateReady: false,
     teacherReviewNeeded,
@@ -269,7 +289,8 @@ async function main() {
       independentRealPhotoManifest: "data/experiments/western-strings-m4/independent-real-photo-gold/independent-gold-manifest.json",
       independentRealPhotoBenchmark: "data/experiments/western-strings-m4/independent-source-benchmark/omr-benchmark.json",
       oemerBenchmark: "data/experiments/western-strings-m4/oemer-source-benchmark/oemer-source-benchmark.json",
-      homrBenchmark: "data/experiments/western-strings-m4/homr-source-benchmark/homr-source-benchmark.json",
+      homrBenchmark: "docs/evidence/western-strings-homr-sourcegold-20260717.json",
+      photoScoreDeploymentPreflight: "data/experiments/western-strings-m4/photo-score-deployment-preflight.json",
       clarityBenchmark: "data/experiments/western-strings-m4/clarity-source-benchmark/clarity-source-benchmark.json",
       clarityAdaptationBenchmark: "data/experiments/western-strings-m4/clarity-adaptation-photo-benchmark/clarity-source-benchmark.json",
       nextActions: "data/experiments/western-strings-next-actions.md",
@@ -283,8 +304,14 @@ async function main() {
 
   console.log(JSON.stringify({
     ok: report.ok,
+    evidenceSelfTestComplete: report.evidenceSelfTestComplete,
     machineSelfTestComplete: report.machineSelfTestComplete,
     readyForOmrAccuracyClaim: report.readyForOmrAccuracyClaim,
+    photoScoreMachineExitImplemented: report.photoScoreMachineExitImplemented,
+    photoScoreGovernanceReady: report.photoScoreGovernanceReady,
+    photoScoreRuntimeReady: report.photoScoreRuntimeReady,
+    photoScoreDeploymentReady: report.photoScoreDeploymentReady,
+    photoScoreProductionPoolReady: report.photoScoreProductionPoolReady,
     automaticAdoptionReady: report.automaticAdoptionReady,
     studentGateReady: report.studentGateReady,
     teacherReviewNeeded: report.teacherReviewNeeded,

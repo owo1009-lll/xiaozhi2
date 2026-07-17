@@ -406,11 +406,18 @@ const M4_OEMER_BENCHMARK = path.join(
   "oemer-source-benchmark.json",
 );
 const M4_HOMR_BENCHMARK = path.join(
-  "data",
-  "experiments",
-  "western-strings-m4",
-  "homr-source-benchmark",
-  "homr-source-benchmark.json",
+  "docs",
+  "evidence",
+  "western-strings-homr-sourcegold-20260717.json",
+);
+const HOMR_REVIEW_RECORD = path.join(
+  "config", "third-party", "homr-0.7.0-review.json",
+);
+const PHOTO_SCORE_DEPLOYMENT_CONFIG = path.join(
+  "config", "western-photo-score-deployment.json",
+);
+const PHOTO_SCORE_DEPLOYMENT_PREFLIGHT = path.join(
+  "data", "experiments", "western-strings-m4", "photo-score-deployment-preflight.json",
 );
 const M4_SAME_EDITION_BENCHMARK = path.join(
   "data",
@@ -709,6 +716,45 @@ async function readJson(filePath, fallback = null) {
   } catch {
     return fallback;
   }
+}
+
+function homrEvidenceToBenchmark(evidence) {
+  const aggregate = evidence?.aggregate || {};
+  const complete = Boolean(
+    evidence?.schemaVersion === 1
+      && evidence?.authority === "current-frozen-homr-sourcegold-baseline"
+      && evidence?.evaluationMode === "independent-source-gold"
+      && evidence?.freshRun?.reuseExisting === false
+      && aggregate.rows === 5
+      && aggregate.usableRows === 5,
+  );
+  if (!evidence) return null;
+  return {
+    complete,
+    gate: {
+      automaticAdoptionReady: aggregate.automaticAdoptionReady === true,
+      studentGateReady: aggregate.studentGateReady === true,
+    },
+    runtime: evidence.runtime || {},
+    comparison: {
+      homr: {
+        rows: aggregate.rows ?? 0,
+        usableRows: aggregate.usableRows ?? 0,
+        engineFailureRows: aggregate.engineFailureRows ?? 0,
+        unusableEvidenceRows: aggregate.unusableEvidenceRows ?? 0,
+        pitchOnlyStrictPassRows: aggregate.pitchOnlyStrictPassRows ?? 0,
+        strictPassRows: aggregate.strictPassRows ?? 0,
+        pitchPrecision: aggregate.pitchPrecision ?? null,
+        pitchRecall: aggregate.pitchRecall ?? null,
+        pitchMissRate: aggregate.pitchMissRate ?? null,
+        pitchRecallIncludingEngineFailures:
+          aggregate.pitchRecallIncludingEngineFailures ?? null,
+        onsetQuarterAccuracy: aggregate.onsetQuarterAccuracy ?? null,
+        measureAccuracy: aggregate.measureAccuracy ?? null,
+      },
+    },
+    evidenceManifest: evidence,
+  };
 }
 
 async function readControlledPilotSessions(root = CONTROLLED_PILOT_SESSIONS_ROOT) {
@@ -1719,7 +1765,11 @@ async function buildM4OmrStatus() {
   const benchmark = await readJson(M4_BENCHMARK);
   const independentBenchmark = await readJson(M4_INDEPENDENT_BENCHMARK_AUDIT);
   const oemerBenchmark = await readJson(M4_OEMER_BENCHMARK);
-  const homrBenchmark = await readJson(M4_HOMR_BENCHMARK);
+  const homrEvidence = await readJson(M4_HOMR_BENCHMARK);
+  const homrBenchmark = homrEvidenceToBenchmark(homrEvidence);
+  const homrReview = await readJson(HOMR_REVIEW_RECORD);
+  const photoScoreDeployment = await readJson(PHOTO_SCORE_DEPLOYMENT_CONFIG);
+  const photoScorePreflight = await readJson(PHOTO_SCORE_DEPLOYMENT_PREFLIGHT);
   const sameEditionMultipageBenchmark = await readJson(M4_SAME_EDITION_MULTIPAGE_BENCHMARK);
   const sameEditionBenchmark = sameEditionMultipageBenchmark || await readJson(M4_SAME_EDITION_BENCHMARK);
   const sameEditionBenchmarkSource = sameEditionMultipageBenchmark
@@ -1745,6 +1795,25 @@ async function buildM4OmrStatus() {
   const draftQualityReady = Boolean(benchmark?.gate?.m4OmrDraftQualityReady);
   const independentBenchmarkReady = independentBenchmark?.independentBenchmarkReady === true;
   const automaticAdoptionReady = independentBenchmark?.automaticAdoptionReady === true;
+  const homrDecision = homrReview?.decision || {};
+  // Reuse the strict machine governance verdict rather than maintaining a
+  // looser duplicate here. It includes the named decision, exact scope and the
+  // complete artifact/contract approval binding.
+  const homrLicenseReviewReady = photoScorePreflight?.governanceReady === true;
+  const homrArtifactIntegrityReady =
+    photoScorePreflight?.host?.components?.homr?.ready === true;
+  const homrDeploymentPreflightReady = photoScorePreflight?.deploymentReady === true;
+  const homrProductionPoolReady = Boolean(
+    homrLicenseReviewReady
+      && homrArtifactIntegrityReady
+      && homrDeploymentPreflightReady,
+  );
+  const homrGovernanceBlockingReasons = photoScorePreflight?.blockingReasons?.length
+    ? photoScorePreflight.blockingReasons
+    : [
+        ...(!homrLicenseReviewReady ? ["homr-license-review-pending"] : []),
+        ...(!photoScorePreflight ? ["photo-score-deployment-preflight-missing"] : []),
+      ];
   const automaticAdoptionBlockingReasons = [
     ...(independentBenchmark?.automaticAdoptionBlockingReasons || ["m4-independent-benchmark-audit-missing"]),
     ...(!automaticAdoptionReady && oemerBenchmark?.complete === true && oemerBenchmark?.gate?.automaticAdoptionReady !== true
@@ -1805,6 +1874,11 @@ async function buildM4OmrStatus() {
     m4OemerAutomaticAdoptionReady: oemerBenchmark?.gate?.automaticAdoptionReady === true,
     m4HomrBenchmarkComplete: homrBenchmark?.complete === true,
     m4HomrAutomaticAdoptionReady: homrBenchmark?.gate?.automaticAdoptionReady === true,
+    m4HomrLicenseReviewReady: homrLicenseReviewReady,
+    m4HomrArtifactIntegrityReady: homrArtifactIntegrityReady,
+    m4HomrDeploymentPreflightReady: homrDeploymentPreflightReady,
+    m4HomrProductionPoolReady: homrProductionPoolReady,
+    m4HomrMainlineExecutable: false,
     m4SameEditionBenchmarkEvaluated: sameEditionBenchmark?.goldIdentity?.sameGoldVerified === true,
     m4SameEditionHomrStrictPositive:
       sameEditionBenchmark?.candidate?.engine === "homr"
@@ -1866,12 +1940,39 @@ async function buildM4OmrStatus() {
     },
     blockingReasons,
     automaticAdoptionBlockingReasons,
+    homrGovernance: {
+      licenseReviewReady: homrLicenseReviewReady,
+      artifactIntegrityReady: homrArtifactIntegrityReady,
+      deploymentPreflightReady: homrDeploymentPreflightReady,
+      productionPoolReady: homrProductionPoolReady,
+      mainlineExecutable: false,
+      decisionStatus: homrDecision.status || "missing",
+      reviewedBy: homrDecision.reviewedBy || "",
+      reviewedAt: homrDecision.reviewedAt || "",
+      deploymentScope: photoScoreDeployment?.deploymentScope || "",
+      studentFacing: false,
+      automaticAdoptionAuthorized: false,
+      blockingReasons: homrGovernanceBlockingReasons,
+      lastPreflight: photoScorePreflight
+        ? {
+            generatedAt: photoScorePreflight.generatedAt || "",
+            governanceReady: photoScorePreflight.governanceReady === true,
+            hostReady: photoScorePreflight.hostReady === true,
+            deploymentReady: photoScorePreflight.deploymentReady === true,
+            manifestSha256: photoScorePreflight.manifestSha256 || "",
+            lockSha256: photoScorePreflight.lockSha256 || "",
+          }
+        : null,
+    },
     artifacts: {
       readinessJson: M4_READINESS.replace(/\\/g, "/"),
       benchmarkJson: M4_BENCHMARK.replace(/\\/g, "/"),
       independentBenchmarkJson: M4_INDEPENDENT_BENCHMARK_AUDIT.replace(/\\/g, "/"),
       oemerBenchmarkJson: M4_OEMER_BENCHMARK.replace(/\\/g, "/"),
       homrBenchmarkJson: M4_HOMR_BENCHMARK.replace(/\\/g, "/"),
+      homrReviewRecordJson: HOMR_REVIEW_RECORD.replace(/\\/g, "/"),
+      photoScoreDeploymentConfigJson: PHOTO_SCORE_DEPLOYMENT_CONFIG.replace(/\\/g, "/"),
+      photoScoreDeploymentPreflightJson: PHOTO_SCORE_DEPLOYMENT_PREFLIGHT.replace(/\\/g, "/"),
       sameEditionBenchmarkJson: sameEditionBenchmarkSource.replace(/\\/g, "/"),
       op45PublicReferenceJson: M4_OP45_PUBLIC_REFERENCE.replace(/\\/g, "/"),
       clarityBenchmarkJson: M4_CLARITY_BENCHMARK.replace(/\\/g, "/"),
@@ -1974,11 +2075,14 @@ async function buildM4OmrStatus() {
     },
     homrBenchmark: homrBenchmark ? {
       source: M4_HOMR_BENCHMARK.replace(/\\/g, "/"),
+      evidenceId: homrEvidence?.evidenceId || "",
+      authority: homrEvidence?.authority || "",
       complete: homrBenchmark.complete === true,
       automaticAdoptionReady: homrBenchmark?.gate?.automaticAdoptionReady === true,
       studentGateReady: homrBenchmark?.gate?.studentGateReady === true,
       runtime: homrBenchmark.runtime || {},
       comparison: homrBenchmark.comparison || {},
+      sourceArtifacts: homrEvidence?.sourceArtifacts || {},
     } : {
       source: M4_HOMR_BENCHMARK.replace(/\\/g, "/"),
       missing: true,
@@ -2339,11 +2443,22 @@ const PHOTO_SCORE_BATCH_RUNS = path.join(
 );
 
 async function readPhotoScoreChainStatus() {
-  // Display-only visibility for the offline photo-score chain. Browser and CLI
-  // entry points share the same review-only audit log and never feed a release gate.
+  const preflight = await readJson(PHOTO_SCORE_DEPLOYMENT_PREFLIGHT);
+  const review = await readJson(HOMR_REVIEW_RECORD);
   const base = {
+    codeWired: true,
     wired: true,
     studentFacing: false,
+    automaticAdoptionAuthorized: false,
+    governanceConfiguredReady: preflight?.governanceReady === true,
+    runtimeReady: preflight?.hostReady === true,
+    deploymentReady: preflight?.deploymentReady === true,
+    productionPoolReady: preflight?.deploymentReady === true,
+    homrReviewStatus: review?.decision?.status || "missing",
+    blockingReasons: preflight?.blockingReasons || ["photo-score-deployment-preflight-missing"],
+    deploymentConfig: PHOTO_SCORE_DEPLOYMENT_CONFIG.replace(/\\/g, "/"),
+    reviewRecord: HOMR_REVIEW_RECORD.replace(/\\/g, "/"),
+    preflightReport: PHOTO_SCORE_DEPLOYMENT_PREFLIGHT.replace(/\\/g, "/"),
     acceptedImageTypes: ["JPG", "PNG", "WebP"],
     intake: "Browser multipart upload or POST /api/strings/analyze (kind=photo-score, review_required)",
     batchCommand: "Controlled queue Run batch audit or npm run western:photo-score-batch",
@@ -2708,6 +2823,12 @@ function printProjectStatus(status, outPath) {
       independentBenchmarkReady: m4Omr.m4OmrIndependentBenchmarkReady,
       accuracyClaimReady: m4Omr.m4OmrAccuracyClaimReady,
       automaticAdoptionReady: m4Omr.m4OmrAutomaticAdoptionReady,
+      homrLicenseReviewReady: m4Omr.m4HomrLicenseReviewReady,
+      homrArtifactIntegrityReady: m4Omr.m4HomrArtifactIntegrityReady,
+      homrDeploymentPreflightReady: m4Omr.m4HomrDeploymentPreflightReady,
+      homrProductionPoolReady: m4Omr.m4HomrProductionPoolReady,
+      homrMainlineExecutable: m4Omr.m4HomrMainlineExecutable,
+      homrGovernance: m4Omr.homrGovernance,
       greenSequenceGatePassed: m4Omr.m4GreenSequenceGatePassed,
       greenFeedbackRecommendedForProduction: m4Omr.m4GreenFeedbackRecommendedForProduction,
       greenFreshValidationCandidateFound: m4Omr.m4GreenFreshValidationCandidateFound,

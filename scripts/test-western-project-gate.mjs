@@ -436,7 +436,15 @@ if (m4.m4HomrBenchmarkComplete) {
   assert.equal(m4.homrBenchmark?.comparison?.homr?.usableRows, 5, "HOMR comparison must expose all usable outputs");
   assert.equal(m4.homrBenchmark?.comparison?.homr?.pitchOnlyStrictPassRows, 2, "HOMR must expose pitch-only false positives");
   assert.equal(m4.homrBenchmark?.comparison?.homr?.strictPassRows, 0, "HOMR must reject rhythmically invalid MusicXML");
+  assert.equal(m4.homrBenchmark?.source, "docs/evidence/western-strings-homr-sourcegold-20260717.json", "status must use the tracked fresh evidence manifest");
+  assert.equal(m4.homrBenchmark?.runtime?.onnxruntime, "1.27.0", "status must expose the fresh ORT runtime");
+  assert.equal(m4.homrBenchmark?.comparison?.homr?.pitchPrecision, 0.883324, "status must expose fresh HOMR precision");
+  assert.equal(m4.homrBenchmark?.comparison?.homr?.pitchRecall, 0.957827, "status must expose fresh HOMR recall");
 }
+assert.equal(m4.m4HomrMainlineExecutable, false, "formal analyzer mainline must not execute HOMR");
+assert.equal(m4.m4HomrLicenseReviewReady, false, "pending named review must fail closed");
+assert.equal(m4.m4HomrProductionPoolReady, false, "pending governance must keep the deployment pool closed");
+assert.equal(m4.homrGovernance?.studentFacing, false, "governance must not open the student runtime");
 if (m4.m4SameEditionBenchmarkEvaluated) {
   assert.equal(m4.m4SameEditionHomrStrictPositive, true, "same-edition human gold should expose the observed HOMR strict pass");
   assert.equal(m4.m4SameEditionAutomaticAdoptionReady, false, "one same-edition page must not authorize automatic adoption");
@@ -592,6 +600,9 @@ assert(packageJson.scripts?.["western:m4-oemer-benchmark"], "package.json must e
 assert(packageJson.scripts?.["test:western-m4-oemer-benchmark"], "package.json must expose Oemer benchmark regression tests");
 assert(packageJson.scripts?.["western:m4-homr-benchmark"], "package.json must expose the eval-only HOMR benchmark");
 assert(packageJson.scripts?.["test:western-m4-homr-benchmark"], "package.json must expose HOMR benchmark regression tests");
+assert(packageJson.scripts?.["western:homr-evidence-check"], "package.json must expose the tracked fresh-evidence check");
+assert(packageJson.scripts?.["western:photo-score-deployment-preflight"], "package.json must expose the photo-score deployment preflight");
+assert(packageJson.scripts?.["test:western-photo-score-deployment-preflight"], "package.json must expose deployment-preflight tests");
 assert(packageJson.scripts?.["western:m4-op45-public-reference"], "package.json must expose the Op.45 external pitch-reference probe");
 assert(packageJson.scripts?.["test:western-m4-op45-public-reference"], "package.json must expose the Op.45 external pitch-reference regression test");
 assert(packageJson.scripts?.["western:m4-op45-promote-gold"], "package.json must expose fail-closed Op.45 gold promotion");
@@ -832,6 +843,15 @@ assert.equal(
   m4Failure.artifact,
   m4.artifacts.sameEditionBenchmarkJson,
   "M4 page-count failure should point to the same-edition benchmark",
+);
+const m4DeploymentFailure = fullGate.failures.find(
+  (failure) => failure.track === "M4 photo-score deployment/governance",
+);
+assert(m4DeploymentFailure, "pending HOMR governance must be an independent project-gate failure");
+assert.equal(
+  m4DeploymentFailure.artifact,
+  m4.artifacts.photoScoreDeploymentPreflightJson,
+  "deployment failure should point to the machine-readable preflight",
 );
 
 console.log(JSON.stringify({

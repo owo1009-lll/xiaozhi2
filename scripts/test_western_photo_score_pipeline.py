@@ -12,7 +12,13 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 sys.path.insert(0, str(REPO / "scripts" / "experiments"))
 
-from western_photo_score_pipeline import decide, MIN_CONFIRMED, MIN_AGREEMENT  # noqa: E402
+from western_photo_score_pipeline import (  # noqa: E402
+    MIN_AGREEMENT,
+    MIN_CONFIRMED,
+    decide,
+    engine_pool_status,
+    main as pipeline_main,
+)
 from proto_western_strings_score_anchored_feedback import (  # noqa: E402
     _pitch_cost,
     align,
@@ -183,6 +189,27 @@ def write_mxl(tmp, name, **kw):
     return p
 
 with tempfile.TemporaryDirectory() as tmp:
+    audiveris = Path(tmp) / "Audiveris.exe"
+    homr = Path(tmp) / "homr.exe"
+    pool = engine_pool_status(audiveris, homr)
+    check("engine-pool-missing-is-degraded",
+          pool["complete"] is False and pool["missing"] == ["audiveris", "homr"])
+    audiveris.touch()
+    homr.touch()
+    pool = engine_pool_status(audiveris, homr)
+    check("engine-pool-two-executables-complete",
+          pool["complete"] is True and pool["degraded"] is False)
+
+    missing_homr = Path(tmp) / "missing-homr.exe"
+    exit_code = pipeline_main([
+        "--photo", str(Path(tmp) / "missing-photo.jpg"),
+        "--audio", str(Path(tmp) / "missing-audio.wav"),
+        "--audiveris", str(audiveris),
+        "--homr", str(missing_homr),
+        "--require-complete-engine-pool",
+    ])
+    check("required-engine-pool-fails-before-analysis", exit_code == 2)
+
     gate = evaluate_musicxml_only_structure([write_mxl(tmp, "ready.musicxml")])
     check("mxlgate-ready", gate["ready"] is True
           and gate["evidenceSource"] == "musicxml-only"
@@ -239,7 +266,8 @@ src = (REPO / "scripts" / "western_photo_score_pipeline.py").read_text(encoding=
 for token in ("studentRuntimeTouched", "missingExtraVerdictsEmitted", "retake-photo", "degraded-feedback",
               "score-structure-review-required", "scoreStructureRequiresClefKeyMeter",
               "western-photo-score-v3-homr-pool", "p0StructureGateVersion",
-              "homr-unavailable", "annotationStyle", "enginePool"):
+              "homr-unavailable", "annotationStyle", "enginePool",
+              "require-complete-engine-pool", "enginePoolComplete"):
     check(f"audit-contract-{token}", token in src)
 
 print(json.dumps({"ok": True, "checks": checks}, ensure_ascii=False))

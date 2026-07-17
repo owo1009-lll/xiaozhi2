@@ -5,8 +5,9 @@
 Single entry point for the M4 photo-score flow (layered gate, machine-only):
   1. Run Audiveris on preprocessing variants (up2 / up2-otsu / up3) of the photo
      (cached per variant; skips variants already recognized), plus HOMR on the
-     original photo as a fourth pool candidate (cached; skipped when the HOMR
-     venv is absent — the pool then degrades to Audiveris-only behavior).
+     original photo as a fourth pool candidate. Direct research runs may
+     explicitly tolerate a missing HOMR executable; controlled deployment uses
+     --require-complete-engine-pool and fails before audio/OMR work instead.
   2. Arbitrate candidates with the student's recording (basic-pitch events):
      winner needs >= MIN_CONFIRMED audio-confirmed notes and >= MIN_AGREEMENT
      alignment agreement, and must pass its score-structure gate (Audiveris:
@@ -52,8 +53,8 @@ from western_m4_omr_structure import (  # noqa: E402
 
 VARIANTS = ["up2", "up2-otsu", "up3"]
 HOMR_VARIANT = "homr"
-DEFAULT_HOMR = (REPO / "data" / "experiments" / "western-strings-m4"
-                / "homr-compat-venv" / "Scripts" / "homr.exe")
+DEFAULT_HOMR = (REPO / "data" / "tools" / "homr-0.7.0-ort1.27.0"
+                / "Scripts" / "homr.exe")
 MIN_CONFIRMED = 20
 MIN_AGREEMENT = 0.6
 
@@ -69,21 +70,37 @@ def recognize_variant(photo: Path, variant: str, work: Path, audiveris: Path, ti
     return vdir
 
 
-def recognize_homr(photo: Path, work: Path, homr_exe: Path, timeout: int) -> Path | None:
-    """HOMR the original photo (cached); returns the MusicXML path or None."""
+def recognize_homr(photo: Path, work: Path, homr_exe: Path,
+                   timeout: int) -> tuple[Path | None, int | None]:
+    """HOMR the original photo; return (MusicXML, process exit code)."""
     vdir = work / HOMR_VARIANT
     vdir.mkdir(parents=True, exist_ok=True)
     got = sorted(vdir.glob("*.musicxml")) + sorted(vdir.glob("*.mxl"))
     if got:
-        return got[0]
+        return got[0], None
     local = vdir / photo.name
     if not local.is_file():
         shutil.copyfile(photo, local)
     with (vdir / "homr.log").open("wb") as log:
-        subprocess.run([str(homr_exe), local.name], cwd=vdir, stdout=log,
-                       stderr=subprocess.STDOUT, timeout=timeout, check=False)
+        completed = subprocess.run([str(homr_exe), local.name], cwd=vdir, stdout=log,
+                                   stderr=subprocess.STDOUT, timeout=timeout, check=False)
     got = sorted(vdir.glob("*.musicxml")) + sorted(vdir.glob("*.mxl"))
-    return got[0] if got else None
+    return (got[0] if got else None), completed.returncode
+
+
+def engine_pool_status(audiveris: Path, homr_exe: Path) -> dict:
+    """Return executable-level readiness for the final in-process safety check."""
+    missing = []
+    if not audiveris.is_file():
+        missing.append("audiveris")
+    if not homr_exe.is_file():
+        missing.append("homr")
+    return {
+        "required": ["audiveris", "homr"],
+        "complete": not missing,
+        "degraded": bool(missing),
+        "missing": missing,
+    }
 
 
 def run_homr_candidate(name: str, mxl: Path, out_root: Path, aev: list[dict]) -> dict:
@@ -145,6 +162,11 @@ def main(argv=None) -> int:
     ap.add_argument("--out", default=str(REPO / "data" / "analysis-photo-score"))
     ap.add_argument("--audiveris", default=str(DEFAULT_AUDIVERIS))
     ap.add_argument("--homr", default=str(DEFAULT_HOMR))
+    ap.add_argument(
+        "--require-complete-engine-pool",
+        action="store_true",
+        help="fail before analysis unless both Audiveris and HOMR executables exist",
+    )
     ap.add_argument("--timeout", type=int, default=420)
     args = ap.parse_args(argv)
 
@@ -157,6 +179,19 @@ def main(argv=None) -> int:
             ap.error("--photo and --audio are required (or use --piece)")
         photo, audio = Path(args.photo), Path(args.audio)
         name = photo.stem
+    audiveris_exe = Path(args.audiveris).resolve()
+    homr_exe = Path(args.homr).resolve()
+    pool = engine_pool_status(audiveris_exe, homr_exe)
+    if args.require_complete_engine_pool and not pool["complete"]:
+        print(json.dumps({
+            "ok": False,
+            "reason": "required-engine-pool-incomplete",
+            "enginePool": pool,
+            "autoDiagnosisIssued": False,
+            "studentFacing": False,
+        }, ensure_ascii=False))
+        return 2
+
     out_root = Path(args.out).resolve() / name
     work = out_root / "variants"
     out_root.mkdir(parents=True, exist_ok=True)
@@ -167,7 +202,7 @@ def main(argv=None) -> int:
     for variant in VARIANTS:
         row = {"variant": variant, "engine": "audiveris"}
         try:
-            vdir = recognize_variant(photo, variant, work, Path(args.audiveris), args.timeout)
+            vdir = recognize_variant(photo, variant, work, audiveris_exe, args.timeout)
             r = _run_variant(name, photo, audio, vdir, out_root, aev)
             omr_files = sorted((vdir / "omr").glob("*.omr"))
             mxl_files = sorted((vdir / "omr").glob("*.mxl"))
@@ -194,13 +229,14 @@ def main(argv=None) -> int:
         cands.append(row)
 
     homr_row = {"variant": HOMR_VARIANT, "engine": "homr"}
-    homr_exe = Path(args.homr)
     if not homr_exe.is_file():
-        # missing venv degrades the pool to Audiveris-only; never blocks a decision
+        # Research-only direct runs may make this explicit degraded comparison.
+        # Controlled runs pass --require-complete-engine-pool and never reach it.
         homr_row.update({"status": "homr-unavailable", "confirmed": 0, "agreement": 0.0})
     else:
         try:
-            mxl = recognize_homr(photo, work, homr_exe, args.timeout)
+            mxl, homr_exit_code = recognize_homr(photo, work, homr_exe, args.timeout)
+            homr_row["processExitCode"] = homr_exit_code
             if mxl is None:
                 homr_row.update({"status": "omr-no-output", "confirmed": 0, "agreement": 0.0})
             else:
@@ -218,6 +254,10 @@ def main(argv=None) -> int:
         "pipeline": "western-photo-score-v3-homr-pool",
         "p0StructureGateVersion": 2,
         "enginePool": [f"audiveris:{v}" for v in VARIANTS] + [HOMR_VARIANT],
+        "enginePoolComplete": pool["complete"],
+        "enginePoolDegraded": pool["degraded"],
+        "enginePoolMissing": pool["missing"],
+        "completeEnginePoolRequired": args.require_complete_engine_pool,
         "photo": str(photo), "audio": str(audio),
         "decision": decision,
         "winnerVariant": winner_variant,
@@ -229,7 +269,8 @@ def main(argv=None) -> int:
         "failClosed": {"studentRuntimeTouched": False,
                        "missingExtraVerdictsEmitted": False,
                        "accusationsRequireBothNeighborConfidence": True,
-                       "scoreStructureRequiresClefKeyMeter": True},
+                       "scoreStructureRequiresClefKeyMeter": True,
+                       "requiredEnginePoolEnforced": args.require_complete_engine_pool},
     }
     (out_root / "audit.json").write_text(json.dumps(audit, ensure_ascii=False, indent=1), encoding="utf-8")
     print(json.dumps({"decision": decision, "audit": str(out_root / "audit.json"),

@@ -39,6 +39,16 @@ assert.equal(parsed.scorePhotoPath, "data/private/x.jpg");
 assert.equal(parsed.scorePhotoHash, "photo-hash");
 assert.equal(parsed.scorePhotoSubmission.name, "x.jpg");
 
+const serviceSource = fs.readFileSync("src/server/westernStringsAlignmentService.js", "utf8");
+const photoAnalyzerSource = serviceSource.split("async function runOfflinePhotoScoreAnalyzer", 2)[1]
+  ?.split("async function buildControlledBatchPhotoScoreAnalysis", 1)[0] || "";
+assert(photoAnalyzerSource.includes("run-western-photo-score-python.ps1"), "server photo-score path must use the exact fail-closed wrapper");
+assert(!photoAnalyzerSource.includes("run-python.ps1"), "server photo-score path must not use the fallback analyzer runner");
+const cliBatchSource = fs.readFileSync("scripts/run-western-photo-score-batch.mjs", "utf8");
+assert(cliBatchSource.includes("preflight-western-photo-score-deployment.mjs"), "CLI batch must preflight before reading accepted work");
+assert(cliBatchSource.includes('filter((r) => r.status === "ok")'), "failed rows must remain retryable");
+assert(cliBatchSource.includes("res.status === 0 && parsed"), "CLI batch must require a successful child exit code");
+
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ws-photo-intake-"));
 const sourceDir = path.join(tmp, "source");
 fs.mkdirSync(sourceDir, { recursive: true });
