@@ -15,6 +15,10 @@ import {
   recordWesternStudentReview,
   runWesternControlledSubmissionBatch,
 } from "./westernStringsAlignmentService.js";
+import {
+  buildWesternStudentGateView,
+  listWesternStudentSubmissions,
+} from "./westernStudentGateService.js";
 
 function defaultParseIncomingPayload(req) {
   return req.body || {};
@@ -144,6 +148,28 @@ export function createWesternStringsRouter({
     }
   });
   router.post("/api/strings/analyze", ...analyzeHandlers);
+
+  router.get("/api/strings/student-gate", (req, res) => {
+    try {
+      return res.json(buildWesternStudentGateView());
+    } catch (error) {
+      return res.status(500).json({ ok: false, error: safeString(error?.message, "failed to build western strings student gate view.") });
+    }
+  });
+
+  router.get("/api/strings/student-submissions", async (req, res) => {
+    try {
+      const limit = Math.max(0, Math.round(Number(req.query?.limit || 20)));
+      const result = await listWesternStudentSubmissions({
+        repoRoot,
+        studentRef: safeString(req.query?.studentRef),
+        limit,
+      });
+      return res.json(result);
+    } catch (error) {
+      return res.status(Number(error?.statusCode) || 500).json({ ok: false, error: safeString(error?.message, "failed to list western strings student submissions.") });
+    }
+  });
 
   router.get("/api/strings/controlled-submissions", async (req, res) => {
     try {

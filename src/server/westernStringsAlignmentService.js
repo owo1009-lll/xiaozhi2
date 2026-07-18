@@ -341,11 +341,11 @@ async function readJsonlRecords(filePath) {
   }
 }
 
-function controlledSubmissionsPath(repoRoot) {
+export function controlledSubmissionsPath(repoRoot) {
   return path.join(repoRoot, "data", "experiments", "western-strings-m3", "controlled-submissions.jsonl");
 }
 
-function controlledSubmissionReviewsPath(repoRoot) {
+export function controlledSubmissionReviewsPath(repoRoot) {
   return path.join(repoRoot, "data", "experiments", "western-strings-m3", "controlled-submission-reviews.jsonl");
 }
 
@@ -1770,6 +1770,7 @@ async function buildControlledSubmissionAnalysis(repoRoot, payload = {}) {
     piece: safeString(payload.piece).trim(),
     recordingId: safeString(payload.recordingId).trim(),
     instrument: safeString(payload.instrument).trim(),
+    studentRef: safeString(payload.studentRef).trim(),
     limit: Math.max(0, Math.round(safeNumber(payload.limit, 20))),
     audioHash,
     audioPath,
@@ -1874,8 +1875,11 @@ export async function recordWesternControlledSubmissionReview({ repoRoot = proce
   const submissionId = safeString(payload.submissionId).trim();
   const action = safeString(payload.action).trim();
   if (!submissionId) throw new Error("submissionId is required.");
-  if (!["review_required", "accepted_for_batch", "reject_unsupported", "failed"].includes(action)) {
-    throw new Error("action must be review_required, accepted_for_batch, reject_unsupported, or failed.");
+  if (!["review_required", "accepted_for_batch", "reject_unsupported", "failed", "feedback_released"].includes(action)) {
+    throw new Error("action must be review_required, accepted_for_batch, reject_unsupported, failed, or feedback_released.");
+  }
+  if (action === "feedback_released" && !safeString(payload.studentMessage).trim()) {
+    throw new Error("feedback_released requires a studentMessage.");
   }
   const submission = await findWesternControlledSubmission({ repoRoot, submissionId });
   if (!submission) throw new Error("controlled submission not found.");
@@ -1886,6 +1890,10 @@ export async function recordWesternControlledSubmissionReview({ repoRoot = proce
     reason: safeString(payload.reason),
     reviewerId: safeString(payload.reviewerId, "reviewer-1"),
     comments: safeString(payload.comments),
+    // Human-authored feedback for the student page; shown there only when the
+    // reviewer explicitly releases it. Machine analysis never flows through.
+    studentMessage: safeString(payload.studentMessage),
+    releaseToStudent: payload.releaseToStudent === true,
   };
   const outPath = controlledSubmissionReviewsPath(repoRoot);
   await fs.mkdir(path.dirname(outPath), { recursive: true });
@@ -2660,6 +2668,8 @@ export function parseStudentAnalysisPayload(payload = {}) {
     piece: safeString(payload.piece).trim(),
     limit: Math.max(0, Math.round(safeNumber(payload.limit, 0))),
     recordingId: safeString(payload.recordingId).trim(),
+    instrument: safeString(payload.instrument).trim(),
+    studentRef: safeString(payload.studentRef).trim(),
     scoreId: safeString(payload.scoreId).trim(),
     scorePhotoPath: safeString(payload.scorePhotoPath).trim(),
     scorePhotoHash: safeString(payload.scorePhotoHash).trim(),

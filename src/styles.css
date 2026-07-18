@@ -202,6 +202,27 @@ button {
   word-break: break-word;
 }
 
+.western-diagnosis-row .western-feedback-release {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 10px;
+  align-items: center;
+}
+
+.western-feedback-release input {
+  min-width: 0;
+}
+
+.western-student-feedback {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: rgba(22, 163, 74, 0.08);
+  color: #166534;
+  word-break: break-word;
+}
+
 .pill-ok,
 .pill-review {
   display: inline-flex;

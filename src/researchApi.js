@@ -303,6 +303,21 @@ export async function fetchWesternStudentAnalysis(payload = {}) {
   );
 }
 
+export async function fetchWesternStudentGate() {
+  return readJson(await fetch("/api/strings/student-gate", NO_STORE_REQUEST));
+}
+
+export async function fetchWesternStudentSubmissions(params = {}) {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params || {})) {
+    if (value !== undefined && value !== null && String(value).trim()) {
+      searchParams.set(key, String(value));
+    }
+  }
+  const suffix = searchParams.toString() ? `?${searchParams.toString()}` : "";
+  return readJson(await fetch(`/api/strings/student-submissions${suffix}`, NO_STORE_REQUEST));
+}
+
 export async function fetchWesternControlledSubmissions(params = {}) {
   const searchParams = new URLSearchParams();
   for (const [key, value] of Object.entries(params || {})) {

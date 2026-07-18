@@ -387,7 +387,8 @@
     "western:photo-score": "powershell -ExecutionPolicy Bypass -File scripts\\run-western-photo-score-python.ps1",
     "test:western-photo-score": "python scripts/test_western_photo_score_pipeline.py",
     "western:photo-score-batch": "node scripts/run-western-photo-score-batch.mjs",
-    "test:western-photo-score-intake": "node scripts/test-western-photo-score-intake.mjs"
+    "test:western-photo-score-intake": "node scripts/test-western-photo-score-intake.mjs",
+    "test:western-student-gate": "node scripts/test-western-student-gate.mjs"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.99",

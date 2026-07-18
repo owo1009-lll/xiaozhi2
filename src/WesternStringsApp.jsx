@@ -44,6 +44,7 @@ export default function WesternStringsApp({ onBackToStudent }) {
   const [submissionBatchResult, setSubmissionBatchResult] = useState(null);
   const [reviewSavingNoteId, setReviewSavingNoteId] = useState("");
   const [reviewMessage, setReviewMessage] = useState("");
+  const [feedbackDrafts, setFeedbackDrafts] = useState({});
 
   const hasScoreInput = Boolean(job?.scoreId || scorePhotoFile);
 
@@ -195,6 +196,32 @@ export default function WesternStringsApp({ onBackToStudent }) {
       await loadControlledSubmissionQueue();
     } catch (queueError) {
       setError(queueError?.message || "Controlled submission review failed.");
+    } finally {
+      setSubmissionReviewSavingId("");
+    }
+  }
+
+  async function releaseStudentFeedback(submission) {
+    const studentMessage = (feedbackDrafts[submission.submissionId] || "").trim();
+    if (!studentMessage) {
+      setError("Write the student feedback text before releasing.");
+      return;
+    }
+    setSubmissionReviewSavingId(submission.submissionId);
+    setReviewMessage("");
+    setError("");
+    try {
+      await saveWesternControlledSubmissionReview({
+        submissionId: submission.submissionId,
+        action: "feedback_released",
+        studentMessage,
+        releaseToStudent: true,
+      });
+      setReviewMessage("Feedback released to the student page.");
+      setFeedbackDrafts((drafts) => ({ ...drafts, [submission.submissionId]: "" }));
+      await loadControlledSubmissionQueue();
+    } catch (releaseError) {
+      setError(releaseError?.message || "Feedback release failed.");
     } finally {
       setSubmissionReviewSavingId("");
     }
@@ -450,6 +477,30 @@ export default function WesternStringsApp({ onBackToStudent }) {
                   >
                     Reject
                   </button>
+                  <div className="western-feedback-release">
+                    <input
+                      type="text"
+                      value={feedbackDrafts[submission.submissionId] || ""}
+                      placeholder="Student feedback text (human-authored)"
+                      onChange={(event) =>
+                        setFeedbackDrafts((drafts) => ({
+                          ...drafts,
+                          [submission.submissionId]: event.target.value,
+                        }))
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      disabled={
+                        submissionReviewSavingId === submission.submissionId
+                        || !(feedbackDrafts[submission.submissionId] || "").trim()
+                      }
+                      onClick={() => releaseStudentFeedback(submission)}
+                    >
+                      Release
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
