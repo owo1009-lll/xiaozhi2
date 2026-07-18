@@ -118,7 +118,7 @@
     "reviewedAt": "2026-07-17T08:01:15.992Z"
   },
   "deployment": {
-    "status": "host-ready-governance-pending",
+    "status": "controlled-offline-approved-preflight-required",
     "targetRuntimeRoot": "data/tools/homr-0.7.0-ort1.27.0",
     "environmentPathTracked": false,
     "offlineRebuildScript": "scripts/setup-western-photo-score-runtime.ps1",
@@ -126,7 +126,7 @@
     "startupPreflightReady": true,
     "modelAutoDownloadRisk": true,
     "modelAutoDownloadBlockedByPreflight": true,
-    "notes": "The tracked offline setup and preflight target data/tools/homr-0.7.0-ort1.27.0 and a separate audio interpreter. The current host passes audio, Audiveris, HOMR, dependency, provider, complete wheel RECORD, METADATA, LICENSE, retained-wheel, and six-model checks; full deployment remains closed because the named license/model review and approval binding are pending. Local wheelhouse, models, and runtimes remain gitignored deployment artifacts."
+    "notes": "The named license/model review and approval binding authorize controlled-offline-review-only. Every start still requires the tracked deployment preflight against data/tools/homr-0.7.0-ort1.27.0 and the separate audio interpreter. The current host passes audio, Audiveris, HOMR, dependency, provider, complete wheel RECORD, METADATA, LICENSE, retained-wheel, and six-model checks. Student-facing network use, automatic adoption, and redistribution remain prohibited. Local wheelhouse, models, and runtimes remain gitignored deployment artifacts."
   },
   "decision": {
     "status": "approved-with-conditions",

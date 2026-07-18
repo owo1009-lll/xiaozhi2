@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -41,6 +42,95 @@ const VIOLIN_MIDI_AUDIT = path.join(
 );
 const V2_ALPHA_MIN_PRECISION = 0.9;
 const V2_ALPHA_MIN_COVERAGE = 0.2;
+
+async function sha256FileOrEmpty(filePath) {
+  try {
+    const bytes = await fs.readFile(path.resolve(process.cwd(), filePath));
+    return crypto.createHash("sha256").update(bytes).digest("hex");
+  } catch {
+    return "";
+  }
+}
+
+export function evaluateHomrDeploymentSnapshot({
+  review = null,
+  reviewSha256 = "",
+  manifestSha256 = "",
+  lockSha256 = "",
+  preflight = null,
+} = {}) {
+  const decision = review?.decision || {};
+  const decisionApproved = decision.status === "approved-with-conditions"
+    && String(decision.reviewedBy || "").trim() !== ""
+    && Array.isArray(decision.approvedScopes)
+    && decision.approvedScopes.length === 1
+    && decision.approvedScopes[0] === "controlled-offline-review-only"
+    && decision.controlledOfflineReviewApproved === true
+    && decision.studentFacingNetworkUseApproved === false
+    && decision.redistributionApproved === false
+    && decision.confirmations?.controlledOfflineOnly === true
+    && decision.confirmations?.modelLicenseBasisReviewed === true
+    && decision.confirmations?.noModelRedistribution === true
+    && decision.approvalBinding?.bindingVersion === 2;
+  const preflightPresent = Boolean(preflight);
+  const reviewBindingCurrent = Boolean(
+    preflightPresent
+      && reviewSha256
+      && preflight.reviewRecordSha256
+      && preflight.reviewRecordSha256 === reviewSha256,
+  );
+  const manifestBindingCurrent = Boolean(
+    preflightPresent
+      && manifestSha256
+      && preflight.manifestSha256
+      && preflight.manifestSha256 === manifestSha256,
+  );
+  const lockBindingCurrent = Boolean(
+    preflightPresent
+      && lockSha256
+      && preflight.lockSha256
+      && preflight.lockSha256 === lockSha256,
+  );
+  const preflightBindingCurrent = reviewBindingCurrent
+    && manifestBindingCurrent
+    && lockBindingCurrent;
+  const licenseReviewReady = decisionApproved
+    && preflightBindingCurrent
+    && preflight?.governanceReady === true;
+  const artifactIntegrityReady = preflightBindingCurrent
+    && preflight?.host?.components?.homr?.ready === true;
+  const deploymentPreflightReady = preflightBindingCurrent
+    && preflight?.deploymentReady === true;
+  const productionPoolReady = Boolean(
+    licenseReviewReady && artifactIntegrityReady && deploymentPreflightReady,
+  );
+  const blockingReasons = [
+    ...(!decisionApproved ? ["homr-license-review-not-approved"] : []),
+    ...(!preflightPresent ? ["photo-score-deployment-preflight-missing"] : []),
+    ...(preflightPresent && !reviewBindingCurrent
+      ? ["photo-score-deployment-preflight-stale-review-record"]
+      : []),
+    ...(preflightPresent && !manifestBindingCurrent
+      ? ["photo-score-deployment-preflight-stale-manifest"]
+      : []),
+    ...(preflightPresent && !lockBindingCurrent
+      ? ["photo-score-deployment-preflight-stale-lock"]
+      : []),
+    ...(preflightBindingCurrent ? (preflight?.blockingReasons || []) : []),
+  ];
+  return {
+    decisionApproved,
+    reviewBindingCurrent,
+    manifestBindingCurrent,
+    lockBindingCurrent,
+    preflightBindingCurrent,
+    licenseReviewReady,
+    artifactIntegrityReady,
+    deploymentPreflightReady,
+    productionPoolReady,
+    blockingReasons: [...new Set(blockingReasons)],
+  };
+}
 
 const CONTROLLED_LABELS = path.join(
   "data",
@@ -415,6 +505,9 @@ const HOMR_REVIEW_RECORD = path.join(
 );
 const PHOTO_SCORE_DEPLOYMENT_CONFIG = path.join(
   "config", "western-photo-score-deployment.json",
+);
+const PHOTO_SCORE_HOMR_RUNTIME_LOCK = path.join(
+  "config", "western-photo-score-homr-runtime.lock.txt",
 );
 const PHOTO_SCORE_DEPLOYMENT_PREFLIGHT = path.join(
   "data", "experiments", "western-strings-m4", "photo-score-deployment-preflight.json",
@@ -1766,7 +1859,10 @@ async function buildM4OmrStatus() {
   const homrEvidence = await readJson(M4_HOMR_BENCHMARK);
   const homrBenchmark = homrEvidenceToBenchmark(homrEvidence);
   const homrReview = await readJson(HOMR_REVIEW_RECORD);
+  const homrReviewSha256 = await sha256FileOrEmpty(HOMR_REVIEW_RECORD);
   const photoScoreDeployment = await readJson(PHOTO_SCORE_DEPLOYMENT_CONFIG);
+  const photoScoreDeploymentSha256 = await sha256FileOrEmpty(PHOTO_SCORE_DEPLOYMENT_CONFIG);
+  const photoScoreLockSha256 = await sha256FileOrEmpty(PHOTO_SCORE_HOMR_RUNTIME_LOCK);
   const photoScorePreflight = await readJson(PHOTO_SCORE_DEPLOYMENT_PREFLIGHT);
   const sameEditionMultipageBenchmark = await readJson(M4_SAME_EDITION_MULTIPAGE_BENCHMARK);
   const sameEditionBenchmark = sameEditionMultipageBenchmark || await readJson(M4_SAME_EDITION_BENCHMARK);
@@ -1794,24 +1890,21 @@ async function buildM4OmrStatus() {
   const independentBenchmarkReady = independentBenchmark?.independentBenchmarkReady === true;
   const automaticAdoptionReady = independentBenchmark?.automaticAdoptionReady === true;
   const homrDecision = homrReview?.decision || {};
-  // Reuse the strict machine governance verdict rather than maintaining a
-  // looser duplicate here. It includes the named decision, exact scope and the
-  // complete artifact/contract approval binding.
-  const homrLicenseReviewReady = photoScorePreflight?.governanceReady === true;
-  const homrArtifactIntegrityReady =
-    photoScorePreflight?.host?.components?.homr?.ready === true;
-  const homrDeploymentPreflightReady = photoScorePreflight?.deploymentReady === true;
-  const homrProductionPoolReady = Boolean(
-    homrLicenseReviewReady
-      && homrArtifactIntegrityReady
-      && homrDeploymentPreflightReady,
-  );
-  const homrGovernanceBlockingReasons = photoScorePreflight?.blockingReasons?.length
-    ? photoScorePreflight.blockingReasons
-    : [
-        ...(!homrLicenseReviewReady ? ["homr-license-review-pending"] : []),
-        ...(!photoScorePreflight ? ["photo-score-deployment-preflight-missing"] : []),
-      ];
+  // A cached preflight is authoritative only for the exact review record it
+  // inspected. This prevents project-status/project-gate from reusing a green
+  // deployment verdict after approval is deferred or any binding changes.
+  const homrDeploymentSnapshot = evaluateHomrDeploymentSnapshot({
+    review: homrReview,
+    reviewSha256: homrReviewSha256,
+    manifestSha256: photoScoreDeploymentSha256,
+    lockSha256: photoScoreLockSha256,
+    preflight: photoScorePreflight,
+  });
+  const homrLicenseReviewReady = homrDeploymentSnapshot.licenseReviewReady;
+  const homrArtifactIntegrityReady = homrDeploymentSnapshot.artifactIntegrityReady;
+  const homrDeploymentPreflightReady = homrDeploymentSnapshot.deploymentPreflightReady;
+  const homrProductionPoolReady = homrDeploymentSnapshot.productionPoolReady;
+  const homrGovernanceBlockingReasons = homrDeploymentSnapshot.blockingReasons;
   const automaticAdoptionBlockingReasons = [
     ...(independentBenchmark?.automaticAdoptionBlockingReasons || ["m4-independent-benchmark-audit-missing"]),
     ...(!automaticAdoptionReady && oemerBenchmark?.complete === true && oemerBenchmark?.gate?.automaticAdoptionReady !== true
@@ -1950,6 +2043,13 @@ async function buildM4OmrStatus() {
       deploymentScope: photoScoreDeployment?.deploymentScope || "",
       studentFacing: false,
       automaticAdoptionAuthorized: false,
+      reviewRecordSha256: homrReviewSha256,
+      reviewRecordBindingCurrent: homrDeploymentSnapshot.reviewBindingCurrent,
+      manifestSha256: photoScoreDeploymentSha256,
+      manifestBindingCurrent: homrDeploymentSnapshot.manifestBindingCurrent,
+      lockSha256: photoScoreLockSha256,
+      lockBindingCurrent: homrDeploymentSnapshot.lockBindingCurrent,
+      preflightBindingCurrent: homrDeploymentSnapshot.preflightBindingCurrent,
       blockingReasons: homrGovernanceBlockingReasons,
       lastPreflight: photoScorePreflight
         ? {
@@ -1959,6 +2059,7 @@ async function buildM4OmrStatus() {
             deploymentReady: photoScorePreflight.deploymentReady === true,
             manifestSha256: photoScorePreflight.manifestSha256 || "",
             lockSha256: photoScorePreflight.lockSha256 || "",
+            reviewRecordSha256: photoScorePreflight.reviewRecordSha256 || "",
           }
         : null,
     },
@@ -2452,17 +2553,25 @@ const PHOTO_SCORE_BATCH_RUNS = path.join(
 async function readPhotoScoreChainStatus() {
   const preflight = await readJson(PHOTO_SCORE_DEPLOYMENT_PREFLIGHT);
   const review = await readJson(HOMR_REVIEW_RECORD);
+  const deploymentSnapshot = evaluateHomrDeploymentSnapshot({
+    review,
+    reviewSha256: await sha256FileOrEmpty(HOMR_REVIEW_RECORD),
+    manifestSha256: await sha256FileOrEmpty(PHOTO_SCORE_DEPLOYMENT_CONFIG),
+    lockSha256: await sha256FileOrEmpty(PHOTO_SCORE_HOMR_RUNTIME_LOCK),
+    preflight,
+  });
   const base = {
     codeWired: true,
     wired: true,
     studentFacing: false,
     automaticAdoptionAuthorized: false,
-    governanceConfiguredReady: preflight?.governanceReady === true,
-    runtimeReady: preflight?.hostReady === true,
-    deploymentReady: preflight?.deploymentReady === true,
-    productionPoolReady: preflight?.deploymentReady === true,
+    governanceConfiguredReady: deploymentSnapshot.licenseReviewReady,
+    runtimeReady: deploymentSnapshot.artifactIntegrityReady && preflight?.hostReady === true,
+    deploymentReady: deploymentSnapshot.deploymentPreflightReady,
+    productionPoolReady: deploymentSnapshot.productionPoolReady,
     homrReviewStatus: review?.decision?.status || "missing",
-    blockingReasons: preflight?.blockingReasons || ["photo-score-deployment-preflight-missing"],
+    preflightBindingCurrent: deploymentSnapshot.preflightBindingCurrent,
+    blockingReasons: deploymentSnapshot.blockingReasons,
     deploymentConfig: PHOTO_SCORE_DEPLOYMENT_CONFIG.replace(/\\/g, "/"),
     reviewRecord: HOMR_REVIEW_RECORD.replace(/\\/g, "/"),
     preflightReport: PHOTO_SCORE_DEPLOYMENT_PREFLIGHT.replace(/\\/g, "/"),

@@ -2,24 +2,24 @@
 
 ## 1. 当前决定
 
-机器权威记录为 `config/third-party/homr-0.7.0-review.json`。当前 `decision.status=pending`，没有具名审查人，不批准受控离线处理、学生端网络使用或再分发。
+机器权威记录为 `config/third-party/homr-0.7.0-review.json`。当前 `decision.status=approved-with-conditions`，具名审查人为 `guanxingzhi (project owner; evidence review delegated to Claude agent, 2026-07-17)`；唯一批准范围是 `controlled-offline-review-only`。学生端网络使用、自动采纳与再分发仍未获批准。
 
 这份记录是工程治理依据，不是法律意见。AGPL 的最终适用范围取决于实际部署、分发、修改和网络交互方式。
 
 ## 2. 已核实事实
 
 - HOMR 0.7.0 的上游仓库和本地 wheel METADATA 均声明 `AGPL-3.0`。
-- 稳定运行时 `data/tools/homr-0.7.0-ort1.27.0` 中 49 个带 RECORD 哈希的文件全部匹配，包含当前 `Scripts/homr.exe` launcher，未发现已安装 HOMR 文件被修改。保留的 `homr-0.7.0-py3-none-any.whl` 另有固定字节数和 SHA-256；由于未找到上游独立发布的 wheel checksum，具名审查仍须说明该本地 wheel 的采用依据。
+- 稳定运行时 `data/tools/homr-0.7.0-ort1.27.0` 中 49 个带 RECORD 哈希的文件全部匹配，包含当前 `Scripts/homr.exe` launcher，未发现已安装 HOMR 文件被修改。保留的 `homr-0.7.0-py3-none-any.whl` 另有固定字节数和 SHA-256；由于未找到上游独立发布的 wheel checksum，当前具名审查已明确按保留 wheel、portable RECORD 与本地安装分发的精确哈希作为受控离线采用依据。
 - Windows pip launcher 会嵌入解释器绝对路径，所以旧实验 venv 与稳定 runtime 的 `homr.exe` 字节哈希不同。跨路径审批不绑定这个 host-specific 哈希，而绑定排除 launcher 行、统一 LF 后的 portable RECORD 摘要，以及 `homr=homr.main:main` console-entry-point 契约；live preflight 仍逐项验证本机 RECORD，包含 launcher 在内必须 49/49、零 mismatch。
 - 正式 analyzer 主线只把 HOMR 暴露为不可执行的 secondary candidate。
 - 离线 v3 候选池以独立 CLI 子进程调用 HOMR，输入为本地图片文件，输出为 MusicXML 和日志；项目进程不 `import homr`。
 - 受控 batch 只选取最新复核操作为 `accepted_for_batch` 的提交，并强制 `studentFacing=false` 与 `autoDiagnosisIssued=false`。
 - 受控生产 wrapper 必须传入 `--require-complete-engine-pool`；Audiveris/HOMR 任一 executable 缺失时在音频解码或 OMR 前以 `required-engine-pool-incomplete` 失败。只有未带该 flag 的直接研究运行允许 Audiveris-only，并必须在 audit 中标记 degraded pool。
-- HOMR 在模型缺失时会从上游 GitHub release 下载 ONNX checkpoint。当前运行时所需的三个 HOMR checkpoint 和三个 RapidOCR ONNX 文件已作为完整六文件集合写入权威 JSON；具名审查尚未记录覆盖全部六文件的模型许可依据。
+- HOMR 在模型缺失时会从上游 GitHub release 下载 ONNX checkpoint。当前运行时所需的三个 HOMR checkpoint 和三个 RapidOCR ONNX 文件已作为完整六文件集合写入权威 JSON；具名审查已逐文件绑定哈希并记录 HOMR AGPL-3.0、RapidOCR/PaddleOCR Apache-2.0 的采用依据。由于各权重没有独立许可证文本，再分发仍明确禁止。
 
 ## 3. 范围边界
 
-当前可被显式审批的唯一范围是 `controlled-offline-review-only`：
+当前已显式审批的唯一范围是 `controlled-offline-review-only`：
 
 - 本地受控 batch；
 - 人工 `accepted_for_batch` 前置；
@@ -63,14 +63,14 @@ node scripts/record-western-homr-license-review.mjs `
 - Audiveris 5.10.2、音频环境、HOMR 环境、METADATA、LICENSE、`pip check` 和完整引擎池由 `npm run western:photo-score-deployment-preflight` 统一验证；
 - batch、服务端和 CLI 均走精确 wrapper；通用 `run-python.ps1` 的回退行为不再进入照片谱生产路径。
 
-2026-07-17 本机 live preflight 为 `hostReady=true`，三个组件 audio/Audiveris/HOMR 全部 ready，HOMR RECORD 为 49/49 且零 mismatch；`governanceReady=false`,`deploymentReady=false` 仅因本文件第 4 节的具名审查与 approval binding 尚未记录。运行时、wheelhouse 与模型包位于 Git 忽略的 `data/tools/`，部署机必须携带授权的本地包后运行：
+2026-07-18 本机 live preflight 为 `governanceReady=true`,`hostReady=true`,`deploymentReady=true`，三个组件 audio/Audiveris/HOMR 全部 ready，HOMR RECORD 为 49/49 且零 mismatch，六个模型、保留 wheel 与 approval binding 均逐项匹配。运行时、wheelhouse 与模型包位于 Git 忽略的 `data/tools/`，每台部署机和每次启动仍必须携带获准的本地包后运行：
 
 ```powershell
 npm run western:photo-score-runtime-setup
 npm run western:photo-score-deployment-preflight
 ```
 
-因此当前权威状态是 `deployment.status=host-ready-governance-pending`，不能写成“已获生产许可”。
+因此当前静态治理状态是 `deployment.status=controlled-offline-approved-preflight-required`；本机 live preflight 对该受控离线范围三绿。它不等于学生端/网络生产许可，也不授权自动采纳或再分发。preflight 产物同时绑定当前 review record、deployment manifest 和 runtime lock 的 SHA-256；三者任一发生变化，旧绿报告都会自动失效并要求重跑。
 
 ## 6. 复核命令
 

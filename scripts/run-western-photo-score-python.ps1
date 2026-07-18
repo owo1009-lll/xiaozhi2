@@ -91,7 +91,22 @@ if ($preflightExit -ne 0) {
 }
 
 try {
-  $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+  $manifestBytes = [IO.File]::ReadAllBytes($manifestPath)
+  $sha256 = [Security.Cryptography.SHA256]::Create()
+  try {
+    $manifestSha256 = ([BitConverter]::ToString($sha256.ComputeHash($manifestBytes))).Replace("-", "").ToLowerInvariant()
+  } finally {
+    $sha256.Dispose()
+  }
+  $strictUtf8 = [Text.UTF8Encoding]::new($false, $true)
+  $manifest = $strictUtf8.GetString($manifestBytes) | ConvertFrom-Json
+  $preflightResult = Get-Content -LiteralPath $preflightReport -Raw -Encoding UTF8 | ConvertFrom-Json
+  if ([string]$preflightResult.manifestSha256 -ne $manifestSha256) {
+    throw "Deployment manifest changed after preflight; rerun is required."
+  }
+  if ($preflightResult.deploymentReady -ne $true) {
+    throw "Deployment preflight report is not ready."
+  }
   $audioPython = Resolve-ExactRuntimePath -Spec $manifest.runtime.audioPython -Label "audio Python"
   $audiveris = Resolve-ExactRuntimePath -Spec $manifest.runtime.audiveris -Label "Audiveris"
   $homr = Resolve-ExactRuntimePath -Spec $manifest.runtime.homr -Label "HOMR"

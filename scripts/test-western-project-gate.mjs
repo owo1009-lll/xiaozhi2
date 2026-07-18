@@ -5,8 +5,82 @@ import { evaluateProjectGate } from "./gate-western-strings-project.mjs";
 import { renderHandoff } from "./create-western-strings-next-action-handoff.mjs";
 import {
   buildProjectStatus,
+  evaluateHomrDeploymentSnapshot,
   summarizePublicModelValidation,
 } from "./status-western-strings-project.mjs";
+
+const approvedHomrReviewFixture = {
+  decision: {
+    status: "approved-with-conditions",
+    reviewedBy: "fixture-reviewer",
+    approvedScopes: ["controlled-offline-review-only"],
+    controlledOfflineReviewApproved: true,
+    studentFacingNetworkUseApproved: false,
+    redistributionApproved: false,
+    confirmations: {
+      controlledOfflineOnly: true,
+      modelLicenseBasisReviewed: true,
+      noModelRedistribution: true,
+    },
+    approvalBinding: { bindingVersion: 2 },
+  },
+};
+const exactReviewHash = "a".repeat(64);
+const exactManifestHash = "b".repeat(64);
+const exactLockHash = "c".repeat(64);
+const greenPreflightFixture = {
+  governanceReady: true,
+  deploymentReady: true,
+  reviewRecordSha256: exactReviewHash,
+  manifestSha256: exactManifestHash,
+  lockSha256: exactLockHash,
+  blockingReasons: [],
+  host: { components: { homr: { ready: true } } },
+};
+const currentHomrSnapshot = evaluateHomrDeploymentSnapshot({
+  review: approvedHomrReviewFixture,
+  reviewSha256: exactReviewHash,
+  manifestSha256: exactManifestHash,
+  lockSha256: exactLockHash,
+  preflight: greenPreflightFixture,
+});
+assert.equal(currentHomrSnapshot.productionPoolReady, true, "exact review hash should retain a green bounded pool");
+const staleHomrSnapshot = evaluateHomrDeploymentSnapshot({
+  review: approvedHomrReviewFixture,
+  reviewSha256: "b".repeat(64),
+  manifestSha256: exactManifestHash,
+  lockSha256: exactLockHash,
+  preflight: greenPreflightFixture,
+});
+assert.equal(staleHomrSnapshot.productionPoolReady, false, "stale review binding must close the pool");
+assert(staleHomrSnapshot.blockingReasons.includes("photo-score-deployment-preflight-stale-review-record"));
+const pendingHomrSnapshot = evaluateHomrDeploymentSnapshot({
+  review: { decision: { status: "pending" } },
+  reviewSha256: exactReviewHash,
+  manifestSha256: exactManifestHash,
+  lockSha256: exactLockHash,
+  preflight: greenPreflightFixture,
+});
+assert.equal(pendingHomrSnapshot.licenseReviewReady, false, "pending governance must fail closed even with a green cached preflight");
+assert(pendingHomrSnapshot.blockingReasons.includes("homr-license-review-not-approved"));
+const staleManifestSnapshot = evaluateHomrDeploymentSnapshot({
+  review: approvedHomrReviewFixture,
+  reviewSha256: exactReviewHash,
+  manifestSha256: "d".repeat(64),
+  lockSha256: exactLockHash,
+  preflight: greenPreflightFixture,
+});
+assert.equal(staleManifestSnapshot.productionPoolReady, false, "manifest drift must close the pool");
+assert(staleManifestSnapshot.blockingReasons.includes("photo-score-deployment-preflight-stale-manifest"));
+const staleLockSnapshot = evaluateHomrDeploymentSnapshot({
+  review: approvedHomrReviewFixture,
+  reviewSha256: exactReviewHash,
+  manifestSha256: exactManifestHash,
+  lockSha256: "d".repeat(64),
+  preflight: greenPreflightFixture,
+});
+assert.equal(staleLockSnapshot.productionPoolReady, false, "lock drift must close the pool");
+assert(staleLockSnapshot.blockingReasons.includes("photo-score-deployment-preflight-stale-lock"));
 
 const status = await buildProjectStatus();
 
@@ -16,6 +90,13 @@ assert.equal(status.reviewPolicy?.source, "docs/western-strings-review-policy.md
 assert.equal(status.runtimeStudentGate.ordinaryUploadAutoFeedbackReady, false, "ordinary upload must not auto-feedback before release gate");
 assert.equal(status.runtimeStudentGate.m3plusAutoFeedbackReady, false, "M3+ mode feedback must stay disabled before labels are ready");
 assert.equal(status.runtimeStudentGate.m4OmrAutoScoreReady, false, "M4 OMR auto score must stay disabled before independent gold");
+assert.equal(
+  status.photoScoreOfflineChain.productionPoolReady,
+  status.tracks.m4Omr.m4HomrProductionPoolReady,
+  "top-level photo-score status must share the strict hash-bound deployment verdict",
+);
+assert.equal(status.photoScoreOfflineChain.studentFacing, false, "bounded offline pool must never open student-facing use");
+assert.equal(status.photoScoreOfflineChain.automaticAdoptionAuthorized, false, "bounded offline pool must never open automatic adoption");
 assert.ok(status.publicProfessionalBenchmark, "public professional benchmark status must always be present");
 assert.equal(
   status.publicProfessionalBenchmark.defaultStudentReleaseEligible,
@@ -472,7 +553,13 @@ if (homrReviewApproved) {
   assert.equal(homrReviewRecord.decision?.studentFacingNetworkUseApproved, false, "approval must never open student-facing network use");
   assert.equal(homrReviewRecord.decision?.redistributionApproved, false, "approval must never open redistribution");
 }
-assert.equal(m4.m4HomrLicenseReviewReady, homrReviewApproved, "license readiness must mirror the named review decision");
+const homrReviewEvidenceCurrent = m4.homrGovernance?.preflightBindingCurrent === true
+  && m4.homrGovernance?.lastPreflight?.governanceReady === true;
+assert.equal(
+  m4.m4HomrLicenseReviewReady,
+  homrReviewApproved && homrReviewEvidenceCurrent,
+  "license readiness must require both the named decision and its current preflight binding",
+);
 if (!homrReviewApproved) {
   assert.equal(m4.m4HomrProductionPoolReady, false, "pending governance must keep the deployment pool closed");
 }
@@ -614,6 +701,7 @@ const reviewPolicy = await fs.readFile("docs/western-strings-review-policy.md", 
 const projectPlan = await fs.readFile("docs/western-strings-project-plan.md", "utf8");
 const migrationPlan = await fs.readFile("docs/western-strings-migration-plan.md", "utf8");
 const releaseReviewSource = await fs.readFile("scripts/run-western-strings-release-review.mjs", "utf8");
+const m4PreflightSource = await fs.readFile("scripts/run-western-strings-m4-preflight.mjs", "utf8");
 const packageJson = JSON.parse(await fs.readFile("package.json", "utf8"));
 const handoff = renderHandoff(status);
 assert(
@@ -636,6 +724,11 @@ assert(packageJson.scripts?.["test:western-m4-homr-benchmark"], "package.json mu
 assert(packageJson.scripts?.["western:homr-evidence-check"], "package.json must expose the tracked fresh-evidence check");
 assert(packageJson.scripts?.["western:photo-score-deployment-preflight"], "package.json must expose the photo-score deployment preflight");
 assert(packageJson.scripts?.["test:western-photo-score-deployment-preflight"], "package.json must expose deployment-preflight tests");
+assert(
+  m4PreflightSource.indexOf('"western:photo-score-deployment-preflight"')
+    < m4PreflightSource.indexOf('"western:project-status"'),
+  "aggregate M4 preflight must refresh the deployment verdict before project status",
+);
 assert(packageJson.scripts?.["western:m4-op45-public-reference"], "package.json must expose the Op.45 external pitch-reference probe");
 assert(packageJson.scripts?.["test:western-m4-op45-public-reference"], "package.json must expose the Op.45 external pitch-reference regression test");
 assert(packageJson.scripts?.["western:m4-op45-promote-gold"], "package.json must expose fail-closed Op.45 gold promotion");

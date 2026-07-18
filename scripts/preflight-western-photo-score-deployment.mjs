@@ -227,6 +227,7 @@ export function evaluateDeploymentPreflight({
   const reviewModels = canonicalModelArtifacts(review.modelArtifacts || []);
   const manifestModels = canonicalModelArtifacts(manifest.runtime?.homr?.models || []);
   const approvedModels = canonicalModelArtifacts(binding.modelArtifacts || []);
+  const uniqueModelPathCount = (items) => new Set(items.map((item) => item.relativePath).filter(Boolean)).size;
 
   governanceChecks.push(
     check("deployment-manifest-schema-unsupported", manifest.schemaVersion === 1, { expected: 1, actual: manifest.schemaVersion }),
@@ -274,6 +275,18 @@ export function evaluateDeploymentPreflight({
     }),
     check("homr-license-reviewer-missing", typeof decision.reviewedBy === "string" && decision.reviewedBy.trim() !== "", { actual: decision.reviewedBy || "" }),
     check("homr-license-review-timestamp-invalid", validTimestamp(decision.reviewedAt), { actual: decision.reviewedAt || "" }),
+    check("homr-model-review-identity-mismatch", review.modelLicenseReview?.reviewedBy === decision.reviewedBy
+      && review.modelLicenseReview?.reviewedAt === decision.reviewedAt, {
+      modelReviewedBy: review.modelLicenseReview?.reviewedBy || "",
+      modelReviewedAt: review.modelLicenseReview?.reviewedAt || "",
+      decisionReviewedBy: decision.reviewedBy || "",
+      decisionReviewedAt: decision.reviewedAt || "",
+    }),
+    check("homr-deployment-review-status-mismatch",
+      review.deployment?.status === "controlled-offline-approved-preflight-required", {
+      expected: "controlled-offline-approved-preflight-required",
+      actual: review.deployment?.status || "",
+    }),
     check("homr-license-confirmations-incomplete", confirmations.controlledOfflineOnly === true
       && confirmations.modelLicenseBasisReviewed === true
       && confirmations.noModelRedistribution === true, { actual: confirmations }),
@@ -325,6 +338,13 @@ export function evaluateDeploymentPreflight({
       approvedCount: approvedModels.length,
       reviewedCount: reviewModels.length,
       manifestCount: manifestModels.length,
+    }),
+    check("homr-model-set-paths-not-unique", uniqueModelPathCount(reviewModels) === 6
+      && uniqueModelPathCount(manifestModels) === 6
+      && uniqueModelPathCount(approvedModels) === 6, {
+      approvedUniquePaths: uniqueModelPathCount(approvedModels),
+      reviewedUniquePaths: uniqueModelPathCount(reviewModels),
+      manifestUniquePaths: uniqueModelPathCount(manifestModels),
     }),
   );
 
@@ -486,6 +506,7 @@ export function evaluateDeploymentPreflight({
     deploymentScope: manifest.deploymentScope || "",
     manifestSha256: repository.manifestSha256 || "",
     lockSha256: repository.lockSha256 || "",
+    reviewRecordSha256: repository.reviewRecordSha256 || "",
     governanceReady: governance.ready,
     hostReady: hostSummary.ready,
     deploymentReady,
@@ -718,9 +739,15 @@ function probeHomr(repoRoot, spec, env, lockPackages, timeoutMs, reviewDistribut
 
 async function readOptionalJson(filePath) {
   try {
-    return { exists: true, value: JSON.parse(await fsp.readFile(filePath, "utf8")), error: "" };
+    const bytes = await fsp.readFile(filePath);
+    return {
+      exists: true,
+      value: JSON.parse(bytes.toString("utf8")),
+      sha256: sha256Buffer(bytes),
+      error: "",
+    };
   } catch (error) {
-    return { exists: false, value: null, error: String(error?.message || error) };
+    return { exists: false, value: null, sha256: "", error: String(error?.message || error) };
   }
 }
 
@@ -768,13 +795,14 @@ export async function runLiveDeploymentPreflight({
     wheelArchiveInsideRepository && fs.existsSync(wheelArchivePath),
   );
   const repository = {
-    manifestSha256: sha256File(manifestPath),
+    manifestSha256: manifestRead.sha256,
     lockFileExists,
     lockSha256: lockFileExists ? sha256Buffer(lockText) : "",
     lockPackages: parsedLock.packages,
     lockErrors: parsedLock.errors,
     reviewRecordExists: reviewRead.exists,
     reviewRecord: reviewRead.value || {},
+    reviewRecordSha256: reviewRead.sha256,
     reviewDocumentExists: fs.existsSync(reviewDocumentPath),
     wheelArchivePath: normalizePath(wheelArchivePath),
     wheelArchiveInsideRepository,

@@ -83,6 +83,7 @@ function readyRepository(review = approvedReview()) {
     manifestSha256: "b".repeat(64),
     lockFileExists: true,
     lockSha256: "c".repeat(64),
+    reviewRecordSha256: "d".repeat(64),
     lockPackages: clone(lock.packages),
     lockErrors: [],
     reviewRecordExists: true,
@@ -179,6 +180,7 @@ const ready = evaluate();
 assert.equal(ready.governanceReady, true, JSON.stringify(ready.governance.blockingReasons));
 assert.equal(ready.hostReady, true, JSON.stringify(ready.host.blockingReasons));
 assert.equal(ready.deploymentReady, true, JSON.stringify(ready.blockingReasons));
+assert.equal(ready.reviewRecordSha256, "d".repeat(64));
 assert.equal(ready.deployment.studentFacing, false);
 assert.equal(ready.deployment.automaticAdoptionAuthorized, false);
 assert.equal(approvedReview().decision.approvalBinding.modelArtifacts.length, 6, "approval must bind the complete runtime model set");
@@ -194,12 +196,30 @@ const extraScope = evaluate({ review: extraScopeReview });
 assert.equal(extraScope.governanceReady, false);
 assert(extraScope.governance.blockingReasons.includes("homr-controlled-offline-scope-not-approved"));
 
+const mismatchedReviewerReview = approvedReview();
+mismatchedReviewerReview.modelLicenseReview.reviewedBy = "different-reviewer";
+const mismatchedReviewer = evaluate({ review: mismatchedReviewerReview });
+assert.equal(mismatchedReviewer.governanceReady, false);
+assert(mismatchedReviewer.governance.blockingReasons.includes("homr-model-review-identity-mismatch"));
+
+const staleDeploymentStatusReview = approvedReview();
+staleDeploymentStatusReview.deployment.status = "host-ready-governance-pending";
+const staleDeploymentStatus = evaluate({ review: staleDeploymentStatusReview });
+assert.equal(staleDeploymentStatus.governanceReady, false);
+assert(staleDeploymentStatus.governance.blockingReasons.includes("homr-deployment-review-status-mismatch"));
+
 const incompleteBindingReview = approvedReview();
 incompleteBindingReview.decision.approvalBinding.modelArtifacts = [];
 const incompleteBinding = evaluate({ review: incompleteBindingReview });
 assert.equal(incompleteBinding.governanceReady, false);
 assert.equal(incompleteBinding.deploymentReady, false);
 assert(incompleteBinding.governance.blockingReasons.includes("homr-approval-binding-model-set-mismatch"));
+
+const duplicateModelPathReview = approvedReview();
+duplicateModelPathReview.modelArtifacts[5].relativePath = duplicateModelPathReview.modelArtifacts[4].relativePath;
+const duplicateModelPath = evaluate({ review: duplicateModelPathReview });
+assert.equal(duplicateModelPath.governanceReady, false);
+assert(duplicateModelPath.governance.blockingReasons.includes("homr-model-set-paths-not-unique"));
 
 const missingArtifactBindingReview = approvedReview();
 delete missingArtifactBindingReview.decision.approvalBinding.metadataSha256;
@@ -334,6 +354,8 @@ assert(wrapperSource.includes("--require-complete-engine-pool"));
 assert(wrapperSource.includes("Resolve-ExactRuntimePath"));
 assert(wrapperSource.includes('$ErrorActionPreference = "Continue"'), "wrapper must preserve native preflight exit semantics on Windows PowerShell");
 assert(wrapperSource.includes("*> $null"), "wrapper must not echo the full failed preflight report through stderr");
+assert(wrapperSource.includes("[IO.File]::ReadAllBytes($manifestPath)"), "wrapper must hash and parse the same manifest bytes");
+assert(wrapperSource.includes("$preflightResult.manifestSha256 -ne $manifestSha256"), "wrapper must reject manifest drift after preflight");
 assert.equal(wrapperSource.includes("run-python.ps1"), false, "production wrapper must not use the fallback-capable generic runner");
 
 const setupSource = fs.readFileSync(path.join(repoRoot, "scripts", "setup-western-photo-score-runtime.ps1"), "utf8");

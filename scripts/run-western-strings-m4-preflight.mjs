@@ -17,6 +17,7 @@ const STEPS = [
   "western:m4-independent-gold-workspace-audit",
   "western:m4-omr-confidence-probe",
   "western:m4-independent-benchmark-audit",
+  "western:photo-score-deployment-preflight",
   "western:project-status",
   "western:next-actions",
 ];

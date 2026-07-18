@@ -254,6 +254,15 @@ export async function writeHomrLicenseReviewDecision(args = {}) {
     },
     approvalBinding: approved ? approvalBinding(record) : null,
   };
+  record.deployment = {
+    ...(record.deployment || {}),
+    status: approved
+      ? "controlled-offline-approved-preflight-required"
+      : "governance-deferred",
+    notes: approved
+      ? "The named license/model review and approval binding authorize controlled-offline-review-only. Every start still requires the tracked deployment preflight. Student-facing network use, automatic adoption, and redistribution remain prohibited. Local wheelhouse, models, and runtimes remain gitignored deployment artifacts."
+      : "The named reviewer deferred HOMR use. Host artifacts may still be audited, but no execution or distribution scope is approved.",
+  };
 
   await fs.mkdir(path.dirname(resolved.out), { recursive: true });
   await fs.writeFile(resolved.out, `${JSON.stringify(record, null, 2)}\n`, "utf8");

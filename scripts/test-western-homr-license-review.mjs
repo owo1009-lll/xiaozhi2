@@ -39,6 +39,12 @@ if (decisionStatus === "pending") {
     authoritative.modelLicenseReview?.status === "reviewer-confirmed-for-controlled-offline-use"
     && authoritative.modelLicenseReview?.controlledOfflineUseConfirmedByReviewer === true
     && authoritative.modelLicenseReview?.redistributionAllowed === false);
+  check("approved-reviewer-and-timestamp-match-model-review",
+    authoritative.modelLicenseReview?.reviewedBy === authoritative.decision?.reviewedBy
+    && authoritative.modelLicenseReview?.reviewedAt === authoritative.decision?.reviewedAt);
+  check("approved-deployment-snapshot-is-synchronized",
+    authoritative.deployment?.status === "controlled-offline-approved-preflight-required"
+    && !String(authoritative.deployment?.notes || "").includes("pending"));
 } else {
   check("deferred-record-names-reviewer", String(authoritative.decision?.reviewedBy || "").trim() !== "");
   check("deferred-record-approves-no-scope", authoritative.decision?.controlledOfflineReviewApproved === false);
@@ -46,6 +52,8 @@ if (decisionStatus === "pending") {
 check("reviewed-runtime-is-stable-target", authoritative.evidence?.localDistribution?.runtimeRoot === authoritative.deployment?.targetRuntimeRoot);
 check("portable-record-binding-is-path-independent", authoritative.evidence?.localDistribution?.executable?.observedHostSha256IsApprovalBinding === false);
 check("complete-runtime-model-set-is-recorded", authoritative.modelArtifacts?.length === 6);
+check("complete-runtime-model-set-has-unique-paths",
+  new Set((authoritative.modelArtifacts || []).map((item) => item.relativePath)).size === 6);
 
 const currentAudit = auditHomrBoundary({ root: repoRoot });
 check("boundary-audit-passes", currentAudit.ok === true);
@@ -98,6 +106,9 @@ try {
   check("approval-does-not-bind-path-sensitive-launcher-hash", !Object.hasOwn(approvedRecord.decision.approvalBinding || {}, "executableSha256"));
   check("approval-binds-portable-record", approvedRecord.decision.approvalBinding?.portableRecord?.sha256 === authoritative.evidence.localDistribution.portableRecord.sha256);
   check("approval-binds-retained-wheel", approvedRecord.decision.approvalBinding?.wheelArchive?.sha256 === authoritative.evidence.localDistribution.wheelArchive.sha256);
+  check("approval-synchronizes-deployment-snapshot",
+    approvedRecord.deployment?.status === "controlled-offline-approved-preflight-required"
+    && !String(approvedRecord.deployment?.notes || "").includes("pending"));
 
   const extraScope = structuredClone(approvedRecord);
   extraScope.decision.approvedScopes.push("unreviewed-extra-scope");
@@ -172,6 +183,9 @@ try {
   });
   check("named-defer-is-recorded", deferred.ok === true && deferred.status === "deferred");
   check("defer-approves-no-scope", deferred.controlledOfflineReviewApproved === false);
+  const deferredRecord = JSON.parse(await fs.readFile(deferredPath, "utf8"));
+  check("defer-synchronizes-deployment-snapshot",
+    deferredRecord.deployment?.status === "governance-deferred");
 } finally {
   await fs.rm(tempRoot, { recursive: true, force: true });
 }
