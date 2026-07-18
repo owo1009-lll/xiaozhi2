@@ -1,0 +1,46 @@
+{
+  "contract": "western-m4b-fresh-blind-promotion-evaluation-v1",
+  "complete": true,
+  "operationalReady": true,
+  "promotionReady": false,
+  "evidenceClass": "fresh-blind-test-only",
+  "counts": {
+    "rows": 0,
+    "validRows": 0,
+    "piecesOrLayouts": 0,
+    "devices": 0
+  },
+  "metrics": null,
+  "thresholds": {
+    "measureBoxF1": 0.95,
+    "exactPageStructureRate": 0.8,
+    "structureConflictReviewRequiredRate": 1.0,
+    "meterRegionF1": 0.95
+  },
+  "freshBlindMinimums": {
+    "pages": 30,
+    "piecesOrLayouts": 6,
+    "devices": 3
+  },
+  "blockingReasons": [
+    "m4b-fresh-blind-intake-missing"
+  ],
+  "provenance": {
+    "structurePolicy": "config/western-m4b-structure-poc.json",
+    "structurePolicySha256": "82132d409911d4f149e8db4c27b0dc5cee436012a78f48fc51ffdb5eb6d125e3",
+    "datasetPolicy": "config/western-m4b-dataset.json",
+    "datasetPolicySha256": "e375884c215e6d9cfd3947e4678d5ea51e61ecb99f8d305ad6ed3790d676cb92",
+    "signedDecision": "data/experiments/western-strings-m4b-poc-promotion-threshold-decision.json",
+    "signedDecisionSha256": "346290358828f255ef41f1076afe510c413c8d66983e3786bbcff45bed4f8602",
+    "intake": "data/private/western-strings-m4b-fresh-blind/intake.json",
+    "intakePresent": false,
+    "evaluator": "scripts/experiments/eval_western_m4b_fresh_blind_promotion.py",
+    "evaluatorSha256": "773f549b1da897a4b95e5a52e01986500d3526cbbc24cfa8c1f83aa205d9c0ce"
+  },
+  "boundary": {
+    "expandedInvestmentOnly": true,
+    "automaticAdoptionAuthorized": false,
+    "studentFacing": false,
+    "freshBlindTrainingEligible": false
+  }
+}

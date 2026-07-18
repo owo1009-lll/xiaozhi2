@@ -1,0 +1,2340 @@
+{
+  "contract": "western-m4b-explicit-structure-result-v1",
+  "ready": true,
+  "reason": "structure-candidate-review-required",
+  "blockingReasons": [],
+  "photo": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-01-self-authored-v1-s19/photo.jpg",
+  "photoSha256": "934375d28330f18c905084bf8cfdaa7e1bfd1d620847615206aeb659cae87ee2",
+  "normalization": {
+    "ready": true,
+    "reason": "ok",
+    "pageDetection": {
+      "ready": true,
+      "reason": "ok",
+      "threshold": 125.0,
+      "coverage": 0.736727,
+      "polygonPixels": [
+        [
+          109.0,
+          43.0
+        ],
+        [
+          86.0,
+          1234.0
+        ],
+        [
+          815.0,
+          1216.0
+        ],
+        [
+          845.0,
+          81.0
+        ]
+      ]
+    },
+    "curvature": {
+      "model": "page-edge-polynomial-dewarp",
+      "degree": 3,
+      "ready": true,
+      "residualCurvePixels": 2.7822,
+      "coefficients": [
+        0.45514554,
+        -2.72500173,
+        -0.49057016,
+        2.06804166
+      ]
+    },
+    "rectifiedSize": [
+      900,
+      1273
+    ]
+  },
+  "structureEvidence": {
+    "contract": "western-m4b-explicit-structure-evidence-v1",
+    "binaryShape": [
+      900,
+      1273
+    ],
+    "rowPeakCount": 23,
+    "staffSequenceCount": 4,
+    "systems": [
+      {
+        "systemIndex": 0,
+        "staffIndices": [
+          0
+        ],
+        "polygonNormalizedPixels": [
+          [
+            100.5,
+            188
+          ],
+          [
+            836.0,
+            188
+          ],
+          [
+            836.0,
+            228
+          ],
+          [
+            100.5,
+            228
+          ]
+        ],
+        "barlineCount": 5,
+        "measureCount": 5,
+        "interlinePixels": 7.5,
+        "polygonPixels": [
+          [
+            191.332,
+            223.475
+          ],
+          [
+            791.318,
+            247.035
+          ],
+          [
+            790.382,
+            283.113
+          ],
+          [
+            190.575,
+            261.012
+          ]
+        ]
+      },
+      {
+        "systemIndex": 1,
+        "staffIndices": [
+          1
+        ],
+        "polygonNormalizedPixels": [
+          [
+            40.5,
+            357
+          ],
+          [
+            836.0,
+            357
+          ],
+          [
+            836.0,
+            397
+          ],
+          [
+            40.5,
+            397
+          ]
+        ],
+        "barlineCount": 6,
+        "measureCount": 6,
+        "interlinePixels": 7.5,
+        "polygonPixels": [
+          [
+            137.141,
+            379.712
+          ],
+          [
+            787.366,
+            399.292
+          ],
+          [
+            786.433,
+            435.264
+          ],
+          [
+            136.404,
+            417.258
+          ]
+        ]
+      },
+      {
+        "systemIndex": 2,
+        "staffIndices": [
+          2
+        ],
+        "polygonNormalizedPixels": [
+          [
+            40.5,
+            526
+          ],
+          [
+            836.0,
+            526
+          ],
+          [
+            836.0,
+            566
+          ],
+          [
+            40.5,
+            566
+          ]
+        ],
+        "barlineCount": 6,
+        "measureCount": 6,
+        "interlinePixels": 7.5,
+        "polygonPixels": [
+          [
+            134.028,
+            538.157
+          ],
+          [
+            783.426,
+            551.101
+          ],
+          [
+            782.495,
+            586.967
+          ],
+          [
+            133.293,
+            575.588
+          ]
+        ]
+      },
+      {
+        "systemIndex": 3,
+        "staffIndices": [
+          3
+        ],
+        "polygonNormalizedPixels": [
+          [
+            40.5,
+            695
+          ],
+          [
+            836.0,
+            695
+          ],
+          [
+            836.0,
+            735
+          ],
+          [
+            40.5,
+            735
+          ]
+        ],
+        "barlineCount": 4,
+        "measureCount": 4,
+        "interlinePixels": 7.5,
+        "polygonPixels": [
+          [
+            130.925,
+            696.117
+          ],
+          [
+            779.497,
+            702.464
+          ],
+          [
+            778.569,
+            738.225
+          ],
+          [
+            130.192,
+            733.433
+          ]
+        ]
+      }
+    ],
+    "staffs": [
+      {
+        "staffIndex": 0,
+        "systemIndex": 0,
+        "staffLinesNormalizedPixels": [
+          [
+            [
+              100.5,
+              193.0
+            ],
+            [
+              836.0,
+              193.0
+            ]
+          ],
+          [
+            [
+              100.5,
+              201.0
+            ],
+            [
+              836.0,
+              201.0
+            ]
+          ],
+          [
+            [
+              100.5,
+              208.0
+            ],
+            [
+              836.0,
+              208.0
+            ]
+          ],
+          [
+            [
+              100.5,
+              215.0
+            ],
+            [
+              836.0,
+              215.0
+            ]
+          ],
+          [
+            [
+              100.5,
+              223.0
+            ],
+            [
+              836.0,
+              223.0
+            ]
+          ]
+        ],
+        "polygonNormalizedPixels": [
+          [
+            100.5,
+            188
+          ],
+          [
+            836.0,
+            188
+          ],
+          [
+            836.0,
+            228
+          ],
+          [
+            100.5,
+            228
+          ]
+        ],
+        "interlinePixels": 7.5,
+        "polygonPixels": [
+          [
+            191.332,
+            223.475
+          ],
+          [
+            791.318,
+            247.035
+          ],
+          [
+            790.382,
+            283.113
+          ],
+          [
+            190.575,
+            261.012
+          ]
+        ],
+        "staffLinesPixels": [
+          [
+            [
+              191.237,
+              228.168
+            ],
+            [
+              791.201,
+              251.546
+            ]
+          ],
+          [
+            [
+              191.086,
+              235.677
+            ],
+            [
+              791.014,
+              258.763
+            ]
+          ],
+          [
+            [
+              190.953,
+              242.247
+            ],
+            [
+              790.85,
+              265.077
+            ]
+          ],
+          [
+            [
+              190.821,
+              248.815
+            ],
+            [
+              790.686,
+              271.39
+            ]
+          ],
+          [
+            [
+              190.67,
+              256.321
+            ],
+            [
+              790.499,
+              278.604
+            ]
+          ]
+        ]
+      },
+      {
+        "staffIndex": 1,
+        "systemIndex": 1,
+        "staffLinesNormalizedPixels": [
+          [
+            [
+              40.5,
+              362.0
+            ],
+            [
+              836.0,
+              362.0
+            ]
+          ],
+          [
+            [
+              40.5,
+              369.0
+            ],
+            [
+              836.0,
+              369.0
+            ]
+          ],
+          [
+            [
+              40.5,
+              377.0
+            ],
+            [
+              836.0,
+              377.0
+            ]
+          ],
+          [
+            [
+              40.5,
+              385.0
+            ],
+            [
+              836.0,
+              385.0
+            ]
+          ],
+          [
+            [
+              40.5,
+              392.0
+            ],
+            [
+              836.0,
+              392.0
+            ]
+          ]
+        ],
+        "polygonNormalizedPixels": [
+          [
+            40.5,
+            357
+          ],
+          [
+            836.0,
+            357
+          ],
+          [
+            836.0,
+            397
+          ],
+          [
+            40.5,
+            397
+          ]
+        ],
+        "interlinePixels": 7.5,
+        "polygonPixels": [
+          [
+            137.141,
+            379.712
+          ],
+          [
+            787.366,
+            399.292
+          ],
+          [
+            786.433,
+            435.264
+          ],
+          [
+            136.404,
+            417.258
+          ]
+        ],
+        "staffLinesPixels": [
+          [
+            [
+              137.049,
+              384.406
+            ],
+            [
+              787.249,
+              403.79
+            ]
+          ],
+          [
+            [
+              136.92,
+              390.978
+            ],
+            [
+              787.086,
+              410.086
+            ]
+          ],
+          [
+            [
+              136.772,
+              398.488
+            ],
+            [
+              786.899,
+              417.281
+            ]
+          ],
+          [
+            [
+              136.625,
+              405.997
+            ],
+            [
+              786.713,
+              424.475
+            ]
+          ],
+          [
+            [
+              136.496,
+              412.566
+            ],
+            [
+              786.549,
+              430.769
+            ]
+          ]
+        ]
+      },
+      {
+        "staffIndex": 2,
+        "systemIndex": 2,
+        "staffLinesNormalizedPixels": [
+          [
+            [
+              40.5,
+              531.0
+            ],
+            [
+              836.0,
+              531.0
+            ]
+          ],
+          [
+            [
+              40.5,
+              539.0
+            ],
+            [
+              836.0,
+              539.0
+            ]
+          ],
+          [
+            [
+              40.5,
+              546.0
+            ],
+            [
+              836.0,
+              546.0
+            ]
+          ],
+          [
+            [
+              40.5,
+              554.0
+            ],
+            [
+              836.0,
+              554.0
+            ]
+          ],
+          [
+            [
+              40.5,
+              561.0
+            ],
+            [
+              836.0,
+              561.0
+            ]
+          ]
+        ],
+        "polygonNormalizedPixels": [
+          [
+            40.5,
+            526
+          ],
+          [
+            836.0,
+            526
+          ],
+          [
+            836.0,
+            566
+          ],
+          [
+            40.5,
+            566
+          ]
+        ],
+        "interlinePixels": 7.5,
+        "polygonPixels": [
+          [
+            134.028,
+            538.157
+          ],
+          [
+            783.426,
+            551.101
+          ],
+          [
+            782.495,
+            586.967
+          ],
+          [
+            133.293,
+            575.588
+          ]
+        ],
+        "staffLinesPixels": [
+          [
+            [
+              133.936,
+              542.837
+            ],
+            [
+              783.31,
+              555.586
+            ]
+          ],
+          [
+            [
+              133.789,
+              550.325
+            ],
+            [
+              783.123,
+              562.76
+            ]
+          ],
+          [
+            [
+              133.66,
+              556.876
+            ],
+            [
+              782.961,
+              569.037
+            ]
+          ],
+          [
+            [
+              133.513,
+              564.361
+            ],
+            [
+              782.774,
+              576.21
+            ]
+          ],
+          [
+            [
+              133.385,
+              570.91
+            ],
+            [
+              782.612,
+              582.485
+            ]
+          ]
+        ]
+      },
+      {
+        "staffIndex": 3,
+        "systemIndex": 3,
+        "staffLinesNormalizedPixels": [
+          [
+            [
+              40.5,
+              700.0
+            ],
+            [
+              836.0,
+              700.0
+            ]
+          ],
+          [
+            [
+              40.5,
+              707.0
+            ],
+            [
+              836.0,
+              707.0
+            ]
+          ],
+          [
+            [
+              40.5,
+              715.0
+            ],
+            [
+              836.0,
+              715.0
+            ]
+          ],
+          [
+            [
+              40.5,
+              722.0
+            ],
+            [
+              836.0,
+              722.0
+            ]
+          ],
+          [
+            [
+              40.5,
+              730.0
+            ],
+            [
+              836.0,
+              730.0
+            ]
+          ]
+        ],
+        "polygonNormalizedPixels": [
+          [
+            40.5,
+            695
+          ],
+          [
+            836.0,
+            695
+          ],
+          [
+            836.0,
+            735
+          ],
+          [
+            40.5,
+            735
+          ]
+        ],
+        "interlinePixels": 7.5,
+        "polygonPixels": [
+          [
+            130.925,
+            696.117
+          ],
+          [
+            779.497,
+            702.464
+          ],
+          [
+            778.569,
+            738.225
+          ],
+          [
+            130.192,
+            733.433
+          ]
+        ],
+        "staffLinesPixels": [
+          [
+            [
+              130.833,
+              700.783
+            ],
+            [
+              779.381,
+              706.936
+            ]
+          ],
+          [
+            [
+              130.705,
+              707.314
+            ],
+            [
+              779.219,
+              713.195
+            ]
+          ],
+          [
+            [
+              130.558,
+              714.778
+            ],
+            [
+              779.033,
+              720.348
+            ]
+          ],
+          [
+            [
+              130.43,
+              721.308
+            ],
+            [
+              778.871,
+              726.605
+            ]
+          ],
+          [
+            [
+              130.283,
+              728.77
+            ],
+            [
+              778.685,
+              733.756
+            ]
+          ]
+        ]
+      }
+    ],
+    "barlines": [
+      {
+        "systemIndex": 0,
+        "ordinal": 0,
+        "type": "single",
+        "lineNormalizedPixels": [
+          [
+            310.0,
+            188.0
+          ],
+          [
+            310.0,
+            228.0
+          ]
+        ],
+        "verticalInkPixels": 33,
+        "strokeWidthPixels": 2,
+        "linePixels": [
+          [
+            367.06,
+            231.811
+          ],
+          [
+            366.25,
+            268.92
+          ]
+        ]
+      },
+      {
+        "systemIndex": 0,
+        "ordinal": 1,
+        "type": "single",
+        "lineNormalizedPixels": [
+          [
+            448.0,
+            188.0
+          ],
+          [
+            448.0,
+            228.0
+          ]
+        ],
+        "verticalInkPixels": 33,
+        "strokeWidthPixels": 2,
+        "linePixels": [
+          [
+            480.67,
+            236.493
+          ],
+          [
+            479.825,
+            273.325
+          ]
+        ]
+      },
+      {
+        "systemIndex": 0,
+        "ordinal": 2,
+        "type": "single",
+        "lineNormalizedPixels": [
+          [
+            586.0,
+            188.0
+          ],
+          [
+            586.0,
+            228.0
+          ]
+        ],
+        "verticalInkPixels": 33,
+        "strokeWidthPixels": 2,
+        "linePixels": [
+          [
+            592.62,
+            240.635
+          ],
+          [
+            591.742,
+            277.195
+          ]
+        ]
+      },
+      {
+        "systemIndex": 0,
+        "ordinal": 3,
+        "type": "single",
+        "lineNormalizedPixels": [
+          [
+            696.0,
+            188.0
+          ],
+          [
+            696.0,
+            228.0
+          ]
+        ],
+        "verticalInkPixels": 33,
+        "strokeWidthPixels": 2,
+        "linePixels": [
+          [
+            680.691,
+            243.607
+          ],
+          [
+            679.787,
+            279.953
+          ]
+        ]
+      },
+      {
+        "systemIndex": 0,
+        "ordinal": 4,
+        "type": "single",
+        "lineNormalizedPixels": [
+          [
+            834.0,
+            188.0
+          ],
+          [
+            834.0,
+            228.0
+          ]
+        ],
+        "verticalInkPixels": 33,
+        "strokeWidthPixels": 2,
+        "linePixels": [
+          [
+            789.749,
+            246.988
+          ],
+          [
+            788.813,
+            283.07
+          ]
+        ]
+      },
+      {
+        "systemIndex": 1,
+        "ordinal": 0,
+        "type": "single",
+        "lineNormalizedPixels": [
+          [
+            244.0,
+            357.0
+          ],
+          [
+            244.0,
+            397.0
+          ]
+        ],
+        "verticalInkPixels": 33,
+        "strokeWidthPixels": 2,
+        "linePixels": [
+          [
+            308.778,
+            386.522
+          ],
+          [
+            307.987,
+            423.651
+          ]
+        ]
+      },
+      {
+        "systemIndex": 1,
+        "ordinal": 1,
+        "type": "single",
+        "lineNormalizedPixels": [
+          [
+            376.0,
+            357.0
+          ],
+          [
+            376.0,
+            397.0
+          ]
+        ],
+        "verticalInkPixels": 33,
+        "strokeWidthPixels": 2,
+        "linePixels": [
+          [
+            418.114,
+            390.165
+          ],
+          [
+            417.289,
+            427.029
+          ]
+        ]
+      },
+      {
+        "systemIndex": 1,
+        "ordinal": 2,
+        "type": "single",
+        "lineNormalizedPixels": [
+          [
+            454.0,
+            357.0
+          ],
+          [
+            454.0,
+            397.0
+          ]
+        ],
+        "verticalInkPixels": 33,
+        "strokeWidthPixels": 2,
+        "linePixels": [
+          [
+            481.999,
+            392.07
+          ],
+          [
+            481.155,
+            428.779
+          ]
+        ]
+      },
+      {
+        "systemIndex": 1,
+        "ordinal": 3,
+        "type": "single",
+        "lineNormalizedPixels": [
+          [
+            580.0,
+            357.0
+          ],
+          [
+            580.0,
+            397.0
+          ]
+        ],
+        "verticalInkPixels": 33,
+        "strokeWidthPixels": 2,
+        "linePixels": [
+          [
+            584.085,
+            394.804
+          ],
+          [
+            583.211,
+            431.267
+          ]
+        ]
+      },
+      {
+        "systemIndex": 1,
+        "ordinal": 4,
+        "type": "single",
+        "lineNormalizedPixels": [
+          [
+            708.0,
+            357.0
+          ],
+          [
+            708.0,
+            397.0
+          ]
+        ],
+        "verticalInkPixels": 33,
+        "strokeWidthPixels": 2,
+        "linePixels": [
+          [
+            686.409,
+            397.206
+          ],
+          [
+            685.505,
+            433.421
+          ]
+        ]
+      },
+      {
+        "systemIndex": 1,
+        "ordinal": 5,
+        "type": "single",
+        "lineNormalizedPixels": [
+          [
+            834.0,
+            357.0
+          ],
+          [
+            834.0,
+            397.0
+          ]
+        ],
+        "verticalInkPixels": 33,
+        "strokeWidthPixels": 2,
+        "linePixels": [
+          [
+            785.799,
+            399.262
+          ],
+          [
+            784.866,
+            435.237
+          ]
+        ]
+      },
+      {
+        "systemIndex": 2,
+        "ordinal": 0,
+        "type": "single",
+        "lineNormalizedPixels": [
+          [
+            226.0,
+            526.0
+          ],
+          [
+            226.0,
+            566.0
+          ]
+        ],
+        "verticalInkPixels": 33,
+        "strokeWidthPixels": 2,
+        "linePixels": [
+          [
+            290.429,
+            542.823
+          ],
+          [
+            289.644,
+            579.876
+          ]
+        ]
+      },
+      {
+        "systemIndex": 2,
+        "ordinal": 1,
+        "type": "single",
+        "lineNormalizedPixels": [
+          [
+            310.0,
+            526.0
+          ],
+          [
+            310.0,
+            566.0
+          ]
+        ],
+        "verticalInkPixels": 33,
+        "strokeWidthPixels": 2,
+        "linePixels": [
+          [
+            360.229,
+            544.54
+          ],
+          [
+            359.423,
+            581.424
+          ]
+        ]
+      },
+      {
+        "systemIndex": 2,
+        "ordinal": 2,
+        "type": "single",
+        "lineNormalizedPixels": [
+          [
+            448.0,
+            526.0
+          ],
+          [
+            448.0,
+            566.0
+          ]
+        ],
+        "verticalInkPixels": 33,
+        "strokeWidthPixels": 2,
+        "linePixels": [
+          [
+            473.548,
+            546.898
+          ],
+          [
+            472.708,
+            583.509
+          ]
+        ]
+      },
+      {
+        "systemIndex": 2,
+        "ordinal": 3,
+        "type": "single",
+        "lineNormalizedPixels": [
+          [
+            586.0,
+            526.0
+          ],
+          [
+            586.0,
+            566.0
+          ]
+        ],
+        "verticalInkPixels": 33,
+        "strokeWidthPixels": 2,
+        "linePixels": [
+          [
+            585.216,
+            548.754
+          ],
+          [
+            584.343,
+            585.096
+          ]
+        ]
+      },
+      {
+        "systemIndex": 2,
+        "ordinal": 4,
+        "type": "single",
+        "lineNormalizedPixels": [
+          [
+            728.0,
+            526.0
+          ],
+          [
+            728.0,
+            566.0
+          ]
+        ],
+        "verticalInkPixels": 33,
+        "strokeWidthPixels": 2,
+        "linePixels": [
+          [
+            698.436,
+            550.226
+          ],
+          [
+            697.53,
+            586.296
+          ]
+        ]
+      },
+      {
+        "systemIndex": 2,
+        "ordinal": 5,
+        "type": "single",
+        "lineNormalizedPixels": [
+          [
+            834.0,
+            526.0
+          ],
+          [
+            834.0,
+            566.0
+          ]
+        ],
+        "verticalInkPixels": 33,
+        "strokeWidthPixels": 2,
+        "linePixels": [
+          [
+            781.861,
+            551.087
+          ],
+          [
+            780.93,
+            586.956
+          ]
+        ]
+      },
+      {
+        "systemIndex": 3,
+        "ordinal": 0,
+        "type": "single",
+        "lineNormalizedPixels": [
+          [
+            330.0,
+            695.0
+          ],
+          [
+            330.0,
+            735.0
+          ]
+        ],
+        "verticalInkPixels": 33,
+        "strokeWidthPixels": 2,
+        "linePixels": [
+          [
+            373.334,
+            700.404
+          ],
+          [
+            372.526,
+            737.137
+          ]
+        ]
+      },
+      {
+        "systemIndex": 3,
+        "ordinal": 1,
+        "type": "single",
+        "lineNormalizedPixels": [
+          [
+            543.0,
+            695.0
+          ],
+          [
+            543.0,
+            735.0
+          ]
+        ],
+        "verticalInkPixels": 33,
+        "strokeWidthPixels": 1,
+        "linePixels": [
+          [
+            546.954,
+            701.947
+          ],
+          [
+            546.093,
+            738.264
+          ]
+        ]
+      },
+      {
+        "systemIndex": 3,
+        "ordinal": 2,
+        "type": "single",
+        "lineNormalizedPixels": [
+          [
+            710.0,
+            695.0
+          ],
+          [
+            710.0,
+            735.0
+          ]
+        ],
+        "verticalInkPixels": 33,
+        "strokeWidthPixels": 2,
+        "linePixels": [
+          [
+            680.37,
+            702.429
+          ],
+          [
+            679.471,
+            738.426
+          ]
+        ]
+      },
+      {
+        "systemIndex": 3,
+        "ordinal": 3,
+        "type": "final",
+        "lineNormalizedPixels": [
+          [
+            834.0,
+            695.0
+          ],
+          [
+            834.0,
+            735.0
+          ]
+        ],
+        "verticalInkPixels": 33,
+        "strokeWidthPixels": 2,
+        "linePixels": [
+          [
+            777.934,
+            702.466
+          ],
+          [
+            777.007,
+            738.23
+          ]
+        ]
+      }
+    ],
+    "measureBoxes": [
+      {
+        "systemIndex": 0,
+        "ordinal": 0,
+        "polygonNormalizedPixels": [
+          [
+            100.5,
+            188
+          ],
+          [
+            310.0,
+            188
+          ],
+          [
+            310.0,
+            228
+          ],
+          [
+            100.5,
+            228
+          ]
+        ],
+        "widthInterlines": 27.9333,
+        "polygonPixels": [
+          [
+            191.332,
+            223.475
+          ],
+          [
+            367.06,
+            231.811
+          ],
+          [
+            366.25,
+            268.92
+          ],
+          [
+            190.575,
+            261.012
+          ]
+        ]
+      },
+      {
+        "systemIndex": 0,
+        "ordinal": 1,
+        "polygonNormalizedPixels": [
+          [
+            310.0,
+            188
+          ],
+          [
+            448.0,
+            188
+          ],
+          [
+            448.0,
+            228
+          ],
+          [
+            310.0,
+            228
+          ]
+        ],
+        "widthInterlines": 18.4,
+        "polygonPixels": [
+          [
+            367.06,
+            231.811
+          ],
+          [
+            480.67,
+            236.493
+          ],
+          [
+            479.825,
+            273.325
+          ],
+          [
+            366.25,
+            268.92
+          ]
+        ]
+      },
+      {
+        "systemIndex": 0,
+        "ordinal": 2,
+        "polygonNormalizedPixels": [
+          [
+            448.0,
+            188
+          ],
+          [
+            586.0,
+            188
+          ],
+          [
+            586.0,
+            228
+          ],
+          [
+            448.0,
+            228
+          ]
+        ],
+        "widthInterlines": 18.4,
+        "polygonPixels": [
+          [
+            480.67,
+            236.493
+          ],
+          [
+            592.62,
+            240.635
+          ],
+          [
+            591.742,
+            277.195
+          ],
+          [
+            479.825,
+            273.325
+          ]
+        ]
+      },
+      {
+        "systemIndex": 0,
+        "ordinal": 3,
+        "polygonNormalizedPixels": [
+          [
+            586.0,
+            188
+          ],
+          [
+            696.0,
+            188
+          ],
+          [
+            696.0,
+            228
+          ],
+          [
+            586.0,
+            228
+          ]
+        ],
+        "widthInterlines": 14.6667,
+        "polygonPixels": [
+          [
+            592.62,
+            240.635
+          ],
+          [
+            680.691,
+            243.607
+          ],
+          [
+            679.787,
+            279.953
+          ],
+          [
+            591.742,
+            277.195
+          ]
+        ]
+      },
+      {
+        "systemIndex": 0,
+        "ordinal": 4,
+        "polygonNormalizedPixels": [
+          [
+            696.0,
+            188
+          ],
+          [
+            834.0,
+            188
+          ],
+          [
+            834.0,
+            228
+          ],
+          [
+            696.0,
+            228
+          ]
+        ],
+        "widthInterlines": 18.4,
+        "polygonPixels": [
+          [
+            680.691,
+            243.607
+          ],
+          [
+            789.749,
+            246.988
+          ],
+          [
+            788.813,
+            283.07
+          ],
+          [
+            679.787,
+            279.953
+          ]
+        ]
+      },
+      {
+        "systemIndex": 1,
+        "ordinal": 0,
+        "polygonNormalizedPixels": [
+          [
+            40.5,
+            357
+          ],
+          [
+            244.0,
+            357
+          ],
+          [
+            244.0,
+            397
+          ],
+          [
+            40.5,
+            397
+          ]
+        ],
+        "widthInterlines": 27.1333,
+        "polygonPixels": [
+          [
+            137.141,
+            379.712
+          ],
+          [
+            308.778,
+            386.522
+          ],
+          [
+            307.987,
+            423.651
+          ],
+          [
+            136.404,
+            417.258
+          ]
+        ]
+      },
+      {
+        "systemIndex": 1,
+        "ordinal": 1,
+        "polygonNormalizedPixels": [
+          [
+            244.0,
+            357
+          ],
+          [
+            376.0,
+            357
+          ],
+          [
+            376.0,
+            397
+          ],
+          [
+            244.0,
+            397
+          ]
+        ],
+        "widthInterlines": 17.6,
+        "polygonPixels": [
+          [
+            308.778,
+            386.522
+          ],
+          [
+            418.114,
+            390.165
+          ],
+          [
+            417.289,
+            427.029
+          ],
+          [
+            307.987,
+            423.651
+          ]
+        ]
+      },
+      {
+        "systemIndex": 1,
+        "ordinal": 2,
+        "polygonNormalizedPixels": [
+          [
+            376.0,
+            357
+          ],
+          [
+            454.0,
+            357
+          ],
+          [
+            454.0,
+            397
+          ],
+          [
+            376.0,
+            397
+          ]
+        ],
+        "widthInterlines": 10.4,
+        "polygonPixels": [
+          [
+            418.114,
+            390.165
+          ],
+          [
+            481.999,
+            392.07
+          ],
+          [
+            481.155,
+            428.779
+          ],
+          [
+            417.289,
+            427.029
+          ]
+        ]
+      },
+      {
+        "systemIndex": 1,
+        "ordinal": 3,
+        "polygonNormalizedPixels": [
+          [
+            454.0,
+            357
+          ],
+          [
+            580.0,
+            357
+          ],
+          [
+            580.0,
+            397
+          ],
+          [
+            454.0,
+            397
+          ]
+        ],
+        "widthInterlines": 16.8,
+        "polygonPixels": [
+          [
+            481.999,
+            392.07
+          ],
+          [
+            584.085,
+            394.804
+          ],
+          [
+            583.211,
+            431.267
+          ],
+          [
+            481.155,
+            428.779
+          ]
+        ]
+      },
+      {
+        "systemIndex": 1,
+        "ordinal": 4,
+        "polygonNormalizedPixels": [
+          [
+            580.0,
+            357
+          ],
+          [
+            708.0,
+            357
+          ],
+          [
+            708.0,
+            397
+          ],
+          [
+            580.0,
+            397
+          ]
+        ],
+        "widthInterlines": 17.0667,
+        "polygonPixels": [
+          [
+            584.085,
+            394.804
+          ],
+          [
+            686.409,
+            397.206
+          ],
+          [
+            685.505,
+            433.421
+          ],
+          [
+            583.211,
+            431.267
+          ]
+        ]
+      },
+      {
+        "systemIndex": 1,
+        "ordinal": 5,
+        "polygonNormalizedPixels": [
+          [
+            708.0,
+            357
+          ],
+          [
+            834.0,
+            357
+          ],
+          [
+            834.0,
+            397
+          ],
+          [
+            708.0,
+            397
+          ]
+        ],
+        "widthInterlines": 16.8,
+        "polygonPixels": [
+          [
+            686.409,
+            397.206
+          ],
+          [
+            785.799,
+            399.262
+          ],
+          [
+            784.866,
+            435.237
+          ],
+          [
+            685.505,
+            433.421
+          ]
+        ]
+      },
+      {
+        "systemIndex": 2,
+        "ordinal": 0,
+        "polygonNormalizedPixels": [
+          [
+            40.5,
+            526
+          ],
+          [
+            226.0,
+            526
+          ],
+          [
+            226.0,
+            566
+          ],
+          [
+            40.5,
+            566
+          ]
+        ],
+        "widthInterlines": 24.7333,
+        "polygonPixels": [
+          [
+            134.028,
+            538.157
+          ],
+          [
+            290.429,
+            542.823
+          ],
+          [
+            289.644,
+            579.876
+          ],
+          [
+            133.293,
+            575.588
+          ]
+        ]
+      },
+      {
+        "systemIndex": 2,
+        "ordinal": 1,
+        "polygonNormalizedPixels": [
+          [
+            226.0,
+            526
+          ],
+          [
+            310.0,
+            526
+          ],
+          [
+            310.0,
+            566
+          ],
+          [
+            226.0,
+            566
+          ]
+        ],
+        "widthInterlines": 11.2,
+        "polygonPixels": [
+          [
+            290.429,
+            542.823
+          ],
+          [
+            360.229,
+            544.54
+          ],
+          [
+            359.423,
+            581.424
+          ],
+          [
+            289.644,
+            579.876
+          ]
+        ]
+      },
+      {
+        "systemIndex": 2,
+        "ordinal": 2,
+        "polygonNormalizedPixels": [
+          [
+            310.0,
+            526
+          ],
+          [
+            448.0,
+            526
+          ],
+          [
+            448.0,
+            566
+          ],
+          [
+            310.0,
+            566
+          ]
+        ],
+        "widthInterlines": 18.4,
+        "polygonPixels": [
+          [
+            360.229,
+            544.54
+          ],
+          [
+            473.548,
+            546.898
+          ],
+          [
+            472.708,
+            583.509
+          ],
+          [
+            359.423,
+            581.424
+          ]
+        ]
+      },
+      {
+        "systemIndex": 2,
+        "ordinal": 3,
+        "polygonNormalizedPixels": [
+          [
+            448.0,
+            526
+          ],
+          [
+            586.0,
+            526
+          ],
+          [
+            586.0,
+            566
+          ],
+          [
+            448.0,
+            566
+          ]
+        ],
+        "widthInterlines": 18.4,
+        "polygonPixels": [
+          [
+            473.548,
+            546.898
+          ],
+          [
+            585.216,
+            548.754
+          ],
+          [
+            584.343,
+            585.096
+          ],
+          [
+            472.708,
+            583.509
+          ]
+        ]
+      },
+      {
+        "systemIndex": 2,
+        "ordinal": 4,
+        "polygonNormalizedPixels": [
+          [
+            586.0,
+            526
+          ],
+          [
+            728.0,
+            526
+          ],
+          [
+            728.0,
+            566
+          ],
+          [
+            586.0,
+            566
+          ]
+        ],
+        "widthInterlines": 18.9333,
+        "polygonPixels": [
+          [
+            585.216,
+            548.754
+          ],
+          [
+            698.436,
+            550.226
+          ],
+          [
+            697.53,
+            586.296
+          ],
+          [
+            584.343,
+            585.096
+          ]
+        ]
+      },
+      {
+        "systemIndex": 2,
+        "ordinal": 5,
+        "polygonNormalizedPixels": [
+          [
+            728.0,
+            526
+          ],
+          [
+            834.0,
+            526
+          ],
+          [
+            834.0,
+            566
+          ],
+          [
+            728.0,
+            566
+          ]
+        ],
+        "widthInterlines": 14.1333,
+        "polygonPixels": [
+          [
+            698.436,
+            550.226
+          ],
+          [
+            781.861,
+            551.087
+          ],
+          [
+            780.93,
+            586.956
+          ],
+          [
+            697.53,
+            586.296
+          ]
+        ]
+      },
+      {
+        "systemIndex": 3,
+        "ordinal": 0,
+        "polygonNormalizedPixels": [
+          [
+            40.5,
+            695
+          ],
+          [
+            330.0,
+            695
+          ],
+          [
+            330.0,
+            735
+          ],
+          [
+            40.5,
+            735
+          ]
+        ],
+        "widthInterlines": 38.6,
+        "polygonPixels": [
+          [
+            130.925,
+            696.117
+          ],
+          [
+            373.334,
+            700.404
+          ],
+          [
+            372.526,
+            737.137
+          ],
+          [
+            130.192,
+            733.433
+          ]
+        ]
+      },
+      {
+        "systemIndex": 3,
+        "ordinal": 1,
+        "polygonNormalizedPixels": [
+          [
+            330.0,
+            695
+          ],
+          [
+            543.0,
+            695
+          ],
+          [
+            543.0,
+            735
+          ],
+          [
+            330.0,
+            735
+          ]
+        ],
+        "widthInterlines": 28.4,
+        "polygonPixels": [
+          [
+            373.334,
+            700.404
+          ],
+          [
+            546.954,
+            701.947
+          ],
+          [
+            546.093,
+            738.264
+          ],
+          [
+            372.526,
+            737.137
+          ]
+        ]
+      },
+      {
+        "systemIndex": 3,
+        "ordinal": 2,
+        "polygonNormalizedPixels": [
+          [
+            543.0,
+            695
+          ],
+          [
+            710.0,
+            695
+          ],
+          [
+            710.0,
+            735
+          ],
+          [
+            543.0,
+            735
+          ]
+        ],
+        "widthInterlines": 22.2667,
+        "polygonPixels": [
+          [
+            546.954,
+            701.947
+          ],
+          [
+            680.37,
+            702.429
+          ],
+          [
+            679.471,
+            738.426
+          ],
+          [
+            546.093,
+            738.264
+          ]
+        ]
+      },
+      {
+        "systemIndex": 3,
+        "ordinal": 3,
+        "polygonNormalizedPixels": [
+          [
+            710.0,
+            695
+          ],
+          [
+            834.0,
+            695
+          ],
+          [
+            834.0,
+            735
+          ],
+          [
+            710.0,
+            735
+          ]
+        ],
+        "widthInterlines": 16.5333,
+        "polygonPixels": [
+          [
+            680.37,
+            702.429
+          ],
+          [
+            777.934,
+            702.466
+          ],
+          [
+            777.007,
+            738.23
+          ],
+          [
+            679.471,
+            738.426
+          ]
+        ]
+      }
+    ],
+    "meterRegions": [
+      {
+        "systemIndex": 0,
+        "proposalMethod": "normalized-page-geometry-calibration-prior",
+        "contentConfirmed": false,
+        "polygonNormalizedPixels": [
+          [
+            139.95,
+            188
+          ],
+          [
+            166.95,
+            188
+          ],
+          [
+            166.95,
+            228
+          ],
+          [
+            139.95,
+            228
+          ]
+        ],
+        "polygonPixels": [
+          [
+            224.727,
+            225.173
+          ],
+          [
+            247.502,
+            226.298
+          ],
+          [
+            246.728,
+            263.697
+          ],
+          [
+            223.961,
+            262.629
+          ]
+        ]
+      }
+    ]
+  },
+  "structureGraph": {
+    "contract": "western-m4b-structure-graph-v1",
+    "decision": "structure-candidate-review-required",
+    "structureReviewRequired": false,
+    "conflicts": [],
+    "graph": {
+      "pageCount": 1,
+      "systemCount": 4,
+      "staffCount": 4,
+      "barlineCount": 21,
+      "measureCount": 21,
+      "meterRegionCount": 1
+    },
+    "silentGuess": false,
+    "reviewRequired": true,
+    "studentFacing": false,
+    "automaticAdoptionAuthorized": false
+  },
+  "contentChallenger": {
+    "contract": "western-m4b-content-challenger-shadow-v1",
+    "ready": true,
+    "reason": "shadow-candidates-prepared",
+    "assignedCandidates": [],
+    "consensusCandidates": [],
+    "unassignableCount": 0,
+    "minimumConsensusEngines": 2,
+    "engines": [
+      "homr-high-recall",
+      "audiveris-supplement",
+      "oemer-supplement"
+    ],
+    "shadowOnly": true,
+    "productionCandidatePool": false,
+    "studentFacing": false
+  },
+  "structureReviewRequired": false,
+  "silentGuess": false,
+  "reviewRequired": true,
+  "studentFacing": false,
+  "automaticAdoptionAuthorized": false
+}

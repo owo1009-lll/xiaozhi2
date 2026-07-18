@@ -1,6 +1,6 @@
 # 西洋弦乐练习诊断项目状态快照
 
-更新时间: 2026-07-19 02:33 +08:00
+更新时间: 2026-07-19 03:01 +08:00
 
 本文件是当前主线状态快照。实时判断仍以命令为准:
 
@@ -12,7 +12,9 @@
 
 二胡线已经冻结为论文证据、困难案例和共享模块来源。当前产品主线是西洋弓弦乐, 小提琴优先, 大提琴后续独立验证。
 
-## 2026-07-18 当前分支刷新
+## 2026-07-19 当前分支刷新
+
+- **M4b 结构 POC 现已完成工程闭环:** 四层主链已落地为页面/透视/弯曲归一化、显式五线谱/系统/小节线/小节框/拍号区域证据、确定性结构图冲突解码、以及坐标可归属的多引擎 shadow challenger。冻结 synthetic-test 12/12 页上小节框 F1=1.000、整页结构完全正确率=1.000、拍号区域 F1=1.000、冲突注入转 `structure-review-required`=12/12。live audit 重算指标并验证每页 result/overlay/原图哈希，伪造合成证据晋升、学生端边界和空数据晋升均会 fail-closed。当前 `m4bStructurePocEngineeringReady=true`、`m4bStructurePocPromotionOperationalReady=true`，但这仍只是 `synthetic-engineering-only`；真实 fresh-blind 为 0/30 页、0/6 版式、0/3 设备，所以 `m4bStructurePocPromotionReady=false`、`m4bOpenWorldOmrAutomaticAdoptionReady=false`。C.3.2 的 100–300 张真实结构标注是晋升后扩大数据投入的目标，不得反向写成 POC 晋升前置条件。
 
 - 当前分支为 `feature/model-bakeoff-omr-align`;本节以 2026-07-18 本地 live 复跑和物理产物审计为准,不使用会因本次提交而自指失效的固定提交号。该分支已包含 HOMR 受控离线治理、M3+ 四区 v2 fail-closed 审计、动态闸学生域预考、round-3 reserve/实现验收材料(非发布 fresh-blind)和 8 张屏拍域基准;这些变化不改变默认学生端闸门。
 - 已在该分支依次重新运行 `npm run western:m4-p0-structure-gate`、`npm run western:project-status` 和 `npm run western:project-gate`。P0 冻结 5 谱结果为完整 `1/5`,谱号/调号/拍号=`3/5,2/5,2/5`,`studentGateReady=false`。

@@ -714,6 +714,10 @@
 
 2026-07-19 数据工程状态:合成优先管线已实现并冻结为 `western-m4b-structure-dataset-policy-v1`。当前从 3 个 M4a registry 真值页确定性生成 60 张相机退化页,每张同时带 pageCorners、系统、谱表/五线、小节线及类型、小节框、拍号区域标签,退化覆盖透视、正弦曲率、阴影、模糊、JPEG、背景与手写干扰;拆分固定为 train/calibration/synthetic-test=`36/12/12`。live verifier 重算全部 60 对图片/标签 SHA-256。现有 5 张 source-gold 与 8 张屏拍已逐文件冻结为 test-only 且 `trainingEligible=false`;fresh-blind 也由同一规则禁止训练泄漏。M4a 验收成功照片将进入 auto-labeled 候选,失败照片只进 active-learning review pool;当前两者均为 0,未伪造真实训练数据。真实结构标签目标仍为 `0/100–300`,fresh-blind 仍为 `0/30`、`0/6` 版式、`0/3` 设备。浏览器结构标注器位于 `docs/m4b-structure-labeler/index.html`,fresh intake 会逐文件绑定照片 SHA、标签、曲目/版式、设备和拍摄批次,并拒绝任何与合成/冻结测试照片复用的字节。
 
+2026-07-19 结构 POC 工程状态:四层链路已实现为 `western-m4b-explicit-structure-poc-policy-v1`。归一化层复用 M4a 页面检测/单应并追加三次多项式页边弯曲展平;结构层显式输出五线谱线、谱表/系统、小节线、小节框和拍号区域;解码层对谱表基数、小节线顺序/间距、拍号-时值和跨谱表合法性做确定性检查，冲突一律 `structure-review-required`;内容层仅将带坐标的 HOMR/Audiveris/Oemer 候选归属到结构小节，至少两引擎一致才保留，且固定 `shadowOnly=true`、`productionCandidatePool=false`、`studentFacing=false`。
+
+已按冻结 synthetic-test 拆分独立评测 12 张合成相机退化页:224 个小节框的 P/R/F1 均为 1.000，系统数+逐系统小节数完全正确为 12/12，拍号区域 F1=1.000，12 页拍号-时值冲突注入全部落 `structure-review-required`。`audit:western-m4b-structure-poc` 会重算汇总指标、重读每页 result/overlay/原图哈希，并强制合成报告不得把 `promotionReady` 改绿。**诚实边界:** 这 12 页只来自 3 个登记自制版本，拍号区域仍使用 calibration 拆分定出的归一化页面几何先验，因此满分只证明工程链与合成域可用，不证明开放域泛化。当前 `engineeringReady=true`、`promotionOperationalReady=true`、`promotionReady=false`;唯一晋升评测只读下节签署后的 fresh-blind 输入。C.3.2 的 100–300 张真实标注是 POC 过门后扩大投入的数据目标，不是 C.3.3 的循环前置条件。
+
 #### C.3.3 晋升门槛(✅ 2026-07-19 已签署冻结,不得因结果回调)
 
 POC → 扩大投入的前提,在 fresh-blind 集(≥30 张,≥6 曲目/版式,≥3 设备)上**全部**满足:
@@ -725,10 +729,12 @@ POC → 扩大投入的前提,在 fresh-blind 集(≥30 张,≥6 曲目/版式,�
 
 未全达标 → 不扩大为数据项目,M4b 维持研究状态,M4a 独立继续服务产品。
 
+当前执行状态:`eval:western-m4b-fresh-blind-promotion` 和其 live audit 已就位，会逐照片重算 SHA-256/标注绑定/保护集泄漏、上述四项指标及冲突注入，且即使通过也只能产生 `expandedInvestmentOnly=true`。fresh-blind intake 尚未存在，计数为 0/30 页、0/6 曲目/版式、0/3 设备，所以当前正确结论是“晋升评测工具完成、评测输入缺失”，不是“门槛已过”。
+
 ### C.4 决策清单(等待负责人)
 
 | # | 决定 | 状态 |
 |---|---|---|
 | 1 | 闸门拆分 M4a/M4b + `projectReleaseReady` 改绑 M4a | ✅ 2026-07-19 已签署并接线 |
 | 2 | C.3.3 晋升门槛数字冻结 | ✅ 2026-07-19 已签署并接入现场验签 |
-| 3 | M4a v1 工程开工(不依赖上两项,可先行) | 可随时启动 |
+| 3 | M4a v1 工程开工(不依赖上两项,可先行) | ✅ C.2a-f 工程完成;真实验收等待 10 张精确版本屏拍+负责人逐框签署 |

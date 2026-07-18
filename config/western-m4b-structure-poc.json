@@ -1,0 +1,56 @@
+{
+  "contract": "western-m4b-explicit-structure-poc-policy-v1",
+  "normalization": {
+    "rectifiedWidth": 900,
+    "rectifiedHeight": 1273,
+    "adaptiveThresholdBlockSize": 35,
+    "adaptiveThresholdC": 15,
+    "curvaturePolynomialDegree": 3,
+    "maximumAcceptedResidualCurvePixels": 24
+  },
+  "structureVision": {
+    "minimumStaffLineInkFraction": 0.32,
+    "rowPeakMergeGapPixels": 2,
+    "minimumInterlinePixels": 5,
+    "maximumInterlinePixels": 14,
+    "maximumInterlineCoefficientOfVariation": 0.32,
+    "horizontalKernelDivisor": 24,
+    "staffLeftPaddingInterlines": 3.0,
+    "staffVerticalPaddingInterlines": 0.55,
+    "barlineMinimumHeightFraction": 0.74,
+    "barlineMinimumLeftOffsetFraction": 0.1,
+    "barlineMinimumPageLeftFraction": 0.2,
+    "barlineMergeGapPixels": 2,
+    "minimumMeasureWidthInterlines": 5.0,
+    "meterRegionLeftInterlines": 4.5,
+    "meterRegionRightInterlines": 7.5,
+    "meterRegionPageLeftFraction": 0.1555,
+    "meterRegionPageRightFraction": 0.1855
+  },
+  "graphDecoder": {
+    "conflictDisposition": "structure-review-required",
+    "candidateDisposition": "structure-candidate-review-required",
+    "silentGuessAllowed": false,
+    "meterDurationToleranceQuarters": 0.001,
+    "crossStaffBarlineToleranceInterlines": 1.0
+  },
+  "contentChallenger": {
+    "engines": [
+      "homr-high-recall",
+      "audiveris-supplement",
+      "oemer-supplement"
+    ],
+    "minimumConsensusEngines": 2,
+    "shadowOnly": true,
+    "productionCandidatePool": false,
+    "studentFacing": false
+  },
+  "evaluation": {
+    "datasetReport": "data/experiments/western-strings-m4b/dataset/report.json",
+    "split": "synthetic-test",
+    "boxIouThreshold": 0.5,
+    "conflictInjectionCount": 12,
+    "promotionDecision": "data/experiments/western-strings-m4b-poc-promotion-threshold-decision.json"
+  },
+  "outputRoot": "data/experiments/western-strings-m4b/structure-poc"
+}

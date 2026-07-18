@@ -26,6 +26,7 @@ import { auditM4aEngineeringAcceptance } from "./audit-western-m4a-engineering-a
 import { auditM4aRealPhotoAcceptance } from "./audit-western-m4a-real-photo-acceptance.mjs";
 import { auditM4bDataset } from "./audit-western-m4b-dataset.mjs";
 import { auditM4bFreshBlindIntake } from "./audit-western-m4b-fresh-blind-intake.mjs";
+import { auditM4bStructurePoc } from "./audit-western-m4b-structure-poc.mjs";
 import { runM4aRegistrationPreflight } from "./preflight-western-m4a-registration.mjs";
 
 const DEFAULT_OUT = path.join("data", "experiments", "western-strings-project-status.json");
@@ -2844,6 +2845,7 @@ async function buildM4OmrStatus() {
   const m4aRealPhotoAcceptance = await auditM4aRealPhotoAcceptance();
   const m4bDataset = await auditM4bDataset();
   const m4bFreshBlind = await auditM4bFreshBlindIntake();
+  const m4bStructurePoc = await auditM4bStructurePoc();
   const readiness = await readJson(M4_READINESS);
   const benchmark = await readJson(M4_BENCHMARK);
   const independentBenchmark = await readJson(M4_INDEPENDENT_BENCHMARK_AUDIT);
@@ -2973,13 +2975,18 @@ async function buildM4OmrStatus() {
     m4bDataFoundationReady: m4bDataset.ready,
     m4bRealAnnotationTargetReady: m4bDataset.realAnnotationTargetReady,
     m4bFreshBlindDatasetReady: m4bFreshBlind.ready,
-    m4bPocBlockingReasons: [
+    m4bStructurePocEngineeringReady: m4bStructurePoc.engineeringReady,
+    m4bStructurePocPromotionOperationalReady: m4bStructurePoc.promotionOperationalReady,
+    m4bStructurePocPromotionReady: m4bStructurePoc.promotionReady,
+    m4bPocBlockingReasons: normalizedReasonList([
       ...m4bPocPromotionDecision.blockingReasons,
-      ...(m4bDataset.realAnnotationTargetReady ? [] : ["m4b-real-structure-labels-below-100"]),
+      ...m4bStructurePoc.blockingReasons,
+      ...m4bStructurePoc.promotionBlockingReasons,
       ...m4bFreshBlind.blockingReasons,
-    ],
+    ]),
     m4bDataset: m4bDataset,
     m4bFreshBlind: m4bFreshBlind,
+    m4bStructurePoc: m4bStructurePoc,
     m4OmrBenchmarkDatasetReady: readinessReady,
     m4OmrDraftQualityReady: draftQualityReady,
     m4OmrIndependentBenchmarkReady: independentBenchmarkReady,
@@ -3096,6 +3103,8 @@ async function buildM4OmrStatus() {
       m4bDatasetJson: m4bDataset.source,
       m4bFreshBlindIntakeJson: m4bFreshBlind.source,
       m4bPocPromotionThresholdDecisionJson: m4bPocPromotionDecision.source,
+      m4bStructurePocEvaluationJson: m4bStructurePoc.source,
+      m4bFreshBlindPromotionEvaluationJson: m4bStructurePoc.promotionSource,
       m4aRegistrationAuditJson: "data/experiments/western-strings-m4a/registration-audit.json",
       readinessJson: M4_READINESS.replace(/\\/g, "/"),
       benchmarkJson: M4_BENCHMARK.replace(/\\/g, "/"),
