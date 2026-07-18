@@ -273,6 +273,7 @@
     "western:ordinary-fresh-blind-eval": "node scripts\\eval-western-ordinary-fresh-blind.mjs",
     "test:western-ordinary-fresh-blind": "node scripts\\test-western-ordinary-fresh-blind.mjs",
     "test:western-status-track-authorization": "node scripts\\test-western-status-track-authorization.mjs",
+    "western:research-diagnosis": "py -3.11 scripts\\experiments\\render_western_strings_research_diagnosis.py",
     "test:western-controlled-pilot-evidence-audit": "node scripts\\test-western-controlled-pilot-evidence-audit.mjs",
     "test:western-fresh-blind-intake": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test_western_fresh_blind_intake.py",
     "test:western-round2-intake": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-western-round2-intake.py",
