@@ -103,6 +103,7 @@ function releaseReviewMatchesLiveEvidence(releaseReview, liveEvidenceBinding) {
     && releaseReview?.tracks?.ordinary?.r3AcceptanceReady === ordinary.r3AcceptanceReady
     && releaseReview?.tracks?.ordinary?.authorizationReady === ordinary.authorizationReady
     && releaseReview?.tracks?.ordinary?.energyVetoIncluded === ordinary.energyVetoIncluded
+    && releaseReview?.tracks?.ordinary?.causalEnergyStatus === ordinary.causalEnergyStatus
     && releaseReview?.tracks?.m3plus?.offlineEvidenceReady === m3plus.offlineEvidenceReady
     && releaseReview?.tracks?.m3plus?.reviewOnlyRuntimeWired === m3plus.reviewOnlyRuntimeWired
     && releaseReview?.tracks?.m3plus?.runtimeFoundationReady === m3plus.runtimeFoundationReady
@@ -171,7 +172,12 @@ function buildBlockingReasons({ status, releaseReview, approval, liveEvidenceBin
   if (ordinary.liveArtifactVerifierReady !== true) reasons.push("live-ordinary-artifact-verifier-not-ready");
   if (ordinary.r3AcceptanceReady !== true) reasons.push("live-ordinary-r3-acceptance-not-ready");
   if (ordinary.authorizationReady !== true) reasons.push("live-ordinary-authorization-closed");
-  if (ordinary.energyVetoIncluded !== true) reasons.push("live-ordinary-energy-veto-not-included");
+  // The causal-energy veto is formally excluded-review-only (owner decision
+  // 2026-07-18); require that known-safe state rather than its inclusion. The
+  // r3 acceptance layer still hard-fails if the veto is ever silently enabled.
+  if (ordinary.causalEnergyStatus !== "excluded-review-only") {
+    reasons.push("live-ordinary-energy-veto-not-excluded-review-only");
+  }
   if (m3plus.offlineEvidenceReady !== true) reasons.push("live-m3plus-offline-evidence-not-ready");
   if (m3plus.reviewOnlyRuntimeWired !== true
       || m3plus.runtimeFoundationReady !== true

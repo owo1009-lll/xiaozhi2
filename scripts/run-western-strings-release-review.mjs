@@ -172,7 +172,7 @@ async function main() {
     && liveEvidence.ordinary.liveArtifactVerifierReady === true
     && liveEvidence.ordinary.r3AcceptanceReady === true
     && liveEvidence.ordinary.authorizationReady === true
-    && liveEvidence.ordinary.energyVetoIncluded === true
+    && liveEvidence.ordinary.causalEnergyStatus === "excluded-review-only"
     && liveEvidence.ordinary.blockingReasons.length === 0;
   const m3plusReady = liveEvidence.m3plus.offlineEvidenceReady === true
     && liveEvidence.m3plus.reviewOnlyRuntimeWired === true
@@ -239,6 +239,7 @@ async function main() {
         r3AcceptanceReady: shadow.r3AcceptanceReady === true,
         authorizationReady: shadow.authorizationReady === true,
         energyVetoIncluded: shadow.energyVetoIncluded === true,
+        causalEnergyStatus: shadow.causalEnergyStatus || null,
         studentGateReady: false,
         automaticAdoptionReady: false,
         blockingReasons: shadow.blockingReasons || [],

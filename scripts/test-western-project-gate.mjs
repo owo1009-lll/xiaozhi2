@@ -610,7 +610,8 @@ const currentAuthorityBinding = {
       liveArtifactVerifierReady: true,
       r3AcceptanceReady: true,
       authorizationReady: true,
-      energyVetoIncluded: true,
+      energyVetoIncluded: false,
+      causalEnergyStatus: "excluded-review-only",
     },
     m3plus: {
       offlineEvidenceReady: true,
@@ -643,7 +644,8 @@ const greenCachedRelease = {
       liveArtifactVerifierReady: true,
       r3AcceptanceReady: true,
       authorizationReady: true,
-      energyVetoIncluded: true,
+      energyVetoIncluded: false,
+      causalEnergyStatus: "excluded-review-only",
     },
     m3plus: {
       readyForControlledPilot: true,

@@ -114,6 +114,7 @@ export function buildControlledPilotLiveEvidenceProjection(status = {}) {
       r3AcceptanceReady: ordinary.r3AcceptanceReady === true,
       authorizationReady: ordinary.authorizationReady === true,
       energyVetoIncluded: ordinary.energyVetoIncluded === true,
+      causalEnergyStatus: ordinary.causalEnergyStatus || null,
       blockingReasons: normalizedReasonList(ordinary.blockingReasons),
       runtimeIdentity: {
         runtimeId: ordinaryRuntime.runtimeId || null,
@@ -183,7 +184,7 @@ export function controlledPilotLiveEvidenceReady(liveEvidenceBinding = {}) {
     && ordinary.liveArtifactVerifierReady === true
     && ordinary.r3AcceptanceReady === true
     && ordinary.authorizationReady === true
-    && ordinary.energyVetoIncluded === true
+    && ordinary.causalEnergyStatus === "excluded-review-only"
     && (ordinary.blockingReasons || []).length === 0
     && ordinaryRuntime.runtimeId === ORDINARY_DYNAMIC_RUNTIME_ID
     && isSha256(ordinaryRuntime.configSha256)
@@ -263,6 +264,7 @@ export function summarizeCurrentControlledPilotAuthority({
     && releaseReview?.tracks?.ordinary?.r3AcceptanceReady === currentOrdinary.r3AcceptanceReady
     && releaseReview?.tracks?.ordinary?.authorizationReady === currentOrdinary.authorizationReady
     && releaseReview?.tracks?.ordinary?.energyVetoIncluded === currentOrdinary.energyVetoIncluded
+    && releaseReview?.tracks?.ordinary?.causalEnergyStatus === currentOrdinary.causalEnergyStatus
     && releaseReview?.tracks?.m3plus?.offlineEvidenceReady === currentM3Plus.offlineEvidenceReady
     && releaseReview?.tracks?.m3plus?.reviewOnlyRuntimeWired === currentM3Plus.reviewOnlyRuntimeWired
     && releaseReview?.tracks?.m3plus?.runtimeFoundationReady === currentM3Plus.runtimeFoundationReady
@@ -2526,7 +2528,6 @@ async function buildOrdinaryDynamicShadowStatus() {
             : "ordinary-dynamic-shadow-r3-acceptance-not-run"]
         : []),
       "ordinary-dynamic-shadow-authorization-closed",
-      "ordinary-dynamic-shadow-energy-veto-excluded-review-only",
     ],
   };
 }

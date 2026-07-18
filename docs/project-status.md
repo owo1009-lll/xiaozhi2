@@ -18,7 +18,7 @@
 - 已在该分支依次重新运行 `npm run western:m4-p0-structure-gate`、`npm run western:project-status` 和 `npm run western:project-gate`。P0 冻结 5 谱结果为完整 `1/5`,谱号/调号/拍号=`3/5,2/5,2/5`,`studentGateReady=false`。
 - 这里的 P0 `1/5` 只表示同一 5 谱中的谱号/调号/拍号结构闸门;真实照片 pitch+onset+measure 完整自动采纳仍为 `0/5`,12 份历史照片链缓存重放中的 P0-ready 又是 `0/12`。三个数字对应不同门槛或数据集,不得互相替换;`m4P0StructureReady=true` 也只表示至少 1 谱 P0-ready,不表示 M4 自动采纳通过。
 - 当前运行时仍为 `ordinaryUploadAutoFeedbackReady=false`,`m3plusAutoFeedbackReady=false`,`m4OmrAutoScoreReady=false`,`policy=fail-closed`。
-- 当前项目总闸门要求 ordinary/M3+/M4 三轨同时通过。2026-07-18 更新:M3+ v2 五区证据已完整(保护库存 14/14 实际执行、平拉独立逐音 gold join=`12/12`、揉弦/滑音 join=`8/8`,`releaseGateReady=true`),现仅因独立授权位(`m3plus-authorization-closed`/`m3plus-student-gate-closed`)fail-closed;ordinary 的 r3 验收已通过,仅剩 `authorization-closed`/`energy-veto-excluded-review-only` 两个设计位;M4 automatic adoption 仍未达标。`western:project-gate` 因此按设计非零退出。(旧值 8/14、0/12、0/8 为 2026-07-17 前的历史状态。)
+- 当前项目总闸门要求 ordinary/M3+/M4 三轨同时通过。2026-07-18 更新:M3+ v2 五区证据已完整(保护库存 14/14 实际执行、平拉独立逐音 gold join=`12/12`、揉弦/滑音 join=`8/8`,`releaseGateReady=true`),现仅因独立授权位(`m3plus-authorization-closed`/`m3plus-student-gate-closed`)fail-closed;ordinary 的 r3 验收已通过,现仅剩 `authorization-closed` 一个设计位(因果能量否决门槛已按负责人 2026-07-18 决定正式排除,见下);M4 automatic adoption 仍未达标。`western:project-gate` 因此按设计非零退出。(旧值 8/14、0/12、0/8 为 2026-07-17 前的历史状态。)
 - HOMR v3 的具名 AGPL/六模型审查现为 `approved-with-conditions`,唯一批准范围 `controlled-offline-review-only`;稳定运行时已迁至 `data/tools/`,live preflight 的 governance/host/deployment 三项均绿。preflight 现与 review-record SHA-256 绑定,审批或 artifact 漂移会令 `project-status/project-gate` fail-closed。学生端网络使用、自动采纳与再分发仍未获授权;这里的三绿不得写成默认生产发布通过。
 - 刷新产物为 `data/experiments/western-strings-m4/p0-structure-gate/report.json`、`data/experiments/western-strings-project-status.json` 与 `data/experiments/western-strings-project-gate.json`;三者位于 `data/` 忽略目录,用于本地可复跑状态,不等同于已提交证据。
 - release review、controlled-pilot decision 与 start preflight 已按当前合同重新生成并明确为红:`readyForControlledPilotDecision=false`,`readyToStartControlledPilot=false`,`okToStartControlledPilot=false`。它们绑定当前 live evidence,不是沿用旧 v1 绿灯;现有 approval 因 scope 过期且缺持久化安全确认也不被接受。
@@ -27,7 +27,7 @@
 
 - 旧 RF / first-measure 的 `3/3` 与五批安全 pilot 继续保留为历史实验事实,但其 `readyForMonitoredPilot`、旧 release review、旧负责人 approval 和旧 pilot decision 已全部显式标为 superseded,不再具有当前授权力。
 - 普通 clean-score 受控 batch 现在无条件进入 Basic Pitch + gap-penalty DTW 的 dynamic-shadow review-only 路径;携带旧 `dataset/piece/recordingId` 也不能再绕回历史 replay。RF 只保留为 `authorizationIgnored=true` 的 telemetry。
-- 冻结候选策略为 `deviation<=0.15`,`eventConfidence>=0.4`,`relativeEventConfidence>=0.8`,`eventDuration>=0.08s`,`same-pitch distance>=0.5 quarter`,`eventDurationRatio>=0.15`;因果能量否决尚无冻结部署物,明确为 `excluded-review-only`,不能暗中进入决策。
+- 冻结候选策略为 `deviation<=0.15`,`eventConfidence>=0.4`,`relativeEventConfidence>=0.8`,`eventDuration>=0.08s`,`same-pitch distance>=0.5 quarter`,`eventDurationRatio>=0.15`;因果能量否决无冻结部署物,状态锁定为 `excluded-review-only`,不能暗中进入决策。2026-07-18 负责人决定(路 B,记录见 `data/experiments/western-ordinary-energy-veto-exclusion-decision.json`):能量否决正式排除,不再作为受控试点/发布的前提门槛。这只修正了 decision/release-review/live-evidence 三处与冻结策略矛盾的门槛(现要求 `causalEnergyStatus==="excluded-review-only"` 而非 `energyVetoIncluded===true`);r3 acceptance 与候选审计层对 `energyVetoIncluded===false && causalEnergyStatus==="excluded-review-only"` 的强校验不变——若能量被悄悄启用,r3 接受性会 fail-closed。ordinary 轨仍被 `authorization-closed` 挡住,本决定不打开任何东西。
 - 普通音频运行时已迁到独立 `data/tools/western-ordinary-dynamic-shadow-py311/`:禁止 system/user site,完整依赖集与 requirements lock 精确绑定,Basic Pitch SavedModel 三文件 tree SHA-256=`c6595f299ff83c52e89555789f7e3e829a6a0f25b6a88f7e99073af5a2470dc4`。config 语义 SHA、lock SHA 与模型 tree SHA 另由代码常量锚定,不能通过同步改写 manifest 自签名降级;每次分析还把 launcher attestation 写入 cache/candidate artifact。它不与 HOMR 的 NumPy>=2.4 环境共享。venv 本体仍位于 gitignored `data/tools/`,新检出环境须运行 `npm run western:ordinary-dynamic-shadow-runtime-setup`;未配置时 preflight 按设计失败。
 - 服务端会独立计算上传音频 SHA-256,并复核 cache realpath、同一字节的 artifact SHA、内部 cache/runtime identity、模型 hash、策略版本及当前 score payload SHA。ordinary 路径强制 `limit=0`;除候选行数必须等于当前 score 的完整音符数外,还逐音核对唯一连续的 `noteIndex=0..N-1` 以及 `noteId/sectionId/measureIndex/midi`,并绑定两侧 identity digest。截断、重复一音或漏一音都不能把局部覆盖率伪装成全曲接受性。candidate artifact 自身再写入 SHA-256;二次审计会重读当前 score store 和全部候选行,不再只相信前 5 条 preview。
 - 二次审计还把 artifact 内部 `batchRunId/submissionId`、scoreId、audio SHA 与 batch item 逐项绑定;JSONL 物理尾行损坏、跨提交替换、symlink/路径错位、同批 legacy ordinary status 或任一 item 尝试自动诊断都会失败,不会回退上一条“好记录”。
@@ -44,7 +44,7 @@
 - 新一轮 M3+ 只完成 review-only 库存清点:444 个音符中 292 个被列为行为候选;这不改变运行时门槛。
 - 已找到随录音放置的 `README-怎么用.md`,确认 `r2-02` / `r2-03` / `r2-04` 的错误数量分别为 5 / 5 / 4。README 没有具体小节且 `notes.txt` 仍缺失,因此只能做数量对照和机器位置搜索,不能计算精确 recall/precision。
 - README 数量约束下的 Basic Pitch + 序列 DTW 搜索得到:错音阈值候选 5 个;漏音保守候选 3 个,未覆盖 README 目标数量;拖拍阈值候选 5 个,按目标数保留前 4 个。它们均为未人工确认的机器假设,没有进入学生反馈。
-- 当前默认学生发布仍关闭。旧 RF 受控证据的 precision=1/coverage=0.04 只解释路线转向,不是实时 blocker。2026-07-18 更新:ordinary dynamic-shadow 为 `foundationReady=true`,live artifact verifier 已实现、r3 接受性已通过,剩余为独立授权关闭与因果能量否决未冻结;M3+ gold-free runtime foundation/物理 audit 通过且 v2 离线证据已完整(declared-only 与独立 gold 缺口均已关闭),剩余为独立授权;M4 OMR 自动采纳仍未达标。
+- 当前默认学生发布仍关闭。旧 RF 受控证据的 precision=1/coverage=0.04 只解释路线转向,不是实时 blocker。2026-07-18 更新:ordinary dynamic-shadow 为 `foundationReady=true`,live artifact verifier 已实现、r3 接受性已通过,因果能量否决门槛已正式排除,剩余仅独立授权关闭;M3+ gold-free runtime foundation/物理 audit 通过且 v2 离线证据已完整(declared-only 与独立 gold 缺口均已关闭),剩余为独立授权;M4 OMR 自动采纳仍未达标。
 - M3 core 的历史人工/gold 闸虽通过,pitch/onset/missing 三类有效错误样本各只有 `2` 个（均 2/2,unsafe=0）;这是低浓度证据,不能把 100% 小样本写成充分扩证。
 
 ## 1. 当前目标
@@ -206,7 +206,7 @@
 
 下一步分两条,不得混为一项:
 
-1. **ordinary dynamic-shadow verifier → 接受性(2026-07-18 已完成):** live artifact verifier 已实现(`scripts/audit-western-ordinary-dynamic-shadow-acceptance.mjs`):重读并重算验收 JSON 引用的每个磁盘产物(cache/candidate artifact SHA、音频与 score store 绑定、runtime identity 预考、逐行 review-only、按冻结策略重算每行 selected、candidate evidence digest 与整体 digest),伪造拒绝测试覆盖 11 种篡改(含重算 digest 的复杂伪造)均 fail-closed;`buildOrdinaryDynamicShadowStatus` 每次都跑 live 复核,报告过期即红。随后 reserve take `r3-02/r3-03` 冷/热双跑验收实跑通过(45/45 行 coverage 0.7778、51/51 行 coverage 0.9412,冷 miss/热 hit,冷热 evidence 稳定,`autoPassCount=0` 全行 review-only),`r3AcceptanceReady=true`。材料自此视为已消费,不得复用为发布盲测;ordinary 轨 blocking 只剩 `authorization-closed` 与 `energy-veto-excluded-review-only` 两个设计授权位。
+1. **ordinary dynamic-shadow verifier → 接受性(2026-07-18 已完成):** live artifact verifier 已实现(`scripts/audit-western-ordinary-dynamic-shadow-acceptance.mjs`):重读并重算验收 JSON 引用的每个磁盘产物(cache/candidate artifact SHA、音频与 score store 绑定、runtime identity 预考、逐行 review-only、按冻结策略重算每行 selected、candidate evidence digest 与整体 digest),伪造拒绝测试覆盖 11 种篡改(含重算 digest 的复杂伪造)均 fail-closed;`buildOrdinaryDynamicShadowStatus` 每次都跑 live 复核,报告过期即红。随后 reserve take `r3-02/r3-03` 冷/热双跑验收实跑通过(45/45 行 coverage 0.7778、51/51 行 coverage 0.9412,冷 miss/热 hit,冷热 evidence 稳定,`autoPassCount=0` 全行 review-only),`r3AcceptanceReady=true`。材料自此视为已消费,不得复用为发布盲测;ordinary 轨 blocking 只剩 `authorization-closed`(能量否决门槛已按 2026-07-18 负责人决定正式排除)。
 2. **M3 duration/extra 定量补证(2026-07-18 已完成):** 量化合同已冻结为 `western-duration-extra-quantization-v1`(单位: 相对 IOI 偏差比/时值比/±3s 同音高未匹配事件;容差全部复用已冻结数值 0.15/0.15/3.0,零新调参;unsafe=目标与后继均被 6-guard shadow 选中即"完全不可见";分种子聚合含显式最差种子)。消费结果:v2 六套注入集 drag 4/24 不可见(20/24 timing 可见)、extra 0/30 不可见、wrong/missing 硬漏放 0/60 复现;r3-04/05 负责人确认真值 drag 0/2 不可见、extra 1/3 不可见(真实重复音被合并吸收的诚实案例);自然学生域 5 条干净录音 mean coverage 0.8656、timing flag 负担 7.67%、extra 负担 2.33%。duration/extra 仍为 review-only,该证据 preGateOnly。命令: `npm run western:duration-extra-quantization` / `npm run test:western-duration-extra-quantization`。
 3. **后续发布证据:** r3 接受性通过后仍须另取全新录音+新曲目,建立独立逐音/fresh-blind 证据和 `western-ordinary-dynamic-shadow-release-v1` 授权;旧 12 条、`r2-08` 与 r3 接受性材料均不可复用。
 4. **后排 M4 坐标补强:** v3 池当前无 Oemer;HOMR 在 12 份历史缓存中赢 8 份,但输出仍是无 bbox 的音符列表。可复用 Oemer sidecar 的设计经验为 HOMR 增加坐标适配器,同时先建立一小批人工坐标 gold/误差标尺;当前 `coordinateGoldReady=false`,不得仅凭“框数等于音符数”把列表反馈升级成像素框选。
@@ -296,10 +296,9 @@ npm run western:ordinary-auto-pass-precision-review-pack -- --recording-id <fres
 
 以下命令仍可复跑历史证据,但不属于当前授权链:`npm run western:controlled-pilot-evidence-audit`、`npm run test:western-fresh-blind-intake`、`npm run western:historical-fresh-blind-intake-status`。旧 `western:fresh-blind-intake-init/stage/status` 现在会在任何读写前非零退出,只有显式 `--historical-replay` 的具名别名可访问旧流程。其中 `r2-08` 入场审计历史上曾通过且该授权已经消费;不得把其结果写成当前 dynamic-shadow pilot 或 release 批准。
 
-`npm run western:project-gate` 当前仍以非零退出阻断默认发布,失败为(2026-07-18 更新:verifier/acceptance 两项已清除):
+`npm run western:project-gate` 当前仍以非零退出阻断默认发布,失败为(2026-07-18 更新:verifier/acceptance 两项已清除,能量否决门槛已正式排除):
 
 - `ordinary-dynamic-shadow-authorization-closed`
-- `ordinary-dynamic-shadow-energy-veto-excluded-review-only`
 - `m3plus-authorization-closed` / `m3plus-student-gate-closed`
 - `M4 OMR automatic adoption`(真实照片完整门槛、运行时安全子集和独立同版页数均未达标)
 

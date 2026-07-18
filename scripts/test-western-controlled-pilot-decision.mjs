@@ -52,7 +52,8 @@ const PASSING_PROJECT_STATUS = {
         liveArtifactVerifierReady: true,
         r3AcceptanceReady: true,
         authorizationReady: true,
-        energyVetoIncluded: true,
+        energyVetoIncluded: false,
+        causalEnergyStatus: "excluded-review-only",
         blockingReasons: [],
         runtime: {
           runtimeId: "western-ordinary-dynamic-shadow-audio-py311",
@@ -199,7 +200,8 @@ await fs.writeFile(CURRENT_RELEASE_PATH, `${JSON.stringify({
       liveArtifactVerifierReady: true,
       r3AcceptanceReady: true,
       authorizationReady: true,
-      energyVetoIncluded: true,
+      energyVetoIncluded: false,
+      causalEnergyStatus: "excluded-review-only",
     },
     m3plus: {
       readyForControlledPilot: true,
@@ -261,7 +263,8 @@ await fs.writeFile(INCOMPLETE_PHYSICAL_RELEASE_PATH, `${JSON.stringify({
       liveArtifactVerifierReady: true,
       r3AcceptanceReady: true,
       authorizationReady: true,
-      energyVetoIncluded: true,
+      energyVetoIncluded: false,
+      causalEnergyStatus: "excluded-review-only",
     },
     m3plus: {
       readyForControlledPilot: true,
