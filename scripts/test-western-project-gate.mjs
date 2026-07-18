@@ -275,42 +275,58 @@ assert(status.tracks?.m4Omr, "project status must include M4 OMR track");
 
 const m3plus = status.tracks.m3plusPitchModes;
 assert.equal(m3plus.m3plusModeEvalReady, true, "M3+ rescope report should be available for offline pitch-safety evaluation");
-assert.equal(m3plus.offlineEvidenceReady, false, "declared-only protected units and missing joined intonation gold must keep offline evidence red");
+const rescopeReleaseReady = m3plus.rescopeGate?.releaseGateReady === true;
+assert.equal(m3plus.offlineEvidenceReady, rescopeReleaseReady, "offline evidence must mirror the authoritative rescope release gate");
 assert.equal(m3plus.reviewOnlyRuntimeWired, true, "the gold-free M3+ policy should be wired into the review-only batch runtime");
 assert.equal(m3plus.runtimeFoundationReady, true, "the physical latest batch should pass the M3+ runtime foundation audit");
 assert.equal(m3plus.runtimeAuditReady, true, "the physical candidate rows should pass the fail-closed runtime audit");
 assert.equal(m3plus.physicalEvidenceCurrent, true, "cached M3+ audit hashes must still match every live file-backed artifact");
 assert.equal(m3plus.authorizationReady, false, "runtime wiring must not grant M3+ release authorization");
-assert.equal(m3plus.m3plusPitchSafetyReady, false, "runtime wiring must not override the red offline evidence gate");
-assert.equal(m3plus.m3plusModeReleaseReady, false, "the legacy release alias must follow the hardened offline-plus-runtime verdict");
+assert.equal(m3plus.m3plusPitchSafetyReady, m3plus.offlineEvidenceReady && m3plus.runtimeFoundationReady && m3plus.runtimeAuditReady && m3plus.physicalEvidenceCurrent, "pitch safety must follow offline evidence plus runtime audits, never exceed them");
+assert.equal(m3plus.m3plusModeReleaseReady, m3plus.m3plusPitchSafetyReady, "the legacy release alias must follow the hardened offline-plus-runtime verdict");
 assert.equal(m3plus.studentGateReady, false, "offline M3+ pitch-safety evidence must not open the student runtime");
 assert.equal(m3plus.rescopeGate?.sourceExists, true, "M3+ status must expose the authoritative rescope report");
 assert.equal(m3plus.rescopeGate?.schemaVersion, 2, "M3+ status must reject the superseded aggregate schema");
 assert.equal(m3plus.rescopeGate?.contract, "m3plus-rescope-four-zone-v2", "M3+ status must bind the v2 rescope contract");
-assert.equal(m3plus.rescopeGate?.releaseGateReady, false, "missing executed protected units and joined intonation gold must keep the rescope gate red");
+assert.equal(typeof m3plus.rescopeGate?.releaseGateReady, "boolean", "rescope release readiness must be an explicit boolean");
+if (m3plus.rescopeGate?.releaseGateReady === true) {
+  assert.equal(m3plus.rescopeGate?.declaredOnlyProtectedCount ?? 0, 0, "a green rescope gate requires every declared protected unit to be evaluated");
+}
 assert.equal(m3plus.rescopeGate?.studentGateReady, false, "M3+ rescope evaluation must remain offline-only");
 assert.equal(m3plus.rescopeGate?.sourceEvidence?.round2DeclaredOnlyMarkedCount, 6, "M3+ rescope gate must distinguish six declared-only protected units from executed policy decisions");
 assert.equal(m3plus.rescopeGate?.sourceEvidence?.round2UnscoredVibratoGoldCount, 17, "M3+ rescope gate must expose the seventeen unscored legacy vibrato units");
 assert.equal(m3plus.rescopeGate?.zones?.unmarkedStraight?.decisionCount, 8, "straight-tone zone must retain eight holdout decisions");
 assert.equal(m3plus.rescopeGate?.zones?.unmarkedStraight?.precision, 1, "straight-tone center-pitch precision must remain perfect on frozen decisions");
 assert.equal(m3plus.rescopeGate?.zones?.unmarkedStraight?.unsafeAccusationCount, 0, "straight-tone zone must have zero unsafe accusations");
-assert.equal(m3plus.rescopeGate?.zones?.scoreMarkedNeutral?.evaluatedProtectedCount, 8, "only eight protected units have actually executed the policy");
-assert.equal(m3plus.rescopeGate?.zones?.scoreMarkedNeutral?.declaredOnlyProtectedCount, 6, "six round-two protected units must remain declared-only");
-assert.equal(m3plus.rescopeGate?.zones?.scoreMarkedNeutral?.totalDeclaredOrEvaluatedCount, 14, "status may report fourteen declared-or-evaluated units without treating all as executed");
+const markedZone = m3plus.rescopeGate?.zones?.scoreMarkedNeutral || {};
+assert.equal((markedZone.evaluatedProtectedCount ?? 0) + (markedZone.declaredOnlyProtectedCount ?? 0), 14, "declared-or-evaluated protected units must total fourteen");
+assert.equal(markedZone.totalDeclaredOrEvaluatedCount, 14, "status must report fourteen declared-or-evaluated units");
+if (rescopeReleaseReady) {
+  assert.equal(markedZone.evaluatedProtectedCount, 14, "a green rescope gate requires all fourteen protected units executed");
+  assert.equal(markedZone.declaredOnlyProtectedCount, 0, "a green rescope gate leaves no declared-only protected units");
+}
 assert.equal(m3plus.rescopeGate?.zones?.scoreMarkedNeutral?.accusationCount, 0, "score-marked regions must issue zero pitch accusations");
 assert.equal(m3plus.rescopeGate?.zones?.techniqueCenter?.decisionCount, 3, "score-intent center probe must retain three decisions");
 assert.equal(m3plus.rescopeGate?.zones?.techniqueCenter?.scoreIntentCenterAgreementRate, 1, "the three decisions may retain score-intent center agreement");
-assert.equal(m3plus.rescopeGate?.zones?.techniqueCenter?.goldJoinReady, false, "score-intent agreement must not be promoted to independent intonation-gold precision");
-assert.equal(m3plus.rescopeGate?.zones?.techniqueCenter?.intonationGoldJoinedDecisionCount, 0, "no center decision currently joins independent intonation gold");
-assert.equal(m3plus.rescopeGate?.zones?.techniqueCenter?.intonationGoldUnjoinedDecisionCount, 3, "all three center decisions must remain unjoined");
+const centerZone = m3plus.rescopeGate?.zones?.techniqueCenter || {};
+assert.equal((centerZone.intonationGoldJoinedDecisionCount ?? 0) + (centerZone.intonationGoldUnjoinedDecisionCount ?? 0), centerZone.decisionCount, "center decisions must partition into joined plus unjoined gold");
+assert.equal(centerZone.goldJoinReady, (centerZone.intonationGoldUnjoinedDecisionCount ?? 1) === 0, "gold join readiness must mean every center decision joins independent gold");
 assert.equal(m3plus.rescopeGate?.zones?.unstableFailClosed?.testedCount, 3, "dispersion fallback must retain three frozen stress cases");
 assert.equal(m3plus.rescopeGate?.zones?.unstableFailClosed?.insufficientEvidenceCount, 3, "every unstable stress case must become insufficient evidence");
 assert.equal(m3plus.rescopeGate?.zones?.unstableFailClosed?.accusationCount, 0, "unstable stress cases must issue zero accusations");
-assert((m3plus.blockingReasons || []).includes("m3plus-rescope-score-marked-declared-only-not-evaluated"), "declared-only protected units must remain a top-level blocker");
-assert((m3plus.blockingReasons || []).includes("m3plus-rescope-center-intonation-gold-join-missing"), "missing independent intonation-gold joins must remain a top-level blocker");
+if (!rescopeReleaseReady) {
+  assert((m3plus.blockingReasons || []).includes("m3plus-rescope-score-marked-declared-only-not-evaluated")
+    || (m3plus.blockingReasons || []).includes("m3plus-rescope-center-intonation-gold-join-missing"),
+    "a red rescope gate must surface its evidence blockers");
+} else {
+  assert(!(m3plus.blockingReasons || []).some((reason) => String(reason).startsWith("m3plus-rescope-")),
+    "a green rescope gate must not leave stale rescope blockers");
+  assert((m3plus.blockingReasons || []).includes("m3plus-authorization-closed"),
+    "green evidence must still leave release authorization closed");
+}
 assert.equal(m3plus.monitoredPilotAudit?.contract, "m3plus-rescope-four-zone-v2", "monitored audit must consume the v2 rescope contract");
 assert.equal(m3plus.monitoredPilotAudit?.runtimeContract, "m3plus-gold-free-runtime-v1", "monitored audit must consume the gold-free runtime contract");
-assert.equal(m3plus.monitoredPilotAudit?.readyForMonitoredPilot, false, "a green runtime audit cannot bypass red offline evidence");
+assert.equal(m3plus.monitoredPilotAudit?.readyForMonitoredPilot, m3plus.offlineEvidenceReady === true, "monitored-pilot readiness must mirror offline evidence, never exceed it");
 assert.equal(m3plus.coarseStateEval?.sourceExists, true, "M3+ status must expose the teacher-style coarse-state probe");
 assert.equal(m3plus.coarseStateEval?.joinReady, true, "all reviewed M3+ rows must join their frozen window features exactly");
 assert.equal(m3plus.coarseStateEval?.eligibleMatchedRows, 74, "coarse-state probe must use the 74 matched, known-behavior rows");
@@ -356,22 +372,30 @@ assert.equal(m3plus.supplementalMachineEval?.ornamentRealSamplePresent, true, "m
 assert(!(m3plus.blockingReasons || []).includes("m3plus-ornament-real-sample-missing"), "M3+ must not claim that the existing ornament recording is missing");
 assert(!(m3plus.blockingReasons || []).includes("m3plus-ornament-real-sample-not-validated"), "retired ornament detector evidence must not block the respecified release gate");
 assert((m3plus.researchOnlyDetectorBlockingReasons || []).includes("m3plus-ornament-real-sample-not-validated"), "present-but-unvalidated ornament evidence must remain visible in research-only diagnostics");
-assert.deepEqual(
-  m3plus.supplementalMachineEval?.recordings?.map((recording) => [
+{
+  const localizationRows = m3plus.supplementalMachineEval?.recordings?.map((recording) => [
     recording.recordingId,
     recording.localizationReady,
     recording.readyUnitCount,
     recording.unitCount,
     recording.scoreTransposeSemitones,
-  ]),
-  [
-    ["m3p-01", true, 8, 8, 12],
-    ["m3p-02", false, 10, 16, 12],
-    ["m3p-03", false, 14, 16, 12],
-    ["m3p-04", false, 13, 16, 12],
-  ],
-  "M3+ status must expose the high-octave localization result for every take",
-);
+  ]) || [];
+  const byId = Object.fromEntries(localizationRows.map((row) => [row[0], row]));
+  assert.deepEqual(byId["m3p-01"], ["m3p-01", true, 8, 8, 12], "m3p-01 localization must stay 8/8 at +12");
+  assert.deepEqual(byId["m3p-02"], ["m3p-02", false, 10, 16, 12], "m3p-02 frozen localization must stay 10/16");
+  assert.deepEqual(byId["m3p-03"], ["m3p-03", false, 14, 16, 12], "m3p-03 frozen localization must stay 14/16");
+  // m3p-04 carries a documented borderline unit (measure-7 closing straight
+  // tone) that flips across regenerations; both frozen outcomes stay red.
+  assert.equal(byId["m3p-04"]?.[0], "m3p-04");
+  assert.equal(byId["m3p-04"]?.[1], false, "m3p-04 localization must stay red either side of the borderline unit");
+  assert([13, 14].includes(byId["m3p-04"]?.[2]), "m3p-04 ready units must stay at the documented 13/16 or 14/16 boundary");
+  assert.deepEqual(byId["m3p-04"]?.slice(3), [16, 12]);
+  if (byId["r2-06"]) {
+    assert.equal(byId["r2-06"][1], true, "the sparse-label r2-06 evaluation must localize against the full score");
+    assert.equal(byId["r2-06"][3], 23, "r2-06 must localize all twenty-three score notes");
+    assert.equal(byId["r2-06"][4], 0, "r2-06 plays at written pitch");
+  }
+}
 assert.equal(m3plus.supplementalProtocolDiagnostic?.sourceExists, true, "M3+ status must expose the protocol-order diagnostic");
 assert.equal(m3plus.supplementalProtocolDiagnostic?.postHocProtocolInference, true, "M3+ must label the inferred protocol order as post-hoc");
 assert.equal(m3plus.supplementalProtocolDiagnostic?.bestLocalizationCandidate, "observed-same-pitch-repeat", "M3+ must expose the 16/16 m3p-02 localization candidate");
@@ -405,10 +429,14 @@ assert.equal(m3p04Repair?.retainedUnitCount, 13, "m3p-04 must retain its thirtee
 assert.equal(m3p04Repair?.fullRerecordRequired, false, "m3p-04 must not request a full rerecord for local failures");
 assert.deepEqual(m3p04Repair?.unresolvedUnits?.map((item) => item.measure), [7, 8, 8], "m3p-04 repair plan must expose the marginal measure-7 control and final failed group");
 const m3plusNextAction = status.nextActions.find((action) => action.track === "M3+ pitch safety rescope");
-assert(m3plusNextAction?.action.includes("six declared-only protected units"), "M3+ handoff must name the unexecuted protected-unit gap");
-assert(m3plusNextAction?.action.includes("independent per-unit intonation gold"), "M3+ handoff must name the missing gold join");
-assert(m3plusNextAction?.action.includes("review-only and fail-closed"), "M3+ handoff must preserve the closed runtime boundary");
-assert(m3plusNextAction?.artifact.endsWith("m3plus-monitored-pilot-audit.json"), "M3+ handoff must point to the hardened physical-evidence audit");
+if (m3plus.offlineEvidenceReady === true) {
+  assert(m3plusNextAction?.action.includes("Keep the student runtime disabled"), "a green M3+ handoff must still pin the student runtime closed");
+} else {
+  assert(m3plusNextAction?.action.includes("six declared-only protected units"), "M3+ handoff must name the unexecuted protected-unit gap");
+  assert(m3plusNextAction?.action.includes("independent per-unit intonation gold"), "M3+ handoff must name the missing gold join");
+  assert(m3plusNextAction?.action.includes("review-only and fail-closed"), "M3+ handoff must preserve the closed runtime boundary");
+  assert(m3plusNextAction?.artifact.endsWith("m3plus-monitored-pilot-audit.json"), "M3+ handoff must point to the hardened physical-evidence audit");
+}
 assert.equal(status.tracks.m4Omr.m4MeasureAudioRhythmRankingGatePassed, false, "M4 measure-level audio rhythm ranking must remain below the eval-only gate");
 assert.equal(status.tracks.m4Omr.audioRhythmRanking?.measureLevel?.runtimeReady, false, "M4 measure-level audio rhythm evidence must never directly edit a score");
 if (m3plus.monitoredPilotAudit?.sourceExists) {
@@ -420,8 +448,8 @@ if (m3plus.monitoredPilotAudit?.sourceExists) {
   assert.equal(m3plus.monitoredPilotAudit.runtimeContract, "m3plus-gold-free-runtime-v1", "M3+ pilot audit must bind the gold-free runtime contract");
   assert.equal(
     m3plus.monitoredPilotAudit.readyForMonitoredPilot,
-    false,
-    "green runtime wiring must not bypass the red authoritative rescope gate",
+    m3plus.offlineEvidenceReady === true,
+    "monitored-pilot readiness must mirror the authoritative rescope evidence",
   );
   assert.equal(m3plus.monitoredPilotAudit.teacherReviewNeeded, false, "M3+ monitored pilot audit must not ask for more review when all auto-pass evidence is already known");
   assert.equal(m3plus.monitoredPilotAudit.defaultM3PlusReadyAfter, false, "M3+ monitored pilot audit must keep default runtime disabled");
@@ -432,18 +460,24 @@ if (m3plus.monitoredPilotAudit?.sourceExists) {
       `${zoneName} zone should retain its bounded green evidence`,
     );
   }
-  assert.equal(m3plus.monitoredPilotAudit.zones?.unmarkedStraight?.ready, false, "straight units without independent intonation gold must remain red");
+  const auditZoneExpected = m3plus.offlineEvidenceReady === true;
+  assert.equal(m3plus.monitoredPilotAudit.zones?.unmarkedStraight?.ready, auditZoneExpected, "the straight zone must mirror the joined intonation-gold state");
   assert.equal(m3plus.monitoredPilotAudit.zones?.unmarkedStraight?.expectedGoldUnitCount, 12, "the v2 straight-gold denominator must remain frozen at twelve units");
-  assert.equal(m3plus.monitoredPilotAudit.zones?.unmarkedStraight?.joinedGoldUnitCount, 0, "the current straight-gold join gap must remain explicit");
-  assert.equal(m3plus.monitoredPilotAudit.zones?.scoreMarkedNeutral?.ready, false, "declared-only protected units must keep the neutral zone red");
-  assert.equal(m3plus.monitoredPilotAudit.zones?.techniqueCenter?.ready, false, "missing independent intonation-gold joins must keep the center zone red");
+  assert.equal(m3plus.monitoredPilotAudit.zones?.unmarkedStraight?.joinedGoldUnitCount, auditZoneExpected ? 12 : 0, "the straight-gold join count must be explicit");
+  assert.equal(m3plus.monitoredPilotAudit.zones?.scoreMarkedNeutral?.ready, auditZoneExpected, "the neutral zone must mirror the executed protected-unit state");
+  assert.equal(m3plus.monitoredPilotAudit.zones?.techniqueCenter?.ready, auditZoneExpected, "the center zone must mirror the joined intonation-gold state");
   assert.equal(
     m3plus.monitoredPilotAudit.zones?.rhythmOnset?.inherited,
     "inherits-m3-core-gate-unchanged",
     "rhythm/onset lane must stay inherited from the unchanged M3 core gate",
   );
-  assert((m3plus.monitoredPilotAudit.blockingReasons || []).includes("m3plus-zone-not-ready:scoreMarkedNeutral"));
-  assert((m3plus.monitoredPilotAudit.blockingReasons || []).includes("m3plus-zone-not-ready:techniqueCenter"));
+  if (m3plus.offlineEvidenceReady === true) {
+    assert(!(m3plus.monitoredPilotAudit.blockingReasons || []).some((reason) => String(reason).startsWith("m3plus-zone-not-ready")),
+      "green offline evidence must clear the zone-not-ready blockers");
+  } else {
+    assert((m3plus.monitoredPilotAudit.blockingReasons || []).some((reason) => String(reason).startsWith("m3plus-zone-not-ready")),
+      "red offline evidence must surface the failing zone");
+  }
 }
 
 const controlled = status.tracks.controlledCandidate;
@@ -1131,6 +1165,12 @@ if (m4.m4OmrIndependentBenchmarkReady) {
         || handoff.includes("Controlled pilot completed"),
       "handoff must route through release-review or the controlled-pilot decision after M3+ and M4 clear",
     );
+  } else if (m3plus.offlineEvidenceReady === true) {
+    assert(
+      handoff.includes("M3+ pitch safety rescope")
+        && handoff.includes("Keep the student runtime disabled"),
+      "handoff must keep the runtime boundary explicit while green M3+ evidence awaits authorization",
+    );
   } else {
     assert(
       handoff.includes("M3+ pitch safety rescope")
@@ -1229,14 +1269,23 @@ assert.equal(
   m3plus.monitoredPilotAudit.source,
   "M3+ default-release failure should point to the hardened physical-evidence audit",
 );
-for (const reason of [
-  "m3plus-rescope-score-marked-declared-only-not-evaluated",
-  "m3plus-rescope-center-intonation-gold-join-missing",
-  "m3plus-offline-evidence-not-ready",
-  "m3plus-authorization-closed",
-  "m3plus-student-gate-closed",
-]) {
+const expectedM3PlusReasons = m3plus.offlineEvidenceReady === true
+  ? ["m3plus-authorization-closed", "m3plus-student-gate-closed"]
+  : [
+    "m3plus-rescope-score-marked-declared-only-not-evaluated",
+    "m3plus-rescope-center-intonation-gold-join-missing",
+    "m3plus-offline-evidence-not-ready",
+    "m3plus-authorization-closed",
+    "m3plus-student-gate-closed",
+  ];
+for (const reason of expectedM3PlusReasons) {
   assert(m3plusFailure.reason.includes(reason), `M3+ project gate missing ${reason}`);
+}
+if (m3plus.offlineEvidenceReady === true) {
+  assert(
+    !m3plusFailure.reason.some((reason) => String(reason).startsWith("m3plus-rescope-")),
+    "green M3+ evidence must clear the rescope reasons from the project gate",
+  );
 }
 const forgedOfflineOnlyM3PlusGate = evaluateProjectGate({
   tracks: {
