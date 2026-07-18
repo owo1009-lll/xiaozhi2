@@ -30,7 +30,11 @@ SOURCE = (REPO / "data" / "experiments" / "western-strings-m3plus"
 HUMAN_GOLD = REPO / "docs" / "western-strings-round2-m3plus-human-gold.json"
 OUT = REPO / "data" / "experiments" / "western-strings-m3plus" / "intonation-gold-pack"
 TARGET_BEHAVIORS = {"stable", "vibrato", "slide-source"}
-PAD_SECONDS = 0.6
+# m3p-02/03/04 pack two ~0.4s sub-units back-to-back inside one measure; any
+# generous context pad bleeds the NEIGHBORING technique into the clip and the
+# annotator hears the wrong behavior under the tag. Cut tight to the voiced
+# window with a hair of margin only.
+PAD_SECONDS = 0.08
 
 BEHAVIOR_CN = {
     "stable": ("平拉", "判这个音整体的音准中心:准 / 偏高 / 偏低 / 拉错音"),
@@ -64,11 +68,13 @@ def load_units() -> list[dict]:
 
 
 def slice_clips(units: list[dict]) -> None:
+    import numpy as np
     import librosa
     import soundfile as sf
     clips = OUT / "clips"
     clips.mkdir(parents=True, exist_ok=True)
     cache: dict[str, tuple] = {}
+    fade = int(0.02 * 22050)
     for unit in units:
         path = unit["audioPath"]
         if path not in cache:
@@ -76,10 +82,28 @@ def slice_clips(units: list[dict]) -> None:
         y, sr = cache[path]
         start = max(0.0, unit["startSec"] - PAD_SECONDS)
         end = min(len(y) / sr, unit["endSec"] + PAD_SECONDS)
-        clip = y[int(start * sr):int(end * sr)]
+        clip = y[int(start * sr):int(end * sr)].copy()
+        if len(clip) > 2 * fade:
+            ramp = np.linspace(0.0, 1.0, fade, dtype=np.float32)
+            clip[:fade] *= ramp
+            clip[-fade:] *= ramp[::-1]
         name = f"{unit['recordingId']}-m{unit['measure']}-u{unit['unitIndex']}.wav"
         sf.write(str(clips / name), clip, sr)
         unit["clip"] = f"clips/{name}"
+        # equal-tempered reference tone (A4=440) for center-pitch comparison
+        midi = unit.get("baseMidi")
+        if isinstance(midi, (int, float)):
+            ref_name = f"ref-{int(midi)}.wav"
+            ref_path = clips / ref_name
+            if not ref_path.exists():
+                freq = 440.0 * (2.0 ** ((float(midi) - 69.0) / 12.0))
+                t = np.arange(int(1.0 * sr)) / sr
+                tone = (0.28 * np.sin(2 * np.pi * freq * t)
+                        + 0.10 * np.sin(2 * np.pi * 2 * freq * t)).astype(np.float32)
+                env = np.minimum(1.0, np.minimum(np.arange(len(tone)) / (0.03 * sr),
+                                                 (len(tone) - np.arange(len(tone))) / (0.15 * sr)))
+                sf.write(str(ref_path), tone * env.astype(np.float32), sr)
+            unit["referenceTone"] = f"clips/{ref_name}"
 
 
 def render_html(units: list[dict]) -> str:
@@ -91,7 +115,8 @@ def render_html(units: list[dict]) -> str:
 <div class="unit" data-recording="{html.escape(unit['recordingId'])}" data-measure="{unit['measure']}" data-unit="{unit['unitIndex']}">
   <h3>{index + 1}/{len(units)} — {html.escape(uid)} <span class="tag">{behavior_cn}</span></h3>
   <p>谱面音高:<b>{html.escape(unit['basePitch'])}</b>(MIDI {unit['baseMidi']}),第 {unit['measure']} 小节。{html.escape(guidance)}</p>
-  <audio controls preload="none" src="{unit['clip']}"></audio>
+  <p>演奏切片:<audio controls preload="none" src="{unit['clip']}"></audio>
+     标准参考音:<audio controls preload="none" src="{unit.get('referenceTone', '')}"></audio></p>
   <div class="btns">
     <label><input type="radio" name="lab-{index}" value="in-tune">准(in-tune)</label>
     <label><input type="radio" name="lab-{index}" value="sharp">偏高(sharp)</label>
