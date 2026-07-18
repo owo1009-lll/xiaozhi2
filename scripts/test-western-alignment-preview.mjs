@@ -43,6 +43,49 @@ function noteIdentitySha256(rows) {
   return createHash("sha256").update(canonicalJson(rows), "utf8").digest("hex");
 }
 
+function m3plusCandidateIdentitySha256(candidateRows) {
+  const normalizeMarkings = (value) => [...new Set((Array.isArray(value) ? value : [])
+    .map((item) => String(item || "").trim().toLowerCase())
+    .filter(Boolean))].sort();
+  return noteIdentitySha256(candidateRows.map((candidate) => ({
+    noteIndex: Number.isInteger(candidate.noteIndex) ? candidate.noteIndex : null,
+    noteId: String(candidate.noteId || "").trim(),
+    sectionId: String(candidate.sectionId || "").trim(),
+    measureIndex: Number.isInteger(candidate.measureIndex) ? candidate.measureIndex : null,
+    beatStart: typeof candidate.beatStart === "number" && Number.isFinite(candidate.beatStart)
+      ? candidate.beatStart
+      : null,
+    beatDuration: typeof candidate.beatDuration === "number" && Number.isFinite(candidate.beatDuration)
+      ? candidate.beatDuration
+      : null,
+    midi: Number.isInteger(candidate.midi) ? candidate.midi : null,
+    scoreArticulations: normalizeMarkings(candidate.scoreArticulations),
+    scoreTechniques: normalizeMarkings(candidate.scoreTechniques),
+    scoreNotations: normalizeMarkings(candidate.scoreNotations),
+    onsetGroupSize: Number.isInteger(candidate.onsetGroupSize) ? candidate.onsetGroupSize : null,
+    polyphonicScoreRegion: candidate.polyphonicScoreRegion === true,
+    glissandoTargetMidi: Number.isInteger(candidate.glissandoTargetMidi)
+      ? candidate.glissandoTargetMidi
+      : null,
+    glissandoTargetNoteId: candidate.glissandoTargetNoteId === null
+      ? null
+      : String(candidate.glissandoTargetNoteId || "").trim() || null,
+  })));
+}
+
+function m3plusRuntimeCounts(candidateRows) {
+  const decisionCounts = {};
+  const zoneCounts = {};
+  for (const candidate of candidateRows) {
+    const evidence = candidate.m3plusPitchSafetyEvidence || {};
+    const decision = String(evidence.decision || "unknown");
+    const zone = String(evidence.zone || "unknown");
+    decisionCounts[decision] = (decisionCounts[decision] || 0) + 1;
+    zoneCounts[zone] = (zoneCounts[zone] || 0) + 1;
+  }
+  return { decisionCounts, zoneCounts };
+}
+
 function listen(server) {
   return new Promise((resolve) => {
     server.listen(0, "127.0.0.1", () => resolve(server.address().port));
@@ -136,6 +179,19 @@ async function writeTinyCleanScoreStore(repoRoot) {
     }),
     "utf8",
   );
+}
+
+async function writeM3PlusRuntimeBindingFixtures(repoRoot) {
+  const paths = [
+    "scripts/experiments/western_strings_m3plus_runtime_policy.py",
+    "scripts/experiments/run_western_strings_offline_feature_analysis.py",
+    "data/experiments/western-strings-m3plus/rescope-gate/report.json",
+  ];
+  for (const relativePath of paths) {
+    const destination = path.join(repoRoot, relativePath);
+    await fs.mkdir(path.dirname(destination), { recursive: true });
+    await fs.copyFile(path.join(process.cwd(), relativePath), destination);
+  }
 }
 
 async function testServiceDefaultNoLeakage() {
@@ -658,6 +714,7 @@ async function testControlledSubmissionValidatedReplayBatch() {
 
 async function testControlledSubmissionOfflineFeatureReviewBatch() {
   const tempRoot = await createTinyStudentReadyRoot();
+  await writeM3PlusRuntimeBindingFixtures(tempRoot);
   await fs.writeFile(
     path.join(tempRoot, "data", "erhu-score-imports.json"),
     JSON.stringify({
@@ -673,9 +730,9 @@ async function testControlledSubmissionOfflineFeatureReviewBatch() {
               title: "Section 1",
               tempo: 72,
               notes: [
-                { noteId: "n1", measureIndex: 1, beatStart: 0, beatDuration: 1, midiPitch: 69, notePosition: { pageNumber: 1, globalMeasureIndex: 1, localMeasureIndex: 1 } },
-                { noteId: "n2", measureIndex: 1, beatStart: 1, beatDuration: 1, midiPitch: 69, notePosition: { pageNumber: 1, globalMeasureIndex: 1, localMeasureIndex: 1 } },
-                { noteId: "n3", measureIndex: 1, beatStart: 2, beatDuration: 1, midiPitch: 69, notePosition: { pageNumber: 1, globalMeasureIndex: 1, localMeasureIndex: 1 } },
+                { noteId: "n1", measureIndex: 1, beatStart: 0, beatDuration: 1, midiPitch: 69, techniques: ["trill"], notePosition: { pageNumber: 1, globalMeasureIndex: 1, localMeasureIndex: 1 } },
+                { noteId: "n2", measureIndex: 1, beatStart: 1, beatDuration: 1, midiPitch: 69, techniques: ["glissando", "natural-harmonic"], notePosition: { pageNumber: 1, globalMeasureIndex: 1, localMeasureIndex: 1 } },
+                { noteId: "n3", measureIndex: 1, beatStart: 2, beatDuration: 1, midiPitch: 71, techniques: ["glissando"], notePosition: { pageNumber: 1, globalMeasureIndex: 1, localMeasureIndex: 1 } },
               ],
             },
           ],
@@ -783,6 +840,46 @@ async function testControlledSubmissionOfflineFeatureReviewBatch() {
     assert.equal(item.candidateGate.evaluatedCandidateCount, 3);
     assert.equal(item.candidateGate.autoPassCandidateCount, 0);
     assert.equal(item.candidateGate.reviewRequiredCandidateCount, 3);
+    const m3plusRuntime = item.candidateGate.m3plusPitchSafetyRuntime;
+    assert.equal(m3plusRuntime.evaluationContract, "m3plus-rescope-four-zone-v2");
+    assert.equal(m3plusRuntime.runtimeContract, "m3plus-gold-free-runtime-v1");
+    assert.equal(m3plusRuntime.policyVersion, "m3plus-gold-free-pitch-safety-policy-v1");
+    assert.equal(m3plusRuntime.policySemanticSha256, "8279e1e9a69c4bf35e18d55f4daf50522a9bb43ef9f472989e6c8c1b5481a274");
+    assert.equal(m3plusRuntime.policyArtifactPath, "scripts/experiments/western_strings_m3plus_runtime_policy.py");
+    assert.match(m3plusRuntime.policyArtifactSha256, /^[a-f0-9]{64}$/);
+    assert.equal(m3plusRuntime.policyArtifactSemanticSha256, "226173fbde4fa73804d21daae7ea0179a3d97a5b547aebdfdebda52ac94e6eab");
+    assert.equal(m3plusRuntime.analyzerArtifactPath, "scripts/experiments/run_western_strings_offline_feature_analysis.py");
+    assert.match(m3plusRuntime.analyzerArtifactSha256, /^[a-f0-9]{64}$/);
+    assert.equal(m3plusRuntime.analyzerArtifactSemanticSha256, "65ea46768bf23e51aac4083c3fd08fecbeb2d81d8af4effc5aaae482bc7a279d");
+    assert.deepEqual(m3plusRuntime.pyinRuntime, {
+      backend: "librosa-pyin",
+      pythonVersion: "3.11.9",
+      librosaVersion: "0.11.0",
+      numpyVersion: "1.26.4",
+      sampleRateHz: 22050,
+      hopLength: 512,
+      frameLength: 2048,
+      fminNote: "C2",
+      fmaxNote: "A7",
+      voicedMask: "finite-f0-and-librosa-voiced",
+    });
+    assert.equal(m3plusRuntime.rescopeReportPath, "data/experiments/western-strings-m3plus/rescope-gate/report.json");
+    assert.match(m3plusRuntime.rescopeReportSha256, /^[a-f0-9]{64}$/);
+    assert.equal(m3plusRuntime.reviewOnlyRuntimeWired, true);
+    assert.equal(m3plusRuntime.runtimeEvidenceReady, true);
+    assert.equal(m3plusRuntime.contractReady, true);
+    assert.equal(m3plusRuntime.reviewOnly, true);
+    assert.equal(m3plusRuntime.feedbackAuthorized, false);
+    assert.equal(m3plusRuntime.studentFacing, false);
+    assert.equal(m3plusRuntime.scoreSafetyIdentityReady, true);
+    assert.equal(
+      m3plusRuntime.candidateScoreSafetyIdentitySha256,
+      m3plusRuntime.scoreSafetyIdentitySha256,
+    );
+    assert.equal(
+      item.candidateGate.scoreProvenance.m3plusPitchSafetyNoteIdentitySha256,
+      m3plusRuntime.scoreSafetyIdentitySha256,
+    );
     assert.equal(item.candidatePreview.length, 3);
     assert.equal(item.candidatePreview[0].method, "basic-pitch-dtw-pyin-window");
     assert.equal(item.candidatePreview[0].autoDecision, "review_required");
@@ -804,6 +901,17 @@ async function testControlledSubmissionOfflineFeatureReviewBatch() {
     assert(candidateRowsArtifact.candidateRows.every((candidate) => candidate.gateVersion === "western-ordinary-dynamic-shadow-gate-v1-review-only"));
     assert(candidateRowsArtifact.candidateRows.every((candidate) => candidate.studentFacing === false));
     assert(candidateRowsArtifact.candidateRows.every((candidate) => candidate.dynamicShadowDecision.contractValid === true));
+    assert(candidateRowsArtifact.candidateRows.every((candidate) => candidate.feedbackAuthorized === false));
+    assert(candidateRowsArtifact.candidateRows.every((candidate) => candidate.m3plusPitchSafetyDecision.contractValid === true));
+    assert(candidateRowsArtifact.candidateRows.every((candidate) => candidate.m3plusPitchSafetyDecision.studentFacing === false));
+    assert.equal(candidateRowsArtifact.candidateRows[0].m3plusPitchSafetyEvidence.zone, "score_marked_neutral");
+    assert.equal(candidateRowsArtifact.candidateRows[0].m3plusPitchSafetyEvidence.decision, "insufficient_evidence");
+    assert.equal(candidateRowsArtifact.candidateRows[0].m3plusPitchSafetyEvidence.accusationIssued, false);
+    assert.equal(candidateRowsArtifact.candidateRows[1].glissandoTargetMidi, 71);
+    assert.equal(candidateRowsArtifact.candidateRows[1].glissandoTargetNoteId, "n3");
+    assert.equal(candidateRowsArtifact.candidateRows[1].m3plusPitchSafetyEvidence.zone, "score_marked_neutral");
+    assert.equal(candidateRowsArtifact.candidateRows[1].m3plusPitchSafetyEvidence.targetMidi, 69);
+    assert.equal(candidateRowsArtifact.candidateRows[1].m3plusPitchSafetyEvidence.reason, "score-marked-region-neutralized");
     const savedBatchRun = await fs.readFile(path.join(tempRoot, "data", "experiments", "western-strings-m3", "controlled-submission-batch-runs.jsonl"), "utf8");
     const audit = auditControlledBatchRuns(savedBatchRun.trim().split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line)), {
       requireFeatureReview: true,
@@ -831,6 +939,25 @@ async function testControlledSubmissionOfflineFeatureReviewBatch() {
     assert(photoOnlyRequiredAudit.failures.some((failure) => failure.code === "no-feature-review-items-found"));
     const candidateArtifactPath = path.join(tempRoot, item.candidateRowsPath);
     const originalCandidateArtifactBytes = await fs.readFile(candidateArtifactPath);
+    const parsedBatchRuns = savedBatchRun.trim().split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
+    async function auditM3PlusArtifactTamper(mutator) {
+      try {
+        const artifact = JSON.parse(originalCandidateArtifactBytes.toString("utf8"));
+        mutator(artifact);
+        const bytes = Buffer.from(`${JSON.stringify(artifact, null, 2)}\n`, "utf8");
+        await fs.writeFile(candidateArtifactPath, bytes);
+        const run = structuredClone(parsedBatchRuns.at(-1));
+        run.items[0].candidateGate = artifact.candidateGate;
+        run.items[0].candidateRowsSha256 = createHash("sha256").update(bytes).digest("hex");
+        return auditControlledBatchRuns([run], {
+          requireFeatureReview: true,
+          sourceRoot: tempRoot,
+          latestOnly: true,
+        });
+      } finally {
+        await fs.writeFile(candidateArtifactPath, originalCandidateArtifactBytes);
+      }
+    }
     try {
       const tamperedArtifact = JSON.parse(originalCandidateArtifactBytes.toString("utf8"));
       tamperedArtifact.batchRunId = "cross-run-substitution";
@@ -909,6 +1036,169 @@ async function testControlledSubmissionOfflineFeatureReviewBatch() {
       assert(provenanceTamperAudit.failures.some((failure) => failure.code === "feature-review-incomplete-score-coverage"));
     } finally {
       await fs.writeFile(candidateArtifactPath, originalCandidateArtifactBytes);
+    }
+    const markerTamperAudit = await auditM3PlusArtifactTamper((artifact) => {
+      artifact.candidateRows[0].scoreTechniques = [];
+      const forgedSha256 = m3plusCandidateIdentitySha256(artifact.candidateRows);
+      artifact.candidateGate.m3plusPitchSafetyRuntime.scoreSafetyIdentitySha256 = forgedSha256;
+      artifact.candidateGate.m3plusPitchSafetyRuntime.candidateScoreSafetyIdentitySha256 = forgedSha256;
+      artifact.candidateGate.scoreProvenance.m3plusPitchSafetyNoteIdentitySha256 = forgedSha256;
+    });
+    assert.equal(markerTamperAudit.ok, false);
+    assert(markerTamperAudit.failures.some((failure) => (
+      failure.code === "feature-review-m3plus-score-marker-mismatch"
+    )));
+    assert(markerTamperAudit.failures.some((failure) => (
+      failure.code === "feature-review-m3plus-score-safety-provenance-sha-mismatch"
+    )));
+
+    const contextTamperAudit = await auditM3PlusArtifactTamper((artifact) => {
+      artifact.candidateRows[1].onsetGroupSize = 2;
+      artifact.candidateRows[1].polyphonicScoreRegion = true;
+      artifact.candidateRows[1].m3plusPitchSafetyEvidence.polyphonicScoreRegion = true;
+      const forgedSha256 = m3plusCandidateIdentitySha256(artifact.candidateRows);
+      artifact.candidateGate.m3plusPitchSafetyRuntime.scoreSafetyIdentitySha256 = forgedSha256;
+      artifact.candidateGate.m3plusPitchSafetyRuntime.candidateScoreSafetyIdentitySha256 = forgedSha256;
+      artifact.candidateGate.scoreProvenance.m3plusPitchSafetyNoteIdentitySha256 = forgedSha256;
+    });
+    assert.equal(contextTamperAudit.ok, false);
+    assert(contextTamperAudit.failures.some((failure) => (
+      failure.code === "feature-review-m3plus-score-context-mismatch"
+    )));
+
+    const evidenceTamperAudit = await auditM3PlusArtifactTamper((artifact) => {
+      const row = artifact.candidateRows[1];
+      row.m3plusPitchSafetyEvidence.spreadCentsP95P05 = 180;
+      row.m3plusPitchSafetyEvidence.iqrCents = 120;
+      row.m3plusPitchSafetyEvidence.highDispersion = true;
+      row.m3plusPitchSafetyEvidence.decision = "issue_detected";
+      row.m3plusPitchSafetyEvidence.reason = "center-pitch-outside-tolerance";
+      row.m3plusPitchSafetyEvidence.accusationIssued = true;
+      row.m3plusPitchSafetyDecision.highDispersion = true;
+      row.m3plusPitchSafetyDecision.decision = "issue_detected";
+      row.m3plusPitchSafetyDecision.reason = "center-pitch-outside-tolerance";
+      row.m3plusPitchSafetyDecision.accusationIssued = true;
+      const counts = m3plusRuntimeCounts(artifact.candidateRows);
+      artifact.candidateGate.m3plusPitchSafetyRuntime.decisionCounts = counts.decisionCounts;
+      artifact.candidateGate.m3plusPitchSafetyRuntime.zoneCounts = counts.zoneCounts;
+    });
+    assert.equal(evidenceTamperAudit.ok, false);
+    assert(evidenceTamperAudit.failures.some((failure) => (
+      failure.code === "feature-review-m3plus-high-dispersion-leak"
+    )));
+
+    const policyPath = path.join(tempRoot, "scripts", "experiments", "western_strings_m3plus_runtime_policy.py");
+    const originalPolicyBytes = await fs.readFile(policyPath);
+    try {
+      const crlfPolicyBytes = Buffer.from(
+        originalPolicyBytes.toString("utf8").replace(/\r?\n/g, "\r\n"),
+        "utf8",
+      );
+      await fs.writeFile(policyPath, crlfPolicyBytes);
+      const crlfRawSha256 = createHash("sha256").update(crlfPolicyBytes).digest("hex");
+      const crlfPolicyAudit = await auditM3PlusArtifactTamper((artifact) => {
+        artifact.candidateGate.m3plusPitchSafetyRuntime.policyArtifactSha256 = crlfRawSha256;
+      });
+      assert.equal(crlfPolicyAudit.ok, true, JSON.stringify(crlfPolicyAudit.failures));
+    } finally {
+      await fs.writeFile(policyPath, originalPolicyBytes);
+    }
+    try {
+      const tamperedPolicyBytes = Buffer.concat([originalPolicyBytes, Buffer.from("\n# tampered\n", "utf8")]);
+      await fs.writeFile(policyPath, tamperedPolicyBytes);
+      const tamperedRawSha256 = createHash("sha256").update(tamperedPolicyBytes).digest("hex");
+      const tamperedSemanticSha256 = createHash("sha256")
+        .update(tamperedPolicyBytes.toString("utf8").replace(/\r\n/g, "\n"), "utf8")
+        .digest("hex");
+      const policyTamperAudit = await auditM3PlusArtifactTamper((artifact) => {
+        artifact.candidateGate.m3plusPitchSafetyRuntime.policyArtifactSha256 = tamperedRawSha256;
+        artifact.candidateGate.m3plusPitchSafetyRuntime.policyArtifactSemanticSha256 = tamperedSemanticSha256;
+      });
+      assert.equal(policyTamperAudit.ok, false);
+      assert(policyTamperAudit.failures.some((failure) => (
+        failure.code === "feature-review-m3plus-policy-artifact-code-anchor-mismatch"
+      )));
+    } finally {
+      await fs.writeFile(policyPath, originalPolicyBytes);
+    }
+
+    const analyzerPath = path.join(tempRoot, "scripts", "experiments", "run_western_strings_offline_feature_analysis.py");
+    const originalAnalyzerBytes = await fs.readFile(analyzerPath);
+    try {
+      const crlfAnalyzerBytes = Buffer.from(
+        originalAnalyzerBytes.toString("utf8").replace(/\r?\n/g, "\r\n"),
+        "utf8",
+      );
+      await fs.writeFile(analyzerPath, crlfAnalyzerBytes);
+      const crlfRawSha256 = createHash("sha256").update(crlfAnalyzerBytes).digest("hex");
+      const crlfAnalyzerAudit = await auditM3PlusArtifactTamper((artifact) => {
+        artifact.candidateGate.m3plusPitchSafetyRuntime.analyzerArtifactSha256 = crlfRawSha256;
+      });
+      assert.equal(crlfAnalyzerAudit.ok, true, JSON.stringify(crlfAnalyzerAudit.failures));
+    } finally {
+      await fs.writeFile(analyzerPath, originalAnalyzerBytes);
+    }
+    try {
+      const tamperedAnalyzerBytes = Buffer.concat([originalAnalyzerBytes, Buffer.from("\n# tampered\n", "utf8")]);
+      await fs.writeFile(analyzerPath, tamperedAnalyzerBytes);
+      const tamperedRawSha256 = createHash("sha256").update(tamperedAnalyzerBytes).digest("hex");
+      const tamperedSemanticSha256 = createHash("sha256")
+        .update(tamperedAnalyzerBytes.toString("utf8").replace(/\r\n/g, "\n"), "utf8")
+        .digest("hex");
+      const analyzerTamperAudit = await auditM3PlusArtifactTamper((artifact) => {
+        artifact.candidateGate.m3plusPitchSafetyRuntime.analyzerArtifactSha256 = tamperedRawSha256;
+        artifact.candidateGate.m3plusPitchSafetyRuntime.analyzerArtifactSemanticSha256 = tamperedSemanticSha256;
+      });
+      assert.equal(analyzerTamperAudit.ok, false);
+      assert(analyzerTamperAudit.failures.some((failure) => (
+        failure.code === "feature-review-m3plus-analyzer-artifact-code-anchor-mismatch"
+      )));
+    } finally {
+      await fs.writeFile(analyzerPath, originalAnalyzerBytes);
+    }
+
+    const missingM3RuntimeAudit = await auditM3PlusArtifactTamper((artifact) => {
+      delete artifact.candidateGate.m3plusPitchSafetyRuntime;
+    });
+    assert.equal(missingM3RuntimeAudit.ok, false);
+    assert.equal(missingM3RuntimeAudit.m3plusRuntimeRequired, true);
+    assert(missingM3RuntimeAudit.failures.some((failure) => (
+      failure.code === "feature-review-m3plus-runtime-missing"
+    )));
+
+    const unreadyM3RuntimeAudit = await auditM3PlusArtifactTamper((artifact) => {
+      const runtime = artifact.candidateGate.m3plusPitchSafetyRuntime;
+      runtime.contractReady = false;
+      runtime.runtimeEvidenceReady = false;
+      runtime.reviewOnlyRuntimeWired = false;
+      runtime.runtimeFoundationReady = false;
+    });
+    assert.equal(unreadyM3RuntimeAudit.ok, false);
+    assert.equal(unreadyM3RuntimeAudit.m3plusRuntimeRequired, true);
+    assert(unreadyM3RuntimeAudit.failures.some((failure) => (
+      failure.code === "feature-review-m3plus-runtime-not-ready"
+    )));
+
+    const rescopePath = path.join(tempRoot, "data", "experiments", "western-strings-m3plus", "rescope-gate", "report.json");
+    const originalRescopeBytes = await fs.readFile(rescopePath);
+    try {
+      const report = JSON.parse(originalRescopeBytes.toString("utf8"));
+      report.contract = "tampered-contract";
+      await fs.writeFile(rescopePath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+      const rescopeTamperAudit = auditControlledBatchRuns(parsedBatchRuns, {
+        requireFeatureReview: true,
+        sourceRoot: tempRoot,
+        latestOnly: true,
+      });
+      assert.equal(rescopeTamperAudit.ok, false);
+      assert(rescopeTamperAudit.failures.some((failure) => (
+        failure.code === "feature-review-m3plus-rescope-report-sha-mismatch"
+      )));
+      assert(rescopeTamperAudit.failures.some((failure) => (
+        failure.code === "feature-review-m3plus-rescope-report-contract-invalid"
+      )));
+    } finally {
+      await fs.writeFile(rescopePath, originalRescopeBytes);
     }
     const staleRun = {
       batchRunId: "stale-run-without-artifact",
@@ -1196,7 +1486,10 @@ async function testControlledSubmissionOfflineFeatureReviewBatch() {
   }
 }
 
-function testOrdinaryControlledPilotScope() {
+// Historical RF/first-measure behavior remains covered only as telemetry.
+// The outer dynamic-shadow gate is the current authority and always forces
+// these rows back to review_required.
+function testHistoricalRfControlledPilotScopeTelemetry() {
   const result = applyOrdinaryControlledPilotScope([
     { candidateId: "pass", measureIndex: 1, confidenceProbability: 0.96, confidenceSelected: true },
     { candidateId: "low-confidence", measureIndex: 1, confidenceProbability: 0.94, confidenceSelected: true },
@@ -1609,7 +1902,7 @@ async function testControlledSubmissionOfflineFeatureConfidenceGateEnabled() {
   }
 }
 
-testOrdinaryControlledPilotScope();
+testHistoricalRfControlledPilotScopeTelemetry();
 testOrdinaryDynamicShadowReviewGate();
 await testServiceDefaultNoLeakage();
 await testServiceEvaluationSummary();
@@ -1623,4 +1916,4 @@ await testControlledSubmissionValidatedReplayBatch();
 await testControlledSubmissionOfflineFeatureReviewBatch();
 await testControlledSubmissionOfflineFeatureConfidenceGateEnabled();
 
-console.log(JSON.stringify({ ok: true, checks: ["western-controlled-pilot-first-measure-scope", "western-alignment-preview-service", "western-alignment-preview-route", "western-student-analysis-route", "western-controlled-submission-route"] }));
+console.log(JSON.stringify({ ok: true, checks: ["western-historical-rf-scope-telemetry", "western-alignment-preview-service", "western-alignment-preview-route", "western-student-analysis-route", "western-controlled-submission-route"] }));

@@ -40,9 +40,11 @@ DEFAULT_OUT = (
 )
 RESCOPE_DECISION = "docs/western-strings-m3plus-rescope-decision.md"
 RESCOPE_DECISION_PATH = REPO / RESCOPE_DECISION
+EVALUATOR_SOURCE = "scripts/experiments/eval_western_strings_m3plus_rescope_gate.py"
+EVALUATOR_PATH = REPO / EVALUATOR_SOURCE
 CONTRACT = "m3plus-rescope-four-zone-v2"
 MARKED_BEHAVIORS = {"trill", "ornament-upper-mordent", "harmonic"}
-SOURCE_BINDING_KEYS = {"machineSource", "humanGold", "m3CoreGate", "rescopeDecision"}
+SOURCE_BINDING_KEYS = {"machineSource", "humanGold", "m3CoreGate", "rescopeDecision", "evaluator"}
 INTONATION_LABELS = {"in-tune", "sharp", "flat", "wrong-note"}
 EXPECTED_STRAIGHT_UNIT_COUNT = 12
 EXPECTED_TECHNIQUE_CENTER_UNIT_COUNT = 8
@@ -700,11 +702,14 @@ def main() -> int:
         raise SystemExit(f"missing M3 core gate: {args.m3_core_gate}")
     if not RESCOPE_DECISION_PATH.is_file():
         raise SystemExit(f"missing M3+ rescope decision: {RESCOPE_DECISION_PATH}")
+    if not EVALUATOR_PATH.is_file():
+        raise SystemExit(f"missing M3+ rescope evaluator: {EVALUATOR_PATH}")
     source_bindings = {
         "machineSource": build_source_binding(args.source),
         "humanGold": build_source_binding(args.human_gold),
         "m3CoreGate": build_source_binding(args.m3_core_gate),
         "rescopeDecision": build_source_binding(RESCOPE_DECISION_PATH),
+        "evaluator": build_source_binding(EVALUATOR_PATH),
     }
     report = evaluate_rescope_gate(
         json.loads(args.source.read_text(encoding="utf-8")),

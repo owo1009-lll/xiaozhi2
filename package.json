@@ -274,6 +274,7 @@
     "test:western-m3plus-protocol-order-diagnostic": "py -3.11 scripts\\test-western-m3plus-protocol-order-diagnostic.py",
     "test:western-m3plus-feature-separability": "py -3.11 scripts\\test-western-m3plus-feature-separability.py",
     "test:western-m3plus-rescope-gate": "py -3.11 scripts\\test-western-m3plus-rescope-gate.py",
+    "test:western-m3plus-runtime-policy": "node scripts\\run-western-ordinary-audio-python.mjs --script scripts\\test-western-m3plus-runtime-policy.py --",
     "test:western-m3plus-coarse-states": "py -3.11 scripts\\test-western-m3plus-coarse-states.py",
     "test:western-measure-feedback": "py -3.11 scripts\\test-western-measure-feedback.py",
     "test:western-score-harmonic-parsing": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-western-score-harmonic-parsing.py",

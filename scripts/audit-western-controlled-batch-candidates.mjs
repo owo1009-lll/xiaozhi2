@@ -57,6 +57,52 @@ const BASIC_PITCH_MODEL_ARTIFACT_SHA256 = "c6595f299ff83c52e89555789f7e3e829a6a0
 const ORDINARY_AUDIO_RUNTIME_ID = "western-ordinary-dynamic-shadow-audio-py311";
 const ORDINARY_AUDIO_RUNTIME_CONFIG_SHA256 = "1f3a47f5cfe2b2d2e427be9a03ab43b4b4aa09a5db0edeed0b55e610a42ac6f9";
 const ORDINARY_AUDIO_RUNTIME_LOCK_SHA256 = "4120a811da1ecb1aa93ceabcbb5aa0b45a37c08e5ee3138d2b793e38f2828d04";
+const M3PLUS_EVALUATION_CONTRACT = "m3plus-rescope-four-zone-v2";
+const M3PLUS_RUNTIME_CONTRACT = "m3plus-gold-free-runtime-v1";
+const M3PLUS_RUNTIME_POLICY_VERSION = "m3plus-gold-free-pitch-safety-policy-v1";
+const M3PLUS_RUNTIME_POLICY_SEMANTIC_SHA256 = "8279e1e9a69c4bf35e18d55f4daf50522a9bb43ef9f472989e6c8c1b5481a274";
+const M3PLUS_F0_BACKEND = "librosa-pyin";
+const M3PLUS_POLICY_ARTIFACT_PATH = "scripts/experiments/western_strings_m3plus_runtime_policy.py";
+const M3PLUS_POLICY_ARTIFACT_SEMANTIC_SHA256 = "226173fbde4fa73804d21daae7ea0179a3d97a5b547aebdfdebda52ac94e6eab";
+const M3PLUS_ANALYZER_ARTIFACT_PATH = "scripts/experiments/run_western_strings_offline_feature_analysis.py";
+const M3PLUS_ANALYZER_ARTIFACT_SEMANTIC_SHA256 = "65ea46768bf23e51aac4083c3fd08fecbeb2d81d8af4effc5aaae482bc7a279d";
+const M3PLUS_RESCOPE_REPORT_PATH = "data/experiments/western-strings-m3plus/rescope-gate/report.json";
+const M3PLUS_PYIN_RUNTIME_DESCRIPTOR = Object.freeze({
+  backend: "librosa-pyin",
+  pythonVersion: "3.11.9",
+  librosaVersion: "0.11.0",
+  numpyVersion: "1.26.4",
+  sampleRateHz: 22050,
+  hopLength: 512,
+  frameLength: 2048,
+  fminNote: "C2",
+  fmaxNote: "A7",
+  voicedMask: "finite-f0-and-librosa-voiced",
+});
+const M3PLUS_RUNTIME_THRESHOLDS = Object.freeze({
+  pitchToleranceCents: 50,
+  maxSpreadCentsP95P05: 80,
+  maxIqrCents: 80,
+  minTotalFrameCount: 12,
+  minVoicedFrameCount: 12,
+  minVoicedFrameRatio: 0.7,
+  glissandoTargetTailFraction: 0.35,
+});
+const M3PLUS_PROTECTED_EXACT_MARKINGS = new Set([
+  "delayed-turn",
+  "inverted-delayed-turn",
+  "inverted-mordent",
+  "inverted-turn",
+  "mordent",
+  "ornament",
+  "ornaments",
+  "shake",
+  "schleifer",
+  "trill",
+  "trill-mark",
+  "turn",
+]);
+const M3PLUS_GLISSANDO_MARKINGS = new Set(["gliss", "glissando", "portamento", "slide"]);
 
 function canonicalJson(value) {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
@@ -99,6 +145,146 @@ function buildCandidateNoteIdentityRows(rows) {
     midi: typeof candidate?.midi === "number" && Number.isInteger(candidate.midi)
       ? candidate.midi
       : null,
+  }));
+}
+
+function normalizeM3PlusMarkings(value) {
+  const source = Array.isArray(value) ? value : (value === null || value === undefined ? [] : [value]);
+  return [...new Set(source
+    .map((item) => safeString(item).trim().toLowerCase())
+    .filter(Boolean))].sort();
+}
+
+function m3plusProtectedMarkings(techniques, notations) {
+  const markings = [...new Set([
+    ...normalizeM3PlusMarkings(techniques),
+    ...normalizeM3PlusMarkings(notations),
+  ])].sort();
+  return markings.filter((marking) => (
+    M3PLUS_PROTECTED_EXACT_MARKINGS.has(marking)
+    || marking.includes("harmonic")
+    || marking.includes("ornament")
+    || marking.includes("trill")
+    || marking.includes("mordent")
+    || marking.endsWith("-turn")
+  ));
+}
+
+function m3plusHasGlissandoMarking(techniques, notations) {
+  const markings = [...new Set([
+    ...normalizeM3PlusMarkings(techniques),
+    ...normalizeM3PlusMarkings(notations),
+  ])];
+  return markings.some((marking) => M3PLUS_GLISSANDO_MARKINGS.has(marking) || marking.includes("gliss"));
+}
+
+function buildScoreM3PlusNoteIdentityRows(score) {
+  const notes = [];
+  let order = 0;
+  for (const section of score?.sections || []) {
+    for (const note of section?.notes || []) {
+      const midi = asNumber(note?.midiPitch, -1);
+      if (midi <= 0) continue;
+      const sourceMeasureIndex = Math.round(asNumber(note?.measureIndex, 0));
+      const position = note?.notePosition && typeof note.notePosition === "object"
+        ? note.notePosition
+        : {};
+      notes.push({
+        order,
+        pageNumber: Math.round(asNumber(position.pageNumber, 0)),
+        sourceMeasureIndex,
+        noteId: safeString(note?.noteId || `note-${order}`).trim(),
+        sectionId: safeString(section?.sectionId).trim(),
+        measureIndex: Math.round(asNumber(position.globalMeasureIndex, sourceMeasureIndex)),
+        beatStart: asNumber(note?.beatStart, 0),
+        beatDuration: Math.max(0.05, asNumber(note?.beatDuration, 1)),
+        midi: Math.round(midi),
+        scoreArticulations: normalizeM3PlusMarkings(note?.articulations),
+        scoreTechniques: normalizeM3PlusMarkings(note?.techniques),
+        scoreNotations: normalizeM3PlusMarkings(note?.notations),
+      });
+      order += 1;
+    }
+  }
+  notes.sort((left, right) => (
+    left.pageNumber - right.pageNumber
+    || left.sourceMeasureIndex - right.sourceMeasureIndex
+    || left.beatStart - right.beatStart
+    || left.order - right.order
+  ));
+  const onsetCounts = new Map();
+  for (const note of notes) {
+    const key = `${note.sectionId}\u0000${note.sourceMeasureIndex}\u0000${note.beatStart.toFixed(6)}`;
+    onsetCounts.set(key, (onsetCounts.get(key) || 0) + 1);
+  }
+  for (const [index, note] of notes.entries()) {
+    const key = `${note.sectionId}\u0000${note.sourceMeasureIndex}\u0000${note.beatStart.toFixed(6)}`;
+    note.onsetGroupSize = onsetCounts.get(key) || 1;
+    note.polyphonicScoreRegion = note.onsetGroupSize > 1;
+    note.glissandoTargetMidi = null;
+    note.glissandoTargetNoteId = null;
+    if (!m3plusHasGlissandoMarking(note.scoreTechniques, note.scoreNotations)) continue;
+    const previous = notes[index - 1];
+    const previousIsSameGlissando = Boolean(
+      previous
+      && previous.sectionId === note.sectionId
+      && previous.sourceMeasureIndex === note.sourceMeasureIndex
+      && m3plusHasGlissandoMarking(previous.scoreTechniques, previous.scoreNotations)
+    );
+    const target = notes[index + 1];
+    if (previousIsSameGlissando || !target) continue;
+    const targetIsSameMarkedPhrase = target.sectionId === note.sectionId
+      && target.sourceMeasureIndex === note.sourceMeasureIndex
+      && target.beatStart > note.beatStart
+      && target.midi !== note.midi
+      && m3plusHasGlissandoMarking(target.scoreTechniques, target.scoreNotations);
+    if (targetIsSameMarkedPhrase) {
+      note.glissandoTargetMidi = target.midi;
+      note.glissandoTargetNoteId = target.noteId;
+    }
+  }
+  return notes.map((note, noteIndex) => ({
+    noteIndex,
+    noteId: note.noteId,
+    sectionId: note.sectionId,
+    measureIndex: note.measureIndex,
+    beatStart: note.beatStart,
+    beatDuration: note.beatDuration,
+    midi: note.midi,
+    scoreArticulations: note.scoreArticulations,
+    scoreTechniques: note.scoreTechniques,
+    scoreNotations: note.scoreNotations,
+    onsetGroupSize: note.onsetGroupSize,
+    polyphonicScoreRegion: note.polyphonicScoreRegion,
+    glissandoTargetMidi: note.glissandoTargetMidi,
+    glissandoTargetNoteId: note.glissandoTargetNoteId,
+  }));
+}
+
+function buildCandidateM3PlusNoteIdentityRows(rows) {
+  return (Array.isArray(rows) ? rows : []).map((candidate) => ({
+    noteIndex: Number.isInteger(candidate?.noteIndex) ? candidate.noteIndex : null,
+    noteId: safeString(candidate?.noteId).trim(),
+    sectionId: safeString(candidate?.sectionId).trim(),
+    measureIndex: Number.isInteger(candidate?.measureIndex) ? candidate.measureIndex : null,
+    beatStart: typeof candidate?.beatStart === "number" && Number.isFinite(candidate.beatStart)
+      ? candidate.beatStart
+      : null,
+    beatDuration: typeof candidate?.beatDuration === "number" && Number.isFinite(candidate.beatDuration)
+      ? candidate.beatDuration
+      : null,
+    midi: Number.isInteger(candidate?.midi) ? candidate.midi : null,
+    scoreArticulations: normalizeM3PlusMarkings(candidate?.scoreArticulations),
+    scoreTechniques: normalizeM3PlusMarkings(candidate?.scoreTechniques),
+    scoreNotations: normalizeM3PlusMarkings(candidate?.scoreNotations),
+    onsetGroupSize: Number.isInteger(candidate?.onsetGroupSize) ? candidate.onsetGroupSize : null,
+    polyphonicScoreRegion: candidate?.polyphonicScoreRegion === true,
+    glissandoTargetMidi: Number.isInteger(candidate?.glissandoTargetMidi)
+      ? candidate.glissandoTargetMidi
+      : null,
+    glissandoTargetNoteId: candidate?.glissandoTargetNoteId === null
+      ? null
+      : safeString(candidate?.glissandoTargetNoteId).trim() || null,
   }));
 }
 
@@ -166,8 +352,12 @@ function auditPhysicalScoreBinding(sourceRoot, scoreProvenance, candidateRows) {
   }
   const expectedNotes = buildScoreNoteIdentityRows(score);
   const candidateNotes = buildCandidateNoteIdentityRows(candidateRows);
+  const expectedM3PlusNotes = buildScoreM3PlusNoteIdentityRows(score);
+  const candidateM3PlusNotes = buildCandidateM3PlusNoteIdentityRows(candidateRows);
   const expectedSha256 = noteIdentitySha256(expectedNotes);
   const candidateSha256 = noteIdentitySha256(candidateNotes);
+  const expectedM3PlusSha256 = noteIdentitySha256(expectedM3PlusNotes);
+  const candidateM3PlusSha256 = noteIdentitySha256(candidateM3PlusNotes);
   const identitiesMatch = candidateNotes.length === expectedNotes.length
     && expectedNotes.length > 0
     && candidateNotes.every((candidate, index) => (
@@ -192,8 +382,429 @@ function auditPhysicalScoreBinding(sourceRoot, scoreProvenance, candidateRows) {
     blockingReasons: [...new Set(blockingReasons)],
     expectedSha256,
     candidateSha256,
+    expectedM3PlusSha256,
+    candidateM3PlusSha256,
+    expectedM3PlusNotes,
+    candidateM3PlusNotes,
     noteCount: expectedNotes.length,
   };
+}
+
+function auditPhysicalBoundArtifact(sourceRoot, recordedPath, recordedSha256, expectedPath, prefix) {
+  const blockingReasons = [];
+  const normalizedPath = safeString(recordedPath).trim().replace(/\\/g, "/");
+  const normalizedSha256 = safeString(recordedSha256).trim().toLowerCase();
+  if (normalizedPath !== expectedPath) blockingReasons.push(`${prefix}-path-mismatch`);
+  if (!/^[a-f0-9]{64}$/.test(normalizedSha256)) blockingReasons.push(`${prefix}-sha-invalid`);
+  const root = path.resolve(sourceRoot || ".");
+  const artifactPath = path.resolve(root, normalizedPath || expectedPath);
+  const relative = path.relative(root, artifactPath);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    return { ready: false, blockingReasons: [...new Set([...blockingReasons, `${prefix}-outside-root`])] };
+  }
+  try {
+    const realRoot = fsSync.realpathSync(root);
+    const realArtifactPath = fsSync.realpathSync(artifactPath);
+    const realRelative = path.relative(realRoot, realArtifactPath);
+    if (realRelative.startsWith("..") || path.isAbsolute(realRelative)) {
+      return {
+        ready: false,
+        blockingReasons: [...new Set([...blockingReasons, `${prefix}-realpath-outside-root`])],
+      };
+    }
+    const bytes = fsSync.readFileSync(realArtifactPath);
+    const observedSha256 = crypto.createHash("sha256").update(bytes).digest("hex");
+    if (observedSha256 !== normalizedSha256) blockingReasons.push(`${prefix}-sha-mismatch`);
+    const afterSha256 = crypto.createHash("sha256").update(fsSync.readFileSync(realArtifactPath)).digest("hex");
+    if (afterSha256 !== observedSha256) blockingReasons.push(`${prefix}-changed-during-audit`);
+    return {
+      ready: blockingReasons.length === 0,
+      blockingReasons: [...new Set(blockingReasons)],
+      bytes,
+      observedSha256,
+    };
+  } catch {
+    return {
+      ready: false,
+      blockingReasons: [...new Set([...blockingReasons, `${prefix}-unreadable`])],
+    };
+  }
+}
+
+function readM3PlusEvidenceNumber(evidence, key, errors, { integer = false, min = null, max = null } = {}) {
+  if (!Object.hasOwn(evidence, key)) {
+    errors.push(`field-missing:${key}`);
+    return null;
+  }
+  if (evidence[key] === null) return null;
+  const value = evidence[key];
+  if (typeof value !== "number" || !Number.isFinite(value) || (integer && !Number.isInteger(value))) {
+    errors.push(`field-invalid:${key}`);
+    return null;
+  }
+  if (min !== null && value < min) errors.push(`field-below-minimum:${key}`);
+  if (max !== null && value > max) errors.push(`field-above-maximum:${key}`);
+  return value;
+}
+
+function auditM3PlusCandidate(candidate, expectedScoreNote, runtime, failures, detail) {
+  const evidence = candidate?.m3plusPitchSafetyEvidence;
+  const decision = candidate?.m3plusPitchSafetyDecision;
+  const errors = [];
+  if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) {
+    pushFailure(failures, "feature-review-m3plus-candidate-evidence-missing", detail);
+    return;
+  }
+  if (!decision || typeof decision !== "object" || Array.isArray(decision)) {
+    pushFailure(failures, "feature-review-m3plus-candidate-decision-missing", detail);
+    return;
+  }
+  if (!expectedScoreNote) errors.push("score-note-missing");
+  if (candidate.feedbackAuthorized !== false
+      || candidate.studentFacing !== false
+      || candidate.autoDecision !== "review_required"
+      || candidate.gateDecision !== "review_required") {
+    errors.push("candidate-review-only-state-invalid");
+  }
+  if (evidence.evaluationContract !== M3PLUS_EVALUATION_CONTRACT
+      || evidence.runtimeContract !== M3PLUS_RUNTIME_CONTRACT
+      || evidence.policyVersion !== M3PLUS_RUNTIME_POLICY_VERSION
+      || evidence.policySemanticSha256 !== M3PLUS_RUNTIME_POLICY_SEMANTIC_SHA256
+      || evidence.f0Backend !== M3PLUS_F0_BACKEND
+      || canonicalJson(evidence.thresholds || {}) !== canonicalJson(M3PLUS_RUNTIME_THRESHOLDS)) {
+    errors.push("evidence-contract-invalid");
+  }
+  if (evidence.evaluationContract !== runtime.evaluationContract
+      || evidence.runtimeContract !== runtime.runtimeContract
+      || evidence.policyVersion !== runtime.policyVersion
+      || evidence.policySemanticSha256 !== runtime.policySemanticSha256) {
+    errors.push("evidence-runtime-binding-mismatch");
+  }
+  if (evidence.reviewOnly !== true
+      || evidence.feedbackAuthorized !== false
+      || evidence.studentFacing !== false) {
+    errors.push("evidence-review-only-state-invalid");
+  }
+  for (const forbidden of ["expectedBehavior", "evaluationSplit", "humanGold", "goldLabel"]) {
+    if (Object.hasOwn(evidence, forbidden)) errors.push(`gold-dependent-field-forbidden:${forbidden}`);
+  }
+
+  const expectedTechniques = expectedScoreNote?.scoreTechniques || [];
+  const expectedNotations = expectedScoreNote?.scoreNotations || [];
+  const expectedArticulations = expectedScoreNote?.scoreArticulations || [];
+  const protectedMarkings = m3plusProtectedMarkings(expectedTechniques, expectedNotations);
+  const glissandoMarked = m3plusHasGlissandoMarking(expectedTechniques, expectedNotations);
+  const markerMismatch = canonicalJson(normalizeM3PlusMarkings(candidate.scoreTechniques)) !== canonicalJson(expectedTechniques)
+    || canonicalJson(normalizeM3PlusMarkings(candidate.scoreNotations)) !== canonicalJson(expectedNotations)
+    || canonicalJson(normalizeM3PlusMarkings(candidate.scoreArticulations)) !== canonicalJson(expectedArticulations)
+    || canonicalJson(normalizeM3PlusMarkings(evidence.scoreTechniques)) !== canonicalJson(expectedTechniques)
+    || canonicalJson(normalizeM3PlusMarkings(evidence.scoreNotations)) !== canonicalJson(expectedNotations)
+    || canonicalJson(normalizeM3PlusMarkings(evidence.protectedMarkings)) !== canonicalJson(protectedMarkings)
+    || evidence.glissandoMarked !== glissandoMarked;
+  if (markerMismatch) {
+    errors.push("score-marker-mismatch");
+    pushFailure(failures, "feature-review-m3plus-score-marker-mismatch", detail);
+  }
+  const contextMismatch = candidate.polyphonicScoreRegion !== expectedScoreNote?.polyphonicScoreRegion
+    || evidence.polyphonicScoreRegion !== expectedScoreNote?.polyphonicScoreRegion
+    || candidate.onsetGroupSize !== expectedScoreNote?.onsetGroupSize
+    || candidate.glissandoTargetMidi !== expectedScoreNote?.glissandoTargetMidi
+    || candidate.glissandoTargetNoteId !== expectedScoreNote?.glissandoTargetNoteId
+    || evidence.glissandoTargetMidi !== expectedScoreNote?.glissandoTargetMidi;
+  if (contextMismatch) {
+    errors.push("score-context-mismatch");
+    pushFailure(failures, "feature-review-m3plus-score-context-mismatch", detail);
+  }
+  if (typeof evidence.timingAssignmentAvailable !== "boolean"
+      || evidence.timingAssignmentAvailable !== candidate.m3plusTimingAssignmentAvailable) {
+    errors.push("timing-assignment-state-invalid");
+  }
+
+  const windowStart = readM3PlusEvidenceNumber(evidence, "windowStartSeconds", errors);
+  const windowEnd = readM3PlusEvidenceNumber(evidence, "windowEndSeconds", errors);
+  const totalFrames = readM3PlusEvidenceNumber(evidence, "totalFrameCount", errors, { integer: true, min: 0 });
+  const voicedFrames = readM3PlusEvidenceNumber(evidence, "voicedFrameCount", errors, { integer: true, min: 0 });
+  const voicedRatio = readM3PlusEvidenceNumber(evidence, "voicedFrameRatio", errors, { min: 0, max: 1 });
+  const medianMidi = readM3PlusEvidenceNumber(evidence, "medianObservedMidi", errors);
+  const centerError = readM3PlusEvidenceNumber(evidence, "centerErrorCents", errors);
+  const spread = readM3PlusEvidenceNumber(evidence, "spreadCentsP95P05", errors, { min: 0 });
+  const iqr = readM3PlusEvidenceNumber(evidence, "iqrCents", errors, { min: 0 });
+  const targetMidi = readM3PlusEvidenceNumber(evidence, "targetMidi", errors, { integer: true });
+  if (totalFrames !== null && voicedFrames !== null && voicedFrames > totalFrames) {
+    errors.push("voiced-frame-count-exceeds-total");
+  }
+  if (totalFrames !== null && voicedFrames !== null && voicedRatio !== null) {
+    const expectedRatio = totalFrames > 0 ? voicedFrames / totalFrames : 0;
+    if (Math.abs(expectedRatio - voicedRatio) > 0.000001) errors.push("voiced-frame-ratio-inconsistent");
+  }
+  const windowAvailable = windowStart !== null
+    && windowEnd !== null
+    && windowEnd > windowStart
+    && totalFrames !== null
+    && totalFrames > 0;
+  if (evidence.windowAvailable !== windowAvailable) errors.push("window-state-inconsistent");
+  const expectedTargetMidi = !protectedMarkings.length
+    && glissandoMarked
+    && expectedScoreNote?.glissandoTargetMidi !== null
+    ? expectedScoreNote.glissandoTargetMidi
+    : expectedScoreNote?.midi;
+  if (targetMidi !== expectedTargetMidi) errors.push("target-midi-mismatch");
+  if (medianMidi !== null && targetMidi !== null && centerError !== null) {
+    if (Math.abs(((medianMidi - targetMidi) * 100) - centerError) > 0.0001) {
+      errors.push("center-error-inconsistent");
+    }
+  } else if ((medianMidi === null || targetMidi === null) && centerError !== null) {
+    errors.push("center-error-without-input");
+  }
+
+  const highDispersion = Boolean(
+    (spread !== null && spread > M3PLUS_RUNTIME_THRESHOLDS.maxSpreadCentsP95P05)
+    || (iqr !== null && iqr > M3PLUS_RUNTIME_THRESHOLDS.maxIqrCents)
+  );
+  let expectedZone = protectedMarkings.length ? "score_marked_neutral" : "stable_center";
+  let expectedWindowKind = "stable-center";
+  if (!protectedMarkings.length && glissandoMarked) {
+    expectedZone = "glissando_target_tail";
+    expectedWindowKind = "glissando-target-tail";
+  }
+  let expectedDecision = "insufficient_evidence";
+  let expectedReason = "pitch-safety-evidence-not-ready";
+  if (protectedMarkings.length) {
+    expectedReason = "score-marked-region-neutralized";
+  } else if (expectedScoreNote?.polyphonicScoreRegion) {
+    expectedZone = "multi_f0_review_only";
+    expectedReason = "polyphonic-score-region-requires-multi-f0";
+  } else if (glissandoMarked && expectedScoreNote?.glissandoTargetMidi === null) {
+    expectedReason = "glissando-target-unavailable";
+  } else if (evidence.timingAssignmentAvailable !== true) {
+    expectedReason = "timing-assignment-missing";
+  } else if (!windowAvailable) {
+    expectedReason = "pitch-window-missing";
+  } else if (totalFrames < M3PLUS_RUNTIME_THRESHOLDS.minTotalFrameCount) {
+    expectedReason = "pitch-window-frame-count-below-floor";
+  } else if (voicedFrames < M3PLUS_RUNTIME_THRESHOLDS.minVoicedFrameCount) {
+    expectedReason = "voiced-frame-count-below-floor";
+  } else if (voicedRatio === null || voicedRatio < M3PLUS_RUNTIME_THRESHOLDS.minVoicedFrameRatio) {
+    expectedReason = "voiced-frame-ratio-below-floor";
+  } else if (medianMidi === null) {
+    expectedReason = "center-pitch-missing";
+  } else if (spread === null || iqr === null) {
+    expectedReason = "pitch-dispersion-missing";
+  } else if (highDispersion) {
+    expectedReason = "pitch-dispersion-too-high";
+  } else if (centerError === null) {
+    expectedReason = "center-pitch-error-missing";
+  } else if (Math.abs(centerError) > M3PLUS_RUNTIME_THRESHOLDS.pitchToleranceCents) {
+    expectedDecision = "issue_detected";
+    expectedReason = "center-pitch-outside-tolerance";
+  } else {
+    expectedDecision = "confirmed_center";
+    expectedReason = "center-pitch-within-tolerance";
+  }
+  if (evidence.zone !== expectedZone
+      || evidence.analysisWindowKind !== expectedWindowKind
+      || evidence.decision !== expectedDecision
+      || evidence.reason !== expectedReason
+      || evidence.accusationIssued !== (expectedDecision === "issue_detected")
+      || evidence.highDispersion !== highDispersion) {
+    errors.push("policy-decision-mismatch");
+  }
+  if (highDispersion && (evidence.decision !== "insufficient_evidence" || evidence.accusationIssued !== false)) {
+    pushFailure(failures, "feature-review-m3plus-high-dispersion-leak", detail);
+  }
+  if (protectedMarkings.length
+      && (evidence.zone !== "score_marked_neutral"
+        || evidence.decision !== "insufficient_evidence"
+        || evidence.accusationIssued !== false)) {
+    pushFailure(failures, "feature-review-m3plus-score-marked-accusation", detail);
+  }
+  if (decision.contractValid !== true
+      || decision.evaluationContract !== M3PLUS_EVALUATION_CONTRACT
+      || decision.runtimeContract !== M3PLUS_RUNTIME_CONTRACT
+      || decision.policyVersion !== M3PLUS_RUNTIME_POLICY_VERSION
+      || decision.policySemanticSha256 !== M3PLUS_RUNTIME_POLICY_SEMANTIC_SHA256
+      || decision.zone !== expectedZone
+      || decision.decision !== expectedDecision
+      || decision.reason !== expectedReason
+      || decision.accusationIssued !== (expectedDecision === "issue_detected")
+      || decision.highDispersion !== highDispersion
+      || decision.reviewOnly !== true
+      || decision.feedbackAuthorized !== false
+      || decision.studentFacing !== false
+      || !Array.isArray(decision.blockingReasons)
+      || decision.blockingReasons.length > 0) {
+    errors.push("runtime-decision-mismatch");
+  }
+  if (errors.length) {
+    pushFailure(failures, "feature-review-m3plus-candidate-runtime-invalid", {
+      ...detail,
+      reasons: [...new Set(errors)],
+    });
+  }
+}
+
+function auditM3PlusRuntime(
+  candidateGate,
+  rows,
+  scoreProvenance,
+  scoreBinding,
+  sourceRoot,
+  failures,
+  detail,
+  { required = false } = {},
+) {
+  const runtime = candidateGate?.m3plusPitchSafetyRuntime;
+  if (!runtime || typeof runtime !== "object" || Array.isArray(runtime)) {
+    if (required) pushFailure(failures, "feature-review-m3plus-runtime-missing", detail);
+    return;
+  }
+  const safetyStateReady = runtime.reviewOnly === true
+    && runtime.feedbackAuthorized === false
+    && runtime.authorizationReady === false
+    && runtime.studentGateReady === false
+    && runtime.studentFacing === false
+    && runtime.automaticAdoptionReady === false;
+  if (!safetyStateReady) {
+    pushFailure(failures, "feature-review-m3plus-runtime-safety-state-invalid", detail);
+  }
+  if (runtime.contractReady !== true) {
+    if (required) {
+      pushFailure(failures, "feature-review-m3plus-runtime-not-ready", detail);
+    }
+    if (runtime.runtimeEvidenceReady === true
+        || runtime.reviewOnlyRuntimeWired === true
+        || runtime.runtimeFoundationReady === true) {
+      pushFailure(failures, "feature-review-m3plus-runtime-false-state-inconsistent", detail);
+    }
+    for (const [candidateIndex, candidate] of rows.entries()) {
+      if (candidate?.feedbackAuthorized === true
+          || candidate?.studentFacing === true
+          || candidate?.m3plusPitchSafetyEvidence?.feedbackAuthorized === true
+          || candidate?.m3plusPitchSafetyEvidence?.studentFacing === true
+          || candidate?.m3plusPitchSafetyDecision?.feedbackAuthorized === true
+          || candidate?.m3plusPitchSafetyDecision?.studentFacing === true) {
+        pushFailure(failures, "feature-review-m3plus-fail-closed-row-leak", { ...detail, candidateIndex });
+      }
+    }
+    return;
+  }
+
+  if (!safetyStateReady
+      || runtime.evaluationContract !== M3PLUS_EVALUATION_CONTRACT
+      || runtime.runtimeContract !== M3PLUS_RUNTIME_CONTRACT
+      || runtime.policyVersion !== M3PLUS_RUNTIME_POLICY_VERSION
+      || runtime.policySemanticSha256 !== M3PLUS_RUNTIME_POLICY_SEMANTIC_SHA256
+      || runtime.f0Backend !== M3PLUS_F0_BACKEND
+      || canonicalJson(runtime.thresholds || {}) !== canonicalJson(M3PLUS_RUNTIME_THRESHOLDS)
+      || canonicalJson(runtime.pyinRuntime || {}) !== canonicalJson(M3PLUS_PYIN_RUNTIME_DESCRIPTOR)
+      || runtime.runtimeEvidenceReady !== true
+      || runtime.reviewOnlyRuntimeWired !== true
+      || runtime.runtimeFoundationReady !== true) {
+    pushFailure(failures, "feature-review-m3plus-runtime-contract-invalid", detail);
+  }
+
+  const policyBinding = auditPhysicalBoundArtifact(
+    sourceRoot,
+    runtime.policyArtifactPath,
+    runtime.policyArtifactSha256,
+    M3PLUS_POLICY_ARTIFACT_PATH,
+    "feature-review-m3plus-policy-artifact",
+  );
+  for (const code of policyBinding.blockingReasons || []) pushFailure(failures, code, detail);
+  const observedPolicySemanticSha256 = policyBinding.bytes
+    ? crypto.createHash("sha256")
+      .update(policyBinding.bytes.toString("utf8").replace(/\r\n/g, "\n"), "utf8")
+      .digest("hex")
+    : "";
+  if (safeString(runtime.policyArtifactSemanticSha256).trim().toLowerCase()
+      !== M3PLUS_POLICY_ARTIFACT_SEMANTIC_SHA256
+      || observedPolicySemanticSha256 !== M3PLUS_POLICY_ARTIFACT_SEMANTIC_SHA256) {
+    pushFailure(failures, "feature-review-m3plus-policy-artifact-code-anchor-mismatch", detail);
+  }
+  const analyzerBinding = auditPhysicalBoundArtifact(
+    sourceRoot,
+    runtime.analyzerArtifactPath,
+    runtime.analyzerArtifactSha256,
+    M3PLUS_ANALYZER_ARTIFACT_PATH,
+    "feature-review-m3plus-analyzer-artifact",
+  );
+  for (const code of analyzerBinding.blockingReasons || []) pushFailure(failures, code, detail);
+  const observedAnalyzerSemanticSha256 = analyzerBinding.bytes
+    ? crypto.createHash("sha256")
+      .update(analyzerBinding.bytes.toString("utf8").replace(/\r\n/g, "\n"), "utf8")
+      .digest("hex")
+    : "";
+  if (safeString(runtime.analyzerArtifactSemanticSha256).trim().toLowerCase()
+      !== M3PLUS_ANALYZER_ARTIFACT_SEMANTIC_SHA256
+      || observedAnalyzerSemanticSha256 !== M3PLUS_ANALYZER_ARTIFACT_SEMANTIC_SHA256) {
+    pushFailure(failures, "feature-review-m3plus-analyzer-artifact-code-anchor-mismatch", detail);
+  }
+  const rescopeBinding = auditPhysicalBoundArtifact(
+    sourceRoot,
+    runtime.rescopeReportPath,
+    runtime.rescopeReportSha256,
+    M3PLUS_RESCOPE_REPORT_PATH,
+    "feature-review-m3plus-rescope-report",
+  );
+  for (const code of rescopeBinding.blockingReasons || []) pushFailure(failures, code, detail);
+  if (rescopeBinding.bytes) {
+    try {
+      const report = JSON.parse(rescopeBinding.bytes.toString("utf8"));
+      if (report?.schemaVersion !== 2 || report?.contract !== M3PLUS_EVALUATION_CONTRACT) {
+        pushFailure(failures, "feature-review-m3plus-rescope-report-contract-invalid", detail);
+      }
+      if (runtime.rescopeReleaseGateReady !== (report?.releaseGateReady === true)) {
+        pushFailure(failures, "feature-review-m3plus-rescope-release-state-mismatch", detail);
+      }
+    } catch {
+      pushFailure(failures, "feature-review-m3plus-rescope-report-json-invalid", detail);
+    }
+  }
+
+  const expectedSha256 = scoreBinding?.expectedM3PlusSha256;
+  const candidateSha256 = scoreBinding?.candidateM3PlusSha256;
+  const identityReady = Boolean(
+    scoreBinding?.ready === true
+    && expectedSha256
+    && expectedSha256 === candidateSha256
+    && scoreBinding?.expectedM3PlusNotes?.length === rows.length
+  );
+  if (!identityReady) pushFailure(failures, "feature-review-m3plus-score-safety-identity-mismatch", detail);
+  if (safeString(scoreProvenance?.m3plusPitchSafetyNoteIdentitySha256).trim().toLowerCase() !== expectedSha256) {
+    pushFailure(failures, "feature-review-m3plus-score-safety-provenance-sha-mismatch", detail);
+  }
+  if (runtime.scoreSafetyIdentityReady !== true
+      || runtime.scoreSafetyIdentitySha256 !== expectedSha256
+      || runtime.candidateScoreSafetyIdentitySha256 !== candidateSha256) {
+    pushFailure(failures, "feature-review-m3plus-score-safety-gate-sha-mismatch", detail);
+  }
+
+  const decisionCounts = {};
+  const zoneCounts = {};
+  for (const candidate of rows) {
+    const evidence = candidate?.m3plusPitchSafetyEvidence || {};
+    const decisionName = safeString(evidence.decision, "unknown");
+    const zoneName = safeString(evidence.zone, "unknown");
+    decisionCounts[decisionName] = (decisionCounts[decisionName] || 0) + 1;
+    zoneCounts[zoneName] = (zoneCounts[zoneName] || 0) + 1;
+  }
+  if (runtime.expectedScoreNoteCount !== rows.length
+      || runtime.evaluatedCandidateCount !== rows.length
+      || runtime.validEvidenceCount !== rows.length
+      || runtime.invalidEvidenceCount !== 0
+      || canonicalJson(runtime.decisionCounts || {}) !== canonicalJson(decisionCounts)
+      || canonicalJson(runtime.zoneCounts || {}) !== canonicalJson(zoneCounts)) {
+    pushFailure(failures, "feature-review-m3plus-runtime-counts-mismatch", detail);
+  }
+  for (const [candidateIndex, candidate] of rows.entries()) {
+    auditM3PlusCandidate(
+      candidate,
+      scoreBinding?.expectedM3PlusNotes?.[candidateIndex],
+      runtime,
+      failures,
+      { ...detail, candidateIndex },
+    );
+  }
 }
 
 function auditDynamicCandidate(candidate, failures, {
@@ -241,6 +852,7 @@ export function auditFeatureReviewItem(item = {}, {
   itemIndex = 0,
   sourceRoot = "",
   batchRunId = "",
+  requireM3PlusRuntime = false,
 } = {}) {
   const failures = [];
   const summary = item.analysisSummary || {};
@@ -475,6 +1087,16 @@ export function auditFeatureReviewItem(item = {}, {
             candidateRowsPath,
           });
         }
+        auditM3PlusRuntime(
+          candidateGate,
+          rows,
+          scoreProvenance,
+          scoreBinding,
+          realSourceRoot,
+          failures,
+          { runIndex, itemIndex, candidateRowsPath },
+          { required: requireM3PlusRuntime },
+        );
         for (const [candidateIndex, candidate] of rows.entries()) {
           auditDynamicCandidate(candidate, failures, {
             runIndex,
@@ -513,7 +1135,13 @@ function selectBatchRunsForAudit(runs = [], { latestOnly = false } = {}) {
   return runs.length ? [runs[runs.length - 1]] : [];
 }
 
-export function auditControlledBatchRuns(runs = [], { requireFeatureReview = false, sourceRoot = "", latestOnly = false } = {}) {
+export function auditControlledBatchRuns(runs = [], options = {}) {
+  const {
+    requireFeatureReview = false,
+    sourceRoot = "",
+    latestOnly = false,
+  } = options;
+  const requireM3PlusRuntime = options.requireM3PlusRuntime ?? latestOnly;
   const failures = [];
   let runCount = 0;
   let featureReviewItemCount = 0;
@@ -557,6 +1185,7 @@ export function auditControlledBatchRuns(runs = [], { requireFeatureReview = fal
         itemIndex,
         sourceRoot,
         batchRunId,
+        requireM3PlusRuntime,
       }));
     }
   }
@@ -569,6 +1198,7 @@ export function auditControlledBatchRuns(runs = [], { requireFeatureReview = fal
     ok: failures.length === 0,
     runCount,
     auditedRunMode: latestOnly ? "latest" : "all",
+    m3plusRuntimeRequired: requireM3PlusRuntime,
     auditedBatchRunIds: selectedRunIds,
     featureReviewItemCount,
     candidateRowCount,

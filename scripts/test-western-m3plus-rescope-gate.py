@@ -25,6 +25,7 @@ SOURCE_BINDINGS = {
     "humanGold": {"path": "fixtures/human-gold.json", "sha256": "2" * 64},
     "m3CoreGate": {"path": "fixtures/m3-core.json", "sha256": "3" * 64},
     "rescopeDecision": {"path": "fixtures/rescope-decision.md", "sha256": "4" * 64},
+    "evaluator": {"path": "fixtures/evaluator.py", "sha256": "5" * 64},
 }
 
 

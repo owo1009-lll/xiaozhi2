@@ -38,6 +38,51 @@ const ORDINARY_DYNAMIC_SHADOW_POLICY = Object.freeze({
   minEventDurationRatio: 0.15,
   minSamePitchScoreDistanceQuarters: 0.5,
 });
+const M3PLUS_EVALUATION_CONTRACT = "m3plus-rescope-four-zone-v2";
+const M3PLUS_RUNTIME_CONTRACT = "m3plus-gold-free-runtime-v1";
+const M3PLUS_RUNTIME_POLICY_VERSION = "m3plus-gold-free-pitch-safety-policy-v1";
+const M3PLUS_F0_BACKEND = "librosa-pyin";
+const M3PLUS_RUNTIME_POLICY_SOURCE = "scripts/experiments/western_strings_m3plus_runtime_policy.py";
+const M3PLUS_ANALYZER_SOURCE = "scripts/experiments/run_western_strings_offline_feature_analysis.py";
+const M3PLUS_RUNTIME_POLICY_SEMANTIC_SHA256 = "8279e1e9a69c4bf35e18d55f4daf50522a9bb43ef9f472989e6c8c1b5481a274";
+const M3PLUS_RUNTIME_POLICY_ARTIFACT_SHA256 = "226173fbde4fa73804d21daae7ea0179a3d97a5b547aebdfdebda52ac94e6eab";
+const M3PLUS_ANALYZER_ARTIFACT_SEMANTIC_SHA256 = "65ea46768bf23e51aac4083c3fd08fecbeb2d81d8af4effc5aaae482bc7a279d";
+const M3PLUS_PYIN_RUNTIME_DESCRIPTOR = Object.freeze({
+  backend: "librosa-pyin",
+  pythonVersion: "3.11.9",
+  librosaVersion: "0.11.0",
+  numpyVersion: "1.26.4",
+  sampleRateHz: 22050,
+  hopLength: 512,
+  frameLength: 2048,
+  fminNote: "C2",
+  fmaxNote: "A7",
+  voicedMask: "finite-f0-and-librosa-voiced",
+});
+const M3PLUS_RUNTIME_THRESHOLDS = Object.freeze({
+  pitchToleranceCents: 50,
+  maxSpreadCentsP95P05: 80,
+  maxIqrCents: 80,
+  minTotalFrameCount: 12,
+  minVoicedFrameCount: 12,
+  minVoicedFrameRatio: 0.7,
+  glissandoTargetTailFraction: 0.35,
+});
+const M3PLUS_PROTECTED_EXACT_MARKINGS = new Set([
+  "delayed-turn",
+  "inverted-delayed-turn",
+  "inverted-mordent",
+  "inverted-turn",
+  "mordent",
+  "ornament",
+  "ornaments",
+  "shake",
+  "schleifer",
+  "trill",
+  "trill-mark",
+  "turn",
+]);
+const M3PLUS_GLISSANDO_MARKINGS = new Set(["gliss", "glissando", "portamento", "slide"]);
 
 export const WESTERN_ALIGNMENT_METHOD_PREFERENCE = [
   "parangonar-basic-pitch",
@@ -451,6 +496,146 @@ function buildCandidateNoteIdentityRows(candidateRows) {
   }));
 }
 
+function normalizeM3PlusMarkings(value) {
+  const source = Array.isArray(value) ? value : (value === null || value === undefined ? [] : [value]);
+  return [...new Set(source
+    .map((item) => safeString(item).trim().toLowerCase())
+    .filter(Boolean))].sort();
+}
+
+function m3plusProtectedMarkings(techniques, notations) {
+  const markings = [...new Set([
+    ...normalizeM3PlusMarkings(techniques),
+    ...normalizeM3PlusMarkings(notations),
+  ])].sort();
+  return markings.filter((marking) => (
+    M3PLUS_PROTECTED_EXACT_MARKINGS.has(marking)
+    || marking.includes("harmonic")
+    || marking.includes("ornament")
+    || marking.includes("trill")
+    || marking.includes("mordent")
+    || marking.endsWith("-turn")
+  ));
+}
+
+function m3plusHasGlissandoMarking(techniques, notations) {
+  const markings = [...new Set([
+    ...normalizeM3PlusMarkings(techniques),
+    ...normalizeM3PlusMarkings(notations),
+  ])];
+  return markings.some((marking) => M3PLUS_GLISSANDO_MARKINGS.has(marking) || marking.includes("gliss"));
+}
+
+function buildScoreM3PlusNoteIdentityRows(score) {
+  const notes = [];
+  let order = 0;
+  for (const section of score?.sections || []) {
+    for (const note of section?.notes || []) {
+      const midi = safeNumber(note?.midiPitch, -1);
+      if (midi <= 0) continue;
+      const sourceMeasureIndex = Math.round(safeNumber(note?.measureIndex, 0));
+      const position = note?.notePosition && typeof note.notePosition === "object"
+        ? note.notePosition
+        : {};
+      notes.push({
+        order,
+        pageNumber: Math.round(safeNumber(position.pageNumber, 0)),
+        sourceMeasureIndex,
+        noteId: safeString(note?.noteId || `note-${order}`).trim(),
+        sectionId: safeString(section?.sectionId).trim(),
+        measureIndex: Math.round(safeNumber(position.globalMeasureIndex, sourceMeasureIndex)),
+        beatStart: safeNumber(note?.beatStart, 0),
+        beatDuration: Math.max(0.05, safeNumber(note?.beatDuration, 1)),
+        midi: Math.round(midi),
+        scoreArticulations: normalizeM3PlusMarkings(note?.articulations),
+        scoreTechniques: normalizeM3PlusMarkings(note?.techniques),
+        scoreNotations: normalizeM3PlusMarkings(note?.notations),
+      });
+      order += 1;
+    }
+  }
+  notes.sort((left, right) => (
+    left.pageNumber - right.pageNumber
+    || left.sourceMeasureIndex - right.sourceMeasureIndex
+    || left.beatStart - right.beatStart
+    || left.order - right.order
+  ));
+  const onsetCounts = new Map();
+  for (const note of notes) {
+    const key = `${note.sectionId}\u0000${note.sourceMeasureIndex}\u0000${note.beatStart.toFixed(6)}`;
+    onsetCounts.set(key, (onsetCounts.get(key) || 0) + 1);
+  }
+  for (const [index, note] of notes.entries()) {
+    const key = `${note.sectionId}\u0000${note.sourceMeasureIndex}\u0000${note.beatStart.toFixed(6)}`;
+    note.onsetGroupSize = onsetCounts.get(key) || 1;
+    note.polyphonicScoreRegion = note.onsetGroupSize > 1;
+    note.glissandoTargetMidi = null;
+    note.glissandoTargetNoteId = null;
+    if (!m3plusHasGlissandoMarking(note.scoreTechniques, note.scoreNotations)) continue;
+    const previous = notes[index - 1];
+    const previousIsSameGlissando = Boolean(
+      previous
+      && previous.sectionId === note.sectionId
+      && previous.sourceMeasureIndex === note.sourceMeasureIndex
+      && m3plusHasGlissandoMarking(previous.scoreTechniques, previous.scoreNotations)
+    );
+    const target = notes[index + 1];
+    if (previousIsSameGlissando || !target) continue;
+    const targetIsSameMarkedPhrase = target.sectionId === note.sectionId
+      && target.sourceMeasureIndex === note.sourceMeasureIndex
+      && target.beatStart > note.beatStart
+      && target.midi !== note.midi
+      && m3plusHasGlissandoMarking(target.scoreTechniques, target.scoreNotations);
+    if (targetIsSameMarkedPhrase) {
+      note.glissandoTargetMidi = target.midi;
+      note.glissandoTargetNoteId = target.noteId;
+    }
+  }
+  return notes.map((note, noteIndex) => ({
+    noteIndex,
+    noteId: note.noteId,
+    sectionId: note.sectionId,
+    measureIndex: note.measureIndex,
+    beatStart: note.beatStart,
+    beatDuration: note.beatDuration,
+    midi: note.midi,
+    scoreArticulations: note.scoreArticulations,
+    scoreTechniques: note.scoreTechniques,
+    scoreNotations: note.scoreNotations,
+    onsetGroupSize: note.onsetGroupSize,
+    polyphonicScoreRegion: note.polyphonicScoreRegion,
+    glissandoTargetMidi: note.glissandoTargetMidi,
+    glissandoTargetNoteId: note.glissandoTargetNoteId,
+  }));
+}
+
+function buildCandidateM3PlusNoteIdentityRows(candidateRows) {
+  return (Array.isArray(candidateRows) ? candidateRows : []).map((candidate) => ({
+    noteIndex: Number.isInteger(candidate?.noteIndex) ? candidate.noteIndex : null,
+    noteId: safeString(candidate?.noteId).trim(),
+    sectionId: safeString(candidate?.sectionId).trim(),
+    measureIndex: Number.isInteger(candidate?.measureIndex) ? candidate.measureIndex : null,
+    beatStart: typeof candidate?.beatStart === "number" && Number.isFinite(candidate.beatStart)
+      ? candidate.beatStart
+      : null,
+    beatDuration: typeof candidate?.beatDuration === "number" && Number.isFinite(candidate.beatDuration)
+      ? candidate.beatDuration
+      : null,
+    midi: Number.isInteger(candidate?.midi) ? candidate.midi : null,
+    scoreArticulations: normalizeM3PlusMarkings(candidate?.scoreArticulations),
+    scoreTechniques: normalizeM3PlusMarkings(candidate?.scoreTechniques),
+    scoreNotations: normalizeM3PlusMarkings(candidate?.scoreNotations),
+    onsetGroupSize: Number.isInteger(candidate?.onsetGroupSize) ? candidate.onsetGroupSize : null,
+    polyphonicScoreRegion: candidate?.polyphonicScoreRegion === true,
+    glissandoTargetMidi: Number.isInteger(candidate?.glissandoTargetMidi)
+      ? candidate.glissandoTargetMidi
+      : null,
+    glissandoTargetNoteId: candidate?.glissandoTargetNoteId === null
+      ? null
+      : safeString(candidate?.glissandoTargetNoteId).trim() || null,
+  }));
+}
+
 function noteIdentityRowsSha256(rows) {
   return crypto.createHash("sha256").update(canonicalJson(rows), "utf8").digest("hex");
 }
@@ -485,8 +670,10 @@ async function verifyScoreProvenance(repoRoot, provenance, expectedScoreId) {
     ? crypto.createHash("sha256").update(canonicalJson(score), "utf8").digest("hex")
     : "";
   const expectedNotes = score ? buildScoreNoteIdentityRows(score) : [];
+  const expectedM3PlusNotes = score ? buildScoreM3PlusNoteIdentityRows(score) : [];
   const noteCount = expectedNotes.length;
   const noteIdentitySha256 = noteIdentityRowsSha256(expectedNotes);
+  const m3plusPitchSafetyNoteIdentitySha256 = noteIdentityRowsSha256(expectedM3PlusNotes);
   const reportedSource = safeString(provenance?.scoreStorePath).trim().replace(/\\/g, "/");
   const expectedSource = path.relative(repoRoot, sourcePath).replace(/\\/g, "/");
   if (provenance?.scoreId !== scoreId) blockingReasons.push("ordinary-upload-score-provenance-id-mismatch");
@@ -513,8 +700,396 @@ async function verifyScoreProvenance(repoRoot, provenance, expectedScoreId) {
       scoreStoreArtifactSha256,
       noteCount,
       noteIdentitySha256,
+      m3plusPitchSafetyNoteIdentitySha256,
     },
     expectedNotes,
+    expectedM3PlusNotes,
+  };
+}
+
+async function verifyM3PlusRuntimeBindings(repoRoot, descriptor) {
+  const blockingReasons = [];
+  const descriptorValue = descriptor && typeof descriptor === "object" && !Array.isArray(descriptor)
+    ? descriptor
+    : null;
+  const descriptorReady = Boolean(
+    descriptorValue
+    && descriptorValue.evaluationContract === M3PLUS_EVALUATION_CONTRACT
+    && descriptorValue.runtimeContract === M3PLUS_RUNTIME_CONTRACT
+    && descriptorValue.policyVersion === M3PLUS_RUNTIME_POLICY_VERSION
+    && descriptorValue.f0Backend === M3PLUS_F0_BACKEND
+    && descriptorValue.policySemanticSha256 === M3PLUS_RUNTIME_POLICY_SEMANTIC_SHA256
+    && canonicalJson(descriptorValue.thresholds || {}) === canonicalJson(M3PLUS_RUNTIME_THRESHOLDS)
+    && descriptorValue.analyzerArtifactPath === M3PLUS_ANALYZER_SOURCE
+    && /^[a-f0-9]{64}$/.test(safeString(descriptorValue.analyzerArtifactSha256).trim().toLowerCase())
+    && descriptorValue.analyzerArtifactSemanticSha256 === M3PLUS_ANALYZER_ARTIFACT_SEMANTIC_SHA256
+    && canonicalJson(descriptorValue.pyinRuntime || {}) === canonicalJson(M3PLUS_PYIN_RUNTIME_DESCRIPTOR)
+    && descriptorValue.reviewOnly === true
+    && descriptorValue.feedbackAuthorized === false
+    && descriptorValue.studentFacing === false
+  );
+  if (!descriptorReady) blockingReasons.push("m3plus-runtime-policy-descriptor-invalid");
+
+  const policyPath = path.join(SOURCE_ROOT, M3PLUS_RUNTIME_POLICY_SOURCE);
+  let policyArtifactSha256 = "";
+  let policyArtifactSemanticSha256 = "";
+  try {
+    const policyBytes = await fs.readFile(policyPath);
+    policyArtifactSha256 = crypto.createHash("sha256").update(policyBytes).digest("hex");
+    policyArtifactSemanticSha256 = crypto.createHash("sha256")
+      .update(policyBytes.toString("utf8").replace(/\r\n/g, "\n"), "utf8")
+      .digest("hex");
+    if (policyArtifactSemanticSha256 !== M3PLUS_RUNTIME_POLICY_ARTIFACT_SHA256) {
+      blockingReasons.push("m3plus-runtime-policy-artifact-sha-mismatch");
+    }
+  } catch {
+    blockingReasons.push("m3plus-runtime-policy-artifact-unreadable");
+  }
+
+  const analyzerPath = path.join(SOURCE_ROOT, M3PLUS_ANALYZER_SOURCE);
+  let analyzerArtifactSha256 = "";
+  let analyzerArtifactSemanticSha256 = "";
+  try {
+    const analyzerBytes = await fs.readFile(analyzerPath);
+    analyzerArtifactSha256 = crypto.createHash("sha256").update(analyzerBytes).digest("hex");
+    analyzerArtifactSemanticSha256 = crypto.createHash("sha256")
+      .update(analyzerBytes.toString("utf8").replace(/\r\n/g, "\n"), "utf8")
+      .digest("hex");
+    if (analyzerArtifactSha256 !== safeString(descriptorValue?.analyzerArtifactSha256).trim().toLowerCase()) {
+      blockingReasons.push("m3plus-runtime-analyzer-artifact-raw-sha-mismatch");
+    }
+    if (analyzerArtifactSemanticSha256 !== M3PLUS_ANALYZER_ARTIFACT_SEMANTIC_SHA256
+        || analyzerArtifactSemanticSha256 !== descriptorValue?.analyzerArtifactSemanticSha256) {
+      blockingReasons.push("m3plus-runtime-analyzer-artifact-code-anchor-mismatch");
+    }
+  } catch {
+    blockingReasons.push("m3plus-runtime-analyzer-artifact-unreadable");
+  }
+
+  const rescopeReportPath = path.join(
+    repoRoot,
+    "data",
+    "experiments",
+    "western-strings-m3plus",
+    "rescope-gate",
+    "report.json",
+  );
+  let rescopeReportSha256 = "";
+  let rescopeReleaseGateReady = false;
+  try {
+    const bytes = await fs.readFile(rescopeReportPath);
+    rescopeReportSha256 = crypto.createHash("sha256").update(bytes).digest("hex");
+    const report = JSON.parse(bytes.toString("utf8"));
+    if (report?.schemaVersion !== 2 || report?.contract !== M3PLUS_EVALUATION_CONTRACT) {
+      blockingReasons.push("m3plus-runtime-rescope-report-contract-invalid");
+    }
+    rescopeReleaseGateReady = report?.releaseGateReady === true;
+  } catch {
+    blockingReasons.push("m3plus-runtime-rescope-report-unreadable");
+  }
+  return {
+    ready: blockingReasons.length === 0,
+    blockingReasons: [...new Set(blockingReasons)],
+    descriptorReady,
+    policyArtifactPath: M3PLUS_RUNTIME_POLICY_SOURCE,
+    policyArtifactSha256,
+    policyArtifactSemanticSha256,
+    analyzerArtifactPath: M3PLUS_ANALYZER_SOURCE,
+    analyzerArtifactSha256,
+    analyzerArtifactSemanticSha256,
+    pyinRuntime: { ...M3PLUS_PYIN_RUNTIME_DESCRIPTOR },
+    rescopeReportPath: path.relative(repoRoot, rescopeReportPath).replace(/\\/g, "/"),
+    rescopeReportSha256,
+    rescopeReleaseGateReady,
+  };
+}
+
+function m3plusEvidenceNumber(evidence, key, errors, { integer = false, min = null, max = null } = {}) {
+  if (!Object.hasOwn(evidence, key)) {
+    errors.push(`m3plus-runtime-evidence-field-missing:${key}`);
+    return null;
+  }
+  if (evidence[key] === null) return null;
+  const value = evidence[key];
+  if (typeof value !== "number" || !Number.isFinite(value) || (integer && !Number.isInteger(value))) {
+    errors.push(`m3plus-runtime-evidence-field-invalid:${key}`);
+    return null;
+  }
+  if (min !== null && value < min) errors.push(`m3plus-runtime-evidence-field-below-minimum:${key}`);
+  if (max !== null && value > max) errors.push(`m3plus-runtime-evidence-field-above-maximum:${key}`);
+  return value;
+}
+
+function evaluateM3PlusRuntimeEvidence(candidate = {}, expectedScoreNote = null) {
+  const evidence = candidate?.m3plusPitchSafetyEvidence;
+  const errors = [];
+  if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) {
+    return {
+      contractValid: false,
+      decision: "insufficient_evidence",
+      reason: "m3plus-runtime-evidence-missing",
+      zone: "unknown",
+      accusationIssued: false,
+      reviewOnly: true,
+      feedbackAuthorized: false,
+      studentFacing: false,
+      blockingReasons: ["m3plus-runtime-evidence-missing"],
+    };
+  }
+  if (!expectedScoreNote) errors.push("m3plus-runtime-score-note-missing");
+  if (evidence.evaluationContract !== M3PLUS_EVALUATION_CONTRACT) {
+    errors.push("m3plus-runtime-evaluation-contract-mismatch");
+  }
+  if (evidence.runtimeContract !== M3PLUS_RUNTIME_CONTRACT) {
+    errors.push("m3plus-runtime-contract-mismatch");
+  }
+  if (evidence.policyVersion !== M3PLUS_RUNTIME_POLICY_VERSION) {
+    errors.push("m3plus-runtime-policy-version-mismatch");
+  }
+  if (evidence.policySemanticSha256 !== M3PLUS_RUNTIME_POLICY_SEMANTIC_SHA256) {
+    errors.push("m3plus-runtime-policy-semantic-sha-mismatch");
+  }
+  if (evidence.f0Backend !== M3PLUS_F0_BACKEND) errors.push("m3plus-runtime-f0-backend-mismatch");
+  if (canonicalJson(evidence.thresholds || {}) !== canonicalJson(M3PLUS_RUNTIME_THRESHOLDS)) {
+    errors.push("m3plus-runtime-thresholds-mismatch");
+  }
+  if (evidence.reviewOnly !== true
+      || evidence.feedbackAuthorized !== false
+      || evidence.studentFacing !== false
+      || candidate.feedbackAuthorized !== false
+      || candidate.studentFacing !== false) {
+    errors.push("m3plus-runtime-review-only-state-invalid");
+  }
+  for (const forbidden of ["expectedBehavior", "evaluationSplit", "humanGold", "goldLabel"]) {
+    if (Object.hasOwn(evidence, forbidden)) errors.push(`m3plus-runtime-gold-dependent-field-forbidden:${forbidden}`);
+  }
+
+  const expectedTechniques = expectedScoreNote?.scoreTechniques || [];
+  const expectedNotations = expectedScoreNote?.scoreNotations || [];
+  const expectedArticulations = expectedScoreNote?.scoreArticulations || [];
+  if (canonicalJson(normalizeM3PlusMarkings(candidate.scoreTechniques)) !== canonicalJson(expectedTechniques)
+      || canonicalJson(normalizeM3PlusMarkings(candidate.scoreNotations)) !== canonicalJson(expectedNotations)
+      || canonicalJson(normalizeM3PlusMarkings(candidate.scoreArticulations)) !== canonicalJson(expectedArticulations)
+      || canonicalJson(normalizeM3PlusMarkings(evidence.scoreTechniques)) !== canonicalJson(expectedTechniques)
+      || canonicalJson(normalizeM3PlusMarkings(evidence.scoreNotations)) !== canonicalJson(expectedNotations)) {
+    errors.push("m3plus-runtime-score-marking-mismatch");
+  }
+  if (candidate.polyphonicScoreRegion !== expectedScoreNote?.polyphonicScoreRegion
+      || evidence.polyphonicScoreRegion !== expectedScoreNote?.polyphonicScoreRegion
+      || candidate.onsetGroupSize !== expectedScoreNote?.onsetGroupSize
+      || candidate.glissandoTargetMidi !== expectedScoreNote?.glissandoTargetMidi
+      || candidate.glissandoTargetNoteId !== expectedScoreNote?.glissandoTargetNoteId) {
+    errors.push("m3plus-runtime-score-context-mismatch");
+  }
+
+  const protectedMarkings = m3plusProtectedMarkings(expectedTechniques, expectedNotations);
+  const glissandoMarked = m3plusHasGlissandoMarking(expectedTechniques, expectedNotations);
+  if (canonicalJson(normalizeM3PlusMarkings(evidence.protectedMarkings)) !== canonicalJson(protectedMarkings)
+      || evidence.glissandoMarked !== glissandoMarked
+      || evidence.glissandoTargetMidi !== expectedScoreNote?.glissandoTargetMidi) {
+    errors.push("m3plus-runtime-zone-marker-derivation-mismatch");
+  }
+  if (typeof evidence.timingAssignmentAvailable !== "boolean"
+      || evidence.timingAssignmentAvailable !== candidate.m3plusTimingAssignmentAvailable) {
+    errors.push("m3plus-runtime-timing-assignment-state-invalid");
+  }
+
+  const windowStart = m3plusEvidenceNumber(evidence, "windowStartSeconds", errors);
+  const windowEnd = m3plusEvidenceNumber(evidence, "windowEndSeconds", errors);
+  const totalFrames = m3plusEvidenceNumber(evidence, "totalFrameCount", errors, { integer: true, min: 0 });
+  const voicedFrames = m3plusEvidenceNumber(evidence, "voicedFrameCount", errors, { integer: true, min: 0 });
+  const voicedRatio = m3plusEvidenceNumber(evidence, "voicedFrameRatio", errors, { min: 0, max: 1 });
+  const medianMidi = m3plusEvidenceNumber(evidence, "medianObservedMidi", errors);
+  const centerError = m3plusEvidenceNumber(evidence, "centerErrorCents", errors);
+  const spread = m3plusEvidenceNumber(evidence, "spreadCentsP95P05", errors, { min: 0 });
+  const iqr = m3plusEvidenceNumber(evidence, "iqrCents", errors, { min: 0 });
+  const targetMidi = m3plusEvidenceNumber(evidence, "targetMidi", errors, { integer: true });
+  if (totalFrames !== null && voicedFrames !== null && voicedFrames > totalFrames) {
+    errors.push("m3plus-runtime-voiced-frame-count-exceeds-total");
+  }
+  if (totalFrames !== null && voicedFrames !== null && voicedRatio !== null) {
+    const expectedRatio = totalFrames > 0 ? voicedFrames / totalFrames : 0;
+    if (Math.abs(expectedRatio - voicedRatio) > 0.000001) {
+      errors.push("m3plus-runtime-voiced-frame-ratio-inconsistent");
+    }
+  }
+  const windowAvailable = windowStart !== null
+    && windowEnd !== null
+    && windowEnd > windowStart
+    && totalFrames !== null
+    && totalFrames > 0;
+  if (evidence.windowAvailable !== windowAvailable) errors.push("m3plus-runtime-window-state-inconsistent");
+
+  const expectedTargetMidi = !protectedMarkings.length
+    && glissandoMarked
+    && expectedScoreNote?.glissandoTargetMidi !== null
+    ? expectedScoreNote.glissandoTargetMidi
+    : expectedScoreNote?.midi;
+  if (targetMidi !== expectedTargetMidi) errors.push("m3plus-runtime-target-midi-mismatch");
+  if (medianMidi !== null && targetMidi !== null && centerError !== null) {
+    const expectedError = (medianMidi - targetMidi) * 100;
+    if (Math.abs(expectedError - centerError) > 0.0001) {
+      errors.push("m3plus-runtime-center-error-inconsistent");
+    }
+  } else if ((medianMidi === null || targetMidi === null) && centerError !== null) {
+    errors.push("m3plus-runtime-center-error-without-input");
+  }
+
+  const highDispersion = Boolean(
+    (spread !== null && spread > M3PLUS_RUNTIME_THRESHOLDS.maxSpreadCentsP95P05)
+    || (iqr !== null && iqr > M3PLUS_RUNTIME_THRESHOLDS.maxIqrCents)
+  );
+  let expectedZone = protectedMarkings.length ? "score_marked_neutral" : "stable_center";
+  let expectedWindowKind = "stable-center";
+  if (!protectedMarkings.length && glissandoMarked) {
+    expectedZone = "glissando_target_tail";
+    expectedWindowKind = "glissando-target-tail";
+  }
+  let expectedDecision = "insufficient_evidence";
+  let expectedReason = "pitch-safety-evidence-not-ready";
+  if (protectedMarkings.length) {
+    expectedReason = "score-marked-region-neutralized";
+  } else if (expectedScoreNote?.polyphonicScoreRegion) {
+    expectedZone = "multi_f0_review_only";
+    expectedReason = "polyphonic-score-region-requires-multi-f0";
+  } else if (glissandoMarked && expectedScoreNote?.glissandoTargetMidi === null) {
+    expectedReason = "glissando-target-unavailable";
+  } else if (evidence.timingAssignmentAvailable !== true) {
+    expectedReason = "timing-assignment-missing";
+  } else if (!windowAvailable) {
+    expectedReason = "pitch-window-missing";
+  } else if (totalFrames < M3PLUS_RUNTIME_THRESHOLDS.minTotalFrameCount) {
+    expectedReason = "pitch-window-frame-count-below-floor";
+  } else if (voicedFrames < M3PLUS_RUNTIME_THRESHOLDS.minVoicedFrameCount) {
+    expectedReason = "voiced-frame-count-below-floor";
+  } else if (voicedRatio === null || voicedRatio < M3PLUS_RUNTIME_THRESHOLDS.minVoicedFrameRatio) {
+    expectedReason = "voiced-frame-ratio-below-floor";
+  } else if (medianMidi === null) {
+    expectedReason = "center-pitch-missing";
+  } else if (spread === null || iqr === null) {
+    expectedReason = "pitch-dispersion-missing";
+  } else if (highDispersion) {
+    expectedReason = "pitch-dispersion-too-high";
+  } else if (centerError === null) {
+    expectedReason = "center-pitch-error-missing";
+  } else if (Math.abs(centerError) > M3PLUS_RUNTIME_THRESHOLDS.pitchToleranceCents) {
+    expectedDecision = "issue_detected";
+    expectedReason = "center-pitch-outside-tolerance";
+  } else {
+    expectedDecision = "confirmed_center";
+    expectedReason = "center-pitch-within-tolerance";
+  }
+  if (evidence.zone !== expectedZone
+      || evidence.analysisWindowKind !== expectedWindowKind
+      || evidence.decision !== expectedDecision
+      || evidence.reason !== expectedReason
+      || evidence.accusationIssued !== (expectedDecision === "issue_detected")
+      || evidence.highDispersion !== highDispersion) {
+    errors.push("m3plus-runtime-policy-decision-mismatch");
+  }
+  const contractValid = errors.length === 0;
+  return {
+    contractValid,
+    evaluationContract: M3PLUS_EVALUATION_CONTRACT,
+    runtimeContract: M3PLUS_RUNTIME_CONTRACT,
+    policyVersion: M3PLUS_RUNTIME_POLICY_VERSION,
+    policySemanticSha256: M3PLUS_RUNTIME_POLICY_SEMANTIC_SHA256,
+    zone: contractValid ? expectedZone : "unknown",
+    decision: contractValid ? expectedDecision : "insufficient_evidence",
+    reason: contractValid ? expectedReason : "m3plus-runtime-evidence-invalid",
+    accusationIssued: contractValid && expectedDecision === "issue_detected",
+    highDispersion: contractValid && highDispersion,
+    reviewOnly: true,
+    feedbackAuthorized: false,
+    studentFacing: false,
+    blockingReasons: [...new Set(errors)],
+  };
+}
+
+export function buildM3PlusPitchSafetyReviewRuntime(candidateRows = [], {
+  scoreVerification = null,
+  runtimeBindings = null,
+} = {}) {
+  const inputRows = Array.isArray(candidateRows) ? candidateRows : [];
+  const expectedRows = Array.isArray(scoreVerification?.expectedM3PlusNotes)
+    ? scoreVerification.expectedM3PlusNotes
+    : [];
+  const candidateIdentityRows = buildCandidateM3PlusNoteIdentityRows(inputRows);
+  const expectedIdentitySha256 = noteIdentityRowsSha256(expectedRows);
+  const candidateIdentitySha256 = noteIdentityRowsSha256(candidateIdentityRows);
+  const scoreSafetyIdentityReady = scoreVerification?.verified === true
+    && inputRows.length > 0
+    && inputRows.length === expectedRows.length
+    && canonicalJson(candidateIdentityRows) === canonicalJson(expectedRows)
+    && expectedIdentitySha256 === candidateIdentitySha256;
+  const rows = inputRows.map((candidate, index) => ({
+    ...candidate,
+    m3plusPitchSafetyDecision: evaluateM3PlusRuntimeEvidence(candidate, expectedRows[index]),
+    feedbackAuthorized: false,
+    studentFacing: false,
+  }));
+  const validEvidenceCount = rows.filter((row) => row.m3plusPitchSafetyDecision.contractValid).length;
+  const invalidEvidenceCount = rows.length - validEvidenceCount;
+  const runtimeEvidenceReady = rows.length > 0
+    && invalidEvidenceCount === 0
+    && scoreSafetyIdentityReady
+    && runtimeBindings?.ready === true;
+  const decisionCounts = {};
+  const zoneCounts = {};
+  for (const row of rows) {
+    const evidence = row.m3plusPitchSafetyEvidence || {};
+    const decision = safeString(evidence.decision, "unknown");
+    const zone = safeString(evidence.zone, "unknown");
+    decisionCounts[decision] = (decisionCounts[decision] || 0) + 1;
+    zoneCounts[zone] = (zoneCounts[zone] || 0) + 1;
+  }
+  const blockingReasons = [
+    "m3plus-runtime-review-only",
+    "m3plus-runtime-authorization-closed",
+    !scoreSafetyIdentityReady ? "m3plus-runtime-score-safety-identity-mismatch" : "",
+    invalidEvidenceCount > 0 ? "m3plus-runtime-candidate-evidence-invalid" : "",
+    ...(runtimeBindings?.blockingReasons || []),
+  ].filter(Boolean);
+  return {
+    rows,
+    gate: {
+      evaluationContract: M3PLUS_EVALUATION_CONTRACT,
+      runtimeContract: M3PLUS_RUNTIME_CONTRACT,
+      policyVersion: M3PLUS_RUNTIME_POLICY_VERSION,
+      policySemanticSha256: M3PLUS_RUNTIME_POLICY_SEMANTIC_SHA256,
+      policyArtifactPath: runtimeBindings?.policyArtifactPath || M3PLUS_RUNTIME_POLICY_SOURCE,
+      policyArtifactSha256: runtimeBindings?.policyArtifactSha256 || "",
+      policyArtifactSemanticSha256: runtimeBindings?.policyArtifactSemanticSha256 || "",
+      analyzerArtifactPath: runtimeBindings?.analyzerArtifactPath || M3PLUS_ANALYZER_SOURCE,
+      analyzerArtifactSha256: runtimeBindings?.analyzerArtifactSha256 || "",
+      analyzerArtifactSemanticSha256: runtimeBindings?.analyzerArtifactSemanticSha256 || "",
+      pyinRuntime: runtimeBindings?.pyinRuntime || { ...M3PLUS_PYIN_RUNTIME_DESCRIPTOR },
+      f0Backend: M3PLUS_F0_BACKEND,
+      thresholds: { ...M3PLUS_RUNTIME_THRESHOLDS },
+      reviewOnlyRuntimeWired: runtimeEvidenceReady,
+      runtimeFoundationReady: runtimeEvidenceReady,
+      runtimeEvidenceReady,
+      contractReady: runtimeEvidenceReady,
+      reviewOnly: true,
+      feedbackAuthorized: false,
+      authorizationReady: false,
+      studentGateReady: false,
+      studentFacing: false,
+      automaticAdoptionReady: false,
+      rescopeReportPath: runtimeBindings?.rescopeReportPath || "",
+      rescopeReportSha256: runtimeBindings?.rescopeReportSha256 || "",
+      rescopeReleaseGateReady: runtimeBindings?.rescopeReleaseGateReady === true,
+      expectedScoreNoteCount: expectedRows.length,
+      evaluatedCandidateCount: rows.length,
+      validEvidenceCount,
+      invalidEvidenceCount,
+      scoreSafetyIdentityReady,
+      scoreSafetyIdentitySha256: expectedIdentitySha256,
+      candidateScoreSafetyIdentitySha256: candidateIdentitySha256,
+      decisionCounts,
+      zoneCounts,
+      blockingReasons: [...new Set(blockingReasons)],
+    },
   };
 }
 
@@ -1629,9 +2204,10 @@ async function buildControlledBatchOfflineFeatureAnalysis(repoRoot, submission, 
       && typeof analysis.basicPitchCacheProvenance === "object"
       ? analysis.basicPitchCacheProvenance
       : null;
-    const [cacheArtifactVerification, scoreVerification] = await Promise.all([
+    const [cacheArtifactVerification, scoreVerification, m3plusRuntimeBindings] = await Promise.all([
       verifyBasicPitchCacheArtifact(repoRoot, basicPitchCacheProvenance, expectedAudioSha256),
       verifyScoreProvenance(repoRoot, analysis?.scoreProvenance, scoreId),
+      verifyM3PlusRuntimeBindings(repoRoot, analysis?.m3plusPitchSafetyRuntime),
     ]);
     const runtimeAttestationVerification = evaluateOrdinaryAudioRuntimeAttestation(
       analysis?.runtimeAttestation,
@@ -1645,8 +2221,15 @@ async function buildControlledBatchOfflineFeatureAnalysis(repoRoot, submission, 
       scoreVerification,
       runtimeAttestationVerification,
     });
-    const candidateGate = dynamicShadow.gate;
-    const gatedCandidateRows = dynamicShadow.rows;
+    const m3plusRuntime = buildM3PlusPitchSafetyReviewRuntime(dynamicShadow.rows, {
+      scoreVerification,
+      runtimeBindings: m3plusRuntimeBindings,
+    });
+    const candidateGate = {
+      ...dynamicShadow.gate,
+      m3plusPitchSafetyRuntime: m3plusRuntime.gate,
+    };
+    const gatedCandidateRows = m3plusRuntime.rows;
     const candidateRowsArtifact = await writeControlledSubmissionCandidateRows(repoRoot, {
       batchRunId,
       submissionId: submission.submissionId,
@@ -1679,6 +2262,12 @@ async function buildControlledBatchOfflineFeatureAnalysis(repoRoot, submission, 
         dynamicShadowScoreProvenanceReady: candidateGate.scoreProvenanceReady,
         dynamicShadowSelectedCandidateCount: candidateGate.shadowSelectedCandidateCount,
         dynamicShadowInvalidEvidenceCount: candidateGate.invalidEvidenceCount,
+        m3plusPitchSafetyRuntime: candidateGate.m3plusPitchSafetyRuntime,
+        m3plusReviewOnlyRuntimeWired:
+          candidateGate.m3plusPitchSafetyRuntime.reviewOnlyRuntimeWired === true,
+        m3plusRuntimeEvidenceReady:
+          candidateGate.m3plusPitchSafetyRuntime.runtimeEvidenceReady === true,
+        m3plusFeedbackAuthorized: false,
         confidenceModelVersion: safeString(candidateGate.rfTelemetry?.modelVersion),
         confidenceThreshold: candidateGate.rfTelemetry?.threshold ?? null,
       },

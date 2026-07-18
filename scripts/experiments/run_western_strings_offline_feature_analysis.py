@@ -6,6 +6,7 @@ import importlib.metadata
 import json
 import math
 import os
+import platform
 import shutil
 import sqlite3
 import statistics
@@ -29,6 +30,12 @@ from western_strings_dynamic_shadow_policy import (
     build_dynamic_shadow_evidence,
     empty_dynamic_features,
 )
+from western_strings_m3plus_runtime_policy import (
+    M3PLUS_GLISSANDO_TARGET_TAIL_FRACTION,
+    evaluate_m3plus_pitch_safety,
+    has_glissando_marking,
+    runtime_policy_descriptor,
+)
 
 
 RELATIVE_IOI_CONSISTENCY_LIMIT = 0.35
@@ -38,6 +45,19 @@ BASIC_PITCH_MODEL_ARTIFACT_SHA256 = "c6595f299ff83c52e89555789f7e3e829a6a0f25b6a
 ORDINARY_AUDIO_RUNTIME_ID = "western-ordinary-dynamic-shadow-audio-py311"
 ORDINARY_AUDIO_RUNTIME_CONFIG_SHA256 = "1f3a47f5cfe2b2d2e427be9a03ab43b4b4aa09a5db0edeed0b55e610a42ac6f9"
 ORDINARY_AUDIO_RUNTIME_LOCK_SHA256 = "4120a811da1ecb1aa93ceabcbb5aa0b45a37c08e5ee3138d2b793e38f2828d04"
+M3PLUS_ANALYZER_SOURCE = "scripts/experiments/run_western_strings_offline_feature_analysis.py"
+M3PLUS_PYIN_RUNTIME_DESCRIPTOR = {
+    "backend": "librosa-pyin",
+    "pythonVersion": "3.11.9",
+    "librosaVersion": "0.11.0",
+    "numpyVersion": "1.26.4",
+    "sampleRateHz": 22050,
+    "hopLength": 512,
+    "frameLength": 2048,
+    "fminNote": "C2",
+    "fmaxNote": "A7",
+    "voicedMask": "finite-f0-and-librosa-voiced",
+}
 
 
 def runtime_attestation_from_env() -> dict[str, Any]:
@@ -61,6 +81,25 @@ def runtime_attestation_from_env() -> dict[str, Any]:
         "modelArtifactSha256": model_sha256,
         "studentFacing": False,
         "automaticAdoptionAuthorized": False,
+    }
+
+
+def m3plus_analyzer_runtime_descriptor() -> dict[str, Any]:
+    analyzer_path = Path(__file__).resolve()
+    analyzer_bytes = analyzer_path.read_bytes()
+    observed_runtime = {
+        **M3PLUS_PYIN_RUNTIME_DESCRIPTOR,
+        "pythonVersion": platform.python_version(),
+        "librosaVersion": importlib.metadata.version("librosa"),
+        "numpyVersion": importlib.metadata.version("numpy"),
+    }
+    return {
+        "analyzerArtifactPath": M3PLUS_ANALYZER_SOURCE,
+        "analyzerArtifactSha256": hashlib.sha256(analyzer_bytes).hexdigest(),
+        "analyzerArtifactSemanticSha256": hashlib.sha256(
+            analyzer_bytes.replace(b"\r\n", b"\n")
+        ).hexdigest(),
+        "pyinRuntime": observed_runtime,
     }
 
 
@@ -117,6 +156,55 @@ def note_position(note: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def score_markings(value: Any) -> list[str]:
+    source = value if isinstance(value, (list, tuple, set)) else [value]
+    return sorted({str(item).strip().lower() for item in source if str(item or "").strip()})
+
+
+def annotate_m3plus_score_context(notes: list[dict[str, Any]]) -> None:
+    onset_groups: dict[tuple[str, int, float], list[dict[str, Any]]] = {}
+    for note in notes:
+        key = (
+            str(note.get("sectionId") or ""),
+            safe_int(note.get("measureIndex"), 0),
+            round(safe_float(note.get("beatStart"), 0.0) or 0.0, 6),
+        )
+        onset_groups.setdefault(key, []).append(note)
+    for group in onset_groups.values():
+        for note in group:
+            note["onsetGroupSize"] = len(group)
+            note["polyphonicScoreRegion"] = len(group) > 1
+
+    for index, note in enumerate(notes):
+        note["glissandoTargetMidi"] = None
+        note["glissandoTargetNoteId"] = None
+        if not has_glissando_marking(note.get("techniques"), note.get("notations")):
+            continue
+        if index == 0:
+            previous_is_same_glissando = False
+        else:
+            previous = notes[index - 1]
+            previous_is_same_glissando = bool(
+                previous.get("sectionId") == note.get("sectionId")
+                and previous.get("measureIndex") == note.get("measureIndex")
+                and has_glissando_marking(previous.get("techniques"), previous.get("notations"))
+            )
+        if previous_is_same_glissando or index + 1 >= len(notes):
+            continue
+        target = notes[index + 1]
+        same_measure = bool(
+            target.get("sectionId") == note.get("sectionId")
+            and target.get("measureIndex") == note.get("measureIndex")
+        )
+        target_is_marked = has_glissando_marking(target.get("techniques"), target.get("notations"))
+        later_beat = (safe_float(target.get("beatStart"), 0.0) or 0.0) > (
+            safe_float(note.get("beatStart"), 0.0) or 0.0
+        )
+        if same_measure and target_is_marked and later_beat and target.get("midi") != note.get("midi"):
+            note["glissandoTargetMidi"] = safe_int(target.get("midi"), 0) or None
+            note["glissandoTargetNoteId"] = target.get("noteId")
+
+
 def collect_score_notes(store: dict[str, Any], score_id: str) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     score = next((item for item in store.get("scores", []) if str(item.get("scoreId", "")).strip() == score_id), None)
     if not score:
@@ -147,6 +235,9 @@ def collect_score_notes(store: dict[str, Any], score_id: str) -> tuple[dict[str,
                     "tempo": tempo,
                     "measureQuarterSpan": measure_span,
                     "position": note_position(note),
+                    "articulations": score_markings(note.get("articulations")),
+                    "techniques": score_markings(note.get("techniques")),
+                    "notations": score_markings(note.get("notations")),
                 }
             )
             order += 1
@@ -156,6 +247,7 @@ def collect_score_notes(store: dict[str, Any], score_id: str) -> tuple[dict[str,
         safe_float(item.get("beatStart"), 0.0) or 0.0,
         safe_int(item.get("order"), 0),
     ))
+    annotate_m3plus_score_context(notes)
     return score, notes
 
 
@@ -705,6 +797,54 @@ def cents_error(observed_midi: float, target_midi: int) -> float:
     return float((observed_midi - target_midi) * 100.0)
 
 
+def summarize_pitch_window(
+    times: np.ndarray,
+    midi_track: np.ndarray,
+    window_start_seconds: float | None,
+    window_end_seconds: float | None,
+) -> dict[str, Any]:
+    start = safe_float(window_start_seconds)
+    end = safe_float(window_end_seconds)
+    if start is None or end is None or end <= start:
+        return {
+            "windowStartSeconds": start,
+            "windowEndSeconds": end,
+            "totalFrameCount": 0,
+            "voicedFrameCount": 0,
+            "voicedFrameRatio": 0.0,
+            "medianObservedMidi": None,
+            "spreadCentsP95P05": None,
+            "iqrCents": None,
+        }
+    mask = (times >= start) & (times <= end)
+    window_values = midi_track[mask]
+    total_count = int(window_values.size)
+    voiced = window_values[np.isfinite(window_values)]
+    voiced_count = int(voiced.size)
+    voiced_ratio = voiced_count / total_count if total_count else 0.0
+    if not voiced_count:
+        median_midi = None
+        spread = None
+        iqr = None
+    else:
+        percentile_5, percentile_25, median_midi, percentile_75, percentile_95 = np.percentile(
+            voiced,
+            [5, 25, 50, 75, 95],
+        )
+        spread = float((percentile_95 - percentile_5) * 100.0)
+        iqr = float((percentile_75 - percentile_25) * 100.0)
+    return {
+        "windowStartSeconds": round(start, 6),
+        "windowEndSeconds": round(end, 6),
+        "totalFrameCount": total_count,
+        "voicedFrameCount": voiced_count,
+        "voicedFrameRatio": round(voiced_ratio, 6),
+        "medianObservedMidi": round(float(median_midi), 6) if median_midi is not None else None,
+        "spreadCentsP95P05": round(spread, 6) if spread is not None else None,
+        "iqrCents": round(iqr, 6) if iqr is not None else None,
+    }
+
+
 def build_decisions(
     notes: list[dict[str, Any]],
     times: np.ndarray,
@@ -762,19 +902,62 @@ def build_decisions(
             if stable_end <= stable_start:
                 stable_start, stable_end = event_start, event_end
             measurement_time = (stable_start + stable_end) / 2.0
-            window = (times >= stable_start) & (times <= stable_end)
+            window_start = stable_start
+            window_end = stable_end
         elif predicted_onset is not None:
             measurement_time = predicted_onset
-            window = np.abs(times - predicted_onset) <= 0.18
+            window_start = predicted_onset - 0.18
+            window_end = predicted_onset + 0.18
         else:
             measurement_time = None
-            window = np.zeros_like(times, dtype=bool)
-        observed = midi_track[window]
-        observed = observed[np.isfinite(observed)]
-        voiced_frames = int(observed.size)
-        median_midi = float(np.median(observed)) if voiced_frames else None
+            window_start = None
+            window_end = None
+        pitch_window = summarize_pitch_window(times, midi_track, window_start, window_end)
+        voiced_frames = int(pitch_window["voicedFrameCount"])
+        median_midi = safe_float(pitch_window["medianObservedMidi"])
         cents = cents_error(median_midi, safe_int(note.get("midi"), 0)) if median_midi is not None else None
         support = bool(voiced_frames >= 2 and cents is not None and abs(cents) <= 80.0)
+        glissando_target_midi = safe_int(note.get("glissandoTargetMidi"), 0) or None
+        if assignment is not None and glissando_target_midi is not None:
+            target_tail_start = event_end - (event_duration * M3PLUS_GLISSANDO_TARGET_TAIL_FRACTION)
+            target_tail_end = event_end
+        else:
+            target_tail_start = None
+            target_tail_end = None
+        glissando_target_tail = {
+            "targetNoteId": note.get("glissandoTargetNoteId"),
+            "targetMidi": glissando_target_midi,
+            **summarize_pitch_window(
+                times,
+                midi_track,
+                target_tail_start,
+                target_tail_end,
+            ),
+        }
+        m3plus_evidence = evaluate_m3plus_pitch_safety(
+            score_midi=safe_int(note.get("midi"), 0),
+            score_techniques=note.get("techniques"),
+            score_notations=note.get("notations"),
+            timing_assignment_available=bool(timing_assignments is not None and assignment is not None),
+            window_start_seconds=pitch_window["windowStartSeconds"],
+            window_end_seconds=pitch_window["windowEndSeconds"],
+            total_frame_count=pitch_window["totalFrameCount"],
+            voiced_frame_count=pitch_window["voicedFrameCount"],
+            voiced_frame_ratio=pitch_window["voicedFrameRatio"],
+            median_observed_midi=pitch_window["medianObservedMidi"],
+            spread_cents_p95_p05=pitch_window["spreadCentsP95P05"],
+            iqr_cents=pitch_window["iqrCents"],
+            polyphonic_score_region=bool(note.get("polyphonicScoreRegion")),
+            glissando_target_midi=glissando_target_tail["targetMidi"],
+            target_tail_window_start_seconds=glissando_target_tail["windowStartSeconds"],
+            target_tail_window_end_seconds=glissando_target_tail["windowEndSeconds"],
+            target_tail_total_frame_count=glissando_target_tail["totalFrameCount"],
+            target_tail_voiced_frame_count=glissando_target_tail["voicedFrameCount"],
+            target_tail_voiced_frame_ratio=glissando_target_tail["voicedFrameRatio"],
+            target_tail_median_observed_midi=glissando_target_tail["medianObservedMidi"],
+            target_tail_spread_cents_p95_p05=glissando_target_tail["spreadCentsP95P05"],
+            target_tail_iqr_cents=glissando_target_tail["iqrCents"],
+        )
         decisions.append(
             {
                 "noteId": note["noteId"],
@@ -783,12 +966,22 @@ def build_decisions(
                 "measureIndex": note["position"].get("measureIndex") or note.get("measureIndex"),
                 "pageNumber": note["position"].get("pageNumber"),
                 "midi": note["midi"],
+                "beatStart": note.get("beatStart"),
+                "beatDuration": note.get("beatDuration"),
+                "scoreArticulations": list(note.get("articulations") or []),
+                "scoreTechniques": list(note.get("techniques") or []),
+                "scoreNotations": list(note.get("notations") or []),
+                "onsetGroupSize": safe_int(note.get("onsetGroupSize"), 1),
+                "polyphonicScoreRegion": bool(note.get("polyphonicScoreRegion")),
+                "glissandoTargetMidi": glissando_target_midi,
+                "glissandoTargetNoteId": note.get("glissandoTargetNoteId"),
                 "predictedOnsetSeconds": round(predicted_onset, 4) if predicted_onset is not None else None,
                 "autoDecision": "review_required",
                 "reviewRequiredReason": "offline-feature-analysis-review-only",
                 "confidenceScore": 0.0,
                 "evidence": {
                     "analysisMode": analysis_mode,
+                    **pitch_window,
                     "voicedFrameCount": voiced_frames,
                     "medianObservedMidi": round(median_midi, 4) if median_midi is not None else None,
                     "centsError": round(cents, 2) if cents is not None else None,
@@ -798,6 +991,8 @@ def build_decisions(
                     "basicPitchEventMidi": assignment.get("eventMidi") if assignment else None,
                     "basicPitchEventConfidence": round(float(assignment["confidence"]), 6) if assignment else None,
                     "basicPitchPitchDistanceSemitones": assignment.get("pitchDistanceSemitones") if assignment else None,
+                    "glissandoTargetTail": glissando_target_tail,
+                    "m3plusPitchSafetyEvidence": m3plus_evidence,
                     **relative_ioi[note_index],
                     "dynamicShadowEvidence": build_dynamic_shadow_evidence(
                         dynamic_features[note_index],
@@ -880,6 +1075,15 @@ def build_candidate_rows(decisions: list[dict[str, Any]]) -> list[dict[str, Any]
                 "measureIndex": decision.get("measureIndex"),
                 "pageNumber": decision.get("pageNumber"),
                 "midi": decision.get("midi"),
+                "beatStart": decision.get("beatStart"),
+                "beatDuration": decision.get("beatDuration"),
+                "scoreArticulations": list(decision.get("scoreArticulations") or []),
+                "scoreTechniques": list(decision.get("scoreTechniques") or []),
+                "scoreNotations": list(decision.get("scoreNotations") or []),
+                "onsetGroupSize": decision.get("onsetGroupSize"),
+                "polyphonicScoreRegion": bool(decision.get("polyphonicScoreRegion")),
+                "glissandoTargetMidi": decision.get("glissandoTargetMidi"),
+                "glissandoTargetNoteId": decision.get("glissandoTargetNoteId"),
                 "predictedOnsetSeconds": decision.get("predictedOnsetSeconds"),
                 "method": (
                     "basic-pitch-dtw-pyin-window"
@@ -887,11 +1091,20 @@ def build_candidate_rows(decisions: list[dict[str, Any]]) -> list[dict[str, Any]
                     else "pyin-linear-score-window"
                 ),
                 "analysisMode": evidence.get("analysisMode"),
+                "pitchWindowStartSeconds": evidence.get("windowStartSeconds"),
+                "pitchWindowEndSeconds": evidence.get("windowEndSeconds"),
+                "totalFrameCount": evidence.get("totalFrameCount"),
                 "voicedFrameCount": evidence.get("voicedFrameCount"),
+                "voicedFrameRatio": evidence.get("voicedFrameRatio"),
                 "medianObservedMidi": evidence.get("medianObservedMidi"),
                 "centsError": evidence.get("centsError"),
+                "spreadCentsP95P05": evidence.get("spreadCentsP95P05"),
+                "iqrCents": evidence.get("iqrCents"),
                 "pitchSupportWithin80Cents": bool(evidence.get("pitchSupportWithin80Cents")),
                 "timingAssignmentAvailable": bool(evidence.get("timingAssignmentAvailable")),
+                "m3plusTimingAssignmentAvailable": bool(
+                    evidence.get("m3plusPitchSafetyEvidence", {}).get("timingAssignmentAvailable")
+                ),
                 "pitchMeasurementTimeSeconds": evidence.get("pitchMeasurementTimeSeconds"),
                 "basicPitchEventMidi": evidence.get("basicPitchEventMidi"),
                 "basicPitchEventConfidence": evidence.get("basicPitchEventConfidence"),
@@ -901,9 +1114,12 @@ def build_candidate_rows(decisions: list[dict[str, Any]]) -> list[dict[str, Any]
                 "relativeIoiDeviationRatio": evidence.get("relativeIoiDeviationRatio"),
                 "relativeIoiConsistent": evidence.get("relativeIoiConsistent"),
                 "dynamicShadowEvidence": evidence.get("dynamicShadowEvidence"),
+                "glissandoTargetTail": evidence.get("glissandoTargetTail"),
+                "m3plusPitchSafetyEvidence": evidence.get("m3plusPitchSafetyEvidence"),
                 "autoDecision": "review_required",
                 "reviewRequiredReason": "offline-feature-analysis-review-only",
                 "studentSafeGateReady": False,
+                "feedbackAuthorized": False,
                 "studentFacing": False,
             }
         )
@@ -939,6 +1155,23 @@ def summarize(
         bool(item.get("evidence", {}).get("dynamicShadowEvidence", {}).get("selected"))
         for item in decisions
     )
+    m3plus_rows = [
+        item.get("evidence", {}).get("m3plusPitchSafetyEvidence")
+        for item in decisions
+        if isinstance(item.get("evidence", {}).get("m3plusPitchSafetyEvidence"), dict)
+    ]
+    m3plus_decision_counts = {
+        decision: sum(row.get("decision") == decision for row in m3plus_rows)
+        for decision in ("confirmed_center", "issue_detected", "insufficient_evidence")
+    }
+    m3plus_runtime = {
+        **runtime_policy_descriptor(),
+        **m3plus_analyzer_runtime_descriptor(),
+        "reviewOnlyRuntimeWired": True,
+        "contractReady": True,
+        "evidenceRowCount": len(m3plus_rows),
+        "decisionCounts": m3plus_decision_counts,
+    }
     return {
         "analysisMode": analysis_mode,
         "scoreId": score.get("scoreId"),
@@ -967,6 +1200,7 @@ def summarize(
         "measureCombinedReviewEvidenceReadyCount": measure_combined_ready,
         "measureCombinedReviewEvidenceCoverage": round(measure_combined_ready / len(measure_rows), 6) if measure_rows else 0.0,
         "medianAbsCents": round(statistics.median(cents_values), 2) if cents_values else None,
+        "m3plusPitchSafetyRuntime": m3plus_runtime,
         "studentSafeGateReady": False,
         "studentFacing": False,
     }
@@ -1077,6 +1311,7 @@ def main() -> int:
             "basicPitchCacheProvenance": basic_pitch_cache_provenance,
             "scoreProvenance": score_provenance,
             "runtimeAttestation": runtime_attestation,
+            "m3plusPitchSafetyRuntime": summary["m3plusPitchSafetyRuntime"],
         }
         if not args.summary_only:
             payload.update({
