@@ -1,0 +1,164 @@
+{
+  "contract": "western-m4a-real-photo-acceptance-policy-v1",
+  "evidenceClass": "frozen-real-screen-photo-acceptance",
+  "thresholds": {
+    "minimumPositivePhotos": 10,
+    "minimumPositivePassRate": 0.9,
+    "ownerMeasureBoxConfirmationRate": 1.0,
+    "minimumWrongEditionPhotos": 5,
+    "maximumWrongEditionLeakCount": 0,
+    "requiredPoorImageTransforms": [
+      "gaussian-blur",
+      "half-page-crop"
+    ],
+    "maximumPoorImageLeakCount": 0
+  },
+  "safety": {
+    "reviewRequired": true,
+    "studentFacing": false,
+    "automaticAdoptionAuthorized": false,
+    "omrAllowed": false
+  },
+  "positiveCaptureTasks": [
+    {
+      "caseId": "m4a-positive-01",
+      "pieceId": "r2-01",
+      "editionId": "self-authored-v1",
+      "photoPath": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-01.jpg",
+      "audioPath": "data/private/western-strings-round2/r2-01.m4a",
+      "captureVariant": "near-frontal"
+    },
+    {
+      "caseId": "m4a-positive-02",
+      "pieceId": "r2-01",
+      "editionId": "self-authored-v1",
+      "photoPath": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-02.jpg",
+      "audioPath": "data/private/western-strings-round2/r2-01.m4a",
+      "captureVariant": "left-perspective"
+    },
+    {
+      "caseId": "m4a-positive-03",
+      "pieceId": "r2-01",
+      "editionId": "self-authored-v1",
+      "photoPath": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-03.jpg",
+      "audioPath": "data/private/western-strings-round2/r2-01.m4a",
+      "captureVariant": "right-perspective"
+    },
+    {
+      "caseId": "m4a-positive-04",
+      "pieceId": "r2-01",
+      "editionId": "self-authored-v1",
+      "photoPath": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-04.jpg",
+      "audioPath": "data/private/western-strings-round2/r2-01.m4a",
+      "captureVariant": "top-perspective"
+    },
+    {
+      "caseId": "m4a-positive-05",
+      "pieceId": "r2-06",
+      "editionId": "self-authored-v1",
+      "photoPath": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-05.jpg",
+      "audioPath": "data/private/western-strings-round2/r2-06.m4a",
+      "captureVariant": "near-frontal"
+    },
+    {
+      "caseId": "m4a-positive-06",
+      "pieceId": "r2-06",
+      "editionId": "self-authored-v1",
+      "photoPath": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-06.jpg",
+      "audioPath": "data/private/western-strings-round2/r2-06.m4a",
+      "captureVariant": "left-perspective"
+    },
+    {
+      "caseId": "m4a-positive-07",
+      "pieceId": "r2-06",
+      "editionId": "self-authored-v1",
+      "photoPath": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-07.jpg",
+      "audioPath": "data/private/western-strings-round2/r2-06.m4a",
+      "captureVariant": "right-perspective"
+    },
+    {
+      "caseId": "m4a-positive-08",
+      "pieceId": "r3-01",
+      "editionId": "self-authored-v1",
+      "photoPath": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-08.jpg",
+      "audioPath": "data/private/western-strings-round3/r3-01.m4a",
+      "captureVariant": "near-frontal"
+    },
+    {
+      "caseId": "m4a-positive-09",
+      "pieceId": "r3-01",
+      "editionId": "self-authored-v1",
+      "photoPath": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-09.jpg",
+      "audioPath": "data/private/western-strings-round3/r3-01.m4a",
+      "captureVariant": "left-perspective"
+    },
+    {
+      "caseId": "m4a-positive-10",
+      "pieceId": "r3-01",
+      "editionId": "self-authored-v1",
+      "photoPath": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-10.jpg",
+      "audioPath": "data/private/western-strings-round3/r3-01.m4a",
+      "captureVariant": "right-perspective"
+    }
+  ],
+  "wrongEditionCases": [
+    {
+      "caseId": "m4a-wrong-edition-01",
+      "claimedPieceId": "r2-01",
+      "claimedEditionId": "self-authored-v1",
+      "photoPath": "data/private/western-strings-round2/r2-01-screenphoto.jpg",
+      "audioPath": "data/private/western-strings-round2/r2-01.m4a"
+    },
+    {
+      "caseId": "m4a-wrong-edition-02",
+      "claimedPieceId": "r2-01",
+      "claimedEditionId": "self-authored-v1",
+      "photoPath": "data/private/western-strings-round2/r2-02-screenphoto.jpg",
+      "audioPath": "data/private/western-strings-round2/r2-01.m4a"
+    },
+    {
+      "caseId": "m4a-wrong-edition-03",
+      "claimedPieceId": "r2-01",
+      "claimedEditionId": "self-authored-v1",
+      "photoPath": "data/private/western-strings-round2/r2-03-screenphoto.jpg",
+      "audioPath": "data/private/western-strings-round2/r2-01.m4a"
+    },
+    {
+      "caseId": "m4a-wrong-edition-04",
+      "claimedPieceId": "r2-01",
+      "claimedEditionId": "self-authored-v1",
+      "photoPath": "data/private/western-strings-round2/r2-04-screenphoto.jpg",
+      "audioPath": "data/private/western-strings-round2/r2-01.m4a"
+    },
+    {
+      "caseId": "m4a-wrong-edition-05",
+      "claimedPieceId": "r2-01",
+      "claimedEditionId": "self-authored-v1",
+      "photoPath": "data/private/western-strings-round2/r2-05-screenphoto.jpg",
+      "audioPath": "data/private/western-strings-round2/r2-01.m4a"
+    },
+    {
+      "caseId": "m4a-wrong-edition-06",
+      "claimedPieceId": "r2-01",
+      "claimedEditionId": "self-authored-v1",
+      "photoPath": "data/private/western-strings-round2/r2-06-screenphoto.jpg",
+      "audioPath": "data/private/western-strings-round2/r2-01.m4a"
+    },
+    {
+      "caseId": "m4a-wrong-edition-07",
+      "claimedPieceId": "r2-01",
+      "claimedEditionId": "self-authored-v1",
+      "photoPath": "data/private/western-strings-round2/r2-07-screenphoto.jpg",
+      "audioPath": "data/private/western-strings-round2/r2-01.m4a"
+    },
+    {
+      "caseId": "m4a-wrong-edition-08",
+      "claimedPieceId": "r2-01",
+      "claimedEditionId": "self-authored-v1",
+      "photoPath": "data/private/western-strings-round2/r2-08-screenphoto.jpg",
+      "audioPath": "data/private/western-strings-round2/r2-01.m4a"
+    }
+  ],
+  "ownerReviewPath": "data/private/western-strings-m4a-real-photo-acceptance/owner-measure-review.json",
+  "outputRoot": "data/experiments/western-strings-m4a/real-photo-acceptance"
+}

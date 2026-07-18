@@ -1,6 +1,6 @@
 # 西洋弦乐练习诊断项目状态快照
 
-更新时间: 2026-07-19 02:10 +08:00
+更新时间: 2026-07-19 02:22 +08:00
 
 本文件是当前主线状态快照。实时判断仍以命令为准:
 
@@ -19,7 +19,7 @@
 - 这里的 P0 `1/5` 只表示同一 5 谱中的谱号/调号/拍号结构闸门;真实照片 pitch+onset+measure 完整自动采纳仍为 `0/5`,12 份历史照片链缓存重放中的 P0-ready 又是 `0/12`。三个数字对应不同门槛或数据集,不得互相替换;`m4P0StructureReady=true` 也只表示至少 1 谱 P0-ready,不表示 M4 自动采纳通过。
 - 当前运行时仍为 `ordinaryUploadAutoFeedbackReady=false`,`m3plusAutoFeedbackReady=false`,`m4OmrAutoScoreReady=false`,`policy=fail-closed`。
 - 当前项目总闸门要求 ordinary/M3+/M4 三轨同时通过。**2026-07-19 更新(重大):** 负责人已亲口"认"接受 2026-07-18 fresh-blind 证据并"批"过受控试点,`authorizationReady` 已从硬编码 false 改为从负责人常备批准文件(`data/experiments/western-strings-controlled-pilot-approval.json`)派生;ordinary 与 M3+ 两轨现均 `authorizationReady=true`,`m3plus-authorization-closed`/`ordinary-dynamic-shadow-authorization-closed` 均已清除。**`readyToStartControlledPilot=true`,受控试点(review-only,人工复核每一行,不触达学生)现已可启动,但尚未实际执行。** 两轨仍各自保留 `*-student-gate-closed`(学生端闸门,与授权完全独立、结构性永远 false)。M3+ v2 五区证据完整(保护库存 14/14、平拉 gold join `12/12`、揉弦/滑音 join `8/8`,`releaseGateReady=true`)。M4 必选闸门仍未达标,`projectReleaseReady` 仍为 false。`western:project-gate` 因此仍按设计非零退出(M3+ 学生闸+M4)。(旧值 8/14、0/12、0/8 为 2026-07-17 前的历史状态。)
-- **2026-07-19 M4 双轨改绑:** 负责人已分别签署 M4a/M4b 闸门拆分和 M4b POC 晋升数字冻结。必选 M4 项现改绑 `M4aSupportedEditionRegistrationReady`,不再要求 M4b 开放域 OMR 自动采纳;M4b 的历史失败事实和 `m4bOpenWorldOmrAutomaticAdoptionReady=false` 均保持不变。M4a C.2a-f 工程链已完成:3 个内置自制版本(r2-01/r2-06/r3-01)的 registry `validEntries=3/3`;固定 Python/OpenCV 运行时 live preflight 通过;无 OMR 的页面检测→单应/TPS→结构质量闸→音频 0.6 仲裁→坐标反投影→review-only 标注链可执行。工程验收用 3 个确定性透视正例与 4 个拒绝例复跑为 `3/3`、`4/4`,并逐项验证 67/23/59 个诊断事件全部落到登记音符锚点。该证据明确标为 engineering-only,不能冒充冻结的真实屏拍验收。M4a 仍未就绪;live 唯一阻塞现为 `m4a-real-photo-acceptance-not-ready`。
+- **2026-07-19 M4 双轨改绑:** 负责人已分别签署 M4a/M4b 闸门拆分和 M4b POC 晋升数字冻结。必选 M4 项现改绑 `M4aSupportedEditionRegistrationReady`,不再要求 M4b 开放域 OMR 自动采纳;M4b 的历史失败事实和 `m4bOpenWorldOmrAutomaticAdoptionReady=false` 均保持不变。M4a C.2a-f 工程链已完成:3 个内置自制版本(r2-01/r2-06/r3-01)的 registry `validEntries=3/3`;固定 Python/OpenCV 运行时 live preflight 通过;无 OMR 的页面检测→单应/TPS→结构质量闸→音频 0.6 仲裁→坐标反投影→review-only 标注链可执行。工程验收用 3 个确定性透视正例与 4 个拒绝例复跑为 `3/3`、`4/4`,并逐项验证 67/23/59 个诊断事件全部落到登记音符锚点。真实验收执行器也已就位并接入 status/project gate:现有 8 张旧渲染器/错曲真实屏拍已全部拦截(`8/8`,0 漏放),10 张精确登记版本的拍摄包、无覆盖 intake、真实照片派生模糊/半页拒绝集及负责人逐小节框哈希签署流程均已生成。该证据明确区分 engineering-only 与 frozen-real-screen-photo;M4a 仍未就绪,当前 external blocker 是 `m4a-real-photo-positive-missing:10`,随后才可执行派生低质集与负责人 100% 逐框确认。
 - HOMR v3 的具名 AGPL/六模型审查现为 `approved-with-conditions`,唯一批准范围 `controlled-offline-review-only`;稳定运行时已迁至 `data/tools/`,live preflight 的 governance/host/deployment 三项均绿。preflight 现与 review-record SHA-256 绑定,审批或 artifact 漂移会令 `project-status/project-gate` fail-closed。学生端网络使用、自动采纳与再分发仍未获授权;这里的三绿不得写成默认生产发布通过。
 - 刷新产物为 `data/experiments/western-strings-m4/p0-structure-gate/report.json`、`data/experiments/western-strings-project-status.json` 与 `data/experiments/western-strings-project-gate.json`;三者位于 `data/` 忽略目录,用于本地可复跑状态,不等同于已提交证据。
 - **2026-07-19 更新:** release review、controlled-pilot decision 与 start preflight 已按当前合同重新生成,且均已转绿:`readyForControlledPilotDecision=true`,`readyToStartControlledPilot=true`,`okToStartControlledPilot=true`。它们绑定当前 live evidence(非缓存假象——`liveEvidenceBindingCurrent=true`),approval 文件 scope 与当前合同精确匹配且持久化安全确认齐全。**这只代表受控试点"可启动",试点本身尚未执行**;执行需要另一次显式命令(`npm run western:controlled-pilot-run -- --execute`),且仍是纯 review-only、不产生任何学生反馈。旧描述(scope 过期/缺确认导致红)为 2026-07-18 前状态,已被本次授权接线更新。
@@ -320,7 +320,7 @@ npm run western:ordinary-auto-pass-precision-review-pack -- --recording-id <fres
 `npm run western:project-gate` 当前仍以非零退出阻断默认发布(`projectReleaseReady=false`),失败为(2026-07-19 更新:两轨 `*-authorization-closed` 均已因负责人授权接线清除,M4 必选项已按具名签署改绑 M4a):
 
 - `m3plus-student-gate-closed`(结构性硬编码,与授权无关,学生端仍需单独批准)
-- `M4a supported-edition registration`(谱库、配准运行时及 C.2a-f 工程验收均已现场验真;尚缺冻结的真实屏拍验收与负责人逐框确认)
+- `M4a supported-edition registration`(谱库、配准运行时、C.2a-f 工程验收和错版真实屏拍 8/8 拒绝均已现场验真;尚缺拍摄包所列 10 张精确登记版本屏拍,之后由机器生成低质拒绝集并交负责人逐框确认)
 
 注意:ordinary 轨此前的 `blockingReasons` 现为空数组,但因为 M3+ 学生闸与 M4a 仍未达标,`ordinaryUploadAutoFeedbackReady`/`m3plusAutoFeedbackReady`/`m4OmrAutoScoreReady` 三个学生端运行时开关**均未受本次改动影响,仍然是 `false`**;M4b 自动采纳也继续独立关闭。当前打开的只是受控试点的"可启动"状态(`readyToStartControlledPilot=true`),不是学生发布。
 

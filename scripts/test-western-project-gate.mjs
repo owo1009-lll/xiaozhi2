@@ -1433,7 +1433,8 @@ if (m4.m4GateSplitDecisionReady === true) {
     && m4.m4aRegistrationRuntimeReady === true
     && m4.m4aEngineeringAcceptanceReady === true
   ) {
-    assert(m4Failure.reason.includes("m4a-real-photo-acceptance-not-ready"));
+    assert(m4.m4aRealPhotoAcceptanceOperationalReady === true);
+    assert(m4Failure.reason.some((reason) => String(reason).startsWith("m4a-real-photo-")));
   } else if (m4.m4aSupportedEditionRegistryReady === true) {
     assert(m4Failure.reason.some((reason) => String(reason).includes("registration")));
   } else {

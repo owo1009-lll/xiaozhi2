@@ -1,0 +1,337 @@
+{
+  "contract": "western-m4a-supported-edition-registration-v1",
+  "ready": false,
+  "reason": "supported-edition-registration-review-required",
+  "blockingReasons": [
+    "supported-edition-registration-review-required"
+  ],
+  "pieceId": "r2-01",
+  "editionId": "self-authored-v1",
+  "photo": "C:\\Users\\Administrator\\Downloads\\ai二胡\\data\\private\\western-strings-round2\\r2-04-screenphoto.jpg",
+  "photoSha256": "0c944d48104506f8f734c1b9e61456869541bc39a254dc467e2ce96f3d209d96",
+  "registry": {
+    "source": "data/experiments/western-strings-m4a/supported-editions/registry.json",
+    "sha256": "10a35688cfaad13d6510b6bbe3a9a9fbca3d0ecb0b1ee3b7dbdec3cb9ffd9c9c",
+    "entryTriplet": {
+      "musicxmlSha256": "c8452070f5bc54c04cc86de128175a0acac5bfa176ccadb99fdf5f0c9a0edbf2",
+      "renderSha256": "db9535c03bb923852885f4d2668a1985bf863a9df43ed4d5083daf577986ca3e",
+      "coordinateSidecarSha256": "b30bffd2af13b1978fd907507ec07b49fc4b9b8c44fd1061ced2f65b354cee88"
+    }
+  },
+  "registrationQuality": {
+    "ready": false,
+    "checks": {
+      "imageDimensions": true,
+      "pageDetection": true,
+      "blur": true,
+      "goodMatches": true,
+      "inliers": true,
+      "inlierRatio": true,
+      "referenceGridCoverage": true,
+      "systemConsistency": true,
+      "barlineConsistency": false,
+      "structuralResidual": true
+    },
+    "pageDetection": {
+      "ready": true,
+      "reason": "ok",
+      "threshold": 81.0,
+      "coverage": 0.794294,
+      "polygonPixels": [
+        [
+          165.01,
+          685.44
+        ],
+        [
+          139.63,
+          4280.83
+        ],
+        [
+          5562.85,
+          4280.83
+        ],
+        [
+          5559.68,
+          755.25
+        ]
+      ]
+    },
+    "laplacianVariance": 11676.320497,
+    "referenceKeypoints": 2380,
+    "photoKeypoints": 4649,
+    "goodMatchCount": 325,
+    "mutualGoodMatchCount": 14,
+    "inlierCount": 160,
+    "inlierRatio": 0.492308,
+    "referenceGridCoverage": 0.6875,
+    "systemConsistency": 1.0,
+    "systemRows": [
+      {
+        "systemIndex": 0,
+        "inlierCount": 40,
+        "consistent": true
+      },
+      {
+        "systemIndex": 1,
+        "inlierCount": 37,
+        "consistent": true
+      },
+      {
+        "systemIndex": 2,
+        "inlierCount": 59,
+        "consistent": true
+      },
+      {
+        "systemIndex": 3,
+        "inlierCount": 24,
+        "consistent": true
+      }
+    ],
+    "barlineConsistency": 0.0,
+    "barlineRows": [
+      {
+        "systemIndex": 0,
+        "hits": 0,
+        "expected": 5,
+        "ratio": 0.0,
+        "responses": [
+          {
+            "measureIndex": 1,
+            "response": 0.0,
+            "contrast": 0.0,
+            "threshold": 0.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 2,
+            "response": 0.0,
+            "contrast": 0.0,
+            "threshold": 0.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 3,
+            "response": 0.0,
+            "contrast": 0.0,
+            "threshold": 0.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 4,
+            "response": 0.0,
+            "contrast": 0.0,
+            "threshold": 0.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 5,
+            "response": 0.0,
+            "contrast": 0.0,
+            "threshold": 0.0,
+            "hit": false
+          }
+        ]
+      },
+      {
+        "systemIndex": 1,
+        "hits": 0,
+        "expected": 6,
+        "ratio": 0.0,
+        "responses": [
+          {
+            "measureIndex": 6,
+            "response": 0.0,
+            "contrast": 0.0,
+            "threshold": 0.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 7,
+            "response": 0.0,
+            "contrast": 0.0,
+            "threshold": 0.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 8,
+            "response": 0.0,
+            "contrast": 0.0,
+            "threshold": 0.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 9,
+            "response": 0.0,
+            "contrast": 0.0,
+            "threshold": 0.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 10,
+            "response": 0.0,
+            "contrast": 0.0,
+            "threshold": 0.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 11,
+            "response": 0.0,
+            "contrast": 0.0,
+            "threshold": 0.0,
+            "hit": false
+          }
+        ]
+      },
+      {
+        "systemIndex": 2,
+        "hits": 0,
+        "expected": 6,
+        "ratio": 0.0,
+        "responses": [
+          {
+            "measureIndex": 12,
+            "response": 0.0,
+            "contrast": 0.0,
+            "threshold": 0.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 13,
+            "response": 0.0,
+            "contrast": 0.0,
+            "threshold": 0.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 14,
+            "response": 0.0,
+            "contrast": 0.0,
+            "threshold": 0.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 15,
+            "response": 0.0,
+            "contrast": 0.0,
+            "threshold": 0.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 16,
+            "response": 0.0,
+            "contrast": 0.0,
+            "threshold": 0.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 17,
+            "response": 0.0,
+            "contrast": 0.0,
+            "threshold": 0.0,
+            "hit": false
+          }
+        ]
+      },
+      {
+        "systemIndex": 3,
+        "hits": 0,
+        "expected": 4,
+        "ratio": 0.0,
+        "responses": [
+          {
+            "measureIndex": 18,
+            "response": 0.8,
+            "contrast": 0.0,
+            "threshold": 80.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 19,
+            "response": 0.9,
+            "contrast": 0.0,
+            "threshold": 68.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 20,
+            "response": 0.92,
+            "contrast": 0.02,
+            "threshold": 79.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 21,
+            "response": 0.82,
+            "contrast": 0.02,
+            "threshold": 59.0,
+            "hit": false
+          }
+        ]
+      }
+    ],
+    "structuralResidualNormalized": 0.00977566,
+    "deformation": {
+      "model": "homography",
+      "eligible": false,
+      "activated": false,
+      "baselineResidualP90Normalized": 0.00036073,
+      "validationResidualImprovement": 0.0
+    },
+    "referenceToPhotoHomography": [
+      [
+        0.0186866529,
+        -1.1386383312,
+        1093.0624543998
+      ],
+      [
+        0.03946247,
+        -2.4054176159,
+        2309.1195595807
+      ],
+      [
+        1.71254e-05,
+        -0.0010417326,
+        1.0
+      ]
+    ],
+    "photoToReferenceHomography": [
+      [
+        59702.5968349922,
+        -35781.9791623788,
+        17366200.93385748
+      ],
+      [
+        72664.9645921293,
+        -28741.1966655841,
+        -13060485.159692911
+      ],
+      [
+        74.6750306799,
+        -29.3278601374,
+        -13901.9368334088
+      ]
+    ]
+  },
+  "audioSentinel": {
+    "ready": true,
+    "reason": "ok",
+    "minimumAgreement": 0.6,
+    "agreement": 0.955224,
+    "confirmed": 64,
+    "eventCount": 67,
+    "source": "registered-musicxml-plus-basic-pitch-score-anchored-verdicts"
+  },
+  "projectedCoordinates": {
+    "systems": [],
+    "staves": [],
+    "measures": [],
+    "notes": []
+  },
+  "deformationModel": "homography",
+  "omrUsed": false,
+  "machineFeedbackPrepared": false,
+  "reviewRequired": true,
+  "studentFacing": false,
+  "automaticAdoptionAuthorized": false,
+  "autoDiagnosisIssued": false
+}

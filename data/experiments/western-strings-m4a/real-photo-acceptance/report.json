@@ -1,0 +1,604 @@
+{
+  "contract": "western-m4a-real-photo-acceptance-v1",
+  "complete": true,
+  "acceptanceReady": false,
+  "evidenceClass": "frozen-real-screen-photo-acceptance",
+  "provenance": {
+    "policy": "config/western-m4a-real-photo-acceptance.json",
+    "policySha256": "bd830445b918919e01ad56b1444bb1e28dbfba3411ae38f935f38e4cc730aa6e",
+    "implementation": "scripts/western_m4a_registration.py",
+    "implementationSha256": "c7f30264aa097b975e1cee061dc34e66a0b4dfa72e001b553b5a8335c9507616",
+    "registry": "data/experiments/western-strings-m4a/supported-editions/registry.json",
+    "registrySha256": "10a35688cfaad13d6510b6bbe3a9a9fbca3d0ecb0b1ee3b7dbdec3cb9ffd9c9c"
+  },
+  "thresholds": {
+    "minimumPositivePhotos": 10,
+    "minimumPositivePassRate": 0.9,
+    "ownerMeasureBoxConfirmationRate": 1.0,
+    "minimumWrongEditionPhotos": 5,
+    "maximumWrongEditionLeakCount": 0,
+    "requiredPoorImageTransforms": [
+      "gaussian-blur",
+      "half-page-crop"
+    ],
+    "maximumPoorImageLeakCount": 0
+  },
+  "checks": {
+    "positivePhotoCount": false,
+    "positivePassRate": false,
+    "ownerMeasureBoxConfirmation": false,
+    "wrongEditionCount": true,
+    "wrongEditionLeakCount": true,
+    "poorImageCoverage": false,
+    "poorImageLeakCount": true,
+    "reviewOnlySafety": true
+  },
+  "blockingReasons": [
+    "m4a-real-photo-positive-missing:10",
+    "m4a-owner-measure-box-confirmation-not-ready",
+    "m4a-real-photo-poor-image-coverage-not-ready"
+  ],
+  "evidenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "positiveCases": [
+    {
+      "caseId": "m4a-positive-01",
+      "pieceId": "r2-01",
+      "editionId": "self-authored-v1",
+      "captureVariant": "near-frontal",
+      "available": false,
+      "ready": false,
+      "reason": "real-screen-photo-missing",
+      "photo": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-01.jpg",
+      "audio": "data/private/western-strings-round2/r2-01.m4a"
+    },
+    {
+      "caseId": "m4a-positive-02",
+      "pieceId": "r2-01",
+      "editionId": "self-authored-v1",
+      "captureVariant": "left-perspective",
+      "available": false,
+      "ready": false,
+      "reason": "real-screen-photo-missing",
+      "photo": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-02.jpg",
+      "audio": "data/private/western-strings-round2/r2-01.m4a"
+    },
+    {
+      "caseId": "m4a-positive-03",
+      "pieceId": "r2-01",
+      "editionId": "self-authored-v1",
+      "captureVariant": "right-perspective",
+      "available": false,
+      "ready": false,
+      "reason": "real-screen-photo-missing",
+      "photo": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-03.jpg",
+      "audio": "data/private/western-strings-round2/r2-01.m4a"
+    },
+    {
+      "caseId": "m4a-positive-04",
+      "pieceId": "r2-01",
+      "editionId": "self-authored-v1",
+      "captureVariant": "top-perspective",
+      "available": false,
+      "ready": false,
+      "reason": "real-screen-photo-missing",
+      "photo": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-04.jpg",
+      "audio": "data/private/western-strings-round2/r2-01.m4a"
+    },
+    {
+      "caseId": "m4a-positive-05",
+      "pieceId": "r2-06",
+      "editionId": "self-authored-v1",
+      "captureVariant": "near-frontal",
+      "available": false,
+      "ready": false,
+      "reason": "real-screen-photo-missing",
+      "photo": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-05.jpg",
+      "audio": "data/private/western-strings-round2/r2-06.m4a"
+    },
+    {
+      "caseId": "m4a-positive-06",
+      "pieceId": "r2-06",
+      "editionId": "self-authored-v1",
+      "captureVariant": "left-perspective",
+      "available": false,
+      "ready": false,
+      "reason": "real-screen-photo-missing",
+      "photo": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-06.jpg",
+      "audio": "data/private/western-strings-round2/r2-06.m4a"
+    },
+    {
+      "caseId": "m4a-positive-07",
+      "pieceId": "r2-06",
+      "editionId": "self-authored-v1",
+      "captureVariant": "right-perspective",
+      "available": false,
+      "ready": false,
+      "reason": "real-screen-photo-missing",
+      "photo": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-07.jpg",
+      "audio": "data/private/western-strings-round2/r2-06.m4a"
+    },
+    {
+      "caseId": "m4a-positive-08",
+      "pieceId": "r3-01",
+      "editionId": "self-authored-v1",
+      "captureVariant": "near-frontal",
+      "available": false,
+      "ready": false,
+      "reason": "real-screen-photo-missing",
+      "photo": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-08.jpg",
+      "audio": "data/private/western-strings-round3/r3-01.m4a"
+    },
+    {
+      "caseId": "m4a-positive-09",
+      "pieceId": "r3-01",
+      "editionId": "self-authored-v1",
+      "captureVariant": "left-perspective",
+      "available": false,
+      "ready": false,
+      "reason": "real-screen-photo-missing",
+      "photo": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-09.jpg",
+      "audio": "data/private/western-strings-round3/r3-01.m4a"
+    },
+    {
+      "caseId": "m4a-positive-10",
+      "pieceId": "r3-01",
+      "editionId": "self-authored-v1",
+      "captureVariant": "right-perspective",
+      "available": false,
+      "ready": false,
+      "reason": "real-screen-photo-missing",
+      "photo": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-10.jpg",
+      "audio": "data/private/western-strings-round3/r3-01.m4a"
+    }
+  ],
+  "wrongEditionCases": [
+    {
+      "caseId": "m4a-wrong-edition-01",
+      "claimedPieceId": "r2-01",
+      "claimedEditionId": "self-authored-v1",
+      "available": true,
+      "photo": "data/private/western-strings-round2/r2-01-screenphoto.jpg",
+      "photoSha256": "78ed2d2d63d19d2c54623a1c3ecacec46584c72f3b773feb3885dfdec121c364",
+      "audio": "data/private/western-strings-round2/r2-01.m4a",
+      "audioSha256": "59b3f5a163fc2d37a7e5c6375143b830d7d33e5c81465273b1a6c03fcd788d6c",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 183,
+        "inlierCount": 45,
+        "inlierRatio": 0.245902,
+        "referenceGridCoverage": 0.625,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 0.428571,
+        "structuralResidualNormalized": 0.01022701,
+        "deformation": {
+          "model": "homography",
+          "eligible": true,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00159887,
+          "validationResidualImprovement": -29.634837
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/wrong-edition-cases/m4a-wrong-edition-01-audit.json",
+      "auditSha256": "b10829930ccfa158dd668f5be339265e6f41690cde571d94d04185d63ec5a855"
+    },
+    {
+      "caseId": "m4a-wrong-edition-02",
+      "claimedPieceId": "r2-01",
+      "claimedEditionId": "self-authored-v1",
+      "available": true,
+      "photo": "data/private/western-strings-round2/r2-02-screenphoto.jpg",
+      "photoSha256": "96bf385fe34cf33b5d25657a8693ed3965785d4c6eb10412875e52434d59ef07",
+      "audio": "data/private/western-strings-round2/r2-01.m4a",
+      "audioSha256": "59b3f5a163fc2d37a7e5c6375143b830d7d33e5c81465273b1a6c03fcd788d6c",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 210,
+        "inlierCount": 88,
+        "inlierRatio": 0.419048,
+        "referenceGridCoverage": 0.6875,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 0.047619,
+        "structuralResidualNormalized": 0.01076318,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 2.093e-05,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/wrong-edition-cases/m4a-wrong-edition-02-audit.json",
+      "auditSha256": "7bad1ead4114313a5f07b66853547759e5578cf40557eab530d82eb60fb347c1"
+    },
+    {
+      "caseId": "m4a-wrong-edition-03",
+      "claimedPieceId": "r2-01",
+      "claimedEditionId": "self-authored-v1",
+      "available": true,
+      "photo": "data/private/western-strings-round2/r2-03-screenphoto.jpg",
+      "photoSha256": "4945e709973b96df095bb35ace4b584ac37f5b44bd73d2d5760440982f8ea106",
+      "audio": "data/private/western-strings-round2/r2-01.m4a",
+      "audioSha256": "59b3f5a163fc2d37a7e5c6375143b830d7d33e5c81465273b1a6c03fcd788d6c",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 229,
+        "inlierCount": 48,
+        "inlierRatio": 0.209607,
+        "referenceGridCoverage": 0.625,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 0.095238,
+        "structuralResidualNormalized": 0.01083911,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 7.496e-05,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/wrong-edition-cases/m4a-wrong-edition-03-audit.json",
+      "auditSha256": "f05540850c551cc825f89a7da0887a134df880272c72de82673c5c1d7b6a822d"
+    },
+    {
+      "caseId": "m4a-wrong-edition-04",
+      "claimedPieceId": "r2-01",
+      "claimedEditionId": "self-authored-v1",
+      "available": true,
+      "photo": "data/private/western-strings-round2/r2-04-screenphoto.jpg",
+      "photoSha256": "0c944d48104506f8f734c1b9e61456869541bc39a254dc467e2ce96f3d209d96",
+      "audio": "data/private/western-strings-round2/r2-01.m4a",
+      "audioSha256": "59b3f5a163fc2d37a7e5c6375143b830d7d33e5c81465273b1a6c03fcd788d6c",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 325,
+        "inlierCount": 160,
+        "inlierRatio": 0.492308,
+        "referenceGridCoverage": 0.6875,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 0.0,
+        "structuralResidualNormalized": 0.00977566,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00036073,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/wrong-edition-cases/m4a-wrong-edition-04-audit.json",
+      "auditSha256": "b83e8f66212abcb7d02749e2b740acb68e6b52b0c48cc46c4537867c4d70523e"
+    },
+    {
+      "caseId": "m4a-wrong-edition-05",
+      "claimedPieceId": "r2-01",
+      "claimedEditionId": "self-authored-v1",
+      "available": true,
+      "photo": "data/private/western-strings-round2/r2-05-screenphoto.jpg",
+      "photoSha256": "5aa7a0fd28e70786fb045b07ca6429201670641f32013c9da358251e9df71057",
+      "audio": "data/private/western-strings-round2/r2-01.m4a",
+      "audioSha256": "59b3f5a163fc2d37a7e5c6375143b830d7d33e5c81465273b1a6c03fcd788d6c",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 141,
+        "inlierCount": 21,
+        "inlierRatio": 0.148936,
+        "referenceGridCoverage": 0.5,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 0.619048,
+        "structuralResidualNormalized": 0.01020315,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00129948,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/wrong-edition-cases/m4a-wrong-edition-05-audit.json",
+      "auditSha256": "683603a4997b1d858f916d7be7845bcd421a7b46e31488d516a7dbcdb0a843ab"
+    },
+    {
+      "caseId": "m4a-wrong-edition-06",
+      "claimedPieceId": "r2-01",
+      "claimedEditionId": "self-authored-v1",
+      "available": true,
+      "photo": "data/private/western-strings-round2/r2-06-screenphoto.jpg",
+      "photoSha256": "d1c5bba078c51eb5c93a9cbd7ae4fa4d8797f99ded7a163a99c1659ddff42d2f",
+      "audio": "data/private/western-strings-round2/r2-01.m4a",
+      "audioSha256": "59b3f5a163fc2d37a7e5c6375143b830d7d33e5c81465273b1a6c03fcd788d6c",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 199,
+        "inlierCount": 96,
+        "inlierRatio": 0.482412,
+        "referenceGridCoverage": 0.6875,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 0.0,
+        "structuralResidualNormalized": 0.01065201,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00036532,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/wrong-edition-cases/m4a-wrong-edition-06-audit.json",
+      "auditSha256": "c9bfc2891ceda8b0c9d0761749096ab846b6680224314899c511c25854eb0576"
+    },
+    {
+      "caseId": "m4a-wrong-edition-07",
+      "claimedPieceId": "r2-01",
+      "claimedEditionId": "self-authored-v1",
+      "available": true,
+      "photo": "data/private/western-strings-round2/r2-07-screenphoto.jpg",
+      "photoSha256": "7bc1efb9a86561a769f0d94f8b58eeb4b0c7ad565a02724cc489d4e7d68c960b",
+      "audio": "data/private/western-strings-round2/r2-01.m4a",
+      "audioSha256": "59b3f5a163fc2d37a7e5c6375143b830d7d33e5c81465273b1a6c03fcd788d6c",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 129,
+        "inlierCount": 28,
+        "inlierRatio": 0.217054,
+        "referenceGridCoverage": 0.625,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 0.0,
+        "structuralResidualNormalized": 0.01070913,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00121963,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/wrong-edition-cases/m4a-wrong-edition-07-audit.json",
+      "auditSha256": "ef585210d6e6ba6264bcc4dfdce4c8f86b220f731780dc655b42f35375c092e6"
+    },
+    {
+      "caseId": "m4a-wrong-edition-08",
+      "claimedPieceId": "r2-01",
+      "claimedEditionId": "self-authored-v1",
+      "available": true,
+      "photo": "data/private/western-strings-round2/r2-08-screenphoto.jpg",
+      "photoSha256": "9430c864e40921782433a25dba921710bdc6ea400e1b1a9b549e8684e528ad64",
+      "audio": "data/private/western-strings-round2/r2-01.m4a",
+      "audioSha256": "59b3f5a163fc2d37a7e5c6375143b830d7d33e5c81465273b1a6c03fcd788d6c",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 114,
+        "inlierCount": 27,
+        "inlierRatio": 0.236842,
+        "referenceGridCoverage": 0.5625,
+        "systemConsistency": 0.75,
+        "barlineConsistency": 0.619048,
+        "structuralResidualNormalized": 0.00966255,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.07249389,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/wrong-edition-cases/m4a-wrong-edition-08-audit.json",
+      "auditSha256": "7a6bc547fc926bcc6b1e18d5824fb8f61891d6ece9074282c71bf1a678335e24"
+    }
+  ],
+  "poorImageCases": [],
+  "ownerReview": {
+    "ready": false,
+    "reason": "m4a-owner-measure-review-missing-or-invalid",
+    "error": "[Errno 2] No such file or directory: 'C:\\\\Users\\\\Administrator\\\\Downloads\\\\ai二胡\\\\data\\\\private\\\\western-strings-m4a-real-photo-acceptance\\\\owner-measure-review.json'",
+    "reviewer": "",
+    "reviewedAt": "",
+    "confirmedMeasureCount": 0,
+    "expectedMeasureCount": 0,
+    "confirmationRate": 0.0
+  },
+  "summary": {
+    "positiveExpected": 10,
+    "positiveAvailable": 0,
+    "positivePassed": 0,
+    "positivePassRate": 0.0,
+    "wrongEditionAvailable": 8,
+    "wrongEditionBlocked": 8,
+    "wrongEditionLeakCount": 0,
+    "poorImageExpected": 0,
+    "poorImageEvaluated": 0,
+    "poorImageBlocked": 0,
+    "poorImageLeakCount": 0,
+    "ownerConfirmedMeasures": 0,
+    "ownerExpectedMeasures": 0
+  },
+  "safety": {
+    "reviewRequired": true,
+    "studentFacing": false,
+    "automaticAdoptionAuthorized": false,
+    "omrAllowed": false
+  }
+}

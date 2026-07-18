@@ -1,0 +1,337 @@
+{
+  "contract": "western-m4a-supported-edition-registration-v1",
+  "ready": false,
+  "reason": "supported-edition-registration-review-required",
+  "blockingReasons": [
+    "supported-edition-registration-review-required"
+  ],
+  "pieceId": "r2-01",
+  "editionId": "self-authored-v1",
+  "photo": "C:\\Users\\Administrator\\Downloads\\ai二胡\\data\\private\\western-strings-round2\\r2-05-screenphoto.jpg",
+  "photoSha256": "5aa7a0fd28e70786fb045b07ca6429201670641f32013c9da358251e9df71057",
+  "registry": {
+    "source": "data/experiments/western-strings-m4a/supported-editions/registry.json",
+    "sha256": "10a35688cfaad13d6510b6bbe3a9a9fbca3d0ecb0b1ee3b7dbdec3cb9ffd9c9c",
+    "entryTriplet": {
+      "musicxmlSha256": "c8452070f5bc54c04cc86de128175a0acac5bfa176ccadb99fdf5f0c9a0edbf2",
+      "renderSha256": "db9535c03bb923852885f4d2668a1985bf863a9df43ed4d5083daf577986ca3e",
+      "coordinateSidecarSha256": "b30bffd2af13b1978fd907507ec07b49fc4b9b8c44fd1061ced2f65b354cee88"
+    }
+  },
+  "registrationQuality": {
+    "ready": false,
+    "checks": {
+      "imageDimensions": true,
+      "pageDetection": true,
+      "blur": true,
+      "goodMatches": true,
+      "inliers": true,
+      "inlierRatio": false,
+      "referenceGridCoverage": true,
+      "systemConsistency": true,
+      "barlineConsistency": false,
+      "structuralResidual": true
+    },
+    "pageDetection": {
+      "ready": true,
+      "reason": "ok",
+      "threshold": 80.0,
+      "coverage": 0.793273,
+      "polygonPixels": [
+        [
+          0.0,
+          859.97
+        ],
+        [
+          0.0,
+          4280.83
+        ],
+        [
+          5708.83,
+          4280.83
+        ],
+        [
+          5629.49,
+          907.57
+        ]
+      ]
+    },
+    "laplacianVariance": 10805.856387,
+    "referenceKeypoints": 2380,
+    "photoKeypoints": 2488,
+    "goodMatchCount": 141,
+    "mutualGoodMatchCount": 12,
+    "inlierCount": 21,
+    "inlierRatio": 0.148936,
+    "referenceGridCoverage": 0.5,
+    "systemConsistency": 1.0,
+    "systemRows": [
+      {
+        "systemIndex": 0,
+        "inlierCount": 3,
+        "consistent": true
+      },
+      {
+        "systemIndex": 1,
+        "inlierCount": 9,
+        "consistent": true
+      },
+      {
+        "systemIndex": 2,
+        "inlierCount": 3,
+        "consistent": true
+      },
+      {
+        "systemIndex": 3,
+        "inlierCount": 6,
+        "consistent": true
+      }
+    ],
+    "barlineConsistency": 0.619048,
+    "barlineRows": [
+      {
+        "systemIndex": 0,
+        "hits": 4,
+        "expected": 5,
+        "ratio": 0.8,
+        "responses": [
+          {
+            "measureIndex": 1,
+            "response": 1.0,
+            "contrast": 0.22,
+            "threshold": 235.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 2,
+            "response": 0.88,
+            "contrast": 0.34,
+            "threshold": 141.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 3,
+            "response": 0.74,
+            "contrast": 0.24,
+            "threshold": 190.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 4,
+            "response": 0.72,
+            "contrast": 0.18,
+            "threshold": 164.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 5,
+            "response": 0.18,
+            "contrast": 0.14,
+            "threshold": 146.0,
+            "hit": false
+          }
+        ]
+      },
+      {
+        "systemIndex": 1,
+        "hits": 6,
+        "expected": 6,
+        "ratio": 1.0,
+        "responses": [
+          {
+            "measureIndex": 6,
+            "response": 1.0,
+            "contrast": 0.408163,
+            "threshold": 229.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 7,
+            "response": 0.673469,
+            "contrast": 0.306122,
+            "threshold": 127.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 8,
+            "response": 0.714286,
+            "contrast": 0.122449,
+            "threshold": 132.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 9,
+            "response": 0.836735,
+            "contrast": 0.183673,
+            "threshold": 157.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 10,
+            "response": 0.673469,
+            "contrast": 0.142857,
+            "threshold": 145.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 11,
+            "response": 0.816327,
+            "contrast": 0.122449,
+            "threshold": 139.0,
+            "hit": true
+          }
+        ]
+      },
+      {
+        "systemIndex": 2,
+        "hits": 3,
+        "expected": 6,
+        "ratio": 0.5,
+        "responses": [
+          {
+            "measureIndex": 12,
+            "response": 0.6,
+            "contrast": 0.32,
+            "threshold": 237.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 13,
+            "response": 0.64,
+            "contrast": 0.0,
+            "threshold": 124.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 14,
+            "response": 0.84,
+            "contrast": 0.2,
+            "threshold": 159.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 15,
+            "response": 0.66,
+            "contrast": 0.12,
+            "threshold": 141.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 16,
+            "response": 0.28,
+            "contrast": 0.1,
+            "threshold": 134.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 17,
+            "response": 1.0,
+            "contrast": 0.08,
+            "threshold": 133.0,
+            "hit": false
+          }
+        ]
+      },
+      {
+        "systemIndex": 3,
+        "hits": 0,
+        "expected": 4,
+        "ratio": 0.0,
+        "responses": [
+          {
+            "measureIndex": 18,
+            "response": 1.0,
+            "contrast": 0.06,
+            "threshold": 152.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 19,
+            "response": 0.7,
+            "contrast": 0.1,
+            "threshold": 133.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 20,
+            "response": 0.14,
+            "contrast": 0.08,
+            "threshold": 136.0,
+            "hit": false
+          },
+          {
+            "measureIndex": 21,
+            "response": 0.8,
+            "contrast": 0.06,
+            "threshold": 139.0,
+            "hit": false
+          }
+        ]
+      }
+    ],
+    "structuralResidualNormalized": 0.01020315,
+    "deformation": {
+      "model": "homography",
+      "eligible": false,
+      "activated": false,
+      "baselineResidualP90Normalized": 0.00129948,
+      "validationResidualImprovement": 0.0
+    },
+    "referenceToPhotoHomography": [
+      [
+        -1.4190514113,
+        -0.7879235423,
+        1257.4728181019
+      ],
+      [
+        -2.3648672282,
+        -1.3143405749,
+        2097.3740656265
+      ],
+      [
+        -0.001127637,
+        -0.0006266565,
+        1.0
+      ]
+    ],
+    "photoToReferenceHomography": [
+      [
+        860.0305664905,
+        9204.2537027433,
+        -20386228.069679078
+      ],
+      [
+        24100.6466238829,
+        124117.9649929113,
+        -290627708.8826817
+      ],
+      [
+        16.0726292913,
+        88.1583874053,
+        -205111.0098605916
+      ]
+    ]
+  },
+  "audioSentinel": {
+    "ready": true,
+    "reason": "ok",
+    "minimumAgreement": 0.6,
+    "agreement": 0.955224,
+    "confirmed": 64,
+    "eventCount": 67,
+    "source": "registered-musicxml-plus-basic-pitch-score-anchored-verdicts"
+  },
+  "projectedCoordinates": {
+    "systems": [],
+    "staves": [],
+    "measures": [],
+    "notes": []
+  },
+  "deformationModel": "homography",
+  "omrUsed": false,
+  "machineFeedbackPrepared": false,
+  "reviewRequired": true,
+  "studentFacing": false,
+  "automaticAdoptionAuthorized": false,
+  "autoDiagnosisIssued": false
+}

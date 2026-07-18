@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>M4a 真实屏拍验收包</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, "Microsoft YaHei", sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #111827; color: #f9fafb; }
+    header { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 10px 16px; background: rgba(17,24,39,.96); border-bottom: 1px solid #374151; }
+    h1 { margin: 0; font-size: 18px; }
+    .meta { color: #cbd5e1; font-size: 13px; }
+    button { border: 1px solid #64748b; border-radius: 8px; background: #1e293b; color: white; padding: 8px 12px; cursor: pointer; }
+    button.active { background: #0f766e; border-color: #2dd4bf; }
+    main { display: grid; grid-template-columns: 280px 1fr; min-height: calc(100vh - 60px); }
+    aside { padding: 12px; border-right: 1px solid #374151; overflow: auto; }
+    .task { width: 100%; text-align: left; margin-bottom: 8px; }
+    .viewer { display: grid; place-items: center; padding: 12px; overflow: hidden; background: #0b0f16; }
+    #score { max-width: 100%; max-height: calc(100vh - 88px); object-fit: contain; box-shadow: 0 0 0 1px #94a3b8; background: white; }
+    .instructions { margin-top: 14px; padding: 12px; border-radius: 8px; background: #1f2937; color: #dbeafe; font-size: 13px; line-height: 1.55; }
+    code { color: #99f6e4; }
+    @media (max-width: 760px) { main { grid-template-columns: 1fr; } aside { border-right: 0; border-bottom: 1px solid #374151; } #score { max-height: 72vh; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>M4a 真实屏拍验收包 · 10 张</h1>
+      <div class="meta" id="meta"></div>
+    </div>
+    <button id="fullscreen">全屏显示当前谱页</button>
+  </header>
+  <main>
+    <aside>
+      <div id="tasks"></div>
+      <div class="instructions">
+        <strong>拍摄纪律</strong><br>
+        1. 用手机相机拍屏幕，不要截屏；完整保留白色谱页四边。<br>
+        2. 按任务指定角度做轻度透视，不要故意模糊或裁页。<br>
+        3. 每张照片改成页面显示的精确文件名。<br>
+        4. 放入 <code>Downloads\m4a-photo-acceptance</code>，之后运行：<br>
+        <code>npm run western:m4a-photo-intake</code>
+      </div>
+    </aside>
+    <section class="viewer" id="viewer"><img id="score" alt="登记谱页"></section>
+  </main>
+  <script>
+    const tasks = [{"caseId":"m4a-positive-01","pieceId":"r2-01","editionId":"self-authored-v1","photoPath":"data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-01.jpg","audioPath":"data/private/western-strings-round2/r2-01.m4a","captureVariant":"near-frontal","renderUrl":"../../data/experiments/western-strings-m4a/supported-editions/editions/r2-01/self-authored-v1/render-page-01.png","outputName":"m4a-positive-01.jpg"},{"caseId":"m4a-positive-02","pieceId":"r2-01","editionId":"self-authored-v1","photoPath":"data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-02.jpg","audioPath":"data/private/western-strings-round2/r2-01.m4a","captureVariant":"left-perspective","renderUrl":"../../data/experiments/western-strings-m4a/supported-editions/editions/r2-01/self-authored-v1/render-page-01.png","outputName":"m4a-positive-02.jpg"},{"caseId":"m4a-positive-03","pieceId":"r2-01","editionId":"self-authored-v1","photoPath":"data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-03.jpg","audioPath":"data/private/western-strings-round2/r2-01.m4a","captureVariant":"right-perspective","renderUrl":"../../data/experiments/western-strings-m4a/supported-editions/editions/r2-01/self-authored-v1/render-page-01.png","outputName":"m4a-positive-03.jpg"},{"caseId":"m4a-positive-04","pieceId":"r2-01","editionId":"self-authored-v1","photoPath":"data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-04.jpg","audioPath":"data/private/western-strings-round2/r2-01.m4a","captureVariant":"top-perspective","renderUrl":"../../data/experiments/western-strings-m4a/supported-editions/editions/r2-01/self-authored-v1/render-page-01.png","outputName":"m4a-positive-04.jpg"},{"caseId":"m4a-positive-05","pieceId":"r2-06","editionId":"self-authored-v1","photoPath":"data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-05.jpg","audioPath":"data/private/western-strings-round2/r2-06.m4a","captureVariant":"near-frontal","renderUrl":"../../data/experiments/western-strings-m4a/supported-editions/editions/r2-06/self-authored-v1/render-page-01.png","outputName":"m4a-positive-05.jpg"},{"caseId":"m4a-positive-06","pieceId":"r2-06","editionId":"self-authored-v1","photoPath":"data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-06.jpg","audioPath":"data/private/western-strings-round2/r2-06.m4a","captureVariant":"left-perspective","renderUrl":"../../data/experiments/western-strings-m4a/supported-editions/editions/r2-06/self-authored-v1/render-page-01.png","outputName":"m4a-positive-06.jpg"},{"caseId":"m4a-positive-07","pieceId":"r2-06","editionId":"self-authored-v1","photoPath":"data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-07.jpg","audioPath":"data/private/western-strings-round2/r2-06.m4a","captureVariant":"right-perspective","renderUrl":"../../data/experiments/western-strings-m4a/supported-editions/editions/r2-06/self-authored-v1/render-page-01.png","outputName":"m4a-positive-07.jpg"},{"caseId":"m4a-positive-08","pieceId":"r3-01","editionId":"self-authored-v1","photoPath":"data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-08.jpg","audioPath":"data/private/western-strings-round3/r3-01.m4a","captureVariant":"near-frontal","renderUrl":"../../data/experiments/western-strings-m4a/supported-editions/editions/r3-01/self-authored-v1/render-page-01.png","outputName":"m4a-positive-08.jpg"},{"caseId":"m4a-positive-09","pieceId":"r3-01","editionId":"self-authored-v1","photoPath":"data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-09.jpg","audioPath":"data/private/western-strings-round3/r3-01.m4a","captureVariant":"left-perspective","renderUrl":"../../data/experiments/western-strings-m4a/supported-editions/editions/r3-01/self-authored-v1/render-page-01.png","outputName":"m4a-positive-09.jpg"},{"caseId":"m4a-positive-10","pieceId":"r3-01","editionId":"self-authored-v1","photoPath":"data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-10.jpg","audioPath":"data/private/western-strings-round3/r3-01.m4a","captureVariant":"right-perspective","renderUrl":"../../data/experiments/western-strings-m4a/supported-editions/editions/r3-01/self-authored-v1/render-page-01.png","outputName":"m4a-positive-10.jpg"}];
+    const list = document.querySelector('#tasks');
+    const score = document.querySelector('#score');
+    const meta = document.querySelector('#meta');
+    let active = 0;
+    function show(index) {
+      active = index;
+      const task = tasks[index];
+      score.src = task.renderUrl;
+      meta.textContent = `${task.caseId} · ${task.pieceId} · ${task.captureVariant} · 保存为 ${task.outputName}`;
+      [...list.children].forEach((button, i) => button.classList.toggle('active', i === index));
+    }
+    tasks.forEach((task, index) => {
+      const button = document.createElement('button');
+      button.className = 'task';
+      button.textContent = `${index + 1}. ${task.caseId} · ${task.captureVariant}`;
+      button.addEventListener('click', () => show(index));
+      list.appendChild(button);
+    });
+    document.querySelector('#fullscreen').addEventListener('click', () => document.querySelector('#viewer').requestFullscreen());
+    show(0);
+  </script>
+</body>
+</html>
