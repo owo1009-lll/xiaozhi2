@@ -1428,10 +1428,15 @@ const m4Failure = fullGate.failures.find((failure) => failure.track === (
 assert(m4Failure, "the required M4 track must remain fail-closed until its active contract is ready");
 if (m4.m4GateSplitDecisionReady === true) {
   assert.equal(m4.m4aSupportedEditionRegistrationReady, false);
-  assert(
-    m4Failure.reason.includes("m4a-supported-edition-registry-not-ready"),
-    "signed M4a gate split must point at the unfinished supported-edition registry",
-  );
+  if (m4.m4aSupportedEditionRegistryReady === true) {
+    assert(m4Failure.reason.includes("m4a-registration-runtime-not-ready"));
+    assert(m4Failure.reason.includes("m4a-acceptance-evidence-not-ready"));
+  } else {
+    assert(
+      m4Failure.reason.some((reason) => String(reason).includes("registry")),
+      "an invalid M4a supported-edition registry must remain fail-closed",
+    );
+  }
   assert.equal(m4Failure.artifact, m4.artifacts.m4aRegistrationAuditJson);
   assert.equal(
     fullGate.failures.some((failure) => failure.track === "M4 OMR automatic adoption"),

@@ -1,6 +1,6 @@
 # 西洋弦乐练习诊断项目状态快照
 
-更新时间: 2026-07-18 13:10 +08:00
+更新时间: 2026-07-19 01:38 +08:00
 
 本文件是当前主线状态快照。实时判断仍以命令为准:
 
@@ -18,7 +18,8 @@
 - 已在该分支依次重新运行 `npm run western:m4-p0-structure-gate`、`npm run western:project-status` 和 `npm run western:project-gate`。P0 冻结 5 谱结果为完整 `1/5`,谱号/调号/拍号=`3/5,2/5,2/5`,`studentGateReady=false`。
 - 这里的 P0 `1/5` 只表示同一 5 谱中的谱号/调号/拍号结构闸门;真实照片 pitch+onset+measure 完整自动采纳仍为 `0/5`,12 份历史照片链缓存重放中的 P0-ready 又是 `0/12`。三个数字对应不同门槛或数据集,不得互相替换;`m4P0StructureReady=true` 也只表示至少 1 谱 P0-ready,不表示 M4 自动采纳通过。
 - 当前运行时仍为 `ordinaryUploadAutoFeedbackReady=false`,`m3plusAutoFeedbackReady=false`,`m4OmrAutoScoreReady=false`,`policy=fail-closed`。
-- 当前项目总闸门要求 ordinary/M3+/M4 三轨同时通过。**2026-07-19 更新(重大):** 负责人已亲口"认"接受 2026-07-18 fresh-blind 证据并"批"过受控试点,`authorizationReady` 已从硬编码 false 改为从负责人常备批准文件(`data/experiments/western-strings-controlled-pilot-approval.json`)派生;ordinary 与 M3+ 两轨现均 `authorizationReady=true`,`m3plus-authorization-closed`/`ordinary-dynamic-shadow-authorization-closed` 均已清除。**`readyToStartControlledPilot=true`,受控试点(review-only,人工复核每一行,不触达学生)现已可启动,但尚未实际执行。** 两轨仍各自保留 `*-student-gate-closed`(学生端闸门,与授权完全独立、结构性永远 false)。M3+ v2 五区证据完整(保护库存 14/14、平拉 gold join `12/12`、揉弦/滑音 join `8/8`,`releaseGateReady=true`)。M4 automatic adoption 仍未达标,`projectReleaseReady` 仍为 false。`western:project-gate` 因此仍按设计非零退出(M3+ 学生闸+M4)。(旧值 8/14、0/12、0/8 为 2026-07-17 前的历史状态。)
+- 当前项目总闸门要求 ordinary/M3+/M4 三轨同时通过。**2026-07-19 更新(重大):** 负责人已亲口"认"接受 2026-07-18 fresh-blind 证据并"批"过受控试点,`authorizationReady` 已从硬编码 false 改为从负责人常备批准文件(`data/experiments/western-strings-controlled-pilot-approval.json`)派生;ordinary 与 M3+ 两轨现均 `authorizationReady=true`,`m3plus-authorization-closed`/`ordinary-dynamic-shadow-authorization-closed` 均已清除。**`readyToStartControlledPilot=true`,受控试点(review-only,人工复核每一行,不触达学生)现已可启动,但尚未实际执行。** 两轨仍各自保留 `*-student-gate-closed`(学生端闸门,与授权完全独立、结构性永远 false)。M3+ v2 五区证据完整(保护库存 14/14、平拉 gold join `12/12`、揉弦/滑音 join `8/8`,`releaseGateReady=true`)。M4 必选闸门仍未达标,`projectReleaseReady` 仍为 false。`western:project-gate` 因此仍按设计非零退出(M3+ 学生闸+M4)。(旧值 8/14、0/12、0/8 为 2026-07-17 前的历史状态。)
+- **2026-07-19 M4 双轨改绑:** 负责人已分别签署 M4a/M4b 闸门拆分和 M4b POC 晋升数字冻结。必选 M4 项现改绑 `M4aSupportedEditionRegistrationReady`,不再要求 M4b 开放域 OMR 自动采纳;M4b 的历史失败事实和 `m4bOpenWorldOmrAutomaticAdoptionReady=false` 均保持不变。M4a C.2a-b 已完成:固定 MuseScore Studio 4.7.4/150 dpi 的 3 个内置自制版本(r2-01/r2-06/r3-01)均生成 MusicXML+标准 PNG+系统/谱表/小节/音符坐标 sidecar 三元组,live verifier 现场重算三项 SHA-256、许可、人工确认和坐标边界,当前 `validEntries=3/3`。M4a 尚未就绪;当前明确阻塞已前移为 `m4a-registration-runtime-not-ready` 和 `m4a-acceptance-evidence-not-ready`。
 - HOMR v3 的具名 AGPL/六模型审查现为 `approved-with-conditions`,唯一批准范围 `controlled-offline-review-only`;稳定运行时已迁至 `data/tools/`,live preflight 的 governance/host/deployment 三项均绿。preflight 现与 review-record SHA-256 绑定,审批或 artifact 漂移会令 `project-status/project-gate` fail-closed。学生端网络使用、自动采纳与再分发仍未获授权;这里的三绿不得写成默认生产发布通过。
 - 刷新产物为 `data/experiments/western-strings-m4/p0-structure-gate/report.json`、`data/experiments/western-strings-project-status.json` 与 `data/experiments/western-strings-project-gate.json`;三者位于 `data/` 忽略目录,用于本地可复跑状态,不等同于已提交证据。
 - **2026-07-19 更新:** release review、controlled-pilot decision 与 start preflight 已按当前合同重新生成,且均已转绿:`readyForControlledPilotDecision=true`,`readyToStartControlledPilot=true`,`okToStartControlledPilot=true`。它们绑定当前 live evidence(非缓存假象——`liveEvidenceBindingCurrent=true`),approval 文件 scope 与当前合同精确匹配且持久化安全确认齐全。**这只代表受控试点"可启动",试点本身尚未执行**;执行需要另一次显式命令(`npm run western:controlled-pilot-run -- --execute`),且仍是纯 review-only、不产生任何学生反馈。旧描述(scope 过期/缺确认导致红)为 2026-07-18 前状态,已被本次授权接线更新。
@@ -146,7 +147,9 @@
 - 新增 `npm run western:m3plus-protocol-order-diagnostic` 后确认:`m3p-02` 并未缺少 16 个单元,而是按同一音高完成两轮后再换音。只读候选顺序 `[1,5,2,6,3,7,4,8]` 可把定位从 `10/16` 提升到 `16/16`,路径成本从约 `0.179` 降至 `0.006`,但这是由音频反推的 post-hoc 协议候选,未自动改写 performance gold。完整定位后,8 个预期颤音里有 7 个存在上方音或音高交替证据；唯一异常是 holdout 第 8 组约 `15.915-16.900s`,没有上方音或交替证据。该单元先标为待确认的演奏偏差,不通过放宽阈值掩盖,也不在未确认前重写正式指标；因此当前颤音 holdout 仍如实报告 precision=`1.00`、recall=`0.75`。揉弦已完成多路线受控对照：CREPE full 与 pYIN 均弱于 CREPE tiny；同录音直音基线、FFT、4-8Hz 自相关、独立谐波 ridge、chroma/onset 及基于上方音的边界重切均未达到 holdout 门槛。固定六物理特征 L2 logistic 在原窗和重切窗均只有 precision=`1.00`、recall=`0.25`,证明问题不是单阈值过简；不得继续在 12 条 calibration 上调分类器。
 - `npm run western:m3plus-feature-separability` 对 CREPE full 报告做了独立盲验审计。装饰音在 calibration/holdout 各只有 `3` 个可靠正例,滑音 holdout 只有 `3` 个可靠正例,均低于每类每 split 至少 `4` 个的冻结要求;现有上方音、净移动、单调性和过渡时长特征无一具备可放行证据。因此八度修正、CREPE full 和协议重排均不能替代合规技法执行及足量盲验单元,M3+ 继续 fail-closed。
 
-### M4 OMR benchmark
+### M4 双轨状态与 M4b OMR benchmark
+
+2026-07-19 起以附录 C 为现行合同:M4a 是支持库配准产品线,M4b 是开放域结构专用研究线。下列既有 OMR 数字只属于 M4b/历史研究证据,不得再被写成 M4a 的运行时实现或总项目必选条件。M4a 谱库/sidecar 的当前实现状态见文件顶部刷新段。
 
 当前证据已拆成两层,不可混用:
 
@@ -186,8 +189,8 @@
 
 结论:
 
-- M4 已完成可复跑的独立**研究级** OMR 准确率基准,可以报告限定范围内的数字谱/合成退化结果。
-- M4 尚未达到自动采纳:逐谱严格门槛仅 12/32,真实照片独立源谱按 pitch+onset+measure 完整门槛严格通过 `0/5`,运行时置信特征也筛不出安全子集。OMR 不会进入学生端运行时自动诊断。
+- M4b 已完成可复跑的独立**研究级** OMR 准确率基准,可以报告限定范围内的数字谱/合成退化结果。
+- M4b 尚未达到开放域自动采纳:逐谱严格门槛仅 12/32,真实照片独立源谱按 pitch+onset+measure 完整门槛严格通过 `0/5`,运行时置信特征也筛不出安全子集。OMR 不会进入学生端运行时自动诊断;这不否定也不放行独立的 M4a 支持库配准产品线。
 - Clarity 监督适配已完成 Bach 和 DoReMi 两次从数据生成、无泄漏划分、低负载训练到冻结真照片的完整闭环,但真照片完整指标都有退化,候选均已拒绝并清理。该路线不再继续堆干净数字谱、训练步数或调参;除非以后新增拍照域退化、符杠/符尾/休止/附点与小节结构级监督,否则 Clarity 只保留为负基线,`studentGateReady=false` 不变。
 - 维持“当前不可自动采纳”的裁决不需要教师或制谱人员继续操作。新增真实照片 gold 的基础证据缺口已经关闭,Audiveris 预处理/置信筛选、Oemer、HOMR 与 Clarity-OMR 均未达到完整门槛;继续扩大照片只增强外部效度,不能掩盖当前 `0/5`。若主动推进第 2 份同版 gold,仍可完成 Op.45 候选的四项人工复核,但该可选任务不是当前 fail-closed 裁决的阻塞项。
 - 报告论文/表格时必须将独立 render-gold 与 `human-approved-unchanged-draft` 分开,后者不得伪称独立照片准确率。
@@ -297,12 +300,12 @@ npm run western:ordinary-auto-pass-precision-review-pack -- --recording-id <fres
 
 以下命令仍可复跑历史证据,但不属于当前授权链:`npm run western:controlled-pilot-evidence-audit`、`npm run test:western-fresh-blind-intake`、`npm run western:historical-fresh-blind-intake-status`。旧 `western:fresh-blind-intake-init/stage/status` 现在会在任何读写前非零退出,只有显式 `--historical-replay` 的具名别名可访问旧流程。其中 `r2-08` 入场审计历史上曾通过且该授权已经消费;不得把其结果写成当前 dynamic-shadow pilot 或 release 批准。
 
-`npm run western:project-gate` 当前仍以非零退出阻断默认发布(`projectReleaseReady=false`),失败为(2026-07-19 更新:两轨 `*-authorization-closed` 均已因负责人授权接线清除,详见上文"授权接线"小节):
+`npm run western:project-gate` 当前仍以非零退出阻断默认发布(`projectReleaseReady=false`),失败为(2026-07-19 更新:两轨 `*-authorization-closed` 均已因负责人授权接线清除,M4 必选项已按具名签署改绑 M4a):
 
 - `m3plus-student-gate-closed`(结构性硬编码,与授权无关,学生端仍需单独批准)
-- `M4 OMR automatic adoption`(真实照片完整门槛、运行时安全子集和独立同版页数均未达标)
+- `M4a supported-edition registration`(谱库 3/3 已现场验真,但配准运行时和冻结验收证据尚未完成)
 
-注意:ordinary 轨此前的 `blockingReasons` 现为空数组,但因为 M3+ 学生闸与 M4 仍未达标,`ordinaryUploadAutoFeedbackReady`/`m3plusAutoFeedbackReady`/`m4OmrAutoScoreReady` 三个学生端运行时开关**均未受本次改动影响,仍然是 `false`**;唯一实际打开的是受控试点的"可启动"状态(`readyToStartControlledPilot=true`),不是学生发布。
+注意:ordinary 轨此前的 `blockingReasons` 现为空数组,但因为 M3+ 学生闸与 M4a 仍未达标,`ordinaryUploadAutoFeedbackReady`/`m3plusAutoFeedbackReady`/`m4OmrAutoScoreReady` 三个学生端运行时开关**均未受本次改动影响,仍然是 `false`**;M4b 自动采纳也继续独立关闭。当前打开的只是受控试点的"可启动"状态(`readyToStartControlledPilot=true`),不是学生发布。
 
 这是安全态,不是命令故障;维持该裁决不依赖补交复核数据。
 

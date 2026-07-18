@@ -21,6 +21,7 @@ import {
 } from "./eval-western-ordinary-fresh-blind.mjs";
 import { loadM4aGateSplitDecision } from "./m4a-supported-edition-governance.mjs";
 import { loadM4bPocPromotionDecision } from "./m4b-poc-promotion-governance.mjs";
+import { auditM4aSupportedEditionRegistry } from "./audit-western-m4a-supported-edition-registry.mjs";
 
 const DEFAULT_OUT = path.join("data", "experiments", "western-strings-project-status.json");
 const REVIEW_POLICY_DOC = path.join("docs", "western-strings-review-policy.md");
@@ -2832,6 +2833,7 @@ async function buildControlledStatus() {
 async function buildM4OmrStatus() {
   const m4aGateSplitDecision = await loadM4aGateSplitDecision();
   const m4bPocPromotionDecision = await loadM4bPocPromotionDecision();
+  const m4aSupportedEditionRegistry = await auditM4aSupportedEditionRegistry();
   const readiness = await readJson(M4_READINESS);
   const benchmark = await readJson(M4_BENCHMARK);
   const independentBenchmark = await readJson(M4_INDEPENDENT_BENCHMARK_AUDIT);
@@ -2940,8 +2942,13 @@ async function buildM4OmrStatus() {
     m4aSupportedEditionRegistrationReady: false,
     m4aBlockingReasons: [
       ...m4aGateSplitDecision.blockingReasons,
-      ...(m4aGateSplitDecision.ready ? ["m4a-supported-edition-registry-not-ready"] : []),
+      ...m4aSupportedEditionRegistry.blockingReasons,
+      ...(m4aGateSplitDecision.ready && m4aSupportedEditionRegistry.ready
+        ? ["m4a-registration-runtime-not-ready", "m4a-acceptance-evidence-not-ready"]
+        : []),
     ],
+    m4aSupportedEditionRegistryReady: m4aSupportedEditionRegistry.ready,
+    m4aSupportedEditionRegistry: m4aSupportedEditionRegistry,
     m4bOpenWorldOmrAutomaticAdoptionReady: automaticAdoptionReady,
     m4aGateSplitDecision: m4aGateSplitDecision,
     m4bPocPromotionThresholdDecisionReady: m4bPocPromotionDecision.ready,
@@ -3055,6 +3062,7 @@ async function buildM4OmrStatus() {
     },
     artifacts: {
       m4aGateSplitDecisionJson: m4aGateSplitDecision.source,
+      m4aSupportedEditionRegistryJson: m4aSupportedEditionRegistry.source,
       m4bPocPromotionThresholdDecisionJson: m4bPocPromotionDecision.source,
       m4aRegistrationAuditJson: "data/experiments/western-strings-m4a/registration-audit.json",
       readinessJson: M4_READINESS.replace(/\\/g, "/"),

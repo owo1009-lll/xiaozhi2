@@ -1,0 +1,38 @@
+{
+  "contract": "western-m4a-supported-edition-seeds-v1",
+  "renderer": {
+    "id": "musescore-studio",
+    "version": "4.7.4",
+    "dpi": 150
+  },
+  "catalogApproval": {
+    "source": "docs/western-strings-project-plan.md#c25-initial-score-library-catalog",
+    "commit": "51bd302a3cbfb2a1bb1a63fff18d714fe32becea",
+    "confirmedBy": "guanxingzhi (project owner)",
+    "confirmedAt": "2026-07-19T01:22:15+08:00",
+    "confirmationMethod": "self-authored-score-construction-is-ground-truth-and-entry-is-listed-as-immediately-registerable-in-appendix-c2.5"
+  },
+  "entries": [
+    {
+      "pieceId": "r2-01",
+      "editionId": "self-authored-v1",
+      "title": "D major stepwise etude",
+      "sourceMusicxmlPath": "data/private/western-strings-round2/r2-01.musicxml",
+      "licenseStatus": "self-authored"
+    },
+    {
+      "pieceId": "r2-06",
+      "editionId": "self-authored-v1",
+      "title": "D major long-tone and vibrato etude",
+      "sourceMusicxmlPath": "data/private/western-strings-round2/r2-06.musicxml",
+      "licenseStatus": "self-authored"
+    },
+    {
+      "pieceId": "r3-01",
+      "editionId": "self-authored-v1",
+      "title": "E minor etude",
+      "sourceMusicxmlPath": "data/private/western-strings-round3/r3-01.musicxml",
+      "licenseStatus": "self-authored"
+    }
+  ]
+}

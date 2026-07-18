@@ -1,0 +1,75 @@
+{
+  "contract": "western-m4a-supported-edition-registry-v1",
+  "generatedBy": "scripts/experiments/build_western_m4a_supported_editions.py",
+  "catalogApproval": {
+    "source": "docs/western-strings-project-plan.md#c25-initial-score-library-catalog",
+    "commit": "51bd302a3cbfb2a1bb1a63fff18d714fe32becea",
+    "confirmedBy": "guanxingzhi (project owner)",
+    "confirmedAt": "2026-07-19T01:22:15+08:00",
+    "confirmationMethod": "self-authored-score-construction-is-ground-truth-and-entry-is-listed-as-immediately-registerable-in-appendix-c2.5"
+  },
+  "renderer": {
+    "id": "musescore-studio",
+    "version": "4.7.4",
+    "dpi": 150
+  },
+  "entries": [
+    {
+      "pieceId": "r2-01",
+      "editionId": "self-authored-v1",
+      "title": "D major stepwise etude",
+      "musicxmlPath": "editions/r2-01/self-authored-v1/score.musicxml",
+      "musicxmlSha256": "c8452070f5bc54c04cc86de128175a0acac5bfa176ccadb99fdf5f0c9a0edbf2",
+      "renderPath": "editions/r2-01/self-authored-v1/render-page-01.png",
+      "renderSha256": "db9535c03bb923852885f4d2668a1985bf863a9df43ed4d5083daf577986ca3e",
+      "coordinateSidecarPath": "editions/r2-01/self-authored-v1/coordinates.json",
+      "coordinateSidecarSha256": "b30bffd2af13b1978fd907507ec07b49fc4b9b8c44fd1061ced2f65b354cee88",
+      "rendererVersion": "4.7.4",
+      "confirmedBy": "guanxingzhi (project owner)",
+      "confirmedAt": "2026-07-19T01:22:15+08:00",
+      "confirmationMethod": "self-authored-score-construction-is-ground-truth-and-entry-is-listed-as-immediately-registerable-in-appendix-c2.5",
+      "confirmationSource": "docs/western-strings-project-plan.md#c25-initial-score-library-catalog",
+      "confirmationCommit": "51bd302a3cbfb2a1bb1a63fff18d714fe32becea",
+      "licenseStatus": "self-authored",
+      "pageCount": 1
+    },
+    {
+      "pieceId": "r2-06",
+      "editionId": "self-authored-v1",
+      "title": "D major long-tone and vibrato etude",
+      "musicxmlPath": "editions/r2-06/self-authored-v1/score.musicxml",
+      "musicxmlSha256": "fac16259a43b292f05c1fede742b713ff066df57e986f5075c5abc5689683b6c",
+      "renderPath": "editions/r2-06/self-authored-v1/render-page-01.png",
+      "renderSha256": "ebab85fa2d0ab000ac4730727c3e3fb085f86b7c85b3fcb671d0e306e6454c36",
+      "coordinateSidecarPath": "editions/r2-06/self-authored-v1/coordinates.json",
+      "coordinateSidecarSha256": "6885832678c8ea6c5b30d1e988e3d747ba916d2ecbfa93fdb09b3d6af17ce817",
+      "rendererVersion": "4.7.4",
+      "confirmedBy": "guanxingzhi (project owner)",
+      "confirmedAt": "2026-07-19T01:22:15+08:00",
+      "confirmationMethod": "self-authored-score-construction-is-ground-truth-and-entry-is-listed-as-immediately-registerable-in-appendix-c2.5",
+      "confirmationSource": "docs/western-strings-project-plan.md#c25-initial-score-library-catalog",
+      "confirmationCommit": "51bd302a3cbfb2a1bb1a63fff18d714fe32becea",
+      "licenseStatus": "self-authored",
+      "pageCount": 1
+    },
+    {
+      "pieceId": "r3-01",
+      "editionId": "self-authored-v1",
+      "title": "E minor etude",
+      "musicxmlPath": "editions/r3-01/self-authored-v1/score.musicxml",
+      "musicxmlSha256": "a7744530efefb818f3d4bff371894682f6777f658e293186ad08030ee443efd5",
+      "renderPath": "editions/r3-01/self-authored-v1/render-page-01.png",
+      "renderSha256": "46f1ed94b21a7c608a8e09e0c7232177faebe4d94b18371b84ed876fa8a87c6f",
+      "coordinateSidecarPath": "editions/r3-01/self-authored-v1/coordinates.json",
+      "coordinateSidecarSha256": "307bd83af7e67fcf784f93881c6a0ce2568a0a81b9b5e51e463a1c1b30eac961",
+      "rendererVersion": "4.7.4",
+      "confirmedBy": "guanxingzhi (project owner)",
+      "confirmedAt": "2026-07-19T01:22:15+08:00",
+      "confirmationMethod": "self-authored-score-construction-is-ground-truth-and-entry-is-listed-as-immediately-registerable-in-appendix-c2.5",
+      "confirmationSource": "docs/western-strings-project-plan.md#c25-initial-score-library-catalog",
+      "confirmationCommit": "51bd302a3cbfb2a1bb1a63fff18d714fe32becea",
+      "licenseStatus": "self-authored",
+      "pageCount": 1
+    }
+  ]
+}

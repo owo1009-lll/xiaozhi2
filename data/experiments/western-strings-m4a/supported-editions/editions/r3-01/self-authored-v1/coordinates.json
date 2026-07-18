@@ -1,0 +1,2058 @@
+{
+  "contract": "western-m4a-render-coordinate-sidecar-v1",
+  "pieceId": "r3-01",
+  "editionId": "self-authored-v1",
+  "renderer": {
+    "id": "musescore-studio",
+    "version": "4.7.4",
+    "dpi": 150
+  },
+  "page": {
+    "pageIndex": 1,
+    "widthPixels": 1240,
+    "heightPixels": 1754,
+    "svgViewBox": [
+      0.0,
+      0.0,
+      9924.0,
+      14028.0
+    ],
+    "svgToPixelScale": [
+      0.1249496171,
+      0.125035643
+    ]
+  },
+  "counts": {
+    "systems": 3,
+    "staves": 3,
+    "measures": 18,
+    "notes": 59
+  },
+  "systems": [
+    {
+      "systemIndex": 0,
+      "staffIndices": [
+        0
+      ],
+      "bboxPixels": [
+        140,
+        261,
+        1152,
+        309
+      ],
+      "bboxNormalized": [
+        0.11290323,
+        0.14880274,
+        0.92903226,
+        0.17616876
+      ]
+    },
+    {
+      "systemIndex": 1,
+      "staffIndices": [
+        1
+      ],
+      "bboxPixels": [
+        88,
+        515,
+        1152,
+        562
+      ],
+      "bboxNormalized": [
+        0.07096774,
+        0.2936146,
+        0.92903226,
+        0.32041049
+      ]
+    },
+    {
+      "systemIndex": 2,
+      "staffIndices": [
+        2
+      ],
+      "bboxPixels": [
+        88,
+        768,
+        1152,
+        815
+      ],
+      "bboxNormalized": [
+        0.07096774,
+        0.43785633,
+        0.92903226,
+        0.46465222
+      ]
+    }
+  ],
+  "staves": [
+    {
+      "staffIndex": 0,
+      "systemIndex": 0,
+      "bboxPixels": [
+        140,
+        261,
+        1152,
+        309
+      ],
+      "bboxNormalized": [
+        0.11290323,
+        0.14880274,
+        0.92903226,
+        0.17616876
+      ]
+    },
+    {
+      "staffIndex": 1,
+      "systemIndex": 1,
+      "bboxPixels": [
+        88,
+        515,
+        1152,
+        562
+      ],
+      "bboxNormalized": [
+        0.07096774,
+        0.2936146,
+        0.92903226,
+        0.32041049
+      ]
+    },
+    {
+      "staffIndex": 2,
+      "systemIndex": 2,
+      "bboxPixels": [
+        88,
+        768,
+        1152,
+        815
+      ],
+      "bboxNormalized": [
+        0.07096774,
+        0.43785633,
+        0.92903226,
+        0.46465222
+      ]
+    }
+  ],
+  "measures": [
+    {
+      "globalMeasureIndex": 1,
+      "sourceMeasureNumber": "1",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        140,
+        263,
+        421,
+        307
+      ],
+      "bboxNormalized": [
+        0.11290323,
+        0.14994299,
+        0.33951613,
+        0.17502851
+      ]
+    },
+    {
+      "globalMeasureIndex": 2,
+      "sourceMeasureNumber": "2",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        420,
+        263,
+        615,
+        307
+      ],
+      "bboxNormalized": [
+        0.33870968,
+        0.14994299,
+        0.49596774,
+        0.17502851
+      ]
+    },
+    {
+      "globalMeasureIndex": 3,
+      "sourceMeasureNumber": "3",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        614,
+        263,
+        808,
+        307
+      ],
+      "bboxNormalized": [
+        0.49516129,
+        0.14994299,
+        0.6516129,
+        0.17502851
+      ]
+    },
+    {
+      "globalMeasureIndex": 4,
+      "sourceMeasureNumber": "4",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        807,
+        263,
+        957,
+        307
+      ],
+      "bboxNormalized": [
+        0.65080645,
+        0.14994299,
+        0.77177419,
+        0.17502851
+      ]
+    },
+    {
+      "globalMeasureIndex": 5,
+      "sourceMeasureNumber": "5",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        956,
+        263,
+        1151,
+        307
+      ],
+      "bboxNormalized": [
+        0.77096774,
+        0.14994299,
+        0.92822581,
+        0.17502851
+      ]
+    },
+    {
+      "globalMeasureIndex": 6,
+      "sourceMeasureNumber": "6",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        88,
+        517,
+        336,
+        560
+      ],
+      "bboxNormalized": [
+        0.07096774,
+        0.29475485,
+        0.27096774,
+        0.31927024
+      ]
+    },
+    {
+      "globalMeasureIndex": 7,
+      "sourceMeasureNumber": "7",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        335,
+        517,
+        474,
+        560
+      ],
+      "bboxNormalized": [
+        0.27016129,
+        0.29475485,
+        0.38225806,
+        0.31927024
+      ]
+    },
+    {
+      "globalMeasureIndex": 8,
+      "sourceMeasureNumber": "8",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        473,
+        517,
+        654,
+        560
+      ],
+      "bboxNormalized": [
+        0.38145161,
+        0.29475485,
+        0.52741935,
+        0.31927024
+      ]
+    },
+    {
+      "globalMeasureIndex": 9,
+      "sourceMeasureNumber": "9",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        653,
+        517,
+        833,
+        560
+      ],
+      "bboxNormalized": [
+        0.5266129,
+        0.29475485,
+        0.67177419,
+        0.31927024
+      ]
+    },
+    {
+      "globalMeasureIndex": 10,
+      "sourceMeasureNumber": "10",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        832,
+        517,
+        972,
+        560
+      ],
+      "bboxNormalized": [
+        0.67096774,
+        0.29475485,
+        0.78387097,
+        0.31927024
+      ]
+    },
+    {
+      "globalMeasureIndex": 11,
+      "sourceMeasureNumber": "11",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        971,
+        517,
+        1151,
+        560
+      ],
+      "bboxNormalized": [
+        0.78306452,
+        0.29475485,
+        0.92822581,
+        0.31927024
+      ]
+    },
+    {
+      "globalMeasureIndex": 12,
+      "sourceMeasureNumber": "12",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        88,
+        770,
+        315,
+        813
+      ],
+      "bboxNormalized": [
+        0.07096774,
+        0.43899658,
+        0.25403226,
+        0.46351197
+      ]
+    },
+    {
+      "globalMeasureIndex": 13,
+      "sourceMeasureNumber": "13",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        314,
+        770,
+        477,
+        813
+      ],
+      "bboxNormalized": [
+        0.25322581,
+        0.43899658,
+        0.38467742,
+        0.46351197
+      ]
+    },
+    {
+      "globalMeasureIndex": 14,
+      "sourceMeasureNumber": "14",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        476,
+        770,
+        603,
+        813
+      ],
+      "bboxNormalized": [
+        0.38387097,
+        0.43899658,
+        0.48629032,
+        0.46351197
+      ]
+    },
+    {
+      "globalMeasureIndex": 15,
+      "sourceMeasureNumber": "15",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        602,
+        770,
+        765,
+        813
+      ],
+      "bboxNormalized": [
+        0.48548387,
+        0.43899658,
+        0.61693548,
+        0.46351197
+      ]
+    },
+    {
+      "globalMeasureIndex": 16,
+      "sourceMeasureNumber": "16",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        764,
+        770,
+        927,
+        813
+      ],
+      "bboxNormalized": [
+        0.61612903,
+        0.43899658,
+        0.74758065,
+        0.46351197
+      ]
+    },
+    {
+      "globalMeasureIndex": 17,
+      "sourceMeasureNumber": "17",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        926,
+        770,
+        1052,
+        813
+      ],
+      "bboxNormalized": [
+        0.74677419,
+        0.43899658,
+        0.8483871,
+        0.46351197
+      ]
+    },
+    {
+      "globalMeasureIndex": 18,
+      "sourceMeasureNumber": "18",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        1051,
+        770,
+        1151,
+        813
+      ],
+      "bboxNormalized": [
+        0.84758065,
+        0.43899658,
+        0.92822581,
+        0.46351197
+      ]
+    }
+  ],
+  "notes": [
+    {
+      "xmlPitchedNoteIndex": 0,
+      "pitch": {
+        "step": "E",
+        "alter": 0,
+        "octave": 4,
+        "midi": 64
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 1,
+      "sourceMeasureNumber": "1",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        240,
+        300,
+        255,
+        312
+      ],
+      "bboxNormalized": [
+        0.19354839,
+        0.17103763,
+        0.20564516,
+        0.17787913
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 1,
+      "pitch": {
+        "step": "F",
+        "alter": 1,
+        "octave": 4,
+        "midi": 66
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 1,
+      "sourceMeasureNumber": "1",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        285,
+        295,
+        300,
+        307
+      ],
+      "bboxNormalized": [
+        0.22983871,
+        0.168187,
+        0.24193548,
+        0.17502851
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 2,
+      "pitch": {
+        "step": "G",
+        "alter": 0,
+        "octave": 4,
+        "midi": 67
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 1,
+      "sourceMeasureNumber": "1",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        330,
+        289,
+        344,
+        301
+      ],
+      "bboxNormalized": [
+        0.26612903,
+        0.16476625,
+        0.27741935,
+        0.17160775
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 3,
+      "pitch": {
+        "step": "A",
+        "alter": 0,
+        "octave": 4,
+        "midi": 69
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 1,
+      "sourceMeasureNumber": "1",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        375,
+        284,
+        389,
+        296
+      ],
+      "bboxNormalized": [
+        0.30241935,
+        0.16191562,
+        0.31370968,
+        0.16875713
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 4,
+      "pitch": {
+        "step": "B",
+        "alter": 0,
+        "octave": 4,
+        "midi": 71
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 2,
+      "sourceMeasureNumber": "2",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        434,
+        279,
+        448,
+        291
+      ],
+      "bboxNormalized": [
+        0.35,
+        0.15906499,
+        0.36129032,
+        0.1659065
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 5,
+      "pitch": {
+        "step": "A",
+        "alter": 0,
+        "octave": 4,
+        "midi": 69
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 2,
+      "sourceMeasureNumber": "2",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        479,
+        284,
+        493,
+        296
+      ],
+      "bboxNormalized": [
+        0.38629032,
+        0.16191562,
+        0.39758065,
+        0.16875713
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 6,
+      "pitch": {
+        "step": "G",
+        "alter": 0,
+        "octave": 4,
+        "midi": 67
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 2,
+      "sourceMeasureNumber": "2",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        523,
+        289,
+        538,
+        301
+      ],
+      "bboxNormalized": [
+        0.42177419,
+        0.16476625,
+        0.43387097,
+        0.17160775
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 7,
+      "pitch": {
+        "step": "F",
+        "alter": 1,
+        "octave": 4,
+        "midi": 66
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 2,
+      "sourceMeasureNumber": "2",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        568,
+        295,
+        583,
+        307
+      ],
+      "bboxNormalized": [
+        0.45806452,
+        0.168187,
+        0.47016129,
+        0.17502851
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 8,
+      "pitch": {
+        "step": "E",
+        "alter": 0,
+        "octave": 4,
+        "midi": 64
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 3,
+      "sourceMeasureNumber": "3",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        628,
+        300,
+        642,
+        312
+      ],
+      "bboxNormalized": [
+        0.50645161,
+        0.17103763,
+        0.51774194,
+        0.17787913
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 9,
+      "pitch": {
+        "step": "G",
+        "alter": 0,
+        "octave": 4,
+        "midi": 67
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 3,
+      "sourceMeasureNumber": "3",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        672,
+        289,
+        687,
+        301
+      ],
+      "bboxNormalized": [
+        0.54193548,
+        0.16476625,
+        0.55403226,
+        0.17160775
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 10,
+      "pitch": {
+        "step": "B",
+        "alter": 0,
+        "octave": 4,
+        "midi": 71
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 3,
+      "sourceMeasureNumber": "3",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        717,
+        279,
+        732,
+        291
+      ],
+      "bboxNormalized": [
+        0.57822581,
+        0.15906499,
+        0.59032258,
+        0.1659065
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 11,
+      "pitch": {
+        "step": "E",
+        "alter": 0,
+        "octave": 5,
+        "midi": 76
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 3,
+      "sourceMeasureNumber": "3",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        762,
+        264,
+        776,
+        276
+      ],
+      "bboxNormalized": [
+        0.61451613,
+        0.15051311,
+        0.62580645,
+        0.15735462
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 12,
+      "pitch": {
+        "step": "D",
+        "alter": 0,
+        "octave": 5,
+        "midi": 74
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 4,
+      "sourceMeasureNumber": "4",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        821,
+        269,
+        836,
+        281
+      ],
+      "bboxNormalized": [
+        0.66209677,
+        0.15336374,
+        0.67419355,
+        0.16020525
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 13,
+      "pitch": {
+        "step": "B",
+        "alter": 0,
+        "octave": 4,
+        "midi": 71
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 4,
+      "sourceMeasureNumber": "4",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        888,
+        279,
+        903,
+        291
+      ],
+      "bboxNormalized": [
+        0.71612903,
+        0.15906499,
+        0.72822581,
+        0.1659065
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 14,
+      "pitch": {
+        "step": "C",
+        "alter": 0,
+        "octave": 5,
+        "midi": 72
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 5,
+      "sourceMeasureNumber": "5",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        970,
+        274,
+        985,
+        286
+      ],
+      "bboxNormalized": [
+        0.78225806,
+        0.15621437,
+        0.79435484,
+        0.16305587
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 15,
+      "pitch": {
+        "step": "B",
+        "alter": 0,
+        "octave": 4,
+        "midi": 71
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 5,
+      "sourceMeasureNumber": "5",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        1015,
+        279,
+        1029,
+        291
+      ],
+      "bboxNormalized": [
+        0.81854839,
+        0.15906499,
+        0.82983871,
+        0.1659065
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 16,
+      "pitch": {
+        "step": "A",
+        "alter": 0,
+        "octave": 4,
+        "midi": 69
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 5,
+      "sourceMeasureNumber": "5",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        1060,
+        284,
+        1074,
+        296
+      ],
+      "bboxNormalized": [
+        0.85483871,
+        0.16191562,
+        0.86612903,
+        0.16875713
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 17,
+      "pitch": {
+        "step": "G",
+        "alter": 0,
+        "octave": 4,
+        "midi": 67
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 5,
+      "sourceMeasureNumber": "5",
+      "systemIndex": 0,
+      "staffIndex": 0,
+      "bboxPixels": [
+        1104,
+        289,
+        1119,
+        301
+      ],
+      "bboxNormalized": [
+        0.89032258,
+        0.16476625,
+        0.90241935,
+        0.17160775
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 18,
+      "pitch": {
+        "step": "F",
+        "alter": 1,
+        "octave": 4,
+        "midi": 66
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 6,
+      "sourceMeasureNumber": "6",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        169,
+        548,
+        184,
+        560
+      ],
+      "bboxNormalized": [
+        0.13629032,
+        0.31242873,
+        0.1483871,
+        0.31927024
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 19,
+      "pitch": {
+        "step": "G",
+        "alter": 0,
+        "octave": 4,
+        "midi": 67
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 6,
+      "sourceMeasureNumber": "6",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        210,
+        543,
+        225,
+        555
+      ],
+      "bboxNormalized": [
+        0.16935484,
+        0.30957811,
+        0.18145161,
+        0.31641961
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 20,
+      "pitch": {
+        "step": "A",
+        "alter": 0,
+        "octave": 4,
+        "midi": 69
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 6,
+      "sourceMeasureNumber": "6",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        252,
+        537,
+        266,
+        549
+      ],
+      "bboxNormalized": [
+        0.20322581,
+        0.30615735,
+        0.21451613,
+        0.31299886
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 21,
+      "pitch": {
+        "step": "F",
+        "alter": 1,
+        "octave": 4,
+        "midi": 66
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 6,
+      "sourceMeasureNumber": "6",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        293,
+        548,
+        307,
+        560
+      ],
+      "bboxNormalized": [
+        0.23629032,
+        0.31242873,
+        0.24758065,
+        0.31927024
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 22,
+      "pitch": {
+        "step": "G",
+        "alter": 0,
+        "octave": 4,
+        "midi": 67
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 7,
+      "sourceMeasureNumber": "7",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        349,
+        543,
+        363,
+        555
+      ],
+      "bboxNormalized": [
+        0.28145161,
+        0.30957811,
+        0.29274194,
+        0.31641961
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 23,
+      "pitch": {
+        "step": "E",
+        "alter": 0,
+        "octave": 4,
+        "midi": 64
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 7,
+      "sourceMeasureNumber": "7",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        411,
+        553,
+        425,
+        565
+      ],
+      "bboxNormalized": [
+        0.33145161,
+        0.31527936,
+        0.34274194,
+        0.32212087
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 24,
+      "pitch": {
+        "step": "E",
+        "alter": 0,
+        "octave": 4,
+        "midi": 64
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 8,
+      "sourceMeasureNumber": "8",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        487,
+        553,
+        502,
+        565
+      ],
+      "bboxNormalized": [
+        0.39274194,
+        0.31527936,
+        0.40483871,
+        0.32212087
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 25,
+      "pitch": {
+        "step": "B",
+        "alter": 0,
+        "octave": 4,
+        "midi": 71
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 8,
+      "sourceMeasureNumber": "8",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        528,
+        532,
+        543,
+        544
+      ],
+      "bboxNormalized": [
+        0.42580645,
+        0.30330673,
+        0.43790323,
+        0.31014823
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 26,
+      "pitch": {
+        "step": "G",
+        "alter": 0,
+        "octave": 4,
+        "midi": 67
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 8,
+      "sourceMeasureNumber": "8",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        569,
+        543,
+        584,
+        555
+      ],
+      "bboxNormalized": [
+        0.45887097,
+        0.30957811,
+        0.47096774,
+        0.31641961
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 27,
+      "pitch": {
+        "step": "E",
+        "alter": 0,
+        "octave": 5,
+        "midi": 76
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 8,
+      "sourceMeasureNumber": "8",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        611,
+        517,
+        625,
+        529
+      ],
+      "bboxNormalized": [
+        0.49274194,
+        0.29475485,
+        0.50403226,
+        0.30159635
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 28,
+      "pitch": {
+        "step": "D",
+        "alter": 0,
+        "octave": 5,
+        "midi": 74
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 9,
+      "sourceMeasureNumber": "9",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        667,
+        522,
+        681,
+        534
+      ],
+      "bboxNormalized": [
+        0.53790323,
+        0.29760547,
+        0.54919355,
+        0.30444698
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 29,
+      "pitch": {
+        "step": "C",
+        "alter": 0,
+        "octave": 5,
+        "midi": 72
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 9,
+      "sourceMeasureNumber": "9",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        708,
+        527,
+        722,
+        539
+      ],
+      "bboxNormalized": [
+        0.57096774,
+        0.3004561,
+        0.58225806,
+        0.30729761
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 30,
+      "pitch": {
+        "step": "B",
+        "alter": 0,
+        "octave": 4,
+        "midi": 71
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 9,
+      "sourceMeasureNumber": "9",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        749,
+        532,
+        763,
+        544
+      ],
+      "bboxNormalized": [
+        0.60403226,
+        0.30330673,
+        0.61532258,
+        0.31014823
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 31,
+      "pitch": {
+        "step": "A",
+        "alter": 0,
+        "octave": 4,
+        "midi": 69
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 9,
+      "sourceMeasureNumber": "9",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        790,
+        537,
+        805,
+        549
+      ],
+      "bboxNormalized": [
+        0.63709677,
+        0.30615735,
+        0.64919355,
+        0.31299886
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 32,
+      "pitch": {
+        "step": "B",
+        "alter": 0,
+        "octave": 4,
+        "midi": 71
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 10,
+      "sourceMeasureNumber": "10",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        846,
+        532,
+        861,
+        544
+      ],
+      "bboxNormalized": [
+        0.68225806,
+        0.30330673,
+        0.69435484,
+        0.31014823
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 33,
+      "pitch": {
+        "step": "G",
+        "alter": 0,
+        "octave": 4,
+        "midi": 67
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 10,
+      "sourceMeasureNumber": "10",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        908,
+        543,
+        922,
+        555
+      ],
+      "bboxNormalized": [
+        0.73225806,
+        0.30957811,
+        0.74354839,
+        0.31641961
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 34,
+      "pitch": {
+        "step": "A",
+        "alter": 0,
+        "octave": 4,
+        "midi": 69
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 11,
+      "sourceMeasureNumber": "11",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        984,
+        537,
+        999,
+        549
+      ],
+      "bboxNormalized": [
+        0.79354839,
+        0.30615735,
+        0.80564516,
+        0.31299886
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 35,
+      "pitch": {
+        "step": "B",
+        "alter": 0,
+        "octave": 4,
+        "midi": 71
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 11,
+      "sourceMeasureNumber": "11",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        1026,
+        532,
+        1040,
+        544
+      ],
+      "bboxNormalized": [
+        0.82741935,
+        0.30330673,
+        0.83870968,
+        0.31014823
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 36,
+      "pitch": {
+        "step": "C",
+        "alter": 0,
+        "octave": 5,
+        "midi": 72
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 11,
+      "sourceMeasureNumber": "11",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        1067,
+        527,
+        1081,
+        539
+      ],
+      "bboxNormalized": [
+        0.86048387,
+        0.3004561,
+        0.87177419,
+        0.30729761
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 37,
+      "pitch": {
+        "step": "D",
+        "alter": 0,
+        "octave": 5,
+        "midi": 74
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 11,
+      "sourceMeasureNumber": "11",
+      "systemIndex": 1,
+      "staffIndex": 1,
+      "bboxPixels": [
+        1108,
+        522,
+        1122,
+        534
+      ],
+      "bboxNormalized": [
+        0.89354839,
+        0.29760547,
+        0.90483871,
+        0.30444698
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 38,
+      "pitch": {
+        "step": "E",
+        "alter": 0,
+        "octave": 5,
+        "midi": 76
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 12,
+      "sourceMeasureNumber": "12",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        166,
+        770,
+        180,
+        782
+      ],
+      "bboxNormalized": [
+        0.13387097,
+        0.43899658,
+        0.14516129,
+        0.44583808
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 39,
+      "pitch": {
+        "step": "D",
+        "alter": 0,
+        "octave": 5,
+        "midi": 74
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 12,
+      "sourceMeasureNumber": "12",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        203,
+        775,
+        217,
+        787
+      ],
+      "bboxNormalized": [
+        0.16370968,
+        0.44184721,
+        0.175,
+        0.44868871
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 40,
+      "pitch": {
+        "step": "C",
+        "alter": 0,
+        "octave": 5,
+        "midi": 72
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 12,
+      "sourceMeasureNumber": "12",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        240,
+        780,
+        254,
+        792
+      ],
+      "bboxNormalized": [
+        0.19354839,
+        0.44469783,
+        0.20483871,
+        0.45153934
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 41,
+      "pitch": {
+        "step": "B",
+        "alter": 0,
+        "octave": 4,
+        "midi": 71
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 12,
+      "sourceMeasureNumber": "12",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        276,
+        786,
+        291,
+        798
+      ],
+      "bboxNormalized": [
+        0.22258065,
+        0.44811859,
+        0.23467742,
+        0.45496009
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 42,
+      "pitch": {
+        "step": "A",
+        "alter": 0,
+        "octave": 4,
+        "midi": 69
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 13,
+      "sourceMeasureNumber": "13",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        328,
+        791,
+        343,
+        803
+      ],
+      "bboxNormalized": [
+        0.26451613,
+        0.45096921,
+        0.2766129,
+        0.45781072
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 43,
+      "pitch": {
+        "step": "C",
+        "alter": 0,
+        "octave": 5,
+        "midi": 72
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 13,
+      "sourceMeasureNumber": "13",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        365,
+        780,
+        379,
+        792
+      ],
+      "bboxNormalized": [
+        0.29435484,
+        0.44469783,
+        0.30564516,
+        0.45153934
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 44,
+      "pitch": {
+        "step": "E",
+        "alter": 0,
+        "octave": 5,
+        "midi": 76
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 13,
+      "sourceMeasureNumber": "13",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        402,
+        770,
+        416,
+        782
+      ],
+      "bboxNormalized": [
+        0.32419355,
+        0.43899658,
+        0.33548387,
+        0.44583808
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 45,
+      "pitch": {
+        "step": "A",
+        "alter": 0,
+        "octave": 4,
+        "midi": 69
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 13,
+      "sourceMeasureNumber": "13",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        439,
+        791,
+        453,
+        803
+      ],
+      "bboxNormalized": [
+        0.35403226,
+        0.45096921,
+        0.36532258,
+        0.45781072
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 46,
+      "pitch": {
+        "step": "B",
+        "alter": 0,
+        "octave": 4,
+        "midi": 71
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 14,
+      "sourceMeasureNumber": "14",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        490,
+        786,
+        505,
+        798
+      ],
+      "bboxNormalized": [
+        0.39516129,
+        0.44811859,
+        0.40725806,
+        0.45496009
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 47,
+      "pitch": {
+        "step": "F",
+        "alter": 1,
+        "octave": 4,
+        "midi": 66
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 14,
+      "sourceMeasureNumber": "14",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        546,
+        801,
+        560,
+        813
+      ],
+      "bboxNormalized": [
+        0.44032258,
+        0.45667047,
+        0.4516129,
+        0.46351197
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 48,
+      "pitch": {
+        "step": "G",
+        "alter": 0,
+        "octave": 4,
+        "midi": 67
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 15,
+      "sourceMeasureNumber": "15",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        616,
+        796,
+        630,
+        808
+      ],
+      "bboxNormalized": [
+        0.49677419,
+        0.45381984,
+        0.50806452,
+        0.46066135
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 49,
+      "pitch": {
+        "step": "F",
+        "alter": 1,
+        "octave": 4,
+        "midi": 66
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 15,
+      "sourceMeasureNumber": "15",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        652,
+        801,
+        667,
+        813
+      ],
+      "bboxNormalized": [
+        0.52580645,
+        0.45667047,
+        0.53790323,
+        0.46351197
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 50,
+      "pitch": {
+        "step": "E",
+        "alter": 0,
+        "octave": 4,
+        "midi": 64
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 15,
+      "sourceMeasureNumber": "15",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        689,
+        806,
+        704,
+        818
+      ],
+      "bboxNormalized": [
+        0.55564516,
+        0.45952109,
+        0.56774194,
+        0.4663626
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 51,
+      "pitch": {
+        "step": "G",
+        "alter": 0,
+        "octave": 4,
+        "midi": 67
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 15,
+      "sourceMeasureNumber": "15",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        726,
+        796,
+        741,
+        808
+      ],
+      "bboxNormalized": [
+        0.58548387,
+        0.45381984,
+        0.59758065,
+        0.46066135
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 52,
+      "pitch": {
+        "step": "B",
+        "alter": 0,
+        "octave": 4,
+        "midi": 71
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 16,
+      "sourceMeasureNumber": "16",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        778,
+        786,
+        792,
+        798
+      ],
+      "bboxNormalized": [
+        0.62741935,
+        0.44811859,
+        0.63870968,
+        0.45496009
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 53,
+      "pitch": {
+        "step": "A",
+        "alter": 0,
+        "octave": 4,
+        "midi": 69
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 16,
+      "sourceMeasureNumber": "16",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        815,
+        791,
+        829,
+        803
+      ],
+      "bboxNormalized": [
+        0.65725806,
+        0.45096921,
+        0.66854839,
+        0.45781072
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 54,
+      "pitch": {
+        "step": "F",
+        "alter": 1,
+        "octave": 4,
+        "midi": 66
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 16,
+      "sourceMeasureNumber": "16",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        851,
+        801,
+        866,
+        813
+      ],
+      "bboxNormalized": [
+        0.68629032,
+        0.45667047,
+        0.6983871,
+        0.46351197
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 55,
+      "pitch": {
+        "step": "D",
+        "alter": 1,
+        "octave": 4,
+        "midi": 63
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 16,
+      "sourceMeasureNumber": "16",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        888,
+        811,
+        903,
+        823
+      ],
+      "bboxNormalized": [
+        0.71612903,
+        0.46237172,
+        0.72822581,
+        0.46921323
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 56,
+      "pitch": {
+        "step": "E",
+        "alter": 0,
+        "octave": 4,
+        "midi": 64
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 17,
+      "sourceMeasureNumber": "17",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        940,
+        806,
+        954,
+        818
+      ],
+      "bboxNormalized": [
+        0.75806452,
+        0.45952109,
+        0.76935484,
+        0.4663626
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 57,
+      "pitch": {
+        "step": "B",
+        "alter": 0,
+        "octave": 4,
+        "midi": 71
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 17,
+      "sourceMeasureNumber": "17",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        995,
+        786,
+        1010,
+        798
+      ],
+      "bboxNormalized": [
+        0.80241935,
+        0.44811859,
+        0.81451613,
+        0.45496009
+      ]
+    },
+    {
+      "xmlPitchedNoteIndex": 58,
+      "pitch": {
+        "step": "E",
+        "alter": 0,
+        "octave": 4,
+        "midi": 64
+      },
+      "voice": "1",
+      "isChordTone": false,
+      "globalMeasureIndex": 18,
+      "sourceMeasureNumber": "18",
+      "systemIndex": 2,
+      "staffIndex": 2,
+      "bboxPixels": [
+        1065,
+        806,
+        1082,
+        818
+      ],
+      "bboxNormalized": [
+        0.85887097,
+        0.45952109,
+        0.87258065,
+        0.4663626
+      ]
+    }
+  ]
+}

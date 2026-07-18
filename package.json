@@ -268,6 +268,8 @@
     "western:open-next-action": "node scripts\\open-western-strings-next-action.mjs",
     "test:western-project-gate": "node scripts\\test-western-project-gate.mjs",
     "test:western-m4a-gate-split": "node scripts\\test-western-m4a-gate-split.mjs",
+    "test:western-m4a-supported-edition-registry": "node scripts\\test-western-m4a-supported-edition-registry.mjs",
+    "build:western-m4a-supported-editions": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\build_western_m4a_supported_editions.py",
     "test:western-m4b-poc-promotion-governance": "node scripts\\test-western-m4b-poc-promotion-governance.mjs",
     "test:western-controlled-pilot-decision": "node scripts\\test-western-controlled-pilot-decision.mjs",
     "test:western-controlled-pilot-run": "node scripts\\test-western-controlled-pilot-session.mjs",

@@ -554,6 +554,8 @@
 | e | 音频仲裁哨兵接线 | 复用 0.6 agreement 闸 |
 | f | 三条 fail-closed 出口+测试(含伪造/错版/低质照片拒绝) | 房规:先写拒绝测试 |
 
+2026-07-19 工程状态:C.2a-b 已完成。`config/western-m4a-supported-edition-seeds.json` 冻结首批 3 个自制版本(r2-01/r2-06/r3-01)及 MuseScore Studio 4.7.4/150 dpi;`build:western-m4a-supported-editions` 可重复生成 MusicXML、标准 PNG 与系统/谱表/小节/音符坐标 sidecar 三元组。`test:western-m4a-supported-edition-registry` 每次从磁盘重读三元组并重算 SHA-256,同时拒绝路径逃逸、许可/人工确认缺失、sidecar 越界与任一三元组伪造。当前 registry `validEntries=3/3`;C.2c-f 与冻结验收仍未完成,不得据此打开 M4a。
+
 验收(冻结,达标才开 `M4aSupportedEditionRegistrationReady`):
 - 屏拍域:登记版本的真实屏拍 ≥10 张,配准通过率 ≥90%,反投影小节框逐一目检正确率 100%(负责人核);
 - 错版/错曲照片 ≥5 张全部被两道哨兵之一拦截(0 漏放);
