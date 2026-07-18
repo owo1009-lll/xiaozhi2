@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "western-m4b-real-structure-label-v1",
+  "type": "object",
+  "required": [
+    "contract",
+    "caseId",
+    "photoSha256",
+    "pieceOrLayoutId",
+    "deviceId",
+    "captureBatchId",
+    "labels"
+  ],
+  "properties": {
+    "contract": {
+      "const": "western-m4b-real-structure-label-v1"
+    },
+    "caseId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "photoSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "pieceOrLayoutId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "deviceId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "captureBatchId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "labels": {
+      "type": "object",
+      "required": [
+        "pageCorners",
+        "systems",
+        "staffs",
+        "barlinesWithType",
+        "measureBoxes",
+        "meterRegions",
+        "sameEdition",
+        "judgeable"
+      ]
+    }
+  }
+}

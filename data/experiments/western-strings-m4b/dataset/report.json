@@ -1,0 +1,52 @@
+{
+  "contract": "western-m4b-structure-dataset-report-v1",
+  "complete": true,
+  "dataFoundationReady": true,
+  "realAnnotationTargetReady": false,
+  "freshBlindReady": false,
+  "manifest": "data/experiments/western-strings-m4b/dataset/manifest.json",
+  "manifestSha256": "fdf2eb261221b3fde77e2a2d7ddb86f5107d1a1064d5f33d7c726244c36e117e",
+  "provenance": {
+    "policy": "config/western-m4b-dataset.json",
+    "policySha256": "e375884c215e6d9cfd3947e4678d5ea51e61ecb99f8d305ad6ed3790d676cb92",
+    "builder": "scripts/experiments/build_western_m4b_structure_dataset.py",
+    "builderSha256": "f89f717b9d94f23b333c7f0785c78f312bf9b866d27adec9d7f8f166bdf2a393"
+  },
+  "artifacts": {
+    "labelSchema": {
+      "path": "data/experiments/western-strings-m4b/dataset/real-structure-label.schema.json",
+      "sha256": "3df1bf08bc18bc31e518dc795166444c16242b7d3e06cfd70b0245f219be92ea",
+      "bytes": 1059
+    },
+    "freshBlindTemplate": {
+      "path": "data/experiments/western-strings-m4b/dataset/fresh-blind-intake.template.json",
+      "sha256": "26313f61a0d8baa7de53e02a36f607d0f21b9377702484384f2e32067e442cca",
+      "bytes": 8925
+    }
+  },
+  "counts": {
+    "synthetic": 60,
+    "syntheticSplits": {
+      "train": 36,
+      "calibration": 12,
+      "synthetic-test": 12
+    },
+    "frozenSourceGoldTestOnly": 5,
+    "frozenScreenPhotoTestOnly": 8,
+    "m4aAutoLabeled": 0,
+    "activeLearning": 0,
+    "freshBlind": 0,
+    "freshBlindPiecesOrLayouts": 0,
+    "freshBlindDevices": 0
+  },
+  "blockingReasons": [
+    "m4b-real-structure-labels-below-100",
+    "m4b-fresh-blind-dataset-not-ready"
+  ],
+  "discipline": {
+    "sourceGoldTrainingEligible": false,
+    "screenPhotoTrainingEligible": false,
+    "freshBlindTrainingEligible": false,
+    "m4aFailuresEnterActiveLearningOnly": true
+  }
+}

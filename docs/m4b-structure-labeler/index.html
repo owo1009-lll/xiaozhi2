@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>M4b 结构标注器</title>
+  <style>
+    :root { font-family: system-ui, "Microsoft YaHei", sans-serif; color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #0f172a; color: #f8fafc; }
+    header { position: sticky; top: 0; z-index: 3; padding: 10px; background: #111827; border-bottom: 1px solid #334155; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    input, select, button { padding: 8px; border: 1px solid #64748b; border-radius: 6px; background: #1e293b; color: white; }
+    input[type=text] { width: 150px; }
+    main { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 12px; padding: 12px; }
+    .canvas-wrap { overflow: auto; background: #020617; min-height: 75vh; display: grid; place-items: start center; }
+    canvas { max-width: 100%; height: auto; cursor: crosshair; touch-action: none; }
+    aside { background: #1e293b; padding: 12px; border-radius: 8px; line-height: 1.5; }
+    .status { white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 12px; color: #bae6fd; }
+    label { display: inline-flex; gap: 5px; align-items: center; }
+    @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="toolbar">
+      <input id="photo" type="file" accept="image/jpeg,image/png,image/webp">
+      <input id="caseId" type="text" placeholder="caseId">
+      <input id="piece" type="text" placeholder="pieceOrLayoutId">
+      <input id="device" type="text" placeholder="deviceId">
+      <input id="batch" type="text" placeholder="captureBatchId">
+      <select id="tool">
+        <option value="pageCorners">页四角：依次点击 4 点</option>
+        <option value="systems">系统框：拖框</option>
+        <option value="staffs">谱表框：拖框</option>
+        <option value="barlinesWithType">小节线：拖线</option>
+        <option value="measureBoxes">小节框：拖框</option>
+        <option value="meterRegions">拍号区域：拖框</option>
+      </select>
+      <select id="barType"><option>single</option><option>double</option><option>final</option><option>repeat-left</option><option>repeat-right</option></select>
+      <label><input id="sameEdition" type="checkbox">同版</label>
+      <label><input id="judgeable" type="checkbox" checked>可判</label>
+      <button id="undo">撤销</button>
+      <button id="clearTool">清空当前工具</button>
+      <button id="export">导出结构 JSON</button>
+    </div>
+  </header>
+  <main>
+    <section class="canvas-wrap"><canvas id="canvas"></canvas></section>
+    <aside>
+      <h2>标注顺序</h2>
+      <ol>
+        <li>加载原始照片，填入四个隔离字段。</li>
+        <li>页四角按左上→右上→右下→左下点击。</li>
+        <li>逐一框系统、谱表、小节和拍号区域。</li>
+        <li>小节线按从上到下拖线，并选择 single/double/final/repeat 类型。</li>
+        <li>确认是否同版、是否可判，再导出 JSON。</li>
+      </ol>
+      <p>本工具只做结构标注，不标音符内容。fresh-blind JSON 与照片永不进入训练集。</p>
+      <div id="status" class="status">尚未加载照片</div>
+    </aside>
+  </main>
+  <script>
+    const canvas = document.querySelector('#canvas');
+    const ctx = canvas.getContext('2d');
+    const image = new Image();
+    const labels = { pageCorners: [], systems: [], staffs: [], barlinesWithType: [], measureBoxes: [], meterRegions: [] };
+    const history = [];
+    let photoBytes = null;
+    let photoName = '';
+    let dragStart = null;
+    let preview = null;
+    const colors = { pageCorners:'#facc15', systems:'#22d3ee', staffs:'#a78bfa', barlinesWithType:'#fb7185', measureBoxes:'#34d399', meterRegions:'#f97316' };
+    function snapshot() { history.push(JSON.stringify(labels)); if (history.length > 100) history.shift(); }
+    function point(event) {
+      const box = canvas.getBoundingClientRect();
+      return [Math.round((event.clientX - box.left) * canvas.width / box.width), Math.round((event.clientY - box.top) * canvas.height / box.height)];
+    }
+    function rectPolygon(a, b) {
+      const x1=Math.min(a[0],b[0]), y1=Math.min(a[1],b[1]), x2=Math.max(a[0],b[0]), y2=Math.max(a[1],b[1]);
+      return [[x1,y1],[x2,y1],[x2,y2],[x1,y2]];
+    }
+    function strokePolygon(polygon, color, width=3) {
+      if (!polygon.length) return;
+      ctx.strokeStyle=color; ctx.lineWidth=width; ctx.beginPath(); ctx.moveTo(...polygon[0]);
+      polygon.slice(1).forEach(p=>ctx.lineTo(...p)); ctx.closePath(); ctx.stroke();
+    }
+    function render() {
+      if (!image.complete || !image.naturalWidth) return;
+      ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(image,0,0);
+      labels.pageCorners.forEach((p,i)=>{ ctx.fillStyle=colors.pageCorners; ctx.beginPath();ctx.arc(p[0],p[1],7,0,Math.PI*2);ctx.fill();ctx.fillText(String(i+1),p[0]+9,p[1]); });
+      if (labels.pageCorners.length===4) strokePolygon(labels.pageCorners,colors.pageCorners,4);
+      for (const key of ['systems','staffs','measureBoxes','meterRegions']) labels[key].forEach(row=>strokePolygon(row.polygon,colors[key]));
+      labels.barlinesWithType.forEach(row=>{ctx.strokeStyle=colors.barlinesWithType;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(...row.line[0]);ctx.lineTo(...row.line[1]);ctx.stroke();ctx.fillStyle=colors.barlinesWithType;ctx.fillText(row.type,row.line[0][0]+5,row.line[0][1]);});
+      if (preview) {
+        ctx.save(); ctx.setLineDash([8,5]);
+        if (preview.tool==='barlinesWithType') {ctx.strokeStyle=colors.barlinesWithType;ctx.beginPath();ctx.moveTo(...preview.start);ctx.lineTo(...preview.end);ctx.stroke();}
+        else strokePolygon(rectPolygon(preview.start,preview.end),colors[preview.tool],2);
+        ctx.restore();
+      }
+      document.querySelector('#status').textContent = JSON.stringify(Object.fromEntries(Object.entries(labels).map(([k,v])=>[k,v.length])),null,2);
+    }
+    document.querySelector('#photo').addEventListener('change', async event => {
+      const file=event.target.files[0]; if(!file)return; photoBytes=await file.arrayBuffer();photoName=file.name;
+      image.onload=()=>{canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;Object.keys(labels).forEach(k=>labels[k]=[]);history.length=0;render();};
+      image.src=URL.createObjectURL(file);
+      if(!document.querySelector('#caseId').value)document.querySelector('#caseId').value=file.name.replace(/\.[^.]+$/,'');
+    });
+    canvas.addEventListener('pointerdown', event => {
+      if(!photoBytes)return; const tool=document.querySelector('#tool').value; const p=point(event);
+      if(tool==='pageCorners'){snapshot(); if(labels.pageCorners.length===4)labels.pageCorners=[];labels.pageCorners.push(p);render();return;}
+      dragStart=p; preview={tool,start:p,end:p};canvas.setPointerCapture(event.pointerId);render();
+    });
+    canvas.addEventListener('pointermove', event => {if(!dragStart)return;preview.end=point(event);render();});
+    canvas.addEventListener('pointerup', event => {
+      if(!dragStart)return;const tool=document.querySelector('#tool').value;const end=point(event);snapshot();
+      if(tool==='barlinesWithType')labels.barlinesWithType.push({line:[dragStart,end],type:document.querySelector('#barType').value});
+      else labels[tool].push({polygon:rectPolygon(dragStart,end)});
+      dragStart=null;preview=null;render();
+    });
+    document.querySelector('#undo').addEventListener('click',()=>{if(!history.length)return;const old=JSON.parse(history.pop());Object.keys(labels).forEach(k=>labels[k]=old[k]);render();});
+    document.querySelector('#clearTool').addEventListener('click',()=>{snapshot();labels[document.querySelector('#tool').value]=[];render();});
+    document.querySelector('#export').addEventListener('click',async()=>{
+      const caseId=document.querySelector('#caseId').value.trim(),piece=document.querySelector('#piece').value.trim(),device=document.querySelector('#device').value.trim(),batch=document.querySelector('#batch').value.trim();
+      if(!photoBytes||!caseId||!piece||!device||!batch){alert('照片与四个隔离字段必须齐全');return}
+      if(labels.pageCorners.length!==4){alert('页四角必须正好 4 个');return}
+      const digest=await crypto.subtle.digest('SHA-256',photoBytes);const photoSha256=[...new Uint8Array(digest)].map(v=>v.toString(16).padStart(2,'0')).join('');
+      const value={contract:'western-m4b-real-structure-label-v1',caseId,photoFileName:photoName,photoSha256,pieceOrLayoutId:piece,deviceId:device,captureBatchId:batch,labels:{...labels,sameEdition:document.querySelector('#sameEdition').checked,judgeable:document.querySelector('#judgeable').checked}};
+      const blob=new Blob([JSON.stringify(value,null,2)+'\n'],{type:'application/json'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=caseId+'.structure.json';link.click();URL.revokeObjectURL(link.href);
+    });
+  </script>
+</body>
+</html>

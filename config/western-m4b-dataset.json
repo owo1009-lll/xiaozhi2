@@ -1,0 +1,117 @@
+{
+  "contract": "western-m4b-structure-dataset-policy-v1",
+  "synthetic": {
+    "registryPath": "data/experiments/western-strings-m4a/supported-editions/registry.json",
+    "variantsPerEdition": 20,
+    "seed": 20260719,
+    "augmentations": [
+      "perspective",
+      "curvature",
+      "shadow",
+      "blur",
+      "jpeg",
+      "background",
+      "handwriting"
+    ],
+    "splitsByVariant": {
+      "train": 12,
+      "calibration": 4,
+      "synthetic-test": 4
+    }
+  },
+  "realAnnotation": {
+    "minimumTarget": 100,
+    "maximumTarget": 300,
+    "schema": "western-m4b-real-structure-label-v1",
+    "requiredLabels": [
+      "pageCorners",
+      "systems",
+      "staffs",
+      "barlinesWithType",
+      "measureBoxes",
+      "meterRegions",
+      "sameEdition",
+      "judgeable"
+    ]
+  },
+  "frozenSourceGoldTestOnly": [
+    {
+      "pieceId": "violin-ex09",
+      "photoPath": "data/private/western-strings-m2/violin-ex09-score.jpg",
+      "goldPath": "data/experiments/western-strings-m4/independent-real-photo-gold/violin-ex09.independent-source-gold.musicxml"
+    },
+    {
+      "pieceId": "violin-ex05",
+      "photoPath": "data/private/western-strings-m2/violin-ex05-score.jpg",
+      "goldPath": "data/experiments/western-strings-m4/independent-real-photo-gold/violin-ex05.independent-source-gold.musicxml"
+    },
+    {
+      "pieceId": "violin-ex08",
+      "photoPath": "data/private/western-strings-m2/violin-ex08-score.jpg",
+      "goldPath": "data/experiments/western-strings-m4/independent-real-photo-gold/violin-ex08.independent-source-gold.musicxml"
+    },
+    {
+      "pieceId": "violin-ex10",
+      "photoPath": "data/private/western-strings-m2/violin-ex10-score.jpg",
+      "goldPath": "data/experiments/western-strings-m4/independent-real-photo-gold/violin-ex10.independent-source-gold.musicxml"
+    },
+    {
+      "pieceId": "violin-ex12",
+      "photoPath": "data/private/western-strings-m2/violin-ex12-score.jpg",
+      "goldPath": "data/experiments/western-strings-m4/independent-real-photo-gold/violin-ex12.independent-source-gold.musicxml"
+    }
+  ],
+  "frozenScreenPhotoTestOnly": [
+    {
+      "pieceId": "r2-01",
+      "photoPath": "data/private/western-strings-round2/r2-01-screenphoto.jpg"
+    },
+    {
+      "pieceId": "r2-02",
+      "photoPath": "data/private/western-strings-round2/r2-02-screenphoto.jpg"
+    },
+    {
+      "pieceId": "r2-03",
+      "photoPath": "data/private/western-strings-round2/r2-03-screenphoto.jpg"
+    },
+    {
+      "pieceId": "r2-04",
+      "photoPath": "data/private/western-strings-round2/r2-04-screenphoto.jpg"
+    },
+    {
+      "pieceId": "r2-05",
+      "photoPath": "data/private/western-strings-round2/r2-05-screenphoto.jpg"
+    },
+    {
+      "pieceId": "r2-06",
+      "photoPath": "data/private/western-strings-round2/r2-06-screenphoto.jpg"
+    },
+    {
+      "pieceId": "r2-07",
+      "photoPath": "data/private/western-strings-round2/r2-07-screenphoto.jpg"
+    },
+    {
+      "pieceId": "r2-08",
+      "photoPath": "data/private/western-strings-round2/r2-08-screenphoto.jpg"
+    }
+  ],
+  "m4aLabelSource": {
+    "acceptanceReportPath": "data/experiments/western-strings-m4a/real-photo-acceptance/report.json",
+    "successfulPhotosRole": "auto-labeled-real-train-candidate",
+    "failedPhotosRole": "active-learning-review-pool"
+  },
+  "freshBlind": {
+    "minimumPhotos": 30,
+    "targetPhotos": 50,
+    "minimumPiecesOrLayouts": 6,
+    "minimumDevices": 3,
+    "root": "data/private/western-strings-m4b-fresh-blind",
+    "intakeManifest": "data/private/western-strings-m4b-fresh-blind/intake.json",
+    "splitKeys": [
+      "pieceOrLayoutId",
+      "deviceId",
+      "captureBatchId"
+    ]
+  },
+  "outputRoot": "data/experiments/western-strings-m4b/dataset"
+}

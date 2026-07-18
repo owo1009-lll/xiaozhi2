@@ -712,6 +712,8 @@
 - **M4a 作为免费数据引擎(本方案新增)**:每张配准成功的照片,把库内结构框反投影 = 零人工的真实照片结构标签;配准失败照片进主动学习难例池。先跑 M4a 再启 M4b 标注,实际人工量预计远低于 300 张。
 - **冻结集**:现有 5 张 source-gold 照片永不入训练;8 张屏拍照片显式分配(默认隔离入测试);另建 ≥30–50 张按曲目版本/设备/拍摄批次隔离的 fresh-blind 集。MUSCIMA++ 只借"记谱图"形式化(手写域数据不可直接用)。
 
+2026-07-19 数据工程状态:合成优先管线已实现并冻结为 `western-m4b-structure-dataset-policy-v1`。当前从 3 个 M4a registry 真值页确定性生成 60 张相机退化页,每张同时带 pageCorners、系统、谱表/五线、小节线及类型、小节框、拍号区域标签,退化覆盖透视、正弦曲率、阴影、模糊、JPEG、背景与手写干扰;拆分固定为 train/calibration/synthetic-test=`36/12/12`。live verifier 重算全部 60 对图片/标签 SHA-256。现有 5 张 source-gold 与 8 张屏拍已逐文件冻结为 test-only 且 `trainingEligible=false`;fresh-blind 也由同一规则禁止训练泄漏。M4a 验收成功照片将进入 auto-labeled 候选,失败照片只进 active-learning review pool;当前两者均为 0,未伪造真实训练数据。真实结构标签目标仍为 `0/100–300`,fresh-blind 仍为 `0/30`、`0/6` 版式、`0/3` 设备。浏览器结构标注器位于 `docs/m4b-structure-labeler/index.html`,fresh intake 会逐文件绑定照片 SHA、标签、曲目/版式、设备和拍摄批次,并拒绝任何与合成/冻结测试照片复用的字节。
+
 #### C.3.3 晋升门槛(✅ 2026-07-19 已签署冻结,不得因结果回调)
 
 POC → 扩大投入的前提,在 fresh-blind 集(≥30 张,≥6 曲目/版式,≥3 设备)上**全部**满足:
