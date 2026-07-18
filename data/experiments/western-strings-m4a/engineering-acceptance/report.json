@@ -1,0 +1,360 @@
+{
+  "contract": "western-m4a-engineering-acceptance-v1",
+  "complete": true,
+  "engineeringReady": true,
+  "evidenceClass": "engineering-only-synthetic-positive-and-real-wrong-edition-negative",
+  "doesNotSatisfyFrozenRealPhotoAcceptance": true,
+  "provenance": {
+    "implementation": "scripts/western_m4a_registration.py",
+    "implementationSha256": "c7f30264aa097b975e1cee061dc34e66a0b4dfa72e001b553b5a8335c9507616",
+    "policy": "config/western-m4a-registration.json",
+    "policySha256": "0e68cfe1a483f4932a4ba77443e935e311fafba665d64faaf7beecef23f9fd94",
+    "registry": "data/experiments/western-strings-m4a/supported-editions/registry.json",
+    "registrySha256": "10a35688cfaad13d6510b6bbe3a9a9fbca3d0ecb0b1ee3b7dbdec3cb9ffd9c9c"
+  },
+  "positives": [
+    {
+      "caseId": "positive-r2-01",
+      "ready": true,
+      "reason": "supported-edition-registration-ready",
+      "blockingReasons": [],
+      "photo": "data/experiments/western-strings-m4a/engineering-acceptance/positive-r2-01/perspective-photo.jpg",
+      "photoSha256": "5c1bddcb062b4a995b8f41acc346c07a179f6b5b8877edfdc389d3116304c9a9",
+      "audio": "data/private/western-strings-round2/r2-01.m4a",
+      "audioSha256": "59b3f5a163fc2d37a7e5c6375143b830d7d33e5c81465273b1a6c03fcd788d6c",
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": true,
+        "goodMatchCount": 590,
+        "inlierCount": 260,
+        "inlierRatio": 0.440678,
+        "referenceGridCoverage": 0.75,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 1.0,
+        "structuralResidualNormalized": 8.916e-05,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00029726,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 4,
+        "staves": 4,
+        "measures": 21,
+        "notes": 67
+      },
+      "feedbackProjection": {
+        "ready": true,
+        "expectedAnchorCount": 67,
+        "mappedAnchorCount": 67
+      },
+      "audit": "data/experiments/western-strings-m4a/engineering-acceptance/positive-r2-01/audit.json",
+      "auditSha256": "2ef302cfb1b172f9ade3077d551d48ebe816adc2de1432562e04befbce7186c8",
+      "annotatedPhoto": "data/experiments/western-strings-m4a/engineering-acceptance/positive-r2-01/annotated-photo.jpg",
+      "annotatedPhotoSha256": "55ebd5c9ae3b9f7ab0e332097d676cb65fc12e4a0edf8a3827d056017e9d55a1",
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false
+    },
+    {
+      "caseId": "positive-r2-06",
+      "ready": true,
+      "reason": "supported-edition-registration-ready",
+      "blockingReasons": [],
+      "photo": "data/experiments/western-strings-m4a/engineering-acceptance/positive-r2-06/perspective-photo.jpg",
+      "photoSha256": "cd7239033b21468d93fcba2b8eb91c42bafee8640a3afc6684b088ef239f7e68",
+      "audio": "data/private/western-strings-round2/r2-06.m4a",
+      "audioSha256": "d40c624bb3dbfd38fc83224541d0fe3c7eb383dcefbc7ec07fb42681c514e768",
+      "audioAgreement": 0.954545,
+      "registrationQuality": {
+        "ready": true,
+        "goodMatchCount": 452,
+        "inlierCount": 302,
+        "inlierRatio": 0.668142,
+        "referenceGridCoverage": 0.5,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 1.0,
+        "structuralResidualNormalized": 9.549e-05,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00024636,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 2,
+        "staves": 2,
+        "measures": 17,
+        "notes": 23
+      },
+      "feedbackProjection": {
+        "ready": true,
+        "expectedAnchorCount": 23,
+        "mappedAnchorCount": 23
+      },
+      "audit": "data/experiments/western-strings-m4a/engineering-acceptance/positive-r2-06/audit.json",
+      "auditSha256": "3664311731d32c04b88fcd787981439df922f0aa69add9984aca2df7fb488846",
+      "annotatedPhoto": "data/experiments/western-strings-m4a/engineering-acceptance/positive-r2-06/annotated-photo.jpg",
+      "annotatedPhotoSha256": "6da86f149e53f37e54e442dd4478767326361f2c17229d980abf5eb7fbe0284b",
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false
+    },
+    {
+      "caseId": "positive-r3-01",
+      "ready": true,
+      "reason": "supported-edition-registration-ready",
+      "blockingReasons": [],
+      "photo": "data/experiments/western-strings-m4a/engineering-acceptance/positive-r3-01/perspective-photo.jpg",
+      "photoSha256": "297945af62e0b969ee27d456b743bc529556639f23533dfe359a0af8e3181ea4",
+      "audio": "data/private/western-strings-round3/r3-01.m4a",
+      "audioSha256": "c714e81db43a303b0bec66d8ab6244cb2960995d2dd0a6bd90348e028a7bb99e",
+      "audioAgreement": 1.0,
+      "registrationQuality": {
+        "ready": true,
+        "goodMatchCount": 535,
+        "inlierCount": 280,
+        "inlierRatio": 0.523364,
+        "referenceGridCoverage": 0.5,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 1.0,
+        "structuralResidualNormalized": 9.396e-05,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00036192,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 3,
+        "staves": 3,
+        "measures": 18,
+        "notes": 59
+      },
+      "feedbackProjection": {
+        "ready": true,
+        "expectedAnchorCount": 59,
+        "mappedAnchorCount": 59
+      },
+      "audit": "data/experiments/western-strings-m4a/engineering-acceptance/positive-r3-01/audit.json",
+      "auditSha256": "c3138a2330f10e46d0a3a354c202de972ccbdfc3010c5d68176428961baea3f0",
+      "annotatedPhoto": "data/experiments/western-strings-m4a/engineering-acceptance/positive-r3-01/annotated-photo.jpg",
+      "annotatedPhotoSha256": "a9928b1650ce85cd5edfd2e23f7c09f732efcfb51c5dbd3464427d265838901c",
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false
+    }
+  ],
+  "negatives": [
+    {
+      "caseId": "negative-blurred",
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "photo": "data/experiments/western-strings-m4a/engineering-acceptance/negative-inputs/blurred.jpg",
+      "photoSha256": "903702326931ebe424c92903744b8507e4af0ec895797fc557115746e8e047fc",
+      "audio": "data/private/western-strings-round2/r2-01.m4a",
+      "audioSha256": "59b3f5a163fc2d37a7e5c6375143b830d7d33e5c81465273b1a6c03fcd788d6c",
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 0,
+        "inlierCount": 0,
+        "inlierRatio": 0.0,
+        "referenceGridCoverage": 0.0,
+        "systemConsistency": 0.0,
+        "barlineConsistency": 0.0,
+        "structuralResidualNormalized": 1.0,
+        "deformation": {
+          "model": "none",
+          "activated": false
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "audit": null,
+      "auditSha256": null,
+      "annotatedPhoto": null,
+      "annotatedPhotoSha256": null,
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false
+    },
+    {
+      "caseId": "negative-half-page",
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "photo": "data/experiments/western-strings-m4a/engineering-acceptance/negative-inputs/half-page.jpg",
+      "photoSha256": "c7d808e3fe9f390d80e7972f3f5d62f444f1c52c04665c49fe522440c53a24ef",
+      "audio": "data/private/western-strings-round2/r2-01.m4a",
+      "audioSha256": "59b3f5a163fc2d37a7e5c6375143b830d7d33e5c81465273b1a6c03fcd788d6c",
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 531,
+        "inlierCount": 253,
+        "inlierRatio": 0.47646,
+        "referenceGridCoverage": 0.5625,
+        "systemConsistency": 0.75,
+        "barlineConsistency": 0.809524,
+        "structuralResidualNormalized": 0.00233135,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00042182,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "audit": null,
+      "auditSha256": null,
+      "annotatedPhoto": null,
+      "annotatedPhotoSha256": null,
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false
+    },
+    {
+      "caseId": "negative-wrong-renderer-edition",
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "photo": "data/private/western-strings-round2/r2-01-screenphoto.jpg",
+      "photoSha256": "78ed2d2d63d19d2c54623a1c3ecacec46584c72f3b773feb3885dfdec121c364",
+      "audio": "data/private/western-strings-round2/r2-01.m4a",
+      "audioSha256": "59b3f5a163fc2d37a7e5c6375143b830d7d33e5c81465273b1a6c03fcd788d6c",
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 183,
+        "inlierCount": 45,
+        "inlierRatio": 0.245902,
+        "referenceGridCoverage": 0.625,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 0.428571,
+        "structuralResidualNormalized": 0.01022701,
+        "deformation": {
+          "model": "homography",
+          "eligible": true,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00159887,
+          "validationResidualImprovement": -29.634837
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "audit": null,
+      "auditSha256": null,
+      "annotatedPhoto": null,
+      "annotatedPhotoSha256": null,
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false
+    },
+    {
+      "caseId": "negative-not-in-library",
+      "ready": false,
+      "reason": "supported-edition-not-in-library",
+      "blockingReasons": [
+        "supported-edition-not-in-library"
+      ],
+      "photo": "data/experiments/western-strings-m4a/engineering-acceptance/negative-inputs/clean-perspective.jpg",
+      "photoSha256": "5c1bddcb062b4a995b8f41acc346c07a179f6b5b8877edfdc389d3116304c9a9",
+      "audio": "data/private/western-strings-round2/r2-01.m4a",
+      "audioSha256": "59b3f5a163fc2d37a7e5c6375143b830d7d33e5c81465273b1a6c03fcd788d6c",
+      "audioAgreement": null,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 0,
+        "inlierCount": 0,
+        "inlierRatio": 0,
+        "referenceGridCoverage": 0,
+        "systemConsistency": 0,
+        "barlineConsistency": 0,
+        "structuralResidualNormalized": 1,
+        "deformation": {}
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "audit": null,
+      "auditSha256": null,
+      "annotatedPhoto": null,
+      "annotatedPhotoSha256": null,
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false
+    }
+  ],
+  "summary": {
+    "positivePassed": 3,
+    "positiveCount": 3,
+    "negativeBlocked": 4,
+    "negativeCount": 4,
+    "omrUsedCount": 0,
+    "studentFacingCount": 0
+  },
+  "interpretation": [
+    "The complete page-detection, homography/TPS, quality-gate, audio-sentinel, coordinate-projection, diagnosis, and annotation chain is executable.",
+    "The owner-captured 2026-07-17 screen photo uses a different renderer/layout and is correctly rejected as the wrong registered edition despite high audio agreement.",
+    "This report does not count as the >=10 real screen-photo acceptance required to open M4a."
+  ]
+}

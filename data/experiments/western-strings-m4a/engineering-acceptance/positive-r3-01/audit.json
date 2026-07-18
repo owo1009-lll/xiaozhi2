@@ -1,0 +1,8914 @@
+{
+  "contract": "western-m4a-supported-edition-registration-v1",
+  "ready": true,
+  "reason": "supported-edition-registration-ready",
+  "blockingReasons": [],
+  "pieceId": "r3-01",
+  "editionId": "self-authored-v1",
+  "photo": "C:\\Users\\Administrator\\Downloads\\ai二胡\\data\\experiments\\western-strings-m4a\\engineering-acceptance\\positive-r3-01\\perspective-photo.jpg",
+  "photoSha256": "297945af62e0b969ee27d456b743bc529556639f23533dfe359a0af8e3181ea4",
+  "registry": {
+    "source": "data/experiments/western-strings-m4a/supported-editions/registry.json",
+    "sha256": "10a35688cfaad13d6510b6bbe3a9a9fbca3d0ecb0b1ee3b7dbdec3cb9ffd9c9c",
+    "entryTriplet": {
+      "musicxmlSha256": "a7744530efefb818f3d4bff371894682f6777f658e293186ad08030ee443efd5",
+      "renderSha256": "46f1ed94b21a7c608a8e09e0c7232177faebe4d94b18371b84ed876fa8a87c6f",
+      "coordinateSidecarSha256": "307bd83af7e67fcf784f93881c6a0ce2568a0a81b9b5e51e463a1c1b30eac961"
+    }
+  },
+  "registrationQuality": {
+    "ready": true,
+    "checks": {
+      "imageDimensions": true,
+      "pageDetection": true,
+      "blur": true,
+      "goodMatches": true,
+      "inliers": true,
+      "inlierRatio": true,
+      "referenceGridCoverage": true,
+      "systemConsistency": true,
+      "barlineConsistency": true,
+      "structuralResidual": true
+    },
+    "pageDetection": {
+      "ready": true,
+      "reason": "ok",
+      "threshold": 137.0,
+      "coverage": 0.593044,
+      "polygonPixels": [
+        [
+          271.0,
+          55.0
+        ],
+        [
+          205.0,
+          1389.0
+        ],
+        [
+          1129.0,
+          1430.0
+        ],
+        [
+          1075.0,
+          91.0
+        ]
+      ]
+    },
+    "laplacianVariance": 1084.661915,
+    "referenceKeypoints": 1996,
+    "photoKeypoints": 1608,
+    "goodMatchCount": 535,
+    "mutualGoodMatchCount": 224,
+    "inlierCount": 280,
+    "inlierRatio": 0.523364,
+    "referenceGridCoverage": 0.5,
+    "systemConsistency": 1.0,
+    "systemRows": [
+      {
+        "systemIndex": 0,
+        "inlierCount": 66,
+        "consistent": true
+      },
+      {
+        "systemIndex": 1,
+        "inlierCount": 40,
+        "consistent": true
+      },
+      {
+        "systemIndex": 2,
+        "inlierCount": 58,
+        "consistent": true
+      }
+    ],
+    "barlineConsistency": 1.0,
+    "barlineRows": [
+      {
+        "systemIndex": 0,
+        "hits": 5,
+        "expected": 5,
+        "ratio": 1.0,
+        "responses": [
+          {
+            "measureIndex": 1,
+            "response": 0.88,
+            "contrast": 0.64,
+            "threshold": 193.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 2,
+            "response": 0.88,
+            "contrast": 0.62,
+            "threshold": 194.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 3,
+            "response": 0.88,
+            "contrast": 0.64,
+            "threshold": 190.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 4,
+            "response": 0.88,
+            "contrast": 0.66,
+            "threshold": 189.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 5,
+            "response": 0.88,
+            "contrast": 0.64,
+            "threshold": 191.0,
+            "hit": true
+          }
+        ]
+      },
+      {
+        "systemIndex": 1,
+        "hits": 6,
+        "expected": 6,
+        "ratio": 1.0,
+        "responses": [
+          {
+            "measureIndex": 6,
+            "response": 0.897959,
+            "contrast": 0.653061,
+            "threshold": 192.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 7,
+            "response": 0.897959,
+            "contrast": 0.673469,
+            "threshold": 188.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 8,
+            "response": 0.897959,
+            "contrast": 0.653061,
+            "threshold": 191.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 9,
+            "response": 0.877551,
+            "contrast": 0.653061,
+            "threshold": 184.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 10,
+            "response": 0.877551,
+            "contrast": 0.653061,
+            "threshold": 187.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 11,
+            "response": 0.897959,
+            "contrast": 0.653061,
+            "threshold": 190.0,
+            "hit": true
+          }
+        ]
+      },
+      {
+        "systemIndex": 2,
+        "hits": 7,
+        "expected": 7,
+        "ratio": 1.0,
+        "responses": [
+          {
+            "measureIndex": 12,
+            "response": 0.918367,
+            "contrast": 0.673469,
+            "threshold": 192.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 13,
+            "response": 0.918367,
+            "contrast": 0.673469,
+            "threshold": 193.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 14,
+            "response": 0.918367,
+            "contrast": 0.653061,
+            "threshold": 197.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 15,
+            "response": 0.897959,
+            "contrast": 0.653061,
+            "threshold": 190.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 16,
+            "response": 0.897959,
+            "contrast": 0.653061,
+            "threshold": 190.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 17,
+            "response": 0.897959,
+            "contrast": 0.673469,
+            "threshold": 190.0,
+            "hit": true
+          },
+          {
+            "measureIndex": 18,
+            "response": 0.897959,
+            "contrast": 0.693878,
+            "threshold": 190.0,
+            "hit": true
+          }
+        ]
+      }
+    ],
+    "structuralResidualNormalized": 9.396e-05,
+    "deformation": {
+      "model": "homography",
+      "eligible": false,
+      "activated": false,
+      "baselineResidualP90Normalized": 0.00036192,
+      "validationResidualImprovement": 0.0
+    },
+    "referenceToPhotoHomography": [
+      [
+        0.6493809625,
+        -0.0528033914,
+        270.3545508723
+      ],
+      [
+        0.0282767455,
+        0.6582495984,
+        55.0912109879
+      ],
+      [
+        -1.181e-07,
+        -7.45141e-05,
+        1.0
+      ]
+    ],
+    "photoToReferenceHomography": [
+      [
+        1.5365528074,
+        0.0757615035,
+        -419.587837117
+      ],
+      [
+        -0.0656124508,
+        1.5065300522,
+        -65.2579402918
+      ],
+      [
+        -4.7075e-06,
+        0.0001122667,
+        0.9950877915
+      ]
+    ]
+  },
+  "audioSentinel": {
+    "ready": true,
+    "reason": "ok",
+    "minimumAgreement": 0.6,
+    "agreement": 1.0,
+    "confirmed": 59,
+    "eventCount": 59,
+    "source": "registered-musicxml-plus-basic-pitch-score-anchored-verdicts"
+  },
+  "projectedCoordinates": {
+    "systems": [
+      {
+        "systemIndex": 0,
+        "staffIndices": [
+          0
+        ],
+        "polygonPixels": [
+          [
+            354.38,
+            235.44
+          ],
+          [
+            689.54,
+            250.04
+          ],
+          [
+            1024.73,
+            264.65
+          ],
+          [
+            1025.31,
+            281.28
+          ],
+          [
+            1025.89,
+            297.97
+          ],
+          [
+            689.47,
+            283.3
+          ],
+          [
+            353.09,
+            268.64
+          ],
+          [
+            353.74,
+            252.01
+          ]
+        ],
+        "bboxPixels": [
+          353,
+          235,
+          1026,
+          298
+        ]
+      },
+      {
+        "systemIndex": 1,
+        "staffIndices": [
+          1
+        ],
+        "polygonPixels": [
+          [
+            312.29,
+            412.41
+          ],
+          [
+            671.6,
+            428.08
+          ],
+          [
+            1030.95,
+            443.75
+          ],
+          [
+            1031.54,
+            460.68
+          ],
+          [
+            1032.13,
+            477.67
+          ],
+          [
+            671.46,
+            461.94
+          ],
+          [
+            310.85,
+            446.21
+          ],
+          [
+            311.57,
+            429.28
+          ]
+        ],
+        "bboxPixels": [
+          310,
+          412,
+          1033,
+          478
+        ]
+      },
+      {
+        "systemIndex": 2,
+        "staffIndices": [
+          2
+        ],
+        "polygonPixels": [
+          [
+            304.37,
+            597.3
+          ],
+          [
+            670.86,
+            613.3
+          ],
+          [
+            1037.4,
+            629.3
+          ],
+          [
+            1038.01,
+            646.91
+          ],
+          [
+            1038.62,
+            664.59
+          ],
+          [
+            670.72,
+            648.53
+          ],
+          [
+            302.86,
+            632.47
+          ],
+          [
+            303.62,
+            614.85
+          ]
+        ],
+        "bboxPixels": [
+          302,
+          597,
+          1039,
+          665
+        ]
+      }
+    ],
+    "staves": [
+      {
+        "staffIndex": 0,
+        "systemIndex": 0,
+        "polygonPixels": [
+          [
+            354.38,
+            235.44
+          ],
+          [
+            689.54,
+            250.04
+          ],
+          [
+            1024.73,
+            264.65
+          ],
+          [
+            1025.31,
+            281.28
+          ],
+          [
+            1025.89,
+            297.97
+          ],
+          [
+            689.47,
+            283.3
+          ],
+          [
+            353.09,
+            268.64
+          ],
+          [
+            353.74,
+            252.01
+          ]
+        ],
+        "bboxPixels": [
+          353,
+          235,
+          1026,
+          298
+        ]
+      },
+      {
+        "staffIndex": 1,
+        "systemIndex": 1,
+        "polygonPixels": [
+          [
+            312.29,
+            412.41
+          ],
+          [
+            671.6,
+            428.08
+          ],
+          [
+            1030.95,
+            443.75
+          ],
+          [
+            1031.54,
+            460.68
+          ],
+          [
+            1032.13,
+            477.67
+          ],
+          [
+            671.46,
+            461.94
+          ],
+          [
+            310.85,
+            446.21
+          ],
+          [
+            311.57,
+            429.28
+          ]
+        ],
+        "bboxPixels": [
+          310,
+          412,
+          1033,
+          478
+        ]
+      },
+      {
+        "staffIndex": 2,
+        "systemIndex": 2,
+        "polygonPixels": [
+          [
+            304.37,
+            597.3
+          ],
+          [
+            670.86,
+            613.3
+          ],
+          [
+            1037.4,
+            629.3
+          ],
+          [
+            1038.01,
+            646.91
+          ],
+          [
+            1038.62,
+            664.59
+          ],
+          [
+            670.72,
+            648.53
+          ],
+          [
+            302.86,
+            632.47
+          ],
+          [
+            303.62,
+            614.85
+          ]
+        ],
+        "bboxPixels": [
+          302,
+          597,
+          1039,
+          665
+        ]
+      }
+    ],
+    "measures": [
+      {
+        "globalMeasureIndex": 1,
+        "sourceMeasureNumber": "1",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            354.33,
+            236.81
+          ],
+          [
+            447.4,
+            240.87
+          ],
+          [
+            540.48,
+            244.93
+          ],
+          [
+            540.19,
+            260.13
+          ],
+          [
+            539.91,
+            275.39
+          ],
+          [
+            446.52,
+            271.32
+          ],
+          [
+            353.14,
+            267.25
+          ],
+          [
+            353.74,
+            252.01
+          ]
+        ],
+        "bboxPixels": [
+          353,
+          236,
+          541,
+          276
+        ]
+      },
+      {
+        "globalMeasureIndex": 2,
+        "sourceMeasureNumber": "2",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            539.81,
+            244.9
+          ],
+          [
+            604.4,
+            247.71
+          ],
+          [
+            669.0,
+            250.53
+          ],
+          [
+            668.93,
+            265.75
+          ],
+          [
+            668.86,
+            281.01
+          ],
+          [
+            604.05,
+            278.19
+          ],
+          [
+            539.25,
+            275.36
+          ],
+          [
+            539.53,
+            260.11
+          ]
+        ],
+        "bboxPixels": [
+          539,
+          244,
+          669,
+          282
+        ]
+      },
+      {
+        "globalMeasureIndex": 3,
+        "sourceMeasureNumber": "3",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            668.33,
+            250.5
+          ],
+          [
+            732.6,
+            253.3
+          ],
+          [
+            796.86,
+            256.1
+          ],
+          [
+            797.01,
+            271.33
+          ],
+          [
+            797.16,
+            286.61
+          ],
+          [
+            732.68,
+            283.79
+          ],
+          [
+            668.2,
+            280.98
+          ],
+          [
+            668.27,
+            265.72
+          ]
+        ],
+        "bboxPixels": [
+          668,
+          250,
+          798,
+          287
+        ]
+      },
+      {
+        "globalMeasureIndex": 4,
+        "sourceMeasureNumber": "4",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            796.2,
+            256.07
+          ],
+          [
+            845.89,
+            258.24
+          ],
+          [
+            895.58,
+            260.4
+          ],
+          [
+            895.89,
+            275.64
+          ],
+          [
+            896.2,
+            290.92
+          ],
+          [
+            846.35,
+            288.75
+          ],
+          [
+            796.49,
+            286.58
+          ],
+          [
+            796.34,
+            271.3
+          ]
+        ],
+        "bboxPixels": [
+          796,
+          256,
+          897,
+          291
+        ]
+      },
+      {
+        "globalMeasureIndex": 5,
+        "sourceMeasureNumber": "5",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            894.91,
+            260.38
+          ],
+          [
+            959.51,
+            263.19
+          ],
+          [
+            1024.11,
+            266.01
+          ],
+          [
+            1024.64,
+            281.25
+          ],
+          [
+            1025.17,
+            296.54
+          ],
+          [
+            960.36,
+            293.72
+          ],
+          [
+            895.54,
+            290.89
+          ],
+          [
+            895.23,
+            275.61
+          ]
+        ],
+        "bboxPixels": [
+          894,
+          260,
+          1026,
+          297
+        ]
+      },
+      {
+        "globalMeasureIndex": 6,
+        "sourceMeasureNumber": "6",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            312.23,
+            413.84
+          ],
+          [
+            395.99,
+            417.49
+          ],
+          [
+            479.75,
+            421.15
+          ],
+          [
+            479.37,
+            436.6
+          ],
+          [
+            478.98,
+            452.09
+          ],
+          [
+            394.94,
+            448.43
+          ],
+          [
+            310.91,
+            444.76
+          ],
+          [
+            311.57,
+            429.28
+          ]
+        ],
+        "bboxPixels": [
+          310,
+          413,
+          480,
+          453
+        ]
+      },
+      {
+        "globalMeasureIndex": 7,
+        "sourceMeasureNumber": "7",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            479.07,
+            421.12
+          ],
+          [
+            526.02,
+            423.17
+          ],
+          [
+            572.97,
+            425.21
+          ],
+          [
+            572.74,
+            440.67
+          ],
+          [
+            572.51,
+            456.17
+          ],
+          [
+            525.41,
+            454.12
+          ],
+          [
+            478.3,
+            452.07
+          ],
+          [
+            478.69,
+            436.57
+          ]
+        ],
+        "bboxPixels": [
+          478,
+          421,
+          573,
+          457
+        ]
+      },
+      {
+        "globalMeasureIndex": 8,
+        "sourceMeasureNumber": "8",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            572.29,
+            425.18
+          ],
+          [
+            633.43,
+            427.85
+          ],
+          [
+            694.56,
+            430.52
+          ],
+          [
+            694.54,
+            445.98
+          ],
+          [
+            694.51,
+            461.5
+          ],
+          [
+            633.17,
+            458.82
+          ],
+          [
+            571.84,
+            456.15
+          ],
+          [
+            572.06,
+            440.64
+          ]
+        ],
+        "bboxPixels": [
+          571,
+          425,
+          695,
+          462
+        ]
+      },
+      {
+        "globalMeasureIndex": 9,
+        "sourceMeasureNumber": "9",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            693.89,
+            430.49
+          ],
+          [
+            754.68,
+            433.14
+          ],
+          [
+            815.49,
+            435.79
+          ],
+          [
+            815.66,
+            451.26
+          ],
+          [
+            815.84,
+            466.79
+          ],
+          [
+            754.84,
+            464.13
+          ],
+          [
+            693.84,
+            461.47
+          ],
+          [
+            693.86,
+            445.95
+          ]
+        ],
+        "bboxPixels": [
+          693,
+          430,
+          816,
+          467
+        ]
+      },
+      {
+        "globalMeasureIndex": 10,
+        "sourceMeasureNumber": "10",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            814.81,
+            435.76
+          ],
+          [
+            862.1,
+            437.83
+          ],
+          [
+            909.39,
+            439.89
+          ],
+          [
+            909.73,
+            455.37
+          ],
+          [
+            910.06,
+            470.9
+          ],
+          [
+            862.61,
+            468.83
+          ],
+          [
+            815.16,
+            466.76
+          ],
+          [
+            814.99,
+            451.24
+          ]
+        ],
+        "bboxPixels": [
+          814,
+          435,
+          911,
+          471
+        ]
+      },
+      {
+        "globalMeasureIndex": 11,
+        "sourceMeasureNumber": "11",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            908.72,
+            439.86
+          ],
+          [
+            969.52,
+            442.51
+          ],
+          [
+            1030.32,
+            445.16
+          ],
+          [
+            1030.86,
+            460.65
+          ],
+          [
+            1031.4,
+            476.19
+          ],
+          [
+            970.39,
+            473.53
+          ],
+          [
+            909.38,
+            470.87
+          ],
+          [
+            909.05,
+            455.34
+          ]
+        ],
+        "bboxPixels": [
+          908,
+          439,
+          1032,
+          477
+        ]
+      },
+      {
+        "globalMeasureIndex": 12,
+        "sourceMeasureNumber": "12",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            304.3,
+            598.79
+          ],
+          [
+            382.5,
+            602.21
+          ],
+          [
+            460.7,
+            605.62
+          ],
+          [
+            460.28,
+            621.69
+          ],
+          [
+            459.86,
+            637.82
+          ],
+          [
+            381.39,
+            634.39
+          ],
+          [
+            302.93,
+            630.97
+          ],
+          [
+            303.62,
+            614.85
+          ]
+        ],
+        "bboxPixels": [
+          302,
+          598,
+          461,
+          638
+        ]
+      },
+      {
+        "globalMeasureIndex": 13,
+        "sourceMeasureNumber": "13",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            460.01,
+            605.59
+          ],
+          [
+            516.17,
+            608.04
+          ],
+          [
+            572.32,
+            610.49
+          ],
+          [
+            572.09,
+            626.57
+          ],
+          [
+            571.86,
+            642.71
+          ],
+          [
+            515.51,
+            640.25
+          ],
+          [
+            459.16,
+            637.79
+          ],
+          [
+            459.59,
+            621.66
+          ]
+        ],
+        "bboxPixels": [
+          459,
+          605,
+          573,
+          643
+        ]
+      },
+      {
+        "globalMeasureIndex": 14,
+        "sourceMeasureNumber": "14",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            571.63,
+            610.46
+          ],
+          [
+            615.38,
+            612.37
+          ],
+          [
+            659.14,
+            614.28
+          ],
+          [
+            659.05,
+            630.37
+          ],
+          [
+            658.97,
+            646.51
+          ],
+          [
+            615.07,
+            644.59
+          ],
+          [
+            571.16,
+            642.68
+          ],
+          [
+            571.4,
+            626.54
+          ]
+        ],
+        "bboxPixels": [
+          571,
+          610,
+          660,
+          647
+        ]
+      },
+      {
+        "globalMeasureIndex": 15,
+        "sourceMeasureNumber": "15",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            658.45,
+            614.25
+          ],
+          [
+            714.61,
+            616.7
+          ],
+          [
+            770.77,
+            619.16
+          ],
+          [
+            770.87,
+            635.25
+          ],
+          [
+            770.98,
+            651.4
+          ],
+          [
+            714.63,
+            648.94
+          ],
+          [
+            658.28,
+            646.48
+          ],
+          [
+            658.36,
+            630.34
+          ]
+        ],
+        "bboxPixels": [
+          658,
+          614,
+          771,
+          652
+        ]
+      },
+      {
+        "globalMeasureIndex": 16,
+        "sourceMeasureNumber": "16",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            770.08,
+            619.13
+          ],
+          [
+            826.24,
+            621.58
+          ],
+          [
+            882.4,
+            624.03
+          ],
+          [
+            882.69,
+            640.13
+          ],
+          [
+            882.99,
+            656.29
+          ],
+          [
+            826.64,
+            653.83
+          ],
+          [
+            770.29,
+            651.37
+          ],
+          [
+            770.18,
+            635.22
+          ]
+        ],
+        "bboxPixels": [
+          770,
+          619,
+          883,
+          657
+        ]
+      },
+      {
+        "globalMeasureIndex": 17,
+        "sourceMeasureNumber": "17",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            881.71,
+            624.0
+          ],
+          [
+            925.12,
+            625.89
+          ],
+          [
+            968.54,
+            627.79
+          ],
+          [
+            968.98,
+            643.9
+          ],
+          [
+            969.42,
+            660.06
+          ],
+          [
+            925.86,
+            658.16
+          ],
+          [
+            882.3,
+            656.26
+          ],
+          [
+            882.0,
+            640.1
+          ]
+        ],
+        "bboxPixels": [
+          881,
+          623,
+          970,
+          661
+        ]
+      },
+      {
+        "globalMeasureIndex": 18,
+        "sourceMeasureNumber": "18",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            967.85,
+            627.76
+          ],
+          [
+            1002.3,
+            629.26
+          ],
+          [
+            1036.76,
+            630.77
+          ],
+          [
+            1037.32,
+            646.88
+          ],
+          [
+            1037.88,
+            663.05
+          ],
+          [
+            1003.3,
+            661.54
+          ],
+          [
+            968.73,
+            660.03
+          ],
+          [
+            968.29,
+            643.87
+          ]
+        ],
+        "bboxPixels": [
+          967,
+          627,
+          1038,
+          664
+        ]
+      }
+    ],
+    "notes": [
+      {
+        "xmlPitchedNoteIndex": 0,
+        "pitch": {
+          "step": "E",
+          "alter": 0,
+          "octave": 4,
+          "midi": 64
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 1,
+        "sourceMeasureNumber": "1",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            419.76,
+            265.29
+          ],
+          [
+            424.74,
+            265.51
+          ],
+          [
+            429.72,
+            265.72
+          ],
+          [
+            429.6,
+            269.89
+          ],
+          [
+            429.47,
+            274.06
+          ],
+          [
+            424.48,
+            273.84
+          ],
+          [
+            419.5,
+            273.62
+          ],
+          [
+            419.63,
+            269.45
+          ]
+        ],
+        "bboxPixels": [
+          419,
+          265,
+          430,
+          275
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 1,
+        "pitch": {
+          "step": "F",
+          "alter": 1,
+          "octave": 4,
+          "midi": 66
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 1,
+        "sourceMeasureNumber": "1",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            449.75,
+            263.13
+          ],
+          [
+            454.73,
+            263.34
+          ],
+          [
+            459.71,
+            263.56
+          ],
+          [
+            459.6,
+            267.72
+          ],
+          [
+            459.49,
+            271.89
+          ],
+          [
+            454.5,
+            271.67
+          ],
+          [
+            449.52,
+            271.45
+          ],
+          [
+            449.63,
+            267.29
+          ]
+        ],
+        "bboxPixels": [
+          449,
+          263,
+          460,
+          272
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 2,
+        "pitch": {
+          "step": "G",
+          "alter": 0,
+          "octave": 4,
+          "midi": 67
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 1,
+        "sourceMeasureNumber": "1",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            479.74,
+            260.27
+          ],
+          [
+            484.39,
+            260.47
+          ],
+          [
+            489.03,
+            260.68
+          ],
+          [
+            488.93,
+            264.83
+          ],
+          [
+            488.83,
+            269.0
+          ],
+          [
+            484.18,
+            268.79
+          ],
+          [
+            479.53,
+            268.59
+          ],
+          [
+            479.64,
+            264.43
+          ]
+        ],
+        "bboxPixels": [
+          479,
+          260,
+          490,
+          269
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 3,
+        "pitch": {
+          "step": "A",
+          "alter": 0,
+          "octave": 4,
+          "midi": 69
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 1,
+        "sourceMeasureNumber": "1",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            509.68,
+            258.11
+          ],
+          [
+            514.33,
+            258.31
+          ],
+          [
+            518.97,
+            258.52
+          ],
+          [
+            518.89,
+            262.67
+          ],
+          [
+            518.8,
+            266.83
+          ],
+          [
+            514.15,
+            266.63
+          ],
+          [
+            509.5,
+            266.42
+          ],
+          [
+            509.59,
+            262.27
+          ]
+        ],
+        "bboxPixels": [
+          509,
+          258,
+          519,
+          267
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 4,
+        "pitch": {
+          "step": "B",
+          "alter": 0,
+          "octave": 4,
+          "midi": 71
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 2,
+        "sourceMeasureNumber": "2",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            548.89,
+            256.36
+          ],
+          [
+            553.54,
+            256.56
+          ],
+          [
+            558.18,
+            256.76
+          ],
+          [
+            558.11,
+            260.92
+          ],
+          [
+            558.04,
+            265.07
+          ],
+          [
+            553.39,
+            264.87
+          ],
+          [
+            548.75,
+            264.67
+          ],
+          [
+            548.82,
+            260.51
+          ]
+        ],
+        "bboxPixels": [
+          548,
+          256,
+          559,
+          266
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 5,
+        "pitch": {
+          "step": "A",
+          "alter": 0,
+          "octave": 4,
+          "midi": 69
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 2,
+        "sourceMeasureNumber": "2",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            578.69,
+            261.12
+          ],
+          [
+            583.34,
+            261.32
+          ],
+          [
+            587.98,
+            261.52
+          ],
+          [
+            587.93,
+            265.68
+          ],
+          [
+            587.87,
+            269.84
+          ],
+          [
+            583.22,
+            269.64
+          ],
+          [
+            578.57,
+            269.44
+          ],
+          [
+            578.63,
+            265.28
+          ]
+        ],
+        "bboxPixels": [
+          578,
+          261,
+          588,
+          270
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 6,
+        "pitch": {
+          "step": "G",
+          "alter": 0,
+          "octave": 4,
+          "midi": 67
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 2,
+        "sourceMeasureNumber": "2",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            607.85,
+            265.86
+          ],
+          [
+            612.83,
+            266.07
+          ],
+          [
+            617.8,
+            266.29
+          ],
+          [
+            617.76,
+            270.45
+          ],
+          [
+            617.72,
+            274.61
+          ],
+          [
+            612.74,
+            274.4
+          ],
+          [
+            607.76,
+            274.18
+          ],
+          [
+            607.8,
+            270.02
+          ]
+        ],
+        "bboxPixels": [
+          607,
+          265,
+          618,
+          275
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 7,
+        "pitch": {
+          "step": "F",
+          "alter": 1,
+          "octave": 4,
+          "midi": 66
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 2,
+        "sourceMeasureNumber": "2",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            637.69,
+            271.32
+          ],
+          [
+            642.67,
+            271.54
+          ],
+          [
+            647.65,
+            271.75
+          ],
+          [
+            647.62,
+            275.92
+          ],
+          [
+            647.59,
+            280.09
+          ],
+          [
+            642.61,
+            279.87
+          ],
+          [
+            637.62,
+            279.65
+          ],
+          [
+            637.65,
+            275.48
+          ]
+        ],
+        "bboxPixels": [
+          637,
+          271,
+          648,
+          281
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 8,
+        "pitch": {
+          "step": "E",
+          "alter": 0,
+          "octave": 4,
+          "midi": 64
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 3,
+        "sourceMeasureNumber": "3",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            677.52,
+            276.53
+          ],
+          [
+            682.17,
+            276.73
+          ],
+          [
+            686.82,
+            276.93
+          ],
+          [
+            686.81,
+            281.1
+          ],
+          [
+            686.8,
+            285.27
+          ],
+          [
+            682.15,
+            285.07
+          ],
+          [
+            677.49,
+            284.87
+          ],
+          [
+            677.51,
+            280.69
+          ]
+        ],
+        "bboxPixels": [
+          677,
+          276,
+          687,
+          286
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 9,
+        "pitch": {
+          "step": "G",
+          "alter": 0,
+          "octave": 4,
+          "midi": 67
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 3,
+        "sourceMeasureNumber": "3",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            706.75,
+            270.17
+          ],
+          [
+            711.73,
+            270.38
+          ],
+          [
+            716.71,
+            270.6
+          ],
+          [
+            716.72,
+            274.76
+          ],
+          [
+            716.72,
+            278.93
+          ],
+          [
+            711.74,
+            278.71
+          ],
+          [
+            706.75,
+            278.49
+          ],
+          [
+            706.75,
+            274.33
+          ]
+        ],
+        "bboxPixels": [
+          706,
+          270,
+          717,
+          279
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 10,
+        "pitch": {
+          "step": "B",
+          "alter": 0,
+          "octave": 4,
+          "midi": 71
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 3,
+        "sourceMeasureNumber": "3",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            736.6,
+            264.54
+          ],
+          [
+            741.58,
+            264.76
+          ],
+          [
+            746.55,
+            264.97
+          ],
+          [
+            746.57,
+            269.13
+          ],
+          [
+            746.59,
+            273.29
+          ],
+          [
+            741.61,
+            273.07
+          ],
+          [
+            736.63,
+            272.86
+          ],
+          [
+            736.62,
+            268.7
+          ]
+        ],
+        "bboxPixels": [
+          736,
+          264,
+          747,
+          274
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 11,
+        "pitch": {
+          "step": "E",
+          "alter": 0,
+          "octave": 5,
+          "midi": 76
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 3,
+        "sourceMeasureNumber": "3",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            766.39,
+            255.46
+          ],
+          [
+            771.03,
+            255.67
+          ],
+          [
+            775.66,
+            255.87
+          ],
+          [
+            775.69,
+            260.02
+          ],
+          [
+            775.73,
+            264.17
+          ],
+          [
+            771.08,
+            263.97
+          ],
+          [
+            766.44,
+            263.76
+          ],
+          [
+            766.41,
+            259.61
+          ]
+        ],
+        "bboxPixels": [
+          766,
+          255,
+          776,
+          265
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 12,
+        "pitch": {
+          "step": "D",
+          "alter": 0,
+          "octave": 5,
+          "midi": 74
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 4,
+        "sourceMeasureNumber": "4",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            805.52,
+            260.62
+          ],
+          [
+            810.49,
+            260.84
+          ],
+          [
+            815.46,
+            261.06
+          ],
+          [
+            815.51,
+            265.21
+          ],
+          [
+            815.56,
+            269.37
+          ],
+          [
+            810.58,
+            269.15
+          ],
+          [
+            805.6,
+            268.93
+          ],
+          [
+            805.56,
+            264.78
+          ]
+        ],
+        "bboxPixels": [
+          805,
+          260,
+          816,
+          270
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 13,
+        "pitch": {
+          "step": "B",
+          "alter": 0,
+          "octave": 4,
+          "midi": 71
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 4,
+        "sourceMeasureNumber": "4",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            850.03,
+            269.48
+          ],
+          [
+            855.01,
+            269.7
+          ],
+          [
+            859.98,
+            269.92
+          ],
+          [
+            860.05,
+            274.08
+          ],
+          [
+            860.12,
+            278.24
+          ],
+          [
+            855.14,
+            278.02
+          ],
+          [
+            850.16,
+            277.8
+          ],
+          [
+            850.1,
+            273.64
+          ]
+        ],
+        "bboxPixels": [
+          850,
+          269,
+          861,
+          279
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 14,
+        "pitch": {
+          "step": "C",
+          "alter": 0,
+          "octave": 5,
+          "midi": 72
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 5,
+        "sourceMeasureNumber": "5",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            904.35,
+            268.39
+          ],
+          [
+            909.33,
+            268.61
+          ],
+          [
+            914.3,
+            268.82
+          ],
+          [
+            914.39,
+            272.98
+          ],
+          [
+            914.49,
+            277.14
+          ],
+          [
+            909.51,
+            276.92
+          ],
+          [
+            904.53,
+            276.71
+          ],
+          [
+            904.44,
+            272.55
+          ]
+        ],
+        "bboxPixels": [
+          904,
+          268,
+          915,
+          278
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 15,
+        "pitch": {
+          "step": "B",
+          "alter": 0,
+          "octave": 4,
+          "midi": 71
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 5,
+        "sourceMeasureNumber": "5",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            934.28,
+            273.16
+          ],
+          [
+            938.92,
+            273.36
+          ],
+          [
+            943.57,
+            273.56
+          ],
+          [
+            943.67,
+            277.72
+          ],
+          [
+            943.78,
+            281.89
+          ],
+          [
+            939.13,
+            281.68
+          ],
+          [
+            934.49,
+            281.48
+          ],
+          [
+            934.38,
+            277.32
+          ]
+        ],
+        "bboxPixels": [
+          934,
+          273,
+          944,
+          282
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 16,
+        "pitch": {
+          "step": "A",
+          "alter": 0,
+          "octave": 4,
+          "midi": 69
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 5,
+        "sourceMeasureNumber": "5",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            964.23,
+            277.92
+          ],
+          [
+            968.87,
+            278.13
+          ],
+          [
+            973.52,
+            278.33
+          ],
+          [
+            973.64,
+            282.49
+          ],
+          [
+            973.76,
+            286.66
+          ],
+          [
+            969.11,
+            286.46
+          ],
+          [
+            964.46,
+            286.26
+          ],
+          [
+            964.34,
+            282.09
+          ]
+        ],
+        "bboxPixels": [
+          964,
+          277,
+          974,
+          287
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 17,
+        "pitch": {
+          "step": "G",
+          "alter": 0,
+          "octave": 4,
+          "midi": 67
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 5,
+        "sourceMeasureNumber": "5",
+        "systemIndex": 0,
+        "staffIndex": 0,
+        "polygonPixels": [
+          [
+            993.54,
+            282.67
+          ],
+          [
+            998.52,
+            282.88
+          ],
+          [
+            1003.49,
+            283.1
+          ],
+          [
+            1003.63,
+            287.27
+          ],
+          [
+            1003.76,
+            291.44
+          ],
+          [
+            998.78,
+            291.22
+          ],
+          [
+            993.8,
+            291.01
+          ],
+          [
+            993.67,
+            286.83
+          ]
+        ],
+        "bboxPixels": [
+          993,
+          282,
+          1004,
+          292
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 18,
+        "pitch": {
+          "step": "F",
+          "alter": 1,
+          "octave": 4,
+          "midi": 66
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 6,
+        "sourceMeasureNumber": "6",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            366.12,
+            438.51
+          ],
+          [
+            371.2,
+            438.73
+          ],
+          [
+            376.28,
+            438.95
+          ],
+          [
+            376.12,
+            443.27
+          ],
+          [
+            375.97,
+            447.6
+          ],
+          [
+            370.88,
+            447.38
+          ],
+          [
+            365.8,
+            447.16
+          ],
+          [
+            365.96,
+            442.83
+          ]
+        ],
+        "bboxPixels": [
+          365,
+          438,
+          377,
+          448
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 19,
+        "pitch": {
+          "step": "G",
+          "alter": 0,
+          "octave": 4,
+          "midi": 67
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 6,
+        "sourceMeasureNumber": "6",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            394.0,
+            436.12
+          ],
+          [
+            399.08,
+            436.34
+          ],
+          [
+            404.16,
+            436.56
+          ],
+          [
+            404.01,
+            440.88
+          ],
+          [
+            403.87,
+            445.21
+          ],
+          [
+            398.79,
+            444.98
+          ],
+          [
+            393.71,
+            444.76
+          ],
+          [
+            393.86,
+            440.44
+          ]
+        ],
+        "bboxPixels": [
+          393,
+          436,
+          405,
+          446
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 20,
+        "pitch": {
+          "step": "A",
+          "alter": 0,
+          "octave": 4,
+          "midi": 69
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 6,
+        "sourceMeasureNumber": "6",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            422.56,
+            433.04
+          ],
+          [
+            427.3,
+            433.24
+          ],
+          [
+            432.04,
+            433.45
+          ],
+          [
+            431.91,
+            437.77
+          ],
+          [
+            431.78,
+            442.09
+          ],
+          [
+            427.04,
+            441.88
+          ],
+          [
+            422.3,
+            441.68
+          ],
+          [
+            422.43,
+            437.36
+          ]
+        ],
+        "bboxPixels": [
+          422,
+          433,
+          433,
+          443
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 21,
+        "pitch": {
+          "step": "F",
+          "alter": 1,
+          "octave": 4,
+          "midi": 66
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 6,
+        "sourceMeasureNumber": "6",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            450.08,
+            442.17
+          ],
+          [
+            454.82,
+            442.37
+          ],
+          [
+            459.56,
+            442.58
+          ],
+          [
+            459.44,
+            446.91
+          ],
+          [
+            459.33,
+            451.24
+          ],
+          [
+            454.58,
+            451.03
+          ],
+          [
+            449.84,
+            450.82
+          ],
+          [
+            449.96,
+            446.49
+          ]
+        ],
+        "bboxPixels": [
+          449,
+          442,
+          460,
+          452
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 22,
+        "pitch": {
+          "step": "G",
+          "alter": 0,
+          "octave": 4,
+          "midi": 67
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 7,
+        "sourceMeasureNumber": "7",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            488.08,
+            440.22
+          ],
+          [
+            492.82,
+            440.43
+          ],
+          [
+            497.56,
+            440.63
+          ],
+          [
+            497.46,
+            444.96
+          ],
+          [
+            497.36,
+            449.28
+          ],
+          [
+            492.62,
+            449.08
+          ],
+          [
+            487.88,
+            448.87
+          ],
+          [
+            487.98,
+            444.54
+          ]
+        ],
+        "bboxPixels": [
+          487,
+          440,
+          498,
+          450
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 23,
+        "pitch": {
+          "step": "E",
+          "alter": 0,
+          "octave": 4,
+          "midi": 64
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 7,
+        "sourceMeasureNumber": "7",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            529.91,
+            449.26
+          ],
+          [
+            534.65,
+            449.47
+          ],
+          [
+            539.39,
+            449.67
+          ],
+          [
+            539.32,
+            454.0
+          ],
+          [
+            539.24,
+            458.34
+          ],
+          [
+            534.49,
+            458.13
+          ],
+          [
+            529.74,
+            457.93
+          ],
+          [
+            529.83,
+            453.59
+          ]
+        ],
+        "bboxPixels": [
+          529,
+          449,
+          540,
+          459
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 24,
+        "pitch": {
+          "step": "E",
+          "alter": 0,
+          "octave": 4,
+          "midi": 64
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 8,
+        "sourceMeasureNumber": "8",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            581.39,
+            451.5
+          ],
+          [
+            586.47,
+            451.73
+          ],
+          [
+            591.55,
+            451.95
+          ],
+          [
+            591.5,
+            456.28
+          ],
+          [
+            591.45,
+            460.62
+          ],
+          [
+            586.36,
+            460.39
+          ],
+          [
+            581.27,
+            460.17
+          ],
+          [
+            581.33,
+            455.84
+          ]
+        ],
+        "bboxPixels": [
+          581,
+          451,
+          592,
+          461
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 25,
+        "pitch": {
+          "step": "B",
+          "alter": 0,
+          "octave": 4,
+          "midi": 71
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 8,
+        "sourceMeasureNumber": "8",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            609.33,
+            437.58
+          ],
+          [
+            614.4,
+            437.81
+          ],
+          [
+            619.47,
+            438.03
+          ],
+          [
+            619.43,
+            442.35
+          ],
+          [
+            619.39,
+            446.67
+          ],
+          [
+            614.31,
+            446.45
+          ],
+          [
+            609.24,
+            446.22
+          ],
+          [
+            609.28,
+            441.9
+          ]
+        ],
+        "bboxPixels": [
+          609,
+          437,
+          620,
+          447
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 26,
+        "pitch": {
+          "step": "G",
+          "alter": 0,
+          "octave": 4,
+          "midi": 67
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 8,
+        "sourceMeasureNumber": "8",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            637.0,
+            446.71
+          ],
+          [
+            642.07,
+            446.94
+          ],
+          [
+            647.15,
+            447.16
+          ],
+          [
+            647.12,
+            451.48
+          ],
+          [
+            647.09,
+            455.82
+          ],
+          [
+            642.01,
+            455.59
+          ],
+          [
+            636.93,
+            455.37
+          ],
+          [
+            636.96,
+            451.04
+          ]
+        ],
+        "bboxPixels": [
+          636,
+          446,
+          648,
+          456
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 27,
+        "pitch": {
+          "step": "E",
+          "alter": 0,
+          "octave": 5,
+          "midi": 76
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 8,
+        "sourceMeasureNumber": "8",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            665.51,
+            429.25
+          ],
+          [
+            670.24,
+            429.46
+          ],
+          [
+            674.97,
+            429.66
+          ],
+          [
+            674.95,
+            433.97
+          ],
+          [
+            674.94,
+            438.29
+          ],
+          [
+            670.21,
+            438.08
+          ],
+          [
+            665.47,
+            437.87
+          ],
+          [
+            665.49,
+            433.56
+          ]
+        ],
+        "bboxPixels": [
+          665,
+          429,
+          675,
+          439
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 28,
+        "pitch": {
+          "step": "D",
+          "alter": 0,
+          "octave": 5,
+          "midi": 74
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 9,
+        "sourceMeasureNumber": "9",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            703.34,
+            434.49
+          ],
+          [
+            708.07,
+            434.7
+          ],
+          [
+            712.8,
+            434.91
+          ],
+          [
+            712.8,
+            439.22
+          ],
+          [
+            712.81,
+            443.54
+          ],
+          [
+            708.07,
+            443.33
+          ],
+          [
+            703.34,
+            443.12
+          ],
+          [
+            703.34,
+            438.81
+          ]
+        ],
+        "bboxPixels": [
+          703,
+          434,
+          713,
+          444
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 29,
+        "pitch": {
+          "step": "C",
+          "alter": 0,
+          "octave": 5,
+          "midi": 72
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 9,
+        "sourceMeasureNumber": "9",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            731.06,
+            439.3
+          ],
+          [
+            735.79,
+            439.5
+          ],
+          [
+            740.52,
+            439.71
+          ],
+          [
+            740.54,
+            444.03
+          ],
+          [
+            740.55,
+            448.35
+          ],
+          [
+            735.82,
+            448.14
+          ],
+          [
+            731.08,
+            447.94
+          ],
+          [
+            731.07,
+            443.61
+          ]
+        ],
+        "bboxPixels": [
+          731,
+          439,
+          741,
+          449
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 30,
+        "pitch": {
+          "step": "B",
+          "alter": 0,
+          "octave": 4,
+          "midi": 71
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 9,
+        "sourceMeasureNumber": "9",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            758.8,
+            444.1
+          ],
+          [
+            763.53,
+            444.31
+          ],
+          [
+            768.27,
+            444.52
+          ],
+          [
+            768.29,
+            448.84
+          ],
+          [
+            768.32,
+            453.16
+          ],
+          [
+            763.58,
+            452.96
+          ],
+          [
+            758.84,
+            452.75
+          ],
+          [
+            758.82,
+            448.43
+          ]
+        ],
+        "bboxPixels": [
+          758,
+          444,
+          769,
+          454
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 31,
+        "pitch": {
+          "step": "A",
+          "alter": 0,
+          "octave": 4,
+          "midi": 69
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 9,
+        "sourceMeasureNumber": "9",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            786.56,
+            448.91
+          ],
+          [
+            791.63,
+            449.14
+          ],
+          [
+            796.71,
+            449.36
+          ],
+          [
+            796.75,
+            453.68
+          ],
+          [
+            796.79,
+            458.01
+          ],
+          [
+            791.71,
+            457.79
+          ],
+          [
+            786.63,
+            457.57
+          ],
+          [
+            786.59,
+            453.24
+          ]
+        ],
+        "bboxPixels": [
+          786,
+          448,
+          797,
+          459
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 32,
+        "pitch": {
+          "step": "B",
+          "alter": 0,
+          "octave": 4,
+          "midi": 71
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 10,
+        "sourceMeasureNumber": "10",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            824.4,
+            446.97
+          ],
+          [
+            829.48,
+            447.19
+          ],
+          [
+            834.55,
+            447.41
+          ],
+          [
+            834.61,
+            451.73
+          ],
+          [
+            834.67,
+            456.06
+          ],
+          [
+            829.59,
+            455.84
+          ],
+          [
+            824.51,
+            455.62
+          ],
+          [
+            824.46,
+            451.29
+          ]
+        ],
+        "bboxPixels": [
+          824,
+          446,
+          835,
+          457
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 33,
+        "pitch": {
+          "step": "G",
+          "alter": 0,
+          "octave": 4,
+          "midi": 67
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 10,
+        "sourceMeasureNumber": "10",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            866.47,
+            456.72
+          ],
+          [
+            871.21,
+            456.93
+          ],
+          [
+            875.95,
+            457.14
+          ],
+          [
+            876.03,
+            461.47
+          ],
+          [
+            876.1,
+            465.81
+          ],
+          [
+            871.36,
+            465.6
+          ],
+          [
+            866.62,
+            465.39
+          ],
+          [
+            866.55,
+            461.06
+          ]
+        ],
+        "bboxPixels": [
+          866,
+          456,
+          877,
+          466
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 34,
+        "pitch": {
+          "step": "A",
+          "alter": 0,
+          "octave": 4,
+          "midi": 69
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 11,
+        "sourceMeasureNumber": "11",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            917.82,
+            454.64
+          ],
+          [
+            922.9,
+            454.86
+          ],
+          [
+            927.97,
+            455.08
+          ],
+          [
+            928.07,
+            459.41
+          ],
+          [
+            928.18,
+            463.74
+          ],
+          [
+            923.1,
+            463.52
+          ],
+          [
+            918.02,
+            463.3
+          ],
+          [
+            917.92,
+            458.97
+          ]
+        ],
+        "bboxPixels": [
+          917,
+          454,
+          929,
+          464
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 35,
+        "pitch": {
+          "step": "B",
+          "alter": 0,
+          "octave": 4,
+          "midi": 71
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 11,
+        "sourceMeasureNumber": "11",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            946.15,
+            452.28
+          ],
+          [
+            950.88,
+            452.48
+          ],
+          [
+            955.62,
+            452.69
+          ],
+          [
+            955.73,
+            457.01
+          ],
+          [
+            955.85,
+            461.34
+          ],
+          [
+            951.11,
+            461.14
+          ],
+          [
+            946.37,
+            460.93
+          ],
+          [
+            946.26,
+            456.6
+          ]
+        ],
+        "bboxPixels": [
+          946,
+          452,
+          956,
+          462
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 36,
+        "pitch": {
+          "step": "C",
+          "alter": 0,
+          "octave": 5,
+          "midi": 72
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 11,
+        "sourceMeasureNumber": "11",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            973.78,
+            449.88
+          ],
+          [
+            978.51,
+            450.09
+          ],
+          [
+            983.24,
+            450.3
+          ],
+          [
+            983.37,
+            454.62
+          ],
+          [
+            983.5,
+            458.95
+          ],
+          [
+            978.76,
+            458.74
+          ],
+          [
+            974.03,
+            458.53
+          ],
+          [
+            973.9,
+            454.21
+          ]
+        ],
+        "bboxPixels": [
+          973,
+          449,
+          984,
+          459
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 37,
+        "pitch": {
+          "step": "D",
+          "alter": 0,
+          "octave": 5,
+          "midi": 74
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 11,
+        "sourceMeasureNumber": "11",
+        "systemIndex": 1,
+        "staffIndex": 1,
+        "polygonPixels": [
+          [
+            1001.39,
+            447.49
+          ],
+          [
+            1006.12,
+            447.7
+          ],
+          [
+            1010.85,
+            447.91
+          ],
+          [
+            1010.99,
+            452.23
+          ],
+          [
+            1011.13,
+            456.55
+          ],
+          [
+            1006.39,
+            456.34
+          ],
+          [
+            1001.66,
+            456.14
+          ],
+          [
+            1001.52,
+            451.81
+          ]
+        ],
+        "bboxPixels": [
+          1001,
+          447,
+          1012,
+          457
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 38,
+        "pitch": {
+          "step": "E",
+          "alter": 0,
+          "octave": 5,
+          "midi": 76
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 12,
+        "sourceMeasureNumber": "12",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            358.04,
+            601.14
+          ],
+          [
+            362.87,
+            601.35
+          ],
+          [
+            367.69,
+            601.56
+          ],
+          [
+            367.53,
+            606.04
+          ],
+          [
+            367.37,
+            610.52
+          ],
+          [
+            362.54,
+            610.31
+          ],
+          [
+            357.71,
+            610.1
+          ],
+          [
+            357.88,
+            605.62
+          ]
+        ],
+        "bboxPixels": [
+          357,
+          601,
+          368,
+          611
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 39,
+        "pitch": {
+          "step": "D",
+          "alter": 0,
+          "octave": 5,
+          "midi": 74
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 12,
+        "sourceMeasureNumber": "12",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            383.41,
+            605.98
+          ],
+          [
+            388.23,
+            606.19
+          ],
+          [
+            393.06,
+            606.41
+          ],
+          [
+            392.91,
+            610.89
+          ],
+          [
+            392.76,
+            615.37
+          ],
+          [
+            387.93,
+            615.16
+          ],
+          [
+            383.1,
+            614.95
+          ],
+          [
+            383.25,
+            610.47
+          ]
+        ],
+        "bboxPixels": [
+          383,
+          605,
+          394,
+          616
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 40,
+        "pitch": {
+          "step": "C",
+          "alter": 0,
+          "octave": 5,
+          "midi": 72
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 12,
+        "sourceMeasureNumber": "12",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            408.79,
+            610.83
+          ],
+          [
+            413.62,
+            611.04
+          ],
+          [
+            418.44,
+            611.25
+          ],
+          [
+            418.31,
+            615.74
+          ],
+          [
+            418.17,
+            620.23
+          ],
+          [
+            413.34,
+            620.02
+          ],
+          [
+            408.51,
+            619.81
+          ],
+          [
+            408.65,
+            615.32
+          ]
+        ],
+        "bboxPixels": [
+          408,
+          610,
+          419,
+          621
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 41,
+        "pitch": {
+          "step": "B",
+          "alter": 0,
+          "octave": 4,
+          "midi": 71
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 12,
+        "sourceMeasureNumber": "12",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            433.48,
+            616.4
+          ],
+          [
+            438.66,
+            616.63
+          ],
+          [
+            443.83,
+            616.85
+          ],
+          [
+            443.7,
+            621.34
+          ],
+          [
+            443.58,
+            625.84
+          ],
+          [
+            438.4,
+            625.61
+          ],
+          [
+            433.22,
+            625.39
+          ],
+          [
+            433.35,
+            620.89
+          ]
+        ],
+        "bboxPixels": [
+          433,
+          616,
+          444,
+          626
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 42,
+        "pitch": {
+          "step": "A",
+          "alter": 0,
+          "octave": 4,
+          "midi": 69
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 13,
+        "sourceMeasureNumber": "13",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            469.26,
+            621.71
+          ],
+          [
+            474.44,
+            621.94
+          ],
+          [
+            479.61,
+            622.16
+          ],
+          [
+            479.5,
+            626.66
+          ],
+          [
+            479.4,
+            631.16
+          ],
+          [
+            474.21,
+            630.93
+          ],
+          [
+            469.03,
+            630.7
+          ],
+          [
+            469.15,
+            626.2
+          ]
+        ],
+        "bboxPixels": [
+          469,
+          621,
+          480,
+          632
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 43,
+        "pitch": {
+          "step": "C",
+          "alter": 0,
+          "octave": 5,
+          "midi": 72
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 13,
+        "sourceMeasureNumber": "13",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            494.98,
+            614.59
+          ],
+          [
+            499.81,
+            614.8
+          ],
+          [
+            504.64,
+            615.02
+          ],
+          [
+            504.54,
+            619.5
+          ],
+          [
+            504.44,
+            623.99
+          ],
+          [
+            499.61,
+            623.78
+          ],
+          [
+            494.78,
+            623.57
+          ],
+          [
+            494.88,
+            619.08
+          ]
+        ],
+        "bboxPixels": [
+          494,
+          614,
+          505,
+          624
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 44,
+        "pitch": {
+          "step": "E",
+          "alter": 0,
+          "octave": 5,
+          "midi": 76
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 13,
+        "sourceMeasureNumber": "13",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            520.64,
+            608.24
+          ],
+          [
+            525.47,
+            608.45
+          ],
+          [
+            530.29,
+            608.66
+          ],
+          [
+            530.21,
+            613.14
+          ],
+          [
+            530.12,
+            617.62
+          ],
+          [
+            525.29,
+            617.41
+          ],
+          [
+            520.47,
+            617.2
+          ],
+          [
+            520.56,
+            612.72
+          ]
+        ],
+        "bboxPixels": [
+          520,
+          608,
+          531,
+          618
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 45,
+        "pitch": {
+          "step": "A",
+          "alter": 0,
+          "octave": 4,
+          "midi": 69
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 13,
+        "sourceMeasureNumber": "13",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            545.87,
+            625.05
+          ],
+          [
+            550.7,
+            625.26
+          ],
+          [
+            555.53,
+            625.48
+          ],
+          [
+            555.46,
+            629.97
+          ],
+          [
+            555.38,
+            634.47
+          ],
+          [
+            550.55,
+            634.26
+          ],
+          [
+            545.71,
+            634.05
+          ],
+          [
+            545.79,
+            629.55
+          ]
+        ],
+        "bboxPixels": [
+          545,
+          625,
+          556,
+          635
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 46,
+        "pitch": {
+          "step": "B",
+          "alter": 0,
+          "octave": 4,
+          "midi": 71
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 14,
+        "sourceMeasureNumber": "14",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            581.12,
+            622.85
+          ],
+          [
+            586.29,
+            623.07
+          ],
+          [
+            591.46,
+            623.3
+          ],
+          [
+            591.41,
+            627.79
+          ],
+          [
+            591.35,
+            632.29
+          ],
+          [
+            586.17,
+            632.06
+          ],
+          [
+            581.0,
+            631.84
+          ],
+          [
+            581.06,
+            627.34
+          ]
+        ],
+        "bboxPixels": [
+          580,
+          622,
+          592,
+          633
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 47,
+        "pitch": {
+          "step": "F",
+          "alter": 1,
+          "octave": 4,
+          "midi": 66
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 14,
+        "sourceMeasureNumber": "14",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            619.65,
+            635.78
+          ],
+          [
+            624.48,
+            635.99
+          ],
+          [
+            629.32,
+            636.2
+          ],
+          [
+            629.28,
+            640.7
+          ],
+          [
+            629.24,
+            645.21
+          ],
+          [
+            624.4,
+            645.0
+          ],
+          [
+            619.56,
+            644.79
+          ],
+          [
+            619.6,
+            640.28
+          ]
+        ],
+        "bboxPixels": [
+          619,
+          635,
+          630,
+          646
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 48,
+        "pitch": {
+          "step": "G",
+          "alter": 0,
+          "octave": 4,
+          "midi": 67
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 15,
+        "sourceMeasureNumber": "15",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            668.01,
+            634.14
+          ],
+          [
+            672.85,
+            634.35
+          ],
+          [
+            677.68,
+            634.56
+          ],
+          [
+            677.66,
+            639.06
+          ],
+          [
+            677.65,
+            643.57
+          ],
+          [
+            672.81,
+            643.36
+          ],
+          [
+            667.97,
+            643.14
+          ],
+          [
+            667.99,
+            638.64
+          ]
+        ],
+        "bboxPixels": [
+          667,
+          634,
+          678,
+          644
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 49,
+        "pitch": {
+          "step": "F",
+          "alter": 1,
+          "octave": 4,
+          "midi": 66
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 15,
+        "sourceMeasureNumber": "15",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            692.86,
+            638.97
+          ],
+          [
+            698.04,
+            639.2
+          ],
+          [
+            703.22,
+            639.42
+          ],
+          [
+            703.22,
+            643.93
+          ],
+          [
+            703.22,
+            648.44
+          ],
+          [
+            698.03,
+            648.22
+          ],
+          [
+            692.85,
+            647.99
+          ],
+          [
+            692.86,
+            643.48
+          ]
+        ],
+        "bboxPixels": [
+          692,
+          638,
+          704,
+          649
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 50,
+        "pitch": {
+          "step": "E",
+          "alter": 0,
+          "octave": 4,
+          "midi": 64
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 15,
+        "sourceMeasureNumber": "15",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            718.42,
+            643.84
+          ],
+          [
+            723.61,
+            644.07
+          ],
+          [
+            728.79,
+            644.3
+          ],
+          [
+            728.8,
+            648.81
+          ],
+          [
+            728.81,
+            653.32
+          ],
+          [
+            723.62,
+            653.1
+          ],
+          [
+            718.43,
+            652.87
+          ],
+          [
+            718.43,
+            648.35
+          ]
+        ],
+        "bboxPixels": [
+          718,
+          643,
+          729,
+          654
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 51,
+        "pitch": {
+          "step": "G",
+          "alter": 0,
+          "octave": 4,
+          "midi": 67
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 15,
+        "sourceMeasureNumber": "15",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            743.96,
+            637.45
+          ],
+          [
+            749.14,
+            637.68
+          ],
+          [
+            754.32,
+            637.9
+          ],
+          [
+            754.34,
+            642.41
+          ],
+          [
+            754.37,
+            646.92
+          ],
+          [
+            749.18,
+            646.69
+          ],
+          [
+            744.0,
+            646.46
+          ],
+          [
+            743.98,
+            641.95
+          ]
+        ],
+        "bboxPixels": [
+          743,
+          637,
+          755,
+          647
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 52,
+        "pitch": {
+          "step": "B",
+          "alter": 0,
+          "octave": 4,
+          "midi": 71
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 16,
+        "sourceMeasureNumber": "16",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            779.81,
+            631.52
+          ],
+          [
+            784.64,
+            631.73
+          ],
+          [
+            789.47,
+            631.94
+          ],
+          [
+            789.51,
+            636.44
+          ],
+          [
+            789.55,
+            640.94
+          ],
+          [
+            784.72,
+            640.73
+          ],
+          [
+            779.88,
+            640.52
+          ],
+          [
+            779.85,
+            636.02
+          ]
+        ],
+        "bboxPixels": [
+          779,
+          631,
+          790,
+          641
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 53,
+        "pitch": {
+          "step": "A",
+          "alter": 0,
+          "octave": 4,
+          "midi": 69
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 16,
+        "sourceMeasureNumber": "16",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            805.38,
+            636.38
+          ],
+          [
+            810.21,
+            636.59
+          ],
+          [
+            815.04,
+            636.8
+          ],
+          [
+            815.09,
+            641.31
+          ],
+          [
+            815.14,
+            645.81
+          ],
+          [
+            810.31,
+            645.6
+          ],
+          [
+            805.47,
+            645.39
+          ],
+          [
+            805.43,
+            640.88
+          ]
+        ],
+        "bboxPixels": [
+          805,
+          636,
+          816,
+          646
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 54,
+        "pitch": {
+          "step": "F",
+          "alter": 1,
+          "octave": 4,
+          "midi": 66
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 16,
+        "sourceMeasureNumber": "16",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            830.32,
+            644.97
+          ],
+          [
+            835.51,
+            645.2
+          ],
+          [
+            840.69,
+            645.43
+          ],
+          [
+            840.75,
+            649.94
+          ],
+          [
+            840.81,
+            654.45
+          ],
+          [
+            835.63,
+            654.22
+          ],
+          [
+            830.44,
+            654.0
+          ],
+          [
+            830.38,
+            649.48
+          ]
+        ],
+        "bboxPixels": [
+          830,
+          644,
+          841,
+          655
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 55,
+        "pitch": {
+          "step": "D",
+          "alter": 1,
+          "octave": 4,
+          "midi": 63
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 16,
+        "sourceMeasureNumber": "16",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            856.0,
+            653.61
+          ],
+          [
+            861.18,
+            653.83
+          ],
+          [
+            866.37,
+            654.06
+          ],
+          [
+            866.45,
+            658.58
+          ],
+          [
+            866.52,
+            663.1
+          ],
+          [
+            861.33,
+            662.87
+          ],
+          [
+            856.14,
+            662.65
+          ],
+          [
+            856.07,
+            658.13
+          ]
+        ],
+        "bboxPixels": [
+          855,
+          653,
+          867,
+          664
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 56,
+        "pitch": {
+          "step": "E",
+          "alter": 0,
+          "octave": 4,
+          "midi": 64
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 17,
+        "sourceMeasureNumber": "17",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            891.88,
+            651.42
+          ],
+          [
+            896.71,
+            651.63
+          ],
+          [
+            901.55,
+            651.84
+          ],
+          [
+            901.64,
+            656.35
+          ],
+          [
+            901.74,
+            660.87
+          ],
+          [
+            896.89,
+            660.66
+          ],
+          [
+            892.05,
+            660.45
+          ],
+          [
+            891.96,
+            655.93
+          ]
+        ],
+        "bboxPixels": [
+          891,
+          651,
+          902,
+          661
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 57,
+        "pitch": {
+          "step": "B",
+          "alter": 0,
+          "octave": 4,
+          "midi": 71
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 17,
+        "sourceMeasureNumber": "17",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            929.54,
+            638.06
+          ],
+          [
+            934.71,
+            638.28
+          ],
+          [
+            939.89,
+            638.51
+          ],
+          [
+            940.0,
+            643.01
+          ],
+          [
+            940.11,
+            647.51
+          ],
+          [
+            934.93,
+            647.29
+          ],
+          [
+            929.75,
+            647.06
+          ],
+          [
+            929.64,
+            642.56
+          ]
+        ],
+        "bboxPixels": [
+          929,
+          638,
+          941,
+          648
+        ]
+      },
+      {
+        "xmlPitchedNoteIndex": 58,
+        "pitch": {
+          "step": "E",
+          "alter": 0,
+          "octave": 4,
+          "midi": 64
+        },
+        "voice": "1",
+        "isChordTone": false,
+        "globalMeasureIndex": 18,
+        "sourceMeasureNumber": "18",
+        "systemIndex": 2,
+        "staffIndex": 2,
+        "polygonPixels": [
+          [
+            978.26,
+            655.19
+          ],
+          [
+            984.14,
+            655.44
+          ],
+          [
+            990.01,
+            655.7
+          ],
+          [
+            990.14,
+            660.22
+          ],
+          [
+            990.28,
+            664.74
+          ],
+          [
+            984.4,
+            664.48
+          ],
+          [
+            978.52,
+            664.22
+          ],
+          [
+            978.39,
+            659.7
+          ]
+        ],
+        "bboxPixels": [
+          978,
+          655,
+          991,
+          665
+        ]
+      }
+    ]
+  },
+  "deformationModel": "homography",
+  "omrUsed": false,
+  "machineFeedbackPrepared": true,
+  "reviewRequired": true,
+  "studentFacing": false,
+  "automaticAdoptionAuthorized": false,
+  "autoDiagnosisIssued": false,
+  "feedback": {
+    "annotationStyle": "registered-photo-pixel-polygons",
+    "reviewOnly": true,
+    "projectionReady": true,
+    "expectedAnchorCount": 59,
+    "mappedAnchorCount": 59,
+    "perNote": [
+      {
+        "eventIndex": 0,
+        "measure": 1,
+        "scoreMidis": [
+          64
+        ],
+        "xmlPitchedNoteIndices": [
+          0
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          64
+        ],
+        "timingDeviationSeconds": 0.1347,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 0,
+            "pitch": {
+              "step": "E",
+              "alter": 0,
+              "octave": 4,
+              "midi": 64
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 1,
+            "sourceMeasureNumber": "1",
+            "systemIndex": 0,
+            "staffIndex": 0,
+            "polygonPixels": [
+              [
+                419.76,
+                265.29
+              ],
+              [
+                424.74,
+                265.51
+              ],
+              [
+                429.72,
+                265.72
+              ],
+              [
+                429.6,
+                269.89
+              ],
+              [
+                429.47,
+                274.06
+              ],
+              [
+                424.48,
+                273.84
+              ],
+              [
+                419.5,
+                273.62
+              ],
+              [
+                419.63,
+                269.45
+              ]
+            ],
+            "bboxPixels": [
+              419,
+              265,
+              430,
+              275
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 1,
+        "measure": 1,
+        "scoreMidis": [
+          66
+        ],
+        "xmlPitchedNoteIndices": [
+          1
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          66
+        ],
+        "timingDeviationSeconds": 0.0602,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 1,
+            "pitch": {
+              "step": "F",
+              "alter": 1,
+              "octave": 4,
+              "midi": 66
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 1,
+            "sourceMeasureNumber": "1",
+            "systemIndex": 0,
+            "staffIndex": 0,
+            "polygonPixels": [
+              [
+                449.75,
+                263.13
+              ],
+              [
+                454.73,
+                263.34
+              ],
+              [
+                459.71,
+                263.56
+              ],
+              [
+                459.6,
+                267.72
+              ],
+              [
+                459.49,
+                271.89
+              ],
+              [
+                454.5,
+                271.67
+              ],
+              [
+                449.52,
+                271.45
+              ],
+              [
+                449.63,
+                267.29
+              ]
+            ],
+            "bboxPixels": [
+              449,
+              263,
+              460,
+              272
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 2,
+        "measure": 1,
+        "scoreMidis": [
+          67
+        ],
+        "xmlPitchedNoteIndices": [
+          2
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          67
+        ],
+        "timingDeviationSeconds": 0.0101,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 2,
+            "pitch": {
+              "step": "G",
+              "alter": 0,
+              "octave": 4,
+              "midi": 67
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 1,
+            "sourceMeasureNumber": "1",
+            "systemIndex": 0,
+            "staffIndex": 0,
+            "polygonPixels": [
+              [
+                479.74,
+                260.27
+              ],
+              [
+                484.39,
+                260.47
+              ],
+              [
+                489.03,
+                260.68
+              ],
+              [
+                488.93,
+                264.83
+              ],
+              [
+                488.83,
+                269.0
+              ],
+              [
+                484.18,
+                268.79
+              ],
+              [
+                479.53,
+                268.59
+              ],
+              [
+                479.64,
+                264.43
+              ]
+            ],
+            "bboxPixels": [
+              479,
+              260,
+              490,
+              269
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 3,
+        "measure": 1,
+        "scoreMidis": [
+          69
+        ],
+        "xmlPitchedNoteIndices": [
+          3
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          69
+        ],
+        "timingDeviationSeconds": -0.0528,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 3,
+            "pitch": {
+              "step": "A",
+              "alter": 0,
+              "octave": 4,
+              "midi": 69
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 1,
+            "sourceMeasureNumber": "1",
+            "systemIndex": 0,
+            "staffIndex": 0,
+            "polygonPixels": [
+              [
+                509.68,
+                258.11
+              ],
+              [
+                514.33,
+                258.31
+              ],
+              [
+                518.97,
+                258.52
+              ],
+              [
+                518.89,
+                262.67
+              ],
+              [
+                518.8,
+                266.83
+              ],
+              [
+                514.15,
+                266.63
+              ],
+              [
+                509.5,
+                266.42
+              ],
+              [
+                509.59,
+                262.27
+              ]
+            ],
+            "bboxPixels": [
+              509,
+              258,
+              519,
+              267
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 4,
+        "measure": 2,
+        "scoreMidis": [
+          71
+        ],
+        "xmlPitchedNoteIndices": [
+          4
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          71
+        ],
+        "timingDeviationSeconds": -0.0809,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 4,
+            "pitch": {
+              "step": "B",
+              "alter": 0,
+              "octave": 4,
+              "midi": 71
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 2,
+            "sourceMeasureNumber": "2",
+            "systemIndex": 0,
+            "staffIndex": 0,
+            "polygonPixels": [
+              [
+                548.89,
+                256.36
+              ],
+              [
+                553.54,
+                256.56
+              ],
+              [
+                558.18,
+                256.76
+              ],
+              [
+                558.11,
+                260.92
+              ],
+              [
+                558.04,
+                265.07
+              ],
+              [
+                553.39,
+                264.87
+              ],
+              [
+                548.75,
+                264.67
+              ],
+              [
+                548.82,
+                260.51
+              ]
+            ],
+            "bboxPixels": [
+              548,
+              256,
+              559,
+              266
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 5,
+        "measure": 2,
+        "scoreMidis": [
+          69
+        ],
+        "xmlPitchedNoteIndices": [
+          5
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          69
+        ],
+        "timingDeviationSeconds": -0.1426,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 5,
+            "pitch": {
+              "step": "A",
+              "alter": 0,
+              "octave": 4,
+              "midi": 69
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 2,
+            "sourceMeasureNumber": "2",
+            "systemIndex": 0,
+            "staffIndex": 0,
+            "polygonPixels": [
+              [
+                578.69,
+                261.12
+              ],
+              [
+                583.34,
+                261.32
+              ],
+              [
+                587.98,
+                261.52
+              ],
+              [
+                587.93,
+                265.68
+              ],
+              [
+                587.87,
+                269.84
+              ],
+              [
+                583.22,
+                269.64
+              ],
+              [
+                578.57,
+                269.44
+              ],
+              [
+                578.63,
+                265.28
+              ]
+            ],
+            "bboxPixels": [
+              578,
+              261,
+              588,
+              270
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 6,
+        "measure": 2,
+        "scoreMidis": [
+          67
+        ],
+        "xmlPitchedNoteIndices": [
+          6
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          67
+        ],
+        "timingDeviationSeconds": -0.1359,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 6,
+            "pitch": {
+              "step": "G",
+              "alter": 0,
+              "octave": 4,
+              "midi": 67
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 2,
+            "sourceMeasureNumber": "2",
+            "systemIndex": 0,
+            "staffIndex": 0,
+            "polygonPixels": [
+              [
+                607.85,
+                265.86
+              ],
+              [
+                612.83,
+                266.07
+              ],
+              [
+                617.8,
+                266.29
+              ],
+              [
+                617.76,
+                270.45
+              ],
+              [
+                617.72,
+                274.61
+              ],
+              [
+                612.74,
+                274.4
+              ],
+              [
+                607.76,
+                274.18
+              ],
+              [
+                607.8,
+                270.02
+              ]
+            ],
+            "bboxPixels": [
+              607,
+              265,
+              618,
+              275
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 7,
+        "measure": 2,
+        "scoreMidis": [
+          66
+        ],
+        "xmlPitchedNoteIndices": [
+          7
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          66
+        ],
+        "timingDeviationSeconds": -0.2208,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 7,
+            "pitch": {
+              "step": "F",
+              "alter": 1,
+              "octave": 4,
+              "midi": 66
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 2,
+            "sourceMeasureNumber": "2",
+            "systemIndex": 0,
+            "staffIndex": 0,
+            "polygonPixels": [
+              [
+                637.69,
+                271.32
+              ],
+              [
+                642.67,
+                271.54
+              ],
+              [
+                647.65,
+                271.75
+              ],
+              [
+                647.62,
+                275.92
+              ],
+              [
+                647.59,
+                280.09
+              ],
+              [
+                642.61,
+                279.87
+              ],
+              [
+                637.62,
+                279.65
+              ],
+              [
+                637.65,
+                275.48
+              ]
+            ],
+            "bboxPixels": [
+              637,
+              271,
+              648,
+              281
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 8,
+        "measure": 3,
+        "scoreMidis": [
+          64
+        ],
+        "xmlPitchedNoteIndices": [
+          8
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          64
+        ],
+        "timingDeviationSeconds": -0.2605,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 8,
+            "pitch": {
+              "step": "E",
+              "alter": 0,
+              "octave": 4,
+              "midi": 64
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 3,
+            "sourceMeasureNumber": "3",
+            "systemIndex": 0,
+            "staffIndex": 0,
+            "polygonPixels": [
+              [
+                677.52,
+                276.53
+              ],
+              [
+                682.17,
+                276.73
+              ],
+              [
+                686.82,
+                276.93
+              ],
+              [
+                686.81,
+                281.1
+              ],
+              [
+                686.8,
+                285.27
+              ],
+              [
+                682.15,
+                285.07
+              ],
+              [
+                677.49,
+                284.87
+              ],
+              [
+                677.51,
+                280.69
+              ]
+            ],
+            "bboxPixels": [
+              677,
+              276,
+              687,
+              286
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 9,
+        "measure": 3,
+        "scoreMidis": [
+          67
+        ],
+        "xmlPitchedNoteIndices": [
+          9
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          67
+        ],
+        "timingDeviationSeconds": -0.2306,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 9,
+            "pitch": {
+              "step": "G",
+              "alter": 0,
+              "octave": 4,
+              "midi": 67
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 3,
+            "sourceMeasureNumber": "3",
+            "systemIndex": 0,
+            "staffIndex": 0,
+            "polygonPixels": [
+              [
+                706.75,
+                270.17
+              ],
+              [
+                711.73,
+                270.38
+              ],
+              [
+                716.71,
+                270.6
+              ],
+              [
+                716.72,
+                274.76
+              ],
+              [
+                716.72,
+                278.93
+              ],
+              [
+                711.74,
+                278.71
+              ],
+              [
+                706.75,
+                278.49
+              ],
+              [
+                706.75,
+                274.33
+              ]
+            ],
+            "bboxPixels": [
+              706,
+              270,
+              717,
+              279
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 10,
+        "measure": 3,
+        "scoreMidis": [
+          71
+        ],
+        "xmlPitchedNoteIndices": [
+          10
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          71
+        ],
+        "timingDeviationSeconds": -0.4315,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 10,
+            "pitch": {
+              "step": "B",
+              "alter": 0,
+              "octave": 4,
+              "midi": 71
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 3,
+            "sourceMeasureNumber": "3",
+            "systemIndex": 0,
+            "staffIndex": 0,
+            "polygonPixels": [
+              [
+                736.6,
+                264.54
+              ],
+              [
+                741.58,
+                264.76
+              ],
+              [
+                746.55,
+                264.97
+              ],
+              [
+                746.57,
+                269.13
+              ],
+              [
+                746.59,
+                273.29
+              ],
+              [
+                741.61,
+                273.07
+              ],
+              [
+                736.63,
+                272.86
+              ],
+              [
+                736.62,
+                268.7
+              ]
+            ],
+            "bboxPixels": [
+              736,
+              264,
+              747,
+              274
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 11,
+        "measure": 3,
+        "scoreMidis": [
+          76
+        ],
+        "xmlPitchedNoteIndices": [
+          11
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          76
+        ],
+        "timingDeviationSeconds": -0.5061,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 11,
+            "pitch": {
+              "step": "E",
+              "alter": 0,
+              "octave": 5,
+              "midi": 76
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 3,
+            "sourceMeasureNumber": "3",
+            "systemIndex": 0,
+            "staffIndex": 0,
+            "polygonPixels": [
+              [
+                766.39,
+                255.46
+              ],
+              [
+                771.03,
+                255.67
+              ],
+              [
+                775.66,
+                255.87
+              ],
+              [
+                775.69,
+                260.02
+              ],
+              [
+                775.73,
+                264.17
+              ],
+              [
+                771.08,
+                263.97
+              ],
+              [
+                766.44,
+                263.76
+              ],
+              [
+                766.41,
+                259.61
+              ]
+            ],
+            "bboxPixels": [
+              766,
+              255,
+              776,
+              265
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 12,
+        "measure": 4,
+        "scoreMidis": [
+          74
+        ],
+        "xmlPitchedNoteIndices": [
+          12
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          74
+        ],
+        "timingDeviationSeconds": -0.5226,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 12,
+            "pitch": {
+              "step": "D",
+              "alter": 0,
+              "octave": 5,
+              "midi": 74
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 4,
+            "sourceMeasureNumber": "4",
+            "systemIndex": 0,
+            "staffIndex": 0,
+            "polygonPixels": [
+              [
+                805.52,
+                260.62
+              ],
+              [
+                810.49,
+                260.84
+              ],
+              [
+                815.46,
+                261.06
+              ],
+              [
+                815.51,
+                265.21
+              ],
+              [
+                815.56,
+                269.37
+              ],
+              [
+                810.58,
+                269.15
+              ],
+              [
+                805.6,
+                268.93
+              ],
+              [
+                805.56,
+                264.78
+              ]
+            ],
+            "bboxPixels": [
+              805,
+              260,
+              816,
+              270
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 13,
+        "measure": 4,
+        "scoreMidis": [
+          71
+        ],
+        "xmlPitchedNoteIndices": [
+          13
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          71
+        ],
+        "timingDeviationSeconds": -0.0734,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 13,
+            "pitch": {
+              "step": "B",
+              "alter": 0,
+              "octave": 4,
+              "midi": 71
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 4,
+            "sourceMeasureNumber": "4",
+            "systemIndex": 0,
+            "staffIndex": 0,
+            "polygonPixels": [
+              [
+                850.03,
+                269.48
+              ],
+              [
+                855.01,
+                269.7
+              ],
+              [
+                859.98,
+                269.92
+              ],
+              [
+                860.05,
+                274.08
+              ],
+              [
+                860.12,
+                278.24
+              ],
+              [
+                855.14,
+                278.02
+              ],
+              [
+                850.16,
+                277.8
+              ],
+              [
+                850.1,
+                273.64
+              ]
+            ],
+            "bboxPixels": [
+              850,
+              269,
+              861,
+              279
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 14,
+        "measure": 5,
+        "scoreMidis": [
+          72
+        ],
+        "xmlPitchedNoteIndices": [
+          14
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          72
+        ],
+        "timingDeviationSeconds": 0.3758,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 14,
+            "pitch": {
+              "step": "C",
+              "alter": 0,
+              "octave": 5,
+              "midi": 72
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 5,
+            "sourceMeasureNumber": "5",
+            "systemIndex": 0,
+            "staffIndex": 0,
+            "polygonPixels": [
+              [
+                904.35,
+                268.39
+              ],
+              [
+                909.33,
+                268.61
+              ],
+              [
+                914.3,
+                268.82
+              ],
+              [
+                914.39,
+                272.98
+              ],
+              [
+                914.49,
+                277.14
+              ],
+              [
+                909.51,
+                276.92
+              ],
+              [
+                904.53,
+                276.71
+              ],
+              [
+                904.44,
+                272.55
+              ]
+            ],
+            "bboxPixels": [
+              904,
+              268,
+              915,
+              278
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 15,
+        "measure": 5,
+        "scoreMidis": [
+          71
+        ],
+        "xmlPitchedNoteIndices": [
+          15
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          71
+        ],
+        "timingDeviationSeconds": 0.2431,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 15,
+            "pitch": {
+              "step": "B",
+              "alter": 0,
+              "octave": 4,
+              "midi": 71
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 5,
+            "sourceMeasureNumber": "5",
+            "systemIndex": 0,
+            "staffIndex": 0,
+            "polygonPixels": [
+              [
+                934.28,
+                273.16
+              ],
+              [
+                938.92,
+                273.36
+              ],
+              [
+                943.57,
+                273.56
+              ],
+              [
+                943.67,
+                277.72
+              ],
+              [
+                943.78,
+                281.89
+              ],
+              [
+                939.13,
+                281.68
+              ],
+              [
+                934.49,
+                281.48
+              ],
+              [
+                934.38,
+                277.32
+              ]
+            ],
+            "bboxPixels": [
+              934,
+              273,
+              944,
+              282
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 16,
+        "measure": 5,
+        "scoreMidis": [
+          69
+        ],
+        "xmlPitchedNoteIndices": [
+          16
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          69
+        ],
+        "timingDeviationSeconds": 0.1454,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 16,
+            "pitch": {
+              "step": "A",
+              "alter": 0,
+              "octave": 4,
+              "midi": 69
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 5,
+            "sourceMeasureNumber": "5",
+            "systemIndex": 0,
+            "staffIndex": 0,
+            "polygonPixels": [
+              [
+                964.23,
+                277.92
+              ],
+              [
+                968.87,
+                278.13
+              ],
+              [
+                973.52,
+                278.33
+              ],
+              [
+                973.64,
+                282.49
+              ],
+              [
+                973.76,
+                286.66
+              ],
+              [
+                969.11,
+                286.46
+              ],
+              [
+                964.46,
+                286.26
+              ],
+              [
+                964.34,
+                282.09
+              ]
+            ],
+            "bboxPixels": [
+              964,
+              277,
+              974,
+              287
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 17,
+        "measure": 5,
+        "scoreMidis": [
+          67
+        ],
+        "xmlPitchedNoteIndices": [
+          17
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          67
+        ],
+        "timingDeviationSeconds": 0.1185,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 17,
+            "pitch": {
+              "step": "G",
+              "alter": 0,
+              "octave": 4,
+              "midi": 67
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 5,
+            "sourceMeasureNumber": "5",
+            "systemIndex": 0,
+            "staffIndex": 0,
+            "polygonPixels": [
+              [
+                993.54,
+                282.67
+              ],
+              [
+                998.52,
+                282.88
+              ],
+              [
+                1003.49,
+                283.1
+              ],
+              [
+                1003.63,
+                287.27
+              ],
+              [
+                1003.76,
+                291.44
+              ],
+              [
+                998.78,
+                291.22
+              ],
+              [
+                993.8,
+                291.01
+              ],
+              [
+                993.67,
+                286.83
+              ]
+            ],
+            "bboxPixels": [
+              993,
+              282,
+              1004,
+              292
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 18,
+        "measure": 6,
+        "scoreMidis": [
+          66
+        ],
+        "xmlPitchedNoteIndices": [
+          18
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          66
+        ],
+        "timingDeviationSeconds": 0.1253,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 18,
+            "pitch": {
+              "step": "F",
+              "alter": 1,
+              "octave": 4,
+              "midi": 66
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 6,
+            "sourceMeasureNumber": "6",
+            "systemIndex": 1,
+            "staffIndex": 1,
+            "polygonPixels": [
+              [
+                366.12,
+                438.51
+              ],
+              [
+                371.2,
+                438.73
+              ],
+              [
+                376.28,
+                438.95
+              ],
+              [
+                376.12,
+                443.27
+              ],
+              [
+                375.97,
+                447.6
+              ],
+              [
+                370.88,
+                447.38
+              ],
+              [
+                365.8,
+                447.16
+              ],
+              [
+                365.96,
+                442.83
+              ]
+            ],
+            "bboxPixels": [
+              365,
+              438,
+              377,
+              448
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 19,
+        "measure": 6,
+        "scoreMidis": [
+          67
+        ],
+        "xmlPitchedNoteIndices": [
+          19
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          67
+        ],
+        "timingDeviationSeconds": 0.0043,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 19,
+            "pitch": {
+              "step": "G",
+              "alter": 0,
+              "octave": 4,
+              "midi": 67
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 6,
+            "sourceMeasureNumber": "6",
+            "systemIndex": 1,
+            "staffIndex": 1,
+            "polygonPixels": [
+              [
+                394.0,
+                436.12
+              ],
+              [
+                399.08,
+                436.34
+              ],
+              [
+                404.16,
+                436.56
+              ],
+              [
+                404.01,
+                440.88
+              ],
+              [
+                403.87,
+                445.21
+              ],
+              [
+                398.79,
+                444.98
+              ],
+              [
+                393.71,
+                444.76
+              ],
+              [
+                393.86,
+                440.44
+              ]
+            ],
+            "bboxPixels": [
+              393,
+              436,
+              405,
+              446
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 20,
+        "measure": 6,
+        "scoreMidis": [
+          69
+        ],
+        "xmlPitchedNoteIndices": [
+          20
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          69
+        ],
+        "timingDeviationSeconds": -0.1271,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 20,
+            "pitch": {
+              "step": "A",
+              "alter": 0,
+              "octave": 4,
+              "midi": 69
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 6,
+            "sourceMeasureNumber": "6",
+            "systemIndex": 1,
+            "staffIndex": 1,
+            "polygonPixels": [
+              [
+                422.56,
+                433.04
+              ],
+              [
+                427.3,
+                433.24
+              ],
+              [
+                432.04,
+                433.45
+              ],
+              [
+                431.91,
+                437.77
+              ],
+              [
+                431.78,
+                442.09
+              ],
+              [
+                427.04,
+                441.88
+              ],
+              [
+                422.3,
+                441.68
+              ],
+              [
+                422.43,
+                437.36
+              ]
+            ],
+            "bboxPixels": [
+              422,
+              433,
+              433,
+              443
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 21,
+        "measure": 6,
+        "scoreMidis": [
+          66
+        ],
+        "xmlPitchedNoteIndices": [
+          21
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          66
+        ],
+        "timingDeviationSeconds": -0.2829,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 21,
+            "pitch": {
+              "step": "F",
+              "alter": 1,
+              "octave": 4,
+              "midi": 66
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 6,
+            "sourceMeasureNumber": "6",
+            "systemIndex": 1,
+            "staffIndex": 1,
+            "polygonPixels": [
+              [
+                450.08,
+                442.17
+              ],
+              [
+                454.82,
+                442.37
+              ],
+              [
+                459.56,
+                442.58
+              ],
+              [
+                459.44,
+                446.91
+              ],
+              [
+                459.33,
+                451.24
+              ],
+              [
+                454.58,
+                451.03
+              ],
+              [
+                449.84,
+                450.82
+              ],
+              [
+                449.96,
+                446.49
+              ]
+            ],
+            "bboxPixels": [
+              449,
+              442,
+              460,
+              452
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 22,
+        "measure": 7,
+        "scoreMidis": [
+          67
+        ],
+        "xmlPitchedNoteIndices": [
+          22
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          67
+        ],
+        "timingDeviationSeconds": -0.3342,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 22,
+            "pitch": {
+              "step": "G",
+              "alter": 0,
+              "octave": 4,
+              "midi": 67
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 7,
+            "sourceMeasureNumber": "7",
+            "systemIndex": 1,
+            "staffIndex": 1,
+            "polygonPixels": [
+              [
+                488.08,
+                440.22
+              ],
+              [
+                492.82,
+                440.43
+              ],
+              [
+                497.56,
+                440.63
+              ],
+              [
+                497.46,
+                444.96
+              ],
+              [
+                497.36,
+                449.28
+              ],
+              [
+                492.62,
+                449.08
+              ],
+              [
+                487.88,
+                448.87
+              ],
+              [
+                487.98,
+                444.54
+              ]
+            ],
+            "bboxPixels": [
+              487,
+              440,
+              498,
+              450
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 23,
+        "measure": 7,
+        "scoreMidis": [
+          64
+        ],
+        "xmlPitchedNoteIndices": [
+          23
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          64
+        ],
+        "timingDeviationSeconds": 0.1614,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 23,
+            "pitch": {
+              "step": "E",
+              "alter": 0,
+              "octave": 4,
+              "midi": 64
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 7,
+            "sourceMeasureNumber": "7",
+            "systemIndex": 1,
+            "staffIndex": 1,
+            "polygonPixels": [
+              [
+                529.91,
+                449.26
+              ],
+              [
+                534.65,
+                449.47
+              ],
+              [
+                539.39,
+                449.67
+              ],
+              [
+                539.32,
+                454.0
+              ],
+              [
+                539.24,
+                458.34
+              ],
+              [
+                534.49,
+                458.13
+              ],
+              [
+                529.74,
+                457.93
+              ],
+              [
+                529.83,
+                453.59
+              ]
+            ],
+            "bboxPixels": [
+              529,
+              449,
+              540,
+              459
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 24,
+        "measure": 8,
+        "scoreMidis": [
+          64
+        ],
+        "xmlPitchedNoteIndices": [
+          24
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          64
+        ],
+        "timingDeviationSeconds": 0.6454,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 24,
+            "pitch": {
+              "step": "E",
+              "alter": 0,
+              "octave": 4,
+              "midi": 64
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 8,
+            "sourceMeasureNumber": "8",
+            "systemIndex": 1,
+            "staffIndex": 1,
+            "polygonPixels": [
+              [
+                581.39,
+                451.5
+              ],
+              [
+                586.47,
+                451.73
+              ],
+              [
+                591.55,
+                451.95
+              ],
+              [
+                591.5,
+                456.28
+              ],
+              [
+                591.45,
+                460.62
+              ],
+              [
+                586.36,
+                460.39
+              ],
+              [
+                581.27,
+                460.17
+              ],
+              [
+                581.33,
+                455.84
+              ]
+            ],
+            "bboxPixels": [
+              581,
+              451,
+              592,
+              461
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 25,
+        "measure": 8,
+        "scoreMidis": [
+          71
+        ],
+        "xmlPitchedNoteIndices": [
+          25
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          71
+        ],
+        "timingDeviationSeconds": 0.5012,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 25,
+            "pitch": {
+              "step": "B",
+              "alter": 0,
+              "octave": 4,
+              "midi": 71
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 8,
+            "sourceMeasureNumber": "8",
+            "systemIndex": 1,
+            "staffIndex": 1,
+            "polygonPixels": [
+              [
+                609.33,
+                437.58
+              ],
+              [
+                614.4,
+                437.81
+              ],
+              [
+                619.47,
+                438.03
+              ],
+              [
+                619.43,
+                442.35
+              ],
+              [
+                619.39,
+                446.67
+              ],
+              [
+                614.31,
+                446.45
+              ],
+              [
+                609.24,
+                446.22
+              ],
+              [
+                609.28,
+                441.9
+              ]
+            ],
+            "bboxPixels": [
+              609,
+              437,
+              620,
+              447
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 26,
+        "measure": 8,
+        "scoreMidis": [
+          67
+        ],
+        "xmlPitchedNoteIndices": [
+          26
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          67
+        ],
+        "timingDeviationSeconds": 0.4034,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 26,
+            "pitch": {
+              "step": "G",
+              "alter": 0,
+              "octave": 4,
+              "midi": 67
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 8,
+            "sourceMeasureNumber": "8",
+            "systemIndex": 1,
+            "staffIndex": 1,
+            "polygonPixels": [
+              [
+                637.0,
+                446.71
+              ],
+              [
+                642.07,
+                446.94
+              ],
+              [
+                647.15,
+                447.16
+              ],
+              [
+                647.12,
+                451.48
+              ],
+              [
+                647.09,
+                455.82
+              ],
+              [
+                642.01,
+                455.59
+              ],
+              [
+                636.93,
+                455.37
+              ],
+              [
+                636.96,
+                451.04
+              ]
+            ],
+            "bboxPixels": [
+              636,
+              446,
+              648,
+              456
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 27,
+        "measure": 8,
+        "scoreMidis": [
+          76
+        ],
+        "xmlPitchedNoteIndices": [
+          27
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          76
+        ],
+        "timingDeviationSeconds": 0.3056,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 27,
+            "pitch": {
+              "step": "E",
+              "alter": 0,
+              "octave": 5,
+              "midi": 76
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 8,
+            "sourceMeasureNumber": "8",
+            "systemIndex": 1,
+            "staffIndex": 1,
+            "polygonPixels": [
+              [
+                665.51,
+                429.25
+              ],
+              [
+                670.24,
+                429.46
+              ],
+              [
+                674.97,
+                429.66
+              ],
+              [
+                674.95,
+                433.97
+              ],
+              [
+                674.94,
+                438.29
+              ],
+              [
+                670.21,
+                438.08
+              ],
+              [
+                665.47,
+                437.87
+              ],
+              [
+                665.49,
+                433.56
+              ]
+            ],
+            "bboxPixels": [
+              665,
+              429,
+              675,
+              439
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 28,
+        "measure": 9,
+        "scoreMidis": [
+          74
+        ],
+        "xmlPitchedNoteIndices": [
+          28
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          74
+        ],
+        "timingDeviationSeconds": 0.1743,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 28,
+            "pitch": {
+              "step": "D",
+              "alter": 0,
+              "octave": 5,
+              "midi": 74
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 9,
+            "sourceMeasureNumber": "9",
+            "systemIndex": 1,
+            "staffIndex": 1,
+            "polygonPixels": [
+              [
+                703.34,
+                434.49
+              ],
+              [
+                708.07,
+                434.7
+              ],
+              [
+                712.8,
+                434.91
+              ],
+              [
+                712.8,
+                439.22
+              ],
+              [
+                712.81,
+                443.54
+              ],
+              [
+                708.07,
+                443.33
+              ],
+              [
+                703.34,
+                443.12
+              ],
+              [
+                703.34,
+                438.81
+              ]
+            ],
+            "bboxPixels": [
+              703,
+              434,
+              713,
+              444
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 29,
+        "measure": 9,
+        "scoreMidis": [
+          72
+        ],
+        "xmlPitchedNoteIndices": [
+          29
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          72
+        ],
+        "timingDeviationSeconds": 0.0417,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 29,
+            "pitch": {
+              "step": "C",
+              "alter": 0,
+              "octave": 5,
+              "midi": 72
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 9,
+            "sourceMeasureNumber": "9",
+            "systemIndex": 1,
+            "staffIndex": 1,
+            "polygonPixels": [
+              [
+                731.06,
+                439.3
+              ],
+              [
+                735.79,
+                439.5
+              ],
+              [
+                740.52,
+                439.71
+              ],
+              [
+                740.54,
+                444.03
+              ],
+              [
+                740.55,
+                448.35
+              ],
+              [
+                735.82,
+                448.14
+              ],
+              [
+                731.08,
+                447.94
+              ],
+              [
+                731.07,
+                443.61
+              ]
+            ],
+            "bboxPixels": [
+              731,
+              439,
+              741,
+              449
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 30,
+        "measure": 9,
+        "scoreMidis": [
+          71
+        ],
+        "xmlPitchedNoteIndices": [
+          30
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          71
+        ],
+        "timingDeviationSeconds": -0.0793,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 30,
+            "pitch": {
+              "step": "B",
+              "alter": 0,
+              "octave": 4,
+              "midi": 71
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 9,
+            "sourceMeasureNumber": "9",
+            "systemIndex": 1,
+            "staffIndex": 1,
+            "polygonPixels": [
+              [
+                758.8,
+                444.1
+              ],
+              [
+                763.53,
+                444.31
+              ],
+              [
+                768.27,
+                444.52
+              ],
+              [
+                768.29,
+                448.84
+              ],
+              [
+                768.32,
+                453.16
+              ],
+              [
+                763.58,
+                452.96
+              ],
+              [
+                758.84,
+                452.75
+              ],
+              [
+                758.82,
+                448.43
+              ]
+            ],
+            "bboxPixels": [
+              758,
+              444,
+              769,
+              454
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 31,
+        "measure": 9,
+        "scoreMidis": [
+          69
+        ],
+        "xmlPitchedNoteIndices": [
+          31
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          69
+        ],
+        "timingDeviationSeconds": -0.1874,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 31,
+            "pitch": {
+              "step": "A",
+              "alter": 0,
+              "octave": 4,
+              "midi": 69
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 9,
+            "sourceMeasureNumber": "9",
+            "systemIndex": 1,
+            "staffIndex": 1,
+            "polygonPixels": [
+              [
+                786.56,
+                448.91
+              ],
+              [
+                791.63,
+                449.14
+              ],
+              [
+                796.71,
+                449.36
+              ],
+              [
+                796.75,
+                453.68
+              ],
+              [
+                796.79,
+                458.01
+              ],
+              [
+                791.71,
+                457.79
+              ],
+              [
+                786.63,
+                457.57
+              ],
+              [
+                786.59,
+                453.24
+              ]
+            ],
+            "bboxPixels": [
+              786,
+              448,
+              797,
+              459
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 32,
+        "measure": 10,
+        "scoreMidis": [
+          71
+        ],
+        "xmlPitchedNoteIndices": [
+          32
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          71
+        ],
+        "timingDeviationSeconds": -0.2503,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 32,
+            "pitch": {
+              "step": "B",
+              "alter": 0,
+              "octave": 4,
+              "midi": 71
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 10,
+            "sourceMeasureNumber": "10",
+            "systemIndex": 1,
+            "staffIndex": 1,
+            "polygonPixels": [
+              [
+                824.4,
+                446.97
+              ],
+              [
+                829.48,
+                447.19
+              ],
+              [
+                834.55,
+                447.41
+              ],
+              [
+                834.61,
+                451.73
+              ],
+              [
+                834.67,
+                456.06
+              ],
+              [
+                829.59,
+                455.84
+              ],
+              [
+                824.51,
+                455.62
+              ],
+              [
+                824.46,
+                451.29
+              ]
+            ],
+            "bboxPixels": [
+              824,
+              446,
+              835,
+              457
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 33,
+        "measure": 10,
+        "scoreMidis": [
+          67
+        ],
+        "xmlPitchedNoteIndices": [
+          33
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          67
+        ],
+        "timingDeviationSeconds": 0.2104,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 33,
+            "pitch": {
+              "step": "G",
+              "alter": 0,
+              "octave": 4,
+              "midi": 67
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 10,
+            "sourceMeasureNumber": "10",
+            "systemIndex": 1,
+            "staffIndex": 1,
+            "polygonPixels": [
+              [
+                866.47,
+                456.72
+              ],
+              [
+                871.21,
+                456.93
+              ],
+              [
+                875.95,
+                457.14
+              ],
+              [
+                876.03,
+                461.47
+              ],
+              [
+                876.1,
+                465.81
+              ],
+              [
+                871.36,
+                465.6
+              ],
+              [
+                866.62,
+                465.39
+              ],
+              [
+                866.55,
+                461.06
+              ]
+            ],
+            "bboxPixels": [
+              866,
+              456,
+              877,
+              466
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 34,
+        "measure": 11,
+        "scoreMidis": [
+          69
+        ],
+        "xmlPitchedNoteIndices": [
+          34
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          69
+        ],
+        "timingDeviationSeconds": 0.5771,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 34,
+            "pitch": {
+              "step": "A",
+              "alter": 0,
+              "octave": 4,
+              "midi": 69
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 11,
+            "sourceMeasureNumber": "11",
+            "systemIndex": 1,
+            "staffIndex": 1,
+            "polygonPixels": [
+              [
+                917.82,
+                454.64
+              ],
+              [
+                922.9,
+                454.86
+              ],
+              [
+                927.97,
+                455.08
+              ],
+              [
+                928.07,
+                459.41
+              ],
+              [
+                928.18,
+                463.74
+              ],
+              [
+                923.1,
+                463.52
+              ],
+              [
+                918.02,
+                463.3
+              ],
+              [
+                917.92,
+                458.97
+              ]
+            ],
+            "bboxPixels": [
+              917,
+              454,
+              929,
+              464
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 35,
+        "measure": 11,
+        "scoreMidis": [
+          71
+        ],
+        "xmlPitchedNoteIndices": [
+          35
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          71
+        ],
+        "timingDeviationSeconds": 0.469,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 35,
+            "pitch": {
+              "step": "B",
+              "alter": 0,
+              "octave": 4,
+              "midi": 71
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 11,
+            "sourceMeasureNumber": "11",
+            "systemIndex": 1,
+            "staffIndex": 1,
+            "polygonPixels": [
+              [
+                946.15,
+                452.28
+              ],
+              [
+                950.88,
+                452.48
+              ],
+              [
+                955.62,
+                452.69
+              ],
+              [
+                955.73,
+                457.01
+              ],
+              [
+                955.85,
+                461.34
+              ],
+              [
+                951.11,
+                461.14
+              ],
+              [
+                946.37,
+                460.93
+              ],
+              [
+                946.26,
+                456.6
+              ]
+            ],
+            "bboxPixels": [
+              946,
+              452,
+              956,
+              462
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 36,
+        "measure": 11,
+        "scoreMidis": [
+          72
+        ],
+        "xmlPitchedNoteIndices": [
+          36
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          72
+        ],
+        "timingDeviationSeconds": 0.3944,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 36,
+            "pitch": {
+              "step": "C",
+              "alter": 0,
+              "octave": 5,
+              "midi": 72
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 11,
+            "sourceMeasureNumber": "11",
+            "systemIndex": 1,
+            "staffIndex": 1,
+            "polygonPixels": [
+              [
+                973.78,
+                449.88
+              ],
+              [
+                978.51,
+                450.09
+              ],
+              [
+                983.24,
+                450.3
+              ],
+              [
+                983.37,
+                454.62
+              ],
+              [
+                983.5,
+                458.95
+              ],
+              [
+                978.76,
+                458.74
+              ],
+              [
+                974.03,
+                458.53
+              ],
+              [
+                973.9,
+                454.21
+              ]
+            ],
+            "bboxPixels": [
+              973,
+              449,
+              984,
+              459
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 37,
+        "measure": 11,
+        "scoreMidis": [
+          74
+        ],
+        "xmlPitchedNoteIndices": [
+          37
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          74
+        ],
+        "timingDeviationSeconds": 0.4243,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 37,
+            "pitch": {
+              "step": "D",
+              "alter": 0,
+              "octave": 5,
+              "midi": 74
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 11,
+            "sourceMeasureNumber": "11",
+            "systemIndex": 1,
+            "staffIndex": 1,
+            "polygonPixels": [
+              [
+                1001.39,
+                447.49
+              ],
+              [
+                1006.12,
+                447.7
+              ],
+              [
+                1010.85,
+                447.91
+              ],
+              [
+                1010.99,
+                452.23
+              ],
+              [
+                1011.13,
+                456.55
+              ],
+              [
+                1006.39,
+                456.34
+              ],
+              [
+                1001.66,
+                456.14
+              ],
+              [
+                1001.52,
+                451.81
+              ]
+            ],
+            "bboxPixels": [
+              1001,
+              447,
+              1012,
+              457
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 38,
+        "measure": 12,
+        "scoreMidis": [
+          76
+        ],
+        "xmlPitchedNoteIndices": [
+          38
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          76
+        ],
+        "timingDeviationSeconds": 0.2001,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 38,
+            "pitch": {
+              "step": "E",
+              "alter": 0,
+              "octave": 5,
+              "midi": 76
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 12,
+            "sourceMeasureNumber": "12",
+            "systemIndex": 2,
+            "staffIndex": 2,
+            "polygonPixels": [
+              [
+                358.04,
+                601.14
+              ],
+              [
+                362.87,
+                601.35
+              ],
+              [
+                367.69,
+                601.56
+              ],
+              [
+                367.53,
+                606.04
+              ],
+              [
+                367.37,
+                610.52
+              ],
+              [
+                362.54,
+                610.31
+              ],
+              [
+                357.71,
+                610.1
+              ],
+              [
+                357.88,
+                605.62
+              ]
+            ],
+            "bboxPixels": [
+              357,
+              601,
+              368,
+              611
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 39,
+        "measure": 12,
+        "scoreMidis": [
+          74
+        ],
+        "xmlPitchedNoteIndices": [
+          39
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          74
+        ],
+        "timingDeviationSeconds": 0.0791,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 39,
+            "pitch": {
+              "step": "D",
+              "alter": 0,
+              "octave": 5,
+              "midi": 74
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 12,
+            "sourceMeasureNumber": "12",
+            "systemIndex": 2,
+            "staffIndex": 2,
+            "polygonPixels": [
+              [
+                383.41,
+                605.98
+              ],
+              [
+                388.23,
+                606.19
+              ],
+              [
+                393.06,
+                606.41
+              ],
+              [
+                392.91,
+                610.89
+              ],
+              [
+                392.76,
+                615.37
+              ],
+              [
+                387.93,
+                615.16
+              ],
+              [
+                383.1,
+                614.95
+              ],
+              [
+                383.25,
+                610.47
+              ]
+            ],
+            "bboxPixels": [
+              383,
+              605,
+              394,
+              616
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 40,
+        "measure": 12,
+        "scoreMidis": [
+          72
+        ],
+        "xmlPitchedNoteIndices": [
+          40
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          72
+        ],
+        "timingDeviationSeconds": -0.0651,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 40,
+            "pitch": {
+              "step": "C",
+              "alter": 0,
+              "octave": 5,
+              "midi": 72
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 12,
+            "sourceMeasureNumber": "12",
+            "systemIndex": 2,
+            "staffIndex": 2,
+            "polygonPixels": [
+              [
+                408.79,
+                610.83
+              ],
+              [
+                413.62,
+                611.04
+              ],
+              [
+                418.44,
+                611.25
+              ],
+              [
+                418.31,
+                615.74
+              ],
+              [
+                418.17,
+                620.23
+              ],
+              [
+                413.34,
+                620.02
+              ],
+              [
+                408.51,
+                619.81
+              ],
+              [
+                408.65,
+                615.32
+              ]
+            ],
+            "bboxPixels": [
+              408,
+              610,
+              419,
+              621
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 41,
+        "measure": 12,
+        "scoreMidis": [
+          71
+        ],
+        "xmlPitchedNoteIndices": [
+          41
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          71
+        ],
+        "timingDeviationSeconds": -0.1383,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 41,
+            "pitch": {
+              "step": "B",
+              "alter": 0,
+              "octave": 4,
+              "midi": 71
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 12,
+            "sourceMeasureNumber": "12",
+            "systemIndex": 2,
+            "staffIndex": 2,
+            "polygonPixels": [
+              [
+                433.48,
+                616.4
+              ],
+              [
+                438.66,
+                616.63
+              ],
+              [
+                443.83,
+                616.85
+              ],
+              [
+                443.7,
+                621.34
+              ],
+              [
+                443.58,
+                625.84
+              ],
+              [
+                438.4,
+                625.61
+              ],
+              [
+                433.22,
+                625.39
+              ],
+              [
+                433.35,
+                620.89
+              ]
+            ],
+            "bboxPixels": [
+              433,
+              616,
+              444,
+              626
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 42,
+        "measure": 13,
+        "scoreMidis": [
+          69
+        ],
+        "xmlPitchedNoteIndices": [
+          42
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          69
+        ],
+        "timingDeviationSeconds": -0.2245,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 42,
+            "pitch": {
+              "step": "A",
+              "alter": 0,
+              "octave": 4,
+              "midi": 69
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 13,
+            "sourceMeasureNumber": "13",
+            "systemIndex": 2,
+            "staffIndex": 2,
+            "polygonPixels": [
+              [
+                469.26,
+                621.71
+              ],
+              [
+                474.44,
+                621.94
+              ],
+              [
+                479.61,
+                622.16
+              ],
+              [
+                479.5,
+                626.66
+              ],
+              [
+                479.4,
+                631.16
+              ],
+              [
+                474.21,
+                630.93
+              ],
+              [
+                469.03,
+                630.7
+              ],
+              [
+                469.15,
+                626.2
+              ]
+            ],
+            "bboxPixels": [
+              469,
+              621,
+              480,
+              632
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 43,
+        "measure": 13,
+        "scoreMidis": [
+          72
+        ],
+        "xmlPitchedNoteIndices": [
+          43
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          72
+        ],
+        "timingDeviationSeconds": 0.2479,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 43,
+            "pitch": {
+              "step": "C",
+              "alter": 0,
+              "octave": 5,
+              "midi": 72
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 13,
+            "sourceMeasureNumber": "13",
+            "systemIndex": 2,
+            "staffIndex": 2,
+            "polygonPixels": [
+              [
+                494.98,
+                614.59
+              ],
+              [
+                499.81,
+                614.8
+              ],
+              [
+                504.64,
+                615.02
+              ],
+              [
+                504.54,
+                619.5
+              ],
+              [
+                504.44,
+                623.99
+              ],
+              [
+                499.61,
+                623.78
+              ],
+              [
+                494.78,
+                623.57
+              ],
+              [
+                494.88,
+                619.08
+              ]
+            ],
+            "bboxPixels": [
+              494,
+              614,
+              505,
+              624
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 44,
+        "measure": 13,
+        "scoreMidis": [
+          76
+        ],
+        "xmlPitchedNoteIndices": [
+          44
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          76
+        ],
+        "timingDeviationSeconds": -0.4188,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 44,
+            "pitch": {
+              "step": "E",
+              "alter": 0,
+              "octave": 5,
+              "midi": 76
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 13,
+            "sourceMeasureNumber": "13",
+            "systemIndex": 2,
+            "staffIndex": 2,
+            "polygonPixels": [
+              [
+                520.64,
+                608.24
+              ],
+              [
+                525.47,
+                608.45
+              ],
+              [
+                530.29,
+                608.66
+              ],
+              [
+                530.21,
+                613.14
+              ],
+              [
+                530.12,
+                617.62
+              ],
+              [
+                525.29,
+                617.41
+              ],
+              [
+                520.47,
+                617.2
+              ],
+              [
+                520.56,
+                612.72
+              ]
+            ],
+            "bboxPixels": [
+              520,
+              608,
+              531,
+              618
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 45,
+        "measure": 13,
+        "scoreMidis": [
+          69
+        ],
+        "xmlPitchedNoteIndices": [
+          45
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          69
+        ],
+        "timingDeviationSeconds": -0.563,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 45,
+            "pitch": {
+              "step": "A",
+              "alter": 0,
+              "octave": 4,
+              "midi": 69
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 13,
+            "sourceMeasureNumber": "13",
+            "systemIndex": 2,
+            "staffIndex": 2,
+            "polygonPixels": [
+              [
+                545.87,
+                625.05
+              ],
+              [
+                550.7,
+                625.26
+              ],
+              [
+                555.53,
+                625.48
+              ],
+              [
+                555.46,
+                629.97
+              ],
+              [
+                555.38,
+                634.47
+              ],
+              [
+                550.55,
+                634.26
+              ],
+              [
+                545.71,
+                634.05
+              ],
+              [
+                545.79,
+                629.55
+              ]
+            ],
+            "bboxPixels": [
+              545,
+              625,
+              556,
+              635
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 46,
+        "measure": 14,
+        "scoreMidis": [
+          71
+        ],
+        "xmlPitchedNoteIndices": [
+          46
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          71
+        ],
+        "timingDeviationSeconds": -0.5911,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 46,
+            "pitch": {
+              "step": "B",
+              "alter": 0,
+              "octave": 4,
+              "midi": 71
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 14,
+            "sourceMeasureNumber": "14",
+            "systemIndex": 2,
+            "staffIndex": 2,
+            "polygonPixels": [
+              [
+                581.12,
+                622.85
+              ],
+              [
+                586.29,
+                623.07
+              ],
+              [
+                591.46,
+                623.3
+              ],
+              [
+                591.41,
+                627.79
+              ],
+              [
+                591.35,
+                632.29
+              ],
+              [
+                586.17,
+                632.06
+              ],
+              [
+                581.0,
+                631.84
+              ],
+              [
+                581.06,
+                627.34
+              ]
+            ],
+            "bboxPixels": [
+              580,
+              622,
+              592,
+              633
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 47,
+        "measure": 14,
+        "scoreMidis": [
+          66
+        ],
+        "xmlPitchedNoteIndices": [
+          47
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          66
+        ],
+        "timingDeviationSeconds": -0.1419,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 47,
+            "pitch": {
+              "step": "F",
+              "alter": 1,
+              "octave": 4,
+              "midi": 66
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 14,
+            "sourceMeasureNumber": "14",
+            "systemIndex": 2,
+            "staffIndex": 2,
+            "polygonPixels": [
+              [
+                619.65,
+                635.78
+              ],
+              [
+                624.48,
+                635.99
+              ],
+              [
+                629.32,
+                636.2
+              ],
+              [
+                629.28,
+                640.7
+              ],
+              [
+                629.24,
+                645.21
+              ],
+              [
+                624.4,
+                645.0
+              ],
+              [
+                619.56,
+                644.79
+              ],
+              [
+                619.6,
+                640.28
+              ]
+            ],
+            "bboxPixels": [
+              619,
+              635,
+              630,
+              646
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 48,
+        "measure": 15,
+        "scoreMidis": [
+          67
+        ],
+        "xmlPitchedNoteIndices": [
+          48
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          67
+        ],
+        "timingDeviationSeconds": 0.3537,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 48,
+            "pitch": {
+              "step": "G",
+              "alter": 0,
+              "octave": 4,
+              "midi": 67
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 15,
+            "sourceMeasureNumber": "15",
+            "systemIndex": 2,
+            "staffIndex": 2,
+            "polygonPixels": [
+              [
+                668.01,
+                634.14
+              ],
+              [
+                672.85,
+                634.35
+              ],
+              [
+                677.68,
+                634.56
+              ],
+              [
+                677.66,
+                639.06
+              ],
+              [
+                677.65,
+                643.57
+              ],
+              [
+                672.81,
+                643.36
+              ],
+              [
+                667.97,
+                643.14
+              ],
+              [
+                667.99,
+                638.64
+              ]
+            ],
+            "bboxPixels": [
+              667,
+              634,
+              678,
+              644
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 49,
+        "measure": 15,
+        "scoreMidis": [
+          66
+        ],
+        "xmlPitchedNoteIndices": [
+          49
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          66
+        ],
+        "timingDeviationSeconds": 0.3488,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 49,
+            "pitch": {
+              "step": "F",
+              "alter": 1,
+              "octave": 4,
+              "midi": 66
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 15,
+            "sourceMeasureNumber": "15",
+            "systemIndex": 2,
+            "staffIndex": 2,
+            "polygonPixels": [
+              [
+                692.86,
+                638.97
+              ],
+              [
+                698.04,
+                639.2
+              ],
+              [
+                703.22,
+                639.42
+              ],
+              [
+                703.22,
+                643.93
+              ],
+              [
+                703.22,
+                648.44
+              ],
+              [
+                698.03,
+                648.22
+              ],
+              [
+                692.85,
+                647.99
+              ],
+              [
+                692.86,
+                643.48
+              ]
+            ],
+            "bboxPixels": [
+              692,
+              638,
+              704,
+              649
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 50,
+        "measure": 15,
+        "scoreMidis": [
+          64
+        ],
+        "xmlPitchedNoteIndices": [
+          50
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          64
+        ],
+        "timingDeviationSeconds": 0.1233,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 50,
+            "pitch": {
+              "step": "E",
+              "alter": 0,
+              "octave": 4,
+              "midi": 64
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 15,
+            "sourceMeasureNumber": "15",
+            "systemIndex": 2,
+            "staffIndex": 2,
+            "polygonPixels": [
+              [
+                718.42,
+                643.84
+              ],
+              [
+                723.61,
+                644.07
+              ],
+              [
+                728.79,
+                644.3
+              ],
+              [
+                728.8,
+                648.81
+              ],
+              [
+                728.81,
+                653.32
+              ],
+              [
+                723.62,
+                653.1
+              ],
+              [
+                718.43,
+                652.87
+              ],
+              [
+                718.43,
+                648.35
+              ]
+            ],
+            "bboxPixels": [
+              718,
+              643,
+              729,
+              654
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 51,
+        "measure": 15,
+        "scoreMidis": [
+          67
+        ],
+        "xmlPitchedNoteIndices": [
+          51
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          67
+        ],
+        "timingDeviationSeconds": 0.0268,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 51,
+            "pitch": {
+              "step": "G",
+              "alter": 0,
+              "octave": 4,
+              "midi": 67
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 15,
+            "sourceMeasureNumber": "15",
+            "systemIndex": 2,
+            "staffIndex": 2,
+            "polygonPixels": [
+              [
+                743.96,
+                637.45
+              ],
+              [
+                749.14,
+                637.68
+              ],
+              [
+                754.32,
+                637.9
+              ],
+              [
+                754.34,
+                642.41
+              ],
+              [
+                754.37,
+                646.92
+              ],
+              [
+                749.18,
+                646.69
+              ],
+              [
+                744.0,
+                646.46
+              ],
+              [
+                743.98,
+                641.95
+              ]
+            ],
+            "bboxPixels": [
+              743,
+              637,
+              755,
+              647
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 52,
+        "measure": 16,
+        "scoreMidis": [
+          71
+        ],
+        "xmlPitchedNoteIndices": [
+          52
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          71
+        ],
+        "timingDeviationSeconds": -0.0942,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 52,
+            "pitch": {
+              "step": "B",
+              "alter": 0,
+              "octave": 4,
+              "midi": 71
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 16,
+            "sourceMeasureNumber": "16",
+            "systemIndex": 2,
+            "staffIndex": 2,
+            "polygonPixels": [
+              [
+                779.81,
+                631.52
+              ],
+              [
+                784.64,
+                631.73
+              ],
+              [
+                789.47,
+                631.94
+              ],
+              [
+                789.51,
+                636.44
+              ],
+              [
+                789.55,
+                640.94
+              ],
+              [
+                784.72,
+                640.73
+              ],
+              [
+                779.88,
+                640.52
+              ],
+              [
+                779.85,
+                636.02
+              ]
+            ],
+            "bboxPixels": [
+              779,
+              631,
+              790,
+              641
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 53,
+        "measure": 16,
+        "scoreMidis": [
+          69
+        ],
+        "xmlPitchedNoteIndices": [
+          53
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          69
+        ],
+        "timingDeviationSeconds": -0.1107,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 53,
+            "pitch": {
+              "step": "A",
+              "alter": 0,
+              "octave": 4,
+              "midi": 69
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 16,
+            "sourceMeasureNumber": "16",
+            "systemIndex": 2,
+            "staffIndex": 2,
+            "polygonPixels": [
+              [
+                805.38,
+                636.38
+              ],
+              [
+                810.21,
+                636.59
+              ],
+              [
+                815.04,
+                636.8
+              ],
+              [
+                815.09,
+                641.31
+              ],
+              [
+                815.14,
+                645.81
+              ],
+              [
+                810.31,
+                645.6
+              ],
+              [
+                805.47,
+                645.39
+              ],
+              [
+                805.43,
+                640.88
+              ]
+            ],
+            "bboxPixels": [
+              805,
+              636,
+              816,
+              646
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 54,
+        "measure": 16,
+        "scoreMidis": [
+          66
+        ],
+        "xmlPitchedNoteIndices": [
+          54
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          66
+        ],
+        "timingDeviationSeconds": -0.2536,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 54,
+            "pitch": {
+              "step": "F",
+              "alter": 1,
+              "octave": 4,
+              "midi": 66
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 16,
+            "sourceMeasureNumber": "16",
+            "systemIndex": 2,
+            "staffIndex": 2,
+            "polygonPixels": [
+              [
+                830.32,
+                644.97
+              ],
+              [
+                835.51,
+                645.2
+              ],
+              [
+                840.69,
+                645.43
+              ],
+              [
+                840.75,
+                649.94
+              ],
+              [
+                840.81,
+                654.45
+              ],
+              [
+                835.63,
+                654.22
+              ],
+              [
+                830.44,
+                654.0
+              ],
+              [
+                830.38,
+                649.48
+              ]
+            ],
+            "bboxPixels": [
+              830,
+              644,
+              841,
+              655
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 55,
+        "measure": 16,
+        "scoreMidis": [
+          63
+        ],
+        "xmlPitchedNoteIndices": [
+          55
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          63
+        ],
+        "timingDeviationSeconds": -0.3746,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 55,
+            "pitch": {
+              "step": "D",
+              "alter": 1,
+              "octave": 4,
+              "midi": 63
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 16,
+            "sourceMeasureNumber": "16",
+            "systemIndex": 2,
+            "staffIndex": 2,
+            "polygonPixels": [
+              [
+                856.0,
+                653.61
+              ],
+              [
+                861.18,
+                653.83
+              ],
+              [
+                866.37,
+                654.06
+              ],
+              [
+                866.45,
+                658.58
+              ],
+              [
+                866.52,
+                663.1
+              ],
+              [
+                861.33,
+                662.87
+              ],
+              [
+                856.14,
+                662.65
+              ],
+              [
+                856.07,
+                658.13
+              ]
+            ],
+            "bboxPixels": [
+              855,
+              653,
+              867,
+              664
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 56,
+        "measure": 17,
+        "scoreMidis": [
+          64
+        ],
+        "xmlPitchedNoteIndices": [
+          56
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          64
+        ],
+        "timingDeviationSeconds": -0.484,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 56,
+            "pitch": {
+              "step": "E",
+              "alter": 0,
+              "octave": 4,
+              "midi": 64
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 17,
+            "sourceMeasureNumber": "17",
+            "systemIndex": 2,
+            "staffIndex": 2,
+            "polygonPixels": [
+              [
+                891.88,
+                651.42
+              ],
+              [
+                896.71,
+                651.63
+              ],
+              [
+                901.55,
+                651.84
+              ],
+              [
+                901.64,
+                656.35
+              ],
+              [
+                901.74,
+                660.87
+              ],
+              [
+                896.89,
+                660.66
+              ],
+              [
+                892.05,
+                660.45
+              ],
+              [
+                891.96,
+                655.93
+              ]
+            ],
+            "bboxPixels": [
+              891,
+              651,
+              902,
+              661
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 57,
+        "measure": 17,
+        "scoreMidis": [
+          71
+        ],
+        "xmlPitchedNoteIndices": [
+          57
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          71
+        ],
+        "timingDeviationSeconds": 0.0,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 57,
+            "pitch": {
+              "step": "B",
+              "alter": 0,
+              "octave": 4,
+              "midi": 71
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 17,
+            "sourceMeasureNumber": "17",
+            "systemIndex": 2,
+            "staffIndex": 2,
+            "polygonPixels": [
+              [
+                929.54,
+                638.06
+              ],
+              [
+                934.71,
+                638.28
+              ],
+              [
+                939.89,
+                638.51
+              ],
+              [
+                940.0,
+                643.01
+              ],
+              [
+                940.11,
+                647.51
+              ],
+              [
+                934.93,
+                647.29
+              ],
+              [
+                929.75,
+                647.06
+              ],
+              [
+                929.64,
+                642.56
+              ]
+            ],
+            "bboxPixels": [
+              929,
+              638,
+              941,
+              648
+            ]
+          }
+        ]
+      },
+      {
+        "eventIndex": 58,
+        "measure": 18,
+        "scoreMidis": [
+          64
+        ],
+        "xmlPitchedNoteIndices": [
+          58
+        ],
+        "verdict": "confirmed",
+        "audioMidis": [
+          64
+        ],
+        "timingDeviationSeconds": 0.5176,
+        "projectedNoteAnchors": [
+          {
+            "xmlPitchedNoteIndex": 58,
+            "pitch": {
+              "step": "E",
+              "alter": 0,
+              "octave": 4,
+              "midi": 64
+            },
+            "voice": "1",
+            "isChordTone": false,
+            "globalMeasureIndex": 18,
+            "sourceMeasureNumber": "18",
+            "systemIndex": 2,
+            "staffIndex": 2,
+            "polygonPixels": [
+              [
+                978.26,
+                655.19
+              ],
+              [
+                984.14,
+                655.44
+              ],
+              [
+                990.01,
+                655.7
+              ],
+              [
+                990.14,
+                660.22
+              ],
+              [
+                990.28,
+                664.74
+              ],
+              [
+                984.4,
+                664.48
+              ],
+              [
+                978.52,
+                664.22
+              ],
+              [
+                978.39,
+                659.7
+              ]
+            ],
+            "bboxPixels": [
+              978,
+              655,
+              991,
+              665
+            ]
+          }
+        ]
+      }
+    ],
+    "verdictCounts": {
+      "confirmed": 59,
+      "pitch-mismatch": 0,
+      "no-audio-evidence": 0,
+      "beyond-recording": 0,
+      "anchor-uncertain": 0
+    },
+    "annotatedPhoto": "C:\\Users\\Administrator\\Downloads\\ai二胡\\data\\experiments\\western-strings-m4a\\engineering-acceptance\\positive-r3-01\\annotated-photo.jpg",
+    "annotatedPhotoSha256": "a9928b1650ce85cd5edfd2e23f7c09f732efcfb51c5dbd3464427d265838901c"
+  }
+}

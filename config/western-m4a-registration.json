@@ -1,0 +1,50 @@
+{
+  "contract": "western-m4a-registration-policy-v1",
+  "runtime": {
+    "pythonPathEnv": "WESTERN_M4A_PYTHON_EXE",
+    "defaultPythonRelativePath": "data/tools/western-photo-score-audio-py311/Scripts/python.exe",
+    "pythonVersion": "3.11.9",
+    "requiredPackages": {
+      "numpy": "1.26.4",
+      "opencv-python": "4.11.0.86",
+      "Pillow": "12.2.0"
+    }
+  },
+  "policy": {
+    "studentFacing": false,
+    "automaticAdoptionAuthorized": false,
+    "reviewRequired": true,
+    "omrAllowedInMainChain": false
+  },
+  "registration": {
+    "feature": "SIFT",
+    "maxWorkingDimension": 1800,
+    "minimumImageWidth": 640,
+    "minimumImageHeight": 480,
+    "minimumLaplacianVariance": 18.0,
+    "ratioTest": 0.76,
+    "ransacReprojectionPixels": 6.0,
+    "minimumGoodMatches": 24,
+    "minimumInliers": 16,
+    "minimumInlierRatio": 0.2,
+    "minimumReferenceGridCoverage": 0.2,
+    "minimumSystemConsistency": 1.0,
+    "minimumBarlineConsistency": 0.6,
+    "minimumPerSystemBarlineConsistency": 0.5,
+    "maximumStructuralResidualNormalized": 0.012
+  },
+  "deformation": {
+    "paperCurvatureModel": "homography-plus-thin-plate-spline-residual",
+    "minimumTpsInliers": 30,
+    "minimumTpsGridCoverage": 0.3,
+    "activationResidualNormalized": 0.0015,
+    "minimumResidualImprovement": 0.15,
+    "regularization": 0.01,
+    "maximumControlPoints": 80
+  },
+  "audioSentinel": {
+    "minimumAgreement": 0.6,
+    "missingEvidenceDisposition": "supported-edition-audio-agreement-missing",
+    "mismatchDisposition": "supported-edition-audio-mismatch"
+  }
+}

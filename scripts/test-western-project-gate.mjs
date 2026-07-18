@@ -1428,9 +1428,14 @@ const m4Failure = fullGate.failures.find((failure) => failure.track === (
 assert(m4Failure, "the required M4 track must remain fail-closed until its active contract is ready");
 if (m4.m4GateSplitDecisionReady === true) {
   assert.equal(m4.m4aSupportedEditionRegistrationReady, false);
-  if (m4.m4aSupportedEditionRegistryReady === true) {
-    assert(m4Failure.reason.includes("m4a-registration-runtime-not-ready"));
-    assert(m4Failure.reason.includes("m4a-acceptance-evidence-not-ready"));
+  if (
+    m4.m4aSupportedEditionRegistryReady === true
+    && m4.m4aRegistrationRuntimeReady === true
+    && m4.m4aEngineeringAcceptanceReady === true
+  ) {
+    assert(m4Failure.reason.includes("m4a-real-photo-acceptance-not-ready"));
+  } else if (m4.m4aSupportedEditionRegistryReady === true) {
+    assert(m4Failure.reason.some((reason) => String(reason).includes("registration")));
   } else {
     assert(
       m4Failure.reason.some((reason) => String(reason).includes("registry")),
