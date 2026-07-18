@@ -12,6 +12,7 @@ import {
   summarizeControlledCandidateConfidencePilot,
 } from "./status-western-controlled-candidate-review.mjs";
 import { evaluateOrdinaryAudioRuntime } from "./run-western-ordinary-audio-python.mjs";
+import { auditOrdinaryDynamicShadowAcceptanceLiveArtifacts } from "./audit-western-ordinary-dynamic-shadow-acceptance.mjs";
 
 const DEFAULT_OUT = path.join("data", "experiments", "western-strings-project-status.json");
 const REVIEW_POLICY_DOC = path.join("docs", "western-strings-review-policy.md");
@@ -60,7 +61,7 @@ const ORDINARY_DYNAMIC_TIMING_MODE = "basic-pitch-dtw";
 const ORDINARY_DYNAMIC_RUNTIME_ID = "western-ordinary-dynamic-shadow-audio-py311";
 const ORDINARY_DYNAMIC_MODEL_SHA256 = "c6595f299ff83c52e89555789f7e3e829a6a0f25b6a88f7e99073af5a2470dc4";
 const ORDINARY_DYNAMIC_ACCEPTANCE_RECORDINGS = ["r3-02", "r3-03"];
-const ORDINARY_DYNAMIC_ACCEPTANCE_LIVE_VERIFIER_IMPLEMENTED = false;
+const ORDINARY_DYNAMIC_ACCEPTANCE_LIVE_VERIFIER_IMPLEMENTED = true;
 const M3PLUS_RESCOPE_SCHEMA_VERSION = 2;
 const M3PLUS_RESCOPE_CONTRACT = "m3plus-rescope-four-zone-v2";
 const M3PLUS_RUNTIME_CONTRACT = "m3plus-gold-free-runtime-v1";
@@ -2458,7 +2459,13 @@ async function buildOrdinaryDynamicShadowStatus() {
     hashWorkspaceArtifact(ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE),
   ]);
   const acceptanceValidation = validateOrdinaryDynamicShadowAcceptance(acceptance);
-  const r3AcceptanceReady = acceptanceValidation.ready === true;
+  // The schema-valid report only stays green while the live-artifact verifier
+  // re-confirms every artifact it cites on disk (hash, identity, and
+  // policy-recomputable decisions). A forged or stale report fails closed.
+  const liveArtifactAudit = acceptanceValidation.ready === true
+    ? auditOrdinaryDynamicShadowAcceptanceLiveArtifacts({ acceptance, runtimeReport: runtime })
+    : { ready: false, blockingReasons: ["ordinary-dynamic-shadow-r3-live-audit-skipped-schema-invalid"] };
+  const r3AcceptanceReady = acceptanceValidation.ready === true && liveArtifactAudit.ready === true;
   return {
     contractVersion: ORDINARY_DYNAMIC_CONTRACT_VERSION,
     policyVersion: ORDINARY_DYNAMIC_POLICY_VERSION,
@@ -2496,6 +2503,10 @@ async function buildOrdinaryDynamicShadowStatus() {
           evidenceDigestSha256: acceptance.evidenceDigestSha256 || "",
           recordings: acceptance.recordings || [],
           blockingReasons: acceptanceValidation.blockingReasons,
+          liveArtifactAudit: {
+            ready: liveArtifactAudit.ready === true,
+            blockingReasons: liveArtifactAudit.blockingReasons || [],
+          },
         }
       : {
           source: ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE.replace(/\\/g, "/"),
@@ -2509,7 +2520,9 @@ async function buildOrdinaryDynamicShadowStatus() {
         : []),
       ...(!r3AcceptanceReady
         ? [acceptance
-            ? "ordinary-dynamic-shadow-r3-acceptance-invalid"
+            ? (acceptanceValidation.ready === true
+                ? "ordinary-dynamic-shadow-r3-live-artifact-audit-failed"
+                : "ordinary-dynamic-shadow-r3-acceptance-invalid")
             : "ordinary-dynamic-shadow-r3-acceptance-not-run"]
         : []),
       "ordinary-dynamic-shadow-authorization-closed",

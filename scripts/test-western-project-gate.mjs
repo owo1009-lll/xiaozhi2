@@ -66,7 +66,6 @@ const forgedMinimalAcceptance = validateOrdinaryDynamicShadowAcceptance({
 assert.equal(forgedMinimalAcceptance.ready, false, "a minimal self-asserted r3 JSON must not open acceptance");
 assert(forgedMinimalAcceptance.blockingReasons.includes("ordinary-dynamic-shadow-r3-recording-set-invalid"));
 assert(forgedMinimalAcceptance.blockingReasons.includes("ordinary-dynamic-shadow-r3-evidence-digest-invalid"));
-assert(forgedMinimalAcceptance.blockingReasons.includes("ordinary-dynamic-shadow-r3-live-artifact-verifier-not-implemented"));
 
 const approvedHomrReviewFixture = {
   decision: {
@@ -538,8 +537,28 @@ assert.equal(
 );
 assert.equal(controlled.ordinaryDynamicShadow?.foundationReady, true);
 assert.equal(controlled.ordinaryDynamicShadow?.runtimePreflightReady, true);
-assert.equal(controlled.ordinaryDynamicShadow?.liveArtifactVerifierReady, false);
-assert.equal(controlled.ordinaryDynamicShadow?.r3AcceptanceReady, false);
+assert.equal(controlled.ordinaryDynamicShadow?.liveArtifactVerifierReady, true);
+const shadowAcceptanceReady = controlled.ordinaryDynamicShadow?.r3AcceptanceReady === true;
+if (shadowAcceptanceReady) {
+  assert.equal(
+    controlled.ordinaryDynamicShadow?.acceptanceEvidence?.liveArtifactAudit?.ready,
+    true,
+    "green r3 acceptance requires the live-artifact audit to be current",
+  );
+  assert(
+    !controlled.ordinaryDynamicShadow.blockingReasons.some((reason) => reason.startsWith("ordinary-dynamic-shadow-r3-")),
+    "green r3 acceptance must clear every r3 blocking reason",
+  );
+} else {
+  assert(
+    controlled.ordinaryDynamicShadow?.blockingReasons?.some((reason) => reason.startsWith("ordinary-dynamic-shadow-r3-")),
+    "a non-green r3 acceptance must carry an explicit r3 blocking reason",
+  );
+}
+assert(
+  controlled.ordinaryDynamicShadow?.blockingReasons?.includes("ordinary-dynamic-shadow-authorization-closed"),
+  "the ordinary shadow authorization stays closed regardless of acceptance evidence",
+);
 assert.equal(controlled.ordinaryDynamicShadow?.authorizationReady, false);
 assert.equal(controlled.ordinaryDynamicShadow?.studentGateReady, false);
 assert.equal(controlled.ordinaryDynamicShadow?.automaticAdoptionReady, false);
@@ -757,7 +776,15 @@ for (const [label, mutate] of [
   assert.equal(authority.controlledPilotDecision.readyToStartControlledPilot, false, `${label} must close cached start authority`);
   assert(!authorityNextActions(authority).some((action) => action.track === "Start monitored pilot"));
 }
-assert.equal(status.nextActions[0]?.track, "Ordinary dynamic shadow r3 evidence verifier");
+assert.equal(
+  status.nextActions[0]?.track,
+  shadowAcceptanceReady
+    ? "Ordinary dynamic shadow authorization"
+    : controlled.ordinaryDynamicShadow?.liveArtifactVerifierReady
+      ? "Ordinary dynamic shadow r3 acceptance"
+      : "Ordinary dynamic shadow r3 evidence verifier",
+  "the first next action must follow the r3 evidence progression",
+);
 assert.equal(
   status.nextActions[0]?.artifact,
   "data/experiments/western-strings-m3/ordinary-dynamic-shadow-r3-acceptance/report.json",
@@ -969,10 +996,9 @@ assert.equal(
   "data/experiments/western-strings-m4/independent-gold-todo.html",
   "M4 handoff should expose the visual independent-gold checklist",
 );
-assert.equal(
-  status.nextActions[0]?.track,
-  "Ordinary dynamic shadow r3 evidence verifier",
-  "M4 must not displace the prerequisite ordinary dynamic-shadow live verifier task",
+assert(
+  String(status.nextActions[0]?.track || "").startsWith("Ordinary dynamic shadow"),
+  "M4 must not displace the prerequisite ordinary dynamic-shadow evidence task",
 );
 
 const m4ChecklistHtml = await fs.readFile("data/experiments/western-strings-m4/independent-gold-todo.html", "utf8");
