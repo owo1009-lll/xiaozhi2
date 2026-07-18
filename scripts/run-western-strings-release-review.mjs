@@ -171,6 +171,7 @@ async function main() {
   const ordinaryReady = liveEvidence.ordinary.foundationReady === true
     && liveEvidence.ordinary.liveArtifactVerifierReady === true
     && liveEvidence.ordinary.r3AcceptanceReady === true
+    && liveEvidence.ordinary.freshBlindEvidenceReady === true
     && liveEvidence.ordinary.authorizationReady === true
     && liveEvidence.ordinary.causalEnergyStatus === "excluded-review-only"
     && liveEvidence.ordinary.blockingReasons.length === 0;
@@ -237,6 +238,7 @@ async function main() {
         foundationReady: shadow.foundationReady === true,
         liveArtifactVerifierReady: shadow.liveArtifactVerifierReady === true,
         r3AcceptanceReady: shadow.r3AcceptanceReady === true,
+        freshBlindEvidenceReady: shadow.freshBlindEvidence?.ready === true,
         authorizationReady: shadow.authorizationReady === true,
         energyVetoIncluded: shadow.energyVetoIncluded === true,
         causalEnergyStatus: shadow.causalEnergyStatus || null,

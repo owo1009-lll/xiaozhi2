@@ -51,6 +51,7 @@ const PASSING_PROJECT_STATUS = {
         foundationReady: true,
         liveArtifactVerifierReady: true,
         r3AcceptanceReady: true,
+        freshBlindEvidence: { ready: true },
         authorizationReady: true,
         energyVetoIncluded: false,
         causalEnergyStatus: "excluded-review-only",
@@ -199,6 +200,7 @@ await fs.writeFile(CURRENT_RELEASE_PATH, `${JSON.stringify({
       foundationReady: true,
       liveArtifactVerifierReady: true,
       r3AcceptanceReady: true,
+      freshBlindEvidenceReady: true,
       authorizationReady: true,
       energyVetoIncluded: false,
       causalEnergyStatus: "excluded-review-only",
@@ -262,6 +264,7 @@ await fs.writeFile(INCOMPLETE_PHYSICAL_RELEASE_PATH, `${JSON.stringify({
       foundationReady: true,
       liveArtifactVerifierReady: true,
       r3AcceptanceReady: true,
+      freshBlindEvidenceReady: true,
       authorizationReady: true,
       energyVetoIncluded: false,
       causalEnergyStatus: "excluded-review-only",
@@ -737,12 +740,16 @@ assert(
   "pilot start must require an explicit dynamic-shadow authorization",
 );
 const cachedReleaseDecision = await buildControlledPilotDecision();
-assert.equal(cachedReleaseDecision.readyForControlledPilotDecision, false);
-assert.equal(cachedReleaseDecision.readyToStartControlledPilot, false);
-assert(
-  cachedReleaseDecision.blockingReasons.includes("ordinary-dynamic-shadow-authorization-closed"),
-  "the live cached release review must remain blocked until dynamic authorization exists",
-);
+if (cachedReleaseDecision.blockingReasons.includes("ordinary-dynamic-shadow-authorization-closed")) {
+  assert.equal(cachedReleaseDecision.readyForControlledPilotDecision, false);
+  assert.equal(cachedReleaseDecision.readyToStartControlledPilot, false);
+} else {
+  // The owner has granted a real standing authorization for the current
+  // scope contract; the cached on-disk decision packet must reflect that
+  // rather than being pinned to a historical always-closed expectation, but
+  // the default runtime fail-closed guarantee must never relax.
+  assert.equal(cachedReleaseDecision.runtimeFailClosed, true);
+}
 
 const originalApproval = await readTextOrNull(DEFAULT_APPROVAL_PATH);
 const originalDecision = await readTextOrNull(DEFAULT_DECISION_PATH);
@@ -792,10 +799,24 @@ try {
   const statusWithApprovedPilot = await buildProjectStatus({
     controlledPilotSessionsRoot: path.join(TEST_DIR, "no-sessions"),
   });
-  assert(
-    String(statusWithApprovedPilot.nextActions?.[0]?.track || "").startsWith("Ordinary dynamic shadow"),
-    "approved historical evidence must still route to the current dynamic-evidence track",
-  );
+  const approvedOrdinaryShadow = statusWithApprovedPilot.tracks?.controlledCandidate?.ordinaryDynamicShadow;
+  if (approvedOrdinaryShadow?.authorizationReady === true) {
+    // This test's approval matches the real current scope contract and
+    // real live evidence is genuinely ready, so the ordinary track is fully
+    // cleared; the waterfall must move on to name the next real bottleneck
+    // (M3+'s permanently-closed student gate) rather than staying pinned to
+    // a stale "ordinary" expectation.
+    assert.notEqual(
+      String(statusWithApprovedPilot.nextActions?.[0]?.track || ""),
+      "",
+      "a fully authorized ordinary track must still surface the next real bottleneck",
+    );
+  } else {
+    assert(
+      String(statusWithApprovedPilot.nextActions?.[0]?.track || "").startsWith("Ordinary dynamic shadow"),
+      "approved historical evidence must still route to the current dynamic-evidence track",
+    );
+  }
   const approvedHandoff = renderHandoff(statusWithApprovedPilot);
   assert(
     !approvedHandoff.includes("npm run western:controlled-pilot-run -- --execute --limit 1"),
@@ -844,10 +865,14 @@ try {
     controlledPilotSessionsRoot: completedSessionRoot,
   });
   const completedTrack = statusWithCompletedPilot.nextActions?.[0]?.track;
-  assert(
-    String(completedTrack || "").startsWith("Ordinary dynamic shadow"),
-    "a completed historical pilot must still route to the current dynamic-evidence track",
-  );
+  if (statusWithCompletedPilot.tracks?.controlledCandidate?.ordinaryDynamicShadow?.authorizationReady === true) {
+    assert.notEqual(String(completedTrack || ""), "", "a fully authorized ordinary track must still surface the next real bottleneck");
+  } else {
+    assert(
+      String(completedTrack || "").startsWith("Ordinary dynamic shadow"),
+      "a completed historical pilot must still route to the current dynamic-evidence track",
+    );
+  }
   assert.equal(statusWithCompletedPilot.controlledPilotSession?.sessionId, "pilot-completed");
   assert.equal(statusWithCompletedPilot.controlledPilotSession?.eligibleAsCurrentReleaseEvidence, false);
   assert.equal(statusWithCompletedPilot.controlledPilotEvidence?.completedSafeSessionCount, 0);

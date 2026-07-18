@@ -75,6 +75,48 @@ export const CONTROLLED_PILOT_LIVE_EVIDENCE_CONTRACT = "western-controlled-pilot
 const CONTROLLED_PILOT_ORDINARY_AUTHORIZATION_CONTRACT = "western-ordinary-dynamic-shadow-release-v1";
 const CONTROLLED_PILOT_SCOPE_CONTRACT = "western-ordinary-dynamic-shadow-release-v1+m3plus-rescope-four-zone-v2";
 const CONTROLLED_PILOT_REQUIRED_TRACKS = Object.freeze(["m3plus", "ordinary"]);
+const CONTROLLED_PILOT_APPROVAL = path.join(
+  "data",
+  "experiments",
+  "western-strings-controlled-pilot-approval.json",
+);
+
+// authorizationReady represents the owner's standing consent to release this
+// track's review-only mechanism for a monitored pilot. It is intentionally
+// coarse-grained (bound to the scope-contract version, not to any specific
+// evidence digest): evidence freshness is independently enforced by the
+// track's own *Ready flags (r3AcceptanceReady, freshBlindEvidence.ready,
+// pitchSafetyReady, ...), so this only has to answer "did the owner say yes
+// to this contract version, for this track". A stale scope-contract version
+// or a track missing from approvedTracks fails closed.
+export function evaluateTrackAuthorizationFromApproval(approval, track) {
+  const blockingReasons = [];
+  if (!approval) {
+    blockingReasons.push("authorization-approval-missing");
+    return { ready: false, blockingReasons };
+  }
+  if (approval.pilotApproved !== true) blockingReasons.push("authorization-approval-not-granted");
+  if (approval.scopeContract !== CONTROLLED_PILOT_SCOPE_CONTRACT) {
+    blockingReasons.push("authorization-approval-scope-contract-stale");
+  }
+  const approvedTracks = Array.isArray(approval.approvedTracks) ? approval.approvedTracks : [];
+  if (!approvedTracks.includes(track)) blockingReasons.push(`authorization-approval-track-missing:${track}`);
+  if (approval.confirmSeparateMonitoredPilot !== true) {
+    blockingReasons.push("authorization-approval-confirmation-missing:confirmSeparateMonitoredPilot");
+  }
+  if (approval.confirmDefaultRuntimeFailClosed !== true) {
+    blockingReasons.push("authorization-approval-confirmation-missing:confirmDefaultRuntimeFailClosed");
+  }
+  if (String(approval.approvedBy || "").trim() === "" || String(approval.approvedAt || "").trim() === "") {
+    blockingReasons.push("authorization-approval-identity-missing");
+  }
+  return { ready: blockingReasons.length === 0, blockingReasons };
+}
+
+async function evaluateTrackAuthorization(track) {
+  const approval = await readJson(CONTROLLED_PILOT_APPROVAL);
+  return evaluateTrackAuthorizationFromApproval(approval, track);
+}
 
 function canonicalJson(value) {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
@@ -118,6 +160,7 @@ export function buildControlledPilotLiveEvidenceProjection(status = {}) {
       foundationReady: ordinary.foundationReady === true,
       liveArtifactVerifierReady: ordinary.liveArtifactVerifierReady === true,
       r3AcceptanceReady: ordinary.r3AcceptanceReady === true,
+      freshBlindEvidenceReady: ordinary.freshBlindEvidence?.ready === true,
       authorizationReady: ordinary.authorizationReady === true,
       energyVetoIncluded: ordinary.energyVetoIncluded === true,
       causalEnergyStatus: ordinary.causalEnergyStatus || null,
@@ -189,6 +232,7 @@ export function controlledPilotLiveEvidenceReady(liveEvidenceBinding = {}) {
     && ordinary.foundationReady === true
     && ordinary.liveArtifactVerifierReady === true
     && ordinary.r3AcceptanceReady === true
+    && ordinary.freshBlindEvidenceReady === true
     && ordinary.authorizationReady === true
     && ordinary.causalEnergyStatus === "excluded-review-only"
     && (ordinary.blockingReasons || []).length === 0
@@ -268,6 +312,7 @@ export function summarizeCurrentControlledPilotAuthority({
     && releaseReview?.tracks?.ordinary?.liveArtifactVerifierReady
       === currentOrdinary.liveArtifactVerifierReady
     && releaseReview?.tracks?.ordinary?.r3AcceptanceReady === currentOrdinary.r3AcceptanceReady
+    && releaseReview?.tracks?.ordinary?.freshBlindEvidenceReady === currentOrdinary.freshBlindEvidenceReady
     && releaseReview?.tracks?.ordinary?.authorizationReady === currentOrdinary.authorizationReady
     && releaseReview?.tracks?.ordinary?.energyVetoIncluded === currentOrdinary.energyVetoIncluded
     && releaseReview?.tracks?.ordinary?.causalEnergyStatus === currentOrdinary.causalEnergyStatus
@@ -2011,7 +2056,8 @@ async function buildM3PlusStatus() {
     && monitoredPilotAudit?.runtimeEvidence?.runtime?.reviewOnlyRuntimeWired === true;
   const runtimeAuditReady = monitoredAuditContractReady
     && monitoredPilotAudit?.runtimeAuditReady === true;
-  const authorizationReady = false;
+  const trackAuthorization = await evaluateTrackAuthorization("m3plus");
+  const authorizationReady = trackAuthorization.ready;
   const studentGateReady = false;
   const pitchSafetyReady = offlineEvidenceReady
     && reviewOnlyRuntimeWired
@@ -2087,7 +2133,9 @@ async function buildM3PlusStatus() {
       : []),
     ...(!reviewOnlyRuntimeWired ? ["m3plus-review-only-runtime-not-wired"] : []),
     ...(!runtimeAuditReady ? ["m3plus-runtime-audit-not-ready"] : []),
-    ...(!authorizationReady ? ["m3plus-authorization-closed"] : []),
+    ...(!authorizationReady
+      ? ["m3plus-authorization-closed", ...trackAuthorization.blockingReasons]
+      : []),
     ...(!studentGateReady ? ["m3plus-student-gate-closed"] : []),
   ])];
   return {
@@ -2483,6 +2531,8 @@ async function buildOrdinaryDynamicShadowStatus() {
     ? auditFreshBlindEvidenceLiveArtifacts({})
     : { ready: false, blockingReasons: ["fresh-blind-live-audit-skipped-evidence-not-ready"] };
   const freshBlindEvidenceReady = freshBlindReport.evidenceReady === true && freshBlindLiveAudit.ready === true;
+  const trackAuthorization = await evaluateTrackAuthorization("ordinary");
+  const authorizationReady = trackAuthorization.ready;
   return {
     contractVersion: ORDINARY_DYNAMIC_CONTRACT_VERSION,
     policyVersion: ORDINARY_DYNAMIC_POLICY_VERSION,
@@ -2522,7 +2572,8 @@ async function buildOrdinaryDynamicShadowStatus() {
         ...(freshBlindLiveAudit.blockingReasons || []),
       ]),
     },
-    authorizationReady: false,
+    authorizationReady,
+    authorizationEvidence: trackAuthorization,
     studentGateReady: false,
     automaticAdoptionReady: false,
     energyVetoIncluded: false,
@@ -2559,7 +2610,10 @@ async function buildOrdinaryDynamicShadowStatus() {
                 : "ordinary-dynamic-shadow-r3-acceptance-invalid")
             : "ordinary-dynamic-shadow-r3-acceptance-not-run"]
         : []),
-      "ordinary-dynamic-shadow-authorization-closed",
+      ...(r3AcceptanceReady && !freshBlindEvidenceReady ? ["ordinary-dynamic-shadow-fresh-blind-evidence-not-ready"] : []),
+      ...(!authorizationReady
+        ? ["ordinary-dynamic-shadow-authorization-closed", ...trackAuthorization.blockingReasons]
+        : []),
     ],
   };
 }
@@ -2742,7 +2796,11 @@ async function buildControlledStatus() {
       ? ["Implement and test the live r3 artifact verifier before consuming reserve takes r3-02/r3-03; historical RF and first-measure pilot artifacts remain superseded."]
       : !status.ordinaryDynamicShadow.r3AcceptanceReady
         ? ["Run the frozen review-only dynamic shadow on reserve takes r3-02/r3-03 with cold/warm cache and live artifact verification; this is implementation acceptance only, not release authorization."]
-        : ["Prepare a separate fresh-blind dynamic-shadow authorization contract; do not reuse historical RF, first-measure, or r3 acceptance recordings as release evidence."];
+        : !status.ordinaryDynamicShadow.freshBlindEvidence?.ready
+          ? ["Run `npm run western:ordinary-fresh-blind-eval` on a controlled batch from a performer/voice never used to tune any threshold; do not reuse historical RF, first-measure, or r3 acceptance recordings as release evidence."]
+          : !status.ordinaryDynamicShadow.authorizationReady
+            ? ["The r3 acceptance and fresh-blind evidence are both ready; this now needs the owner's explicit western-ordinary-dynamic-shadow-release-v1 authorization before any monitored pilot or student-facing promotion."]
+            : ["Ordinary dynamic-shadow evidence and authorization are both ready for the monitored pilot; the default student runtime remains fail-closed until a further explicit authorization."];
   status.reviewArtifacts = {
     reviewPage: CONTROLLED_REVIEW_PAGE.replace(/\\/g, "/"),
     completedCsv: CONTROLLED_COMPLETED.replace(/\\/g, "/"),

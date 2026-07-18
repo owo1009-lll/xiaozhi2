@@ -38,12 +38,16 @@ const m3plusReadiness = m3plusPilotExecutorReadiness();
 assert.equal(m3plusReadiness.ready, true);
 assert.equal(m3plusReadiness.contract, REQUIRED_M3PLUS_PILOT_EXECUTOR_CONTRACT);
 
-// executor readiness alone must never make the preflight startable
+// executor readiness alone (with no owner approval on file) must never make
+// the preflight startable. Point at a nonexistent approval path so this
+// proof is independent of whatever the real standing approval currently
+// says; the real approval's own effect is covered by the live checks below.
 const readyExecutorsOnlyPreflight = await buildControlledPilotStartPreflight({
   pilotExecutorContractReady: true,
   pilotExecutorContract: REQUIRED_PILOT_EXECUTOR_CONTRACT,
   m3plusPilotExecutorContractReady: true,
   m3plusPilotExecutorContract: REQUIRED_M3PLUS_PILOT_EXECUTOR_CONTRACT,
+  approval: "data/experiments/test-fixtures-nonexistent-approval.json",
 });
 assert.equal(readyExecutorsOnlyPreflight.ordinaryPilotExecutorReady, true);
 assert.equal(readyExecutorsOnlyPreflight.m3plusPilotExecutorReady, true);
@@ -55,7 +59,24 @@ assert(
 assert.equal(
   readyExecutorsOnlyPreflight.okToStartControlledPilot,
   false,
-  "executor readiness must not bypass the evidence and authorization chain",
+  "executor readiness without an owner approval must not bypass the evidence and authorization chain",
+);
+
+// On the real, live default paths, declaring the executors ready must only
+// ever remove the two executor-not-implemented reasons; it must never
+// change any other blocking reason coming from real evidence/authorization.
+const liveExecutorsReadyPreflight = await buildControlledPilotStartPreflight({
+  pilotExecutorContractReady: true,
+  pilotExecutorContract: REQUIRED_PILOT_EXECUTOR_CONTRACT,
+  m3plusPilotExecutorContractReady: true,
+  m3plusPilotExecutorContract: REQUIRED_M3PLUS_PILOT_EXECUTOR_CONTRACT,
+});
+const liveExecutorsUnreadyPreflight = await buildControlledPilotStartPreflight({});
+const nonExecutorReasons = (reasons) => reasons.filter((reason) => !reason.includes("pilot-executor-not-implemented")).sort();
+assert.deepEqual(
+  nonExecutorReasons(liveExecutorsReadyPreflight.blockingReasons),
+  nonExecutorReasons(liveExecutorsUnreadyPreflight.blockingReasons),
+  "declaring executors ready must never change any non-executor blocking reason",
 );
 
 // ---- temp-repo fixture ------------------------------------------------------

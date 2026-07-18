@@ -101,6 +101,7 @@ function releaseReviewMatchesLiveEvidence(releaseReview, liveEvidenceBinding) {
     && releaseReview?.tracks?.ordinary?.foundationReady === ordinary.foundationReady
     && releaseReview?.tracks?.ordinary?.liveArtifactVerifierReady === ordinary.liveArtifactVerifierReady
     && releaseReview?.tracks?.ordinary?.r3AcceptanceReady === ordinary.r3AcceptanceReady
+    && releaseReview?.tracks?.ordinary?.freshBlindEvidenceReady === ordinary.freshBlindEvidenceReady
     && releaseReview?.tracks?.ordinary?.authorizationReady === ordinary.authorizationReady
     && releaseReview?.tracks?.ordinary?.energyVetoIncluded === ordinary.energyVetoIncluded
     && releaseReview?.tracks?.ordinary?.causalEnergyStatus === ordinary.causalEnergyStatus
@@ -171,6 +172,7 @@ function buildBlockingReasons({ status, releaseReview, approval, liveEvidenceBin
   if (ordinary.foundationReady !== true) reasons.push("live-ordinary-foundation-not-ready");
   if (ordinary.liveArtifactVerifierReady !== true) reasons.push("live-ordinary-artifact-verifier-not-ready");
   if (ordinary.r3AcceptanceReady !== true) reasons.push("live-ordinary-r3-acceptance-not-ready");
+  if (ordinary.freshBlindEvidenceReady !== true) reasons.push("live-ordinary-fresh-blind-evidence-not-ready");
   if (ordinary.authorizationReady !== true) reasons.push("live-ordinary-authorization-closed");
   // The causal-energy veto is formally excluded-review-only (owner decision
   // 2026-07-18); require that known-safe state rather than its inclusion. The
