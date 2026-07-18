@@ -269,6 +269,7 @@
     "test:western-project-gate": "node scripts\\test-western-project-gate.mjs",
     "test:western-controlled-pilot-decision": "node scripts\\test-western-controlled-pilot-decision.mjs",
     "test:western-controlled-pilot-run": "node scripts\\test-western-controlled-pilot-session.mjs",
+    "test:western-pilot-executors": "node scripts\\test-western-pilot-executors.mjs",
     "test:western-controlled-pilot-evidence-audit": "node scripts\\test-western-controlled-pilot-evidence-audit.mjs",
     "test:western-fresh-blind-intake": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test_western_fresh_blind_intake.py",
     "test:western-round2-intake": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\test-western-round2-intake.py",

@@ -120,7 +120,23 @@ export async function buildControlledPilotStartPreflight(args = {}) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const report = await buildControlledPilotStartPreflight(args);
+  const [{ ordinaryPilotExecutorReadiness }, { m3plusPilotExecutorReadiness }] = await Promise.all([
+    import("./western-ordinary-dynamic-shadow-pilot-executor.mjs"),
+    import("./western-m3plus-pitch-safety-pilot-executor.mjs"),
+  ]);
+  const ordinaryReadiness = await ordinaryPilotExecutorReadiness();
+  const m3plusReadiness = m3plusPilotExecutorReadiness();
+  const report = await buildControlledPilotStartPreflight({
+    ...args,
+    pilotExecutorContractReady: ordinaryReadiness.ready === true,
+    pilotExecutorContract: ordinaryReadiness.contract,
+    m3plusPilotExecutorContractReady: m3plusReadiness.ready === true,
+    m3plusPilotExecutorContract: m3plusReadiness.contract,
+  });
+  report.executorReadiness = {
+    ordinary: ordinaryReadiness,
+    m3plus: m3plusReadiness,
+  };
   await fs.mkdir(path.dirname(args.out), { recursive: true });
   await fs.writeFile(args.out, `${JSON.stringify(report, null, 2)}\n`, "utf8");
   await fs.writeFile(args.summary, renderMarkdown(report), "utf8");

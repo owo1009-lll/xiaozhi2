@@ -269,6 +269,16 @@ export async function runControlledPilotSession(args = {}, dependencies = {}) {
   const preflight = await buildPreflight({
     approval: args.approval,
     releaseReview: args.releaseReview,
+    pilotExecutorContractReady: typeof runDynamicShadowPilotSession === "function"
+      && runDynamicShadowPilotSession.contract === REQUIRED_PILOT_EXECUTOR_CONTRACT,
+    pilotExecutorContract: typeof runDynamicShadowPilotSession === "function"
+      ? String(runDynamicShadowPilotSession.contract || "")
+      : "",
+    m3plusPilotExecutorContractReady: typeof runM3PlusPitchSafetyPilotSession === "function"
+      && runM3PlusPitchSafetyPilotSession.contract === REQUIRED_M3PLUS_PILOT_EXECUTOR_CONTRACT,
+    m3plusPilotExecutorContract: typeof runM3PlusPitchSafetyPilotSession === "function"
+      ? String(runM3PlusPitchSafetyPilotSession.contract || "")
+      : "",
   });
   if (preflight.okToStartControlledPilot !== true) {
     blockingReasons.push(...(preflight.blockingReasons || []));
@@ -487,7 +497,14 @@ export async function runControlledPilotSession(args = {}, dependencies = {}) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const report = await runControlledPilotSession(args);
+  const [{ runDynamicShadowPilotSession }, { runM3PlusPitchSafetyPilotSession }] = await Promise.all([
+    import("./western-ordinary-dynamic-shadow-pilot-executor.mjs"),
+    import("./western-m3plus-pitch-safety-pilot-executor.mjs"),
+  ]);
+  const report = await runControlledPilotSession(args, {
+    runDynamicShadowPilotSession,
+    runM3PlusPitchSafetyPilotSession,
+  });
   console.log(JSON.stringify({
     ok: report.ok,
     sessionStatus: report.sessionStatus,
