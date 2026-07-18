@@ -1,0 +1,24 @@
+{
+  "decision": "western-m4b-poc-promotion-thresholds-v1",
+  "approved": true,
+  "decidedBy": "guanxingzhi (project owner)",
+  "decidedAt": "2026-07-19T01:28:31+08:00",
+  "promotionScope": "m4b-poc-to-expanded-investment-only",
+  "freshBlindMinimums": {
+    "pages": 30,
+    "piecesOrLayouts": 6,
+    "devices": 3
+  },
+  "thresholds": {
+    "measureBoxF1": 0.95,
+    "exactPageStructureRate": 0.8,
+    "structureConflictReviewRequiredRate": 1.0,
+    "meterRegionF1": 0.95
+  },
+  "confirmNoRetroactiveThresholdTuning": true,
+  "confirmThresholdFailureKeepsM4bResearchOnly": true,
+  "confirmDoesNotAuthorizeAutomaticAdoption": true,
+  "m4bOpenWorldOmrAutomaticAdoptionReady": false,
+  "scope": "Freeze the Appendix C.3.3 numeric thresholds before the M4b POC is evaluated. Passing them may authorize expanded research investment only; it does not authorize production or student-facing automatic adoption.",
+  "proxyRecordNote": "The project owner explicitly stated '决定 #2(M4b 晋升门槛数字冻结)一同签署' in conversation on 2026-07-19. Recorded on the owner's instruction by the assistant, using the existing proxy-record precedent."
+}
