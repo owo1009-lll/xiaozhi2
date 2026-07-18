@@ -475,7 +475,7 @@
 
 > 本方案取代"路 A(全量真实照片+完整 MusicXML 标注)/ 路 B(整体换端到端模型)"二选一的旧框架。
 > 结论:**近期走 M4a(支持库配准),长期走 M4b(结构专用架构 POC)**;路 A 收缩为 M4b 的定向结构标注,不单独立项。
-> 状态标注:方案方向已由负责人审定;文中标注 ⚖️ 的条目是仍需负责人**具名签署**的决定,签署前一律不生效。
+> 状态标注:方案方向已由负责人审定。2026-07-19 负责人已具名签署 M4a/M4b 闸门拆分及 `projectReleaseReady` 改绑 M4a,记录见 `data/experiments/western-strings-m4a-gate-split-decision.json`;C.3.3 的 M4b POC 晋升数字仍须单独签署,不得由 M4a 签署代替。
 
 ### C.0 裁决依据(全部为仓库内已冻结证据)
 
@@ -489,12 +489,12 @@
 
 **核心推断:失败主要在拍摄几何域(透视/弯曲/光照)与版本混杂,不在内容识别能力。** 同版+平整输入下现有引擎接近满分。因此:消掉几何与版本两个变量的 M4a 立即可行;真正的开放域识别(M4b)是独立的长期研究题。
 
-### C.1 闸门拆分(⚖️ 需负责人签署)
+### C.1 闸门拆分(2026-07-19 已签署)
 
 - 新增两个独立闸门,替代单一 `m4OmrAutoScoreReady`:
   - `M4aSupportedEditionRegistrationReady` —— 支持库内谱页的照片配准反馈;
   - `M4bOpenWorldOmrAutomaticAdoptionReady` —— 任意照片开放域 OMR 自动采纳(维持现有全部门槛,继续关闭)。
-- ⚖️ `projectReleaseReady` 总闸从"绑整个 M4"改绑 M4a:这是合同变更,须按能量否决先例落具名决定记录(`data/experiments/` 下 JSON + 代录注记),签署前总闸维持现状。
+- ✅ `projectReleaseReady` 总闸从"绑整个 M4"改绑 M4a:具名决定已按能量否决先例落入 `data/experiments/western-strings-m4a-gate-split-decision.json`。M4a 自身验收未绿前总闸仍 fail-closed;M4b 保持独立关闭且不再作为支持库产品线的必选条件。
 - 纪律红线:M4a 的成功**不得**表述为"OMR 已解决"或用于给 M4b 的任何门槛放水;两闸证据互不流通。
 
 ### C.2 M4a 详细方案:支持库配准(近期产品线)
@@ -630,6 +630,6 @@ POC → 扩大投入的前提,在 fresh-blind 集(≥30 张,≥6 曲目/版式,�
 
 | # | 决定 | 状态 |
 |---|---|---|
-| 1 | 闸门拆分 M4a/M4b + `projectReleaseReady` 改绑 M4a | ⚖️ 待签署 |
+| 1 | 闸门拆分 M4a/M4b + `projectReleaseReady` 改绑 M4a | ✅ 2026-07-19 已签署并接线 |
 | 2 | C.3.3 晋升门槛数字冻结 | ⚖️ 待签署 |
 | 3 | M4a v1 工程开工(不依赖上两项,可先行) | 可随时启动 |

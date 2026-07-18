@@ -60,7 +60,25 @@ export function evaluateProjectGate(status, requiredTracks) {
         || "",
     });
   }
-  if (requiredTracks.has("m4") && !m4.m4OmrAutomaticAdoptionReady) {
+  if (
+    requiredTracks.has("m4")
+    && m4.m4GateSplitDecisionReady === true
+    && m4.m4aSupportedEditionRegistrationReady !== true
+  ) {
+    failures.push({
+      track: "M4a supported-edition registration",
+      reason: m4.m4aBlockingReasons || ["m4a-supported-edition-registration-not-ready"],
+      artifact:
+        m4.artifacts?.m4aRegistrationAuditJson
+        || m4.artifacts?.m4aGateSplitDecisionJson
+        || "",
+    });
+  }
+  if (
+    requiredTracks.has("m4")
+    && m4.m4GateSplitDecisionReady !== true
+    && !m4.m4OmrAutomaticAdoptionReady
+  ) {
     const reasons = m4.automaticAdoptionBlockingReasons || m4.blockingReasons || ["m4-omr-automatic-adoption-not-ready"];
     const artifact = reasons.includes("m4-same-edition-homr-independent-page-count-below-floor")
       ? m4.artifacts?.sameEditionBenchmarkJson
@@ -71,7 +89,11 @@ export function evaluateProjectGate(status, requiredTracks) {
       artifact: artifact || m4.artifacts?.independentGoldTodoHtml || m4.artifacts?.independentGoldTodo || "",
     });
   }
-  if (requiredTracks.has("m4") && !m4.m4HomrProductionPoolReady) {
+  if (
+    requiredTracks.has("m4")
+    && m4.m4GateSplitDecisionReady !== true
+    && !m4.m4HomrProductionPoolReady
+  ) {
     failures.push({
       track: "M4 photo-score deployment/governance",
       reason: m4.homrGovernance?.blockingReasons || ["homr-production-pool-not-ready"],

@@ -19,6 +19,7 @@ import {
   auditFreshBlindEvidence,
   auditFreshBlindEvidenceLiveArtifacts,
 } from "./eval-western-ordinary-fresh-blind.mjs";
+import { loadM4aGateSplitDecision } from "./m4a-supported-edition-governance.mjs";
 
 const DEFAULT_OUT = path.join("data", "experiments", "western-strings-project-status.json");
 const REVIEW_POLICY_DOC = path.join("docs", "western-strings-review-policy.md");
@@ -2828,6 +2829,7 @@ async function buildControlledStatus() {
 }
 
 async function buildM4OmrStatus() {
+  const m4aGateSplitDecision = await loadM4aGateSplitDecision();
   const readiness = await readJson(M4_READINESS);
   const benchmark = await readJson(M4_BENCHMARK);
   const independentBenchmark = await readJson(M4_INDEPENDENT_BENCHMARK_AUDIT);
@@ -2932,6 +2934,14 @@ async function buildM4OmrStatus() {
   }
   return {
     ok: true,
+    m4GateSplitDecisionReady: m4aGateSplitDecision.ready,
+    m4aSupportedEditionRegistrationReady: false,
+    m4aBlockingReasons: [
+      ...m4aGateSplitDecision.blockingReasons,
+      ...(m4aGateSplitDecision.ready ? ["m4a-supported-edition-registry-not-ready"] : []),
+    ],
+    m4bOpenWorldOmrAutomaticAdoptionReady: automaticAdoptionReady,
+    m4aGateSplitDecision: m4aGateSplitDecision,
     m4OmrBenchmarkDatasetReady: readinessReady,
     m4OmrDraftQualityReady: draftQualityReady,
     m4OmrIndependentBenchmarkReady: independentBenchmarkReady,
@@ -3040,6 +3050,8 @@ async function buildM4OmrStatus() {
         : null,
     },
     artifacts: {
+      m4aGateSplitDecisionJson: m4aGateSplitDecision.source,
+      m4aRegistrationAuditJson: "data/experiments/western-strings-m4a/registration-audit.json",
       readinessJson: M4_READINESS.replace(/\\/g, "/"),
       benchmarkJson: M4_BENCHMARK.replace(/\\/g, "/"),
       independentBenchmarkJson: M4_INDEPENDENT_BENCHMARK_AUDIT.replace(/\\/g, "/"),

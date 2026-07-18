@@ -1,0 +1,20 @@
+{
+  "decision": "western-m4a-m4b-gate-split-v1",
+  "approved": true,
+  "decidedBy": "guanxingzhi (project owner)",
+  "decidedAt": "2026-07-19T01:21:28+08:00",
+  "projectGateBinding": "m4a-supported-edition-registration",
+  "m4bOpenWorldOmrAutomaticAdoptionReady": false,
+  "confirmM4aDoesNotAuthorizeOpenWorldOmr": true,
+  "confirmStudentRuntimeRemainsFailClosed": true,
+  "scope": "M4a supported-edition registration may satisfy the required M4 project track after its own frozen evidence gate passes. M4b open-world OMR automatic adoption remains an independent closed research gate.",
+  "safetyRules": [
+    "M4a registration success must never be reported as open-world OMR success.",
+    "M4a and M4b evidence do not authorize each other.",
+    "The student-facing OMR runtime switch remains false.",
+    "Until the M4a evidence gate passes, the required M4 project track remains fail-closed.",
+    "This signature does not freeze the separate M4b POC promotion thresholds in Appendix C.3.3."
+  ],
+  "proxyRecordNote": "The project owner explicitly stated 'm4a我确认签署' in conversation on 2026-07-19 and instructed completion of Appendix C. Recorded on the owner's instruction by the assistant, using the existing proxy-record precedent.",
+  "supersedes": "the required-project-track binding that treated M4b open-world OMR automatic adoption as the only way to satisfy the M4 track"
+}

@@ -1420,17 +1420,31 @@ assert.equal(forgedOfflineOnlyM3PlusGate.projectReleaseReady, false, "an old off
 assert(forgedOfflineOnlyM3PlusGate.failures[0].reason.includes("m3plus-runtime-audit-not-ready"));
 assert(forgedOfflineOnlyM3PlusGate.failures[0].reason.includes("m3plus-authorization-closed"));
 assert(forgedOfflineOnlyM3PlusGate.failures[0].reason.includes("m3plus-student-gate-closed"));
-const m4Failure = fullGate.failures.find((failure) => failure.track === "M4 OMR automatic adoption");
-assert(m4Failure, "M4 automatic adoption must remain a project-gate failure below its strict multi-page floor");
-assert(
-  m4Failure.reason.includes("m4-same-edition-homr-independent-page-count-below-floor"),
-  "M4 project failure must preserve the same-edition page-count blocker",
-);
-assert.equal(
-  m4Failure.artifact,
-  m4.artifacts.sameEditionBenchmarkJson,
-  "M4 page-count failure should point to the same-edition benchmark",
-);
+const m4Failure = fullGate.failures.find((failure) => failure.track === (
+  m4.m4GateSplitDecisionReady === true
+    ? "M4a supported-edition registration"
+    : "M4 OMR automatic adoption"
+));
+assert(m4Failure, "the required M4 track must remain fail-closed until its active contract is ready");
+if (m4.m4GateSplitDecisionReady === true) {
+  assert.equal(m4.m4aSupportedEditionRegistrationReady, false);
+  assert(
+    m4Failure.reason.includes("m4a-supported-edition-registry-not-ready"),
+    "signed M4a gate split must point at the unfinished supported-edition registry",
+  );
+  assert.equal(m4Failure.artifact, m4.artifacts.m4aRegistrationAuditJson);
+  assert.equal(
+    fullGate.failures.some((failure) => failure.track === "M4 OMR automatic adoption"),
+    false,
+    "M4b open-world OMR must remain separate from the signed M4a project binding",
+  );
+} else {
+  assert(
+    m4Failure.reason.includes("m4-same-edition-homr-independent-page-count-below-floor"),
+    "unsigned split must preserve the same-edition page-count blocker",
+  );
+  assert.equal(m4Failure.artifact, m4.artifacts.sameEditionBenchmarkJson);
+}
 const m4DeploymentFailure = fullGate.failures.find(
   (failure) => failure.track === "M4 photo-score deployment/governance",
 );
