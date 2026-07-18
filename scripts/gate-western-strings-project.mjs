@@ -32,11 +32,32 @@ export function evaluateProjectGate(status, requiredTracks) {
       artifact: ordinaryDynamicShadow.acceptanceEvidence?.source || "",
     });
   }
-  if (requiredTracks.has("m3plus") && !m3plus.m3plusPitchSafetyReady) {
+  const m3plusReleaseBlockingReasons = [...new Set([
+    ...(m3plus.blockingReasons || []),
+    ...(m3plus.offlineEvidenceReady !== true ? ["m3plus-offline-evidence-not-ready"] : []),
+    ...(m3plus.reviewOnlyRuntimeWired !== true ? ["m3plus-review-only-runtime-not-wired"] : []),
+    ...(m3plus.runtimeFoundationReady !== true ? ["m3plus-runtime-foundation-not-ready"] : []),
+    ...(m3plus.runtimeAuditReady !== true ? ["m3plus-runtime-audit-not-ready"] : []),
+    ...(m3plus.authorizationReady !== true ? ["m3plus-authorization-closed"] : []),
+    ...(m3plus.studentGateReady !== true ? ["m3plus-student-gate-closed"] : []),
+  ])];
+  const m3plusReleaseReady = m3plus.m3plusPitchSafetyReady === true
+    && m3plus.offlineEvidenceReady === true
+    && m3plus.reviewOnlyRuntimeWired === true
+    && m3plus.runtimeFoundationReady === true
+    && m3plus.runtimeAuditReady === true
+    && m3plus.authorizationReady === true
+    && m3plus.studentGateReady === true;
+  if (requiredTracks.has("m3plus") && !m3plusReleaseReady) {
     failures.push({
       track: "M3+ pitch safety rescope",
-      reason: m3plus.blockingReasons || ["m3plus-rescope-gate-not-ready"],
-      artifact: m3plus.rescopeGate?.source || m3plus.reviewArtifacts?.rescopeGateJson || "",
+      reason: m3plusReleaseBlockingReasons.length
+        ? m3plusReleaseBlockingReasons
+        : ["m3plus-release-gate-not-ready"],
+      artifact: m3plus.monitoredPilotAudit?.source
+        || m3plus.rescopeGate?.source
+        || m3plus.reviewArtifacts?.rescopeGateJson
+        || "",
     });
   }
   if (requiredTracks.has("m4") && !m4.m4OmrAutomaticAdoptionReady) {

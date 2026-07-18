@@ -2,7 +2,16 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { buildProjectStatus } from "./status-western-strings-project.mjs";
+import {
+  CONTROLLED_PILOT_LIVE_EVIDENCE_CONTRACT,
+  buildControlledPilotLiveEvidenceBinding,
+  buildProjectStatus,
+  controlledPilotLiveEvidenceReady,
+} from "./status-western-strings-project.mjs";
+import {
+  REQUIRED_APPROVED_TRACKS,
+  SCOPE_CONTRACT,
+} from "./record-western-controlled-pilot-decision.mjs";
 
 const DEFAULT_RELEASE_REVIEW = path.join("data", "experiments", "western-strings-release-review.json");
 const DEFAULT_OUT = path.join("data", "experiments", "western-strings-controlled-pilot-decision.json");
@@ -48,14 +57,34 @@ function bulletList(items) {
 // The approval must bind to the CURRENT pilot scope contract. Approvals from
 // the superseded first-measure slide/trill era carry no scopeContract (or an
 // older value) and must not start a pilot under the rescope contract.
-const REQUIRED_SCOPE_CONTRACT = "western-ordinary-dynamic-shadow-release-v1+m3plus-rescope-four-zone-v1";
+const REQUIRED_SCOPE_CONTRACT = SCOPE_CONTRACT;
 const REQUIRED_ORDINARY_AUTHORIZATION_CONTRACT = "western-ordinary-dynamic-shadow-release-v1";
+const REQUIRED_M3PLUS_EVALUATION_CONTRACT = "m3plus-rescope-four-zone-v2";
+const REQUIRED_M3PLUS_RUNTIME_CONTRACT = "m3plus-gold-free-runtime-v1";
+
+function normalizedApprovedTracks(approval) {
+  return [...new Set((Array.isArray(approval?.approvedTracks) ? approval.approvedTracks : [])
+    .map((item) => String(item || "").trim().toLowerCase())
+    .filter(Boolean))].sort();
+}
+
+function approvalTracksAreValid(approval) {
+  return normalizedApprovedTracks(approval).join(",")
+    === [...REQUIRED_APPROVED_TRACKS].sort().join(",");
+}
+
+function approvalConfirmationsAreValid(approval) {
+  return approval?.confirmSeparateMonitoredPilot === true
+    && approval?.confirmDefaultRuntimeFailClosed === true;
+}
 
 function approvalIsValid(approval) {
   return approval?.pilotApproved === true
     && String(approval?.approvedBy || "").trim() !== ""
     && String(approval?.approvedAt || "").trim() !== ""
-    && approval?.scopeContract === REQUIRED_SCOPE_CONTRACT;
+    && approval?.scopeContract === REQUIRED_SCOPE_CONTRACT
+    && approvalTracksAreValid(approval)
+    && approvalConfirmationsAreValid(approval);
 }
 
 function approvalIsExplicitNoGo(approval) {
@@ -64,31 +93,114 @@ function approvalIsExplicitNoGo(approval) {
     && String(approval?.approvedAt || "").trim() !== "";
 }
 
-function buildBlockingReasons({ status, releaseReview, approval }) {
+function releaseReviewMatchesLiveEvidence(releaseReview, liveEvidenceBinding) {
+  const ordinary = liveEvidenceBinding?.evidence?.ordinary || {};
+  const m3plus = liveEvidenceBinding?.evidence?.m3plus || {};
+  return releaseReview?.liveEvidenceBinding?.contract === CONTROLLED_PILOT_LIVE_EVIDENCE_CONTRACT
+    && releaseReview?.liveEvidenceBinding?.sha256 === liveEvidenceBinding?.sha256
+    && releaseReview?.tracks?.ordinary?.foundationReady === ordinary.foundationReady
+    && releaseReview?.tracks?.ordinary?.liveArtifactVerifierReady === ordinary.liveArtifactVerifierReady
+    && releaseReview?.tracks?.ordinary?.r3AcceptanceReady === ordinary.r3AcceptanceReady
+    && releaseReview?.tracks?.ordinary?.authorizationReady === ordinary.authorizationReady
+    && releaseReview?.tracks?.ordinary?.energyVetoIncluded === ordinary.energyVetoIncluded
+    && releaseReview?.tracks?.m3plus?.offlineEvidenceReady === m3plus.offlineEvidenceReady
+    && releaseReview?.tracks?.m3plus?.reviewOnlyRuntimeWired === m3plus.reviewOnlyRuntimeWired
+    && releaseReview?.tracks?.m3plus?.runtimeFoundationReady === m3plus.runtimeFoundationReady
+    && releaseReview?.tracks?.m3plus?.runtimeAuditReady === m3plus.runtimeAuditReady
+    && releaseReview?.tracks?.m3plus?.physicalEvidenceCurrent === m3plus.physicalEvidenceCurrent
+    && releaseReview?.tracks?.m3plus?.authorizationReady === m3plus.authorizationReady
+    && releaseReview?.tracks?.m3plus?.pitchSafetyReady === m3plus.pitchSafetyReady
+    && releaseReview?.tracks?.m3plus?.contract === m3plus.evaluationContract
+    && releaseReview?.tracks?.m3plus?.runtimeContract === m3plus.runtimeContract;
+}
+
+function releaseReviewIsReady(releaseReview, liveEvidenceBinding) {
+  return releaseReview?.schemaVersion === 2
+    && releaseReview?.ok === true
+    && releaseReview?.ordinaryAuthorizationContract === REQUIRED_ORDINARY_AUTHORIZATION_CONTRACT
+    && releaseReview?.commandChecksPassed === true
+    && releaseReview?.requiredEvidenceComplete === true
+    && releaseReview?.machineChecksComplete === true
+    && releaseReview?.readyForControlledPilot === true
+    && releaseReview?.teacherReviewNeeded === false
+    && releaseReview?.runtimeFailClosed === true
+    && releaseReview?.tracks?.ordinary?.readyForControlledPilot === true
+    && releaseReview?.tracks?.m3plus?.readyForControlledPilot === true
+    && controlledPilotLiveEvidenceReady(liveEvidenceBinding)
+    && releaseReviewMatchesLiveEvidence(releaseReview, liveEvidenceBinding);
+}
+
+function buildBlockingReasons({ status, releaseReview, approval, liveEvidenceBinding }) {
   const reasons = [];
   if (!releaseReview) reasons.push("release-review-missing");
   else {
+    if (releaseReview.ok !== true) reasons.push("release-review-not-ok");
     if (releaseReview.schemaVersion !== 2
         || releaseReview.ordinaryAuthorizationContract !== REQUIRED_ORDINARY_AUTHORIZATION_CONTRACT) {
       reasons.push("release-review-ordinary-authorization-contract-superseded");
     }
+    if (releaseReview.tracks?.ordinary?.readyForControlledPilot !== true) {
+      reasons.push("release-review-ordinary-track-not-ready-for-controlled-pilot");
+    }
     if (releaseReview.tracks?.ordinary?.authorizationReady !== true) {
       reasons.push("ordinary-dynamic-shadow-authorization-closed");
     }
+    if (releaseReview.commandChecksPassed !== true) reasons.push("release-review-command-checks-not-passed");
+    if (releaseReview.requiredEvidenceComplete !== true) reasons.push("release-review-required-evidence-incomplete");
+    if (releaseReview.machineChecksComplete !== true) reasons.push("release-review-machine-checks-incomplete");
+    if (releaseReview.tracks?.m3plus?.authorizationReady !== true) {
+      reasons.push("m3plus-authorization-closed");
+    }
+    if (releaseReview.tracks?.m3plus?.readyForControlledPilot !== true) {
+      reasons.push("release-review-m3plus-track-not-ready-for-controlled-pilot");
+    }
+    if (!releaseReviewMatchesLiveEvidence(releaseReview, liveEvidenceBinding)) {
+      reasons.push("release-review-live-evidence-binding-missing-or-stale");
+    }
     if (releaseReview.readyForControlledPilot !== true) reasons.push("release-review-not-ready-for-controlled-pilot");
-    if (releaseReview.teacherReviewNeeded === true) reasons.push("release-review-still-needs-teacher-review");
+    if (releaseReview.teacherReviewNeeded !== false) reasons.push("release-review-still-needs-teacher-review");
     if (releaseReview.runtimeFailClosed !== true) reasons.push("runtime-not-fail-closed-during-review");
+  }
+  const live = liveEvidenceBinding?.evidence || {};
+  const ordinary = live.ordinary || {};
+  const m3plus = live.m3plus || {};
+  if (!controlledPilotLiveEvidenceReady(liveEvidenceBinding)) {
+    reasons.push("live-controlled-pilot-evidence-incomplete");
+  }
+  if (ordinary.foundationReady !== true) reasons.push("live-ordinary-foundation-not-ready");
+  if (ordinary.liveArtifactVerifierReady !== true) reasons.push("live-ordinary-artifact-verifier-not-ready");
+  if (ordinary.r3AcceptanceReady !== true) reasons.push("live-ordinary-r3-acceptance-not-ready");
+  if (ordinary.authorizationReady !== true) reasons.push("live-ordinary-authorization-closed");
+  if (ordinary.energyVetoIncluded !== true) reasons.push("live-ordinary-energy-veto-not-included");
+  if (m3plus.offlineEvidenceReady !== true) reasons.push("live-m3plus-offline-evidence-not-ready");
+  if (m3plus.reviewOnlyRuntimeWired !== true
+      || m3plus.runtimeFoundationReady !== true
+      || m3plus.runtimeAuditReady !== true) {
+    reasons.push("live-m3plus-runtime-audit-not-ready");
+  }
+  if (m3plus.authorizationReady !== true) reasons.push("live-m3plus-authorization-closed");
+  if (m3plus.pitchSafetyReady !== true
+      || m3plus.auditSchemaVersion !== 2
+      || m3plus.evaluationContract !== REQUIRED_M3PLUS_EVALUATION_CONTRACT
+      || m3plus.runtimeContract !== REQUIRED_M3PLUS_RUNTIME_CONTRACT
+      || m3plus.readyForMonitoredPilot !== true
+      || (m3plus.blockingReasons || []).length !== 0) {
+    reasons.push("live-m3plus-pitch-safety-not-ready");
   }
   if (status.runtimeStudentGate?.ordinaryUploadAutoFeedbackReady !== false) reasons.push("ordinary-default-runtime-enabled");
   if (status.runtimeStudentGate?.m3plusAutoFeedbackReady !== false) reasons.push("m3plus-default-runtime-enabled");
   if (status.runtimeStudentGate?.m4OmrAutoScoreReady !== false) reasons.push("m4-default-runtime-enabled");
   if (approvalIsExplicitNoGo(approval)) reasons.push("controlled-pilot-explicitly-deferred");
   else if (!approvalIsValid(approval)) {
-    reasons.push(
-      approval?.pilotApproved === true
-        ? "controlled-pilot-approval-scope-contract-superseded"
-        : "controlled-pilot-approval-missing",
-    );
+    if (approval?.pilotApproved === true && approval?.scopeContract !== REQUIRED_SCOPE_CONTRACT) {
+      reasons.push("controlled-pilot-approval-scope-contract-superseded");
+    } else if (approval?.pilotApproved === true && !approvalTracksAreValid(approval)) {
+      reasons.push("controlled-pilot-approval-tracks-mismatch");
+    } else if (approval?.pilotApproved === true && !approvalConfirmationsAreValid(approval)) {
+      reasons.push("controlled-pilot-approval-safety-confirmations-missing");
+    } else {
+      reasons.push("controlled-pilot-approval-missing");
+    }
   }
   return reasons;
 }
@@ -106,6 +218,8 @@ function renderMarkdown(decision) {
     `- approvalRequired: ${decision.approvalRequired}`,
     `- approvalPresent: ${decision.approvalPresent}`,
     `- runtimeFailClosed: ${decision.runtimeFailClosed}`,
+    `- liveEvidenceContract: ${decision.liveEvidenceBinding.contract}`,
+    `- liveEvidenceSha256: ${decision.liveEvidenceBinding.sha256}`,
     "",
     "## Allowed Pilot Scope",
     "",
@@ -163,7 +277,7 @@ function renderMarkdown(decision) {
     "Only if the owner explicitly approves the monitored pilot, record approval with both safety confirmations:",
     "",
     "```bash",
-    "npm run western:controlled-pilot-record-decision -- --decision approve --by owner-name --confirm-separate-monitored-pilot --confirm-default-runtime-fail-closed",
+    "npm run western:controlled-pilot-record-decision -- --decision approve --by owner-name --tracks ordinary,m3plus --confirm-separate-monitored-pilot --confirm-default-runtime-fail-closed",
     "```",
     "",
     "Equivalent approval file content:",
@@ -173,7 +287,10 @@ function renderMarkdown(decision) {
       pilotApproved: true,
       approvedBy: "owner-name",
       approvedAt: "2026-07-17T00:00:00+08:00",
-      scope: "ordinary candidate-evidence auto_pass only; M3+ four-zone pitch-safety scope (rescope contract) only if explicitly included in the pilot",
+      approvedTracks: REQUIRED_APPROVED_TRACKS,
+      confirmSeparateMonitoredPilot: true,
+      confirmDefaultRuntimeFailClosed: true,
+      scope: "ordinary dynamic-shadow plus M3+ four-zone pitch-safety; both tracks use separately audited executors and remain isolated from the default runtime",
       scopeContract: REQUIRED_SCOPE_CONTRACT,
       notes: "Default runtime remains fail-closed.",
     }, null, 2),
@@ -190,35 +307,33 @@ function renderMarkdown(decision) {
 }
 
 export async function buildControlledPilotDecision(args = {}) {
-  const status = await buildProjectStatus();
+  const status = args.projectStatus || await buildProjectStatus();
+  const liveEvidenceBinding = buildControlledPilotLiveEvidenceBinding(status);
   const releaseReviewPath = args.releaseReview || DEFAULT_RELEASE_REVIEW;
   const approvalPath = args.approval || DEFAULT_APPROVAL;
   const releaseReview = await readJsonOrNull(releaseReviewPath);
   const approval = await readJsonOrNull(approvalPath);
-  const blockingReasons = buildBlockingReasons({ status, releaseReview, approval });
+  const blockingReasons = buildBlockingReasons({ status, releaseReview, approval, liveEvidenceBinding });
   const approvalPresent = approvalIsValid(approval);
   const approvalDeferred = approvalIsExplicitNoGo(approval);
-  const releaseReady = releaseReview?.schemaVersion === 2
-    && releaseReview?.ordinaryAuthorizationContract === REQUIRED_ORDINARY_AUTHORIZATION_CONTRACT
-    && releaseReview?.tracks?.ordinary?.authorizationReady === true
-    && releaseReview?.readyForControlledPilot === true
-    && releaseReview.teacherReviewNeeded !== true
-    && releaseReview.runtimeFailClosed === true;
-  const runtimeFailClosed = status.runtimeStudentGate?.policy === "fail-closed"
-    && status.runtimeStudentGate?.ordinaryUploadAutoFeedbackReady === false
-    && status.runtimeStudentGate?.m3plusAutoFeedbackReady === false
-    && status.runtimeStudentGate?.m4OmrAutoScoreReady === false;
+  const releaseReady = releaseReviewIsReady(releaseReview, liveEvidenceBinding);
+  const runtimeFailClosed = liveEvidenceBinding.evidence.runtimeFailClosed === true;
   const decision = {
     schemaVersion: 2,
     ordinaryAuthorizationContract: REQUIRED_ORDINARY_AUTHORIZATION_CONTRACT,
     ok: true,
     generatedAt: new Date().toISOString(),
     readyForControlledPilotDecision: releaseReady && runtimeFailClosed,
-    readyToStartControlledPilot: blockingReasons.length === 0,
+    readyToStartControlledPilot: releaseReady
+      && runtimeFailClosed
+      && approvalPresent
+      && blockingReasons.length === 0,
     approvalRequired: true,
     approvalPresent,
     approvalDeferred,
+    approvedTracks: approvalPresent ? normalizedApprovedTracks(approval) : [],
     runtimeFailClosed,
+    liveEvidenceBinding,
     allowedScope: [
       "ordinary dynamic-shadow candidates only when the versioned release report explicitly records authorizationReady=true; otherwise review-only",
       "M3+ four-zone pitch-safety scope (rescope contract: straight-tone/center-pitch decisions with score-marked and unstable regions neutralized) only if explicitly included in the pilot",
@@ -239,6 +354,7 @@ export async function buildControlledPilotDecision(args = {}) {
       "ordinary dynamic-shadow authorizationReady remains true",
       "default runtime remains fail-closed",
       "approval file exists and records owner approval",
+      "approval explicitly binds both ordinary and m3plus tracks",
       "pilot process sets any release flag only in that process",
       "monitoring captures auto_pass, review_required, rejected, and unsafe false-positive counts",
     ],

@@ -3,7 +3,11 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
-import { buildControlledPilotStartPreflight } from "./run-western-controlled-pilot-start-preflight.mjs";
+import {
+  REQUIRED_M3PLUS_PILOT_EXECUTOR_CONTRACT,
+  REQUIRED_PILOT_EXECUTOR_CONTRACT,
+  buildControlledPilotStartPreflight,
+} from "./run-western-controlled-pilot-start-preflight.mjs";
 import { buildProjectStatus } from "./status-western-strings-project.mjs";
 
 const ENABLE_ENV = "WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE";
@@ -129,6 +133,8 @@ function renderMarkdown(report) {
     `- sessionStatus: ${report.sessionStatus}`,
     `- executionRequested: ${report.executionRequested}`,
     `- executionPerformed: ${report.executionPerformed}`,
+    `- ordinaryExecutionPassed: ${report.executors.ordinary.executionPassed}`,
+    `- m3plusExecutionPassed: ${report.executors.m3plus.executionPassed}`,
     `- pilotRunAccepted: ${report.pilotRunAccepted}`,
     `- approvedBy: ${report.approvedBy || ""}`,
     `- requestedRecordingIds: ${report.requestedRecordingIds.join(", ") || "any eligible recording"}`,
@@ -193,6 +199,19 @@ function emptyMonitoring() {
   };
 }
 
+function m3plusExecutionResultReady(result) {
+  return Boolean(
+    result
+    && result.contract === REQUIRED_M3PLUS_PILOT_EXECUTOR_CONTRACT
+    && result.ok === true
+    && result.reviewOnly === true
+    && result.feedbackAuthorized === false
+    && result.studentFacing === false
+    && Array.isArray(result.blockers)
+    && result.blockers.length === 0,
+  );
+}
+
 export async function runControlledPilotSession(args = {}, dependencies = {}) {
   const execute = args.execute === true;
   const limit = Math.max(1, Math.min(20, Math.round(Number(args.limit) || 1)));
@@ -207,6 +226,7 @@ export async function runControlledPilotSession(args = {}, dependencies = {}) {
   const runDynamicShadowPilotSession = dependencies.runDynamicShadowPilotSession
     || dependencies.runPrecisionSession
     || null;
+  const runM3PlusPitchSafetyPilotSession = dependencies.runM3PlusPitchSafetyPilotSession || null;
   const buildStatus = dependencies.buildStatus || buildProjectStatus;
   const refreshReleaseReview = dependencies.refreshReleaseReview || (() => runNpmScript("western:release-review"));
   const loadHistory = dependencies.loadHistoricalRecordingIds || loadHistoricalRecordingIds;
@@ -224,7 +244,12 @@ export async function runControlledPilotSession(args = {}, dependencies = {}) {
   const parentEnvEnabled = envEnabled(oldEnable);
   const blockingReasons = [];
   let executionPerformed = false;
+  let ordinaryExecutionPerformed = false;
+  let ordinaryExecutionPassed = false;
+  let m3plusExecutionPerformed = false;
+  let m3plusExecutionPassed = false;
   let precision = null;
+  let m3plusResult = null;
   let runtimeStatusAfter = null;
   let caughtError = "";
   const historyExcludedRecordingIds = await loadHistory(args.outRoot || DEFAULT_OUT_ROOT);
@@ -248,12 +273,38 @@ export async function runControlledPilotSession(args = {}, dependencies = {}) {
   if (preflight.okToStartControlledPilot !== true) {
     blockingReasons.push(...(preflight.blockingReasons || []));
   }
+  const ordinaryExecutorReadinessReady = preflight.ordinaryPilotExecutorReady === true
+    && preflight.pilotExecutorContract === REQUIRED_PILOT_EXECUTOR_CONTRACT;
+  const m3plusExecutorReadinessReady = preflight.m3plusPilotExecutorReady === true
+    && preflight.m3plusPilotExecutorContract === REQUIRED_M3PLUS_PILOT_EXECUTOR_CONTRACT;
+  const aggregateExecutorReadinessReady = preflight.pilotExecutorReady === true;
+  if (!ordinaryExecutorReadinessReady) {
+    blockingReasons.push("ordinary-pilot-executor-readiness-contract-invalid");
+  }
+  if (!m3plusExecutorReadinessReady) {
+    blockingReasons.push("m3plus-pilot-executor-readiness-contract-invalid");
+  }
+  if (!aggregateExecutorReadinessReady) {
+    blockingReasons.push("pilot-executor-aggregate-readiness-invalid");
+  }
+  if (preflight.pilotExecutorContract === preflight.m3plusPilotExecutorContract) {
+    blockingReasons.push("pilot-executor-contracts-not-distinct");
+  }
   if (execute && typeof runDynamicShadowPilotSession !== "function") {
     blockingReasons.push("ordinary-dynamic-shadow-pilot-executor-not-implemented");
+  }
+  if (execute && typeof runM3PlusPitchSafetyPilotSession !== "function") {
+    blockingReasons.push("m3plus-pitch-safety-pilot-executor-not-implemented");
+  }
+  if (execute
+      && typeof runDynamicShadowPilotSession === "function"
+      && runDynamicShadowPilotSession === runM3PlusPitchSafetyPilotSession) {
+    blockingReasons.push("pilot-executors-must-be-distinct-functions");
   }
 
   try {
     if (execute && blockingReasons.length === 0) {
+      ordinaryExecutionPerformed = true;
       executionPerformed = true;
       precision = await runDynamicShadowPilotSession({
         batchLimit: limit,
@@ -263,6 +314,17 @@ export async function runControlledPilotSession(args = {}, dependencies = {}) {
         includeRecordingIds: requestedRecordingIds,
         excludeRecordingIds: effectiveExcludedRecordingIds,
       });
+      ordinaryExecutionPassed = precision?.summary?.ok === true;
+      if (!ordinaryExecutionPassed) blockingReasons.push("ordinary-pilot-executor-result-invalid");
+      m3plusExecutionPerformed = true;
+      m3plusResult = await runM3PlusPitchSafetyPilotSession({
+        batchLimit: limit,
+        outDir: path.join(sessionDir, "m3plus-review"),
+        includeRecordingIds: requestedRecordingIds,
+        excludeRecordingIds: effectiveExcludedRecordingIds,
+      });
+      m3plusExecutionPassed = m3plusExecutionResultReady(m3plusResult);
+      if (!m3plusExecutionPassed) blockingReasons.push("m3plus-pitch-safety-pilot-result-invalid");
     }
   } catch (error) {
     caughtError = String(error?.message || error);
@@ -358,7 +420,9 @@ export async function runControlledPilotSession(args = {}, dependencies = {}) {
     knownWrongAutoPassCandidateCount: knownWrong,
     unknownAutoPassCandidateCount: unknown,
   } : emptyMonitoring();
-  const pilotRunAccepted = sessionStatus === "completed_safe";
+  const pilotRunAccepted = sessionStatus === "completed_safe"
+    && ordinaryExecutionPassed
+    && m3plusExecutionPassed;
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -367,6 +431,22 @@ export async function runControlledPilotSession(args = {}, dependencies = {}) {
     executionRequested: execute,
     executionPerformed,
     pilotRunAccepted,
+    executors: {
+      aggregateReadinessReady: aggregateExecutorReadinessReady,
+      ordinary: {
+        contract: preflight.pilotExecutorContract || "",
+        readinessReady: ordinaryExecutorReadinessReady,
+        executionPerformed: ordinaryExecutionPerformed,
+        executionPassed: ordinaryExecutionPassed,
+      },
+      m3plus: {
+        contract: preflight.m3plusPilotExecutorContract || "",
+        readinessReady: m3plusExecutorReadinessReady,
+        executionPerformed: m3plusExecutionPerformed,
+        executionPassed: m3plusExecutionPassed,
+        result: m3plusResult,
+      },
+    },
     approvedBy: preflight.decision?.approval?.approvedBy || "",
     approvalPresent: preflight.decision?.approvalPresent === true,
     requestedRecordingIds,

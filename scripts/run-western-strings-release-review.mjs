@@ -4,7 +4,12 @@ import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
 import { evaluateProjectGate } from "./gate-western-strings-project.mjs";
-import { buildProjectStatus, writeProjectStatus } from "./status-western-strings-project.mjs";
+import {
+  buildControlledPilotLiveEvidenceBinding,
+  buildProjectStatus,
+  controlledPilotLiveEvidenceReady,
+  writeProjectStatus,
+} from "./status-western-strings-project.mjs";
 
 const DEFAULT_OUT = path.join("data", "experiments", "western-strings-release-review.json");
 const DEFAULT_SUMMARY = path.join("data", "experiments", "western-strings-release-review.md");
@@ -19,6 +24,8 @@ const STEPS = [
   "test:western-bach-violin-musc-pilot",
   "test:western-bach-violin-musc-calibration",
   "test:western-violin-midi-dataset-audit",
+  "test:western-m3plus-rescope-gate",
+  "test:western-m3plus-runtime-policy",
   "western:m3plus-monitored-pilot-audit",
   "western:m4-preflight",
 ];
@@ -87,13 +94,21 @@ function buildSummary(report) {
     `- readyForDefaultStudentRelease: ${report.readyForDefaultStudentRelease}`,
     `- teacherReviewNeeded: ${report.teacherReviewNeeded}`,
     `- runtimeFailClosed: ${report.runtimeFailClosed}`,
+    `- liveEvidenceContract: ${report.liveEvidenceBinding.contract}`,
+    `- liveEvidenceSha256: ${report.liveEvidenceBinding.sha256}`,
     "",
     "## Track Decisions",
     "",
     `- ordinary dynamic shadow foundation: ${report.tracks.ordinary.foundationReady}`,
     `- ordinary r3 acceptance: ${report.tracks.ordinary.r3AcceptanceReady}`,
     `- ordinary authorization: ${report.tracks.ordinary.authorizationReady}`,
+    `- M3+ offline evidence: ${report.tracks.m3plus.offlineEvidenceReady}`,
+    `- M3+ review-only runtime wired: ${report.tracks.m3plus.reviewOnlyRuntimeWired}`,
+    `- M3+ runtime audit: ${report.tracks.m3plus.runtimeAuditReady}`,
+    `- M3+ live physical evidence: ${report.tracks.m3plus.physicalEvidenceCurrent}`,
     `- M3+ monitored pilot evidence: ${report.tracks.m3plus.readyForControlledPilot}`,
+    `- M3+ authorization: ${report.tracks.m3plus.authorizationReady}`,
+    `- M3+ student gate: ${report.tracks.m3plus.studentGateReady}`,
     `- M4 OMR benchmark evidence: ${report.tracks.m4.readyForOmrAccuracyClaim}`
       + " (decoupled from controlled-pilot readiness by owner decision 2026-07-17;"
       + " still required for default student release)",
@@ -149,22 +164,39 @@ async function main() {
   const m4 = status.tracks?.m4Omr || {};
   const publicValidation = status.publicModelValidation || {};
   const shadow = controlled.ordinaryDynamicShadow || {};
+  const liveEvidenceBinding = buildControlledPilotLiveEvidenceBinding(status);
+  const liveEvidence = liveEvidenceBinding.evidence;
   const historicalRfReady = ordinaryAudit.historicalReadyForMonitoredPilot === true
     || ordinaryAudit.readyForMonitoredPilot === true;
-  const ordinaryReady = shadow.foundationReady === true
-    && shadow.r3AcceptanceReady === true
-    && shadow.authorizationReady === true;
-  const m3plusReady = m3plusAudit.readyForMonitoredPilot === true
-    && m3plusAudit.teacherReviewNeeded !== true
-    && m3plusAudit.defaultM3PlusReadyAfter !== true
-    && (m3plusAudit.blockingReasons || []).length === 0;
+  const ordinaryReady = liveEvidence.ordinary.foundationReady === true
+    && liveEvidence.ordinary.liveArtifactVerifierReady === true
+    && liveEvidence.ordinary.r3AcceptanceReady === true
+    && liveEvidence.ordinary.authorizationReady === true
+    && liveEvidence.ordinary.energyVetoIncluded === true
+    && liveEvidence.ordinary.blockingReasons.length === 0;
+  const m3plusReady = liveEvidence.m3plus.offlineEvidenceReady === true
+    && liveEvidence.m3plus.reviewOnlyRuntimeWired === true
+    && liveEvidence.m3plus.runtimeFoundationReady === true
+    && liveEvidence.m3plus.runtimeAuditReady === true
+    && liveEvidence.m3plus.physicalEvidenceCurrent === true
+    && liveEvidence.m3plus.authorizationReady === true
+    && liveEvidence.m3plus.pitchSafetyReady === true
+    && liveEvidence.m3plus.studentGateReady === false
+    && liveEvidence.m3plus.auditSchemaVersion === 2
+    && liveEvidence.m3plus.evaluationContract === "m3plus-rescope-four-zone-v2"
+    && liveEvidence.m3plus.runtimeContract === "m3plus-gold-free-runtime-v1"
+    && liveEvidence.m3plus.readyForMonitoredPilot === true
+    && liveEvidence.m3plus.teacherReviewNeeded === false
+    && liveEvidence.m3plus.defaultM3PlusReadyAfter === false
+    && liveEvidence.m3plus.blockingReasons.length === 0;
   const m4Ready = m4.m4OmrAccuracyClaimReady === true
     && m4.teacherReviewNeeded !== true
     && (m4.blockingReasons || []).length === 0;
   const runtimeFailClosed = status.runtimeStudentGate?.policy === "fail-closed"
     && status.runtimeStudentGate?.ordinaryUploadAutoFeedbackReady === false
     && status.runtimeStudentGate?.m3plusAutoFeedbackReady === false
-    && status.runtimeStudentGate?.m4OmrAutoScoreReady === false;
+      && status.runtimeStudentGate?.m4OmrAutoScoreReady === false;
+  const boundLiveEvidenceReady = controlledPilotLiveEvidenceReady(liveEvidenceBinding);
   const teacherReviewNeeded = ordinaryAudit.teacherReviewNeeded === true
     || m3plusAudit.teacherReviewNeeded === true
     || m4.teacherReviewNeeded === true;
@@ -174,10 +206,11 @@ async function main() {
   // it hostage. M4 stays a required track for the default-student-release
   // project gate and keeps automatic adoption closed; m4Ready is still
   // computed and reported below.
-  const requiredEvidenceComplete = ordinaryReady && m3plusReady;
+  const requiredEvidenceComplete = ordinaryReady && m3plusReady && boundLiveEvidenceReady;
   const readyForControlledPilot = commandOk
     && ordinaryReady
     && m3plusReady
+    && boundLiveEvidenceReady
     && runtimeFailClosed
     && !teacherReviewNeeded;
   const readyForDefaultStudentRelease = projectGate.projectReleaseReady === true
@@ -196,13 +229,16 @@ async function main() {
     m4DecouplingNote: "Owner decision 2026-07-17: controlled-pilot readiness no longer requires the M4 photo-OMR accuracy claim; M4 remains a required track for default student release and automatic adoption stays closed.",
     teacherReviewNeeded,
     runtimeFailClosed,
+    liveEvidenceBinding,
     projectGate,
     tracks: {
       ordinary: {
         readyForControlledPilot: ordinaryReady,
         foundationReady: shadow.foundationReady === true,
+        liveArtifactVerifierReady: shadow.liveArtifactVerifierReady === true,
         r3AcceptanceReady: shadow.r3AcceptanceReady === true,
         authorizationReady: shadow.authorizationReady === true,
+        energyVetoIncluded: shadow.energyVetoIncluded === true,
         studentGateReady: false,
         automaticAdoptionReady: false,
         blockingReasons: shadow.blockingReasons || [],
@@ -216,6 +252,16 @@ async function main() {
       },
       m3plus: {
         readyForControlledPilot: m3plusReady,
+        offlineEvidenceReady: m3plus.offlineEvidenceReady === true,
+        reviewOnlyRuntimeWired: m3plus.reviewOnlyRuntimeWired === true,
+        runtimeFoundationReady: m3plus.runtimeFoundationReady === true,
+        runtimeAuditReady: m3plus.runtimeAuditReady === true,
+        physicalEvidenceCurrent: m3plus.physicalEvidenceCurrent === true,
+        authorizationReady: m3plus.authorizationReady === true,
+        pitchSafetyReady: m3plus.m3plusPitchSafetyReady === true,
+        studentGateReady: m3plus.studentGateReady === true,
+        contract: m3plusAudit.contract || null,
+        runtimeContract: m3plusAudit.runtimeContract || null,
         defaultReadyAfterAudit: m3plusAudit.defaultM3PlusReadyAfter === true,
         teacherReviewNeeded: m3plusAudit.teacherReviewNeeded === true,
         releaseModes: m3plusAudit.releaseModes || {},

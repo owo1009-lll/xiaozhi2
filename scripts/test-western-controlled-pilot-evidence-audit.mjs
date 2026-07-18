@@ -106,7 +106,7 @@ console.log(JSON.stringify({
     "known-bad-recording-excluded",
     "historical-loro-floor-enforced",
     "operational-coverage-floor-enforced",
-    "first-measure-scope-is-reported-separately",
+    "historical-first-measure-scope-is-reported-separately",
     "teacher-review-blocked-until-machine-gate-passes",
   ],
 }, null, 2));

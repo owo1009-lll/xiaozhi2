@@ -2,6 +2,11 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import {
+  REQUIRED_APPROVED_TRACKS,
+  SCOPE_CONTRACT,
+} from "./record-western-controlled-pilot-decision.mjs";
+
 const DEFAULT_OUT = path.join(
   "data",
   "experiments",
@@ -31,12 +36,18 @@ function buildTemplate() {
     pilotApproved: false,
     approvedBy: "",
     approvedAt: "",
-    scope: "ordinary candidate-evidence auto_pass only; optional first-measure slide/trill M3+ subset",
+    approvedTracks: [...REQUIRED_APPROVED_TRACKS],
+    confirmSeparateMonitoredPilot: false,
+    confirmDefaultRuntimeFailClosed: false,
+    scopeContract: SCOPE_CONTRACT,
+    scope: "ordinary dynamic-shadow scope plus M3+ four-zone pitch-safety scope; both remain separate offline monitored-pilot tracks",
     notes: "Template only. Copy this to data/experiments/western-strings-controlled-pilot-approval.json and set pilotApproved=true only if the product owner explicitly approves a separate monitored pilot. Default runtime must remain fail-closed.",
     noGoUsage: "To explicitly defer or reject the pilot, keep pilotApproved=false and fill approvedBy/approvedAt. This records a safe hold and will not start the pilot.",
     safetyRules: [
       "Do not enable default production/student runtime.",
       "Do not commit WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1.",
+      "Do not revive first-measure slide/trill technique detection; M3+ uses the four-zone pitch-safety contract only.",
+      "Both approvedTracks must have a separately audited executor before the combined pilot may start.",
       "Run npm run western:release-review and npm run western:controlled-pilot-decision after any pilot wiring change.",
       "Ask for teacher/professional review only if machine precheck reports unknown or unsafe auto-pass rows.",
     ],

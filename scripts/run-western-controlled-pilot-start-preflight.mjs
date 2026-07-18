@@ -15,6 +15,7 @@ const DEFAULT_SUMMARY = path.join(
   "western-strings-controlled-pilot-start-preflight.md",
 );
 export const REQUIRED_PILOT_EXECUTOR_CONTRACT = "western-ordinary-dynamic-shadow-pilot-executor-v1";
+export const REQUIRED_M3PLUS_PILOT_EXECUTOR_CONTRACT = "western-m3plus-pitch-safety-pilot-executor-v1";
 
 function parseArgs(argv) {
   const args = { out: DEFAULT_OUT, summary: DEFAULT_SUMMARY };
@@ -43,6 +44,8 @@ function renderMarkdown(report) {
     `- okToStartControlledPilot: ${report.okToStartControlledPilot}`,
     `- approvalPresent: ${report.decision.approvalPresent}`,
     `- runtimeFailClosed: ${report.decision.runtimeFailClosed}`,
+    `- ordinaryPilotExecutorReady: ${report.ordinaryPilotExecutorReady}`,
+    `- m3plusPilotExecutorReady: ${report.m3plusPilotExecutorReady}`,
     "",
     "## Blocking Reasons",
     "",
@@ -71,6 +74,7 @@ export async function buildControlledPilotStartPreflight(args = {}) {
   const decision = await buildControlledPilotDecision({
     releaseReview: args.releaseReview,
     approval: args.approval,
+    projectStatus: args.projectStatus,
   });
   const blockingReasons = [...(decision.blockingReasons || [])];
   if (decision.readyForControlledPilotDecision !== true) {
@@ -85,10 +89,15 @@ export async function buildControlledPilotStartPreflight(args = {}) {
   if (decision.approvalPresent !== true) {
     blockingReasons.push(decision.approvalDeferred === true ? "approval-explicitly-deferred" : "approval-not-present");
   }
-  const pilotExecutorReady = args.pilotExecutorContractReady === true
+  const ordinaryPilotExecutorReady = args.pilotExecutorContractReady === true
     && args.pilotExecutorContract === REQUIRED_PILOT_EXECUTOR_CONTRACT;
-  if (!pilotExecutorReady) {
+  if (!ordinaryPilotExecutorReady) {
     blockingReasons.push("ordinary-dynamic-shadow-pilot-executor-not-implemented");
+  }
+  const m3plusPilotExecutorReady = args.m3plusPilotExecutorContractReady === true
+    && args.m3plusPilotExecutorContract === REQUIRED_M3PLUS_PILOT_EXECUTOR_CONTRACT;
+  if (!m3plusPilotExecutorReady) {
+    blockingReasons.push("m3plus-pitch-safety-pilot-executor-not-implemented");
   }
   const uniqueBlockingReasons = [...new Set(blockingReasons)];
   return {
@@ -96,7 +105,10 @@ export async function buildControlledPilotStartPreflight(args = {}) {
     generatedAt: new Date().toISOString(),
     okToStartControlledPilot: uniqueBlockingReasons.length === 0,
     pilotExecutorContract: REQUIRED_PILOT_EXECUTOR_CONTRACT,
-    pilotExecutorReady,
+    pilotExecutorReady: ordinaryPilotExecutorReady && m3plusPilotExecutorReady,
+    ordinaryPilotExecutorReady,
+    m3plusPilotExecutorContract: REQUIRED_M3PLUS_PILOT_EXECUTOR_CONTRACT,
+    m3plusPilotExecutorReady,
     blockingReasons: uniqueBlockingReasons,
     decision,
     artifacts: {

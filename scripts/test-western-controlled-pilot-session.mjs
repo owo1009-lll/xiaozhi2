@@ -9,6 +9,8 @@ import {
 } from "./run-western-controlled-pilot-session.mjs";
 
 const ENABLE_ENV = "WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE";
+const ORDINARY_EXECUTOR_CONTRACT = "western-ordinary-dynamic-shadow-pilot-executor-v1";
+const M3PLUS_EXECUTOR_CONTRACT = "western-m3plus-pitch-safety-pilot-executor-v1";
 
 function statusFailClosed() {
   return {
@@ -24,6 +26,11 @@ function statusFailClosed() {
 function approvedPreflight() {
   return {
     okToStartControlledPilot: true,
+    ordinaryPilotExecutorReady: true,
+    pilotExecutorContract: ORDINARY_EXECUTOR_CONTRACT,
+    m3plusPilotExecutorReady: true,
+    m3plusPilotExecutorContract: M3PLUS_EXECUTOR_CONTRACT,
+    pilotExecutorReady: true,
     blockingReasons: [],
     decision: {
       approvalPresent: true,
@@ -35,8 +42,41 @@ function approvedPreflight() {
 function blockedPreflight() {
   return {
     okToStartControlledPilot: false,
+    ordinaryPilotExecutorReady: true,
+    pilotExecutorContract: ORDINARY_EXECUTOR_CONTRACT,
+    m3plusPilotExecutorReady: true,
+    m3plusPilotExecutorContract: M3PLUS_EXECUTOR_CONTRACT,
+    pilotExecutorReady: true,
     blockingReasons: ["controlled-pilot-approval-missing"],
     decision: { approvalPresent: false, approval: null },
+  };
+}
+
+function ordinaryOnlyExecutorPreflight() {
+  return {
+    okToStartControlledPilot: false,
+    ordinaryPilotExecutorReady: true,
+    pilotExecutorContract: ORDINARY_EXECUTOR_CONTRACT,
+    m3plusPilotExecutorReady: false,
+    m3plusPilotExecutorContract: M3PLUS_EXECUTOR_CONTRACT,
+    pilotExecutorReady: false,
+    blockingReasons: ["m3plus-pitch-safety-pilot-executor-not-implemented"],
+    decision: {
+      approvalPresent: true,
+      approval: { approvedBy: "test-owner" },
+    },
+  };
+}
+
+function m3plusResult(overrides = {}) {
+  return {
+    contract: M3PLUS_EXECUTOR_CONTRACT,
+    ok: true,
+    reviewOnly: true,
+    feedbackAuthorized: false,
+    studentFacing: false,
+    blockers: [],
+    ...overrides,
   };
 }
 
@@ -73,11 +113,16 @@ const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "western-controlled-pil
 const oldEnable = process.env[ENABLE_ENV];
 try {
   let calls = 0;
+  let m3plusCalls = 0;
   const common = {
     outRoot: tempRoot,
     refreshReleaseReview: async () => ({ ok: true }),
     buildStatus: async () => statusFailClosed(),
     loadHistoricalRecordingIds: async () => [],
+    runM3PlusPitchSafetyPilotSession: async () => {
+      m3plusCalls += 1;
+      return m3plusResult();
+    },
   };
 
   await fs.mkdir(path.join(tempRoot, "history-zero"), { recursive: true });
@@ -124,6 +169,91 @@ try {
   assert(noApproval.blockingReasons.includes("controlled-pilot-approval-missing"));
   assert.equal(calls, 0, "missing approval must not execute the pilot batch");
 
+  const ordinaryOnlyExecutor = await runControlledPilotSession({
+    execute: true,
+    sessionId: "ordinary-only-executor",
+    outRoot: tempRoot,
+  }, {
+    ...common,
+    buildPreflight: async () => ordinaryOnlyExecutorPreflight(),
+    runPrecisionSession: async () => { calls += 1; return precisionResult(); },
+  });
+  assert.equal(ordinaryOnlyExecutor.sessionStatus, "blocked");
+  assert.equal(ordinaryOnlyExecutor.executionPerformed, false);
+  assert(
+    ordinaryOnlyExecutor.blockingReasons.includes("m3plus-pitch-safety-pilot-executor-not-implemented"),
+    "an ordinary-only executor must leave the combined session fail-closed",
+  );
+  assert.equal(calls, 0, "ordinary execution must not start while the M3+ executor is absent");
+
+  const missingM3Executor = await runControlledPilotSession({
+    execute: true,
+    sessionId: "missing-m3-executor",
+    outRoot: tempRoot,
+  }, {
+    ...common,
+    buildPreflight: async () => approvedPreflight(),
+    runPrecisionSession: async () => { calls += 1; return precisionResult(); },
+    runM3PlusPitchSafetyPilotSession: null,
+  });
+  assert.equal(missingM3Executor.sessionStatus, "blocked");
+  assert.equal(missingM3Executor.executionPerformed, false);
+  assert(
+    missingM3Executor.blockingReasons.includes("m3plus-pitch-safety-pilot-executor-not-implemented"),
+  );
+
+  const contradictoryAggregatePreflight = approvedPreflight();
+  contradictoryAggregatePreflight.pilotExecutorReady = false;
+  const aggregateNotReady = await runControlledPilotSession({
+    execute: true,
+    sessionId: "aggregate-executor-not-ready",
+    outRoot: tempRoot,
+  }, {
+    ...common,
+    buildPreflight: async () => contradictoryAggregatePreflight,
+    runPrecisionSession: async () => { calls += 1; return precisionResult(); },
+  });
+  assert.equal(aggregateNotReady.sessionStatus, "blocked");
+  assert.equal(aggregateNotReady.executionPerformed, false);
+  assert(aggregateNotReady.blockingReasons.includes("pilot-executor-aggregate-readiness-invalid"));
+
+  let sharedExecutorCalls = 0;
+  const sharedExecutor = async () => {
+    sharedExecutorCalls += 1;
+    return precisionResult();
+  };
+  const sameFunctionExecutors = await runControlledPilotSession({
+    execute: true,
+    sessionId: "same-function-executors",
+    outRoot: tempRoot,
+  }, {
+    ...common,
+    buildPreflight: async () => approvedPreflight(),
+    runPrecisionSession: sharedExecutor,
+    runM3PlusPitchSafetyPilotSession: sharedExecutor,
+  });
+  assert.equal(sameFunctionExecutors.sessionStatus, "blocked");
+  assert.equal(sameFunctionExecutors.executionPerformed, false);
+  assert(
+    sameFunctionExecutors.blockingReasons.includes("pilot-executors-must-be-distinct-functions"),
+  );
+  assert.equal(sharedExecutorCalls, 0, "same-function executors must be rejected before execution");
+
+  const sameContractPreflight = approvedPreflight();
+  sameContractPreflight.m3plusPilotExecutorContract = ORDINARY_EXECUTOR_CONTRACT;
+  const sameContract = await runControlledPilotSession({
+    execute: true,
+    sessionId: "same-contract",
+    outRoot: tempRoot,
+  }, {
+    ...common,
+    buildPreflight: async () => sameContractPreflight,
+    runPrecisionSession: async () => { calls += 1; return precisionResult(); },
+  });
+  assert.equal(sameContract.sessionStatus, "blocked");
+  assert(sameContract.blockingReasons.includes("m3plus-pilot-executor-readiness-contract-invalid"));
+  assert(sameContract.blockingReasons.includes("pilot-executor-contracts-not-distinct"));
+
   process.env[ENABLE_ENV] = "1";
   const parentEnabled = await runControlledPilotSession({ execute: true, sessionId: "parent-enabled", outRoot: tempRoot }, {
     ...common,
@@ -142,6 +272,13 @@ try {
   });
   assert.equal(safe.sessionStatus, "completed_safe");
   assert.equal(safe.pilotRunAccepted, true);
+  assert.equal(safe.executors.ordinary.contract, ORDINARY_EXECUTOR_CONTRACT);
+  assert.equal(safe.executors.ordinary.executionPerformed, true);
+  assert.equal(safe.executors.ordinary.executionPassed, true);
+  assert.equal(safe.executors.m3plus.contract, M3PLUS_EXECUTOR_CONTRACT);
+  assert.equal(safe.executors.m3plus.executionPerformed, true);
+  assert.equal(safe.executors.m3plus.executionPassed, true);
+  assert.equal(safe.executors.m3plus.result.reviewOnly, true);
   assert.equal(safe.monitoring.knownUsableAutoPassCandidateCount, 3);
   assert.equal(safe.monitoring.modelAutoPassCandidateCount, 3);
   assert.equal(safe.monitoring.pilotEligibleAutoPassCandidateCount, 3);
@@ -151,6 +288,52 @@ try {
   assert.equal(safe.defaultRuntimeFailClosedAfter, true);
   assert.equal(safe.processEnvironmentRestored, true);
   assert.equal(process.env[ENABLE_ENV], undefined);
+
+  const invalidM3Results = [
+    ["wrong-contract", { contract: ORDINARY_EXECUTOR_CONTRACT }],
+    ["not-ok", { ok: false }],
+    ["not-review-only", { reviewOnly: false }],
+    ["feedback-authorized", { feedbackAuthorized: true }],
+    ["student-facing", { studentFacing: true }],
+    ["has-blockers", { blockers: ["unsafe"] }],
+  ];
+  for (const [name, override] of invalidM3Results) {
+    const invalidM3 = await runControlledPilotSession({
+      execute: true,
+      sessionId: `invalid-m3-${name}`,
+      outRoot: tempRoot,
+    }, {
+      ...common,
+      buildPreflight: async () => approvedPreflight(),
+      runPrecisionSession: async () => { calls += 1; return precisionResult(); },
+      runM3PlusPitchSafetyPilotSession: async () => {
+        m3plusCalls += 1;
+        return m3plusResult(override);
+      },
+    });
+    assert.equal(invalidM3.sessionStatus, "aborted");
+    assert.equal(invalidM3.executionPerformed, true);
+    assert.equal(invalidM3.pilotRunAccepted, false);
+    assert.equal(invalidM3.executors.ordinary.executionPassed, true);
+    assert.equal(invalidM3.executors.m3plus.executionPerformed, true);
+    assert.equal(invalidM3.executors.m3plus.executionPassed, false);
+    assert(invalidM3.blockingReasons.includes("m3plus-pitch-safety-pilot-result-invalid"));
+  }
+  const invalidOrdinary = await runControlledPilotSession({
+    execute: true,
+    sessionId: "invalid-ordinary-result",
+    outRoot: tempRoot,
+  }, {
+    ...common,
+    buildPreflight: async () => approvedPreflight(),
+    runPrecisionSession: async () => { calls += 1; return precisionResult({ ok: false }); },
+  });
+  assert.equal(invalidOrdinary.sessionStatus, "aborted");
+  assert.equal(invalidOrdinary.pilotRunAccepted, false);
+  assert.equal(invalidOrdinary.executors.ordinary.executionPassed, false);
+  assert.equal(invalidOrdinary.executors.m3plus.executionPassed, true);
+  assert(invalidOrdinary.blockingReasons.includes("ordinary-pilot-executor-result-invalid"));
+  assert(invalidOrdinary.blockingReasons.includes("pilot:precision-check-failed"));
 
   const suppressed = await runControlledPilotSession({ execute: true, sessionId: "suppressed", outRoot: tempRoot }, {
     ...common,
@@ -298,8 +481,15 @@ console.log(JSON.stringify({
   checks: [
     "dry-run-never-executes",
     "missing-approval-blocks",
+    "ordinary-only-executor-keeps-combined-session-closed",
+    "missing-m3plus-executor-blocks-before-execution",
+    "aggregate-executor-readiness-must-be-explicitly-green",
+    "same-function-executors-block-before-execution",
+    "executor-contracts-must-be-exact-and-distinct",
     "parent-enabled-env-blocks",
-    "safe-session-completes",
+    "safe-session-runs-and-passes-both-executors",
+    "invalid-m3plus-result-contracts-abort",
+    "invalid-ordinary-result-aborts",
     "raw-model-auto-pass-is-suppressed-unless-self-checked",
     "self-check-accounting-mismatch-aborts",
     "historical-recordings-are-excluded",

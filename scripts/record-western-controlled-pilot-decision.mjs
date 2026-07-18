@@ -6,8 +6,9 @@ const DEFAULT_OUT = path.join("data", "experiments", "western-strings-controlled
 // Contract version the approval binds to. Bumping this (e.g. after the
 // 2026-07-17 M3+ rescope superseded the first-measure slide/trill contract)
 // invalidates every earlier approval and forces a fresh owner decision.
-export const SCOPE_CONTRACT = "western-ordinary-dynamic-shadow-release-v1+m3plus-rescope-four-zone-v1";
-const DEFAULT_SCOPE = "ordinary dynamic-shadow only after a separate authorizationReady=true release contract; M3+ four-zone pitch-safety scope only if explicitly included in the pilot";
+export const SCOPE_CONTRACT = "western-ordinary-dynamic-shadow-release-v1+m3plus-rescope-four-zone-v2";
+const DEFAULT_SCOPE = "ordinary dynamic-shadow plus M3+ four-zone pitch-safety; both tracks require their own audited executor and the default runtime remains fail-closed";
+export const REQUIRED_APPROVED_TRACKS = Object.freeze(["ordinary", "m3plus"]);
 
 function parseArgs(argv) {
   const args = {
@@ -21,6 +22,7 @@ function parseArgs(argv) {
     else if (arg === "--by") args.by = argv[++index] || args.by;
     else if (arg === "--at") args.at = argv[++index] || args.at;
     else if (arg === "--scope") args.scope = argv[++index] || args.scope;
+    else if (arg === "--tracks") args.tracks = argv[++index] || args.tracks;
     else if (arg === "--notes") args.notes = argv[++index] || args.notes;
     else if (arg === "--out") args.out = argv[++index] || args.out;
     else if (arg === "--confirm-separate-monitored-pilot") args.confirmSeparateMonitoredPilot = true;
@@ -35,6 +37,13 @@ function rel(filePath) {
 
 function validateArgs(args) {
   const decision = String(args.decision || "").trim().toLowerCase();
+  const requestedTracks = [...new Set(String(args.tracks || "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean))];
+  const tracksAreExact = requestedTracks.length === REQUIRED_APPROVED_TRACKS.length
+    && REQUIRED_APPROVED_TRACKS.every((track) => requestedTracks.includes(track));
+  const approvedTracks = tracksAreExact ? [...REQUIRED_APPROVED_TRACKS] : requestedTracks;
   const errors = [];
   if (!["approve", "defer"].includes(decision)) {
     errors.push("decision-must-be-approve-or-defer");
@@ -43,6 +52,9 @@ function validateArgs(args) {
     errors.push("approved-by-required");
   }
   if (decision === "approve") {
+    if (!tracksAreExact) {
+      errors.push("approve-requires-explicit-tracks-ordinary-and-m3plus");
+    }
     if (args.confirmSeparateMonitoredPilot !== true) {
       errors.push("approve-requires-confirm-separate-monitored-pilot");
     }
@@ -50,7 +62,7 @@ function validateArgs(args) {
       errors.push("approve-requires-confirm-default-runtime-fail-closed");
     }
   }
-  return { decision, errors };
+  return { decision, approvedTracks, errors };
 }
 
 export async function writeControlledPilotApprovalDecision(args = {}) {
@@ -58,13 +70,14 @@ export async function writeControlledPilotApprovalDecision(args = {}) {
     out: args.out || DEFAULT_OUT,
     scope: args.scope || DEFAULT_SCOPE,
     notes: args.notes || "",
+    tracks: args.tracks || "",
     decision: args.decision,
     by: args.by,
     at: args.at,
     confirmSeparateMonitoredPilot: args.confirmSeparateMonitoredPilot,
     confirmDefaultRuntimeFailClosed: args.confirmDefaultRuntimeFailClosed,
   };
-  const { decision, errors } = validateArgs(resolved);
+  const { decision, approvedTracks, errors } = validateArgs(resolved);
   if (errors.length) {
     return {
       ok: false,
@@ -74,7 +87,7 @@ export async function writeControlledPilotApprovalDecision(args = {}) {
         "Defer/no-go:",
         "node scripts/record-western-controlled-pilot-decision.mjs --decision defer --by owner-name",
         "Approve monitored pilot:",
-        "node scripts/record-western-controlled-pilot-decision.mjs --decision approve --by owner-name --confirm-separate-monitored-pilot --confirm-default-runtime-fail-closed",
+        "node scripts/record-western-controlled-pilot-decision.mjs --decision approve --by owner-name --tracks ordinary,m3plus --confirm-separate-monitored-pilot --confirm-default-runtime-fail-closed",
       ],
     };
   }
@@ -82,6 +95,11 @@ export async function writeControlledPilotApprovalDecision(args = {}) {
     pilotApproved: decision === "approve",
     approvedBy: String(resolved.by || "").trim(),
     approvedAt: resolved.at || new Date().toISOString(),
+    approvedTracks,
+    confirmSeparateMonitoredPilot: decision === "approve"
+      && resolved.confirmSeparateMonitoredPilot === true,
+    confirmDefaultRuntimeFailClosed: decision === "approve"
+      && resolved.confirmDefaultRuntimeFailClosed === true,
     scope: resolved.scope,
     scopeContract: SCOPE_CONTRACT,
     notes: resolved.notes || (

@@ -166,59 +166,22 @@ function commandForAction(action) {
   if (track === "M3+ pitch safety rescope") {
     return [
       "Open data/experiments/western-strings-m3plus/rescope-gate/report.json.",
-      "Keep score-marked trill, ornament, and harmonic regions neutral; do not use the archived audio technique detectors as release authority.",
-      "Use stable F0 center evidence only where localization and dispersion guards pass; all other rows remain insufficient_evidence.",
-      "The offline gate does not enable student feedback. Runtime wiring requires a separate monitored audit and must remain fail-closed by default.",
-      "After any runtime change, rerun npm run western:m3plus-rescope-gate, npm run test:western-project-gate, and npm run build.",
+      "Confirm the report contract is m3plus-rescope-four-zone-v2 and inspect sourceBindings before reading any aggregate pass field.",
+      "Treat the 8 policy-evaluated protected units separately from the 6 declared-only units; do not report 14 units as executed.",
+      "Treat 3/8 only as score-intent center agreement/decision coverage. Join independent per-note intonation gold by recording/unit/note before computing precision; the current join is 0/8 and the 17 round2 vibrato units remain unscored.",
+      "Run npm run western:m3plus-monitored-pilot-audit against the latest physical controlled batch. Keep offlineEvidenceReady, runtimeFoundationReady, runtimeAuditReady, authorization, and student readiness separate.",
+      "Keep all M3+ output review_required with studentFacing=false and feedbackAuthorized=false; protected, low-voicing, high-dispersion, missing-field, or untrusted-window rows must fail closed.",
+      "Do not reuse the superseded first-measure slide/trill pack as authorization evidence; any future release audit needs newly registered recordings and pieces.",
+      "After any evidence/runtime change, rerun npm run western:m3plus-rescope-gate, create a fresh controlled queue batch bound to that report SHA, run npm run western:controlled-batch-candidate-audit, then rerun npm run western:m3plus-monitored-pilot-audit, npm run test:western-project-gate, and npm run build.",
     ];
   }
   if (track === "M3+ pitch behavior modes") {
-    if (hasReason(action, "m3plus-runtime-disabled-by-default")) {
-      return [
-        "Do not request more M3+ review for the current pack; the first-measure safe subset has already been imported and evaluated.",
-        "Keep production/default runtime fail-closed: m3plusAutoFeedbackReady must remain false unless a separate monitored pilot is explicitly started.",
-        "Inspect data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-pitch-mode-eval.json and confirm releaseReadyModes are slide-like and trill-like.",
-        "If productizing, design a scoped pilot that only allows first-measure, trusted-recording, slide-like/trill-like rows; later measures and other modes must remain review_required.",
-        "After any runtime pilot code change, run npm run test:western-project-gate, npm run western:project-status, and npm run build.",
-      ];
-    }
-    if (hasReason(action, "m3plus-no-mode-specific-release-ready")) {
-      if (String(action.action || "").includes("candidate-quality review pack")) {
-        return [
-          "Keep all M3+ pitch-behavior modes review-only in student/runtime output.",
-          "Open data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/index.html and review the 24 candidate-quality rows.",
-          "This pack is restricted to first-measure rows from recordings whose prior M3+ review rows were all audio-score matches. Later measures are excluded because their linear score-time windows drift.",
-          "After review, save the downloaded CSV as data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/m3plus-pitch-mode-review.completed.csv, or leave it in Downloads and run npm run western:ingest-review-downloads -- --target m3plus-candidate-quality --apply.",
-          "Import with npm run western:m3plus-review-import -- --source data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/m3plus-pitch-mode-review.csv --reviews data/experiments/western-strings-m3plus/pitch-mode-review-pack-candidate-quality/m3plus-pitch-mode-review.completed.csv",
-          "Then rerun npm run western:m3plus-mode-eval, npm run western:m3plus-localization-diagnosis, and npm run western:project-status.",
-        ];
-      }
-      if (String(action.action || "").includes("round-2 is imported")) {
-        return [
-          "Keep all M3+ pitch-behavior modes review-only in student/runtime output.",
-          "Inspect data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-localization-diagnosis-groups.csv first; it identifies the recording/scenario/candidate-mode groups with the highest non-match rate.",
-          "Use data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-localization-diagnosis-rows.csv to inspect the concrete mismatch/uncertain rows.",
-          "Treat the current high mismatch/uncertain rate as a score-audio localization/candidate-quality blocker before any M3+ release attempt.",
-          "Use data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-pitch-mode-eval.csv only after localization is improved; it explains per-mode precision but does not fix wrong score/audio windows.",
-          "Improve score-audio localization or candidate generation, then create a fresh targeted eval pack instead of reusing the current round-2 pack.",
-          "After any candidate-generation change, rerun npm run western:m3plus-pitch-modes, create a new review pack, import labels, then rerun npm run western:m3plus-mode-eval and npm run western:m3plus-localization-diagnosis.",
-        ];
-      }
-      return [
-        "Keep all M3+ pitch-behavior modes review-only in student/runtime output.",
-        "Inspect data/experiments/western-strings-m3plus/pitch-mode-review-pack/m3plus-pitch-mode-eval.csv for per-mode evidence.",
-        "Open data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/index.html and review the 36 non-control supplemental samples.",
-        "After review, either save m3plus-pitch-mode-review.completed.csv in data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/, or leave it in Downloads and run npm run western:ingest-review-downloads -- --target m3plus-round2 --apply.",
-        "Import with npm run western:m3plus-review-import -- --source data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/m3plus-pitch-mode-review.csv --reviews data/experiments/western-strings-m3plus/pitch-mode-review-pack-round2/m3plus-pitch-mode-review.completed.csv",
-        "After adding labels, rerun npm run western:m3plus-mode-eval",
-        "Then run npm run western:project-status",
-      ];
-    }
     return [
-      "Open data/experiments/western-strings-m3plus/pitch-mode-review-pack/index.html",
-      "After review, save m3plus-pitch-mode-review.completed.csv in that folder",
-      "Run npm run western:m3plus-review-import",
-      "Then run npm run western:m3plus-review-status",
+      "Treat the historical pitch-mode packs and releaseReadyModes fields as research evidence only; the 2026-07-17 supersession removed their pilot authority.",
+      "Use data/experiments/western-strings-m3plus/rescope-gate/report.json as the v2 evidence entrypoint and keep it fail-closed until all declared protected units are evaluated and independent per-note intonation gold is joined.",
+      "Run npm run western:m3plus-monitored-pilot-audit against the latest physical controlled batch to verify the m3plus-gold-free-runtime-v1 contract.",
+      "Keep m3plusAutoFeedbackReady=false, studentFacing=false, and feedbackAuthorized=false.",
+      "For any future release evidence, register genuinely new recordings and pieces; do not reuse the first-measure slide/trill pack or the existing 12 recordings.",
     ];
   }
   if (track === "M4 OMR benchmark") {
@@ -255,7 +218,7 @@ function commandForAction(action) {
       "Run npm run western:controlled-pilot-decision.",
       "Open data/experiments/western-strings-controlled-pilot-decision.md.",
       "Do not ask for more teacher/professional review unless the decision packet reports unknown or unsafe auto-pass rows.",
-      "Confirm the pilot scope in writing before starting any runtime process: ordinary candidate-evidence auto_pass only, plus the documented M3+ safe subset if needed.",
+      "Confirm both approved tracks and the current ordinary dynamic-shadow + M3+ four-zone v2 scope contract in writing before starting any runtime process; no historical first-measure M3+ subset is eligible.",
       "Keep production/default runtime fail-closed.",
       "Do not commit WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 or enable it globally.",
       "If a pilot is approved, start it as a separate monitored process and rerun npm run western:release-review after any code or runtime wiring change.",
@@ -268,7 +231,7 @@ function commandForAction(action) {
       "No teacher/professional review is needed at this step; the machine checks are already complete.",
       "Optionally run npm run western:controlled-pilot-approval-template to generate a non-approving template.",
       "To stop safely in review-only mode, run npm run western:controlled-pilot-record-decision -- --decision defer --by <owner-name>.",
-      "Only if the owner explicitly approves the monitored pilot, run npm run western:controlled-pilot-record-decision -- --decision approve --by <owner-name> --confirm-separate-monitored-pilot --confirm-default-runtime-fail-closed.",
+      "Only if both current tracks are independently ready and the owner explicitly approves the monitored pilot, run npm run western:controlled-pilot-record-decision -- --decision approve --by <owner-name> --tracks ordinary,m3plus --confirm-separate-monitored-pilot --confirm-default-runtime-fail-closed.",
       "Keep production/default runtime fail-closed.",
       "Do not commit WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1 or enable it globally.",
     ];
@@ -304,25 +267,19 @@ function commandForAction(action) {
   }
   if (track === "Scoped V2-alpha blind audit preparation") {
     return [
-      "Do not send any existing review pack to the teacher; current labels and pilot recordings are not fresh blind evidence.",
-      "Open data/experiments/western-strings-controlled-pilot-evidence-audit.md and confirm the scope is first-measure-only with confidence >= 0.95.",
-      "Put one new independent violin recording, a clean reviewed MusicXML/MXL score, and its score image/PDF in the private intake directory. Do not hand-edit intake.json.",
-      "Run npm run western:fresh-blind-intake-stage with explicit --recording-id, --piece-id, --audio, --score, --score-display, and --reviewed-by values. It audits a temporary manifest and replaces intake.json only when readyForMachinePrecheck=true.",
-      "Confirm with npm run western:fresh-blind-intake-status; reused recording IDs, audio content, piece IDs, or score content are rejected.",
-      "Run the ordinary machine precheck on the new recording before generating a professional-review pack.",
-      "Machine-QA the generated pack: audio opens, score locator shows the first measure, controls work, and every row is inside the scoped gate.",
-      "Only then request a small fresh blind professional audit. Do not ask the reviewer to debug playback, score localization, or candidate generation.",
-      "Keep production/default student runtime fail-closed until that fresh blind audit passes.",
+      "Stop: the current ordinary-dynamic-shadow-full-score-fresh-blind-v1 intake runner and audit contract are not implemented.",
+      "Do not run the legacy first-measure V2-alpha intake stage/status commands or treat their ready result as current release evidence.",
+      "Do not reuse existing recordings, pieces, r3 acceptance evidence, or historical first-measure intake artifacts.",
+      "Implement and test a separate full-score fresh-blind intake runner before staging any new recording or generating a professional-review pack.",
+      "Keep production/default student runtime fail-closed.",
     ];
   }
   if (track === "Fresh blind machine precheck") {
     return [
-      "Open data/experiments/western-strings-v2alpha-blind-intake-status.md and confirm readyForMachinePrecheck=true.",
-      "Stage only the candidate named in that report into the controlled intake; do not mix it into training labels.",
-      "Run the ordinary machine precheck with --recording-id set to the fresh intake recording; the whitelist must select exactly that recording. Keep every later-measure candidate review_required.",
-      "If the machine precheck produces no scoped candidate or any unsafe candidate, stop and fix the input/candidate pipeline before professional review.",
-      "Generate a small fresh blind professional pack only after the machine precheck passes, then machine-QA audio playback, score location, controls, and scope membership.",
-      "Keep production/default student runtime fail-closed until the fresh blind professional audit passes.",
+      "Stop: this handoff track belongs to the superseded first-measure intake path and has no current release authority.",
+      "Do not use the historical V2-alpha intake report or its ready result to stage a candidate or start a machine precheck.",
+      "The ordinary-dynamic-shadow-full-score-fresh-blind-v1 intake runner and audit contract are not implemented; wait for both to be implemented and tested.",
+      "Keep production/default student runtime fail-closed.",
     ];
   }
   if (track === "Controlled pilot completed") {
