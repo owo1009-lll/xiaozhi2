@@ -63,6 +63,79 @@ def xml_local_name(node: ET.Element) -> str:
     return node.tag.rsplit("}", 1)[-1]
 
 
+_STEP_SEMITONES = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
+
+
+def full_score_pseudo_units(score_path: Path) -> list[dict[str, Any]]:
+    """Every pitched note of the score as a localization pseudo-unit.
+
+    Sparse-label recordings (round-2 pieces where only the score-marked notes
+    carry intent labels) cannot align a handful of labels against a full
+    performance: the monotonic DP partitions ALL voiced frames among the
+    units, so sparse units absorb neighbouring notes and fail pitch support.
+    Localizing against the complete score sequence and then transferring the
+    aligned windows onto the labeled notes keeps the localization honest.
+    """
+    root = ET.fromstring(score_path.read_text(encoding="utf-8"))
+    part = next((node for node in root.iter() if xml_local_name(node) == "part"), None)
+    if part is None:
+        raise ValueError(f"MusicXML has no part: {score_path}")
+    units: list[dict[str, Any]] = []
+    fallback_measure = 0
+    for measure in (node for node in list(part) if xml_local_name(node) == "measure"):
+        fallback_measure += 1
+        try:
+            measure_index = int(str(measure.attrib.get("number") or fallback_measure).strip())
+        except ValueError:
+            measure_index = fallback_measure
+        note_index = 0
+        for element in list(measure):
+            if xml_local_name(element) != "note":
+                continue
+            child_tags = {xml_local_name(node) for node in list(element)}
+            if child_tags.intersection({"rest", "grace", "cue"}):
+                continue
+            note_index += 1
+            pitch = next((node for node in list(element) if xml_local_name(node) == "pitch"), None)
+            if pitch is None:
+                continue
+            step = octave = alter = None
+            for node in list(pitch):
+                tag = xml_local_name(node)
+                if tag == "step":
+                    step = str(node.text or "").strip()
+                elif tag == "octave":
+                    octave = int(str(node.text or "0").strip())
+                elif tag == "alter":
+                    alter = float(str(node.text or "0").strip())
+            if step not in _STEP_SEMITONES or octave is None:
+                continue
+            midi = 12 * (octave + 1) + _STEP_SEMITONES[step] + (alter or 0.0)
+            # trilled/ornamented notes spend roughly half their frames on the
+            # upper neighbour; without an auxiliary pitch their localization
+            # support craters. A +2 semitone auxiliary (localization aid only,
+            # tolerance covers the +1 diatonic case) keeps support honest.
+            has_ornament = any(
+                ORNAMENT_TAGS.get(xml_local_name(node)) in {"trill", "ornament"}
+                for node in element.iter()
+            )
+            units.append(
+                {
+                    "unitIndex": len(units),
+                    "measure": measure_index,
+                    "noteIndex": note_index,
+                    "basePitch": librosa.midi_to_note(midi),
+                    "baseMidi": float(midi),
+                    "auxiliaryPitch": librosa.midi_to_note(midi + 2.0) if has_ornament else None,
+                    "auxiliaryMidi": float(midi + 2.0) if has_ornament else None,
+                    "expectedBehavior": None,
+                }
+            )
+    if not units:
+        raise ValueError(f"score has no pitched notes: {score_path}")
+    return units
+
+
 def text_technique_intent(text: str) -> tuple[set[str], bool]:
     normalized = " ".join(str(text or "").lower().split())
     explicit_control = any(
@@ -290,6 +363,7 @@ def align_units_to_track(
     max_normalized_path_cost: float = DEFAULT_MAX_NORMALIZED_PATH_COST,
     min_unit_frame_ratio: float = DEFAULT_MIN_UNIT_FRAME_RATIO,
     max_unit_frame_ratio: float = DEFAULT_MAX_UNIT_FRAME_RATIO,
+    min_ready_unit_ratio: float = 0.90,
 ) -> dict[str, Any]:
     valid = np.isfinite(times) & np.isfinite(midi_track)
     voiced_times = np.asarray(times[valid], dtype=np.float64)
@@ -452,7 +526,7 @@ def align_units_to_track(
     support_rates = [unit["pitchSupportRate"] for unit in aligned_units]
     normalized_cost = final_score / max(1, frame_count)
     localization_ready = bool(
-        ready_units / unit_count >= 0.90
+        ready_units / unit_count >= min_ready_unit_ratio
         and float(np.median(support_rates)) >= 0.75
         and normalized_cost <= max_normalized_path_cost
     )
@@ -870,13 +944,48 @@ def evaluate_track(
             unit["auxiliaryMidi"] = float(unit["auxiliaryMidi"]) + float(
                 score_transpose_semitones
             )
-    alignment = align_units_to_track(
-        units,
-        times,
-        midi_track,
-        pitch_tolerance_cents=pitch_tolerance_cents,
-        max_normalized_path_cost=max_normalized_path_cost,
-    )
+    pseudo_source = recording.get("_fullScoreUnits")
+    if pseudo_source:
+        pseudo_units = [dict(unit) for unit in pseudo_source]
+        for unit in pseudo_units:
+            unit["writtenBaseMidi"] = float(unit["baseMidi"])
+            unit["baseMidi"] = float(unit["baseMidi"]) + float(score_transpose_semitones)
+        alignment = align_units_to_track(
+            pseudo_units,
+            times,
+            midi_track,
+            pitch_tolerance_cents=pitch_tolerance_cents,
+            max_normalized_path_cost=max_normalized_path_cost,
+            min_ready_unit_ratio=float(recording.get("localizationReadyMinUnitRatio", 0.90)),
+        )
+        aligned_by_note = {
+            (int(unit["measure"]), int(unit["noteIndex"])): unit
+            for unit in alignment["units"]
+        }
+        transferred: list[dict[str, Any]] = []
+        for unit in units:
+            source_unit = aligned_by_note.get((int(unit["measure"]), int(unit["noteIndex"])))
+            if source_unit is None:
+                raise ValueError(
+                    f"label not present in score sequence: m{unit['measure']} n{unit['noteIndex']}")
+            transferred.append({
+                **unit,
+                **{key: source_unit[key] for key in (
+                    "firstVoicedSeconds", "lastVoicedSeconds", "assignedVoicedFrameCount",
+                    "pitchSupportRate", "startSeconds", "endSeconds", "durationSeconds",
+                    "durationRatioToMedian", "localizationUnitReady")},
+            })
+        alignment = {**alignment, "units": transferred}
+    else:
+        alignment = align_units_to_track(
+            units,
+            times,
+            midi_track,
+            pitch_tolerance_cents=pitch_tolerance_cents,
+            max_normalized_path_cost=max_normalized_path_cost,
+        )
+    calibration_max_measure = int(
+        recording.get("calibrationMaxMeasure", CALIBRATION_MAX_MEASURE))
     rows: list[dict[str, Any]] = []
     for unit in alignment["units"]:
         predicted_modes, mode_decisions, diagnostics = infer_modes(
@@ -890,7 +999,7 @@ def evaluate_track(
                 **unit,
                 "evaluationSplit": (
                     "calibration"
-                    if int(unit.get("measure") or 0) <= CALIBRATION_MAX_MEASURE
+                    if int(unit.get("measure") or 0) <= calibration_max_measure
                     else "holdout"
                 ),
                 "startSeconds": round(float(unit["startSeconds"]), 4),
@@ -1299,6 +1408,9 @@ def run_evaluation(
                 if score_transpose_semitones is not None
                 else recording.get("localizationTransposeSemitones", 0.0)
             )
+            if recording.get("localizeAgainstFullScore"):
+                recording["_fullScoreUnits"] = full_score_pseudo_units(
+                    source / str(recording.get("scoreFile") or f"{recording_id}.musicxml"))
             times, midi_track, duration = extract_f0(
                 audio_path,
                 backend=resolved_f0_backend,
@@ -1346,12 +1458,12 @@ def run_evaluation(
         [row for row in raw_rows if row.get("evaluationSplit") == "holdout"]
     )
     score_intent_ready = bool(
-        len(score_intent_reports) == 4
+        len(score_intent_reports) == len(recordings)
         and all(report.get("ready") is True for report in score_intent_reports)
     )
     machine_complete = bool(
         score_intent_ready
-        and len(reports) == 4
+        and len(reports) == len(recordings)
         and all(report.get("status") == "ok" for report in reports)
     )
     mode_gate_passed = bool(

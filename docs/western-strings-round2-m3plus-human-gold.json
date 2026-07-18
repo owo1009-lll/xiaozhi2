@@ -173,5 +173,55 @@
       "intonationGoldVerified": true,
       "notes": ""
     }
+  ],
+  "protectedScoreUnits": [
+    {
+      "recordingId": "r2-06",
+      "measure": 3,
+      "unitIndex": 0,
+      "scoreProtectionVerified": true,
+      "markType": "trill",
+      "provenance": "construction-gold trill mark in r2-06.musicxml (deterministic round-2 generator); execution confirmed by owner 2026-07-15 (trillExpectedNoteCount=6); per-unit keys from the sparse-label supplemental evaluation added 2026-07-18"
+    },
+    {
+      "recordingId": "r2-06",
+      "measure": 6,
+      "unitIndex": 1,
+      "scoreProtectionVerified": true,
+      "markType": "trill",
+      "provenance": "construction-gold trill mark in r2-06.musicxml (deterministic round-2 generator); execution confirmed by owner 2026-07-15 (trillExpectedNoteCount=6); per-unit keys from the sparse-label supplemental evaluation added 2026-07-18"
+    },
+    {
+      "recordingId": "r2-06",
+      "measure": 8,
+      "unitIndex": 2,
+      "scoreProtectionVerified": true,
+      "markType": "trill",
+      "provenance": "construction-gold trill mark in r2-06.musicxml (deterministic round-2 generator); execution confirmed by owner 2026-07-15 (trillExpectedNoteCount=6); per-unit keys from the sparse-label supplemental evaluation added 2026-07-18"
+    },
+    {
+      "recordingId": "r2-06",
+      "measure": 11,
+      "unitIndex": 3,
+      "scoreProtectionVerified": true,
+      "markType": "trill",
+      "provenance": "construction-gold trill mark in r2-06.musicxml (deterministic round-2 generator); execution confirmed by owner 2026-07-15 (trillExpectedNoteCount=6); per-unit keys from the sparse-label supplemental evaluation added 2026-07-18"
+    },
+    {
+      "recordingId": "r2-06",
+      "measure": 14,
+      "unitIndex": 4,
+      "scoreProtectionVerified": true,
+      "markType": "trill",
+      "provenance": "construction-gold trill mark in r2-06.musicxml (deterministic round-2 generator); execution confirmed by owner 2026-07-15 (trillExpectedNoteCount=6); per-unit keys from the sparse-label supplemental evaluation added 2026-07-18"
+    },
+    {
+      "recordingId": "r2-06",
+      "measure": 15,
+      "unitIndex": 5,
+      "scoreProtectionVerified": true,
+      "markType": "trill",
+      "provenance": "construction-gold trill mark in r2-06.musicxml (deterministic round-2 generator); execution confirmed by owner 2026-07-15 (trillExpectedNoteCount=6); per-unit keys from the sparse-label supplemental evaluation added 2026-07-18"
+    }
   ]
 }
