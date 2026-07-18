@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 
 
 export const M4B_STRUCTURE_POC_POLICY_PATH = path.join("config", "western-m4b-structure-poc.json");
+export const M4B_FRESH_CAPTURE_POLICY_PATH = path.join("config", "western-m4b-fresh-blind-capture.json");
 
 function sha256(bytes) {
   return crypto.createHash("sha256").update(bytes).digest("hex");
@@ -187,9 +188,43 @@ export async function auditM4bStructurePoc(repoRoot = process.cwd()) {
   }
   const reportPath = path.join(config.outputRoot, "report.json").replace(/\\/g, "/");
   const promotionPath = path.join(config.outputRoot, "fresh-blind-promotion-report.json").replace(/\\/g, "/");
+  const capture = await readJson(repoRoot, M4B_FRESH_CAPTURE_POLICY_PATH, "m4b-fresh-capture-policy", blockers);
   const report = await readJson(repoRoot, reportPath, "m4b-structure-poc-report", blockers);
   const promotion = await readJson(repoRoot, promotionPath, "m4b-fresh-promotion-report", blockers);
   blockers.push(...evaluateReportContracts({ config, report, promotion }));
+  if (
+    capture?.contract !== "western-m4b-fresh-blind-capture-policy-v1"
+    || capture?.minimumValidPhotos !== 30
+    || capture?.minimumLayouts !== 6
+    || capture?.minimumDevices !== 3
+    || capture?.layoutSlots?.length !== 6
+    || capture?.deviceSlots?.length !== 3
+    || capture?.poses?.length !== 6
+    || capture?.thresholdDecision !== config?.evaluation?.promotionDecision
+  ) {
+    blockers.push("m4b-fresh-capture-policy-drift");
+  }
+  const capturePack = resolveInside(repoRoot, capture?.capturePack);
+  try {
+    const html = await fs.readFile(capturePack, "utf8");
+    if (
+      !html.includes("western:m4b-fresh-blind-intake")
+      || !html.includes("m4b-structure-labeler/index.html")
+      || !html.includes("m4b-fresh-blind-metadata.json")
+    ) {
+      blockers.push("m4b-fresh-capture-pack-contract-missing");
+    }
+  } catch {
+    blockers.push("m4b-fresh-capture-pack-missing");
+  }
+  try {
+    const ingest = await fs.readFile(path.join(repoRoot, "scripts", "ingest-western-m4b-fresh-blind.mjs"), "utf8");
+    if (!ingest.includes("different-destination-exists") || ingest.includes("--replace")) {
+      blockers.push("m4b-fresh-capture-no-replacement-contract-drift");
+    }
+  } catch {
+    blockers.push("m4b-fresh-capture-ingest-missing");
+  }
 
   for (const [key, label] of [
     ["policy", "m4b-structure-policy"],
@@ -263,7 +298,7 @@ export async function auditM4bStructurePoc(repoRoot = process.cwd()) {
   return {
     ready: auditReady,
     engineeringReady: auditReady && report?.engineeringReady === true,
-    promotionOperationalReady: auditReady && promotion?.operationalReady === true,
+    promotionOperationalReady: auditReady && promotion?.operationalReady === true && capture != null,
     promotionReady,
     source: reportPath,
     promotionSource: promotionPath,

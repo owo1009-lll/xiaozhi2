@@ -731,6 +731,8 @@ POC → 扩大投入的前提,在 fresh-blind 集(≥30 张,≥6 曲目/版式,�
 
 当前执行状态:`eval:western-m4b-fresh-blind-promotion` 和其 live audit 已就位，会逐照片重算 SHA-256/标注绑定/保护集泄漏、上述四项指标及冲突注入，且即使通过也只能产生 `expandedInvestmentOnly=true`。fresh-blind intake 尚未存在，计数为 0/30 页、0/6 曲目/版式、0/3 设备，所以当前正确结论是“晋升评测工具完成、评测输入缺失”，不是“门槛已过”。
 
+该输入的可执行交付面也已完成:`docs/m4b-fresh-blind-capture-pack/index.html` 固定 6 个盲测版式槽×6 个拍摄姿态=36 个不可覆盖槽位，用 3 台物理设备交叉拍摄，并提供元数据/任务表下载及结构标注器入口。`npm run western:m4b-fresh-blind-intake -- --from "<capture-dir>"` 会对版式源 SHA-256、实体设备 ID、照片签名、标注完整性、照片-标注-批次绑定和阈值决定哈希做现场复核，只写 `fresh-blind-test-only/trainingEligible=false` 记录。已入库字节如果不同会拒绝，不允许用“重拍替换失败样本”改变冻结测试集。
+
 ### C.4 决策清单(等待负责人)
 
 | # | 决定 | 状态 |

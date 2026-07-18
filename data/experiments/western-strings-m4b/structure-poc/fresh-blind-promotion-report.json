@@ -35,7 +35,7 @@
     "intake": "data/private/western-strings-m4b-fresh-blind/intake.json",
     "intakePresent": false,
     "evaluator": "scripts/experiments/eval_western_m4b_fresh_blind_promotion.py",
-    "evaluatorSha256": "773f549b1da897a4b95e5a52e01986500d3526cbbc24cfa8c1f83aa205d9c0ce"
+    "evaluatorSha256": "c0417fea464766c5cd02e90e6dc46d77ec39a2e05b3c98f1e813bfb5cc894ed3"
   },
   "boundary": {
     "expandedInvestmentOnly": true,

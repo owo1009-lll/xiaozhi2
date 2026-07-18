@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>M4b fresh-blind 拍摄与标注包</title>
+  <style>
+    :root { font-family: system-ui, "Microsoft YaHei", sans-serif; color: #e5eef9; background: #07111f; }
+    body { max-width: 1120px; margin: auto; padding: 24px; line-height: 1.65; }
+    h1, h2 { color: #7dd3fc; }
+    .warning { border: 1px solid #fb923c; background: #43140766; padding: 14px; border-radius: 10px; }
+    .ok { border: 1px solid #34d399; background: #064e3b55; padding: 14px; border-radius: 10px; }
+    code { background: #172033; padding: 2px 5px; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { border: 1px solid #334155; padding: 7px; text-align: left; vertical-align: top; }
+    th { background: #172033; position: sticky; top: 0; }
+    button, a.button { display: inline-block; color: white; background: #0369a1; border: 0; padding: 10px 14px; border-radius: 7px; cursor: pointer; text-decoration: none; margin: 4px; }
+    li { margin: 7px 0; }
+  </style>
+</head>
+<body>
+  <h1>M4b fresh-blind 拍摄与标注包</h1>
+  <p>用途只有一个：为已签署冻结的 C.3.3 晋升门槛提供真实盲测输入。通过也只代表“可以扩大研究投入”，不打开生产或学生端自动采纳。</p>
+
+  <div class="warning">
+    <strong>盲测红线：</strong>选 6 张未被 M4b POC/训练/调参使用的谱页，不得使用 r2-01、r2-06、r3-01 的已登记版式，也不得复用仓库已冻结的 5 张 source-gold 和 8 张旧屏拍。阈值已于 2026-07-19 冻结；拍摄后不得因结果更换失败照片。
+  </div>
+
+  <h2>一次完成的顺序</h2>
+  <ol>
+    <li>在 6 张不同曲目/版式上分别写下 <code>layout-01</code>…<code>layout-06</code>，对每个源 PDF/图片计算 SHA-256。</li>
+    <li>准备 3 台物理不同的手机/相机，记为 <code>device-01</code>…<code>device-03</code>，在元数据中写明型号和不含个人信息的设备 ID。</li>
+    <li>下载元数据模板，填完 6 个版式和 3 台设备，文件名保持 <code>m4b-fresh-blind-metadata.json</code>。</li>
+    <li>按下表拍 36 张；最低要求是 30 张可判照片、6 种版式、3 台设备。文件名必须与 caseId 一致。</li>
+    <li>用 <a href="../m4b-structure-labeler/index.html">结构标注器</a> 逐张只标页角、系统、谱表、小节线类型、小节框和拍号区域；导出为 <code>&lt;caseId&gt;.structure.json</code>。</li>
+    <li>把照片、标注 JSON 和元数据放入同一目录，执行 <code>npm run western:m4b-fresh-blind-intake -- --from "&lt;该目录&gt;"</code>。</li>
+  </ol>
+  <div class="ok">入库器会验证图片签名、标注对照片 SHA-256 的绑定、版式/设备/批次字段、标签完整性和冻结阈值决定。任何已入库字节变化都会拒绝覆盖，没有 <code>--replace</code> 逃生口。</div>
+
+  <p><button id="metadata">下载元数据模板</button><button id="csv">下载 36 个任务 CSV</button></p>
+  <h2>36 个冻结拍摄槽位</h2>
+  <table><thead><tr><th>caseId</th><th>版式槽</th><th>设备槽</th><th>姿态</th><th>要求</th></tr></thead><tbody id="tasks"></tbody></table>
+
+  <script>
+    const layouts=Array.from({length:6},(_,i)=>`layout-${String(i+1).padStart(2,'0')}`);
+    const poses=[
+      ['p01-front','device-01','基本正面，整页+少量背景边缘'],
+      ['p02-left','device-02','左侧约 20–30°，整页可见'],
+      ['p03-right','device-03','右侧约 20–30°，整页可见'],
+      ['p04-curve','device-01','纸页自然弯曲，禁止数字变形'],
+      ['p05-shadow','device-02','保留自然侧影，但记谱仍可判'],
+      ['p06-distance','device-03','谱页占画面约 55–70%']
+    ];
+    const tasks=[];
+    layouts.forEach((layout,li)=>poses.forEach((pose,pi)=>tasks.push({caseId:`m4b-fresh-l${String(li+1).padStart(2,'0')}-p${String(pi+1).padStart(2,'0')}`,layout,poseId:pose[0],device:pose[1],instruction:pose[2]})));
+    document.querySelector('#tasks').innerHTML=tasks.map(t=>`<tr><td><code>${t.caseId}</code></td><td>${t.layout}</td><td>${t.device}</td><td>${t.poseId}</td><td>${t.instruction}</td></tr>`).join('');
+    function download(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();URL.revokeObjectURL(a.href)}
+    document.querySelector('#metadata').onclick=()=>download('m4b-fresh-blind-metadata.json',JSON.stringify({
+      contract:'western-m4b-fresh-blind-capture-metadata-v1',captureBatchId:'m4b-fresh-blind-batch-01',capturedBy:'',capturedAt:'',
+      confirmThresholdsFrozenBeforeCapture:true,confirmLayoutsExcludedFromPocAndTraining:true,confirmPhotosAndLabelsRemainTestOnly:true,confirmNoFailedCaptureWasSilentlyReplaced:true,
+      layouts:layouts.map(slot=>({slot,pieceOrLayoutId:'',sourceFingerprintSha256:''})),
+      devices:['device-01','device-02','device-03'].map(slot=>({slot,deviceId:'',makeModel:''}))
+    },null,2)+'\n','application/json');
+    document.querySelector('#csv').onclick=()=>download('m4b-fresh-blind-capture-tasks.csv','caseId,layoutSlot,deviceSlot,poseId,instruction\n'+tasks.map(t=>[t.caseId,t.layout,t.device,t.poseId,`"${t.instruction}"`].join(',')).join('\n')+'\n','text/csv');
+  </script>
+</body>
+</html>

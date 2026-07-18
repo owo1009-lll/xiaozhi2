@@ -29,14 +29,17 @@ async function writeJson(root, relativePath, value) {
 async function buildFixture(root) {
   const fixed = [
     "config/western-m4b-structure-poc.json",
+    "config/western-m4b-fresh-blind-capture.json",
     "config/western-m4b-dataset.json",
     "data/experiments/western-strings-m4b-poc-promotion-threshold-decision.json",
     "data/experiments/western-strings-m4b/dataset/manifest.json",
     "scripts/western_m4b_structure_poc.py",
+    "scripts/ingest-western-m4b-fresh-blind.mjs",
     "scripts/experiments/eval_western_m4b_structure_poc.py",
     "scripts/experiments/eval_western_m4b_fresh_blind_promotion.py",
   ];
   await Promise.all(fixed.map((value) => copyRelative(root, value)));
+  await copyRelative(root, "docs/m4b-fresh-blind-capture-pack/index.html");
   await fs.cp(
     path.join(REPO, "data", "experiments", "western-strings-m4b", "structure-poc"),
     path.join(root, "data", "experiments", "western-strings-m4b", "structure-poc"),

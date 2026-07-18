@@ -1,0 +1,68 @@
+{
+  "contract": "western-m4b-fresh-blind-capture-policy-v1",
+  "captureBatchId": "m4b-fresh-blind-batch-01",
+  "defaultSourceRoot": "../m4b-fresh-blind-capture",
+  "metadataFileName": "m4b-fresh-blind-metadata.json",
+  "layoutSlots": [
+    "layout-01",
+    "layout-02",
+    "layout-03",
+    "layout-04",
+    "layout-05",
+    "layout-06"
+  ],
+  "deviceSlots": [
+    "device-01",
+    "device-02",
+    "device-03"
+  ],
+  "poses": [
+    {
+      "poseId": "p01-front",
+      "deviceSlot": "device-01",
+      "instruction": "Mostly frontal; include the entire physical page and a small background border."
+    },
+    {
+      "poseId": "p02-left",
+      "deviceSlot": "device-02",
+      "instruction": "Photograph from the left at about 20-30 degrees; keep the complete page visible."
+    },
+    {
+      "poseId": "p03-right",
+      "deviceSlot": "device-03",
+      "instruction": "Photograph from the right at about 20-30 degrees; keep the complete page visible."
+    },
+    {
+      "poseId": "p04-curve",
+      "deviceSlot": "device-01",
+      "instruction": "Use a naturally curved paper page; do not digitally warp or enhance it."
+    },
+    {
+      "poseId": "p05-shadow",
+      "deviceSlot": "device-02",
+      "instruction": "Allow a natural side shadow while keeping all notation judgeable."
+    },
+    {
+      "poseId": "p06-distance",
+      "deviceSlot": "device-03",
+      "instruction": "Increase distance so the page occupies about 55-70 percent of the frame."
+    }
+  ],
+  "acceptedImageExtensions": [
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".webp"
+  ],
+  "minimumValidPhotos": 30,
+  "minimumLayouts": 6,
+  "minimumDevices": 3,
+  "requiredMetadataConfirmations": [
+    "confirmThresholdsFrozenBeforeCapture",
+    "confirmLayoutsExcludedFromPocAndTraining",
+    "confirmPhotosAndLabelsRemainTestOnly",
+    "confirmNoFailedCaptureWasSilentlyReplaced"
+  ],
+  "thresholdDecision": "data/experiments/western-strings-m4b-poc-promotion-threshold-decision.json",
+  "capturePack": "docs/m4b-fresh-blind-capture-pack/index.html"
+}

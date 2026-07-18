@@ -31,6 +31,13 @@ def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def resolve_inside(relative_path: str) -> Path | None:
+    if not relative_path or Path(relative_path).is_absolute():
+        return None
+    target = (REPO / relative_path).resolve()
+    return target if REPO in target.parents else None
+
+
 def exact_structure(result: dict[str, Any], labels: dict[str, Any]) -> bool:
     evidence = result.get("structureEvidence", {})
     systems = evidence.get("systems", [])
@@ -127,6 +134,66 @@ def evaluate() -> dict[str, Any]:
     if len({row.get("caseId") for row in rows}) != len(rows):
         blockers.append("m4b-fresh-blind-duplicate-case-id")
 
+    attestation = intake.get("captureAttestation", {})
+    if (
+        attestation.get("contract") != "western-m4b-fresh-blind-capture-attestation-v1"
+        or attestation.get("noReplacementAllowed") is not True
+        or attestation.get("trainingEligible") is not False
+        or not attestation.get("confirmations")
+        or not all(value is True for value in attestation.get("confirmations", {}).values())
+    ):
+        blockers.append("m4b-fresh-blind-capture-attestation-invalid")
+    attested_artifacts = [
+        ("capturePolicy", "capturePolicySha256", "m4b-fresh-capture-policy"),
+        ("captureMetadata", "captureMetadataSha256", "m4b-fresh-capture-metadata"),
+        ("thresholdDecision", "thresholdDecisionSha256", "m4b-fresh-threshold-decision"),
+    ]
+    capture_policy: dict[str, Any] = {}
+    capture_metadata: dict[str, Any] = {}
+    for path_key, hash_key, label in attested_artifacts:
+        artifact = resolve_inside(str(attestation.get(path_key) or ""))
+        if artifact is None or not artifact.is_file() or file_hash(artifact) != attestation.get(hash_key):
+            blockers.append(f"{label}-binding-invalid")
+            continue
+        if path_key == "captureMetadata":
+            try:
+                capture_metadata = load_json(artifact)
+            except Exception:
+                blockers.append("m4b-fresh-capture-metadata-invalid")
+        if path_key == "capturePolicy":
+            try:
+                capture_policy = load_json(artifact)
+            except Exception:
+                blockers.append("m4b-fresh-capture-policy-invalid")
+    if resolve_inside(str(attestation.get("thresholdDecision") or "")) != decision_path.resolve():
+        blockers.append("m4b-fresh-threshold-decision-path-mismatch")
+    if (
+        capture_policy.get("contract") != "western-m4b-fresh-blind-capture-policy-v1"
+        or capture_policy.get("minimumValidPhotos") != decision["freshBlindMinimums"]["pages"]
+        or capture_policy.get("minimumLayouts") != decision["freshBlindMinimums"]["piecesOrLayouts"]
+        or capture_policy.get("minimumDevices") != decision["freshBlindMinimums"]["devices"]
+    ):
+        blockers.append("m4b-fresh-capture-policy-minimum-drift")
+    if (
+        capture_metadata.get("contract") != "western-m4b-fresh-blind-capture-metadata-v1"
+        or capture_metadata.get("captureBatchId") != attestation.get("captureBatchId")
+    ):
+        blockers.append("m4b-fresh-capture-metadata-contract-mismatch")
+    for field in capture_policy.get("requiredMetadataConfirmations", []):
+        if capture_metadata.get(field) is not True or attestation.get("confirmations", {}).get(field) is not True:
+            blockers.append(f"m4b-fresh-capture-confirmation-invalid:{field}")
+    metadata_layouts = capture_metadata.get("layouts", [])
+    metadata_devices = capture_metadata.get("devices", [])
+    metadata_layout_ids = {row.get("pieceOrLayoutId") for row in metadata_layouts if row.get("pieceOrLayoutId")}
+    metadata_device_ids = {row.get("deviceId") for row in metadata_devices if row.get("deviceId")}
+    metadata_fingerprints = {row.get("sourceFingerprintSha256") for row in metadata_layouts if row.get("sourceFingerprintSha256")}
+    if (
+        len(metadata_layout_ids) != len(capture_policy.get("layoutSlots", []))
+        or len(metadata_fingerprints) != len(capture_policy.get("layoutSlots", []))
+        or len(metadata_device_ids) != len(capture_policy.get("deviceSlots", []))
+    ):
+        blockers.append("m4b-fresh-capture-distinct-layout-or-device-proof-invalid")
+
     manifest_path = REPO / dataset_policy["outputRoot"] / "manifest.json"
     manifest = load_json(manifest_path)
     protected_hashes = {
@@ -156,12 +223,17 @@ def evaluate() -> dict[str, Any]:
         photo_sha256 = file_hash(photo)
         labels = label.get("labels", {})
         binding_ready = (
-            label.get("contract") == "western-m4b-real-structure-label-v1"
+            row.get("trainingEligible") is False
+            and row.get("role") == "fresh-blind-test-only"
+            and label.get("contract") == "western-m4b-real-structure-label-v1"
             and label.get("caseId") == row.get("caseId")
             and label.get("photoSha256") == photo_sha256
             and label.get("pieceOrLayoutId") == row.get("pieceOrLayoutId")
             and label.get("deviceId") == row.get("deviceId")
             and label.get("captureBatchId") == row.get("captureBatchId")
+            and row.get("pieceOrLayoutId") in metadata_layout_ids
+            and row.get("deviceId") in metadata_device_ids
+            and row.get("captureBatchId") == attestation.get("captureBatchId")
             and labels.get("judgeable") is True
             and all(name in labels for name in required)
         )

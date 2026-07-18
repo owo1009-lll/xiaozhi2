@@ -15,6 +15,7 @@
 ## 2026-07-19 当前分支刷新
 
 - **M4b 结构 POC 现已完成工程闭环:** 四层主链已落地为页面/透视/弯曲归一化、显式五线谱/系统/小节线/小节框/拍号区域证据、确定性结构图冲突解码、以及坐标可归属的多引擎 shadow challenger。冻结 synthetic-test 12/12 页上小节框 F1=1.000、整页结构完全正确率=1.000、拍号区域 F1=1.000、冲突注入转 `structure-review-required`=12/12。live audit 重算指标并验证每页 result/overlay/原图哈希，伪造合成证据晋升、学生端边界和空数据晋升均会 fail-closed。当前 `m4bStructurePocEngineeringReady=true`、`m4bStructurePocPromotionOperationalReady=true`，但这仍只是 `synthetic-engineering-only`；真实 fresh-blind 为 0/30 页、0/6 版式、0/3 设备，所以 `m4bStructurePocPromotionReady=false`、`m4bOpenWorldOmrAutomaticAdoptionReady=false`。C.3.2 的 100–300 张真实结构标注是晋升后扩大数据投入的目标，不得反向写成 POC 晋升前置条件。
+- **M4b 外部数据入口已收口:** `docs/m4b-fresh-blind-capture-pack/index.html` 冻结 6 版式×6 姿态的 36 个拍摄槽位和 3 台物理设备分配，并直达结构标注器。`western:m4b-fresh-blind-intake` 会验证版式源指纹、设备去重、图片-标注 SHA-256 绑定、冻结决定和 test-only 确认，且不提供覆盖旧样本的 `--replace` 逃生口。因此当前剩下的 M4b blocker 是真实拍摄+逐页结构标注本身，不再是缺采集/入库/评测工具。
 
 - 当前分支为 `feature/model-bakeoff-omr-align`;本节以 2026-07-18 本地 live 复跑和物理产物审计为准,不使用会因本次提交而自指失效的固定提交号。该分支已包含 HOMR 受控离线治理、M3+ 四区 v2 fail-closed 审计、动态闸学生域预考、round-3 reserve/实现验收材料(非发布 fresh-blind)和 8 张屏拍域基准;这些变化不改变默认学生端闸门。
 - 已在该分支依次重新运行 `npm run western:m4-p0-structure-gate`、`npm run western:project-status` 和 `npm run western:project-gate`。P0 冻结 5 谱结果为完整 `1/5`,谱号/调号/拍号=`3/5,2/5,2/5`,`studentGateReady=false`。
