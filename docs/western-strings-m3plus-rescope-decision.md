@@ -29,7 +29,7 @@
 
 任一行不达标 → 该区保持 review-only;学生端开关仍走既有审批链。
 
-当前权威状态是:平拉 12 个来源单元中 8 个可判但独立 gold join=`0/12`;保护区仅 8/14 实际执行、round2 6 个仍是 declared-only;揉弦/滑音独立 gold join=`0/8`,仅有 `3/8` score-intent center decision coverage。三者都不能称为独立精度已经通过。
+当前权威状态(2026-07-18 更新):平拉 12 个来源单元独立逐音 intonation gold join=`12/12`(负责人逐单元标注);保护区 14/14 实际执行——round2 声明的 6 个 tr 单元已经 r2-06 全谱伪单元定位逐单元通过同一策略(6/6 中性、指控 0,protectedScoreUnits gold join 6/6);揉弦/滑音独立 gold join=`8/8`,techniqueCenter 区通过。五区 `releaseGateReady=true`。历史口径(8 可判/join `0/12`、8/14+6 declared-only、join `0/8` 仅 `3/8` coverage)保留为 2026-07-17 前的状态记录。发布授权与学生闸门仍关闭,须走独立批准链。
 
 ## 理由(证据链)
 

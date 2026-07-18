@@ -18,7 +18,7 @@
 - 已在该分支依次重新运行 `npm run western:m4-p0-structure-gate`、`npm run western:project-status` 和 `npm run western:project-gate`。P0 冻结 5 谱结果为完整 `1/5`,谱号/调号/拍号=`3/5,2/5,2/5`,`studentGateReady=false`。
 - 这里的 P0 `1/5` 只表示同一 5 谱中的谱号/调号/拍号结构闸门;真实照片 pitch+onset+measure 完整自动采纳仍为 `0/5`,12 份历史照片链缓存重放中的 P0-ready 又是 `0/12`。三个数字对应不同门槛或数据集,不得互相替换;`m4P0StructureReady=true` 也只表示至少 1 谱 P0-ready,不表示 M4 自动采纳通过。
 - 当前运行时仍为 `ordinaryUploadAutoFeedbackReady=false`,`m3plusAutoFeedbackReady=false`,`m4OmrAutoScoreReady=false`,`policy=fail-closed`。
-- 当前项目总闸门要求 ordinary/M3+/M4 三轨同时通过。M3+ v2 因保护库存仅 8/14 实际执行、平拉独立逐音 gold join=`0/12`、揉弦/滑音 join=`0/8` 而 fail-closed;ordinary 当前由 dynamic-shadow review-only 合同阻断,M4 automatic adoption 也未达标。`western:project-gate` 因此按设计非零退出。
+- 当前项目总闸门要求 ordinary/M3+/M4 三轨同时通过。2026-07-18 更新:M3+ v2 五区证据已完整(保护库存 14/14 实际执行、平拉独立逐音 gold join=`12/12`、揉弦/滑音 join=`8/8`,`releaseGateReady=true`),现仅因独立授权位(`m3plus-authorization-closed`/`m3plus-student-gate-closed`)fail-closed;ordinary 的 r3 验收已通过,仅剩 `authorization-closed`/`energy-veto-excluded-review-only` 两个设计位;M4 automatic adoption 仍未达标。`western:project-gate` 因此按设计非零退出。(旧值 8/14、0/12、0/8 为 2026-07-17 前的历史状态。)
 - HOMR v3 的具名 AGPL/六模型审查现为 `approved-with-conditions`,唯一批准范围 `controlled-offline-review-only`;稳定运行时已迁至 `data/tools/`,live preflight 的 governance/host/deployment 三项均绿。preflight 现与 review-record SHA-256 绑定,审批或 artifact 漂移会令 `project-status/project-gate` fail-closed。学生端网络使用、自动采纳与再分发仍未获授权;这里的三绿不得写成默认生产发布通过。
 - 刷新产物为 `data/experiments/western-strings-m4/p0-structure-gate/report.json`、`data/experiments/western-strings-project-status.json` 与 `data/experiments/western-strings-project-gate.json`;三者位于 `data/` 忽略目录,用于本地可复跑状态,不等同于已提交证据。
 - release review、controlled-pilot decision 与 start preflight 已按当前合同重新生成并明确为红:`readyForControlledPilotDecision=false`,`readyToStartControlledPilot=false`,`okToStartControlledPilot=false`。它们绑定当前 live evidence,不是沿用旧 v1 绿灯;现有 approval 因 scope 过期且缺持久化安全确认也不被接受。
@@ -44,7 +44,7 @@
 - 新一轮 M3+ 只完成 review-only 库存清点:444 个音符中 292 个被列为行为候选;这不改变运行时门槛。
 - 已找到随录音放置的 `README-怎么用.md`,确认 `r2-02` / `r2-03` / `r2-04` 的错误数量分别为 5 / 5 / 4。README 没有具体小节且 `notes.txt` 仍缺失,因此只能做数量对照和机器位置搜索,不能计算精确 recall/precision。
 - README 数量约束下的 Basic Pitch + 序列 DTW 搜索得到:错音阈值候选 5 个;漏音保守候选 3 个,未覆盖 README 目标数量;拖拍阈值候选 5 个,按目标数保留前 4 个。它们均为未人工确认的机器假设,没有进入学生反馈。
-- 当前默认学生发布仍关闭。旧 RF 受控证据的 precision=1/coverage=0.04 只解释路线转向,不是实时 blocker。当前 ordinary dynamic-shadow 为 `foundationReady=true`,但 live artifact verifier 未实现、r3 接受性未执行、独立授权关闭、因果能量否决未冻结;M3+ gold-free runtime foundation/物理 audit 已通过,但 v2 离线证据仍因 declared-only 与独立 gold 缺口转红;M4 OMR 自动采纳也未达标。
+- 当前默认学生发布仍关闭。旧 RF 受控证据的 precision=1/coverage=0.04 只解释路线转向,不是实时 blocker。2026-07-18 更新:ordinary dynamic-shadow 为 `foundationReady=true`,live artifact verifier 已实现、r3 接受性已通过,剩余为独立授权关闭与因果能量否决未冻结;M3+ gold-free runtime foundation/物理 audit 通过且 v2 离线证据已完整(declared-only 与独立 gold 缺口均已关闭),剩余为独立授权;M4 OMR 自动采纳仍未达标。
 - M3 core 的历史人工/gold 闸虽通过,pitch/onset/missing 三类有效错误样本各只有 `2` 个（均 2/2,unsafe=0）;这是低浓度证据,不能把 100% 小样本写成充分扩证。
 
 ## 1. 当前目标
@@ -105,15 +105,15 @@
 - 决定文档为 `docs/western-strings-m3plus-rescope-decision.md`;颤音/装饰音音频检测、窗边界继续调参和粗状态分类器已退出发布链,只保留为研究证据。
 - 统一离线入口为 `npm run western:m3plus-rescope-gate`,输出 `data/experiments/western-strings-m3plus/rescope-gate/report.json`。
 - 无标记平拉 holdout:8 个可判、8 个与谱面意图一致、unsafe=0、4 个证据不足;这是受控离线安全 probe,不是整条发布链已通过。
-- 谱面保护区实际经过四区策略的只有 8 个 m3p holdout 单元,8/8 均中性且指控数=0。round2 人工记录另声明 6 个 tr 单元,但它们没有逐单元进入同一策略;因此只能记为 `evaluatedProtectedCount=8`,`declaredOnlyProtectedCount=6`,不得合写成“14 个全部中性化”。泛音中性化仍只由规则与回归测试覆盖。
-- 揉弦/滑音中心音高的 `3/8=37.5%` 只表示 8 个谱面意图目标中 3 个得到 `confirmed_center`,即 score-intent center agreement/decision coverage;它不是独立人工 intonation gold precision。当前独立逐音 intonation gold join=`0/8`,所以 agreement/precision 不可定义,其余 5 个为 `insufficient_evidence`。
+- 谱面保护区(2026-07-18 更新):round2 声明的 6 个 tr 单元已通过补充评测器逐单元实际执行同一四区策略(r2-06 全谱伪单元定位+holdout,6/6 中性且指控数=0,protectedScoreUnits gold join 6/6),冻结库存达到 `evaluatedProtectedCount=14`,`declaredOnlyProtectedCount=0`。此前"只有 8 个 m3p holdout 单元实际执行、6 个仅声明"为历史状态。泛音中性化仍只由规则与回归测试覆盖。
+- 揉弦/滑音中心音高的 `3/8=37.5%` 只表示 8 个谱面意图目标中 3 个得到 `confirmed_center`,即 score-intent center agreement/decision coverage;它不是独立人工 intonation gold precision。2026-07-18 更新:负责人已逐单元标注独立 intonation gold(20 条,含 8 个揉弦/滑音目标),join=`8/8`,techniqueCenter 区按四区闸通过;旧 join=`0/8` 为历史状态。
 - round2 的 17 个揉弦单元只有“演奏了揉弦”的人工执行确认,没有与上述 8 个候选逐音连接的稳定中心音高标签,继续列为 unscored;不得拿它们补足独立音准 gold。
 - 高离散度用原始诊断独立枚举后,3/3 输出 `insufficient_evidence`,指控数=0。
-- 当前 v2 `releaseGateReady=false`,`offlineEvidenceReady=false`,`readyForMonitoredPilot=false`。离线 probe、gold-free runtime foundation、物理来源 runtime audit、发布授权和学生闸门必须分层报告;任何一层不得替代下一层。
+- 当前 v2(2026-07-18):`releaseGateReady=true`,`offlineEvidenceReady=true`,`readyForMonitoredPilot=true`;发布授权与学生闸门仍关闭。离线 probe、gold-free runtime foundation、物理来源 runtime audit、发布授权和学生闸门必须分层报告;任何一层不得替代下一层。
 - gold-free runtime policy 只允许从谱面标记、pYIN 帧/有声率、中心/离散度和窗口边界作决定,不得读取 `expectedBehavior`、评测 split 或人工 gold。即使接线成功,保护区、低有声率、高离散度或缺字段仍须 fail-closed,候选与外层输出仍固定 `review_required`,`studentFacing=false`,`feedbackAuthorized=false`。
 - 最新物理 batch `strings-batch-mrq5lf8u-cr2dqk` 已产生 59/59 条合同有效的 M3+ 证据,score identity 完全一致,候选 artifact SHA-256=`3b6390877072d1e09591bc9f13f0e22f64b0f3602617cac1f7dd9ada7d7410b4`;`runtimeFoundationReady=true`,`runtimeAuditReady=true`,其中 46 条 `confirmed_center`、13 条 `insufficient_evidence`,没有自动或学生输出。物理审计固定并重哈希 5 个规范 source bindings(machine report、human gold、M3 core gate、rescope decision、evaluator),再核对物理 JSONL 尾批、完整 candidate artifact、score store/score identity、policy、analyzer(raw + CRLF-normalized SHA-256=`65ea46768bf23e51aac4083c3fd08fecbeb2d81d8af4effc5aaae482bc7a279d`)以及 Python/librosa/numpy/pYIN 参数;任一规范路径替换、同批多 ordinary item、runtime 未 ready 或 standalone candidate audit 缺 M3 runtime 都会 fail-closed。这只证明 gold-free review-only 接线可审计。
 - `project-status` 每次构建还会从当前磁盘重读候选 artifact、runtime policy、analyzer 和 rescope report,逐项重算 raw SHA-256;任一路径缺失、越界或内容漂移都会把 `physicalEvidenceCurrent/runtimeFoundationReady` 转红,并经同一 live-evidence 判定阻断 release review、decision 与 preflight。缓存 audit 与缓存 release report 彼此自洽不再足以放行。
-- `studentGateReady=false`,`m3plusAutoFeedbackReady=false` 保持不变;当前离线证据缺口是补齐 6 个 declared-only 保护单元使冻结库存达到 14/14 实际执行,并为 12 个平拉来源单元和 8 个揉弦/滑音目标提供可按 recording/measure/unit 连接的独立逐音 intonation gold。发布授权仍需在这些证据转绿后单独建立。
+- `studentGateReady=false`,`m3plusAutoFeedbackReady=false` 保持不变。2026-07-18 更新:上述离线证据缺口已全部关闭——6 个 declared-only 保护单元完成实际执行(14/14),12 个平拉来源单元与 8 个揉弦/滑音目标的独立逐音 intonation gold 已按 recording/measure/unit 连接(负责人标注)。剩余仅为发布授权,需按批准链单独建立。
 - 双音 multi-f0 支线范围不变,不由本次单声部中心音高闸门放行。
 
 #### 历史执行证据(保留,不再决定发布)

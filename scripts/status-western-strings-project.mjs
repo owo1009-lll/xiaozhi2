@@ -3267,9 +3267,9 @@ export function summarizeNextActions(
     actions.push({
       priority: 2,
       track: "M3+ pitch safety rescope",
-      action: "The respecified offline pitch-safety gate passes. Keep the student runtime disabled until score-marked neutralization, center-pitch decisions, and insufficient-evidence fallbacks are wired and separately audited. Legacy technique detectors remain research-only.",
+      action: "The respecified offline pitch-safety gate passes and the review-only gold-free runtime is wired and physically audited. Keep the student runtime disabled: the student/pilot executor and the release authorization are the parts that are not wired. Legacy technique detectors remain research-only.",
       artifact: m3plus.rescopeGate?.source || m3plus.reviewArtifacts.rescopeGateJson,
-      reason: ["m3plus-runtime-disabled-by-default", "m3plus-rescope-runtime-not-wired"],
+      reason: ["m3plus-runtime-disabled-by-default", "m3plus-student-executor-and-authorization-not-wired"],
     });
   }
   if (!m4Omr.m4OmrIndependentBenchmarkReady) {
