@@ -60,6 +60,8 @@ def load_units() -> list[dict]:
                 "expectedBehavior": str(row.get("expectedBehavior")),
                 "basePitch": str(row.get("basePitch") or ""),
                 "baseMidi": row.get("baseMidi"),
+                "auxiliaryPitch": str(row.get("auxiliaryPitch") or ""),
+                "auxiliaryMidi": row.get("auxiliaryMidi"),
                 "startSec": float(row.get("firstVoicedSeconds") or 0.0),
                 "endSec": float(row.get("lastVoicedSeconds") or 0.0),
             })
@@ -90,8 +92,12 @@ def slice_clips(units: list[dict]) -> None:
         name = f"{unit['recordingId']}-m{unit['measure']}-u{unit['unitIndex']}.wav"
         sf.write(str(clips / name), clip, sr)
         unit["clip"] = f"clips/{name}"
-        # equal-tempered reference tone (A4=440) for center-pitch comparison
-        midi = unit.get("baseMidi")
+        # equal-tempered reference tone (A4=440) for center-pitch comparison.
+        # Slide units are judged on the ARRIVAL note: reference = auxiliary
+        # (slide target), not the slide-source base pitch (owner report).
+        midi = (unit.get("auxiliaryMidi")
+                if unit["expectedBehavior"] == "slide-source" and unit.get("auxiliaryMidi") is not None
+                else unit.get("baseMidi"))
         if isinstance(midi, (int, float)):
             ref_name = f"ref-{int(midi)}.wav"
             ref_path = clips / ref_name
@@ -114,7 +120,7 @@ def render_html(units: list[dict]) -> str:
         rows.append(f"""
 <div class="unit" data-recording="{html.escape(unit['recordingId'])}" data-measure="{unit['measure']}" data-unit="{unit['unitIndex']}">
   <h3>{index + 1}/{len(units)} — {html.escape(uid)} <span class="tag">{behavior_cn}</span></h3>
-  <p>谱面音高:<b>{html.escape(unit['basePitch'])}</b>(MIDI {unit['baseMidi']}),第 {unit['measure']} 小节。{html.escape(guidance)}</p>
+  <p>{('滑音:从 <b>' + html.escape(unit['basePitch']) + '</b> 起滑,目标音 <b>' + html.escape(unit.get('auxiliaryPitch') or '') + '</b>(参考音=目标音)') if unit['expectedBehavior'] == 'slide-source' else ('谱面音高:<b>' + html.escape(unit['basePitch']) + '</b>')},第 {unit['measure']} 小节。{html.escape(guidance)}</p>
   <p>演奏切片:<audio controls preload="none" src="{unit['clip']}"></audio>
      标准参考音:<audio controls preload="none" src="{unit.get('referenceTone', '')}"></audio></p>
   <div class="btns">
