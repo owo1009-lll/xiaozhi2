@@ -1,6 +1,6 @@
 # M3+ 范围重定决定(2026-07-17,项目负责人拍板)
 
-> 本决定已于 2026-07-17 并入 `western-strings-project-plan.md` 与 `western-strings-migration-plan.md` 的 M3+ 权威段落。本文继续作为范围变更记录;历史执行状态段落保留,不删改。
+> 本决定已于 2026-07-17 并入 `western-strings-project-plan.md` 与 `western-strings-migration-plan.md` 的 M3+ 权威段落。2026-07-18 的证据完整性勘误进一步冻结了独立逐音 gold 与保护单元分母;本文是 rescope gate 的物理 source binding,不得保留与当前闸门矛盾的旧口径。
 
 ## 决定
 
@@ -17,17 +17,19 @@
 
 ## 新闸门(直接考目的,不考手段)
 
-在**既有** holdout 数据上评测(m3p 四条 + round2 + 直音负对照 + `western-strings-round2-m3plus-human-gold.json` 人工确认,**无需新录音**):
+现有 m3p/round2/直音对照可以继续作为受控 probe,但“演奏者确认做了揉弦/颤音”只证明技法执行,**不等于独立逐音音准 gold**。发布闸门必须冻结完整单位库存并逐单位连接可审计 gold;如现有录音无法补出可靠标签,再补录,不得靠删除声明或缩小分母变绿:
 
 | 区域 | 要求 |
 |---|---|
-| 无标记平拉区 | 音准判定 precision ≥90%,unsafe=0 |
-| 谱面标记区(tr/装饰/泛音) | **指控数必须=0**(全部 review/中性) |
-| 揉弦/滑音区(人工 gold 确认段) | 中心音高判定 precision ≥90% |
+| 无标记平拉区 | 冻结 12 个 holdout 单元,12/12 连接独立逐音 intonation gold;可判子集 agreement/precision ≥90%,false-positive/unsafe=0 |
+| 谱面标记区(tr/装饰/泛音) | 冻结总分母 14:现有 8 个 m3p + round2 6 个具名保护单元必须全部实际经过同一策略;14/14 `insufficient_evidence`,**指控数=0** |
+| 揉弦/滑音区 | 冻结 8 个目标,8/8 按 recording/measure/unit 连接独立逐音 intonation gold;可判子集 agreement/precision ≥90%,false-positive/unsafe=0 |
 | 节奏/起音 | 沿用 M3 core 闸门,不变 |
 | 不稳兜底 | 高离散音 100% 落入 `insufficient_evidence`,0 指控 |
 
 任一行不达标 → 该区保持 review-only;学生端开关仍走既有审批链。
+
+当前权威状态是:平拉 12 个来源单元中 8 个可判但独立 gold join=`0/12`;保护区仅 8/14 实际执行、round2 6 个仍是 declared-only;揉弦/滑音独立 gold join=`0/8`,仅有 `3/8` score-intent center decision coverage。三者都不能称为独立精度已经通过。
 
 ## 理由(证据链)
 
@@ -37,6 +39,7 @@
 
 ## 对现有资产的处置
 
-- m3p 四条录音与负对照:**直接复用**为新闸门的评测集(价值不变);
+- m3p 四条录音与负对照:继续复用为受控 probe,但必须补独立逐音 gold 才能进入发布分母;
+- round2 的 6 个 tr 执行确认:保留为待逐单位执行策略的库存,不得通过把 `trillExpectedNoteCount` 改成 0 或删除 human declaration 来消除;
 - 既有检测器/复核包/诊断命令:保留为研究工具,退出发布链;
 - 手册合并点:替换 M3+ 节"目的/单声部音高模式/验收"三段,其余(执行状态史)原样保留。
