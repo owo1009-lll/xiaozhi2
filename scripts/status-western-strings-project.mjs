@@ -13,6 +13,12 @@ import {
 } from "./status-western-controlled-candidate-review.mjs";
 import { evaluateOrdinaryAudioRuntime } from "./run-western-ordinary-audio-python.mjs";
 import { auditOrdinaryDynamicShadowAcceptanceLiveArtifacts } from "./audit-western-ordinary-dynamic-shadow-acceptance.mjs";
+import {
+  FRESH_BLIND_CONTRACT,
+  FRESH_BLIND_REPORT_RELATIVE_PATH,
+  auditFreshBlindEvidence,
+  auditFreshBlindEvidenceLiveArtifacts,
+} from "./eval-western-ordinary-fresh-blind.mjs";
 
 const DEFAULT_OUT = path.join("data", "experiments", "western-strings-project-status.json");
 const REVIEW_POLICY_DOC = path.join("docs", "western-strings-review-policy.md");
@@ -2468,6 +2474,15 @@ async function buildOrdinaryDynamicShadowStatus() {
     ? auditOrdinaryDynamicShadowAcceptanceLiveArtifacts({ acceptance, runtimeReport: runtime })
     : { ready: false, blockingReasons: ["ordinary-dynamic-shadow-r3-live-audit-skipped-schema-invalid"] };
   const r3AcceptanceReady = acceptanceValidation.ready === true && liveArtifactAudit.ready === true;
+  // Fresh-blind evidence (a performer/voice never used to tune any threshold)
+  // is a separate prerequisite for the release-v1 authorization; it is
+  // re-derived from disk on every status build so a stale or forged report
+  // cannot silently keep looking green.
+  const freshBlindReport = auditFreshBlindEvidence({});
+  const freshBlindLiveAudit = freshBlindReport.evidenceReady === true
+    ? auditFreshBlindEvidenceLiveArtifacts({})
+    : { ready: false, blockingReasons: ["fresh-blind-live-audit-skipped-evidence-not-ready"] };
+  const freshBlindEvidenceReady = freshBlindReport.evidenceReady === true && freshBlindLiveAudit.ready === true;
   return {
     contractVersion: ORDINARY_DYNAMIC_CONTRACT_VERSION,
     policyVersion: ORDINARY_DYNAMIC_POLICY_VERSION,
@@ -2490,6 +2505,23 @@ async function buildOrdinaryDynamicShadowStatus() {
     foundationScope: "implementation-and-live-runtime-preflight-only",
     liveArtifactVerifierReady: ORDINARY_DYNAMIC_ACCEPTANCE_LIVE_VERIFIER_IMPLEMENTED,
     r3AcceptanceReady,
+    freshBlindEvidence: {
+      contract: FRESH_BLIND_CONTRACT,
+      ready: freshBlindEvidenceReady,
+      recordingCount: freshBlindReport.recordingCount ?? 0,
+      cleanCoverage: (freshBlindReport.tiers?.cleanFull?.rows || []).map((row) => ({
+        recordingId: row.recordingId,
+        shadowCoverage: row.shadowCoverage,
+      })),
+      techniqueSafety: {
+        totalMarkedZoneRows: freshBlindReport.tiers?.techniqueSafety?.totalMarkedZoneRows ?? 0,
+        totalMarkedZoneAccusations: freshBlindReport.tiers?.techniqueSafety?.totalMarkedZoneAccusations ?? 0,
+      },
+      blockingReasons: normalizedReasonList([
+        ...(freshBlindReport.blockingReasons || []),
+        ...(freshBlindLiveAudit.blockingReasons || []),
+      ]),
+    },
     authorizationReady: false,
     studentGateReady: false,
     automaticAdoptionReady: false,
@@ -3237,11 +3269,19 @@ export function summarizeNextActions(
       artifact: shadow.acceptanceEvidence?.source || ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE.replace(/\\/g, "/"),
       reason: shadow.blockingReasons || ["ordinary-dynamic-shadow-r3-acceptance-not-run"],
     });
+  } else if (!shadow.freshBlindEvidence?.ready) {
+    actions.push({
+      priority: 1,
+      track: "Ordinary dynamic shadow fresh-blind evidence",
+      action: "Run `npm run western:ordinary-fresh-blind-eval` on a controlled batch from a performer/voice never used to tune any threshold. Clean-scenario recordings need shadow coverage above the frozen floor; any technique/marked-zone recording must show zero M3+ accusations. Error-scenario recordings without documented positions stay reference-only and must never be counted as precision evidence.",
+      artifact: FRESH_BLIND_REPORT_RELATIVE_PATH.replace(/\\/g, "/"),
+      reason: shadow.freshBlindEvidence?.blockingReasons || ["fresh-blind-evidence-not-run"],
+    });
   } else if (!shadow.authorizationReady) {
     actions.push({
       priority: 1,
       track: "Ordinary dynamic shadow authorization",
-      action: "The r3 implementation acceptance passed, but the dynamic shadow remains review-only. Prepare a separate fresh-blind authorization contract before any monitored pilot or student-facing promotion.",
+      action: "The r3 implementation acceptance and fresh-blind evidence both passed, but the dynamic shadow remains review-only by design. This needs the owner's explicit western-ordinary-dynamic-shadow-release-v1 authorization before any monitored pilot or student-facing promotion.",
       artifact: shadow.acceptanceEvidence?.source || ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE.replace(/\\/g, "/"),
       reason: ["ordinary-dynamic-shadow-authorization-closed"],
     });
