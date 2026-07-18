@@ -716,7 +716,7 @@
 
 2026-07-19 结构 POC 工程状态:四层链路已实现为 `western-m4b-explicit-structure-poc-policy-v1`。归一化层复用 M4a 页面检测/单应并追加三次多项式页边弯曲展平;结构层显式输出五线谱线、谱表/系统、小节线、小节框和拍号区域;解码层对谱表基数、小节线顺序/间距、拍号-时值和跨谱表合法性做确定性检查，冲突一律 `structure-review-required`;内容层仅将带坐标的 HOMR/Audiveris/Oemer 候选归属到结构小节，至少两引擎一致才保留，且固定 `shadowOnly=true`、`productionCandidatePool=false`、`studentFacing=false`。
 
-已按冻结 synthetic-test 拆分独立评测 12 张合成相机退化页:224 个小节框的 P/R/F1 均为 1.000，系统数+逐系统小节数完全正确为 12/12，拍号区域 F1=1.000，12 页拍号-时值冲突注入全部落 `structure-review-required`。`audit:western-m4b-structure-poc` 会重算汇总指标、重读每页 result/overlay/原图哈希，并强制合成报告不得把 `promotionReady` 改绿。**诚实边界:** 这 12 页只来自 3 个登记自制版本，拍号区域仍使用 calibration 拆分定出的归一化页面几何先验，因此满分只证明工程链与合成域可用，不证明开放域泛化。当前 `engineeringReady=true`、`promotionOperationalReady=true`、`promotionReady=false`;唯一晋升评测只读下节签署后的 fresh-blind 输入。C.3.2 的 100–300 张真实标注是 POC 过门后扩大投入的数据目标，不是 C.3.3 的循环前置条件。
+已按冻结 synthetic-test 拆分独立评测 12 张合成相机退化页:224 个小节框的 P/R/F1 均为 1.000，系统数+逐系统小节数完全正确为 12/12，拍号区域 F1=1.000，12 页拍号-时值冲突注入全部落 `structure-review-required`。`audit:western-m4b-structure-poc` 会重算汇总指标、重读每页 result/overlay/原图哈希，并强制合成报告不得把 `promotionReady` 改绿。**诚实边界:** 证据类固定为 `synthetic-engineering-only`;这 12 页只来自 3 个登记自制版本，拍号区域仍使用 calibration 拆分定出的归一化页面几何先验，因此满分只证明工程链与合成域可用，不证明开放域泛化。当前 `engineeringReady=true`、`promotionOperationalReady=true`、`promotionReady=false`;唯一晋升评测只读下节签署后的 fresh-blind 输入。C.3.2 的 100–300 张真实标注是 POC 过门后扩大投入的数据目标，不是 C.3.3 的循环前置条件。
 
 #### C.3.3 晋升门槛(✅ 2026-07-19 已签署冻结,不得因结果回调)
 
@@ -740,3 +740,5 @@ POC → 扩大投入的前提,在 fresh-blind 集(≥30 张,≥6 曲目/版式,�
 | 1 | 闸门拆分 M4a/M4b + `projectReleaseReady` 改绑 M4a | ✅ 2026-07-19 已签署并接线 |
 | 2 | C.3.3 晋升门槛数字冻结 | ✅ 2026-07-19 已签署并接入现场验签 |
 | 3 | M4a v1 工程开工(不依赖上两项,可先行) | ✅ C.2a-f 工程完成;真实验收等待 10 张精确版本屏拍+负责人逐框签署 |
+
+附录 C 全量 live audit 由 `npm run audit:western-appendix-c` 执行，并由 `test:western-appendix-c` 覆盖两类伪造:把 C.3.2 的 100–300 张扩张数据目标重新塞回 C.3.3 POC 晋升前置，以及在缺 fresh-blind 证据时打开 M4b 自动采纳。当前审计结果为 `engineeringComplete=true`、`appendixAcceptanceComplete=false`:前者表示附录中的决策、工程、数据、验收和晋升执行面均已就位;后者只保留 M4a 真实屏拍/负责人逐框签署和 M4b fresh-blind 拍摄/结构标注两组外部输入。

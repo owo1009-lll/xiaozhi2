@@ -297,6 +297,8 @@
     "test:western-m4b-structure-poc": "node scripts\\test-western-m4b-structure-poc.mjs",
     "western:m4b-fresh-blind-intake": "node scripts\\ingest-western-m4b-fresh-blind.mjs",
     "test:western-m4b-fresh-blind-intake": "node scripts\\test-western-m4b-fresh-blind-ingest.mjs",
+    "audit:western-appendix-c": "node scripts\\audit-western-appendix-c.mjs",
+    "test:western-appendix-c": "node scripts\\test-western-appendix-c-audit.mjs",
     "test:western-controlled-pilot-decision": "node scripts\\test-western-controlled-pilot-decision.mjs",
     "test:western-controlled-pilot-run": "node scripts\\test-western-controlled-pilot-session.mjs",
     "test:western-pilot-executors": "node scripts\\test-western-pilot-executors.mjs",

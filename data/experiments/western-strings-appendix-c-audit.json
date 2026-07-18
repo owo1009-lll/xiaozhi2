@@ -1,0 +1,92 @@
+{
+  "contract": "western-strings-appendix-c-audit-v1",
+  "auditComplete": true,
+  "engineeringComplete": true,
+  "appendixAcceptanceComplete": false,
+  "engineeringBlockingReasons": [],
+  "externalBlockingReasons": [
+    "m4a-real-photo-positive-missing:10",
+    "m4a-owner-measure-box-confirmation-not-ready",
+    "m4a-real-photo-poor-image-coverage-not-ready",
+    "m4b-fresh-blind-intake-missing"
+  ],
+  "decisions": {
+    "m4aGateSplitReady": true,
+    "m4bPromotionThresholdsReady": true
+  },
+  "m4a": {
+    "registryReady": true,
+    "registeredEditions": 3,
+    "runtimeReady": true,
+    "engineeringReady": true,
+    "realPhotoFlowOperationalReady": true,
+    "realPhotoAcceptanceReady": false,
+    "scaleCatalog": {
+      "documented": true,
+      "continuousLifecycleTarget": true,
+      "blocksInitialM4aAcceptance": false
+    }
+  },
+  "m4b": {
+    "dataFoundationReady": true,
+    "realAnnotationExpansionTargetReady": false,
+    "realAnnotationTargetBlocksPocPromotion": false,
+    "freshBlindIntakeOperationalReady": true,
+    "freshBlindDatasetReady": false,
+    "structurePocEngineeringReady": true,
+    "promotionOperationalReady": true,
+    "promotionReady": false,
+    "automaticAdoptionReady": false,
+    "syntheticMetrics": {
+      "measureBoxes": {
+        "truePositive": 224,
+        "falsePositive": 0,
+        "falseNegative": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1
+      },
+      "exactPageStructure": {
+        "passed": 12,
+        "total": 12,
+        "rate": 1
+      },
+      "meterRegions": {
+        "truePositive": 12,
+        "falsePositive": 0,
+        "falseNegative": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1
+      },
+      "structureConflictReviewRequired": {
+        "caught": 12,
+        "total": 12,
+        "rate": 1
+      }
+    },
+    "freshBlindCounts": {
+      "rows": 0,
+      "validRows": 0,
+      "piecesOrLayouts": 0,
+      "devices": 0
+    }
+  },
+  "runtimeBoundary": {
+    "studentM4AutoScoreReady": false,
+    "m4bAutomaticAdoptionReady": false,
+    "failClosed": true
+  },
+  "nextExternalActions": [
+    {
+      "track": "M4a",
+      "action": "Capture the 10 exact registered-version screen photos, run the frozen evaluator, then sign every projected measure box in the owner review pack.",
+      "pack": "docs/m4a-real-photo-capture-pack/index.html"
+    },
+    {
+      "track": "M4b",
+      "action": "Capture and structure-label at least 30 valid fresh-blind photos spanning six held-out layouts and three physical devices, then run the frozen promotion evaluator.",
+      "pack": "docs/m4b-fresh-blind-capture-pack/index.html"
+    }
+  ]
+}
