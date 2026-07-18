@@ -92,6 +92,9 @@ def slice_clips(units: list[dict]) -> None:
         name = f"{unit['recordingId']}-m{unit['measure']}-u{unit['unitIndex']}.wav"
         sf.write(str(clips / name), clip, sr)
         unit["clip"] = f"clips/{name}"
+        unit["_clipAudio"] = clip
+        unit["_fullAudio"] = (y, sr)
+        unit.setdefault("localizationUnreliable", False)
         # equal-tempered reference tone (A4=440) for center-pitch comparison.
         # Slide units are judged on the ARRIVAL note: reference = auxiliary
         # (slide target), not the slide-source base pitch (owner report).
@@ -110,6 +113,31 @@ def slice_clips(units: list[dict]) -> None:
                                                  (len(tone) - np.arange(len(tone))) / (0.15 * sr)))
                 sf.write(str(ref_path), tone * env.astype(np.float32), sr)
             unit["referenceTone"] = f"clips/{ref_name}"
+            # localization self-check: if the clip's median pitch is far from
+            # the reference, the machine window is degenerate (m3p-02 uses a
+            # uniform 0.4s grid for its early units) -> fall back to a wide
+            # context clip and tell the annotator to find the note by ear
+            clip_audio = unit.pop("_clipAudio")
+            y_full, sr_full = unit.pop("_fullAudio")
+            median_midi = None
+            try:
+                f0 = librosa.yin(clip_audio, fmin=180, fmax=1400, sr=sr_full)
+                f0 = f0[np.isfinite(f0)]
+                if len(f0):
+                    median_midi = float(librosa.hz_to_midi(np.median(f0)))
+            except Exception:
+                pass
+            unit.pop("_clipAudio", None) is not None
+            if median_midi is not None and abs(median_midi - float(midi)) > 1.5:
+                wide_start = max(0.0, unit["startSec"] - 1.2)
+                wide_end = min(len(y_full) / sr_full, unit["endSec"] + 1.2)
+                wide = y_full[int(wide_start * sr_full):int(wide_end * sr_full)].copy()
+                if len(wide) > 2 * fade:
+                    ramp = np.linspace(0.0, 1.0, fade, dtype=np.float32)
+                    wide[:fade] *= ramp
+                    wide[-fade:] *= ramp[::-1]
+                sf.write(str(clips / name), wide, sr_full)
+                unit["localizationUnreliable"] = True
 
 
 def render_html(units: list[dict]) -> str:
@@ -121,6 +149,9 @@ def render_html(units: list[dict]) -> str:
 <div class="unit" data-recording="{html.escape(unit['recordingId'])}" data-measure="{unit['measure']}" data-unit="{unit['unitIndex']}">
   <h3>{index + 1}/{len(units)} — {html.escape(uid)} <span class="tag">{behavior_cn}</span></h3>
   <p>{('滑音:从 <b>' + html.escape(unit['basePitch']) + '</b> 起滑,目标音 <b>' + html.escape(unit.get('auxiliaryPitch') or '') + '</b>(参考音=目标音)') if unit['expectedBehavior'] == 'slide-source' else ('谱面音高:<b>' + html.escape(unit['basePitch']) + '</b>')},第 {unit['measure']} 小节。{html.escape(guidance)}</p>
+  {('<p style="color:#b45309"><b>定位不精确:</b>此单元机器定位窗不可靠,切片放宽为上下文;请在其中用耳朵找到该音('
+     + html.escape((unit.get('auxiliaryPitch') or unit['basePitch']) if unit['expectedBehavior'] == 'slide-source' else unit['basePitch'])
+     + ' 的' + ('滑音' if unit['expectedBehavior'] == 'slide-source' else ('揉弦' if unit['expectedBehavior'] == 'vibrato' else '平拉')) + ')再判。</p>') if unit.get('localizationUnreliable') else ''}
   <p>演奏切片:<audio controls preload="none" src="{unit['clip']}"></audio>
      标准参考音:<audio controls preload="none" src="{unit.get('referenceTone', '')}"></audio></p>
   <div class="btns">
@@ -208,6 +239,7 @@ def merge(completed_path: Path) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--merge", type=Path)
+    parser.add_argument("--behaviors", nargs="+", choices=sorted(TARGET_BEHAVIORS))
     args = parser.parse_args()
     if args.merge:
         return merge(args.merge)
@@ -216,8 +248,12 @@ def main() -> int:
     counts = {b: sum(1 for u in units if u["expectedBehavior"] == b) for b in expected}
     if counts != expected:
         raise SystemExit(f"unit inventory mismatch: {counts} != {expected}")
+    if args.behaviors:
+        units = [u for u in units if u["expectedBehavior"] in set(args.behaviors)]
     slice_clips(units)
     (OUT / "index.html").write_text(render_html(units), encoding="utf-8")
+    for u in units:
+        u.pop("_clipAudio", None); u.pop("_fullAudio", None)
     (OUT / "units.json").write_text(json.dumps(
         {"evalOnly": True, "units": [{k: u[k] for k in u if k != "audioPath"} for u in units]},
         ensure_ascii=False, indent=1), encoding="utf-8")
