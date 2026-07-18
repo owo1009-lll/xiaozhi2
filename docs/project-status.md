@@ -1,6 +1,6 @@
 # 西洋弦乐练习诊断项目状态快照
 
-更新时间: 2026-07-17
+更新时间: 2026-07-18 13:10 +08:00
 
 本文件是当前主线状态快照。实时判断仍以命令为准:
 
@@ -12,6 +12,29 @@
 
 二胡线已经冻结为论文证据、困难案例和共享模块来源。当前产品主线是西洋弓弦乐, 小提琴优先, 大提琴后续独立验证。
 
+## 2026-07-18 当前分支刷新
+
+- 分支快照基线:`feature/model-bakeoff-omr-align@b7ce8fc`。该分支已包含 HOMR 受控离线治理、M3+ 四区审计、动态闸学生域预考、round-3 fresh-blind/真实错误材料和 8 张屏拍域基准;这些变化不改变默认学生端闸门。
+- 已在该分支依次重新运行 `npm run western:m4-p0-structure-gate`、`npm run western:project-status` 和 `npm run western:project-gate`。P0 冻结 5 谱结果为完整 `1/5`,谱号/调号/拍号=`3/5,2/5,2/5`,`studentGateReady=false`。
+- 这里的 P0 `1/5` 只表示同一 5 谱中的谱号/调号/拍号结构闸门;真实照片 pitch+onset+measure 完整自动采纳仍为 `0/5`,12 份历史照片链缓存重放中的 P0-ready 又是 `0/12`。三个数字对应不同门槛或数据集,不得互相替换;`m4P0StructureReady=true` 也只表示至少 1 谱 P0-ready,不表示 M4 自动采纳通过。
+- 当前运行时仍为 `ordinaryUploadAutoFeedbackReady=false`,`m3plusAutoFeedbackReady=false`,`m4OmrAutoScoreReady=false`,`policy=fail-closed`。
+- 当前项目总闸门要求 ordinary/M3+/M4 三轨同时通过;M3+ 新口径离线通过,ordinary 当前由 dynamic-shadow review-only 合同阻断,M4 automatic adoption 也未达标。`western:project-gate` 因此按设计非零退出。
+- HOMR v3 的具名 AGPL/六模型审查现为 `approved-with-conditions`,唯一批准范围 `controlled-offline-review-only`;稳定运行时已迁至 `data/tools/`,live preflight 的 governance/host/deployment 三项均绿。preflight 现与 review-record SHA-256 绑定,审批或 artifact 漂移会令 `project-status/project-gate` fail-closed。学生端网络使用、自动采纳与再分发仍未获授权;这里的三绿不得写成默认生产发布通过。
+- 刷新产物为 `data/experiments/western-strings-m4/p0-structure-gate/report.json`、`data/experiments/western-strings-project-status.json` 与 `data/experiments/western-strings-project-gate.json`;三者位于 `data/` 忽略目录,用于本地可复跑状态,不等同于已提交证据。
+
+## 2026-07-18 ordinary dynamic-shadow foundation
+
+- 旧 RF / first-measure 的 `3/3` 与五批安全 pilot 继续保留为历史实验事实,但其 `readyForMonitoredPilot`、旧 release review、旧负责人 approval 和旧 pilot decision 已全部显式标为 superseded,不再具有当前授权力。
+- 普通 clean-score 受控 batch 现在无条件进入 Basic Pitch + gap-penalty DTW 的 dynamic-shadow review-only 路径;携带旧 `dataset/piece/recordingId` 也不能再绕回历史 replay。RF 只保留为 `authorizationIgnored=true` 的 telemetry。
+- 冻结候选策略为 `deviation<=0.15`,`eventConfidence>=0.4`,`relativeEventConfidence>=0.8`,`eventDuration>=0.08s`,`same-pitch distance>=0.5 quarter`,`eventDurationRatio>=0.15`;因果能量否决尚无冻结部署物,明确为 `excluded-review-only`,不能暗中进入决策。
+- 普通音频运行时已迁到独立 `data/tools/western-ordinary-dynamic-shadow-py311/`:禁止 system/user site,完整依赖集与 requirements lock 精确绑定,Basic Pitch SavedModel 三文件 tree SHA-256=`c6595f299ff83c52e89555789f7e3e829a6a0f25b6a88f7e99073af5a2470dc4`。config 语义 SHA、lock SHA 与模型 tree SHA 另由代码常量锚定,不能通过同步改写 manifest 自签名降级;每次分析还把 launcher attestation 写入 cache/candidate artifact。它不与 HOMR 的 NumPy>=2.4 环境共享。venv 本体仍位于 gitignored `data/tools/`,新检出环境须运行 `npm run western:ordinary-dynamic-shadow-runtime-setup`;未配置时 preflight 按设计失败。
+- 服务端会独立计算上传音频 SHA-256,并复核 cache realpath、同一字节的 artifact SHA、内部 cache/runtime identity、模型 hash、策略版本及当前 score payload SHA。ordinary 路径强制 `limit=0`;除候选行数必须等于当前 score 的完整音符数外,还逐音核对唯一连续的 `noteIndex=0..N-1` 以及 `noteId/sectionId/measureIndex/midi`,并绑定两侧 identity digest。截断、重复一音或漏一音都不能把局部覆盖率伪装成全曲接受性。candidate artifact 自身再写入 SHA-256;二次审计会重读当前 score store 和全部候选行,不再只相信前 5 条 preview。
+- 二次审计还把 artifact 内部 `batchRunId/submissionId`、scoreId、audio SHA 与 batch item 逐项绑定;JSONL 物理尾行损坏、跨提交替换、symlink/路径错位、同批 legacy ordinary status 或任一 item 尝试自动诊断都会失败,不会回退上一条“好记录”。
+- r3 接受性合同骨架要求固定 `r3-02/r3-03`、冷 miss/热 hit、完整 score 行数+逐音 identity、内容哈希、候选覆盖、全行 review-only、全 artifact 审计和整体 evidence digest。当前 live artifact verifier 尚未实现,验证器显式加入 `ordinary-dynamic-shadow-r3-live-artifact-verifier-not-implemented`,所以即使伪造一份字段完整且 digest 自洽的报告也不能开绿;下一阶段必须先实现实际文件重读/重算再消费 reserve take。旧 RF session 聚合已移入 `historicalEvidence`,当前计数和 `v2AlphaGate.ready` 固定为 0/false。
+- 旧 controlled-pilot runner 已移除默认 RF executor。新的 `western-ordinary-dynamic-shadow-pilot-executor-v1` 未实现前,start preflight 固定返回 `ordinary-dynamic-shadow-pilot-executor-not-implemented`;即使伪造批准也不能落到旧 RF 执行器。
+- 当前 live 状态是 `foundationReady=true`,`liveArtifactVerifierReady=false`,`r3AcceptanceReady=false`,`authorizationReady=false`,`studentGateReady=false`,`automaticAdoptionReady=false`。首个待办是实现并用伪造报告/artifact 篡改测试验证 live artifact verifier;在它就位前不得消费 reserve take `r3-02/r3-03`。随后冷/热接受性通过也只证明实现正确,不自动授权 pilot 或学生反馈。
+- 2026-07-18 以已污染、仅供基础设施复核的历史 `r3-01` 提交做了受限冷/热重跑:`strings-batch-mrpytpgd-kxkws5` 为 schema-3 cache miss,`strings-batch-mrpyuerg-wa5yec` 为同一 artifact cache hit。两次均为全谱 `59/59`,dynamic-shadow telemetry 选中 54 行,候选行 SHA-256 同为 `5a89f5f30ed349210b287ad682316bbeb6f8c50f2394076dc4e834c6a5d65c1d`,且 `runtimeAttestationReady=true`,`autoPassCandidateCount=0`,`autoDiagnosisIssued=false`,`studentFacing=false`。补上逐音 identity 防篡改后,又以同一历史素材热跑 `strings-batch-mrpzqs9h-f8fien`:全谱 `59/59`,`scoreNoteIdentityReady=true`,score/candidate identity SHA-256 同为 `ce816a0e0bed67d72498996d8b1e59eb84f7562e08830df717dbb4a294d423ea`,候选 artifact SHA-256=`e7c938cc5be0db025ad8b090c98cd24191651f1e02077a6f427141bc2457255b`。公开 `npm run western:controlled-batch-candidate-audit` 默认要求 ordinary item,对物理最新热跑重读 score store 与全部候选行后 0 failure。上述重跑都不计入 `r3-02/r3-03` 接受性,也不构成 fresh-blind 或发布证据。
+
 ## 2026-07-15 第二轮 8 份录音更新
 
 - 第二轮 8/8 组音频、MusicXML 和谱面图片已审计、标准化并完成受控机器分析,总计 444 个谱面音符。
@@ -20,7 +43,8 @@
 - 新一轮 M3+ 只完成 review-only 库存清点:444 个音符中 292 个被列为行为候选;这不改变运行时门槛。
 - 已找到随录音放置的 `README-怎么用.md`,确认 `r2-02` / `r2-03` / `r2-04` 的错误数量分别为 5 / 5 / 4。README 没有具体小节且 `notes.txt` 仍缺失,因此只能做数量对照和机器位置搜索,不能计算精确 recall/precision。
 - README 数量约束下的 Basic Pitch + 序列 DTW 搜索得到:错音阈值候选 5 个;漏音保守候选 3 个,未覆盖 README 目标数量;拖拍阈值候选 5 个,按目标数保留前 4 个。它们均为未人工确认的机器假设,没有进入学生反馈。
-- 当前默认学生发布仍关闭。实时项目闸门失败项为普通上传默认开关关闭,以及 M4 OMR 自动采纳未达标;M3+ 新口径离线通过但学生运行时仍未接线。普通上传受控证据总体 precision=1,但 coverage=0.04,低于 0.20 下限。
+- 当前默认学生发布仍关闭。旧 RF 受控证据的 precision=1/coverage=0.04 只解释路线转向,不是实时 blocker。当前 ordinary dynamic-shadow 为 `foundationReady=true`,但 live artifact verifier 未实现、r3 接受性未执行、独立授权关闭、因果能量否决未冻结;M4 OMR 自动采纳也未达标。M3+ 新口径离线通过但学生运行时仍关闭。
+- M3 core 的历史人工/gold 闸虽通过,pitch/onset/missing 三类有效错误样本各只有 `2` 个（均 2/2,unsafe=0）;这是低浓度证据,不能把 100% 小样本写成充分扩证。
 
 ## 1. 当前目标
 
@@ -43,28 +67,30 @@
 
 ## 3. 当前机器证据
 
-### 普通上传候选 gate
+### 普通上传候选 gate（旧 RF 证据与当前 dynamic-shadow 分层）
 
-已完成:
+历史已完成、但不再具有当前授权力的证据:
 
 - 60 条候选人工标签:46 usable / 14 wrong。
 - confidence pilot、fresh blind validation、threshold-pool runtime-policy audit。
 - 5 批独立机器受控 pilot 已安全完成,默认运行时均已恢复关闭。
-- runtime scorer 与 first-measure-only 显式 pilot scope 已接入,但默认关闭。
-- `npm run western:ordinary-monitored-pilot-audit` 与 `npm run western:controlled-pilot-evidence-audit` 已通过机器前置检查。
+- 旧 RF runtime scorer 与 first-measure-only 显式 pilot scope 曾接入;`npm run western:ordinary-monitored-pilot-audit` 与 `npm run western:controlled-pilot-evidence-audit` 的旧结果曾通过机器前置检查。
+- 上述 release review、负责人 approval、pilot decision 和 `readyForMonitoredPilot` 现均为 `superseded`;不得再用 `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1` 恢复旧路径。
 
-当前关键结果:
+历史关键结果（仅解释路线转向）:
 
 - 全曲 operational:275 候选 / 33 个模型原始 auto-pass / 11 个严格 eligible;precision=1.0,但 coverage=4.00%,不达 V2-alpha 20% 下限。
 - 联合 threshold sweep 没有找到能同时满足 precision>=0.90 与 coverage>=0.20 的全曲阈值。
 - first-measure-only + confidence>=0.95 历史留一录音:12/12 usable,precision=1.0,coverage=25.53%。
 - first-measure-only 真实机器 pilot:11/11 usable,0 wrong,0 unknown,precision=1.0,coverage=26.83%,覆盖 5 条独立录音/曲目。
-- `machinePreflightPassed=true`,`teacherReviewAllowed=true`,但只授权准备一份全新、小型、第一小节范围的专业盲审包。
+- `machinePreflightPassed=true`,`teacherReviewAllowed=true` 是 `r2-08` 入场前的历史授权,只允许准备一份全新、小型、第一小节范围的专业盲审包;该授权已由后续 `r2-08` fresh-blind 执行消耗,不再表示当前仍缺一份待复核包。
 
-结论:
+当前结论:
 
-- 全曲普通上传仍不达 V2-alpha;只有第一小节安全子集可以进入最终小型盲审。
-- 现有 12 条录音全部已经进入训练/复核证据,不得重复使用。
+- 旧全曲/first-measure RF 路线仍不达当前 V2-alpha 授权要求。`r2-08` 的 3 个模型原始 auto-pass 经旧 scope/self-check 后可放行为 0,该结果已完成其负证据作用。
+- 仍欠一项只读历史尸检:逐条解释 `r2-08` 这 3 个模型原始 auto-pass 分别被 scope 还是 self-check 的哪条规则抑制。该记录只用于改进普通上传可观测性,不得复活 RF/first-measure 授权,优先级低于当前 dynamic-shadow live verifier。
+- 当前执行权威是文件顶部的 `western-ordinary-dynamic-shadow-policy-v1`:Basic Pitch + gap-penalty DTW 基础层已就位。下一步先完成 live artifact verifier 与篡改拒绝测试,确认它会重读/重算物理来源;之后才消费 reserve take `r3-02/r3-03` 做冷/热缓存与候选一致性验收。该验收即使通过也只关闭实现正确性缺口,不会自动产生 pilot 授权。
+- 现有 12 条旧录音全部已经进入训练/复核证据;`r3-02/r3-03` 用于实现验收后也不得再伪装成 P4 的 fresh-blind 发布证据。
 - 不得默认开启学生端。
 - 不得提交或全局设置 `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1`。
 
@@ -77,8 +103,8 @@
 - 决定文档为 `docs/western-strings-m3plus-rescope-decision.md`;颤音/装饰音音频检测、窗边界继续调参和粗状态分类器已退出发布链,只保留为研究证据。
 - 统一离线入口为 `npm run western:m3plus-rescope-gate`,输出 `data/experiments/western-strings-m3plus/rescope-gate/report.json`。
 - 无标记平拉 holdout:8 个可判、8 个正确、unsafe=0、4 个证据不足,precision=1.0。
-- 谱面标记的 tr/装饰音/泛音区:14 个保护单元全部中性化,指控数=0。
-- 人工 gold 揉弦/滑音中心音高:3 个可判、3 个正确、unsafe=0、5 个证据不足,precision=1.0。
+- 谱面标记区:14 个真实 tr/装饰音保护单元全部中性化,指控数=0;泛音中性化由规则与回归测试覆盖,当前没有计入这 14 个真实样本。
+- 人工 gold 揉弦/滑音中心音高:8 个目标中仅 3 个可判,覆盖率 `3/8=37.5%`;这 3 个全部正确、unsafe=0,另 5 个证据不足,所以 precision=1.0 不能写成高覆盖。
 - 高离散度兜底:3/3 输出 `insufficient_evidence`,指控数=0。
 - 当前 `m3plusPitchSafetyReady=true`,`m3plusModeReleaseReady=true` 仅表示**新口径离线闸门通过**;`studentGateReady=false`,`m3plusAutoFeedbackReady=false`,运行时仍未接线且默认关闭。
 - 17 个 round2 揉弦人工 gold 单元因旧报告没有稳定中心 f0 数值而未计入本次定量通过数;报告明确列为 unscored,没有伪造通过。
@@ -144,7 +170,7 @@
 - 《北京的金山上》人工 MusicXML 已作为新的独立真照片 gold。OMR 报告现以 recall/漏识率为第一指标：现有 `up2` pitch R/Miss/P/F1=`35.47%/64.53%/87.14%/50.41%`；修正对比度参数后的自适应谱线缩放为 `16.28%/83.72%/28.28%/20.66%`。自适应路径在该页输出更多但漏识和误识都更严重，已按独立 gold 停止接入，不用音频吻合率替代 OMR 准确率。
 - 更强 OMR 引擎对照已完成:`npm run western:m4-oemer-benchmark` 用 Oemer 0.1.8 在同一 5 份 source-gold 上串行评测。`ex05` 原始截图的播放器黑边曾诱发错误 3-track 结构；现在只对该明确失败执行固定行均值裁边重试，Oemer 由 4/5 提升为 5/5 可输出。全 5 份 P/R=`71.87%/76.23%`、onset-quarter/measure accuracy=`5.43%/18.21%`，严格仍为 `0/5`；同 5 份 Audiveris P/R=`85.47%/72.14%`。fallback 解决的是引擎崩溃和坐标缺失，不足以让 Oemer 替换 Audiveris 或进入生产。
 - Oemer 坐标适配已完成但保持 review-only:`run_oemer_with_coordinates.py` 从实际发射 MusicXML 的 `AddNote` 动作保存音头 bbox 和干净 dewarp 画布,不修改第三方包。5 个输出页的坐标数均与 XML 音符数一致，新增裁边页为 `289/289`；正式报告为 `coordinateAdapter.readyRows=5/5`,`studentFacing=false`。坐标可画不改变 OMR 严格 `0/5`。
-- Transformer OMR 对照已完成:`npm run western:m4-homr-benchmark` 用 HOMR 0.7.0 对同一 5 份原始 source 照片串行评测。5/5 均输出,聚合 pitch P/R=`89.00%/96.17%`,onset-quarter/measure accuracy=`30.73%/79.04%`。`ex05/ex12` 若只看音高会成为 `2/5` 假通过,但完整 pitch+onset+measure 严格门槛为 `0/5`;HOMR 因节奏重建错误仍不接生产。
+- Transformer OMR 的 2026-07-15 首跑曾报告 pitch P/R=`89.00%/96.17%`,onset-quarter/measure=`30.73%/79.04%`;这是可追溯的历史四舍五入口径,不是当前权威数字。2026-07-17 用 ONNX Runtime 1.27.0 从零复验后的权威值为 pitch P/R=`88.33%/95.78%`,onset-quarter/measure=`30.03%/79.04%`,完整严格门槛仍为 `0/5`;HOMR 只进入受控离线候选池,未获自动采纳授权。
 - 第三方视觉 Transformer 对照已完成:`npm run western:m4-clarity-benchmark` 用 Clarity-OMR 官方 beam-5 管线评测同一 5 份 source-gold。原始截图因播放器黑边/标题栏导致 Stage A 检出 `0` 个谱表;使用冻结的通用行均值裁页后 5/5 均输出,但聚合 pitch P/R=`72.77%/35.53%`,onset-quarter/measure accuracy=`2.81%/10.10%`,完整严格通过 `0/5`。该裁页仅用于公平评测,Clarity 不接生产。
 - Clarity 监督适配的非人工前置已跑通:`npm run western:m4-clarity-adaptation-data-probe` 从一页独立 Bach MusicXML 生成 8 个去重谱表图像/标签对,无盲测照片混入;`npm run western:m4-clarity-adaptation-split` 按 BWV 作品拆成 train/validation/synthetic-test=`21/4/7`,5 份真实照片 gold 冻结在训练集之外。
 - `npm run western:m4-clarity-training-step` 已在本机 RTX 5060 上完成一次 bf16+DoRA 反向传播:可训练参数 `8,946,222`(`5.1933%`),loss 有限、576 个参数张量获得有限梯度,峰值 reserved 显存约 `1.08 GiB`。官方权重中 48 个缺失键经核验为共享 FFN 别名,另 4 个为官方推理权重未包含的训练辅助 contour head;脚本对除此以外的缺失键 fail-closed。
@@ -157,7 +183,7 @@
 - M4 已完成可复跑的独立**研究级** OMR 准确率基准,可以报告限定范围内的数字谱/合成退化结果。
 - M4 尚未达到自动采纳:逐谱严格门槛仅 12/32,真实照片独立源谱按 pitch+onset+measure 完整门槛严格通过 `0/5`,运行时置信特征也筛不出安全子集。OMR 不会进入学生端运行时自动诊断。
 - Clarity 监督适配已完成 Bach 和 DoReMi 两次从数据生成、无泄漏划分、低负载训练到冻结真照片的完整闭环,但真照片完整指标都有退化,候选均已拒绝并清理。该路线不再继续堆干净数字谱、训练步数或调参;除非以后新增拍照域退化、符杠/符尾/休止/附点与小节结构级监督,否则 Clarity 只保留为负基线,`studentGateReady=false` 不变。
-- 当前不需要教师或制谱人员继续操作。新增真实照片 gold 的证据缺口已经关闭,Audiveris 预处理/置信筛选、Oemer、HOMR 与 Clarity-OMR 均未达到完整门槛;继续扩大照片只增强外部效度,不能掩盖当前 `0/5`。
+- 维持“当前不可自动采纳”的裁决不需要教师或制谱人员继续操作。新增真实照片 gold 的基础证据缺口已经关闭,Audiveris 预处理/置信筛选、Oemer、HOMR 与 Clarity-OMR 均未达到完整门槛;继续扩大照片只增强外部效度,不能掩盖当前 `0/5`。若主动推进第 2 份同版 gold,仍可完成 Op.45 候选的四项人工复核,但该可选任务不是当前 fail-closed 裁决的阻塞项。
 - 报告论文/表格时必须将独立 render-gold 与 `human-approved-unchanged-draft` 分开,后者不得伪称独立照片准确率。
 
 照片谱离线生产链现已接通:
@@ -168,14 +194,17 @@
 - multipart、伪造 MIME、缓存越界路径、批处理分派、审计落盘和桌面/移动浏览器交互均有回归验证。
 - 真实照片独立源谱 gold 已有 5 份,但严格通过率为 0/5;多引擎、预处理或音频仲裁原型都不能替代精度门槛。因此 `m4OmrAutoScoreReady=false` 不变。
 
-## 4. 第二轮执行后的下一步
+## 4. 当前下一步（第二轮旧结论已 supersede）
 
-`r2-08` 已完成全新素材入场和精确受控机器 pilot,因此“继续寻找一条 fresh blind 素材”不再是当前动作。结果不是发布通过,而是新录音没有任何候选通过现有窄范围自检。
+`r2-08` 已完成旧 RF/first-measure 路线的全新素材入场和精确受控机器试验;结果不是发布通过,而是没有候选通过旧窄范围自检。该结果保留为历史负证据,不再决定当前 ordinary 执行顺序。
 
 下一步分两条,不得混为一项:
 
-1. **M3 定量补证:** README 的 5/5/4 数量真值已用于机器候选搜索。当前漏音保守阈值只找到 3 个候选;拖拍有 5 个阈值候选,比目标多 1 个。下一步先改进漏音候选与候选校准;只有补齐精确错误小节真值后,才可区分真命中、漏检和超额假阳性并重算 recall/precision。没有精确标签时不得把候选位置填成 gold。
-2. **P1/普通上传:** 保持默认关闭。先分析本次 3 个原始 auto-pass 为何全部被 scope/self-check 抑制;只有新策略在独立盲验中同时达到 precision>=0.90 和 coverage>=0.20,才讨论扩大范围。当前不需要教师复核 `r2-08`,因为可复核 auto-pass 为 0。
+1. **ordinary dynamic-shadow verifier → 接受性:** 先实现 live artifact 重读/重算和伪造报告拒绝测试;核验器通过后,才用 reserve take `r3-02/r3-03` 验证冷/热缓存、内容寻址 identity、音频/谱面 provenance、策略一致性和全候选 artifact 审计。材料随后视为已消费,不得复用为发布盲测。
+2. **M3 duration/extra 定量补证:** 先冻结可重复的逐音量化合同,让正式 V2 全曲前置闸消费现有 6 套注入集（24 drag、30 extra 目标）,再根据机器摸底定向补真实学生逐音真值。README 的 5/5/4 录音级数量不能替代精确位置 gold。
+3. **后续发布证据:** r3 接受性通过后仍须另取全新录音+新曲目,建立独立逐音/fresh-blind 证据和 `western-ordinary-dynamic-shadow-release-v1` 授权;旧 12 条、`r2-08` 与 r3 接受性材料均不可复用。
+4. **后排 M4 坐标补强:** v3 池当前无 Oemer;HOMR 在 12 份历史缓存中赢 8 份,但输出仍是无 bbox 的音符列表。可复用 Oemer sidecar 的设计经验为 HOMR 增加坐标适配器,同时先建立一小批人工坐标 gold/误差标尺;当前 `coordinateGoldReady=false`,不得仅凭“框数等于音符数”把列表反馈升级成像素框选。
+5. **低成本照片域扩证(负责人约 15 分钟,非当前 fail-closed blocker):** `r2-camera-photo-benchmark` 现有 8 张其实是与生成器字节相同的 clean render;另有 8 张真实屏拍须继续按 `screen-photo-of-pdf` 单独分域。若把 8 页打印后逐页手机拍摄,构造 gold 可直接沿用,可将纸拍 source-gold 从 5 行扩到 13 行,但必须先过输入域分类再计 `CameraPhotoRows`。可顺手提交 Op.45 四项复核 JSON 将同版 gold 页数从 1 增至 2;因候选起点来自 HOMR,该页仍不能计作 HOMR 自身独立自动采纳证据。
 
 第二轮命令:
 
@@ -187,9 +216,9 @@ npm run western:project-status
 npm run western:project-gate
 ```
 
-以下 fresh-blind 入场说明保留为后续批次操作规范:
+以下内容只保留为旧 RF/first-measure 入场链的历史审计说明,不得作为当前 dynamic-shadow 后续批次操作规范。将来可复用其中“新录音/新曲目/哈希去重/授权完整”的输入纪律,但必须另建版本化 dynamic release 合同和命令链:
 
-### V2-alpha 第一小节安全子集:全新盲审素材入场
+### 历史 V2-alpha 第一小节安全子集入场（superseded）
 
 已新增独立入场闸门:
 
@@ -206,7 +235,7 @@ npm run western:fresh-blind-intake-stage -- --recording-id <new-recording-id> --
 
 该命令先审计临时清单；任何重复、解码失败、谱面解析失败或审核信息缺失都会保持正式 `intake.json` 不变。
 
-入场闸门通过后，机器预检必须精确指定本次全新录音，不能按队列顺序取样:
+旧入场闸门通过后，当时的 RF 机器预检会精确指定全新录音；下列命令不再授权当前 dynamic-shadow:
 
 ```bash
 npm run western:ordinary-auto-pass-precision-review-pack -- --recording-id <fresh-recording-id>
@@ -233,9 +262,9 @@ npm run western:ordinary-auto-pass-precision-review-pack -- --recording-id <fres
 - MusicXML/MXL 能否解析、单声部或唯一小提琴声部能否确定、第一小节是否有音符。
 - 谱面是否已批准、显示谱页是否真实存在、授权字段是否齐全。
 
-第二轮 `r2-08` 已实测 `readyForMachinePrecheck=true` 并完成后续精确机器 pilot。未来新批次仍必须从空模板重新走同一闸门;只有状态返回 `true`,才可写入受控 intake。机器预检成功后也只能在出现可复核候选时生成专业盲审包;生成前还要由机器验证音频播放、谱面定位、按钮和 scope membership。任何一步失败都不得交给教师。
+第二轮 `r2-08` 已实测 `readyForMachinePrecheck=true` 并完成旧 first-measure 机器试验。该 intake/审批链只保留为历史审计工具,不能授权当前 dynamic-shadow 路径。未来若启动发布证据批次,必须使用全新录音和新曲目,以当前版本合同重新生成 release review、approval 与 decision;现有 12 条和 `r3-02/r3-03` 实现验收材料都不能复用为该 fresh-blind 证据。
 
-专业盲审仍只审 `first-measure-only + confidence>=0.95` 候选;所有后续小节继续 `review_required`,默认学生端继续 fail-closed。
+当前 dynamic-shadow 不限于 first measure,但所有候选一律 `review_required`;在 r3 接受性报告和独立授权合同同时成立前,不得生成学生 auto-pass 或沿用旧专业盲审 scope。
 
 ## 5. 当前不可声称
 
@@ -245,22 +274,31 @@ npm run western:ordinary-auto-pass-precision-review-pack -- --recording-id <fres
 - 不可声称 OMR 已进入运行时判断层。
 - 不可声称支持大提琴; 大提琴需要 M5 独立验证。
 
-## 6. 最近确认通过的命令
+## 6. 当前回归命令与历史审计边界
 
 - `npm run western:m4-preflight`
-- `npm run western:controlled-pilot-evidence-audit`
-- `npm run test:western-fresh-blind-intake`
-- `npm run western:fresh-blind-intake-status`(`r2-08` 当前已通过入场审计)
+- `npm run western:controlled-batch-candidate-audit`(只审物理最新 dynamic-shadow run)
 - `npm run western:project-status`
 - `npm run western:next-actions`
+- `npm run western:ordinary-dynamic-shadow-runtime-preflight`
+- `npm run test:western-ordinary-audio-runtime`
+- `npm run test:western-dynamic-shadow-policy`
+- `npm run test:western-offline-feature-audio`
+- `npm run test:western-alignment-preview`
 - `npm run test:western-project-gate`
 - `npm run build`
 
-`npm run western:project-gate` 当前仍以非零退出阻断默认发布, 但失败只剩:
+以下命令仍可复跑历史证据,但不属于当前授权链:`npm run western:controlled-pilot-evidence-audit`、`npm run test:western-fresh-blind-intake`、`npm run western:fresh-blind-intake-status`。其中 `r2-08` 入场审计历史上曾通过且该授权已经消费;不得把其结果写成当前 dynamic-shadow pilot 或 release 批准。
 
-- `ordinary-auto-gate-disabled-by-default`
+`npm run western:project-gate` 当前仍以非零退出阻断默认发布,失败为:
 
-这是安全态, 不是缺复核数据。
+- `ordinary-dynamic-shadow-r3-live-artifact-verifier-not-implemented`
+- `ordinary-dynamic-shadow-r3-acceptance-not-run`
+- `ordinary-dynamic-shadow-authorization-closed`
+- `ordinary-dynamic-shadow-energy-veto-excluded-review-only`
+- `M4 OMR automatic adoption`(真实照片完整门槛、运行时安全子集和独立同版页数均未达标)
+
+这是安全态,不是命令故障;维持该裁决不依赖补交复核数据。
 
 ## 7. 公开 Bach 语料主开发决策(2026-07-10)
 
@@ -357,7 +395,7 @@ npm run western:cleanup:apply
 ## 2026-07-16 M4 P0/P1 安全收口
 
 - 照片谱入口的 P0 闸门已升级为“显式符号证据 **或** 可审计结构佐证”；C 大调/无调号不再因 `rawKeyFifths=[]` 永久失败，低分谱号可由全行首一致+小提琴音域佐证，拍号可由导出拍号+小节总时值一致率佐证。原始符号与导出结果冲突时仍 fail-closed。
-- 修正后冻结 5 谱 P0 完整通过仍为 `0/5`，但分项从谱号/调号/拍号=`1/0/2` 提升为 `3/1/2`。剩余失败来自非零调号缺证据或冲突、行首谱号覆盖缺失、节奏结构一致率不足，不再把 C 大调缺少显式符号算作失败；M4 继续 `studentGateReady=false`。
+- 当前分支重新生成后,冻结 5 谱 P0 完整通过为 `1/5`,分项谱号/调号/拍号=`3/5,2/5,2/5`。剩余失败来自非零调号缺证据或冲突、行首谱号覆盖缺失、节奏结构一致率不足,不再把 C 大调缺少显式符号算作失败;M4 继续 `studentGateReady=false`。
 - 12 份历史三变体缓存重放量化了 P0 对反馈率的影响：旧路径为 `10 full + 1 degraded + 1 retake`；严格 P0 后为 `11 score-structure-review-required + 1 retake`。只保留音频确认绿色的模拟可保留 `11/12`、共 `870` 个绿色音并输出 `0` 个指控。绿色安全主尺已改为 sequence gold 映射，structural/consensus 只作诊断：总体 sequence precision=`98.46%`，最差单曲仅 `90%`、`evalOnlyGatePassed=false`，因此本轮不恢复学生端绿色降级，生产策略保持不变。
 - P1 增加符杠相邻类和反复连音组证据后，有界视觉 gold-meter oracle 从 `44/50=88%` 提高到 `49/50=98%`；真实候选保留需要到 `top-k=512` 才有 `48/50=96%`。选择器已实测：Basic Pitch 只有 `14/50` 小节具备足够间隔证据，连续 pYIN F0 形状只有 `11/50`；两者的固定 margin 和按曲留一均选择 `0/50`。`33/50` 小节是未知拍号下音频无法辨别的整体记谱尺度缩放，拍号必须由 P0 独立确定。候选生成门槛已过，但选择门槛未过，`runtimeReady=false`。
 - 专项 gold 已生成：临时记号 `226`、加线音 `453`、换行谱号 `46`（现正确 `43`）；坐标人工 gold 仍缺，`1937` 条 bbox 任务仅是复核清单，不是 gold。

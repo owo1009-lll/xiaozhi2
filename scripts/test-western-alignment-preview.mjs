@@ -1,4 +1,5 @@
 ﻿import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import http from "node:http";
 import os from "node:os";
@@ -14,6 +15,8 @@ import {
 } from "../src/server/audioPayload.js";
 import {
   applyOrdinaryControlledPilotScope,
+  buildOfflineFeatureAnalyzerArgs,
+  buildOrdinaryDynamicShadowReviewGate,
   buildWesternAlignmentPreview,
   buildWesternStudentAnalysis,
   runWesternControlledSubmissionBatch,
@@ -29,6 +32,16 @@ import { applyWesternM2fCleanScoreImports } from "./import-western-m2f-clean-sco
 import { mergeControlledCandidateReviewLabels } from "./import-western-controlled-candidate-review-labels.mjs";
 import { buildControlledCandidateReviewStatus } from "./status-western-controlled-candidate-review.mjs";
 import { buildControlledCandidateInputStatus } from "./status-western-controlled-candidate-inputs.mjs";
+
+function canonicalJson(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map((item) => canonicalJson(item)).join(",")}]`;
+  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+}
+
+function noteIdentitySha256(rows) {
+  return createHash("sha256").update(canonicalJson(rows), "utf8").digest("hex");
+}
 
 function listen(server) {
   return new Promise((resolve) => {
@@ -58,6 +71,71 @@ function sineWavBuffer({ frequency = 440, durationSeconds = 1.25, sampleRate = 2
     buffer.writeInt16LE(value, 44 + index * 2);
   }
   return buffer;
+}
+
+async function writeBasicPitchCacheFixture(repoRoot, audioBytes, events) {
+  const audioSha256 = createHash("sha256").update(audioBytes).digest("hex");
+  const cacheIdentity = {
+    audioSha256,
+    modelVersion: "basic-pitch-0.4.0-default-model",
+    modelArtifactSha256: "c6595f299ff83c52e89555789f7e3e829a6a0f25b6a88f7e99073af5a2470dc4",
+    inferenceVersion: "default-frequency-range-g3-a7-min-note-80ms-v1",
+    policyVersion: "western-ordinary-dynamic-shadow-policy-v1",
+    runtimeId: "western-ordinary-dynamic-shadow-audio-py311",
+    runtimeConfigSemanticSha256: "1f3a47f5cfe2b2d2e427be9a03ab43b4b4aa09a5db0edeed0b55e610a42ac6f9",
+    runtimeRequirementsLockSha256: "4120a811da1ecb1aa93ceabcbb5aa0b45a37c08e5ee3138d2b793e38f2828d04",
+  };
+  const versionIdentity = {
+    inferenceVersion: cacheIdentity.inferenceVersion,
+    modelArtifactSha256: cacheIdentity.modelArtifactSha256,
+    modelVersion: cacheIdentity.modelVersion,
+    policyVersion: cacheIdentity.policyVersion,
+    runtimeConfigSemanticSha256: cacheIdentity.runtimeConfigSemanticSha256,
+    runtimeId: cacheIdentity.runtimeId,
+    runtimeRequirementsLockSha256: cacheIdentity.runtimeRequirementsLockSha256,
+  };
+  const versionDigest = createHash("sha256").update(JSON.stringify(versionIdentity)).digest("hex").slice(0, 16);
+  const cachePath = path.join(
+    repoRoot,
+    "data",
+    "experiments",
+    "western-strings-m3",
+    "offline-basic-pitch-cache",
+    `${audioSha256}-${versionDigest}.basic-pitch.json`,
+  );
+  await fs.mkdir(path.dirname(cachePath), { recursive: true });
+  await fs.writeFile(cachePath, `${JSON.stringify({
+    schemaVersion: 3,
+    cacheIdentity,
+    events,
+  }, null, 2)}\n`, "utf8");
+  return cachePath;
+}
+
+async function writeTinyCleanScoreStore(repoRoot) {
+  await fs.mkdir(path.join(repoRoot, "data"), { recursive: true });
+  await fs.writeFile(
+    path.join(repoRoot, "data", "erhu-score-imports.json"),
+    JSON.stringify({
+      jobs: [],
+      scores: [{
+        scoreId: "score-test-clean",
+        title: "Tiny clean violin score",
+        scoreSource: "musicxml",
+        sections: [{
+          sectionId: "section-1",
+          title: "Section 1",
+          tempo: 72,
+          notes: [
+            { noteId: "n1", measureIndex: 1, beatStart: 0, beatDuration: 1, midiPitch: 69, notePosition: { pageNumber: 1, globalMeasureIndex: 1, localMeasureIndex: 1 } },
+            { noteId: "n2", measureIndex: 1, beatStart: 1, beatDuration: 1, midiPitch: 69, notePosition: { pageNumber: 1, globalMeasureIndex: 1, localMeasureIndex: 1 } },
+            { noteId: "n3", measureIndex: 1, beatStart: 2, beatDuration: 1, midiPitch: 69, notePosition: { pageNumber: 1, globalMeasureIndex: 1, localMeasureIndex: 1 } },
+          ],
+        }],
+      }],
+    }),
+    "utf8",
+  );
 }
 
 async function testServiceDefaultNoLeakage() {
@@ -464,7 +542,8 @@ async function testControlledSubmissionRoute() {
     assert.equal(batchBody.batch.items[0].submissionId, body.analysis.submission.submissionId);
     assert.equal(batchBody.batch.items[0].autoDiagnosisIssued, false);
     assert.equal(batchBody.batch.items[0].offlineAnalysisProduced, false);
-    assert(batchBody.batch.items[0].reasons.includes("controlled-batch-release-gates-not-ready"));
+    assert(!batchBody.batch.items[0].reasons.includes("controlled-batch-release-gates-not-ready"));
+    assert(batchBody.batch.items[0].reasons.includes("controlled-batch-score-not-found"));
     const savedBatchRun = await fs.readFile(path.join(tempRoot, "data", "experiments", "western-strings-m3", "controlled-submission-batch-runs.jsonl"), "utf8");
     assert(savedBatchRun.includes(body.analysis.submission.submissionId), "controlled batch route should append a jsonl run record");
   } finally {
@@ -474,6 +553,7 @@ async function testControlledSubmissionRoute() {
 
 async function testControlledSubmissionValidatedReplayBatch() {
   const tempRoot = await createTinyStudentReadyRoot();
+  await writeTinyCleanScoreStore(tempRoot);
   const audioCacheDir = path.join(tempRoot, "data", "analysis-audio-cache");
   const app = express();
   app.use(express.json());
@@ -501,7 +581,8 @@ async function testControlledSubmissionValidatedReplayBatch() {
         duration: 8.5,
       },
     }));
-    formData.append("audio", new Blob([Buffer.from("fake-wave-data")], { type: "audio/wav" }), "student.wav");
+    const studentAudio = sineWavBuffer();
+    formData.append("audio", new Blob([studentAudio], { type: "audio/wav" }), "student.wav");
     const response = await fetch(`http://127.0.0.1:${port}/api/strings/analyze`, {
       method: "POST",
       body: formData,
@@ -514,6 +595,11 @@ async function testControlledSubmissionValidatedReplayBatch() {
     assert.equal(body.analysis.submission.dataset, "m0a-bach10");
     assert.equal(body.analysis.submission.piece, "tiny");
     assert.equal(body.analysis.submission.recordingId, "r1");
+    await writeBasicPitchCacheFixture(tempRoot, studentAudio, [
+      { start: 0.1, end: 0.38, midi: 69, confidence: 0.95 },
+      { start: 0.45, end: 0.76, midi: 69, confidence: 0.94 },
+      { start: 0.83, end: 1.15, midi: 69, confidence: 0.93 },
+    ]);
 
     const reviewResponse = await fetch(`http://127.0.0.1:${port}/api/strings/controlled-submissions/reviews`, {
       method: "POST",
@@ -537,22 +623,34 @@ async function testControlledSubmissionValidatedReplayBatch() {
     assert.equal(batchBody.batch.itemCount, 1);
     assert.equal(batchBody.batch.offlineAnalysisProducedCount, 1);
     assert.equal(batchBody.batch.autoDiagnosisIssued, false);
-    assert.equal(batchBody.batch.status, "offline_analysis_ready");
+    assert.equal(batchBody.batch.status, "offline_feature_review_ready");
     assert.equal(batchBody.batch.reason, "controlled-batch-not-student-facing");
     const item = batchBody.batch.items[0];
     assert.equal(item.submissionId, body.analysis.submission.submissionId);
     assert.equal(item.dataset, "m0a-bach10");
     assert.equal(item.piece, "tiny");
     assert.equal(item.recordingId, "r1");
-    assert.equal(item.analysisStatus, "offline_analysis_ready");
+    assert.equal(item.analysisStatus, "offline_feature_review_ready");
     assert.equal(item.offlineAnalysisProduced, true);
     assert.equal(item.autoDiagnosisIssued, false);
-    assert.deepEqual(item.reasons, ["controlled-batch-not-student-facing"]);
-    assert.equal(item.analysisSummary.autoPassCount, 3);
+    assert.deepEqual(item.reasons, ["ordinary-upload-dynamic-shadow-review-only"]);
+    assert.equal(item.analysisSummary.autoPassCount, 0);
+    assert.equal(item.analysisSummary.studentFacing, false);
+    assert.equal(item.candidateGate.mode, "dynamic_shadow_review_only");
+    assert.equal(item.candidateGate.ready, false);
+    assert.equal(item.candidateGate.authorizationReady, false);
+    assert.equal(item.candidateGate.automaticAdoptionAuthorized, false);
+    assert.equal(item.candidateGate.studentSafeGateReady, false);
+    assert.equal(item.candidateGate.studentFacing, false);
+    assert.equal(item.candidateGate.contractReady, true);
+    assert.equal(item.candidateGate.cacheProvenanceReady, true);
     assert.equal(item.decisionCount, 3);
-    assert.equal(item.recordingDiagnosis.recordingId, "r1");
+    assert.equal(item.recordingDiagnosis.mode, "offline_feature_dynamic_shadow_review_only");
+    assert(item.candidatePreview.every((candidate) => candidate.autoDecision === "review_required"));
+    assert(item.candidatePreview.every((candidate) => candidate.studentFacing === false));
     const savedBatchRun = await fs.readFile(path.join(tempRoot, "data", "experiments", "western-strings-m3", "controlled-submission-batch-runs.jsonl"), "utf8");
-    assert(savedBatchRun.includes("offline_analysis_ready"), "validated replay batch should append an offline analysis run");
+    assert(savedBatchRun.includes("offline_feature_review_ready"), "dataset metadata must not bypass the dynamic shadow path");
+    assert(!savedBatchRun.includes('"analysisStatus":"offline_analysis_ready"'));
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -612,7 +710,8 @@ async function testControlledSubmissionOfflineFeatureReviewBatch() {
         duration: 1.25,
       },
     }));
-    formData.append("audio", new Blob([sineWavBuffer()], { type: "audio/wav" }), "student.wav");
+    const studentAudio = sineWavBuffer();
+    formData.append("audio", new Blob([studentAudio], { type: "audio/wav" }), "student.wav");
     const response = await fetch(`http://127.0.0.1:${port}/api/strings/analyze`, {
       method: "POST",
       body: formData,
@@ -622,6 +721,11 @@ async function testControlledSubmissionOfflineFeatureReviewBatch() {
     assert.equal(body.ok, true);
     assert.equal(body.analysis.submissionAccepted, true);
     assert.equal(body.analysis.studentReady, false);
+    await writeBasicPitchCacheFixture(tempRoot, studentAudio, [
+      { start: 0.1, end: 0.38, midi: 69, confidence: 0.95 },
+      { start: 0.45, end: 0.76, midi: 69, confidence: 0.94 },
+      { start: 0.83, end: 1.15, midi: 69, confidence: 0.93 },
+    ]);
 
     const reviewResponse = await fetch(`http://127.0.0.1:${port}/api/strings/controlled-submissions/reviews`, {
       method: "POST",
@@ -650,47 +754,162 @@ async function testControlledSubmissionOfflineFeatureReviewBatch() {
     assert.equal(item.analysisStatus, "offline_feature_review_ready");
     assert.equal(item.offlineAnalysisProduced, true);
     assert.equal(item.autoDiagnosisIssued, false);
-    assert.deepEqual(item.reasons, ["controlled-batch-offline-feature-review-only"]);
-    assert.equal(item.analysisSummary.analysisMode, "linear-score-pyin-review-v1");
+    assert.deepEqual(item.reasons, ["ordinary-upload-dynamic-shadow-review-only"]);
+    assert.equal(item.analysisSummary.analysisMode, "basic-pitch-dtw-pyin-review-v1");
     assert.equal(item.analysisSummary.noteCount, 3);
     assert.equal(item.analysisSummary.candidateRowCount, 3);
     assert.equal(item.analysisSummary.autoPassCount, 0);
     assert.equal(item.analysisSummary.reviewOnlyCandidateCount, 3);
     assert.equal(item.analysisSummary.studentSafeGateReady, false);
     assert.equal(item.analysisSummary.studentSafeCandidateGateReady, false);
-    assert.equal(item.analysisSummary.studentSafeCandidateGateVersion, "western-offline-feature-gate-v0-review-only");
+    assert.equal(item.analysisSummary.studentSafeCandidateGateVersion, "western-ordinary-dynamic-shadow-gate-v1-review-only");
+    assert.equal(item.analysisSummary.dynamicShadowContractReady, true);
+    assert.equal(item.analysisSummary.dynamicShadowInvalidEvidenceCount, 0);
     assert.equal(item.decisionCount, 3);
     assert.equal(item.candidateRowCount, 3);
     assert.match(item.candidateRowsPath, /^data\/experiments\/western-strings-m3\/offline-feature-candidates\/strings-batch-/);
+    assert.match(item.candidateRowsSha256, /^[a-f0-9]{64}$/);
     assert.equal(item.candidateGate.ready, false);
-    assert.equal(item.candidateGate.gateVersion, "western-offline-feature-gate-v0-review-only");
-    assert.equal(item.candidateGate.reason, "ordinary-upload-student-safe-gate-not-calibrated");
+    assert.equal(item.candidateGate.gateVersion, "western-ordinary-dynamic-shadow-gate-v1-review-only");
+    assert.equal(item.candidateGate.mode, "dynamic_shadow_review_only");
+    assert.equal(item.candidateGate.reason, "ordinary-upload-dynamic-shadow-review-only");
+    assert.equal(item.candidateGate.contractReady, true);
+    assert.equal(item.candidateGate.validEvidenceCount, 3);
+    assert.equal(item.candidateGate.invalidEvidenceCount, 0);
+    assert.equal(item.candidateGate.energyVetoIncluded, false);
+    assert.equal(item.candidateGate.basicPitchCacheProvenance.cacheHit, true);
+    assert.equal(item.candidateGate.basicPitchCacheProvenance.identityBound, true);
+    assert.match(item.candidateGate.basicPitchCacheProvenance.cacheArtifactSha256, /^[a-f0-9]{64}$/);
     assert.equal(item.candidateGate.evaluatedCandidateCount, 3);
     assert.equal(item.candidateGate.autoPassCandidateCount, 0);
     assert.equal(item.candidateGate.reviewRequiredCandidateCount, 3);
     assert.equal(item.candidatePreview.length, 3);
-    assert.equal(item.candidatePreview[0].method, "pyin-linear-score-window");
+    assert.equal(item.candidatePreview[0].method, "basic-pitch-dtw-pyin-window");
     assert.equal(item.candidatePreview[0].autoDecision, "review_required");
     assert.equal(item.candidatePreview[0].gateDecision, "review_required");
-    assert.equal(item.candidatePreview[0].gateReason, "ordinary-upload-student-safe-gate-not-calibrated");
-    assert.equal(item.candidatePreview[0].gateVersion, "western-offline-feature-gate-v0-review-only");
+    assert.equal(item.candidatePreview[0].gateReason, "ordinary-upload-dynamic-shadow-review-only");
+    assert.equal(item.candidatePreview[0].gateVersion, "western-ordinary-dynamic-shadow-gate-v1-review-only");
     assert.equal(item.candidatePreview[0].studentSafeGateReady, false);
-    assert.equal(item.recordingDiagnosis.mode, "offline_feature_review_only");
+    assert.equal(item.candidatePreview[0].studentFacing, false);
+    assert.equal(item.candidatePreview[0].dynamicShadowDecision.contractValid, true);
+    assert.equal(item.recordingDiagnosis.mode, "offline_feature_dynamic_shadow_review_only");
+    assert.deepEqual(item.recordingDiagnosis.basicPitchCacheProvenance, item.candidateGate.basicPitchCacheProvenance);
     const candidateRowsArtifact = JSON.parse(await fs.readFile(path.join(tempRoot, item.candidateRowsPath), "utf8"));
     assert.equal(candidateRowsArtifact.batchRunId, batchBody.batch.batchRunId);
     assert.equal(candidateRowsArtifact.submissionId, body.analysis.submission.submissionId);
     assert.equal(candidateRowsArtifact.rowCount, 3);
+    assert.deepEqual(candidateRowsArtifact.candidateGate, item.candidateGate);
     assert.equal(candidateRowsArtifact.candidateRows.length, 3);
     assert(candidateRowsArtifact.candidateRows.every((candidate) => candidate.autoDecision === "review_required"));
-    assert(candidateRowsArtifact.candidateRows.every((candidate) => candidate.gateVersion === "western-offline-feature-gate-v0-review-only"));
+    assert(candidateRowsArtifact.candidateRows.every((candidate) => candidate.gateVersion === "western-ordinary-dynamic-shadow-gate-v1-review-only"));
+    assert(candidateRowsArtifact.candidateRows.every((candidate) => candidate.studentFacing === false));
+    assert(candidateRowsArtifact.candidateRows.every((candidate) => candidate.dynamicShadowDecision.contractValid === true));
     const savedBatchRun = await fs.readFile(path.join(tempRoot, "data", "experiments", "western-strings-m3", "controlled-submission-batch-runs.jsonl"), "utf8");
     const audit = auditControlledBatchRuns(savedBatchRun.trim().split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line)), {
       requireFeatureReview: true,
       sourceRoot: tempRoot,
     });
-    assert.equal(audit.ok, true);
+    assert.equal(audit.ok, true, JSON.stringify(audit.failures));
     assert.equal(audit.featureReviewItemCount, 1);
     assert.equal(audit.candidateRowCount, 3);
+    const emptyRequiredAudit = auditControlledBatchRuns([], {
+      requireFeatureReview: true,
+      sourceRoot: tempRoot,
+      latestOnly: true,
+    });
+    assert.equal(emptyRequiredAudit.ok, false);
+    assert(emptyRequiredAudit.failures.some((failure) => failure.code === "no-feature-review-items-found"));
+    const photoOnlyRequiredAudit = auditControlledBatchRuns([{
+      batchRunId: "photo-only-latest",
+      items: [{ kind: "photo-score", analysisStatus: "photo_score_review_ready" }],
+    }], {
+      requireFeatureReview: true,
+      sourceRoot: tempRoot,
+      latestOnly: true,
+    });
+    assert.equal(photoOnlyRequiredAudit.ok, false);
+    assert(photoOnlyRequiredAudit.failures.some((failure) => failure.code === "no-feature-review-items-found"));
+    const candidateArtifactPath = path.join(tempRoot, item.candidateRowsPath);
+    const originalCandidateArtifactBytes = await fs.readFile(candidateArtifactPath);
+    try {
+      const tamperedArtifact = JSON.parse(originalCandidateArtifactBytes.toString("utf8"));
+      tamperedArtifact.batchRunId = "cross-run-substitution";
+      tamperedArtifact.submissionId = "cross-submission-substitution";
+      tamperedArtifact.candidateRows.at(-1).autoDecision = "auto_pass";
+      tamperedArtifact.candidateRows.at(-1).studentFacing = true;
+      const tamperedBytes = Buffer.from(`${JSON.stringify(tamperedArtifact, null, 2)}\n`, "utf8");
+      await fs.writeFile(candidateArtifactPath, tamperedBytes);
+      const tamperedRun = structuredClone(savedBatchRun.trim().split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line)).at(-1));
+      tamperedRun.items[0].candidatePreview = tamperedRun.items[0].candidatePreview.slice(0, 1);
+      tamperedRun.items[0].candidateRowsSha256 = createHash("sha256").update(tamperedBytes).digest("hex");
+      const tamperedAudit = auditControlledBatchRuns([tamperedRun], {
+        requireFeatureReview: true,
+        sourceRoot: tempRoot,
+        latestOnly: true,
+      });
+      assert.equal(tamperedAudit.ok, false);
+      assert(tamperedAudit.failures.some((failure) => (
+        failure.code === "feature-review-candidate-not-review-required"
+        && failure.source === "artifact"
+      )));
+      assert(tamperedAudit.failures.some((failure) => (
+        failure.code === "feature-review-candidate-student-facing-not-false"
+        && failure.source === "artifact"
+      )));
+      assert(tamperedAudit.failures.some((failure) => (
+        failure.code === "feature-review-candidate-rows-artifact-identity-mismatch"
+      )));
+    } finally {
+      await fs.writeFile(candidateArtifactPath, originalCandidateArtifactBytes);
+    }
+    try {
+      const duplicateNoteArtifact = JSON.parse(originalCandidateArtifactBytes.toString("utf8"));
+      duplicateNoteArtifact.candidateRows[1] = structuredClone(duplicateNoteArtifact.candidateRows[0]);
+      const duplicateIdentities = duplicateNoteArtifact.candidateRows.map((candidate) => ({
+        noteIndex: candidate.noteIndex,
+        noteId: candidate.noteId,
+        sectionId: candidate.sectionId,
+        measureIndex: candidate.measureIndex,
+        midi: candidate.midi,
+      }));
+      duplicateNoteArtifact.candidateGate.candidateNoteIdentitySha256 = noteIdentitySha256(duplicateIdentities);
+      const duplicateNoteBytes = Buffer.from(`${JSON.stringify(duplicateNoteArtifact, null, 2)}\n`, "utf8");
+      await fs.writeFile(candidateArtifactPath, duplicateNoteBytes);
+      const duplicateNoteRun = structuredClone(savedBatchRun.trim().split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line)).at(-1));
+      duplicateNoteRun.items[0].candidateGate = duplicateNoteArtifact.candidateGate;
+      duplicateNoteRun.items[0].candidateRowsSha256 = createHash("sha256").update(duplicateNoteBytes).digest("hex");
+      const duplicateNoteAudit = auditControlledBatchRuns([duplicateNoteRun], {
+        requireFeatureReview: true,
+        sourceRoot: tempRoot,
+        latestOnly: true,
+      });
+      assert.equal(duplicateNoteAudit.ok, false);
+      assert(duplicateNoteAudit.failures.some((failure) => failure.code === "feature-review-incomplete-score-coverage"));
+      assert(duplicateNoteAudit.failures.some((failure) => failure.code === "feature-review-score-note-identity-mismatch"));
+    } finally {
+      await fs.writeFile(candidateArtifactPath, originalCandidateArtifactBytes);
+    }
+    try {
+      const provenanceTamper = JSON.parse(originalCandidateArtifactBytes.toString("utf8"));
+      provenanceTamper.candidateGate.runtimeAttestation.configSemanticSha256 = "f".repeat(64);
+      provenanceTamper.candidateGate.expectedScoreNoteCount = 2;
+      provenanceTamper.candidateGate.scoreProvenance.noteCount = 2;
+      const provenanceTamperBytes = Buffer.from(`${JSON.stringify(provenanceTamper, null, 2)}\n`, "utf8");
+      await fs.writeFile(candidateArtifactPath, provenanceTamperBytes);
+      const provenanceTamperRun = structuredClone(savedBatchRun.trim().split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line)).at(-1));
+      provenanceTamperRun.items[0].candidateGate = provenanceTamper.candidateGate;
+      provenanceTamperRun.items[0].candidateRowsSha256 = createHash("sha256").update(provenanceTamperBytes).digest("hex");
+      const provenanceTamperAudit = auditControlledBatchRuns([provenanceTamperRun], {
+        requireFeatureReview: true,
+        sourceRoot: tempRoot,
+        latestOnly: true,
+      });
+      assert.equal(provenanceTamperAudit.ok, false);
+      assert(provenanceTamperAudit.failures.some((failure) => failure.code === "feature-review-runtime-attestation-invalid"));
+      assert(provenanceTamperAudit.failures.some((failure) => failure.code === "feature-review-incomplete-score-coverage"));
+    } finally {
+      await fs.writeFile(candidateArtifactPath, originalCandidateArtifactBytes);
+    }
     const staleRun = {
       batchRunId: "stale-run-without-artifact",
       autoDiagnosisIssued: false,
@@ -727,6 +946,47 @@ async function testControlledSubmissionOfflineFeatureReviewBatch() {
     });
     assert.equal(latestOnlyAudit.ok, true);
     assert.equal(latestOnlyAudit.auditedRunMode, "latest");
+    const validRun = savedBatchRun.trim().split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line)).at(-1);
+    const invalidTailAudit = auditControlledBatchRuns([validRun, {
+      _invalidJsonLine: 2,
+      _error: "unexpected end of JSON input",
+    }], {
+      requireFeatureReview: true,
+      sourceRoot: tempRoot,
+      latestOnly: true,
+    });
+    assert.equal(invalidTailAudit.ok, false);
+    assert(invalidTailAudit.failures.some((failure) => failure.code === "invalid-jsonl-line"));
+    const crossBoundRun = structuredClone(validRun);
+    crossBoundRun.items[0].scoreId = "cross-score-substitution";
+    crossBoundRun.items[0].analysisAudioSha256 = "f".repeat(64);
+    const crossBoundAudit = auditControlledBatchRuns([crossBoundRun], {
+      requireFeatureReview: true,
+      sourceRoot: tempRoot,
+      latestOnly: true,
+    });
+    assert.equal(crossBoundAudit.ok, false);
+    assert(crossBoundAudit.failures.some((failure) => failure.code === "feature-review-score-id-item-mismatch"));
+    assert(crossBoundAudit.failures.some((failure) => failure.code === "feature-review-cache-audio-sha-item-mismatch"));
+    const legacyMixedRun = structuredClone(validRun);
+    legacyMixedRun.items.push({
+      submissionId: "legacy-bypass",
+      kind: "clean-score",
+      analysisStatus: "offline_analysis_ready",
+      offlineAnalysisProduced: true,
+      autoDiagnosisIssued: true,
+      studentFacing: true,
+      analysisSummary: { studentFacing: true },
+    });
+    const legacyMixedAudit = auditControlledBatchRuns([legacyMixedRun], {
+      requireFeatureReview: true,
+      sourceRoot: tempRoot,
+      latestOnly: true,
+    });
+    assert.equal(legacyMixedAudit.ok, false);
+    assert(legacyMixedAudit.failures.some((failure) => failure.code === "batch-item-issued-auto-diagnosis"));
+    assert(legacyMixedAudit.failures.some((failure) => failure.code === "batch-item-student-facing"));
+    assert(legacyMixedAudit.failures.some((failure) => failure.code === "batch-item-legacy-ordinary-analysis-status"));
     const allRunsAudit = auditControlledBatchRuns([staleRun, ...savedBatchRun.trim().split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line))], {
       requireFeatureReview: true,
       sourceRoot: tempRoot,
@@ -967,6 +1227,218 @@ function testOrdinaryControlledPilotScope() {
   assert.equal(result.rows.find((row) => row.candidateId === "model-rejected").controlledPilotScopeSelected, false);
 }
 
+function testOrdinaryDynamicShadowReviewGate() {
+  const args = buildOfflineFeatureAnalyzerArgs("C:/repo", {
+    scoreId: "score-1",
+    audioPath: "C:/audio/student.wav",
+    limit: 7,
+  });
+  const timingModeIndex = args.indexOf("--timing-mode");
+  assert.match(args[0].replace(/\\/g, "/"), /scripts\/run-western-ordinary-audio-python\.mjs$/);
+  assert.equal(args[1], "--script");
+  assert.match(args[2].replace(/\\/g, "/"), /scripts\/experiments\/run_western_strings_offline_feature_analysis\.py$/);
+  assert.equal(args[3], "--");
+  assert(timingModeIndex > 0);
+  assert.equal(args[timingModeIndex + 1], "basic-pitch-dtw");
+  assert.equal(args.filter((item) => item === "--timing-mode").length, 1);
+  assert.equal(args[args.indexOf("--limit") + 1], "0", "ordinary shadow must always analyze the full score");
+
+  const selectedEvidence = {
+    contractVersion: "western-ordinary-dynamic-shadow-candidate-v1",
+    policyVersion: "western-ordinary-dynamic-shadow-policy-v1",
+    timingMode: "basic-pitch-dtw",
+    selected: true,
+    blockingReasons: [],
+    pitchDistanceSemitones: 0,
+    eventConfidence: 0.8,
+    relativeIoiDeviationRatio: 0.1,
+    relativeEventConfidence: 1.2,
+    eventDurationSeconds: 0.2,
+    nearestSamePitchScoreDistanceQuarters: 1,
+    expectedDurationSeconds: 0.5,
+    eventDurationRatio: 0.4,
+    energyVetoIncluded: false,
+    causalEnergyStatus: "excluded-review-only",
+  };
+  const rejectedEvidence = {
+    ...selectedEvidence,
+    selected: false,
+    blockingReasons: ["dynamic-shadow-pitch-distance-not-exact"],
+    pitchDistanceSemitones: 1,
+  };
+  const rfCandidateGate = {
+    ready: true,
+    mode: "confidence_rf",
+    gateVersion: "western-offline-feature-gate-v1-confidence-rf",
+    modelVersion: "ordinary-upload-confidence-rf-v1",
+    threshold: 0.8,
+    evaluatedCandidateCount: 2,
+    modelAutoPassCandidateCount: 2,
+    autoPassCandidateCount: 2,
+  };
+  const validCacheProvenance = {
+    audioSha256: "a".repeat(64),
+    modelVersion: "basic-pitch-0.4.0-default-model",
+    modelArtifactSha256: "c6595f299ff83c52e89555789f7e3e829a6a0f25b6a88f7e99073af5a2470dc4",
+    inferenceVersion: "default-frequency-range-g3-a7-min-note-80ms-v1",
+    policyVersion: "western-ordinary-dynamic-shadow-policy-v1",
+    runtimeId: "western-ordinary-dynamic-shadow-audio-py311",
+    runtimeConfigSemanticSha256: "1f3a47f5cfe2b2d2e427be9a03ab43b4b4aa09a5db0edeed0b55e610a42ac6f9",
+    runtimeRequirementsLockSha256: "4120a811da1ecb1aa93ceabcbb5aa0b45a37c08e5ee3138d2b793e38f2828d04",
+    cachePath: `data/experiments/western-strings-m3/offline-basic-pitch-cache/${"a".repeat(64)}-0123456789abcdef.basic-pitch.json`,
+    cacheArtifactSha256: "b".repeat(64),
+    cacheHit: true,
+    cacheSource: "content-addressed-cache",
+    identityBound: true,
+  };
+  const expectedScoreNotes = [
+    { noteIndex: 0, noteId: "n1", sectionId: "section-1", measureIndex: 1, midi: 69 },
+    { noteIndex: 1, noteId: "n2", sectionId: "section-1", measureIndex: 1, midi: 69 },
+  ];
+  const validScoreVerification = {
+    verified: true,
+    blockingReasons: [],
+    value: {
+      scoreId: "score-test-clean",
+      scorePayloadSha256: "c".repeat(64),
+      scoreStorePath: "data/erhu-score-imports.json",
+      scoreStoreArtifactSha256: "d".repeat(64),
+      noteCount: 2,
+      noteIdentitySha256: noteIdentitySha256(expectedScoreNotes),
+    },
+    expectedNotes: expectedScoreNotes,
+  };
+  const validRuntimeAttestationVerification = {
+    verified: true,
+    blockingReasons: [],
+    value: {
+      ready: true,
+      runtimeId: "western-ordinary-dynamic-shadow-audio-py311",
+      configSemanticSha256: "1f3a47f5cfe2b2d2e427be9a03ab43b4b4aa09a5db0edeed0b55e610a42ac6f9",
+      requirementsLockSha256: "4120a811da1ecb1aa93ceabcbb5aa0b45a37c08e5ee3138d2b793e38f2828d04",
+      modelArtifactSha256: "c6595f299ff83c52e89555789f7e3e829a6a0f25b6a88f7e99073af5a2470dc4",
+      studentFacing: false,
+      automaticAdoptionAuthorized: false,
+    },
+  };
+  const valid = buildOrdinaryDynamicShadowReviewGate([
+    { candidateId: "selected", noteIndex: 0, noteId: "n1", sectionId: "section-1", measureIndex: 1, midi: 69, confidenceSelected: true, dynamicShadowEvidence: selectedEvidence },
+    { candidateId: "rejected", noteIndex: 1, noteId: "n2", sectionId: "section-1", measureIndex: 1, midi: 69, confidenceSelected: true, dynamicShadowEvidence: rejectedEvidence },
+  ], rfCandidateGate, {
+    basicPitchCacheProvenance: validCacheProvenance,
+    expectedAudioSha256: validCacheProvenance.audioSha256,
+    cacheArtifactVerification: { verified: true, blockingReasons: [] },
+    scoreVerification: validScoreVerification,
+    runtimeAttestationVerification: validRuntimeAttestationVerification,
+  });
+  assert.equal(valid.gate.ready, false);
+  assert.equal(valid.gate.authorizationReady, false);
+  assert.equal(valid.gate.automaticAdoptionAuthorized, false);
+  assert.equal(valid.gate.studentSafeGateReady, false);
+  assert.equal(valid.gate.studentFacing, false);
+  assert.equal(valid.gate.mode, "dynamic_shadow_review_only");
+  assert.equal(valid.gate.contractReady, true);
+  assert.equal(valid.gate.completeScoreCoverage, true);
+  assert.equal(valid.gate.scoreNoteIdentityReady, true);
+  assert.equal(valid.gate.candidateNoteIdentitySha256, valid.gate.scoreNoteIdentitySha256);
+  assert.equal(valid.gate.expectedScoreNoteCount, 2);
+  assert.equal(valid.gate.validEvidenceCount, 2);
+  assert.equal(valid.gate.invalidEvidenceCount, 0);
+  assert.equal(valid.gate.shadowSelectedCandidateCount, 1);
+  assert.equal(valid.gate.cacheProvenanceReady, true);
+  assert.equal(valid.gate.energyVetoIncluded, false);
+  assert.equal(valid.gate.rfTelemetry.ready, true);
+  assert.equal(valid.gate.rfTelemetry.authorizationIgnored, true);
+  assert.equal(valid.gate.rfTelemetry.scopedSelectedCandidateCount, 2);
+  assert(valid.rows.every((row) => row.autoDecision === "review_required"));
+  assert(valid.rows.every((row) => row.gateDecision === "review_required"));
+  assert(valid.rows.every((row) => row.studentSafeGateReady === false));
+  assert(valid.rows.every((row) => row.studentFacing === false));
+  assert.equal(valid.rows[0].dynamicShadowDecision.decision, "shadow_selected");
+  assert.equal(valid.rows[0].dynamicShadowDecision.selected, true);
+  assert.equal(valid.rows[0].dynamicShadowDecision.authorization, "telemetry_only");
+  assert.equal(valid.rows[1].dynamicShadowDecision.decision, "shadow_rejected");
+
+  const truncated = buildOrdinaryDynamicShadowReviewGate([
+    { candidateId: "selected", noteIndex: 0, noteId: "n1", sectionId: "section-1", measureIndex: 1, midi: 69, confidenceSelected: true, dynamicShadowEvidence: selectedEvidence },
+  ], rfCandidateGate, {
+    basicPitchCacheProvenance: validCacheProvenance,
+    expectedAudioSha256: validCacheProvenance.audioSha256,
+    cacheArtifactVerification: { verified: true, blockingReasons: [] },
+    scoreVerification: validScoreVerification,
+    runtimeAttestationVerification: validRuntimeAttestationVerification,
+  });
+  assert.equal(truncated.gate.contractReady, false);
+  assert.equal(truncated.gate.completeScoreCoverage, false);
+  assert(truncated.gate.blockingReasons.includes("ordinary-upload-dynamic-shadow-incomplete-score-coverage"));
+
+  const duplicated = buildOrdinaryDynamicShadowReviewGate([
+    { candidateId: "selected-a", noteIndex: 0, noteId: "n1", sectionId: "section-1", measureIndex: 1, midi: 69, confidenceSelected: true, dynamicShadowEvidence: selectedEvidence },
+    { candidateId: "selected-b", noteIndex: 0, noteId: "n1", sectionId: "section-1", measureIndex: 1, midi: 69, confidenceSelected: true, dynamicShadowEvidence: selectedEvidence },
+  ], rfCandidateGate, {
+    basicPitchCacheProvenance: validCacheProvenance,
+    expectedAudioSha256: validCacheProvenance.audioSha256,
+    cacheArtifactVerification: { verified: true, blockingReasons: [] },
+    scoreVerification: validScoreVerification,
+    runtimeAttestationVerification: validRuntimeAttestationVerification,
+  });
+  assert.equal(duplicated.gate.contractReady, false);
+  assert.equal(duplicated.gate.completeScoreCoverage, false);
+  assert.equal(duplicated.gate.scoreNoteIdentityReady, false);
+  assert(duplicated.gate.blockingReasons.includes("ordinary-upload-dynamic-shadow-score-note-identity-mismatch"));
+
+  const invalid = buildOrdinaryDynamicShadowReviewGate([
+    {
+      candidateId: "wrong-version",
+      dynamicShadowEvidence: { ...selectedEvidence, policyVersion: "stale-policy" },
+    },
+    {
+      candidateId: "numeric-string",
+      dynamicShadowEvidence: { ...selectedEvidence, eventConfidence: "0.8" },
+    },
+    { candidateId: "missing-evidence", confidenceSelected: true },
+  ], rfCandidateGate, {
+    basicPitchCacheProvenance: validCacheProvenance,
+    expectedAudioSha256: validCacheProvenance.audioSha256,
+    cacheArtifactVerification: { verified: true, blockingReasons: [] },
+    scoreVerification: validScoreVerification,
+    runtimeAttestationVerification: validRuntimeAttestationVerification,
+  });
+  assert.equal(invalid.gate.ready, false);
+  assert.equal(invalid.gate.contractReady, false);
+  assert.equal(invalid.gate.invalidEvidenceCount, 3);
+  assert.equal(invalid.gate.shadowSelectedCandidateCount, 0);
+  assert(invalid.gate.blockingReasons.includes("ordinary-upload-dynamic-shadow-evidence-invalid"));
+  assert(invalid.rows.every((row) => row.autoDecision === "review_required"));
+  assert(invalid.rows.every((row) => row.studentFacing === false));
+  assert(invalid.rows.every((row) => row.dynamicShadowDecision.decision === "shadow_invalid"));
+
+  const unboundCache = buildOrdinaryDynamicShadowReviewGate([
+    { candidateId: "selected", dynamicShadowEvidence: selectedEvidence },
+  ], rfCandidateGate);
+  assert.equal(unboundCache.gate.contractReady, false);
+  assert.equal(unboundCache.gate.cacheProvenanceReady, false);
+  assert(unboundCache.gate.blockingReasons.includes("ordinary-upload-basic-pitch-cache-provenance-missing"));
+  assert.equal(unboundCache.rows[0].autoDecision, "review_required");
+  assert.equal(unboundCache.rows[0].studentFacing, false);
+
+  for (const expectedAudioSha256 of ["", "c".repeat(40), "d".repeat(64)]) {
+    const invalidAudioBinding = buildOrdinaryDynamicShadowReviewGate([
+      { candidateId: "selected", dynamicShadowEvidence: selectedEvidence },
+    ], rfCandidateGate, {
+      basicPitchCacheProvenance: validCacheProvenance,
+      expectedAudioSha256,
+      cacheArtifactVerification: { verified: true, blockingReasons: [] },
+      scoreVerification: validScoreVerification,
+      runtimeAttestationVerification: validRuntimeAttestationVerification,
+    });
+    assert.equal(invalidAudioBinding.gate.contractReady, false);
+    assert.equal(invalidAudioBinding.gate.cacheProvenanceReady, false);
+    assert.equal(invalidAudioBinding.rows[0].autoDecision, "review_required");
+    assert.equal(invalidAudioBinding.rows[0].studentFacing, false);
+  }
+}
+
 async function testControlledSubmissionOfflineFeatureConfidenceGateEnabled() {
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "western-controlled-confidence-gate-"));
   const m2Root = path.join(tempRoot, "data", "experiments", "western-strings-m2");
@@ -1019,7 +1491,13 @@ async function testControlledSubmissionOfflineFeatureConfidenceGateEnabled() {
     "utf8",
   );
   const audioPath = path.join(tempRoot, "student.wav");
-  await fs.writeFile(audioPath, sineWavBuffer());
+  const studentAudio = sineWavBuffer();
+  await fs.writeFile(audioPath, studentAudio);
+  await writeBasicPitchCacheFixture(tempRoot, studentAudio, [
+    { start: 0.1, end: 0.38, midi: 69, confidence: 0.95 },
+    { start: 0.45, end: 0.76, midi: 69, confidence: 0.94 },
+    { start: 0.83, end: 1.15, midi: 69, confidence: 0.93 },
+  ]);
   await fs.writeFile(
     path.join(m3Root, "controlled-submissions.jsonl"),
     `${JSON.stringify({
@@ -1080,31 +1558,43 @@ async function testControlledSubmissionOfflineFeatureConfidenceGateEnabled() {
     const result = await runWesternControlledSubmissionBatch({ repoRoot: tempRoot, limit: 1 });
     assert.equal(result.ok, true);
     assert.equal(result.batch.itemCount, 1);
-    assert.equal(result.batch.status, "offline_feature_confidence_ready");
+    assert.equal(result.batch.status, "offline_feature_review_ready");
+    assert.equal(result.batch.autoDiagnosisIssued, false);
     const item = result.batch.items[0];
-    assert.equal(item.analysisStatus, "offline_feature_confidence_ready");
-    assert.equal(item.candidateGate.ready, true);
-    assert.equal(item.candidateGate.mode, "confidence_rf");
-    assert.equal(item.candidateGate.gateVersion, "western-offline-feature-gate-v1-confidence-rf");
-    assert.equal(item.candidateGate.modelVersion, "ordinary-upload-confidence-rf-v1");
-    assert.equal(item.candidateGate.threshold, 0.8);
+    assert.equal(item.analysisStatus, "offline_feature_review_ready");
+    assert.equal(item.autoDiagnosisIssued, false);
+    assert.equal(item.candidateGate.ready, false);
+    assert.equal(item.candidateGate.mode, "dynamic_shadow_review_only");
+    assert.equal(item.candidateGate.gateVersion, "western-ordinary-dynamic-shadow-gate-v1-review-only");
+    assert.equal(item.candidateGate.rfTelemetry.ready, true);
+    assert.equal(item.candidateGate.rfTelemetry.authorizationIgnored, true);
+    assert.equal(item.candidateGate.rfTelemetry.mode, "confidence_rf");
+    assert.equal(item.candidateGate.rfTelemetry.gateVersion, "western-offline-feature-gate-v1-confidence-rf");
+    assert.equal(item.candidateGate.rfTelemetry.modelVersion, "ordinary-upload-confidence-rf-v1");
+    assert.equal(item.candidateGate.rfTelemetry.threshold, 0.8);
     assert.equal(item.candidateGate.evaluatedCandidateCount, 3);
-    assert.equal(item.candidateGate.controlledPilotScope.scopeName, "first-measure-only");
-    assert.equal(item.candidateGate.controlledPilotScope.maxMeasureIndex, 1);
-    assert.equal(item.candidateGate.controlledPilotScope.minConfidence, 0.95);
-    assert(item.candidateGate.modelAutoPassCandidateCount >= item.candidateGate.autoPassCandidateCount);
-    assert.equal(item.candidateGate.autoPassCandidateCount + item.candidateGate.reviewRequiredCandidateCount, 3);
+    assert.equal(item.candidateGate.contractReady, true);
+    assert.equal(item.candidateGate.invalidEvidenceCount, 0);
+    assert.equal(item.candidateGate.basicPitchCacheProvenance.cacheHit, true);
+    assert.equal(item.candidateGate.basicPitchCacheProvenance.identityBound, true);
+    assert.equal(item.candidateGate.autoPassCandidateCount, 0);
+    assert.equal(item.candidateGate.reviewRequiredCandidateCount, 3);
+    assert.equal(
+      item.analysisSummary.shadowTelemetryCoverage,
+      Number((item.candidateGate.shadowSelectedCandidateCount / item.candidateGate.evaluatedCandidateCount).toFixed(6)),
+    );
     assert.equal(item.candidatePreview.length, 3);
     assert(item.candidatePreview.every((candidate) => typeof candidate.confidenceProbability === "number"));
-    assert(item.candidatePreview.every((candidate) => candidate.gateVersion === "western-offline-feature-gate-v1-confidence-rf"));
-    assert(item.candidatePreview.every((candidate) => candidate.studentSafeGateReady === true));
-    assert(item.candidatePreview.every((candidate) => (
-      candidate.studentFacing !== true
-      || (candidate.measureIndex === 1 && candidate.confidenceProbability >= 0.95)
-    )));
+    assert(item.candidatePreview.every((candidate) => candidate.gateVersion === "western-ordinary-dynamic-shadow-gate-v1-review-only"));
+    assert(item.candidatePreview.every((candidate) => candidate.autoDecision === "review_required"));
+    assert(item.candidatePreview.every((candidate) => candidate.studentSafeGateReady === false));
+    assert(item.candidatePreview.every((candidate) => candidate.studentFacing === false));
+    assert(item.candidatePreview.every((candidate) => candidate.dynamicShadowDecision.contractValid === true));
     const artifact = JSON.parse(await fs.readFile(path.join(tempRoot, item.candidateRowsPath), "utf8"));
     assert.equal(artifact.rowCount, 3);
     assert(artifact.candidateRows.every((candidate) => typeof candidate.confidenceProbability === "number"));
+    assert(artifact.candidateRows.every((candidate) => candidate.autoDecision === "review_required"));
+    assert(artifact.candidateRows.every((candidate) => candidate.studentFacing === false));
   } finally {
     if (oldEnable === undefined) {
       delete process.env.WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE;
@@ -1120,6 +1610,7 @@ async function testControlledSubmissionOfflineFeatureConfidenceGateEnabled() {
 }
 
 testOrdinaryControlledPilotScope();
+testOrdinaryDynamicShadowReviewGate();
 await testServiceDefaultNoLeakage();
 await testServiceEvaluationSummary();
 await testStudentSafeFailClosed();

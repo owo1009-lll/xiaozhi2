@@ -31,7 +31,45 @@ function hasReason(action, reason) {
 
 function commandForAction(action) {
   const track = action?.track || "";
+  if (track === "Ordinary dynamic shadow runtime") {
+    return [
+      "Run npm run western:ordinary-dynamic-shadow-runtime-setup",
+      "Run npm run western:ordinary-dynamic-shadow-runtime-preflight",
+      "Run npm run test:western-ordinary-audio-runtime",
+      "Keep all ordinary student-facing and automatic-adoption flags false",
+    ];
+  }
+  if (track === "Ordinary dynamic shadow r3 evidence verifier") {
+    return [
+      "Implement the live source-artifact reread and rehash verifier before using r3-02/r3-03",
+      "Add forged-report and artifact-tamper rejection tests",
+      "Run npm run test:western-project-gate",
+      "Run npm run western:project-status",
+    ];
+  }
+  if (track === "Ordinary dynamic shadow r3 acceptance") {
+    return [
+      "Confirm liveArtifactVerifierReady=true before using either reserve take",
+      "Run r3-02 and r3-03 once each with cold and warm cache verification",
+      "Audit the complete candidate rows and bound source hashes",
+      "Keep all results review-only; do not treat acceptance as release authorization",
+    ];
+  }
+  if (track === "Ordinary dynamic shadow authorization") {
+    return [
+      "Prepare a separate fresh-blind authorization contract with new recordings and pieces",
+      "Do not reuse RF, first-measure, or r3 acceptance evidence",
+      "Keep production/default runtime fail-closed",
+    ];
+  }
   if (track === "M2/M3 ordinary upload candidate gate") {
+    if (hasReason(action, "ordinary-rf-monitored-pilot-authorization-superseded")) {
+      return [
+        "Do not run or approve the historical RF monitored-pilot path",
+        "Use the ordinary dynamic-shadow status and its live r3 verifier as the current entrypoint",
+        "Keep production/default runtime fail-closed",
+      ];
+    }
     if (hasReason(action, "ordinary-confidence-recalibration-context-validation-needed")) {
       return [
         "Keep production/default runtime fail-closed.",

@@ -45,13 +45,15 @@ function toRel(filePath) {
 
 function renderMarkdown(plan) {
   return [
-    "# Ordinary Upload Monitored Pilot Plan",
+    "# Historical Ordinary Upload RF Pilot Plan (Superseded)",
     "",
     `Generated: ${plan.generatedAt}`,
     "",
     "## Decision",
     "",
     `- readyForPilotPlan: ${plan.readyForPilotPlan}`,
+    `- authorizationStatus: ${plan.authorizationStatus}`,
+    `- supersededBy: ${plan.supersededBy}`,
     `- defaultRuntimeEnabled: ${plan.defaultRuntimeEnabled}`,
     `- enableEnvVar: ${plan.enableEnvVar}`,
     `- releaseManifest: ${plan.releaseManifest}`,
@@ -71,22 +73,16 @@ function renderMarkdown(plan) {
     `- precisionPrecheckUnknownReviewRows: ${plan.evidence.precisionPrecheckUnknownReviewRows}`,
     `- threshold: ${plan.evidence.threshold}`,
     "",
-    "## Pilot Scope",
+    "## Current Scope",
     "",
-    "- Run only in a separate monitored process.",
-    "- Do not commit an enabled env value.",
-    "- Do not enable production/default student runtime.",
-    "- Reuse known labels before asking for another teacher review.",
-    "- If unknown auto-pass rows appear, review only those unknown rows before a pilot.",
-    "- Treat every rejected candidate as review_required.",
-    "- Log auto-pass count, review-required count, unsafe false positives, and source recording IDs.",
+    "- This report preserves RF calibration history only.",
+    "- It cannot authorize a monitored pilot or any student-facing runtime.",
+    "- Do not enable the historical RF environment flag, even temporarily as release evidence.",
+    "- Current ordinary-upload work must use the review-only dynamic-shadow contract and later fresh-blind authorization evidence.",
     "",
-    "## Command Pattern",
+    "## Safe Commands",
     "",
     "```powershell",
-    `$env:${plan.enableEnvVar}='1'`,
-    "npm run test:western-alignment-preview",
-    `Remove-Item Env:\\${plan.enableEnvVar}`,
     "npm run test:western-project-gate",
     "npm run western:project-status",
     "```",
@@ -117,6 +113,7 @@ export async function buildOrdinaryMonitoredPilotPlan(args = {}) {
   const controlled = status.tracks?.controlledCandidate || {};
 
   const blockingReasons = [];
+  blockingReasons.push("ordinary-rf-monitored-pilot-authorization-superseded");
   if (release.enabledByDefault !== false) blockingReasons.push("release-manifest-must-be-disabled-by-default");
   if (!release.enableEnvVar) blockingReasons.push("release-manifest-enable-env-missing");
   if (audit.ok !== true) blockingReasons.push("release-audit-not-ok");
@@ -138,6 +135,8 @@ export async function buildOrdinaryMonitoredPilotPlan(args = {}) {
     ok: blockingReasons.length === 0,
     generatedAt: new Date().toISOString(),
     readyForPilotPlan: blockingReasons.length === 0,
+    authorizationStatus: "superseded-historical-rf-only",
+    supersededBy: "western-ordinary-dynamic-shadow-policy-v1",
     defaultRuntimeEnabled: status.runtimeStudentGate?.ordinaryUploadAutoFeedbackReady === true,
     enableEnvVar: release.enableEnvVar || "WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE",
     releaseManifest: toRel(releasePath),

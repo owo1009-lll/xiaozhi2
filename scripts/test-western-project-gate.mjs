@@ -7,7 +7,20 @@ import {
   buildProjectStatus,
   evaluateHomrDeploymentSnapshot,
   summarizePublicModelValidation,
+  validateOrdinaryDynamicShadowAcceptance,
 } from "./status-western-strings-project.mjs";
+
+const forgedMinimalAcceptance = validateOrdinaryDynamicShadowAcceptance({
+  schemaVersion: 1,
+  contractVersion: "western-ordinary-dynamic-shadow-r3-acceptance-v1",
+  acceptanceReady: true,
+  studentFacing: false,
+  automaticAdoptionAuthorized: false,
+});
+assert.equal(forgedMinimalAcceptance.ready, false, "a minimal self-asserted r3 JSON must not open acceptance");
+assert(forgedMinimalAcceptance.blockingReasons.includes("ordinary-dynamic-shadow-r3-recording-set-invalid"));
+assert(forgedMinimalAcceptance.blockingReasons.includes("ordinary-dynamic-shadow-r3-evidence-digest-invalid"));
+assert(forgedMinimalAcceptance.blockingReasons.includes("ordinary-dynamic-shadow-r3-live-artifact-verifier-not-implemented"));
 
 const approvedHomrReviewFixture = {
   decision: {
@@ -375,10 +388,14 @@ assert.equal(controlled.confidencePilot?.readyForStudentGate, false, "eval-only 
 assert.equal(controlled.confidencePilot?.validationEval?.readyForRuntimeGate, false, "validation eval must not enable runtime gate");
 if (controlled.confidencePilot?.validationEval?.blindValidationPassed) {
   assert.equal(controlled.confidencePilot?.needsBlindValidation, false, "passed blind validation should clear needsBlindValidation");
-  assert.equal(controlled.confidencePilot?.runtimeGateWired, true, "passed blind validation should expose the wired runtime release manifest");
+  assert.equal(controlled.confidencePilot?.runtimeGateWired, true, "historical evidence should still report that the RF runtime manifest existed");
+  assert.equal(
+    controlled.confidencePilot?.runtimeGateWiringScope,
+    "historical-rf-disabled-by-default-no-current-authority",
+  );
   assert(
-    controlled.blockingReasons.includes("ordinary-auto-gate-disabled-by-default"),
-    "wired runtime gate must still block until the explicit release flag is enabled",
+    controlled.blockingReasons.includes("ordinary-rf-monitored-pilot-authorization-superseded"),
+    "historical RF wiring must have no current pilot authority",
   );
 } else {
   assert.equal(controlled.confidencePilot?.needsBlindValidation, true, "confidence pilot should still track that the old v1 candidate did not pass the full release process");
@@ -410,75 +427,34 @@ if (controlled.confidencePilot?.validationEval?.blindValidationPassed) {
 assert(controlled.confidencePilot?.bestReleaseCandidate, "confidence pilot should report the best release candidate");
 assert.equal(controlled.confidencePilot.bestReleaseCandidate.featureSet, "deployable", "confidence pilot should report the deployable candidate");
 assert.equal(controlled.confidencePilot.bestReleaseCandidate.groupBy, "recordingId", "confidence pilot should report the strict leave-one-recording candidate");
-const ordinaryPilotAuditPassed = controlled.confidencePilot?.monitoredPilotAudit?.readyForMonitoredPilot === true
-  && controlled.confidencePilot?.monitoredPilotAudit?.teacherReviewNeeded === false
-  && controlled.confidencePilot?.monitoredPilotAudit?.defaultOrdinaryReadyAfter === false;
-const m3plusPilotAuditPassed = m3plus.monitoredPilotAudit?.readyForMonitoredPilot === true
-  && m3plus.monitoredPilotAudit?.teacherReviewNeeded === false
-  && m3plus.monitoredPilotAudit?.defaultM3PlusReadyAfter === false;
-if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
-  assert(
-    status.releaseReview?.readyForControlledPilot
-      ? ["Controlled pilot decision", "Controlled pilot approval", "Controlled pilot deferred", "Start monitored pilot", "Controlled pilot coverage audit", "Scoped V2-alpha blind audit preparation", "Fresh blind machine precheck", "Controlled pilot completed"].includes(status.nextActions[0]?.track)
-      : status.nextActions[0]?.track === "Release review",
-    "after ordinary, M3+, and M4 machine checks pass, handoff should move to release review or controlled pilot decision while runtime stays fail-closed",
-  );
-} else if (ordinaryPilotAuditPassed) {
-  assert.equal(
-    status.nextActions[0]?.track,
-    "M3+ pitch safety rescope",
-    "after ordinary pilot audit passes, handoff should move to the next unfinished track while release stays fail-closed",
-  );
-} else {
-  assert(
-    status.nextActions[0]?.action.includes("confidence-threshold-pool-review/index.html")
-    || status.nextActions[0]?.action.includes("threshold-pool review failed")
-    || status.nextActions[0]?.action.includes("Threshold-pool precision passed")
-    || status.nextActions[0]?.action.includes("separate monitored pilot plan")
-    || status.nextActions[0]?.action.includes("recalibration blind-validation pack")
-    || status.nextActions[0]?.action.includes("context-feature confidence recalibration pack")
-    || status.nextActions[0]?.action.includes("improve candidate/pitch-support evidence")
-    || status.nextActions[0]?.action.includes("wire a runtime gate")
-    || status.nextActions[0]?.action.includes("runtime gate is wired")
-    || status.nextActions[0]?.action.includes("ordinary-monitored-pilot-audit"),
-    "project next action should route to threshold-pool review, recalibration, runtime wiring, pitch-support improvement, or explicit release-flag gating",
-  );
-}
-const expectedOrdinaryArtifact = status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-recalibration-context-validation-needed")
-  ? "data/experiments/western-strings-m3/confidence-recalibration-context-validation-review/index.html"
-  : status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-recalibration-context-validation-failed")
-  ? "data/experiments/western-strings-m3/confidence-recalibration-context-validation-review/confidence-recalibration-context-validation-eval.json"
-  : status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-recalibration-context-runtime-not-wired")
-  ? "data/experiments/western-strings-m3/confidence-recalibration-context-validation-review/confidence-recalibration-context-validation-eval.json"
-  : status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-recalibration-validation-needed")
-  ? "data/experiments/western-strings-m3/confidence-recalibration-validation-review/index.html"
-  : status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-recalibration-validation-failed")
-  ? "data/experiments/western-strings-m3/confidence-recalibration-validation-review/confidence-recalibration-failure-diagnosis.json"
-  : status.tracks.controlledCandidate.blockingReasons.includes("ordinary-confidence-threshold-pool-precision-too-low")
-  ? "data/experiments/western-strings-m3/confidence-threshold-pool-review/confidence-threshold-pool-diagnosis.json"
-  : "data/experiments/western-strings-m3/confidence-validation-review/ordinary-confidence-release-audit.json";
-if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
-  const nextArtifact = status.nextActions[0]?.artifact || "";
-  assert(
-    [
-      "data/experiments/western-strings-release-review.md",
-      "data/experiments/western-strings-controlled-pilot-decision.md",
-      "data/experiments/western-strings-controlled-pilot-evidence-audit.md",
-      "data/experiments/western-strings-v2alpha-blind-intake-status.md",
-    ].includes(nextArtifact)
-      || (nextArtifact.startsWith("data/experiments/western-strings-controlled-pilot-sessions/")
-        && nextArtifact.endsWith("/session.md")),
-    "after machine checks pass, handoff should point to release/decision evidence or the completed pilot session",
-  );
-} else if (ordinaryPilotAuditPassed) {
-  assert.equal(
-    status.nextActions[0]?.artifact,
-    m3plus.rescopeGate?.source,
-    "after ordinary pilot audit passes, handoff artifact should point to the next unfinished track",
-  );
-} else {
-  assert.equal(status.nextActions[0]?.artifact, expectedOrdinaryArtifact, "project artifact should point to the current ordinary-gate evidence artifact");
-}
+assert.equal(
+  controlled.confidencePilot?.monitoredPilotAudit?.historicalReadyForMonitoredPilot,
+  true,
+  "the 3/3 RF result must remain visible only as historical evidence",
+);
+assert.equal(controlled.confidencePilot?.monitoredPilotAudit?.readyForMonitoredPilot, false);
+assert.equal(
+  controlled.confidencePilot?.monitoredPilotAudit?.authorizationStatus,
+  "superseded-historical-rf-only",
+);
+assert.equal(controlled.ordinaryDynamicShadow?.foundationReady, true);
+assert.equal(controlled.ordinaryDynamicShadow?.runtimePreflightReady, true);
+assert.equal(controlled.ordinaryDynamicShadow?.liveArtifactVerifierReady, false);
+assert.equal(controlled.ordinaryDynamicShadow?.r3AcceptanceReady, false);
+assert.equal(controlled.ordinaryDynamicShadow?.authorizationReady, false);
+assert.equal(controlled.ordinaryDynamicShadow?.studentGateReady, false);
+assert.equal(controlled.ordinaryDynamicShadow?.automaticAdoptionReady, false);
+assert.equal(status.releaseReview?.readyForControlledPilot, false, "no cached release review may bypass dynamic acceptance and authorization");
+assert.equal(status.releaseReview?.runtimeFailClosed, true);
+assert.equal(typeof status.releaseReview?.superseded, "boolean");
+assert.equal(status.controlledPilotDecision?.readyForControlledPilotDecision, false);
+assert.equal(status.controlledPilotDecision?.readyToStartControlledPilot, false);
+assert.equal(status.controlledPilotDecision?.authorizationSuperseded, true);
+assert.equal(status.nextActions[0]?.track, "Ordinary dynamic shadow r3 evidence verifier");
+assert.equal(
+  status.nextActions[0]?.artifact,
+  "data/experiments/western-strings-m3/ordinary-dynamic-shadow-r3-acceptance/report.json",
+);
 
 const m4 = status.tracks.m4Omr;
 assert.equal(m4.m4OmrBenchmarkDatasetReady, true, "M4 intake dataset should be ready for benchmarking");
@@ -686,14 +662,11 @@ assert.equal(
   "data/experiments/western-strings-m4/independent-gold-todo.html",
   "M4 handoff should expose the visual independent-gold checklist",
 );
-if (ordinaryPilotAuditPassed && m3plusPilotAuditPassed) {
-  assert(
-    status.releaseReview?.readyForControlledPilot
-      ? ["Controlled pilot decision", "Controlled pilot approval", "Controlled pilot deferred", "Start monitored pilot", "Controlled pilot coverage audit", "Scoped V2-alpha blind audit preparation", "Fresh blind machine precheck", "Controlled pilot completed"].includes(status.nextActions[0]?.track)
-      : status.nextActions[0]?.track === "Release review",
-    "M4 should no longer produce a human-task next action after clean-score approval is recognized",
-  );
-}
+assert.equal(
+  status.nextActions[0]?.track,
+  "Ordinary dynamic shadow r3 evidence verifier",
+  "M4 must not displace the prerequisite ordinary dynamic-shadow live verifier task",
+);
 
 const m4ChecklistHtml = await fs.readFile("data/experiments/western-strings-m4/independent-gold-todo.html", "utf8");
 const m4ChecklistMd = await fs.readFile("data/experiments/western-strings-m4/independent-gold-todo.md", "utf8");
@@ -707,6 +680,10 @@ const handoff = renderHandoff(status);
 assert(
   packageJson.scripts?.["western:m4-preflight"],
   "package.json must expose the aggregate M4 machine self-test command",
+);
+assert(
+  packageJson.scripts?.["western:controlled-batch-candidate-audit"]?.includes("--require-feature-review"),
+  "the public candidate-audit command must fail closed when the latest run has no ordinary feature-review artifact",
 );
 assert(
   packageJson.scripts?.["western:m4-independent-benchmark-audit"],
@@ -808,22 +785,18 @@ assert(
   packageJson.scripts?.["test:western-ordinary-pilot-selection"],
   "package.json must expose exact-recording pilot selection tests",
 );
+for (const requiredDynamicStep of [
+  '"western:ordinary-dynamic-shadow-runtime-preflight"',
+  '"test:western-ordinary-audio-runtime"',
+  '"test:western-dynamic-shadow-policy"',
+  '"test:western-offline-feature-audio"',
+  '"test:western-alignment-preview"',
+]) {
+  assert(releaseReviewSource.includes(requiredDynamicStep), `release review missing ${requiredDynamicStep}`);
+}
 assert(
-  releaseReviewSource.includes('"test:western-controlled-pilot-run"'),
-  "release review must rerun the controlled-pilot runner safety tests before approval",
-);
-assert(
-  releaseReviewSource.includes('"test:western-fresh-blind-intake"'),
-  "release review must rerun fresh blind intake leakage tests before approval",
-);
-assert(
-  releaseReviewSource.includes('"test:western-ordinary-pilot-selection"'),
-  "release review must rerun exact-recording selection tests before approval",
-);
-assert(
-  releaseReviewSource.includes('"test:western-controlled-pilot-evidence-audit"')
-    && releaseReviewSource.includes('"western:controlled-pilot-evidence-audit"'),
-  "release review must refresh the machine-only evidence audit before any human handoff",
+  !releaseReviewSource.includes('"western:ordinary-monitored-pilot-audit"'),
+  "superseded RF monitored-pilot audit must not remain an authorization step",
 );
 assert(
   packageJson.scripts?.["test:western-controlled-pilot-decision"],
@@ -889,8 +862,8 @@ if (m4.m4OmrIndependentBenchmarkReady) {
     "project plan must not reassign the completed historical threshold-pool review",
   );
   assert(
-    projectPlan.includes("历史失败,已被 P1.1 context-feature 重校准取代"),
-    "project plan must distinguish the obsolete confidence-only failure from the current P1.1 release candidate",
+    projectPlan.includes("后续 P1.1 也已被 dynamic-shadow supersede"),
+    "project plan must retain the obsolete confidence-only failure while making clear that P1.1 no longer authorizes release",
   );
 } else {
   assert(
@@ -954,7 +927,7 @@ assert.equal(fullGate.projectReleaseReady, false, "full project gate must block 
 assert(fullGate.failures.some((failure) => failure.track === "M2/M3 ordinary upload candidate gate"), "ordinary track failure should be reported");
 assert.equal(
   fullGate.failures.find((failure) => failure.track === "M2/M3 ordinary upload candidate gate")?.artifact,
-  expectedOrdinaryArtifact,
+  "data/experiments/western-strings-m3/ordinary-dynamic-shadow-r3-acceptance/report.json",
   "ordinary gate failure should point to the current ordinary-gate evidence artifact",
 );
 const m3plusFailure = fullGate.failures.find((failure) => failure.track === "M3+ pitch safety rescope");

@@ -24,24 +24,12 @@ export function evaluateProjectGate(status, requiredTracks) {
   const m4 = status.tracks?.m4Omr || {};
   const publicValidation = status.publicModelValidation || {};
 
-  if (requiredTracks.has("ordinary") && !controlled.studentSafeCandidateGateReady) {
-    const ordinaryArtifact = (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-context-validation-needed")
-      ? (controlled.reviewArtifacts?.recalibrationContextValidationReviewPage || controlled.confidenceRecalibration?.contextValidation?.reviewPage)
-      : (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-context-validation-failed")
-      ? (controlled.reviewArtifacts?.recalibrationContextValidationEvalJson || controlled.confidenceRecalibration?.contextValidation?.evalJson)
-      : (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-context-runtime-not-wired")
-      ? (controlled.reviewArtifacts?.recalibrationContextValidationEvalJson || controlled.confidenceRecalibration?.contextValidation?.evalJson)
-      : (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-validation-needed")
-      ? (controlled.reviewArtifacts?.recalibrationValidationReviewPage || controlled.confidenceRecalibration?.validationReviewPage)
-      : (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-validation-failed")
-      ? (controlled.reviewArtifacts?.recalibrationFailureDiagnosisJson || controlled.reviewArtifacts?.recalibrationValidationEvalJson || controlled.confidenceRecalibration?.validationEvalJson)
-      : (controlled.blockingReasons || []).includes("ordinary-confidence-threshold-pool-precision-too-low")
-      ? (controlled.reviewArtifacts?.thresholdPoolDiagnosisJson || controlled.confidencePilot?.thresholdPoolEvalJson)
-      : (controlled.reviewArtifacts?.releaseAuditJson || controlled.confidencePilot?.thresholdPoolEvalJson || controlled.confidencePilot?.thresholdPoolReviewPage || controlled.reviewArtifacts?.thresholdPoolReviewPage || controlled.confidencePilot?.validationReviewPage || controlled.reviewArtifacts?.reviewPage);
+  const ordinaryDynamicShadow = controlled.ordinaryDynamicShadow || {};
+  if (requiredTracks.has("ordinary") && ordinaryDynamicShadow.studentGateReady !== true) {
     failures.push({
       track: "M2/M3 ordinary upload candidate gate",
-      reason: controlled.blockingReasons || ["ordinary-upload-gate-not-ready"],
-      artifact: ordinaryArtifact || "",
+      reason: ordinaryDynamicShadow.blockingReasons || ["ordinary-dynamic-shadow-gate-not-ready"],
+      artifact: ordinaryDynamicShadow.acceptanceEvidence?.source || "",
     });
   }
   if (requiredTracks.has("m3plus") && !m3plus.m3plusPitchSafetyReady) {

@@ -15,6 +15,8 @@ const DEFERRED_APPROVAL_PATH = path.join(TEST_DIR, "approval.deferred.json");
 const VALID_APPROVAL_PATH = path.join(TEST_DIR, "approval.valid.json");
 const RECORDED_DEFERRED_APPROVAL_PATH = path.join(TEST_DIR, "approval.recorded-deferred.json");
 const RECORDED_VALID_APPROVAL_PATH = path.join(TEST_DIR, "approval.recorded-valid.json");
+const CURRENT_RELEASE_PATH = path.join(TEST_DIR, "release.current.json");
+const LEGACY_RELEASE_PATH = path.join(TEST_DIR, "release.legacy.json");
 const DEFAULT_APPROVAL_PATH = path.join("data", "experiments", "western-strings-controlled-pilot-approval.json");
 const DEFAULT_DECISION_PATH = path.join("data", "experiments", "western-strings-controlled-pilot-decision.json");
 
@@ -37,6 +39,20 @@ async function restoreText(filePath, text) {
 }
 
 await fs.mkdir(TEST_DIR, { recursive: true });
+await fs.writeFile(CURRENT_RELEASE_PATH, `${JSON.stringify({
+  schemaVersion: 2,
+  ordinaryAuthorizationContract: "western-ordinary-dynamic-shadow-release-v1",
+  readyForControlledPilot: true,
+  teacherReviewNeeded: false,
+  runtimeFailClosed: true,
+  tracks: { ordinary: { authorizationReady: true } },
+}, null, 2)}\n`, "utf8");
+await fs.writeFile(LEGACY_RELEASE_PATH, `${JSON.stringify({
+  schemaVersion: 1,
+  readyForControlledPilot: true,
+  teacherReviewNeeded: false,
+  runtimeFailClosed: true,
+}, null, 2)}\n`, "utf8");
 
 const templateResult = await writeApprovalTemplate({ out: TEMPLATE_PATH });
 const template = JSON.parse(await fs.readFile(TEMPLATE_PATH, "utf8"));
@@ -46,6 +62,7 @@ assert.equal(template.approvedBy, "", "approval template must require an owner n
 assert.equal(template.approvedAt, "", "approval template must require an approval timestamp");
 
 const decisionWithoutApproval = await buildControlledPilotDecision({
+  releaseReview: CURRENT_RELEASE_PATH,
   approval: path.join(TEST_DIR, "missing-approval.json"),
 });
 assert.equal(decisionWithoutApproval.readyForControlledPilotDecision, true, "machine evidence should be ready for owner decision");
@@ -57,6 +74,7 @@ assert(
 );
 
 const preflightWithoutApproval = await buildControlledPilotStartPreflight({
+  releaseReview: CURRENT_RELEASE_PATH,
   approval: path.join(TEST_DIR, "missing-approval.json"),
 });
 assert.equal(preflightWithoutApproval.okToStartControlledPilot, false, "start preflight must fail without approval");
@@ -74,6 +92,7 @@ await fs.writeFile(DEFERRED_APPROVAL_PATH, `${JSON.stringify({
 }, null, 2)}\n`, "utf8");
 
 const decisionDeferred = await buildControlledPilotDecision({
+  releaseReview: CURRENT_RELEASE_PATH,
   approval: DEFERRED_APPROVAL_PATH,
 });
 assert.equal(decisionDeferred.approvalPresent, false, "explicit no-go must not count as pilot approval");
@@ -85,6 +104,7 @@ assert(
 );
 
 const preflightDeferred = await buildControlledPilotStartPreflight({
+  releaseReview: CURRENT_RELEASE_PATH,
   approval: DEFERRED_APPROVAL_PATH,
 });
 assert.equal(preflightDeferred.okToStartControlledPilot, false, "start preflight must fail for explicit no-go");
@@ -115,6 +135,7 @@ const recordedDeferred = await writeControlledPilotApprovalDecision({
 assert.equal(recordedDeferred.ok, true, "record-decision should write an explicit defer file");
 assert.equal(recordedDeferred.pilotApproved, false, "defer file must not approve the pilot");
 const decisionRecordedDeferred = await buildControlledPilotDecision({
+  releaseReview: CURRENT_RELEASE_PATH,
   approval: RECORDED_DEFERRED_APPROVAL_PATH,
 });
 assert.equal(decisionRecordedDeferred.approvalDeferred, true, "recorded defer file should be read as explicit no-go");
@@ -151,12 +172,13 @@ await fs.writeFile(VALID_APPROVAL_PATH, `${JSON.stringify({
   pilotApproved: true,
   approvedBy: "test-owner",
   approvedAt: "2026-07-17T00:00:00+08:00",
-  scope: "ordinary candidate-evidence auto_pass only; M3+ four-zone pitch-safety scope (rescope contract) only if explicitly included in the pilot",
-  scopeContract: "m3plus-rescope-four-zone-v1",
+  scope: "ordinary dynamic-shadow authorized release plus M3+ four-zone pitch-safety scope",
+  scopeContract: "western-ordinary-dynamic-shadow-release-v1+m3plus-rescope-four-zone-v1",
   notes: "Test-only approval file under data/experiments; production/default runtime remains fail-closed.",
 }, null, 2)}\n`, "utf8");
 
 const decisionWithApproval = await buildControlledPilotDecision({
+  releaseReview: CURRENT_RELEASE_PATH,
   approval: VALID_APPROVAL_PATH,
 });
 assert.equal(decisionWithApproval.approvalPresent, true, "valid approval should be recognized");
@@ -173,6 +195,7 @@ await fs.writeFile(STALE_APPROVAL_PATH, `${JSON.stringify({
   notes: "Superseded-era approval without a scope contract binding.",
 }, null, 2)}\n`, "utf8");
 const decisionWithStaleApproval = await buildControlledPilotDecision({
+  releaseReview: CURRENT_RELEASE_PATH,
   approval: STALE_APPROVAL_PATH,
 });
 assert.equal(decisionWithStaleApproval.approvalPresent, false, "superseded-era approval must not count as a present approval");
@@ -182,17 +205,52 @@ assert(
   "stale approval must be reported as scope-contract superseded, forcing a fresh owner decision",
 );
 
-const preflightWithApproval = await buildControlledPilotStartPreflight({
+const preflightAuthorizedWithoutExecutor = await buildControlledPilotStartPreflight({
+  releaseReview: CURRENT_RELEASE_PATH,
   approval: VALID_APPROVAL_PATH,
+});
+assert.equal(preflightAuthorizedWithoutExecutor.okToStartControlledPilot, false);
+assert(preflightAuthorizedWithoutExecutor.blockingReasons.includes("ordinary-dynamic-shadow-pilot-executor-not-implemented"));
+
+const preflightWithApproval = await buildControlledPilotStartPreflight({
+  releaseReview: CURRENT_RELEASE_PATH,
+  approval: VALID_APPROVAL_PATH,
+  pilotExecutorContract: "western-ordinary-dynamic-shadow-pilot-executor-v1",
+  pilotExecutorContractReady: true,
 });
 assert.equal(preflightWithApproval.okToStartControlledPilot, true, "start preflight should pass with valid owner approval");
 assert.deepEqual(preflightWithApproval.blockingReasons, [], "passing start preflight should have no blocking reasons");
 assert.equal(preflightWithApproval.decision.runtimeFailClosed, true, "passing start preflight must keep default runtime fail-closed");
 const preflightWithRecordedApproval = await buildControlledPilotStartPreflight({
+  releaseReview: CURRENT_RELEASE_PATH,
   approval: RECORDED_VALID_APPROVAL_PATH,
+  pilotExecutorContract: "western-ordinary-dynamic-shadow-pilot-executor-v1",
+  pilotExecutorContractReady: true,
 });
 assert.equal(preflightWithRecordedApproval.okToStartControlledPilot, true, "recorded approval should pass start preflight");
 assert.equal(preflightWithRecordedApproval.decision.runtimeFailClosed, true, "recorded approval must keep default runtime fail-closed");
+
+const legacyReleaseDecision = await buildControlledPilotDecision({
+  releaseReview: LEGACY_RELEASE_PATH,
+  approval: VALID_APPROVAL_PATH,
+});
+assert.equal(legacyReleaseDecision.readyForControlledPilotDecision, false);
+assert.equal(legacyReleaseDecision.readyToStartControlledPilot, false);
+assert(
+  legacyReleaseDecision.blockingReasons.includes("release-review-ordinary-authorization-contract-superseded"),
+  "the cached pre-dynamic release review must carry no current authority",
+);
+assert(
+  legacyReleaseDecision.blockingReasons.includes("ordinary-dynamic-shadow-authorization-closed"),
+  "pilot start must require an explicit dynamic-shadow authorization",
+);
+const cachedReleaseDecision = await buildControlledPilotDecision();
+assert.equal(cachedReleaseDecision.readyForControlledPilotDecision, false);
+assert.equal(cachedReleaseDecision.readyToStartControlledPilot, false);
+assert(
+  cachedReleaseDecision.blockingReasons.includes("ordinary-dynamic-shadow-authorization-closed"),
+  "the live cached release review must remain blocked until dynamic authorization exists",
+);
 
 const originalApproval = await readTextOrNull(DEFAULT_APPROVAL_PATH);
 const originalDecision = await readTextOrNull(DEFAULT_DECISION_PATH);
@@ -218,25 +276,21 @@ try {
   );
   assert.equal(
     statusWithDeferredPilot.nextActions?.[0]?.track,
-    "Controlled pilot deferred",
-    "project status should not ask for more review after an explicit controlled-pilot no-go",
+    "Ordinary dynamic shadow r3 evidence verifier",
+    "the live dynamic-evidence verifier must outrank the historical pilot decision",
   );
   const handoff = renderHandoff(statusWithDeferredPilot);
   assert(
-    handoff.includes("Controlled pilot deferred"),
-    "handoff should route explicit no-go to the deferred state",
-  );
-  assert(
-    handoff.includes("No teacher/professional review is needed"),
-    "handoff should say no teacher/professional review is needed after explicit no-go",
+    handoff.includes("Ordinary dynamic shadow r3 evidence verifier"),
+    "handoff should route to the current dynamic verifier prerequisite",
   );
 
   await fs.writeFile(DEFAULT_APPROVAL_PATH, `${JSON.stringify({
     pilotApproved: true,
     approvedBy: "test-owner",
     approvedAt: "2026-07-17T00:00:00+08:00",
-    scope: "ordinary candidate-evidence auto_pass only",
-    scopeContract: "m3plus-rescope-four-zone-v1",
+    scope: "ordinary dynamic-shadow authorized release",
+    scopeContract: "western-ordinary-dynamic-shadow-release-v1+m3plus-rescope-four-zone-v1",
     notes: "Test-only approval. Default runtime remains fail-closed.",
   }, null, 2)}\n`, "utf8");
   const defaultApprovedDecision = await buildControlledPilotDecision();
@@ -244,11 +298,11 @@ try {
   const statusWithApprovedPilot = await buildProjectStatus({
     controlledPilotSessionsRoot: path.join(TEST_DIR, "no-sessions"),
   });
-  assert.equal(statusWithApprovedPilot.nextActions?.[0]?.track, "Start monitored pilot");
+  assert.equal(statusWithApprovedPilot.nextActions?.[0]?.track, "Ordinary dynamic shadow r3 evidence verifier");
   const approvedHandoff = renderHandoff(statusWithApprovedPilot);
   assert(
-    approvedHandoff.includes("npm run western:controlled-pilot-run -- --execute --limit 1"),
-    "approved handoff must point to the one-shot controlled-pilot runner",
+    !approvedHandoff.includes("npm run western:controlled-pilot-run -- --execute --limit 1"),
+    "legacy release evidence must never point to the pilot runner",
   );
 
   const completedSessionRoot = path.join(TEST_DIR, "completed-sessions");
@@ -293,22 +347,16 @@ try {
     controlledPilotSessionsRoot: completedSessionRoot,
   });
   const completedTrack = statusWithCompletedPilot.nextActions?.[0]?.track;
-  assert(
-    [
-      "Fresh blind machine precheck",
-      "Scoped V2-alpha blind audit preparation",
-      "Controlled pilot coverage audit",
-      "Controlled pilot completed",
-    ].includes(completedTrack),
-    `a completed safe session must route the handoff into the post-pilot flow, got ${completedTrack}`,
-  );
+  assert.equal(completedTrack, "Ordinary dynamic shadow r3 evidence verifier");
   assert.equal(statusWithCompletedPilot.controlledPilotSession?.sessionId, "pilot-completed");
-  assert.equal(statusWithCompletedPilot.controlledPilotEvidence?.completedSafeSessionCount, 1);
-  assert.equal(statusWithCompletedPilot.controlledPilotEvidence?.safeDistinctRecordingCount, 1);
+  assert.equal(statusWithCompletedPilot.controlledPilotSession?.eligibleAsCurrentReleaseEvidence, false);
+  assert.equal(statusWithCompletedPilot.controlledPilotEvidence?.completedSafeSessionCount, 0);
+  assert.equal(statusWithCompletedPilot.controlledPilotEvidence?.safeDistinctRecordingCount, 0);
+  assert.equal(statusWithCompletedPilot.controlledPilotEvidence?.eligibleAsCurrentReleaseEvidence, false);
+  assert.equal(statusWithCompletedPilot.controlledPilotEvidence?.v2AlphaGate?.ready, false);
+  assert.equal(statusWithCompletedPilot.controlledPilotEvidence?.historicalEvidence?.completedSafeSessionCount, 1);
+  assert.equal(statusWithCompletedPilot.controlledPilotEvidence?.historicalEvidence?.safeDistinctRecordingCount, 1);
   const completedHandoff = renderHandoff(statusWithCompletedPilot);
-  if (completedTrack === "Controlled pilot completed") {
-    assert(completedHandoff.includes("Do not rerun the same recording"));
-  }
   assert(!completedHandoff.includes("western:controlled-pilot-run -- --execute"));
 } finally {
   await restoreText(DEFAULT_APPROVAL_PATH, originalApproval);

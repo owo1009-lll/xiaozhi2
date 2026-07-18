@@ -48,7 +48,8 @@ function bulletList(items) {
 // The approval must bind to the CURRENT pilot scope contract. Approvals from
 // the superseded first-measure slide/trill era carry no scopeContract (or an
 // older value) and must not start a pilot under the rescope contract.
-const REQUIRED_SCOPE_CONTRACT = "m3plus-rescope-four-zone-v1";
+const REQUIRED_SCOPE_CONTRACT = "western-ordinary-dynamic-shadow-release-v1+m3plus-rescope-four-zone-v1";
+const REQUIRED_ORDINARY_AUTHORIZATION_CONTRACT = "western-ordinary-dynamic-shadow-release-v1";
 
 function approvalIsValid(approval) {
   return approval?.pilotApproved === true
@@ -67,6 +68,13 @@ function buildBlockingReasons({ status, releaseReview, approval }) {
   const reasons = [];
   if (!releaseReview) reasons.push("release-review-missing");
   else {
+    if (releaseReview.schemaVersion !== 2
+        || releaseReview.ordinaryAuthorizationContract !== REQUIRED_ORDINARY_AUTHORIZATION_CONTRACT) {
+      reasons.push("release-review-ordinary-authorization-contract-superseded");
+    }
+    if (releaseReview.tracks?.ordinary?.authorizationReady !== true) {
+      reasons.push("ordinary-dynamic-shadow-authorization-closed");
+    }
     if (releaseReview.readyForControlledPilot !== true) reasons.push("release-review-not-ready-for-controlled-pilot");
     if (releaseReview.teacherReviewNeeded === true) reasons.push("release-review-still-needs-teacher-review");
     if (releaseReview.runtimeFailClosed !== true) reasons.push("runtime-not-fail-closed-during-review");
@@ -190,7 +198,10 @@ export async function buildControlledPilotDecision(args = {}) {
   const blockingReasons = buildBlockingReasons({ status, releaseReview, approval });
   const approvalPresent = approvalIsValid(approval);
   const approvalDeferred = approvalIsExplicitNoGo(approval);
-  const releaseReady = releaseReview?.readyForControlledPilot === true
+  const releaseReady = releaseReview?.schemaVersion === 2
+    && releaseReview?.ordinaryAuthorizationContract === REQUIRED_ORDINARY_AUTHORIZATION_CONTRACT
+    && releaseReview?.tracks?.ordinary?.authorizationReady === true
+    && releaseReview?.readyForControlledPilot === true
     && releaseReview.teacherReviewNeeded !== true
     && releaseReview.runtimeFailClosed === true;
   const runtimeFailClosed = status.runtimeStudentGate?.policy === "fail-closed"
@@ -198,6 +209,8 @@ export async function buildControlledPilotDecision(args = {}) {
     && status.runtimeStudentGate?.m3plusAutoFeedbackReady === false
     && status.runtimeStudentGate?.m4OmrAutoScoreReady === false;
   const decision = {
+    schemaVersion: 2,
+    ordinaryAuthorizationContract: REQUIRED_ORDINARY_AUTHORIZATION_CONTRACT,
     ok: true,
     generatedAt: new Date().toISOString(),
     readyForControlledPilotDecision: releaseReady && runtimeFailClosed,
@@ -207,7 +220,7 @@ export async function buildControlledPilotDecision(args = {}) {
     approvalDeferred,
     runtimeFailClosed,
     allowedScope: [
-      "ordinary upload candidate-evidence auto_pass only inside a separate monitored pilot process",
+      "ordinary dynamic-shadow candidates only when the versioned release report explicitly records authorizationReady=true; otherwise review-only",
       "M3+ four-zone pitch-safety scope (rescope contract: straight-tone/center-pitch decisions with score-marked and unstable regions neutralized) only if explicitly included in the pilot",
       "M4 OMR remains eval-only and may be reported as benchmark evidence, not runtime score ingestion",
       "all rejected, unsupported, or low-confidence rows remain review_required",
@@ -222,7 +235,8 @@ export async function buildControlledPilotDecision(args = {}) {
       "do not request teacher review unless a machine precheck reports unknown auto-pass rows",
     ],
     startConditions: [
-      "release review remains readyForControlledPilot=true",
+      "release review schemaVersion=2 and ordinaryAuthorizationContract remains current",
+      "ordinary dynamic-shadow authorizationReady remains true",
       "default runtime remains fail-closed",
       "approval file exists and records owner approval",
       "pilot process sets any release flag only in that process",

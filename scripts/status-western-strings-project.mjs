@@ -9,6 +9,7 @@ import {
   buildControlledCandidateReviewStatus,
   summarizeControlledCandidateConfidencePilot,
 } from "./status-western-controlled-candidate-review.mjs";
+import { evaluateOrdinaryAudioRuntime } from "./run-western-ordinary-audio-python.mjs";
 
 const DEFAULT_OUT = path.join("data", "experiments", "western-strings-project-status.json");
 const REVIEW_POLICY_DOC = path.join("docs", "western-strings-review-policy.md");
@@ -42,6 +43,156 @@ const VIOLIN_MIDI_AUDIT = path.join(
 );
 const V2_ALPHA_MIN_PRECISION = 0.9;
 const V2_ALPHA_MIN_COVERAGE = 0.2;
+const ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE = path.join(
+  "data",
+  "experiments",
+  "western-strings-m3",
+  "ordinary-dynamic-shadow-r3-acceptance",
+  "report.json",
+);
+const ORDINARY_DYNAMIC_CONTRACT_VERSION = "western-ordinary-dynamic-shadow-candidate-v1";
+const ORDINARY_DYNAMIC_POLICY_VERSION = "western-ordinary-dynamic-shadow-policy-v1";
+const ORDINARY_DYNAMIC_GATE_VERSION = "western-ordinary-dynamic-shadow-gate-v1-review-only";
+const ORDINARY_DYNAMIC_ACCEPTANCE_VERSION = "western-ordinary-dynamic-shadow-r3-acceptance-v1";
+const ORDINARY_DYNAMIC_TIMING_MODE = "basic-pitch-dtw";
+const ORDINARY_DYNAMIC_MODEL_SHA256 = "c6595f299ff83c52e89555789f7e3e829a6a0f25b6a88f7e99073af5a2470dc4";
+const ORDINARY_DYNAMIC_ACCEPTANCE_RECORDINGS = ["r3-02", "r3-03"];
+const ORDINARY_DYNAMIC_ACCEPTANCE_LIVE_VERIFIER_IMPLEMENTED = false;
+
+function canonicalJson(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map((item) => canonicalJson(item)).join(",")}]`;
+  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+}
+
+function sha256Canonical(value) {
+  return crypto.createHash("sha256").update(canonicalJson(value), "utf8").digest("hex");
+}
+
+function isSha256(value) {
+  return /^[a-f0-9]{64}$/.test(String(value || "").trim().toLowerCase());
+}
+
+export function validateOrdinaryDynamicShadowAcceptance(acceptance) {
+  const blockingReasons = [];
+  const fail = (reason) => blockingReasons.push(reason);
+  if (!acceptance || typeof acceptance !== "object" || Array.isArray(acceptance)) {
+    return { ready: false, blockingReasons: ["ordinary-dynamic-shadow-r3-acceptance-missing"] };
+  }
+  if (acceptance.schemaVersion !== 1) fail("ordinary-dynamic-shadow-r3-acceptance-schema-invalid");
+  if (acceptance.contractVersion !== ORDINARY_DYNAMIC_ACCEPTANCE_VERSION) fail("ordinary-dynamic-shadow-r3-acceptance-contract-invalid");
+  if (acceptance.candidateContractVersion !== ORDINARY_DYNAMIC_CONTRACT_VERSION) fail("ordinary-dynamic-shadow-r3-candidate-contract-invalid");
+  if (acceptance.policyVersion !== ORDINARY_DYNAMIC_POLICY_VERSION) fail("ordinary-dynamic-shadow-r3-policy-invalid");
+  if (acceptance.gateVersion !== ORDINARY_DYNAMIC_GATE_VERSION) fail("ordinary-dynamic-shadow-r3-gate-invalid");
+  if (acceptance.timingMode !== ORDINARY_DYNAMIC_TIMING_MODE) fail("ordinary-dynamic-shadow-r3-timing-mode-invalid");
+  if (acceptance.acceptanceReady !== true) fail("ordinary-dynamic-shadow-r3-acceptance-not-ready");
+  if (acceptance.studentFacing !== false
+      || acceptance.automaticAdoptionAuthorized !== false
+      || acceptance.authorizationReady !== false) {
+    fail("ordinary-dynamic-shadow-r3-fail-closed-policy-invalid");
+  }
+  if (acceptance.energyVetoIncluded !== false
+      || acceptance.causalEnergyStatus !== "excluded-review-only") {
+    fail("ordinary-dynamic-shadow-r3-energy-state-invalid");
+  }
+  if (!Array.isArray(acceptance.blockingReasons) || acceptance.blockingReasons.length !== 0) {
+    fail("ordinary-dynamic-shadow-r3-blocking-reasons-not-empty");
+  }
+  const digestPayload = structuredClone(acceptance);
+  delete digestPayload.evidenceDigestSha256;
+  delete digestPayload.generatedAt;
+  if (!isSha256(acceptance.evidenceDigestSha256)
+      || sha256Canonical(digestPayload) !== String(acceptance.evidenceDigestSha256).toLowerCase()) {
+    fail("ordinary-dynamic-shadow-r3-evidence-digest-invalid");
+  }
+
+  const recordings = Array.isArray(acceptance.recordings) ? acceptance.recordings : [];
+  const recordingIds = recordings.map((row) => String(row?.recordingId || "").trim()).sort();
+  if (recordings.length !== ORDINARY_DYNAMIC_ACCEPTANCE_RECORDINGS.length
+      || JSON.stringify(recordingIds) !== JSON.stringify([...ORDINARY_DYNAMIC_ACCEPTANCE_RECORDINGS].sort())) {
+    fail("ordinary-dynamic-shadow-r3-recording-set-invalid");
+  }
+  for (const recording of recordings) {
+    const id = String(recording?.recordingId || "").trim();
+    const prefix = `ordinary-dynamic-shadow-r3-recording-invalid:${id || "unknown"}`;
+    const rowCount = recording?.candidateRowCount;
+    const selectedCount = recording?.shadowSelectedCandidateCount;
+    const reportedCoverage = recording?.shadowCoverage;
+    const scoreNoteCount = recording?.scoreNoteCount;
+    const expectedCoverage = Number.isInteger(rowCount) && rowCount > 0
+      ? selectedCount / rowCount
+      : -1;
+    if (!ORDINARY_DYNAMIC_ACCEPTANCE_RECORDINGS.includes(id)
+        || !String(recording?.scoreId || "").trim()
+        || !isSha256(recording?.audioSha256)
+        || !isSha256(recording?.scorePayloadSha256)
+        || !isSha256(recording?.scoreStoreArtifactSha256)
+        || !Number.isInteger(scoreNoteCount) || scoreNoteCount <= 0
+        || !Number.isInteger(rowCount) || rowCount <= 0
+        || rowCount !== scoreNoteCount
+        || !Number.isInteger(selectedCount) || selectedCount < 0 || selectedCount > rowCount
+        || recording?.exactPitchSelectedCount !== selectedCount
+        || !Number.isFinite(reportedCoverage)
+        || Math.abs(reportedCoverage - expectedCoverage) > 1e-6
+        || expectedCoverage < V2_ALPHA_MIN_COVERAGE
+        || recording?.allRowsReviewRequired !== true
+        || recording?.autoPassCount !== 0
+        || recording?.studentFacing !== false
+        || recording?.fullArtifactAuditPassed !== true) {
+      fail(prefix);
+    }
+    const cold = recording?.coldRun || {};
+    const warm = recording?.warmRun || {};
+    const validateRun = (run, expectedCacheHit, label) => {
+      if (run.cacheHit !== expectedCacheHit
+          || run.cacheIdentityBound !== true
+          || run.candidateArtifactAuditPassed !== true
+          || run.allRowsReviewRequired !== true
+          || run.autoPassCount !== 0
+          || run.studentFacing !== false
+          || run.automaticAdoptionAuthorized !== false
+          || run.authorizationReady !== false
+          || run.energyVetoIncluded !== false
+          || run.causalEnergyStatus !== "excluded-review-only"
+          || run.contractVersion !== ORDINARY_DYNAMIC_CONTRACT_VERSION
+          || run.gateVersion !== ORDINARY_DYNAMIC_GATE_VERSION
+          || run.timingMode !== ORDINARY_DYNAMIC_TIMING_MODE
+          || run.candidateRowCount !== rowCount
+          || run.reviewRequiredCount !== rowCount
+          || run.scoreNoteCount !== scoreNoteCount
+          || String(run.audioSha256 || "").toLowerCase() !== String(recording?.audioSha256 || "").toLowerCase()
+          || String(run.scorePayloadSha256 || "").toLowerCase() !== String(recording?.scorePayloadSha256 || "").toLowerCase()
+          || String(run.scoreStoreArtifactSha256 || "").toLowerCase() !== String(recording?.scoreStoreArtifactSha256 || "").toLowerCase()
+          || String(run.modelArtifactSha256 || "").toLowerCase() !== ORDINARY_DYNAMIC_MODEL_SHA256
+          || run.policyVersion !== ORDINARY_DYNAMIC_POLICY_VERSION
+          || !isSha256(run.cacheArtifactSha256)
+          || !isSha256(run.candidateArtifactSha256)
+          || !isSha256(run.candidateEvidenceSha256)) {
+        fail(`${prefix}:${label}`);
+      }
+    };
+    validateRun(cold, false, "cold");
+    validateRun(warm, true, "warm");
+    if (String(cold.cacheArtifactSha256 || "").toLowerCase() !== String(warm.cacheArtifactSha256 || "").toLowerCase()
+        || String(cold.candidateEvidenceSha256 || "").toLowerCase() !== String(warm.candidateEvidenceSha256 || "").toLowerCase()) {
+      fail(`${prefix}:cold-warm-evidence-mismatch`);
+    }
+  }
+  const aggregate = acceptance.aggregate || {};
+  if (aggregate.recordingCount !== 2
+      || aggregate.coldCacheMissCount !== 2
+      || aggregate.warmCacheHitCount !== 2
+      || aggregate.coverageFloor !== V2_ALPHA_MIN_COVERAGE
+      || aggregate.allRowsReviewRequired !== true
+      || aggregate.allArtifactsBound !== true
+      || aggregate.coldWarmEvidenceStable !== true) {
+    fail("ordinary-dynamic-shadow-r3-aggregate-invalid");
+  }
+  if (!ORDINARY_DYNAMIC_ACCEPTANCE_LIVE_VERIFIER_IMPLEMENTED) {
+    fail("ordinary-dynamic-shadow-r3-live-artifact-verifier-not-implemented");
+  }
+  return { ready: blockingReasons.length === 0, blockingReasons: [...new Set(blockingReasons)] };
+}
 
 async function sha256FileOrEmpty(filePath) {
   try {
@@ -957,39 +1108,73 @@ function summarizeControlledPilotEvidence(sessions = []) {
   const meetsPrecisionFloor = precision !== null && precision >= V2_ALPHA_MIN_PRECISION;
   const meetsCoverageFloor = coverage >= V2_ALPHA_MIN_COVERAGE;
   const hasCrossPieceEvidence = safePieceIds.size >= 2;
+  const historicalReady = completedSafe.length >= 2
+    && meetsPrecisionFloor
+    && meetsCoverageFloor
+    && hasCrossPieceEvidence
+    && unknownAutoPassCandidateCount === 0;
   return {
+    historicalOnly: true,
+    eligibleAsCurrentReleaseEvidence: false,
     sessionCount: sessions.length,
-    executedSessionCount: executed.length,
-    completedSafeSessionCount: completedSafe.length,
-    distinctRecordingCount: recordingIds.size,
-    safeDistinctRecordingCount: safeRecordingIds.size,
-    safeDistinctPieceCount: safePieceIds.size,
-    recordingIds: [...recordingIds].sort(),
-    safeRecordingIds: [...safeRecordingIds].sort(),
-    safePieceIds: [...safePieceIds].sort(),
-    precheckRejectedRecordingIds: [...precheckRejectedRecordingIds].sort(),
-    totalCandidateCount: sumMonitoring("totalCandidateCount"),
-    autoPassCandidateCount: sumMonitoring("autoPassCandidateCount"),
-    modelAutoPassCandidateCount: safeSum("modelAutoPass"),
-    pilotEligibleAutoPassCandidateCount,
-    suppressedModelAutoPassCandidateCount: safeSum("suppressed"),
-    reviewRequiredCandidateCount: Math.max(0, safeTotalCandidateCount - pilotEligibleAutoPassCandidateCount),
-    knownUsableAutoPassCandidateCount,
-    knownWrongAutoPassCandidateCount,
-    unknownAutoPassCandidateCount,
+    executedSessionCount: 0,
+    completedSafeSessionCount: 0,
+    distinctRecordingCount: 0,
+    safeDistinctRecordingCount: 0,
+    safeDistinctPieceCount: 0,
+    recordingIds: [],
+    safeRecordingIds: [],
+    safePieceIds: [],
+    precheckRejectedRecordingIds: [],
+    totalCandidateCount: 0,
+    autoPassCandidateCount: 0,
+    modelAutoPassCandidateCount: 0,
+    pilotEligibleAutoPassCandidateCount: 0,
+    suppressedModelAutoPassCandidateCount: 0,
+    reviewRequiredCandidateCount: 0,
+    knownUsableAutoPassCandidateCount: 0,
+    knownWrongAutoPassCandidateCount: 0,
+    unknownAutoPassCandidateCount: 0,
     v2AlphaGate: {
       minPrecision: V2_ALPHA_MIN_PRECISION,
       minCoverage: V2_ALPHA_MIN_COVERAGE,
-      precision,
-      coverage,
-      meetsPrecisionFloor,
-      meetsCoverageFloor,
-      hasCrossPieceEvidence,
-      ready: completedSafe.length >= 2
-        && meetsPrecisionFloor
-        && meetsCoverageFloor
-        && hasCrossPieceEvidence
-        && unknownAutoPassCandidateCount === 0,
+      precision: null,
+      coverage: 0,
+      meetsPrecisionFloor: false,
+      meetsCoverageFloor: false,
+      hasCrossPieceEvidence: false,
+      ready: false,
+      blockingReasons: ["controlled-pilot-evidence-superseded-historical-rf-only"],
+    },
+    historicalEvidence: {
+      executedSessionCount: executed.length,
+      completedSafeSessionCount: completedSafe.length,
+      distinctRecordingCount: recordingIds.size,
+      safeDistinctRecordingCount: safeRecordingIds.size,
+      safeDistinctPieceCount: safePieceIds.size,
+      recordingIds: [...recordingIds].sort(),
+      safeRecordingIds: [...safeRecordingIds].sort(),
+      safePieceIds: [...safePieceIds].sort(),
+      precheckRejectedRecordingIds: [...precheckRejectedRecordingIds].sort(),
+      totalCandidateCount: sumMonitoring("totalCandidateCount"),
+      autoPassCandidateCount: sumMonitoring("autoPassCandidateCount"),
+      modelAutoPassCandidateCount: safeSum("modelAutoPass"),
+      pilotEligibleAutoPassCandidateCount,
+      suppressedModelAutoPassCandidateCount: safeSum("suppressed"),
+      reviewRequiredCandidateCount: Math.max(0, safeTotalCandidateCount - pilotEligibleAutoPassCandidateCount),
+      knownUsableAutoPassCandidateCount,
+      knownWrongAutoPassCandidateCount,
+      unknownAutoPassCandidateCount,
+      v2AlphaGate: {
+        minPrecision: V2_ALPHA_MIN_PRECISION,
+        minCoverage: V2_ALPHA_MIN_COVERAGE,
+        precision,
+        coverage,
+        meetsPrecisionFloor,
+        meetsCoverageFloor,
+        hasCrossPieceEvidence,
+        ready: historicalReady,
+      },
     },
   };
 }
@@ -1677,6 +1862,68 @@ async function buildM3PlusStatus() {
   };
 }
 
+async function buildOrdinaryDynamicShadowStatus() {
+  const runtime = evaluateOrdinaryAudioRuntime();
+  const acceptance = await readJson(ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE);
+  const acceptanceValidation = validateOrdinaryDynamicShadowAcceptance(acceptance);
+  const r3AcceptanceReady = acceptanceValidation.ready === true;
+  return {
+    contractVersion: ORDINARY_DYNAMIC_CONTRACT_VERSION,
+    policyVersion: ORDINARY_DYNAMIC_POLICY_VERSION,
+    gateVersion: ORDINARY_DYNAMIC_GATE_VERSION,
+    timingMode: ORDINARY_DYNAMIC_TIMING_MODE,
+    mode: "review-only",
+    runtimePreflightReady: runtime.runtimeReady === true,
+    runtime: {
+      runtimeId: runtime.runtimeId || "",
+      config: runtime.config || "",
+      configSha256: runtime.configSha256 || "",
+      configSemanticSha256: runtime.configSemanticSha256 || "",
+      isolatedVenv: runtime.python?.isolatedVenv === true,
+      packageSetLocked: runtime.packageSetLocked === true,
+      requirementsLockSha256: runtime.requirementsLock?.normalizedSha256 || "",
+      modelTreeSha256: runtime.modelIdentity?.treeSha256 || "",
+      blockingReasons: runtime.blockingReasons || [],
+    },
+    foundationReady: runtime.runtimeReady === true,
+    foundationScope: "implementation-and-live-runtime-preflight-only",
+    liveArtifactVerifierReady: ORDINARY_DYNAMIC_ACCEPTANCE_LIVE_VERIFIER_IMPLEMENTED,
+    r3AcceptanceReady,
+    authorizationReady: false,
+    studentGateReady: false,
+    automaticAdoptionReady: false,
+    energyVetoIncluded: false,
+    causalEnergyStatus: "excluded-review-only",
+    historicalRfAuthorizationSuperseded: true,
+    acceptanceEvidence: acceptance
+      ? {
+          source: ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE.replace(/\\/g, "/"),
+          missing: false,
+          acceptanceReady: r3AcceptanceReady,
+          recordings: acceptance.recordings || [],
+          blockingReasons: acceptanceValidation.blockingReasons,
+        }
+      : {
+          source: ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE.replace(/\\/g, "/"),
+          missing: true,
+          acceptanceReady: false,
+        },
+    blockingReasons: [
+      ...(runtime.runtimeReady ? [] : (runtime.blockingReasons || ["ordinary-dynamic-shadow-runtime-preflight-failed"])),
+      ...(!ORDINARY_DYNAMIC_ACCEPTANCE_LIVE_VERIFIER_IMPLEMENTED
+        ? ["ordinary-dynamic-shadow-r3-live-artifact-verifier-not-implemented"]
+        : []),
+      ...(!r3AcceptanceReady
+        ? [acceptance
+            ? "ordinary-dynamic-shadow-r3-acceptance-invalid"
+            : "ordinary-dynamic-shadow-r3-acceptance-not-run"]
+        : []),
+      "ordinary-dynamic-shadow-authorization-closed",
+      "ordinary-dynamic-shadow-energy-veto-excluded-review-only",
+    ],
+  };
+}
+
 async function buildControlledStatus() {
   const report = await evaluateControlledCandidateGate({
     reviewCsvPath: CONTROLLED_LABELS,
@@ -1693,7 +1940,31 @@ async function buildControlledStatus() {
     await readJson(CONTROLLED_CONFIDENCE_RELEASE_AUDIT),
     await readJson(CONTROLLED_ORDINARY_MONITORED_PILOT_AUDIT),
   );
+  const historicalRfAudit = confidencePilot.monitoredPilotAudit || {};
+  confidencePilot.monitoredPilotAudit = {
+    ...historicalRfAudit,
+    historicalReadyForMonitoredPilot: historicalRfAudit.historicalReadyForMonitoredPilot === true
+      || historicalRfAudit.readyForMonitoredPilot === true,
+    readyForMonitoredPilot: false,
+    authorizationStatus: "superseded-historical-rf-only",
+    supersededBy: "western-ordinary-dynamic-shadow-policy-v1",
+    blockingReasons: [
+      ...new Set([
+        ...(historicalRfAudit.blockingReasons || []),
+        "ordinary-rf-monitored-pilot-authorization-superseded",
+      ]),
+    ],
+  };
   const status = attachConfidencePilotStatus(buildControlledCandidateReviewStatus(report), confidencePilot);
+  status.ordinaryDynamicShadow = await buildOrdinaryDynamicShadowStatus();
+  status.studentSafeCandidateGateReady = false;
+  status.blockingReasons = [
+    ...new Set([
+      ...(status.blockingReasons || []),
+      "ordinary-rf-monitored-pilot-authorization-superseded",
+      ...status.ordinaryDynamicShadow.blockingReasons,
+    ]),
+  ];
   const recalibrationPilot = await readJson(CONTROLLED_CONFIDENCE_RECALIBRATION_PILOT);
   const recalibrationEval = await readJson(CONTROLLED_CONFIDENCE_RECALIBRATION_VALIDATION_EVAL);
   const recalibrationContextEval = await readJson(CONTROLLED_CONFIDENCE_RECALIBRATION_CONTEXT_VALIDATION_EVAL);
@@ -1825,6 +2096,13 @@ async function buildControlledStatus() {
       `The confidence recalibration blind-validation pack failed${Number.isFinite(precision) ? ` (precision=${precision})` : ""}; do not enable the ordinary-upload auto gate. Inspect the failure diagnosis and improve candidate/localization quality features or collect stronger calibration evidence before exporting another blind-validation pack.`,
     ];
   }
+  status.nextActions = !status.ordinaryDynamicShadow.foundationReady
+    ? ["Provision or repair the pinned ordinary dynamic-shadow runtime; historical RF and first-measure pilot artifacts have no current authorization authority."]
+    : !status.ordinaryDynamicShadow.liveArtifactVerifierReady
+      ? ["Implement and test the live r3 artifact verifier before consuming reserve takes r3-02/r3-03; historical RF and first-measure pilot artifacts remain superseded."]
+      : !status.ordinaryDynamicShadow.r3AcceptanceReady
+        ? ["Run the frozen review-only dynamic shadow on reserve takes r3-02/r3-03 with cold/warm cache and live artifact verification; this is implementation acceptance only, not release authorization."]
+        : ["Prepare a separate fresh-blind dynamic-shadow authorization contract; do not reuse historical RF, first-measure, or r3 acceptance recordings as release evidence."];
   status.reviewArtifacts = {
     reviewPage: CONTROLLED_REVIEW_PAGE.replace(/\\/g, "/"),
     completedCsv: CONTROLLED_COMPLETED.replace(/\\/g, "/"),
@@ -2321,34 +2599,43 @@ function summarizeNextActions(
   freshBlindIntake,
 ) {
   const actions = [];
-  const ordinaryBlockers = controlled.blockingReasons || [];
   const ordinaryPilotAudit = controlled.confidencePilot?.monitoredPilotAudit || {};
   const ordinaryPilotEvidencePassed = ordinaryPilotAudit.readyForMonitoredPilot === true
     && ordinaryPilotAudit.teacherReviewNeeded !== true
     && ordinaryPilotAudit.defaultOrdinaryReadyAfter !== true
     && (ordinaryPilotAudit.blockingReasons || []).length === 0;
-  const ordinaryOnlyDefaultDisabled = ordinaryBlockers.length > 0
-    && ordinaryBlockers.every((reason) => reason === "ordinary-auto-gate-disabled-by-default");
-  if (!controlled.studentSafeCandidateGateReady && !(ordinaryPilotEvidencePassed && ordinaryOnlyDefaultDisabled)) {
-    const ordinaryArtifact = (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-context-validation-needed")
-      ? (controlled.reviewArtifacts.recalibrationContextValidationReviewPage || controlled.confidenceRecalibration?.contextValidation?.reviewPage)
-      : (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-context-validation-failed")
-      ? (controlled.reviewArtifacts.recalibrationContextValidationEvalJson || controlled.confidenceRecalibration?.contextValidation?.evalJson)
-      : (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-context-runtime-not-wired")
-      ? (controlled.reviewArtifacts.recalibrationContextValidationEvalJson || controlled.confidenceRecalibration?.contextValidation?.evalJson)
-      : (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-validation-needed")
-      ? (controlled.reviewArtifacts.recalibrationValidationReviewPage || controlled.confidenceRecalibration?.validationReviewPage)
-      : (controlled.blockingReasons || []).includes("ordinary-confidence-recalibration-validation-failed")
-      ? (controlled.reviewArtifacts.recalibrationFailureDiagnosisJson || controlled.reviewArtifacts.recalibrationValidationEvalJson || controlled.confidenceRecalibration?.validationEvalJson)
-      : (controlled.blockingReasons || []).includes("ordinary-confidence-threshold-pool-precision-too-low")
-      ? (controlled.reviewArtifacts.thresholdPoolDiagnosisJson || controlled.confidencePilot?.thresholdPoolEvalJson)
-      : (controlled.reviewArtifacts.releaseAuditJson || controlled.confidencePilot?.thresholdPoolEvalJson || controlled.confidencePilot?.thresholdPoolReviewPage || controlled.reviewArtifacts.thresholdPoolReviewPage || controlled.confidencePilot?.validationReviewPage || controlled.reviewArtifacts.reviewPage);
+  const shadow = controlled.ordinaryDynamicShadow || {};
+  if (!shadow.foundationReady) {
+    actions.push({
+      priority: 0,
+      track: "Ordinary dynamic shadow runtime",
+      action: "Provision or repair the pinned ordinary-audio venv, then rerun `npm run western:ordinary-dynamic-shadow-runtime-preflight`. Do not consume r3-02/r3-03 while the live runtime identity is invalid.",
+      artifact: shadow.runtime?.config || "config/western-ordinary-audio-runtime.json",
+      reason: shadow.runtime?.blockingReasons || ["ordinary-dynamic-shadow-runtime-preflight-failed"],
+    });
+  } else if (!shadow.liveArtifactVerifierReady) {
     actions.push({
       priority: 1,
-      track: "M2/M3 ordinary upload candidate gate",
-      action: controlled.nextActions?.[0] || "Finish the current blind review batch, run `npm run western:ingest-review-downloads -- --apply` if the CSV is in Downloads, then rerun gate/status.",
-      artifact: ordinaryArtifact,
-      reason: controlled.blockingReasons,
+      track: "Ordinary dynamic shadow r3 evidence verifier",
+      action: "Implement a live verifier that rereads and rehashes every r3 cold/warm source artifact before accepting the aggregate report. Add adversarial tests proving a self-consistent forged report cannot pass. Do not consume reserve takes r3-02/r3-03 until this verifier is live.",
+      artifact: shadow.acceptanceEvidence?.source || ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE.replace(/\\/g, "/"),
+      reason: ["ordinary-dynamic-shadow-r3-live-artifact-verifier-not-implemented"],
+    });
+  } else if (!shadow.r3AcceptanceReady) {
+    actions.push({
+      priority: 1,
+      track: "Ordinary dynamic shadow r3 acceptance",
+      action: "Run the frozen review-only dynamic shadow on reserve takes r3-02 and r3-03 with cold/warm cache verification. This validates implementation coverage and provenance only; it does not authorize student feedback, and these takes become consumed evidence that cannot be reused for the later fresh-blind release audit.",
+      artifact: shadow.acceptanceEvidence?.source || ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE.replace(/\\/g, "/"),
+      reason: shadow.blockingReasons || ["ordinary-dynamic-shadow-r3-acceptance-not-run"],
+    });
+  } else if (!shadow.authorizationReady) {
+    actions.push({
+      priority: 1,
+      track: "Ordinary dynamic shadow authorization",
+      action: "The r3 implementation acceptance passed, but the dynamic shadow remains review-only. Prepare a separate fresh-blind authorization contract before any monitored pilot or student-facing promotion.",
+      artifact: shadow.acceptanceEvidence?.source || ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE.replace(/\\/g, "/"),
+      reason: ["ordinary-dynamic-shadow-authorization-closed"],
     });
   }
   if (!m3plus.m3plusModeEvalReady) {
@@ -2661,7 +2948,7 @@ export async function buildProjectStatus(args = {}) {
       rule: "machine-self-test-before-human-review",
     },
     runtimeStudentGate: {
-      ordinaryUploadAutoFeedbackReady: controlledCandidate.studentSafeCandidateGateReady,
+      ordinaryUploadAutoFeedbackReady: false,
       m3plusAutoFeedbackReady: false,
       m4OmrAutoScoreReady: false,
       policy: "fail-closed",
@@ -2781,8 +3068,15 @@ export async function buildProjectStatus(args = {}) {
       ? {
           source: RELEASE_REVIEW.replace(/\\/g, "/"),
           summary: RELEASE_REVIEW_MD.replace(/\\/g, "/"),
-          readyForControlledPilot: releaseReview.readyForControlledPilot === true,
-          readyForDefaultStudentRelease: releaseReview.readyForDefaultStudentRelease === true,
+          historicalReadyForControlledPilot: releaseReview.readyForControlledPilot === true,
+          readyForControlledPilot: releaseReview.schemaVersion === 2
+            && releaseReview.ordinaryAuthorizationContract === "western-ordinary-dynamic-shadow-release-v1"
+            && releaseReview.readyForControlledPilot === true,
+          readyForDefaultStudentRelease: releaseReview.schemaVersion === 2
+            && releaseReview.ordinaryAuthorizationContract === "western-ordinary-dynamic-shadow-release-v1"
+            && releaseReview.readyForDefaultStudentRelease === true,
+          superseded: releaseReview.schemaVersion !== 2
+            || releaseReview.ordinaryAuthorizationContract !== "western-ordinary-dynamic-shadow-release-v1",
           teacherReviewNeeded: releaseReview.teacherReviewNeeded === true,
           runtimeFailClosed: releaseReview.runtimeFailClosed === true,
         }
@@ -2795,13 +3089,30 @@ export async function buildProjectStatus(args = {}) {
       ? {
           source: CONTROLLED_PILOT_DECISION.replace(/\\/g, "/"),
           summary: CONTROLLED_PILOT_DECISION_MD.replace(/\\/g, "/"),
-          readyForControlledPilotDecision: controlledPilotDecision.readyForControlledPilotDecision === true,
-          readyToStartControlledPilot: controlledPilotDecision.readyToStartControlledPilot === true,
+          historicalReadyForControlledPilotDecision:
+            controlledPilotDecision.readyForControlledPilotDecision === true,
+          readyForControlledPilotDecision: controlledPilotDecision.schemaVersion === 2
+            && controlledPilotDecision.ordinaryAuthorizationContract === "western-ordinary-dynamic-shadow-release-v1"
+            && controlledPilotDecision.readyForControlledPilotDecision === true,
+          readyToStartControlledPilot: controlledPilotDecision.schemaVersion === 2
+            && controlledPilotDecision.ordinaryAuthorizationContract === "western-ordinary-dynamic-shadow-release-v1"
+            && controlledPilotDecision.readyToStartControlledPilot === true,
+          authorizationSuperseded: controlledPilotDecision.schemaVersion !== 2
+            || controlledPilotDecision.ordinaryAuthorizationContract !== "western-ordinary-dynamic-shadow-release-v1",
           approvalRequired: controlledPilotDecision.approvalRequired === true,
-          approvalPresent: controlledPilotDecision.approvalPresent === true,
+          historicalApprovalPresent: controlledPilotDecision.approvalPresent === true,
+          approvalPresent: controlledPilotDecision.schemaVersion === 2
+            && controlledPilotDecision.ordinaryAuthorizationContract === "western-ordinary-dynamic-shadow-release-v1"
+            && controlledPilotDecision.approvalPresent === true,
           approvalDeferred: controlledPilotDecision.approvalDeferred === true,
           runtimeFailClosed: controlledPilotDecision.runtimeFailClosed === true,
-          blockingReasons: controlledPilotDecision.blockingReasons || [],
+          blockingReasons: [
+            ...(controlledPilotDecision.blockingReasons || []),
+            ...((controlledPilotDecision.schemaVersion !== 2
+              || controlledPilotDecision.ordinaryAuthorizationContract !== "western-ordinary-dynamic-shadow-release-v1")
+              ? ["controlled-pilot-decision-authorization-superseded"]
+              : []),
+          ],
         }
       : {
           source: CONTROLLED_PILOT_DECISION.replace(/\\/g, "/"),
@@ -2825,6 +3136,7 @@ export async function buildProjectStatus(args = {}) {
           defaultRuntimeFailClosedAfter: controlledPilotSession.defaultRuntimeFailClosedAfter === true,
           processEnvironmentRestored: controlledPilotSession.processEnvironmentRestored === true,
           studentFeedbackPublished: controlledPilotSession.studentFeedbackPublished === true,
+          eligibleAsCurrentReleaseEvidence: false,
           blockingReasons: controlledPilotSession.blockingReasons || [],
           artifacts: controlledPilotSession.artifacts || {},
         }
@@ -2917,6 +3229,7 @@ function printProjectStatus(status, outPath) {
       ready: controlledCandidate.studentSafeCandidateGateReady,
       counts: controlledCandidate.counts,
       confidencePilot: controlledCandidate.confidencePilot,
+      ordinaryDynamicShadow: controlledCandidate.ordinaryDynamicShadow,
       blockingReasons: controlledCandidate.blockingReasons,
     },
     m3plusPitchModes: {

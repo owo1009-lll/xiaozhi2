@@ -4,26 +4,23 @@ import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
 import { evaluateProjectGate } from "./gate-western-strings-project.mjs";
-import { buildProjectStatus } from "./status-western-strings-project.mjs";
+import { buildProjectStatus, writeProjectStatus } from "./status-western-strings-project.mjs";
 
 const DEFAULT_OUT = path.join("data", "experiments", "western-strings-release-review.json");
 const DEFAULT_SUMMARY = path.join("data", "experiments", "western-strings-release-review.md");
 
 const STEPS = [
+  "western:ordinary-dynamic-shadow-runtime-preflight",
+  "test:western-ordinary-audio-runtime",
+  "test:western-dynamic-shadow-policy",
   "test:western-offline-feature-audio",
+  "test:western-alignment-preview",
   "test:western-phenicx-alignment-eval",
   "test:western-bach-violin-musc-pilot",
   "test:western-bach-violin-musc-calibration",
   "test:western-violin-midi-dataset-audit",
-  "test:western-controlled-pilot-run",
-  "test:western-controlled-pilot-evidence-audit",
-  "test:western-fresh-blind-intake",
-  "test:western-ordinary-pilot-selection",
-  "western:ordinary-monitored-pilot-audit",
   "western:m3plus-monitored-pilot-audit",
   "western:m4-preflight",
-  "western:project-status",
-  "western:controlled-pilot-evidence-audit",
 ];
 
 function parseArgs(argv) {
@@ -83,6 +80,8 @@ function buildSummary(report) {
     "",
     "## Verdict",
     "",
+    `- commandChecksPassed: ${report.commandChecksPassed}`,
+    `- requiredEvidenceComplete: ${report.requiredEvidenceComplete}`,
     `- machineChecksComplete: ${report.machineChecksComplete}`,
     `- readyForControlledPilot: ${report.readyForControlledPilot}`,
     `- readyForDefaultStudentRelease: ${report.readyForDefaultStudentRelease}`,
@@ -91,7 +90,9 @@ function buildSummary(report) {
     "",
     "## Track Decisions",
     "",
-    `- ordinary monitored pilot evidence: ${report.tracks.ordinary.readyForControlledPilot}`,
+    `- ordinary dynamic shadow foundation: ${report.tracks.ordinary.foundationReady}`,
+    `- ordinary r3 acceptance: ${report.tracks.ordinary.r3AcceptanceReady}`,
+    `- ordinary authorization: ${report.tracks.ordinary.authorizationReady}`,
     `- M3+ monitored pilot evidence: ${report.tracks.m3plus.readyForControlledPilot}`,
     `- M4 OMR benchmark evidence: ${report.tracks.m4.readyForOmrAccuracyClaim}`
       + " (decoupled from controlled-pilot readiness by owner decision 2026-07-17;"
@@ -109,8 +110,8 @@ function buildSummary(report) {
     "## Meaning",
     "",
     report.readyForControlledPilot
-      ? "- Current evidence is sufficient to consider a separate monitored pilot. Keep the default student runtime fail-closed unless that pilot is explicitly started."
-      : "- Current evidence is not sufficient for a monitored pilot. Fix the listed blockers before asking for any new review.",
+      ? "- The versioned dynamic-shadow release contract is complete; default student runtime remains fail-closed until separately changed."
+      : "- The dynamic-shadow foundation is review-only. r3 acceptance and a separate authorization contract are required before any monitored pilot.",
     report.readyForDefaultStudentRelease
       ? "- Default student release gate is open."
       : "- Default student release gate remains closed. This is expected while ordinary auto feedback is disabled by default.",
@@ -147,10 +148,12 @@ async function main() {
   const m3plusAudit = m3plus.monitoredPilotAudit || {};
   const m4 = status.tracks?.m4Omr || {};
   const publicValidation = status.publicModelValidation || {};
-  const ordinaryReady = ordinaryAudit.readyForMonitoredPilot === true
-    && ordinaryAudit.teacherReviewNeeded !== true
-    && ordinaryAudit.defaultOrdinaryReadyAfter !== true
-    && (ordinaryAudit.blockingReasons || []).length === 0;
+  const shadow = controlled.ordinaryDynamicShadow || {};
+  const historicalRfReady = ordinaryAudit.historicalReadyForMonitoredPilot === true
+    || ordinaryAudit.readyForMonitoredPilot === true;
+  const ordinaryReady = shadow.foundationReady === true
+    && shadow.r3AcceptanceReady === true
+    && shadow.authorizationReady === true;
   const m3plusReady = m3plusAudit.readyForMonitoredPilot === true
     && m3plusAudit.teacherReviewNeeded !== true
     && m3plusAudit.defaultM3PlusReadyAfter !== true
@@ -171,6 +174,7 @@ async function main() {
   // it hostage. M4 stays a required track for the default-student-release
   // project gate and keeps automatic adoption closed; m4Ready is still
   // computed and reported below.
+  const requiredEvidenceComplete = ordinaryReady && m3plusReady;
   const readyForControlledPilot = commandOk
     && ordinaryReady
     && m3plusReady
@@ -179,9 +183,13 @@ async function main() {
   const readyForDefaultStudentRelease = projectGate.projectReleaseReady === true
     && status.runtimeStudentGate?.ordinaryUploadAutoFeedbackReady === true;
   const report = {
+    schemaVersion: 2,
+    ordinaryAuthorizationContract: "western-ordinary-dynamic-shadow-release-v1",
     ok: commandOk,
     generatedAt: new Date().toISOString(),
-    machineChecksComplete: commandOk,
+    commandChecksPassed: commandOk,
+    requiredEvidenceComplete,
+    machineChecksComplete: commandOk && requiredEvidenceComplete,
     readyForControlledPilot,
     readyForDefaultStudentRelease,
     m4DecoupledFromControlledPilot: true,
@@ -192,10 +200,19 @@ async function main() {
     tracks: {
       ordinary: {
         readyForControlledPilot: ordinaryReady,
+        foundationReady: shadow.foundationReady === true,
+        r3AcceptanceReady: shadow.r3AcceptanceReady === true,
+        authorizationReady: shadow.authorizationReady === true,
+        studentGateReady: false,
+        automaticAdoptionReady: false,
+        blockingReasons: shadow.blockingReasons || [],
+        historicalRfEvidence: {
+          readyForMonitoredPilot: historicalRfReady,
+          authorization: "superseded-no-authority",
+          precisionPrecheck: ordinaryAudit.precisionPrecheck || {},
+        },
         defaultReadyAfterAudit: ordinaryAudit.defaultOrdinaryReadyAfter === true,
         teacherReviewNeeded: ordinaryAudit.teacherReviewNeeded === true,
-        autoPassCandidates: ordinaryAudit.precisionPrecheck || {},
-        blockingReasons: ordinaryAudit.blockingReasons || [],
       },
       m3plus: {
         readyForControlledPilot: m3plusReady,
@@ -236,6 +253,8 @@ async function main() {
   await fs.mkdir(path.dirname(args.out), { recursive: true });
   await fs.writeFile(args.out, JSON.stringify(report, null, 2), "utf8");
   await fs.writeFile(args.summary, buildSummary(report), "utf8");
+  const refreshedStatus = await buildProjectStatus();
+  await writeProjectStatus(refreshedStatus, path.join("data", "experiments", "western-strings-project-status.json"));
   console.log(JSON.stringify({
     ok: report.ok,
     readyForControlledPilot: report.readyForControlledPilot,

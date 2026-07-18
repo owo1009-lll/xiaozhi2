@@ -159,6 +159,9 @@ def main() -> None:
     assert decisions[0]["evidence"]["timingAssignmentAvailable"] is False
     dynamic_rows = module.build_candidate_rows(decisions)
     assert dynamic_rows[0]["candidateId"] == "offline-basic-pitch-dtw:n1"
+    assert dynamic_rows[0]["autoDecision"] == "review_required"
+    assert dynamic_rows[0]["dynamicShadowEvidence"]["selected"] is False
+    assert dynamic_rows[0]["dynamicShadowEvidence"]["energyVetoIncluded"] is False
     measure_notes = []
     measure_assignments = []
     for index in range(5):
@@ -197,6 +200,10 @@ def main() -> None:
     assert measure_rows[0]["measureRhythmReviewEvidenceReady"] is True
     assert measure_rows[0]["measureCombinedReviewEvidenceReady"] is True
     assert measure_rows[0]["autoDecision"] == "review_required"
+    measure_candidates = module.build_candidate_rows(measure_decisions)
+    assert measure_candidates[2]["dynamicShadowEvidence"]["selected"] is True
+    assert measure_candidates[2]["dynamicShadowEvidence"]["eventDurationRatio"] == 0.5
+    assert all(candidate["autoDecision"] == "review_required" for candidate in measure_candidates)
     linear_decisions = module.build_decisions(
         [timeline_note],
         np.asarray([0.0]),

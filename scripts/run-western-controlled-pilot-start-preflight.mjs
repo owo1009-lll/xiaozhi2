@@ -14,6 +14,7 @@ const DEFAULT_SUMMARY = path.join(
   "experiments",
   "western-strings-controlled-pilot-start-preflight.md",
 );
+export const REQUIRED_PILOT_EXECUTOR_CONTRACT = "western-ordinary-dynamic-shadow-pilot-executor-v1";
 
 function parseArgs(argv) {
   const args = { out: DEFAULT_OUT, summary: DEFAULT_SUMMARY };
@@ -84,11 +85,18 @@ export async function buildControlledPilotStartPreflight(args = {}) {
   if (decision.approvalPresent !== true) {
     blockingReasons.push(decision.approvalDeferred === true ? "approval-explicitly-deferred" : "approval-not-present");
   }
+  const pilotExecutorReady = args.pilotExecutorContractReady === true
+    && args.pilotExecutorContract === REQUIRED_PILOT_EXECUTOR_CONTRACT;
+  if (!pilotExecutorReady) {
+    blockingReasons.push("ordinary-dynamic-shadow-pilot-executor-not-implemented");
+  }
   const uniqueBlockingReasons = [...new Set(blockingReasons)];
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
     okToStartControlledPilot: uniqueBlockingReasons.length === 0,
+    pilotExecutorContract: REQUIRED_PILOT_EXECUTOR_CONTRACT,
+    pilotExecutorReady,
     blockingReasons: uniqueBlockingReasons,
     decision,
     artifacts: {

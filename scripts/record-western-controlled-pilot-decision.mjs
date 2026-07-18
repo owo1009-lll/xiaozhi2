@@ -6,8 +6,8 @@ const DEFAULT_OUT = path.join("data", "experiments", "western-strings-controlled
 // Contract version the approval binds to. Bumping this (e.g. after the
 // 2026-07-17 M3+ rescope superseded the first-measure slide/trill contract)
 // invalidates every earlier approval and forces a fresh owner decision.
-export const SCOPE_CONTRACT = "m3plus-rescope-four-zone-v1";
-const DEFAULT_SCOPE = "ordinary candidate-evidence auto_pass only; M3+ four-zone pitch-safety scope (rescope contract) only if explicitly included in the pilot";
+export const SCOPE_CONTRACT = "western-ordinary-dynamic-shadow-release-v1+m3plus-rescope-four-zone-v1";
+const DEFAULT_SCOPE = "ordinary dynamic-shadow only after a separate authorizationReady=true release contract; M3+ four-zone pitch-safety scope only if explicitly included in the pilot";
 
 function parseArgs(argv) {
   const args = {

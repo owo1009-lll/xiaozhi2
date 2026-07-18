@@ -26,13 +26,17 @@ async function runCase(tempRoot, name, precisionReview, expectedReasons) {
       `${name} should include blocking reason ${reason}; got ${plan.blockingReasons.join(",")}`,
     );
   }
+  assert(
+    plan.blockingReasons.includes("ordinary-rf-monitored-pilot-authorization-superseded"),
+    `${name} must retain the global RF supersession blocker`,
+  );
+  assert.equal(plan.authorizationStatus, "superseded-historical-rf-only");
+  assert.equal(plan.readyForPilotPlan, false);
+  assert.equal(plan.ok, false, `${name} must fail closed because the RF pilot path is superseded`);
   if (expectedReasons.length === 0) {
-    assert.equal(plan.ok, true, `${name} should pass`);
     assert.equal(plan.evidence.precisionPrecheckOk, true, `${name} should expose passing precheck evidence`);
     assert.equal(plan.evidence.precisionPrecheckKnownWrong, 0, `${name} should have zero known-wrong rows`);
     assert.equal(plan.evidence.precisionPrecheckUnknownReviewRows, 0, `${name} should have zero unknown review rows`);
-  } else {
-    assert.equal(plan.ok, false, `${name} should fail closed`);
   }
 }
 
@@ -92,7 +96,7 @@ try {
 console.log(JSON.stringify({
   ok: true,
   checks: [
-    "ordinary-pilot-plan-precheck-pass",
+    "ordinary-rf-pilot-plan-globally-superseded",
     "ordinary-pilot-plan-missing-precheck-fails",
     "ordinary-pilot-plan-failed-precheck-fails",
     "ordinary-pilot-plan-no-self-checked-fails",

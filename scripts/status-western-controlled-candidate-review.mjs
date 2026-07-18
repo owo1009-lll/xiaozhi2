@@ -119,10 +119,15 @@ export function summarizeControlledCandidateConfidencePilot(
   ));
   const thresholdPoolRuntime = releaseAudit?.thresholdPoolReviewedSample?.runtimePolicy || {};
   const thresholdPoolConfidenceOnly = releaseAudit?.thresholdPoolReviewedSample?.confidenceOnly || {};
+  const historicalRuntimeGateWired = Boolean(runtimeRelease?.modelVersion && runtimeRelease?.gateVersion);
+  const historicalMonitoredPilotReady = monitoredPilotAudit?.readyForMonitoredPilot === true;
   return {
     source: source.replace(/\\/g, "/"),
     sourceExists: Boolean(pilot),
     readyForStudentGate: false,
+    authorizationStatus: "superseded-historical-rf-only",
+    supersededBy: "western-ordinary-dynamic-shadow-policy-v1",
+    evidenceScope: "historical-rf-calibration-only",
     releaseCandidateFound,
     needsBlindValidation: releaseCandidateFound && !validationEval?.blindValidationPassed,
     runtimeRelease: runtimeRelease ? {
@@ -137,16 +142,24 @@ export function summarizeControlledCandidateConfidencePilot(
       source: DEFAULT_CONFIDENCE_RELEASE.replace(/\\/g, "/"),
       sourceExists: false,
     },
-    runtimeGateWired: Boolean(runtimeRelease?.modelVersion && runtimeRelease?.gateVersion),
-    reason: !pilot
-      ? "confidence-pilot-missing"
-      : validationEval?.blindValidationPassed
-        ? (runtimeRelease?.modelVersion ? "confidence-runtime-gate-wired-disabled-by-default" : "confidence-validation-passed-runtime-gate-still-disabled")
-        : "eval-only-confidence-pilot-needs-blind-validation",
+    runtimeGateWired: historicalRuntimeGateWired,
+    runtimeGateWiringScope: historicalRuntimeGateWired
+      ? "historical-rf-disabled-by-default-no-current-authority"
+      : "historical-rf-runtime-not-wired",
+    reason: "historical-rf-evidence-superseded-by-dynamic-shadow",
     reviewedRowsUsed: Number(pilot?.reviewedRowsUsed || 0),
     usableRows: Number(pilot?.usableRows || 0),
     wrongRows: Number(pilot?.wrongRows || 0),
-    recommendation: pilot?.recommendation || null,
+    recommendation: pilot?.recommendation ? {
+      ...pilot.recommendation,
+      historicalReadyForStudentGate: pilot.recommendation.readyForStudentGate === true,
+      readyForStudentGate: false,
+      historicalStudentGateReason: pilot.recommendation.studentGateReason || "",
+      studentGateReason: "historical-rf-authorization-superseded",
+      authorizationStatus: "superseded-historical-rf-only",
+      historicalNextStep: pilot.recommendation.nextStep || "",
+      nextStep: "Historical RF calibration only; continue with the ordinary dynamic-shadow live verifier and fresh-blind authorization path.",
+    } : null,
     recommendedReleaseCandidate: recommendedCandidates[0] || null,
     bestReleaseCandidate: recommendedCandidates[0] || releaseCandidates[0] || null,
     releaseCandidateCount: releaseCandidates.length,
@@ -180,7 +193,8 @@ export function summarizeControlledCandidateConfidencePilot(
       readyForDefaultEnable: releaseAudit?.releaseReadiness?.readyForDefaultEnable === true,
       blockingReasons: releaseAudit?.releaseReadiness?.blockingReasons || [],
       caveat: releaseAudit?.validationExport?.importantCaveat || "",
-      recommendedNextStep: releaseAudit?.recommendedNextStep || "",
+      historicalRecommendedNextStep: releaseAudit?.recommendedNextStep || "",
+      recommendedNextStep: "Historical RF release audit only; do not enable its environment flag or use it to authorize a pilot.",
     } : {
       source: DEFAULT_CONFIDENCE_RELEASE_AUDIT.replace(/\\/g, "/"),
       sourceExists: false,
@@ -189,10 +203,16 @@ export function summarizeControlledCandidateConfidencePilot(
       source: DEFAULT_ORDINARY_MONITORED_PILOT_AUDIT.replace(/\\/g, "/"),
       sourceExists: true,
       ok: monitoredPilotAudit.ok === true,
-      readyForMonitoredPilot: monitoredPilotAudit.readyForMonitoredPilot === true,
+      historicalReadyForMonitoredPilot: historicalMonitoredPilotReady,
+      readyForMonitoredPilot: false,
+      authorizationStatus: "superseded-historical-rf-only",
+      supersededBy: "western-ordinary-dynamic-shadow-policy-v1",
       teacherReviewNeeded: monitoredPilotAudit.teacherReviewNeeded === true,
       defaultOrdinaryReadyAfter: monitoredPilotAudit.defaultOrdinaryReadyAfter === true,
-      blockingReasons: monitoredPilotAudit.blockingReasons || [],
+      blockingReasons: [...new Set([
+        ...(monitoredPilotAudit.blockingReasons || []),
+        "ordinary-rf-monitored-pilot-authorization-superseded",
+      ])],
       precisionPrecheck: {
         selfCheckedAutoPassCandidateCount: monitoredPilotAudit.precisionPrecheck?.selfCheckedAutoPassCandidateCount ?? 0,
         knownUsableAutoPassCandidateCount: monitoredPilotAudit.precisionPrecheck?.knownUsableAutoPassCandidateCount ?? 0,
@@ -212,6 +232,20 @@ export function summarizeControlledCandidateConfidencePilot(
 }
 
 export function attachConfidencePilotStatus(status, confidencePilot) {
+  if (confidencePilot?.authorizationStatus === "superseded-historical-rf-only") {
+    return {
+      ...status,
+      studentSafeCandidateGateReady: false,
+      confidencePilot,
+      blockingReasons: [...new Set([
+        ...(status.blockingReasons || []),
+        "ordinary-rf-monitored-pilot-authorization-superseded",
+      ])],
+      nextActions: [
+        "Treat all RF confidence and first-measure pilot artifacts as historical only. Continue with the review-only ordinary dynamic-shadow runtime, live r3 artifact verifier, and a later fresh-blind authorization contract.",
+      ],
+    };
+  }
   if (!confidencePilot?.releaseCandidateFound) {
     return { ...status, confidencePilot };
   }

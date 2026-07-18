@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import importlib.metadata
 import json
 import math
 import os
@@ -8,6 +10,7 @@ import shutil
 import sqlite3
 import statistics
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -15,8 +18,50 @@ import librosa
 import numpy as np
 from numba import njit
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from western_strings_dynamic_shadow_policy import (
+    DYNAMIC_SHADOW_CONTRACT_VERSION,
+    DYNAMIC_SHADOW_POLICY_VERSION,
+    build_dynamic_candidate_features,
+    build_dynamic_shadow_evidence,
+    empty_dynamic_features,
+)
+
 
 RELATIVE_IOI_CONSISTENCY_LIMIT = 0.35
+BASIC_PITCH_CACHE_SCHEMA_VERSION = 3
+BASIC_PITCH_INFERENCE_VERSION = "default-frequency-range-g3-a7-min-note-80ms-v1"
+BASIC_PITCH_MODEL_ARTIFACT_SHA256 = "c6595f299ff83c52e89555789f7e3e829a6a0f25b6a88f7e99073af5a2470dc4"
+ORDINARY_AUDIO_RUNTIME_ID = "western-ordinary-dynamic-shadow-audio-py311"
+ORDINARY_AUDIO_RUNTIME_CONFIG_SHA256 = "1f3a47f5cfe2b2d2e427be9a03ab43b4b4aa09a5db0edeed0b55e610a42ac6f9"
+ORDINARY_AUDIO_RUNTIME_LOCK_SHA256 = "4120a811da1ecb1aa93ceabcbb5aa0b45a37c08e5ee3138d2b793e38f2828d04"
+
+
+def runtime_attestation_from_env() -> dict[str, Any]:
+    attested = os.environ.get("WESTERN_ORDINARY_AUDIO_RUNTIME_ATTESTED", "")
+    runtime_id = os.environ.get("WESTERN_ORDINARY_AUDIO_RUNTIME_ID", "")
+    config_sha256 = os.environ.get("WESTERN_ORDINARY_AUDIO_RUNTIME_CONFIG_SHA256", "")
+    lock_sha256 = os.environ.get("WESTERN_ORDINARY_AUDIO_RUNTIME_LOCK_SHA256", "")
+    model_sha256 = os.environ.get("WESTERN_ORDINARY_AUDIO_RUNTIME_MODEL_SHA256", "")
+    ready = (
+        attested == "1"
+        and runtime_id == ORDINARY_AUDIO_RUNTIME_ID
+        and config_sha256 == ORDINARY_AUDIO_RUNTIME_CONFIG_SHA256
+        and lock_sha256 == ORDINARY_AUDIO_RUNTIME_LOCK_SHA256
+        and model_sha256 == BASIC_PITCH_MODEL_ARTIFACT_SHA256
+    )
+    return {
+        "ready": ready,
+        "runtimeId": runtime_id,
+        "configSemanticSha256": config_sha256,
+        "requirementsLockSha256": lock_sha256,
+        "modelArtifactSha256": model_sha256,
+        "studentFacing": False,
+        "automaticAdoptionAuthorized": False,
+    }
 
 
 def safe_float(value: Any, fallback: float | None = None) -> float | None:
@@ -232,20 +277,114 @@ def extract_f0(audio_path: Path) -> tuple[np.ndarray, np.ndarray, float]:
     return times.astype(np.float64), midi.astype(np.float64), float(y.size / sr)
 
 
-def load_basic_pitch_events(audio_path: Path, cache_dir: Path) -> list[dict[str, Any]]:
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_path = cache_dir / f"{audio_path.stem}.basic-pitch.json"
-    if cache_path.is_file():
-        return read_basic_pitch_events(cache_path)
-    from basic_pitch.inference import predict
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
-    _, _, raw_events = predict(
+
+def canonical_payload_sha256(payload: Any) -> str:
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def installed_basic_pitch_model_version() -> str:
+    try:
+        package_version = importlib.metadata.version("basic-pitch")
+    except importlib.metadata.PackageNotFoundError:
+        package_version = "unknown"
+    return f"basic-pitch-{package_version}-default-model"
+
+
+def basic_pitch_cache_identity(
+    audio_path: Path,
+    *,
+    model_version: str | None = None,
+    policy_version: str = DYNAMIC_SHADOW_POLICY_VERSION,
+) -> dict[str, str]:
+    runtime_attestation = runtime_attestation_from_env()
+    return {
+        "audioSha256": sha256_file(audio_path),
+        "modelVersion": model_version or installed_basic_pitch_model_version(),
+        "modelArtifactSha256": BASIC_PITCH_MODEL_ARTIFACT_SHA256,
+        "inferenceVersion": BASIC_PITCH_INFERENCE_VERSION,
+        "policyVersion": policy_version,
+        "runtimeId": str(runtime_attestation["runtimeId"]),
+        "runtimeConfigSemanticSha256": str(runtime_attestation["configSemanticSha256"]),
+        "runtimeRequirementsLockSha256": str(runtime_attestation["requirementsLockSha256"]),
+    }
+
+
+def basic_pitch_cache_path(cache_dir: Path, identity: dict[str, str]) -> Path:
+    version_digest = hashlib.sha256(
+        json.dumps(
+            {
+                "modelVersion": identity["modelVersion"],
+                "modelArtifactSha256": identity["modelArtifactSha256"],
+                "inferenceVersion": identity["inferenceVersion"],
+                "policyVersion": identity["policyVersion"],
+                "runtimeId": identity["runtimeId"],
+                "runtimeConfigSemanticSha256": identity["runtimeConfigSemanticSha256"],
+                "runtimeRequirementsLockSha256": identity["runtimeRequirementsLockSha256"],
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()[:16]
+    return cache_dir / f"{identity['audioSha256']}-{version_digest}.basic-pitch.json"
+
+
+def load_basic_pitch_events_with_provenance(
+    audio_path: Path,
+    cache_dir: Path,
+    *,
+    model_version: str | None = None,
+    policy_version: str = DYNAMIC_SHADOW_POLICY_VERSION,
+    predict_fn: Any | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    identity = basic_pitch_cache_identity(
+        audio_path,
+        model_version=model_version,
+        policy_version=policy_version,
+    )
+    cache_path = basic_pitch_cache_path(cache_dir, identity)
+    if cache_path.is_file():
+        cache_bytes = cache_path.read_bytes()
+        payload = json.loads(cache_bytes.decode("utf-8"))
+        if (
+            isinstance(payload, dict)
+            and payload.get("schemaVersion") == BASIC_PITCH_CACHE_SCHEMA_VERSION
+            and payload.get("cacheIdentity") == identity
+        ):
+            events = normalize_basic_pitch_events(payload.get("events"))
+            if sha256_file(audio_path) != identity["audioSha256"]:
+                raise RuntimeError("basic-pitch-audio-changed-during-cache-read")
+            return events, {
+                **identity,
+                "cachePath": str(cache_path.resolve()),
+                "cacheArtifactSha256": hashlib.sha256(cache_bytes).hexdigest(),
+                "cacheHit": True,
+                "cacheSource": "content-addressed-cache",
+                "identityBound": True,
+            }
+    if predict_fn is None:
+        from basic_pitch.inference import predict as predict_fn
+
+    _, _, raw_events = predict_fn(
         str(audio_path),
         minimum_frequency=float(librosa.note_to_hz("G3")),
         maximum_frequency=float(librosa.note_to_hz("A7")),
         minimum_note_length=80.0,
     )
-    events = sorted(
+    events = normalize_basic_pitch_events(
         [
             {
                 "start": float(start),
@@ -254,18 +393,114 @@ def load_basic_pitch_events(audio_path: Path, cache_dir: Path) -> list[dict[str,
                 "confidence": float(confidence),
             }
             for start, end, pitch, confidence, *_ in raw_events
-        ],
-        key=lambda item: (float(item["start"]), float(item["end"]), int(item["midi"])),
+        ]
     )
-    cache_path.write_text(json.dumps(events, ensure_ascii=False, indent=2), encoding="utf-8")
+    if sha256_file(audio_path) != identity["audioSha256"]:
+        raise RuntimeError("basic-pitch-audio-changed-during-inference")
+    cache_payload = (
+        json.dumps(
+            {
+                "schemaVersion": BASIC_PITCH_CACHE_SCHEMA_VERSION,
+                "cacheIdentity": identity,
+                "events": events,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n"
+    )
+    cache_bytes = cache_payload.encode("utf-8")
+    temporary_path = cache_path.with_name(f".{cache_path.name}.{os.getpid()}.tmp")
+    try:
+        temporary_path.write_bytes(cache_bytes)
+        os.replace(temporary_path, cache_path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+    return events, {
+        **identity,
+        "cachePath": str(cache_path.resolve()),
+        "cacheArtifactSha256": hashlib.sha256(cache_bytes).hexdigest(),
+        "cacheHit": False,
+        "cacheSource": "content-addressed-cache",
+        "identityBound": True,
+    }
+
+
+def load_basic_pitch_events(
+    audio_path: Path,
+    cache_dir: Path,
+    *,
+    model_version: str | None = None,
+    policy_version: str = DYNAMIC_SHADOW_POLICY_VERSION,
+    predict_fn: Any | None = None,
+) -> list[dict[str, Any]]:
+    events, _ = load_basic_pitch_events_with_provenance(
+        audio_path,
+        cache_dir,
+        model_version=model_version,
+        policy_version=policy_version,
+        predict_fn=predict_fn,
+    )
     return events
 
 
-def read_basic_pitch_events(path: Path) -> list[dict[str, Any]]:
+def normalize_basic_pitch_events(payload: Any) -> list[dict[str, Any]]:
+    if not isinstance(payload, list):
+        raise ValueError("basic-pitch-event-cache-invalid")
     return sorted(
-        json.loads(path.read_text(encoding="utf-8")),
+        payload,
         key=lambda item: (float(item["start"]), float(item["end"]), int(item["midi"])),
     )
+
+
+def read_basic_pitch_events(path: Path) -> list[dict[str, Any]]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return normalize_basic_pitch_events(payload.get("events") if isinstance(payload, dict) else payload)
+
+
+def display_path(path: Path, repo_root: Path) -> str:
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(repo_root.resolve()).as_posix()
+    except ValueError:
+        return str(resolved)
+
+
+def explicit_basic_pitch_provenance(
+    audio_path: Path,
+    events_path: Path,
+    repo_root: Path,
+) -> dict[str, Any]:
+    identity = basic_pitch_cache_identity(audio_path)
+    identity_bound = False
+    try:
+        payload = json.loads(events_path.read_text(encoding="utf-8"))
+        cache_identity = payload.get("cacheIdentity") if isinstance(payload, dict) else None
+        if isinstance(cache_identity, dict):
+            observed_identity = {
+                field: str(cache_identity.get(field) or "")
+                for field in (
+                    "audioSha256",
+                    "modelVersion",
+                    "modelArtifactSha256",
+                    "inferenceVersion",
+                    "policyVersion",
+                    "runtimeId",
+                    "runtimeConfigSemanticSha256",
+                    "runtimeRequirementsLockSha256",
+                )
+            }
+            identity_bound = observed_identity == identity
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        pass
+    return {
+        **identity,
+        "cachePath": display_path(events_path, repo_root),
+        "cacheArtifactSha256": sha256_file(events_path),
+        "cacheHit": True,
+        "cacheSource": "explicit-events-file",
+        "identityBound": identity_bound,
+    }
 
 
 def basic_pitch_match_cost(score_midi: int, event_midi: int) -> float:
@@ -499,6 +734,12 @@ def build_decisions(
         if timing_assignments is not None
         else [{} for _ in notes]
     )
+    timing_mode = "basic-pitch-dtw" if timing_assignments is not None else "linear"
+    dynamic_features = (
+        build_dynamic_candidate_features(notes, timing_assignments, relative_ioi)
+        if timing_assignments is not None
+        else [empty_dynamic_features() for _ in notes]
+    )
     for note_index, note in enumerate(selected_notes):
         score_unit = safe_float(note.get("scoreUnit"), 0.0) or 0.0
         assignment = timing_assignments[note_index] if timing_assignments is not None else None
@@ -558,6 +799,10 @@ def build_decisions(
                     "basicPitchEventConfidence": round(float(assignment["confidence"]), 6) if assignment else None,
                     "basicPitchPitchDistanceSemitones": assignment.get("pitchDistanceSemitones") if assignment else None,
                     **relative_ioi[note_index],
+                    "dynamicShadowEvidence": build_dynamic_shadow_evidence(
+                        dynamic_features[note_index],
+                        timing_mode=timing_mode,
+                    ),
                 },
             }
         )
@@ -655,6 +900,7 @@ def build_candidate_rows(decisions: list[dict[str, Any]]) -> list[dict[str, Any]
                 "relativeIoiResidualSeconds": evidence.get("relativeIoiResidualSeconds"),
                 "relativeIoiDeviationRatio": evidence.get("relativeIoiDeviationRatio"),
                 "relativeIoiConsistent": evidence.get("relativeIoiConsistent"),
+                "dynamicShadowEvidence": evidence.get("dynamicShadowEvidence"),
                 "autoDecision": "review_required",
                 "reviewRequiredReason": "offline-feature-analysis-review-only",
                 "studentSafeGateReady": False,
@@ -689,6 +935,10 @@ def summarize(
     measure_pitch_ready = sum(bool(row["measurePitchReviewEvidenceReady"]) for row in measure_rows)
     measure_rhythm_ready = sum(bool(row["measureRhythmReviewEvidenceReady"]) for row in measure_rows)
     measure_combined_ready = sum(bool(row["measureCombinedReviewEvidenceReady"]) for row in measure_rows)
+    dynamic_shadow_selected = sum(
+        bool(item.get("evidence", {}).get("dynamicShadowEvidence", {}).get("selected"))
+        for item in decisions
+    )
     return {
         "analysisMode": analysis_mode,
         "scoreId": score.get("scoreId"),
@@ -700,6 +950,11 @@ def summarize(
         "autoPassCount": 0,
         "reviewRequiredCount": len(decisions),
         "reviewOnlyCandidateCount": len(decisions),
+        "dynamicShadowContractVersion": DYNAMIC_SHADOW_CONTRACT_VERSION,
+        "dynamicShadowPolicyVersion": DYNAMIC_SHADOW_POLICY_VERSION,
+        "dynamicShadowSelectedCount": dynamic_shadow_selected,
+        "dynamicShadowCoverage": round(dynamic_shadow_selected / len(decisions), 6) if decisions else 0.0,
+        "dynamicShadowEnergyVetoIncluded": False,
         "coverage": 0,
         "pitchSupportWithin80CentsCount": support_count,
         "timingAssignmentCount": assignment_count,
@@ -722,7 +977,7 @@ def main() -> int:
     parser.add_argument("--repo-root", required=True)
     parser.add_argument("--score-id", required=True)
     parser.add_argument("--audio", required=True)
-    parser.add_argument("--limit", type=int, default=20)
+    parser.add_argument("--limit", type=int, default=0)
     parser.add_argument(
         "--timing-mode",
         choices=("linear", "basic-pitch-dtw"),
@@ -738,7 +993,10 @@ def main() -> int:
 
     repo_root = Path(args.repo_root).resolve()
     audio_path = Path(args.audio).resolve()
+    runtime_attestation = runtime_attestation_from_env()
     blocking: list[str] = []
+    if not runtime_attestation["ready"]:
+        blocking.append("ordinary-audio-runtime-attestation-invalid")
     if not audio_path.exists():
         blocking.append("controlled-batch-missing-audio")
     try:
@@ -752,20 +1010,51 @@ def main() -> int:
     if not notes:
         blocking.append("controlled-batch-score-notes-empty")
     if blocking:
-        print(json.dumps({"ok": False, "blockingReasons": blocking, "summary": {"noteCount": 0, "autoPassCount": 0}}, ensure_ascii=False))
+        print(json.dumps({
+            "ok": False,
+            "blockingReasons": blocking,
+            "runtimeAttestation": runtime_attestation,
+            "summary": {"noteCount": len(notes), "autoPassCount": 0},
+        }, ensure_ascii=False))
         return 0
+
+    score_store_path = (
+        repo_root / "data" / "erhu-score-imports.sqlite"
+        if (repo_root / "data" / "erhu-score-imports.sqlite").exists()
+        else repo_root / "data" / "erhu-score-imports.json"
+    )
+    score_provenance = {
+        "scoreId": args.score_id,
+        "scorePayloadSha256": canonical_payload_sha256(score),
+        "scoreStorePath": display_path(score_store_path, repo_root),
+        "scoreStoreArtifactSha256": sha256_file(score_store_path),
+        "noteCount": len(notes),
+    }
 
     try:
         timeline = build_symbolic_timeline(notes)
         times, midi_track, audio_duration = extract_f0(audio_path)
         assignments = None
         analysis_mode = "linear-score-pyin-review-v1"
+        basic_pitch_cache_provenance = None
         if args.timing_mode == "basic-pitch-dtw":
-            events = (
-                read_basic_pitch_events((repo_root / args.basic_pitch_events).resolve())
-                if args.basic_pitch_events
-                else load_basic_pitch_events(audio_path, repo_root / args.basic_pitch_cache)
-            )
+            if args.basic_pitch_events:
+                events_path = (repo_root / args.basic_pitch_events).resolve()
+                events = read_basic_pitch_events(events_path)
+                basic_pitch_cache_provenance = explicit_basic_pitch_provenance(
+                    audio_path,
+                    events_path,
+                    repo_root,
+                )
+            else:
+                events, basic_pitch_cache_provenance = load_basic_pitch_events_with_provenance(
+                    audio_path,
+                    repo_root / args.basic_pitch_cache,
+                )
+                basic_pitch_cache_provenance["cachePath"] = display_path(
+                    Path(basic_pitch_cache_provenance["cachePath"]),
+                    repo_root,
+                )
             assignments = assign_basic_pitch_events(timeline, events)
             analysis_mode = "basic-pitch-dtw-pyin-review-v1"
         decisions = build_decisions(
@@ -779,7 +1068,16 @@ def main() -> int:
         )
         candidate_rows = build_candidate_rows(decisions)
         summary = summarize(decisions, score or {}, audio_duration, len(timeline), analysis_mode)
-        payload = {"ok": True, "summary": summary}
+        summary["basicPitchCacheProvenance"] = basic_pitch_cache_provenance
+        summary["scoreProvenance"] = score_provenance
+        summary["runtimeAttestation"] = runtime_attestation
+        payload = {
+            "ok": True,
+            "summary": summary,
+            "basicPitchCacheProvenance": basic_pitch_cache_provenance,
+            "scoreProvenance": score_provenance,
+            "runtimeAttestation": runtime_attestation,
+        }
         if not args.summary_only:
             payload.update({
                 "decisions": decisions,
@@ -793,6 +1091,7 @@ def main() -> int:
             "ok": False,
             "blockingReasons": ["controlled-batch-offline-feature-analysis-failed"],
             "error": f"{type(exc).__name__}: {exc}",
+            "runtimeAttestation": runtime_attestation,
             "summary": {"noteCount": len(notes), "autoPassCount": 0},
         }, ensure_ascii=False))
         return 0

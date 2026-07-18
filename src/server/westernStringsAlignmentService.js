@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { execFile } from "node:child_process";
@@ -5,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { clamp, createId, nowIso, safeBoolean, safeNumber, safeString } from "./baseUtils.js";
+import { readScoreStoreFromSqlite } from "./scoreStoreSqlite.js";
 
 const execFileAsync = promisify(execFile);
 const SOURCE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -16,6 +18,26 @@ const OFFLINE_FEATURE_CONFIDENCE_RELEASE_PATH = path.join(
   "ordinary-upload-confidence-rf-v1",
   "release.json",
 );
+const ORDINARY_DYNAMIC_SHADOW_CONTRACT_VERSION = "western-ordinary-dynamic-shadow-candidate-v1";
+const ORDINARY_DYNAMIC_SHADOW_POLICY_VERSION = "western-ordinary-dynamic-shadow-policy-v1";
+const ORDINARY_DYNAMIC_SHADOW_GATE_VERSION = "western-ordinary-dynamic-shadow-gate-v1-review-only";
+const ORDINARY_DYNAMIC_SHADOW_TIMING_MODE = "basic-pitch-dtw";
+const ORDINARY_DYNAMIC_SHADOW_CAUSAL_ENERGY_STATUS = "excluded-review-only";
+const ORDINARY_DYNAMIC_SHADOW_MODEL_VERSION = "basic-pitch-0.4.0-default-model";
+const ORDINARY_DYNAMIC_SHADOW_MODEL_ARTIFACT_SHA256 = "c6595f299ff83c52e89555789f7e3e829a6a0f25b6a88f7e99073af5a2470dc4";
+const ORDINARY_DYNAMIC_SHADOW_INFERENCE_VERSION = "default-frequency-range-g3-a7-min-note-80ms-v1";
+const ORDINARY_AUDIO_RUNTIME_ID = "western-ordinary-dynamic-shadow-audio-py311";
+const ORDINARY_AUDIO_RUNTIME_CONFIG_SHA256 = "1f3a47f5cfe2b2d2e427be9a03ab43b4b4aa09a5db0edeed0b55e610a42ac6f9";
+const ORDINARY_AUDIO_RUNTIME_LOCK_SHA256 = "4120a811da1ecb1aa93ceabcbb5aa0b45a37c08e5ee3138d2b793e38f2828d04";
+const ORDINARY_DYNAMIC_SHADOW_CACHE_ROOT = "data/experiments/western-strings-m3/offline-basic-pitch-cache/";
+const ORDINARY_DYNAMIC_SHADOW_POLICY = Object.freeze({
+  deviationLimit: 0.15,
+  minEventConfidence: 0.4,
+  minRelativeEventConfidence: 0.8,
+  minEventDurationSeconds: 0.08,
+  minEventDurationRatio: 0.15,
+  minSamePitchScoreDistanceQuarters: 0.5,
+});
 
 export const WESTERN_ALIGNMENT_METHOD_PREFERENCE = [
   "parangonar-basic-pitch",
@@ -294,23 +316,620 @@ function controlledSubmissionCandidateRowsDir(repoRoot, batchRunId) {
   return path.join(repoRoot, "data", "experiments", "western-strings-m3", "offline-feature-candidates", safeString(batchRunId, "unknown-batch"));
 }
 
-async function writeControlledSubmissionCandidateRows(repoRoot, { batchRunId, submissionId, candidateRows }) {
+async function writeControlledSubmissionCandidateRows(
+  repoRoot,
+  { batchRunId, submissionId, candidateRows, candidateGate = null },
+) {
   const safeSubmissionId = safeString(submissionId, "unknown-submission").replace(/[^A-Za-z0-9_.-]/g, "_");
   const outPath = path.join(controlledSubmissionCandidateRowsDir(repoRoot, batchRunId), `${safeSubmissionId}.json`);
   await fs.mkdir(path.dirname(outPath), { recursive: true });
-  await fs.writeFile(outPath, `${JSON.stringify({
+  const bytes = Buffer.from(`${JSON.stringify({
     batchRunId: safeString(batchRunId),
     submissionId: safeString(submissionId),
     rowCount: Array.isArray(candidateRows) ? candidateRows.length : 0,
+    candidateGate,
     candidateRows: Array.isArray(candidateRows) ? candidateRows : [],
   }, null, 2)}\n`, "utf8");
-  return path.relative(repoRoot, outPath).replace(/\\/g, "/");
+  await fs.writeFile(outPath, bytes);
+  return {
+    path: path.relative(repoRoot, outPath).replace(/\\/g, "/"),
+    sha256: crypto.createHash("sha256").update(bytes).digest("hex"),
+  };
 }
 
 function resolveRepoPath(repoRoot, maybeRelativePath) {
   const value = safeString(maybeRelativePath).trim();
   if (!value) return "";
   return path.isAbsolute(value) ? value : path.join(repoRoot, value);
+}
+
+function pathIsInside(root, target) {
+  const relative = path.relative(path.resolve(root), path.resolve(target));
+  return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
+async function verifyBasicPitchCacheArtifact(repoRoot, provenance, expectedAudioSha256) {
+  const blockingReasons = [];
+  const cachePath = safeString(provenance?.cachePath).trim().replace(/\\/g, "/");
+  const cacheRoot = path.resolve(repoRoot, ORDINARY_DYNAMIC_SHADOW_CACHE_ROOT);
+  const artifactPath = cachePath ? path.resolve(repoRoot, cachePath) : "";
+  let realArtifactPath = "";
+  let artifactSha256 = "";
+  let cacheIdentity = null;
+  try {
+    const [realCacheRoot, resolvedArtifact] = await Promise.all([
+      fs.realpath(cacheRoot),
+      fs.realpath(artifactPath),
+    ]);
+    realArtifactPath = resolvedArtifact;
+    if (!pathIsInside(realCacheRoot, realArtifactPath)) {
+      blockingReasons.push("ordinary-upload-basic-pitch-cache-realpath-outside-root");
+    } else {
+      const bytes = await fs.readFile(realArtifactPath);
+      artifactSha256 = crypto.createHash("sha256").update(bytes).digest("hex");
+      let payload = null;
+      try {
+        payload = JSON.parse(bytes.toString("utf8"));
+      } catch {
+        blockingReasons.push("ordinary-upload-basic-pitch-cache-json-invalid");
+      }
+      cacheIdentity = payload?.cacheIdentity || null;
+      if (payload?.schemaVersion !== 3 || !Array.isArray(payload?.events)) {
+        blockingReasons.push("ordinary-upload-basic-pitch-cache-schema-invalid");
+      }
+    }
+  } catch {
+    blockingReasons.push("ordinary-upload-basic-pitch-cache-artifact-unreadable");
+  }
+
+  const expectedIdentity = {
+    audioSha256: safeString(expectedAudioSha256).trim().toLowerCase(),
+    modelVersion: ORDINARY_DYNAMIC_SHADOW_MODEL_VERSION,
+    modelArtifactSha256: ORDINARY_DYNAMIC_SHADOW_MODEL_ARTIFACT_SHA256,
+    inferenceVersion: ORDINARY_DYNAMIC_SHADOW_INFERENCE_VERSION,
+    policyVersion: ORDINARY_DYNAMIC_SHADOW_POLICY_VERSION,
+    runtimeId: ORDINARY_AUDIO_RUNTIME_ID,
+    runtimeConfigSemanticSha256: ORDINARY_AUDIO_RUNTIME_CONFIG_SHA256,
+    runtimeRequirementsLockSha256: ORDINARY_AUDIO_RUNTIME_LOCK_SHA256,
+  };
+  if (!cacheIdentity
+      || typeof cacheIdentity !== "object"
+      || Array.isArray(cacheIdentity)
+      || Object.keys(cacheIdentity).length !== Object.keys(expectedIdentity).length
+      || Object.entries(expectedIdentity).some(([key, value]) => cacheIdentity[key] !== value)) {
+    blockingReasons.push("ordinary-upload-basic-pitch-cache-identity-mismatch");
+  }
+  if (artifactSha256 !== safeString(provenance?.cacheArtifactSha256).trim().toLowerCase()) {
+    blockingReasons.push("ordinary-upload-basic-pitch-cache-artifact-sha-mismatch");
+  }
+  return {
+    verified: blockingReasons.length === 0,
+    blockingReasons: [...new Set(blockingReasons)],
+    cachePath,
+    artifactSha256,
+    cacheIdentity,
+  };
+}
+
+function canonicalJson(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map((item) => canonicalJson(item)).join(",")}]`;
+  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+}
+
+function buildScoreNoteIdentityRows(score) {
+  const rows = [];
+  for (const section of score?.sections || []) {
+    for (const note of section?.notes || []) {
+      const midi = safeNumber(note?.midiPitch, -1);
+      if (midi <= 0) continue;
+      rows.push({
+        noteIndex: rows.length,
+        noteId: safeString(note?.noteId).trim(),
+        sectionId: safeString(section?.sectionId).trim(),
+        measureIndex: Math.round(safeNumber(note?.measureIndex, -1)),
+        midi: Math.round(midi),
+      });
+    }
+  }
+  return rows;
+}
+
+function buildCandidateNoteIdentityRows(candidateRows) {
+  return (Array.isArray(candidateRows) ? candidateRows : []).map((candidate) => ({
+    noteIndex: typeof candidate?.noteIndex === "number" && Number.isInteger(candidate.noteIndex)
+      ? candidate.noteIndex
+      : null,
+    noteId: safeString(candidate?.noteId).trim(),
+    sectionId: safeString(candidate?.sectionId).trim(),
+    measureIndex: typeof candidate?.measureIndex === "number" && Number.isInteger(candidate.measureIndex)
+      ? candidate.measureIndex
+      : null,
+    midi: typeof candidate?.midi === "number" && Number.isInteger(candidate.midi)
+      ? candidate.midi
+      : null,
+  }));
+}
+
+function noteIdentityRowsSha256(rows) {
+  return crypto.createHash("sha256").update(canonicalJson(rows), "utf8").digest("hex");
+}
+
+async function verifyScoreProvenance(repoRoot, provenance, expectedScoreId) {
+  const blockingReasons = [];
+  const sqlitePath = path.join(repoRoot, "data", "erhu-score-imports.sqlite");
+  const jsonPath = path.join(repoRoot, "data", "erhu-score-imports.json");
+  const sqliteExists = await fileExists(sqlitePath);
+  const sourcePath = sqliteExists ? sqlitePath : jsonPath;
+  let store = null;
+  let scoreStoreArtifactSha256 = "";
+  try {
+    const sourceBytesBefore = await fs.readFile(sourcePath);
+    scoreStoreArtifactSha256 = crypto.createHash("sha256").update(sourceBytesBefore).digest("hex");
+    store = sqliteExists
+      ? readScoreStoreFromSqlite(sqlitePath)
+      : JSON.parse(sourceBytesBefore.toString("utf8"));
+    const sourceBytesAfter = await fs.readFile(sourcePath);
+    const afterSha256 = crypto.createHash("sha256").update(sourceBytesAfter).digest("hex");
+    if (afterSha256 !== scoreStoreArtifactSha256) {
+      blockingReasons.push("ordinary-upload-score-provenance-store-changed-during-verification");
+    }
+  } catch {
+    blockingReasons.push("ordinary-upload-score-provenance-store-unreadable");
+  }
+  const scoreId = safeString(expectedScoreId).trim();
+  const score = (Array.isArray(store?.scores) ? store.scores : [])
+    .find((item) => safeString(item?.scoreId).trim() === scoreId);
+  if (!score) blockingReasons.push("ordinary-upload-score-provenance-score-missing");
+  const scorePayloadSha256 = score
+    ? crypto.createHash("sha256").update(canonicalJson(score), "utf8").digest("hex")
+    : "";
+  const expectedNotes = score ? buildScoreNoteIdentityRows(score) : [];
+  const noteCount = expectedNotes.length;
+  const noteIdentitySha256 = noteIdentityRowsSha256(expectedNotes);
+  const reportedSource = safeString(provenance?.scoreStorePath).trim().replace(/\\/g, "/");
+  const expectedSource = path.relative(repoRoot, sourcePath).replace(/\\/g, "/");
+  if (provenance?.scoreId !== scoreId) blockingReasons.push("ordinary-upload-score-provenance-id-mismatch");
+  if (provenance?.scorePayloadSha256 !== scorePayloadSha256) {
+    blockingReasons.push("ordinary-upload-score-provenance-payload-sha-mismatch");
+  }
+  if (reportedSource !== expectedSource) blockingReasons.push("ordinary-upload-score-provenance-source-mismatch");
+  if (safeNumber(provenance?.noteCount, -1) !== noteCount) {
+    blockingReasons.push("ordinary-upload-score-provenance-note-count-mismatch");
+  }
+  const reportedStoreSha256 = safeString(provenance?.scoreStoreArtifactSha256).trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(reportedStoreSha256)) {
+    blockingReasons.push("ordinary-upload-score-provenance-store-sha-invalid");
+  } else if (reportedStoreSha256 !== scoreStoreArtifactSha256) {
+    blockingReasons.push("ordinary-upload-score-provenance-store-sha-mismatch");
+  }
+  return {
+    verified: blockingReasons.length === 0,
+    blockingReasons: [...new Set(blockingReasons)],
+    value: {
+      scoreId,
+      scorePayloadSha256,
+      scoreStorePath: expectedSource,
+      scoreStoreArtifactSha256,
+      noteCount,
+      noteIdentitySha256,
+    },
+    expectedNotes,
+  };
+}
+
+function dynamicShadowNumber(evidence, key, errors, { min = null, max = null } = {}) {
+  if (!Object.hasOwn(evidence, key)) {
+    errors.push(`dynamic-shadow-field-missing:${key}`);
+    return null;
+  }
+  if (evidence[key] === null) return null;
+  const value = evidence[key];
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    errors.push(`dynamic-shadow-field-not-finite:${key}`);
+    return null;
+  }
+  if (min !== null && value < min) errors.push(`dynamic-shadow-field-below-minimum:${key}`);
+  if (max !== null && value > max) errors.push(`dynamic-shadow-field-above-maximum:${key}`);
+  return value;
+}
+
+function evaluateDynamicShadowEvidence(candidate = {}) {
+  const evidence = candidate?.dynamicShadowEvidence;
+  const errors = [];
+  if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) {
+    return {
+      contractVersion: ORDINARY_DYNAMIC_SHADOW_CONTRACT_VERSION,
+      policyVersion: ORDINARY_DYNAMIC_SHADOW_POLICY_VERSION,
+      timingMode: ORDINARY_DYNAMIC_SHADOW_TIMING_MODE,
+      decision: "shadow_invalid",
+      selected: false,
+      authorization: "telemetry_only",
+      contractValid: false,
+      blockingReasons: ["dynamic-shadow-evidence-missing"],
+      features: null,
+      energyVetoIncluded: false,
+      causalEnergyStatus: ORDINARY_DYNAMIC_SHADOW_CAUSAL_ENERGY_STATUS,
+    };
+  }
+
+  const contractVersion = safeString(evidence.contractVersion).trim();
+  const policyVersion = safeString(evidence.policyVersion).trim();
+  const timingMode = safeString(evidence.timingMode).trim();
+  if (contractVersion !== ORDINARY_DYNAMIC_SHADOW_CONTRACT_VERSION) {
+    errors.push("dynamic-shadow-contract-version-mismatch");
+  }
+  if (policyVersion !== ORDINARY_DYNAMIC_SHADOW_POLICY_VERSION) {
+    errors.push("dynamic-shadow-policy-version-mismatch");
+  }
+  if (timingMode !== ORDINARY_DYNAMIC_SHADOW_TIMING_MODE) {
+    errors.push("dynamic-shadow-timing-mode-mismatch");
+  }
+  if (typeof evidence.selected !== "boolean") {
+    errors.push("dynamic-shadow-selected-not-boolean");
+  }
+
+  const sourceBlockingReasons = Array.isArray(evidence.blockingReasons)
+    ? evidence.blockingReasons.filter((reason) => typeof reason === "string").map((reason) => reason.trim()).filter(Boolean)
+    : [];
+  if (!Array.isArray(evidence.blockingReasons)
+      || sourceBlockingReasons.length !== evidence.blockingReasons.length) {
+    errors.push("dynamic-shadow-blocking-reasons-malformed");
+  }
+
+  const features = {
+    pitchDistanceSemitones: dynamicShadowNumber(evidence, "pitchDistanceSemitones", errors, { min: 0 }),
+    eventConfidence: dynamicShadowNumber(evidence, "eventConfidence", errors, { min: 0, max: 1 }),
+    relativeIoiDeviationRatio: dynamicShadowNumber(evidence, "relativeIoiDeviationRatio", errors, { min: 0 }),
+    relativeEventConfidence: dynamicShadowNumber(evidence, "relativeEventConfidence", errors, { min: 0 }),
+    eventDurationSeconds: dynamicShadowNumber(evidence, "eventDurationSeconds", errors, { min: 0 }),
+    nearestSamePitchScoreDistanceQuarters: dynamicShadowNumber(
+      evidence,
+      "nearestSamePitchScoreDistanceQuarters",
+      errors,
+      { min: 0 },
+    ),
+    expectedDurationSeconds: dynamicShadowNumber(evidence, "expectedDurationSeconds", errors, { min: 0 }),
+    eventDurationRatio: dynamicShadowNumber(evidence, "eventDurationRatio", errors, { min: 0 }),
+  };
+  if (features.expectedDurationSeconds === 0) {
+    errors.push("dynamic-shadow-expected-duration-not-positive");
+  }
+  if (evidence.energyVetoIncluded !== false) {
+    errors.push("dynamic-shadow-energy-veto-state-invalid");
+  }
+  if (evidence.causalEnergyStatus !== ORDINARY_DYNAMIC_SHADOW_CAUSAL_ENERGY_STATUS) {
+    errors.push("dynamic-shadow-causal-energy-status-invalid");
+  }
+  if (features.eventDurationRatio !== null
+      && (features.eventDurationSeconds === null || features.expectedDurationSeconds === null)) {
+    errors.push("dynamic-shadow-duration-ratio-input-missing");
+  }
+  if (features.eventDurationRatio !== null
+      && features.eventDurationSeconds !== null
+      && features.expectedDurationSeconds !== null
+      && features.expectedDurationSeconds > 0) {
+    const expectedRatio = features.eventDurationSeconds / Math.max(0.15, features.expectedDurationSeconds);
+    if (Math.abs(features.eventDurationRatio - expectedRatio) > 0.001) {
+      errors.push("dynamic-shadow-duration-ratio-inconsistent");
+    }
+  }
+
+  const policySelected = features.pitchDistanceSemitones === 0
+    && features.eventConfidence !== null
+    && features.eventConfidence >= ORDINARY_DYNAMIC_SHADOW_POLICY.minEventConfidence
+    && features.relativeIoiDeviationRatio !== null
+    && features.relativeIoiDeviationRatio <= ORDINARY_DYNAMIC_SHADOW_POLICY.deviationLimit
+    && features.relativeEventConfidence !== null
+    && features.relativeEventConfidence >= ORDINARY_DYNAMIC_SHADOW_POLICY.minRelativeEventConfidence
+    && features.eventDurationSeconds !== null
+    && features.eventDurationSeconds >= ORDINARY_DYNAMIC_SHADOW_POLICY.minEventDurationSeconds
+    && features.expectedDurationSeconds !== null
+    && features.expectedDurationSeconds > 0
+    && features.eventDurationRatio !== null
+    && features.eventDurationRatio >= ORDINARY_DYNAMIC_SHADOW_POLICY.minEventDurationRatio
+    && (
+      features.nearestSamePitchScoreDistanceQuarters === null
+      || features.nearestSamePitchScoreDistanceQuarters >= ORDINARY_DYNAMIC_SHADOW_POLICY.minSamePitchScoreDistanceQuarters
+    );
+  if (typeof evidence.selected === "boolean" && evidence.selected !== policySelected) {
+    errors.push("dynamic-shadow-selected-policy-mismatch");
+  }
+  if (evidence.selected === true && sourceBlockingReasons.length > 0) {
+    errors.push("dynamic-shadow-selected-has-blocking-reasons");
+  }
+  if (evidence.selected === false && sourceBlockingReasons.length === 0) {
+    errors.push("dynamic-shadow-rejected-without-blocking-reason");
+  }
+
+  const contractValid = errors.length === 0;
+  const selected = contractValid && evidence.selected === true;
+  return {
+    contractVersion: contractVersion || ORDINARY_DYNAMIC_SHADOW_CONTRACT_VERSION,
+    policyVersion: policyVersion || ORDINARY_DYNAMIC_SHADOW_POLICY_VERSION,
+    timingMode: timingMode || ORDINARY_DYNAMIC_SHADOW_TIMING_MODE,
+    decision: contractValid ? (selected ? "shadow_selected" : "shadow_rejected") : "shadow_invalid",
+    selected,
+    authorization: "telemetry_only",
+    contractValid,
+    blockingReasons: [...new Set(contractValid ? sourceBlockingReasons : [...sourceBlockingReasons, ...errors])],
+    features,
+    energyVetoIncluded: false,
+    causalEnergyStatus: ORDINARY_DYNAMIC_SHADOW_CAUSAL_ENERGY_STATUS,
+  };
+}
+
+function buildRfTelemetry(candidateGate = {}) {
+  return {
+    mode: safeString(candidateGate.mode, "review_only"),
+    evaluated: candidateGate.mode === "confidence_rf",
+    authorizationIgnored: true,
+    ready: candidateGate.ready === true,
+    gateVersion: safeString(candidateGate.gateVersion),
+    modelVersion: safeString(candidateGate.modelVersion),
+    threshold: candidateGate.threshold ?? null,
+    evaluatedCandidateCount: Math.max(0, Math.round(safeNumber(candidateGate.evaluatedCandidateCount, 0))),
+    modelSelectedCandidateCount: Math.max(0, Math.round(safeNumber(candidateGate.modelAutoPassCandidateCount, 0))),
+    scopedSelectedCandidateCount: Math.max(0, Math.round(safeNumber(candidateGate.autoPassCandidateCount, 0))),
+  };
+}
+
+function evaluateBasicPitchCacheProvenance(
+  provenance,
+  expectedAudioSha256 = "",
+  artifactVerification = null,
+) {
+  const errors = [];
+  if (!provenance || typeof provenance !== "object" || Array.isArray(provenance)) {
+    return {
+      ready: false,
+      blockingReasons: ["ordinary-upload-basic-pitch-cache-provenance-missing"],
+      value: null,
+    };
+  }
+  const audioSha256 = safeString(provenance.audioSha256).trim().toLowerCase();
+  const modelVersion = safeString(provenance.modelVersion).trim();
+  const modelArtifactSha256 = safeString(provenance.modelArtifactSha256).trim().toLowerCase();
+  const inferenceVersion = safeString(provenance.inferenceVersion).trim();
+  const policyVersion = safeString(provenance.policyVersion).trim();
+  const runtimeId = safeString(provenance.runtimeId).trim();
+  const runtimeConfigSemanticSha256 = safeString(provenance.runtimeConfigSemanticSha256).trim().toLowerCase();
+  const runtimeRequirementsLockSha256 = safeString(provenance.runtimeRequirementsLockSha256).trim().toLowerCase();
+  const cachePath = safeString(provenance.cachePath).trim().replace(/\\/g, "/");
+  const cacheArtifactSha256 = safeString(provenance.cacheArtifactSha256).trim().toLowerCase();
+  const expectedAudio = safeString(expectedAudioSha256).trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(audioSha256)) {
+    errors.push("ordinary-upload-basic-pitch-audio-sha-invalid");
+  }
+  if (!/^[a-f0-9]{64}$/.test(expectedAudio)) {
+    errors.push("ordinary-upload-basic-pitch-expected-audio-sha-invalid");
+  } else if (audioSha256 !== expectedAudio) {
+    errors.push("ordinary-upload-basic-pitch-audio-sha-mismatch");
+  }
+  if (modelVersion !== ORDINARY_DYNAMIC_SHADOW_MODEL_VERSION) {
+    errors.push("ordinary-upload-basic-pitch-model-version-mismatch");
+  }
+  if (modelArtifactSha256 !== ORDINARY_DYNAMIC_SHADOW_MODEL_ARTIFACT_SHA256) {
+    errors.push("ordinary-upload-basic-pitch-model-artifact-mismatch");
+  }
+  if (inferenceVersion !== ORDINARY_DYNAMIC_SHADOW_INFERENCE_VERSION) {
+    errors.push("ordinary-upload-basic-pitch-inference-version-mismatch");
+  }
+  if (policyVersion !== ORDINARY_DYNAMIC_SHADOW_POLICY_VERSION) {
+    errors.push("ordinary-upload-basic-pitch-policy-version-mismatch");
+  }
+  if (runtimeId !== ORDINARY_AUDIO_RUNTIME_ID
+      || runtimeConfigSemanticSha256 !== ORDINARY_AUDIO_RUNTIME_CONFIG_SHA256
+      || runtimeRequirementsLockSha256 !== ORDINARY_AUDIO_RUNTIME_LOCK_SHA256) {
+    errors.push("ordinary-upload-basic-pitch-runtime-identity-mismatch");
+  }
+  if (provenance.cacheSource !== "content-addressed-cache") {
+    errors.push("ordinary-upload-basic-pitch-cache-source-invalid");
+  }
+  if (typeof provenance.cacheHit !== "boolean") {
+    errors.push("ordinary-upload-basic-pitch-cache-hit-invalid");
+  }
+  if (provenance.identityBound !== true) {
+    errors.push("ordinary-upload-basic-pitch-cache-identity-unbound");
+  }
+  if (!/^[a-f0-9]{64}$/.test(cacheArtifactSha256)) {
+    errors.push("ordinary-upload-basic-pitch-cache-artifact-sha-invalid");
+  }
+  const expectedCachePrefix = `${ORDINARY_DYNAMIC_SHADOW_CACHE_ROOT}${audioSha256}-`;
+  if (!cachePath
+      || path.isAbsolute(cachePath)
+      || cachePath.includes("../")
+      || !cachePath.startsWith(expectedCachePrefix)
+      || !cachePath.endsWith(".basic-pitch.json")) {
+    errors.push("ordinary-upload-basic-pitch-cache-path-invalid");
+  }
+  if (artifactVerification?.verified !== true) {
+    errors.push("ordinary-upload-basic-pitch-cache-artifact-not-verified");
+    errors.push(...(artifactVerification?.blockingReasons || []));
+  }
+  return {
+    ready: errors.length === 0,
+    blockingReasons: [...new Set(errors)],
+    value: {
+      audioSha256,
+      modelVersion,
+      modelArtifactSha256,
+      inferenceVersion,
+      policyVersion,
+      runtimeId,
+      runtimeConfigSemanticSha256,
+      runtimeRequirementsLockSha256,
+      cachePath,
+      cacheArtifactSha256,
+      cacheHit: provenance.cacheHit === true,
+      cacheSource: safeString(provenance.cacheSource),
+      identityBound: provenance.identityBound === true,
+    },
+  };
+}
+
+function evaluateOrdinaryAudioRuntimeAttestation(attestation) {
+  const value = attestation && typeof attestation === "object" && !Array.isArray(attestation)
+    ? {
+        ready: attestation.ready === true,
+        runtimeId: safeString(attestation.runtimeId).trim(),
+        configSemanticSha256: safeString(attestation.configSemanticSha256).trim().toLowerCase(),
+        requirementsLockSha256: safeString(attestation.requirementsLockSha256).trim().toLowerCase(),
+        modelArtifactSha256: safeString(attestation.modelArtifactSha256).trim().toLowerCase(),
+        studentFacing: attestation.studentFacing,
+        automaticAdoptionAuthorized: attestation.automaticAdoptionAuthorized,
+      }
+    : null;
+  const verified = value?.ready === true
+    && value.runtimeId === ORDINARY_AUDIO_RUNTIME_ID
+    && value.configSemanticSha256 === ORDINARY_AUDIO_RUNTIME_CONFIG_SHA256
+    && value.requirementsLockSha256 === ORDINARY_AUDIO_RUNTIME_LOCK_SHA256
+    && value.modelArtifactSha256 === ORDINARY_DYNAMIC_SHADOW_MODEL_ARTIFACT_SHA256
+    && value.studentFacing === false
+    && value.automaticAdoptionAuthorized === false;
+  return {
+    verified,
+    blockingReasons: verified ? [] : ["ordinary-upload-audio-runtime-attestation-invalid"],
+    value,
+  };
+}
+
+export function buildOrdinaryDynamicShadowReviewGate(
+  candidateRows = [],
+  rfCandidateGate = {},
+  {
+    basicPitchCacheProvenance = null,
+    expectedAudioSha256 = "",
+    cacheArtifactVerification = null,
+    scoreVerification = null,
+    runtimeAttestationVerification = null,
+  } = {},
+) {
+  const cacheProvenance = evaluateBasicPitchCacheProvenance(
+    basicPitchCacheProvenance,
+    expectedAudioSha256,
+    cacheArtifactVerification,
+  );
+  const inputRows = Array.isArray(candidateRows) ? candidateRows : [];
+  const expectedScoreNoteCount = Number(scoreVerification?.value?.noteCount);
+  const expectedScoreNotes = Array.isArray(scoreVerification?.expectedNotes)
+    ? scoreVerification.expectedNotes
+    : [];
+  const candidateNoteIdentities = buildCandidateNoteIdentityRows(inputRows);
+  const candidateNoteIdentitySha256 = noteIdentityRowsSha256(candidateNoteIdentities);
+  const scoreNoteIdentitySha256 = safeString(scoreVerification?.value?.noteIdentitySha256).trim().toLowerCase();
+  const scoreNoteIdentityReady = scoreVerification?.verified === true
+    && expectedScoreNoteCount > 0
+    && /^[a-f0-9]{64}$/.test(scoreNoteIdentitySha256)
+    && expectedScoreNotes.length === expectedScoreNoteCount
+    && candidateNoteIdentities.length === expectedScoreNotes.length
+    && candidateNoteIdentities.every((candidate, index) => (
+      candidate.noteIndex === index
+      && candidate.noteIndex === expectedScoreNotes[index]?.noteIndex
+      && candidate.noteId !== ""
+      && candidate.noteId === expectedScoreNotes[index]?.noteId
+      && candidate.sectionId !== ""
+      && candidate.sectionId === expectedScoreNotes[index]?.sectionId
+      && candidate.measureIndex === expectedScoreNotes[index]?.measureIndex
+      && candidate.midi === expectedScoreNotes[index]?.midi
+    ))
+    && candidateNoteIdentitySha256 === scoreNoteIdentitySha256;
+  const completeScoreCoverage = Number.isInteger(expectedScoreNoteCount)
+    && expectedScoreNoteCount > 0
+    && inputRows.length === expectedScoreNoteCount
+    && scoreNoteIdentityReady;
+  const rows = inputRows.map((candidate) => {
+    const dynamicShadowDecision = evaluateDynamicShadowEvidence(candidate);
+    const gateReason = dynamicShadowDecision.contractValid
+      && cacheProvenance.ready
+      && scoreVerification?.verified === true
+      && runtimeAttestationVerification?.verified === true
+      && completeScoreCoverage
+      ? "ordinary-upload-dynamic-shadow-review-only"
+      : "ordinary-upload-dynamic-shadow-evidence-invalid";
+    return {
+      ...candidate,
+      dynamicShadowDecision,
+      autoDecision: "review_required",
+      confidenceScore: 0,
+      gateDecision: "review_required",
+      gateReason,
+      gateVersion: ORDINARY_DYNAMIC_SHADOW_GATE_VERSION,
+      reviewRequiredReason: gateReason,
+      studentSafeGateReady: false,
+      studentFacing: false,
+    };
+  });
+  const validEvidenceCount = rows.filter((candidate) => candidate.dynamicShadowDecision.contractValid).length;
+  const shadowSelectedCandidateCount = rows.filter((candidate) => candidate.dynamicShadowDecision.selected).length;
+  const invalidEvidenceCount = rows.length - validEvidenceCount;
+  const contractReady = rows.length > 0
+    && invalidEvidenceCount === 0
+    && cacheProvenance.ready
+    && scoreVerification?.verified === true
+    && runtimeAttestationVerification?.verified === true
+    && completeScoreCoverage;
+  const blockingReasons = [
+    "ordinary-upload-dynamic-shadow-review-only",
+    "ordinary-upload-dynamic-shadow-energy-veto-not-included",
+    !contractReady ? "ordinary-upload-dynamic-shadow-evidence-invalid" : "",
+    ...cacheProvenance.blockingReasons,
+    ...(scoreVerification?.verified === true
+      ? []
+      : [
+          "ordinary-upload-score-provenance-not-verified",
+          ...(scoreVerification?.blockingReasons || []),
+        ]),
+    !completeScoreCoverage ? "ordinary-upload-dynamic-shadow-incomplete-score-coverage" : "",
+    !scoreNoteIdentityReady ? "ordinary-upload-dynamic-shadow-score-note-identity-mismatch" : "",
+    ...(runtimeAttestationVerification?.verified === true
+      ? []
+      : (runtimeAttestationVerification?.blockingReasons || ["ordinary-upload-audio-runtime-attestation-invalid"])),
+  ].filter(Boolean);
+  return {
+    rows,
+    gate: {
+      gateVersion: ORDINARY_DYNAMIC_SHADOW_GATE_VERSION,
+      ready: false,
+      authorizationReady: false,
+      automaticAdoptionAuthorized: false,
+      studentSafeGateReady: false,
+      studentFacing: false,
+      mode: "dynamic_shadow_review_only",
+      reason: !contractReady
+        ? "ordinary-upload-dynamic-shadow-evidence-invalid"
+        : "ordinary-upload-dynamic-shadow-review-only",
+      blockingReasons,
+      evaluatedCandidateCount: rows.length,
+      autoPassCandidateCount: 0,
+      reviewRequiredCandidateCount: rows.length,
+      contractVersion: ORDINARY_DYNAMIC_SHADOW_CONTRACT_VERSION,
+      policyVersion: ORDINARY_DYNAMIC_SHADOW_POLICY_VERSION,
+      timingMode: ORDINARY_DYNAMIC_SHADOW_TIMING_MODE,
+      policy: { ...ORDINARY_DYNAMIC_SHADOW_POLICY },
+      contractReady,
+      validEvidenceCount,
+      invalidEvidenceCount,
+      shadowSelectedCandidateCount,
+      cacheProvenanceReady: cacheProvenance.ready,
+      cacheArtifactVerified: cacheArtifactVerification?.verified === true,
+      basicPitchCacheProvenance: cacheProvenance.value,
+      scoreProvenanceReady: scoreVerification?.verified === true,
+      scoreProvenance: scoreVerification?.value || null,
+      expectedScoreNoteCount: Number.isInteger(expectedScoreNoteCount) ? expectedScoreNoteCount : 0,
+      completeScoreCoverage,
+      scoreNoteIdentityReady,
+      scoreNoteIdentitySha256,
+      candidateNoteIdentitySha256,
+      runtimeAttestationReady: runtimeAttestationVerification?.verified === true,
+      runtimeAttestation: runtimeAttestationVerification?.value || null,
+      energyVetoIncluded: false,
+      causalEnergyStatus: ORDINARY_DYNAMIC_SHADOW_CAUSAL_ENERGY_STATUS,
+      rfTelemetry: buildRfTelemetry(rfCandidateGate),
+      allowedDiagnosticCategories: [],
+      reviewOnlyDiagnosticCategories: ["candidate-evidence", "pitch", "onset", "missing", "duration", "extra"],
+    },
+  };
 }
 
 function ordinaryUploadConfidenceGateEnabled() {
@@ -709,6 +1328,22 @@ async function fileExists(targetPath) {
   }
 }
 
+async function sha256File(targetPath) {
+  const handle = await fs.open(targetPath, "r");
+  const hash = crypto.createHash("sha256");
+  const buffer = Buffer.allocUnsafe(1024 * 1024);
+  try {
+    while (true) {
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, null);
+      if (bytesRead === 0) break;
+      hash.update(buffer.subarray(0, bytesRead));
+    }
+  } finally {
+    await handle.close();
+  }
+  return hash.digest("hex");
+}
+
 async function buildBatchGateSnapshot(repoRoot) {
   const sequenceGate = await readStudentGate(repoRoot);
   const realStudentGate = await readRealStudentGate(repoRoot);
@@ -759,7 +1394,6 @@ async function buildControlledBatchItem(repoRoot, submission, gateSnapshot, {
     : [
       scoreId ? "" : "controlled-batch-missing-score",
       audioExists ? "" : "controlled-batch-missing-audio",
-      gateSnapshot.ready ? "" : "controlled-batch-release-gates-not-ready",
     ].filter(Boolean);
   const replay = blockingReasons.length
     ? {
@@ -772,7 +1406,7 @@ async function buildControlledBatchItem(repoRoot, submission, gateSnapshot, {
         batchRunId,
         runPhotoScoreAnalysis,
       })
-      : await buildControlledBatchReplayAnalysis(repoRoot, submission, { batchRunId });
+      : await buildControlledBatchCleanScoreAnalysis(repoRoot, submission, { batchRunId });
   return {
     submissionId: safeString(submission.submissionId),
     kind,
@@ -784,6 +1418,7 @@ async function buildControlledBatchItem(repoRoot, submission, gateSnapshot, {
     recordingId,
     instrument,
     audioHash: safeString(submission.audioHash),
+    analysisAudioSha256: safeString(replay.analysisAudioSha256),
     audioSubmission: submission.audioSubmission || null,
     inputStatus: "accepted_for_batch",
     analysisStatus: replay.status,
@@ -794,6 +1429,7 @@ async function buildControlledBatchItem(repoRoot, submission, gateSnapshot, {
     decisionCount: replay.decisionCount || 0,
     candidateRowCount: replay.candidateRowCount || 0,
     candidateRowsPath: replay.candidateRowsPath || "",
+    candidateRowsSha256: safeString(replay.candidateRowsSha256),
     candidateGate: replay.candidateGate || null,
     candidatePreview: Array.isArray(replay.candidatePreview) ? replay.candidatePreview : [],
     recordingDiagnosis: replay.recordingDiagnosis || null,
@@ -803,53 +1439,8 @@ async function buildControlledBatchItem(repoRoot, submission, gateSnapshot, {
   };
 }
 
-async function buildControlledBatchReplayAnalysis(repoRoot, submission, { batchRunId = "" } = {}) {
-  const dataset = safeString(submission.dataset).trim();
-  const piece = safeString(submission.piece).trim();
-  const recordingId = safeString(submission.recordingId).trim();
-  if (!dataset || !piece) {
-    return buildControlledBatchOfflineFeatureAnalysis(repoRoot, submission, { batchRunId });
-  }
-  try {
-    const analysis = await buildWesternStudentAnalysis({
-      repoRoot,
-      dataset,
-      piece,
-      recordingId,
-      limit: Math.max(0, Math.round(safeNumber(submission.limit, 20))),
-    });
-    if (analysis.studentReady !== true) {
-      return {
-        produced: false,
-        status: "review_required",
-        reasons: [
-          ...(Array.isArray(analysis.blockingReasons) ? analysis.blockingReasons.map((item) => safeString(item)).filter(Boolean) : []),
-          "controlled-batch-gated-analysis-not-ready",
-        ],
-      };
-    }
-    const replayDecisions = Array.isArray(analysis.decisions) ? analysis.decisions : [];
-    if (replayDecisions.length === 0) {
-      return buildControlledBatchOfflineFeatureAnalysis(repoRoot, submission, { batchRunId });
-    }
-    return {
-      produced: true,
-      status: "offline_analysis_ready",
-      reasons: ["controlled-batch-not-student-facing"],
-      summary: analysis.summary || null,
-      decisionCount: replayDecisions.length,
-      candidateRowCount: replayDecisions.length,
-      candidatePreview: [],
-      recordingDiagnosis: analysis.recordingDiagnosis || null,
-    };
-  } catch (error) {
-    return {
-      produced: false,
-      status: "failed",
-      reasons: ["controlled-batch-offline-analysis-failed"],
-      error: safeString(error?.message || error),
-    };
-  }
+async function buildControlledBatchCleanScoreAnalysis(repoRoot, submission, { batchRunId = "" } = {}) {
+  return buildControlledBatchOfflineFeatureAnalysis(repoRoot, submission, { batchRunId });
 }
 
 function parseJsonFromStdout(stdout) {
@@ -867,17 +1458,16 @@ function parseJsonFromStdout(stdout) {
   return null;
 }
 
-async function runOfflineFeatureAnalyzer(repoRoot, submission) {
+export function buildOfflineFeatureAnalyzerArgs(repoRoot, submission) {
   const scoreId = safeString(submission.scoreId).trim();
   const audioPath = safeString(submission.audioPath).trim();
   const scriptPath = path.join(SOURCE_ROOT, "scripts", "experiments", "run_western_strings_offline_feature_analysis.py");
-  const runnerPath = path.join(SOURCE_ROOT, "scripts", "run-python.ps1");
-  const args = [
-    "-ExecutionPolicy",
-    "Bypass",
-    "-File",
+  const runnerPath = path.join(SOURCE_ROOT, "scripts", "run-western-ordinary-audio-python.mjs");
+  return [
     runnerPath,
+    "--script",
     scriptPath,
+    "--",
     "--repo-root",
     repoRoot,
     "--score-id",
@@ -885,9 +1475,15 @@ async function runOfflineFeatureAnalyzer(repoRoot, submission) {
     "--audio",
     audioPath,
     "--limit",
-    String(Math.max(0, Math.round(safeNumber(submission.limit, 20)))),
+    "0",
+    "--timing-mode",
+    ORDINARY_DYNAMIC_SHADOW_TIMING_MODE,
   ];
-  const { stdout, stderr } = await execFileAsync("powershell.exe", args, {
+}
+
+async function runOfflineFeatureAnalyzer(repoRoot, submission) {
+  const args = buildOfflineFeatureAnalyzerArgs(repoRoot, submission);
+  const { stdout, stderr } = await execFileAsync(process.execPath, args, {
     cwd: SOURCE_ROOT,
     timeout: Math.max(10000, Math.round(safeNumber(process.env.WESTERN_STRINGS_OFFLINE_ANALYZER_TIMEOUT_MS, 120000))),
     maxBuffer: 10 * 1024 * 1024,
@@ -1016,6 +1612,7 @@ async function buildControlledBatchOfflineFeatureAnalysis(repoRoot, submission, 
     };
   }
   try {
+    const expectedAudioSha256 = await sha256File(audioPath);
     const analysis = await runOfflineFeatureAnalyzer(repoRoot, submission);
     if (analysis?.ok !== true) {
       return {
@@ -1028,41 +1625,79 @@ async function buildControlledBatchOfflineFeatureAnalysis(repoRoot, submission, 
       };
     }
     const candidateRows = Array.isArray(analysis.candidateRows) ? analysis.candidateRows : [];
-    const candidateGate = await evaluateOfflineFeatureStudentSafeGate(repoRoot, candidateRows, submission, { batchRunId });
-    const gateInputRows = Array.isArray(candidateGate.scoredCandidateRows) ? candidateGate.scoredCandidateRows : candidateRows;
-    const gatedCandidateRows = applyOfflineFeatureStudentSafeGate(gateInputRows, candidateGate);
-    const candidateRowsPath = await writeControlledSubmissionCandidateRows(repoRoot, {
+    const basicPitchCacheProvenance = analysis?.basicPitchCacheProvenance
+      && typeof analysis.basicPitchCacheProvenance === "object"
+      ? analysis.basicPitchCacheProvenance
+      : null;
+    const [cacheArtifactVerification, scoreVerification] = await Promise.all([
+      verifyBasicPitchCacheArtifact(repoRoot, basicPitchCacheProvenance, expectedAudioSha256),
+      verifyScoreProvenance(repoRoot, analysis?.scoreProvenance, scoreId),
+    ]);
+    const runtimeAttestationVerification = evaluateOrdinaryAudioRuntimeAttestation(
+      analysis?.runtimeAttestation,
+    );
+    const rfCandidateGate = await evaluateOfflineFeatureStudentSafeGate(repoRoot, candidateRows, submission, { batchRunId });
+    const gateInputRows = Array.isArray(rfCandidateGate.scoredCandidateRows) ? rfCandidateGate.scoredCandidateRows : candidateRows;
+    const dynamicShadow = buildOrdinaryDynamicShadowReviewGate(gateInputRows, rfCandidateGate, {
+      basicPitchCacheProvenance,
+      expectedAudioSha256,
+      cacheArtifactVerification,
+      scoreVerification,
+      runtimeAttestationVerification,
+    });
+    const candidateGate = dynamicShadow.gate;
+    const gatedCandidateRows = dynamicShadow.rows;
+    const candidateRowsArtifact = await writeControlledSubmissionCandidateRows(repoRoot, {
       batchRunId,
       submissionId: submission.submissionId,
       candidateRows: gatedCandidateRows,
+      candidateGate,
     });
-    const autoPassCandidateCount = gatedCandidateRows.filter((candidate) => candidate.autoDecision === "auto_pass").length;
     return {
       produced: true,
-      status: candidateGate.ready ? "offline_feature_confidence_ready" : "offline_feature_review_ready",
-      reasons: [candidateGate.ready ? "controlled-batch-offline-feature-confidence-gate-ready" : "controlled-batch-offline-feature-review-only"],
-      autoDiagnosisIssued: candidateGate.ready && autoPassCandidateCount > 0,
+      status: "offline_feature_review_ready",
+      reasons: [candidateGate.reason],
+      autoDiagnosisIssued: false,
       summary: {
         ...(analysis.summary || {}),
-        autoPassCount: autoPassCandidateCount,
-        reviewOnlyCandidateCount: Math.max(0, gatedCandidateRows.length - autoPassCandidateCount),
-        studentSafeGateReady: candidateGate.ready,
-        studentSafeCandidateGateReady: candidateGate.ready,
+        shadowTelemetryCoverage: candidateGate.evaluatedCandidateCount > 0
+          ? Number((candidateGate.shadowSelectedCandidateCount / candidateGate.evaluatedCandidateCount).toFixed(6))
+          : 0,
+        coverage: 0,
+        autoPassCount: 0,
+        reviewOnlyCandidateCount: gatedCandidateRows.length,
+        studentSafeGateReady: false,
+        studentSafeCandidateGateReady: false,
+        studentFacing: false,
+        autoDiagnosisIssued: false,
+        automaticAdoptionAuthorized: false,
+        basicPitchCacheProvenance: candidateGate.basicPitchCacheProvenance,
+        scoreProvenance: candidateGate.scoreProvenance,
         studentSafeCandidateGateVersion: candidateGate.gateVersion,
-        confidenceModelVersion: safeString(candidateGate.modelVersion),
-        confidenceThreshold: candidateGate.threshold ?? null,
+        dynamicShadowContractReady: candidateGate.contractReady,
+        dynamicShadowCacheProvenanceReady: candidateGate.cacheProvenanceReady,
+        dynamicShadowScoreProvenanceReady: candidateGate.scoreProvenanceReady,
+        dynamicShadowSelectedCandidateCount: candidateGate.shadowSelectedCandidateCount,
+        dynamicShadowInvalidEvidenceCount: candidateGate.invalidEvidenceCount,
+        confidenceModelVersion: safeString(candidateGate.rfTelemetry?.modelVersion),
+        confidenceThreshold: candidateGate.rfTelemetry?.threshold ?? null,
       },
       decisionCount: Array.isArray(analysis.decisions) ? analysis.decisions.length : 0,
       candidateRowCount: candidateRows.length,
-      candidateRowsPath,
+      candidateRowsPath: candidateRowsArtifact.path,
+      candidateRowsSha256: candidateRowsArtifact.sha256,
+      analysisAudioSha256: expectedAudioSha256,
       candidateGate,
       candidatePreview: gatedCandidateRows.slice(0, 5),
       recordingDiagnosis: {
-        mode: candidateGate.ready ? "offline_feature_confidence_gate" : "offline_feature_review_only",
+        mode: "offline_feature_dynamic_shadow_review_only",
         scoreId,
-        audioHash: safeString(submission.audioHash),
-        autoDiagnosisIssued: candidateGate.ready && autoPassCandidateCount > 0,
-        autoPassCandidateCount,
+        audioSha256: expectedAudioSha256,
+        audioHashAlgorithm: "sha256",
+        autoDiagnosisIssued: false,
+        autoPassCandidateCount: 0,
+        shadowSelectedCandidateCount: candidateGate.shadowSelectedCandidateCount,
+        basicPitchCacheProvenance: candidateGate.basicPitchCacheProvenance,
       },
     };
   } catch (error) {
@@ -1145,32 +1780,6 @@ async function evaluateOfflineFeatureStudentSafeGate(repoRoot, candidateRows = [
   };
 }
 
-function applyOfflineFeatureStudentSafeGate(candidateRows = [], candidateGate = {}) {
-  return (Array.isArray(candidateRows) ? candidateRows : []).map((candidate) => {
-    const selected = candidateGate.ready === true
-      && (typeof candidate.controlledPilotScopeSelected === "boolean"
-        ? candidate.controlledPilotScopeSelected
-        : candidate.confidenceSelected === true);
-    const gateReason = selected
-      ? "ordinary-upload-confidence-gate-auto-pass"
-      : safeString(
-          candidate.controlledPilotScopeReason,
-          safeString(candidateGate.reason, "ordinary-upload-student-safe-gate-not-calibrated"),
-        );
-    return {
-      ...candidate,
-      autoDecision: selected ? "auto_pass" : "review_required",
-      confidenceScore: selected ? safeNumber(candidate.confidenceProbability, 0) : 0,
-      gateDecision: selected ? "auto_pass" : "review_required",
-      gateReason,
-      gateVersion: safeString(candidateGate.gateVersion, OFFLINE_FEATURE_STUDENT_GATE_VERSION),
-      reviewRequiredReason: selected ? "" : gateReason,
-      studentSafeGateReady: candidateGate.ready === true,
-      studentFacing: selected,
-    };
-  });
-}
-
 export async function runWesternControlledSubmissionBatch({
   repoRoot = process.cwd(),
   limit = 20,
@@ -1205,7 +1814,6 @@ export async function runWesternControlledSubmissionBatch({
   const autoDiagnosisIssued = items.some((item) => item.autoDiagnosisIssued === true);
   const hasValidatedReplay = items.some((item) => item.analysisStatus === "offline_analysis_ready");
   const hasFeatureReview = items.some((item) => item.analysisStatus === "offline_feature_review_ready");
-  const hasFeatureConfidence = items.some((item) => item.analysisStatus === "offline_feature_confidence_ready");
   const hasPhotoScoreReview = items.some((item) => item.analysisStatus === "photo_score_review_ready");
   const run = {
     batchRunId,
@@ -1218,9 +1826,7 @@ export async function runWesternControlledSubmissionBatch({
     status: items.length
       ? (hasValidatedReplay
         ? "offline_analysis_ready"
-        : hasFeatureConfidence
-          ? "offline_feature_confidence_ready"
-          : hasFeatureReview
+        : hasFeatureReview
             ? "offline_feature_review_ready"
             : hasPhotoScoreReview
               ? "photo_score_review_ready"

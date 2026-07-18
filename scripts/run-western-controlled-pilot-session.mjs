@@ -4,7 +4,6 @@ import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
 import { buildControlledPilotStartPreflight } from "./run-western-controlled-pilot-start-preflight.mjs";
-import { runOrdinaryMonitoredPilotReviewPack } from "./run-western-ordinary-monitored-pilot-review-pack.mjs";
 import { buildProjectStatus } from "./status-western-strings-project.mjs";
 
 const ENABLE_ENV = "WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE";
@@ -205,7 +204,9 @@ export async function runControlledPilotSession(args = {}, dependencies = {}) {
   const precisionSummary = path.join(sessionDir, "precision-summary.json");
   const reviewDir = path.join(sessionDir, "targeted-review");
   const buildPreflight = dependencies.buildPreflight || buildControlledPilotStartPreflight;
-  const runPrecisionSession = dependencies.runPrecisionSession || runOrdinaryMonitoredPilotReviewPack;
+  const runDynamicShadowPilotSession = dependencies.runDynamicShadowPilotSession
+    || dependencies.runPrecisionSession
+    || null;
   const buildStatus = dependencies.buildStatus || buildProjectStatus;
   const refreshReleaseReview = dependencies.refreshReleaseReview || (() => runNpmScript("western:release-review"));
   const loadHistory = dependencies.loadHistoricalRecordingIds || loadHistoricalRecordingIds;
@@ -247,11 +248,14 @@ export async function runControlledPilotSession(args = {}, dependencies = {}) {
   if (preflight.okToStartControlledPilot !== true) {
     blockingReasons.push(...(preflight.blockingReasons || []));
   }
+  if (execute && typeof runDynamicShadowPilotSession !== "function") {
+    blockingReasons.push("ordinary-dynamic-shadow-pilot-executor-not-implemented");
+  }
 
   try {
     if (execute && blockingReasons.length === 0) {
       executionPerformed = true;
-      precision = await runPrecisionSession({
+      precision = await runDynamicShadowPilotSession({
         batchLimit: limit,
         outDir: reviewDir,
         selectionJson,
