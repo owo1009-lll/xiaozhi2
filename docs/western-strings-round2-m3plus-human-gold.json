@@ -11,5 +11,167 @@
       "vibratoExpectedLongNoteCount": 17,
       "evidence": "The performer confirmed that all six score-marked trills were played and the remaining long notes used vibrato."
     }
+  ],
+  "intonationGoldUnits": [
+    {
+      "recordingId": "m3p-04",
+      "measure": 5,
+      "unitIndex": 8,
+      "pitchAccuracyLabel": "in-tune",
+      "intonationGoldVerified": true,
+      "notes": ""
+    },
+    {
+      "recordingId": "m3p-04",
+      "measure": 6,
+      "unitIndex": 10,
+      "pitchAccuracyLabel": "in-tune",
+      "intonationGoldVerified": true,
+      "notes": ""
+    },
+    {
+      "recordingId": "m3p-04",
+      "measure": 7,
+      "unitIndex": 12,
+      "pitchAccuracyLabel": "in-tune",
+      "intonationGoldVerified": true,
+      "notes": ""
+    },
+    {
+      "recordingId": "m3p-04",
+      "measure": 8,
+      "unitIndex": 14,
+      "pitchAccuracyLabel": "in-tune",
+      "intonationGoldVerified": true,
+      "notes": ""
+    },
+    {
+      "recordingId": "m3p-01",
+      "measure": 5,
+      "unitIndex": 4,
+      "pitchAccuracyLabel": "in-tune",
+      "intonationGoldVerified": true,
+      "notes": ""
+    },
+    {
+      "recordingId": "m3p-01",
+      "measure": 6,
+      "unitIndex": 5,
+      "pitchAccuracyLabel": "in-tune",
+      "intonationGoldVerified": true,
+      "notes": ""
+    },
+    {
+      "recordingId": "m3p-01",
+      "measure": 7,
+      "unitIndex": 6,
+      "pitchAccuracyLabel": "in-tune",
+      "intonationGoldVerified": true,
+      "notes": ""
+    },
+    {
+      "recordingId": "m3p-01",
+      "measure": 8,
+      "unitIndex": 7,
+      "pitchAccuracyLabel": "in-tune",
+      "intonationGoldVerified": true,
+      "notes": ""
+    },
+    {
+      "recordingId": "m3p-03",
+      "measure": 5,
+      "unitIndex": 9,
+      "pitchAccuracyLabel": "in-tune",
+      "intonationGoldVerified": true,
+      "notes": ""
+    },
+    {
+      "recordingId": "m3p-03",
+      "measure": 6,
+      "unitIndex": 11,
+      "pitchAccuracyLabel": "in-tune",
+      "intonationGoldVerified": true,
+      "notes": ""
+    },
+    {
+      "recordingId": "m3p-03",
+      "measure": 7,
+      "unitIndex": 13,
+      "pitchAccuracyLabel": "in-tune",
+      "intonationGoldVerified": true,
+      "notes": ""
+    },
+    {
+      "recordingId": "m3p-03",
+      "measure": 8,
+      "unitIndex": 15,
+      "pitchAccuracyLabel": "in-tune",
+      "intonationGoldVerified": true,
+      "notes": ""
+    },
+    {
+      "recordingId": "m3p-04",
+      "measure": 5,
+      "unitIndex": 9,
+      "pitchAccuracyLabel": "in-tune",
+      "intonationGoldVerified": true,
+      "notes": ""
+    },
+    {
+      "recordingId": "m3p-04",
+      "measure": 6,
+      "unitIndex": 11,
+      "pitchAccuracyLabel": "in-tune",
+      "intonationGoldVerified": true,
+      "notes": ""
+    },
+    {
+      "recordingId": "m3p-04",
+      "measure": 7,
+      "unitIndex": 13,
+      "pitchAccuracyLabel": "in-tune",
+      "intonationGoldVerified": true,
+      "notes": ""
+    },
+    {
+      "recordingId": "m3p-04",
+      "measure": 8,
+      "unitIndex": 15,
+      "pitchAccuracyLabel": "in-tune",
+      "intonationGoldVerified": true,
+      "notes": ""
+    },
+    {
+      "recordingId": "m3p-02",
+      "measure": 5,
+      "unitIndex": 8,
+      "pitchAccuracyLabel": "in-tune",
+      "intonationGoldVerified": true,
+      "notes": ""
+    },
+    {
+      "recordingId": "m3p-02",
+      "measure": 6,
+      "unitIndex": 10,
+      "pitchAccuracyLabel": "in-tune",
+      "intonationGoldVerified": true,
+      "notes": ""
+    },
+    {
+      "recordingId": "m3p-02",
+      "measure": 7,
+      "unitIndex": 12,
+      "pitchAccuracyLabel": "in-tune",
+      "intonationGoldVerified": true,
+      "notes": ""
+    },
+    {
+      "recordingId": "m3p-02",
+      "measure": 8,
+      "unitIndex": 14,
+      "pitchAccuracyLabel": "in-tune",
+      "intonationGoldVerified": true,
+      "notes": ""
+    }
   ]
 }
