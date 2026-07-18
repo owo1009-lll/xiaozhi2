@@ -31,9 +31,9 @@
 - 普通音频运行时已迁到独立 `data/tools/western-ordinary-dynamic-shadow-py311/`:禁止 system/user site,完整依赖集与 requirements lock 精确绑定,Basic Pitch SavedModel 三文件 tree SHA-256=`c6595f299ff83c52e89555789f7e3e829a6a0f25b6a88f7e99073af5a2470dc4`。config 语义 SHA、lock SHA 与模型 tree SHA 另由代码常量锚定,不能通过同步改写 manifest 自签名降级;每次分析还把 launcher attestation 写入 cache/candidate artifact。它不与 HOMR 的 NumPy>=2.4 环境共享。venv 本体仍位于 gitignored `data/tools/`,新检出环境须运行 `npm run western:ordinary-dynamic-shadow-runtime-setup`;未配置时 preflight 按设计失败。
 - 服务端会独立计算上传音频 SHA-256,并复核 cache realpath、同一字节的 artifact SHA、内部 cache/runtime identity、模型 hash、策略版本及当前 score payload SHA。ordinary 路径强制 `limit=0`;除候选行数必须等于当前 score 的完整音符数外,还逐音核对唯一连续的 `noteIndex=0..N-1` 以及 `noteId/sectionId/measureIndex/midi`,并绑定两侧 identity digest。截断、重复一音或漏一音都不能把局部覆盖率伪装成全曲接受性。candidate artifact 自身再写入 SHA-256;二次审计会重读当前 score store 和全部候选行,不再只相信前 5 条 preview。
 - 二次审计还把 artifact 内部 `batchRunId/submissionId`、scoreId、audio SHA 与 batch item 逐项绑定;JSONL 物理尾行损坏、跨提交替换、symlink/路径错位、同批 legacy ordinary status 或任一 item 尝试自动诊断都会失败,不会回退上一条“好记录”。
-- r3 接受性合同骨架要求固定 `r3-02/r3-03`、冷 miss/热 hit、完整 score 行数+逐音 identity、内容哈希、候选覆盖、全行 review-only、全 artifact 审计和整体 evidence digest。当前 live artifact verifier 尚未实现,验证器显式加入 `ordinary-dynamic-shadow-r3-live-artifact-verifier-not-implemented`,所以即使伪造一份字段完整且 digest 自洽的报告也不能开绿;下一阶段必须先实现实际文件重读/重算再消费 reserve take。旧 RF session 聚合已移入 `historicalEvidence`,当前计数和 `v2AlphaGate.ready` 固定为 0/false。
+- r3 接受性合同骨架要求固定 `r3-02/r3-03`、冷 miss/热 hit、完整 score 行数+逐音 identity、内容哈希、候选覆盖、全行 review-only、全 artifact 审计和整体 evidence digest。live artifact verifier 已于 2026-07-18 实现并接入 status(每次构建重读/重算全部引用产物);字段完整且 digest 自洽的伪造报告仍不能开绿,因为逐产物哈希、runtime identity、逐行策略重算与 candidate evidence digest 都会被独立复核。旧 RF session 聚合已移入 `historicalEvidence`,当前计数和 `v2AlphaGate.ready` 固定为 0/false。
 - 旧 controlled-pilot runner 已移除默认 RF executor。新的 `western-ordinary-dynamic-shadow-pilot-executor-v1` 未实现前,start preflight 固定返回 `ordinary-dynamic-shadow-pilot-executor-not-implemented`;即使伪造批准也不能落到旧 RF 执行器。
-- 当前 live 状态是 `foundationReady=true`,`liveArtifactVerifierReady=false`,`r3AcceptanceReady=false`,`authorizationReady=false`,`studentGateReady=false`,`automaticAdoptionReady=false`。首个待办是实现并用伪造报告/artifact 篡改测试验证 live artifact verifier;在它就位前不得消费 reserve take `r3-02/r3-03`。随后冷/热接受性通过也只证明实现正确,不自动授权 pilot 或学生反馈。
+- 当前 live 状态(2026-07-18 更新):`foundationReady=true`,`liveArtifactVerifierReady=true`,`r3AcceptanceReady=true`,`authorizationReady=false`,`studentGateReady=false`,`automaticAdoptionReady=false`。live artifact verifier 已实现并由 `npm run test:western-ordinary-dynamic-shadow-acceptance` 的 11 项伪造/篡改场景验证(含哈希重绑定+digest 重算的复杂伪造,全部 fail-closed);status 每次构建都对验收 JSON 引用的全部磁盘产物重读重算,过期即红。reserve take `r3-02/r3-03` 冷/热验收已实跑通过并视为已消费。验收只证明实现正确,不产生任何 pilot 或学生反馈授权。
 - 2026-07-18 以已污染、仅供基础设施复核的历史 `r3-01` 提交做了受限冷/热重跑:`strings-batch-mrpytpgd-kxkws5` 为 schema-3 cache miss,`strings-batch-mrpyuerg-wa5yec` 为同一 artifact cache hit。两次均为全谱 `59/59`,dynamic-shadow telemetry 选中 54 行,候选行 SHA-256 同为 `5a89f5f30ed349210b287ad682316bbeb6f8c50f2394076dc4e834c6a5d65c1d`,且 `runtimeAttestationReady=true`,`autoPassCandidateCount=0`,`autoDiagnosisIssued=false`,`studentFacing=false`。补上逐音 identity 防篡改后,又以同一历史素材热跑 `strings-batch-mrpzqs9h-f8fien`:全谱 `59/59`,`scoreNoteIdentityReady=true`,score/candidate identity SHA-256 同为 `ce816a0e0bed67d72498996d8b1e59eb84f7562e08830df717dbb4a294d423ea`,候选 artifact SHA-256=`e7c938cc5be0db025ad8b090c98cd24191651f1e02077a6f427141bc2457255b`。公开 `npm run western:controlled-batch-candidate-audit` 默认要求 ordinary item,对物理最新热跑重读 score store 与全部候选行后 0 failure。上述重跑都不计入 `r3-02/r3-03` 接受性,也不构成 fresh-blind 或发布证据。
 
 ## 2026-07-15 第二轮 8 份录音更新
@@ -90,7 +90,7 @@
 
 - 旧全曲/first-measure RF 路线仍不达当前 V2-alpha 授权要求。`r2-08` 的 3 个模型原始 auto-pass 经旧 scope/self-check 后可放行为 0,该结果已完成其负证据作用。
 - 仍欠一项只读历史尸检:逐条解释 `r2-08` 这 3 个模型原始 auto-pass 分别被 scope 还是 self-check 的哪条规则抑制。该记录只用于改进普通上传可观测性,不得复活 RF/first-measure 授权,优先级低于当前 dynamic-shadow live verifier。
-- 当前执行权威是文件顶部的 `western-ordinary-dynamic-shadow-policy-v1`:Basic Pitch + gap-penalty DTW 基础层已就位。下一步先完成 live artifact verifier 与篡改拒绝测试,确认它会重读/重算物理来源;之后才消费 reserve take `r3-02/r3-03` 做冷/热缓存与候选一致性验收。该验收即使通过也只关闭实现正确性缺口,不会自动产生 pilot 授权。
+- 当前执行权威是文件顶部的 `western-ordinary-dynamic-shadow-policy-v1`:Basic Pitch + gap-penalty DTW 基础层已就位。live artifact verifier 与篡改拒绝测试已完成(2026-07-18),reserve take `r3-02/r3-03` 冷/热缓存与候选一致性验收已通过。该验收只关闭实现正确性缺口,不产生 pilot 授权;下一实质步骤是全新录音+新曲目的 `western-ordinary-dynamic-shadow-full-score-fresh-blind-v1` 发布证据链。
 - 现有 12 条旧录音全部已经进入训练/复核证据;`r3-02/r3-03` 用于实现验收后也不得再伪装成 P4 的 fresh-blind 发布证据。
 - 当前 `ordinary-dynamic-shadow-full-score-fresh-blind-v1` runner/audit contract 尚未实现。旧 `western:fresh-blind-intake-stage/status` 及其 V2-alpha first-measure `readyForMachinePrecheck` 只能作为历史工件,不得列为当前下一步或授权入口。
 - 不得默认开启学生端。
@@ -206,8 +206,8 @@
 
 下一步分两条,不得混为一项:
 
-1. **ordinary dynamic-shadow verifier → 接受性:** 先实现 live artifact 重读/重算和伪造报告拒绝测试;核验器通过后,才用 reserve take `r3-02/r3-03` 验证冷/热缓存、内容寻址 identity、音频/谱面 provenance、策略一致性和全候选 artifact 审计。材料随后视为已消费,不得复用为发布盲测。
-2. **M3 duration/extra 定量补证:** 先冻结可重复的逐音量化合同,让正式 V2 全曲前置闸消费现有 6 套注入集（24 drag、30 extra 目标）,再根据机器摸底定向补真实学生逐音真值。README 的 5/5/4 录音级数量不能替代精确位置 gold。
+1. **ordinary dynamic-shadow verifier → 接受性(2026-07-18 已完成):** live artifact verifier 已实现(`scripts/audit-western-ordinary-dynamic-shadow-acceptance.mjs`):重读并重算验收 JSON 引用的每个磁盘产物(cache/candidate artifact SHA、音频与 score store 绑定、runtime identity 预考、逐行 review-only、按冻结策略重算每行 selected、candidate evidence digest 与整体 digest),伪造拒绝测试覆盖 11 种篡改(含重算 digest 的复杂伪造)均 fail-closed;`buildOrdinaryDynamicShadowStatus` 每次都跑 live 复核,报告过期即红。随后 reserve take `r3-02/r3-03` 冷/热双跑验收实跑通过(45/45 行 coverage 0.7778、51/51 行 coverage 0.9412,冷 miss/热 hit,冷热 evidence 稳定,`autoPassCount=0` 全行 review-only),`r3AcceptanceReady=true`。材料自此视为已消费,不得复用为发布盲测;ordinary 轨 blocking 只剩 `authorization-closed` 与 `energy-veto-excluded-review-only` 两个设计授权位。
+2. **M3 duration/extra 定量补证(2026-07-18 已完成):** 量化合同已冻结为 `western-duration-extra-quantization-v1`(单位: 相对 IOI 偏差比/时值比/±3s 同音高未匹配事件;容差全部复用已冻结数值 0.15/0.15/3.0,零新调参;unsafe=目标与后继均被 6-guard shadow 选中即"完全不可见";分种子聚合含显式最差种子)。消费结果:v2 六套注入集 drag 4/24 不可见(20/24 timing 可见)、extra 0/30 不可见、wrong/missing 硬漏放 0/60 复现;r3-04/05 负责人确认真值 drag 0/2 不可见、extra 1/3 不可见(真实重复音被合并吸收的诚实案例);自然学生域 5 条干净录音 mean coverage 0.8656、timing flag 负担 7.67%、extra 负担 2.33%。duration/extra 仍为 review-only,该证据 preGateOnly。命令: `npm run western:duration-extra-quantization` / `npm run test:western-duration-extra-quantization`。
 3. **后续发布证据:** r3 接受性通过后仍须另取全新录音+新曲目,建立独立逐音/fresh-blind 证据和 `western-ordinary-dynamic-shadow-release-v1` 授权;旧 12 条、`r2-08` 与 r3 接受性材料均不可复用。
 4. **后排 M4 坐标补强:** v3 池当前无 Oemer;HOMR 在 12 份历史缓存中赢 8 份,但输出仍是无 bbox 的音符列表。可复用 Oemer sidecar 的设计经验为 HOMR 增加坐标适配器,同时先建立一小批人工坐标 gold/误差标尺;当前 `coordinateGoldReady=false`,不得仅凭“框数等于音符数”把列表反馈升级成像素框选。
 5. **低成本照片域扩证(负责人约 15 分钟,非当前 fail-closed blocker):** `r2-camera-photo-benchmark` 现有 8 张其实是与生成器字节相同的 clean render;另有 8 张真实屏拍须继续按 `screen-photo-of-pdf` 单独分域。若把 8 页打印后逐页手机拍摄,构造 gold 可直接沿用,可将纸拍 source-gold 从 5 行扩到 13 行,但必须先过输入域分类再计 `CameraPhotoRows`。可顺手提交 Op.45 四项复核 JSON 将同版 gold 页数从 1 增至 2;因候选起点来自 HOMR,该页仍不能计作 HOMR 自身独立自动采纳证据。
@@ -296,12 +296,11 @@ npm run western:ordinary-auto-pass-precision-review-pack -- --recording-id <fres
 
 以下命令仍可复跑历史证据,但不属于当前授权链:`npm run western:controlled-pilot-evidence-audit`、`npm run test:western-fresh-blind-intake`、`npm run western:historical-fresh-blind-intake-status`。旧 `western:fresh-blind-intake-init/stage/status` 现在会在任何读写前非零退出,只有显式 `--historical-replay` 的具名别名可访问旧流程。其中 `r2-08` 入场审计历史上曾通过且该授权已经消费;不得把其结果写成当前 dynamic-shadow pilot 或 release 批准。
 
-`npm run western:project-gate` 当前仍以非零退出阻断默认发布,失败为:
+`npm run western:project-gate` 当前仍以非零退出阻断默认发布,失败为(2026-07-18 更新:verifier/acceptance 两项已清除):
 
-- `ordinary-dynamic-shadow-r3-live-artifact-verifier-not-implemented`
-- `ordinary-dynamic-shadow-r3-acceptance-not-run`
 - `ordinary-dynamic-shadow-authorization-closed`
 - `ordinary-dynamic-shadow-energy-veto-excluded-review-only`
+- `m3plus-authorization-closed` / `m3plus-student-gate-closed`
 - `M4 OMR automatic adoption`(真实照片完整门槛、运行时安全子集和独立同版页数均未达标)
 
 这是安全态,不是命令故障;维持该裁决不依赖补交复核数据。
