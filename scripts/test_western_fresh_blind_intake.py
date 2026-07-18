@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 import hashlib
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
@@ -117,6 +119,62 @@ class FreshBlindIntakeTest(unittest.TestCase):
         self.assertTrue(report["readyForMachinePrecheck"])
         self.assertEqual(report["blockingReasons"], [])
         self.assertEqual(report["candidate"]["score"]["firstMeasurePitchedNoteCount"], 1)
+
+    def test_cli_requires_explicit_historical_replay(self) -> None:
+        cli_manifest = self.root / "cli-init.json"
+        blocked = subprocess.run(
+            [sys.executable, str(SCRIPT), "--init", "--manifest", str(cli_manifest)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(blocked.returncode, 2)
+        self.assertFalse(cli_manifest.exists())
+        self.assertIn("fresh-blind-v2alpha-cli-superseded", blocked.stdout)
+
+        alias_manifest = self.root / "cli-alias-manifest.json"
+        alias_manifest.write_bytes(b'{"sentinel":"unchanged"}\n')
+        original_alias_manifest = alias_manifest.read_bytes()
+        for alias in ("--historical", "--hist"):
+            alias_out = self.root / f"{alias[2:]}.json"
+            alias_markdown = self.root / f"{alias[2:]}.md"
+            rejected_alias = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    alias,
+                    "--manifest",
+                    str(alias_manifest),
+                    "--out",
+                    str(alias_out),
+                    "--markdown",
+                    str(alias_markdown),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(rejected_alias.returncode, 2)
+            self.assertIn(f"unrecognized arguments: {alias}", rejected_alias.stderr)
+            self.assertEqual(alias_manifest.read_bytes(), original_alias_manifest)
+            self.assertFalse(alias_out.exists())
+            self.assertFalse(alias_markdown.exists())
+
+        replay = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT),
+                "--historical-replay",
+                "--init",
+                "--manifest",
+                str(cli_manifest),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(replay.returncode, 0, replay.stderr)
+        self.assertTrue(cli_manifest.is_file())
 
     def test_seen_recording_is_rejected(self) -> None:
         self.write_manifest(recordingId="old-recording")

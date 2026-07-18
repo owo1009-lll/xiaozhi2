@@ -640,7 +640,7 @@ def render_markdown(report: dict[str, Any]) -> str:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(allow_abbrev=False)
     parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
     parser.add_argument("--out", default=str(DEFAULT_OUT))
     parser.add_argument("--markdown", default=str(DEFAULT_MARKDOWN))
@@ -656,11 +656,27 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--notes", default="")
     parser.add_argument("--allow-seen-piece", action="store_true")
     parser.add_argument("--allow-current-machine-precheck-history", action="store_true")
+    parser.add_argument(
+        "--historical-replay",
+        action="store_true",
+        help="Explicitly acknowledge that this is the superseded first-measure V2-alpha workflow.",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    if not args.historical_replay:
+        print(json.dumps({
+            "ok": False,
+            "readyForMachinePrecheck": False,
+            "releaseAuthority": False,
+            "authorityStatus": "superseded-historical-first-measure-only",
+            "requiredCurrentContract": "ordinary-dynamic-shadow-full-score-fresh-blind-v1",
+            "blockingReasons": ["fresh-blind-v2alpha-cli-superseded"],
+            "nextAction": "Stop. The current full-score fresh-blind runner/audit is not implemented.",
+        }, indent=2, ensure_ascii=False))
+        return 2
     manifest_path = Path(args.manifest).resolve()
     if args.init:
         manifest_path.parent.mkdir(parents=True, exist_ok=True)

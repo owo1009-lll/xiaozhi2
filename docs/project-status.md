@@ -14,13 +14,14 @@
 
 ## 2026-07-18 当前分支刷新
 
-- 分支快照基线:`feature/model-bakeoff-omr-align@b7ce8fc`。该分支已包含 HOMR 受控离线治理、M3+ 四区审计、动态闸学生域预考、round-3 fresh-blind/真实错误材料和 8 张屏拍域基准;这些变化不改变默认学生端闸门。
+- 当前分支为 `feature/model-bakeoff-omr-align`;本节以 2026-07-18 本地 live 复跑和物理产物审计为准,不使用会因本次提交而自指失效的固定提交号。该分支已包含 HOMR 受控离线治理、M3+ 四区 v2 fail-closed 审计、动态闸学生域预考、round-3 reserve/实现验收材料(非发布 fresh-blind)和 8 张屏拍域基准;这些变化不改变默认学生端闸门。
 - 已在该分支依次重新运行 `npm run western:m4-p0-structure-gate`、`npm run western:project-status` 和 `npm run western:project-gate`。P0 冻结 5 谱结果为完整 `1/5`,谱号/调号/拍号=`3/5,2/5,2/5`,`studentGateReady=false`。
 - 这里的 P0 `1/5` 只表示同一 5 谱中的谱号/调号/拍号结构闸门;真实照片 pitch+onset+measure 完整自动采纳仍为 `0/5`,12 份历史照片链缓存重放中的 P0-ready 又是 `0/12`。三个数字对应不同门槛或数据集,不得互相替换;`m4P0StructureReady=true` 也只表示至少 1 谱 P0-ready,不表示 M4 自动采纳通过。
 - 当前运行时仍为 `ordinaryUploadAutoFeedbackReady=false`,`m3plusAutoFeedbackReady=false`,`m4OmrAutoScoreReady=false`,`policy=fail-closed`。
-- 当前项目总闸门要求 ordinary/M3+/M4 三轨同时通过;M3+ 新口径离线通过,ordinary 当前由 dynamic-shadow review-only 合同阻断,M4 automatic adoption 也未达标。`western:project-gate` 因此按设计非零退出。
+- 当前项目总闸门要求 ordinary/M3+/M4 三轨同时通过。M3+ v2 因保护库存仅 8/14 实际执行、平拉独立逐音 gold join=`0/12`、揉弦/滑音 join=`0/8` 而 fail-closed;ordinary 当前由 dynamic-shadow review-only 合同阻断,M4 automatic adoption 也未达标。`western:project-gate` 因此按设计非零退出。
 - HOMR v3 的具名 AGPL/六模型审查现为 `approved-with-conditions`,唯一批准范围 `controlled-offline-review-only`;稳定运行时已迁至 `data/tools/`,live preflight 的 governance/host/deployment 三项均绿。preflight 现与 review-record SHA-256 绑定,审批或 artifact 漂移会令 `project-status/project-gate` fail-closed。学生端网络使用、自动采纳与再分发仍未获授权;这里的三绿不得写成默认生产发布通过。
 - 刷新产物为 `data/experiments/western-strings-m4/p0-structure-gate/report.json`、`data/experiments/western-strings-project-status.json` 与 `data/experiments/western-strings-project-gate.json`;三者位于 `data/` 忽略目录,用于本地可复跑状态,不等同于已提交证据。
+- release review、controlled-pilot decision 与 start preflight 已按当前合同重新生成并明确为红:`readyForControlledPilotDecision=false`,`readyToStartControlledPilot=false`,`okToStartControlledPilot=false`。它们绑定当前 live evidence,不是沿用旧 v1 绿灯;现有 approval 因 scope 过期且缺持久化安全确认也不被接受。
 
 ## 2026-07-18 ordinary dynamic-shadow foundation
 
@@ -43,7 +44,7 @@
 - 新一轮 M3+ 只完成 review-only 库存清点:444 个音符中 292 个被列为行为候选;这不改变运行时门槛。
 - 已找到随录音放置的 `README-怎么用.md`,确认 `r2-02` / `r2-03` / `r2-04` 的错误数量分别为 5 / 5 / 4。README 没有具体小节且 `notes.txt` 仍缺失,因此只能做数量对照和机器位置搜索,不能计算精确 recall/precision。
 - README 数量约束下的 Basic Pitch + 序列 DTW 搜索得到:错音阈值候选 5 个;漏音保守候选 3 个,未覆盖 README 目标数量;拖拍阈值候选 5 个,按目标数保留前 4 个。它们均为未人工确认的机器假设,没有进入学生反馈。
-- 当前默认学生发布仍关闭。旧 RF 受控证据的 precision=1/coverage=0.04 只解释路线转向,不是实时 blocker。当前 ordinary dynamic-shadow 为 `foundationReady=true`,但 live artifact verifier 未实现、r3 接受性未执行、独立授权关闭、因果能量否决未冻结;M4 OMR 自动采纳也未达标。M3+ 新口径离线通过但学生运行时仍关闭。
+- 当前默认学生发布仍关闭。旧 RF 受控证据的 precision=1/coverage=0.04 只解释路线转向,不是实时 blocker。当前 ordinary dynamic-shadow 为 `foundationReady=true`,但 live artifact verifier 未实现、r3 接受性未执行、独立授权关闭、因果能量否决未冻结;M3+ gold-free runtime foundation/物理 audit 已通过,但 v2 离线证据仍因 declared-only 与独立 gold 缺口转红;M4 OMR 自动采纳也未达标。
 - M3 core 的历史人工/gold 闸虽通过,pitch/onset/missing 三类有效错误样本各只有 `2` 个（均 2/2,unsafe=0）;这是低浓度证据,不能把 100% 小样本写成充分扩证。
 
 ## 1. 当前目标
@@ -91,6 +92,7 @@
 - 仍欠一项只读历史尸检:逐条解释 `r2-08` 这 3 个模型原始 auto-pass 分别被 scope 还是 self-check 的哪条规则抑制。该记录只用于改进普通上传可观测性,不得复活 RF/first-measure 授权,优先级低于当前 dynamic-shadow live verifier。
 - 当前执行权威是文件顶部的 `western-ordinary-dynamic-shadow-policy-v1`:Basic Pitch + gap-penalty DTW 基础层已就位。下一步先完成 live artifact verifier 与篡改拒绝测试,确认它会重读/重算物理来源;之后才消费 reserve take `r3-02/r3-03` 做冷/热缓存与候选一致性验收。该验收即使通过也只关闭实现正确性缺口,不会自动产生 pilot 授权。
 - 现有 12 条旧录音全部已经进入训练/复核证据;`r3-02/r3-03` 用于实现验收后也不得再伪装成 P4 的 fresh-blind 发布证据。
+- 当前 `ordinary-dynamic-shadow-full-score-fresh-blind-v1` runner/audit contract 尚未实现。旧 `western:fresh-blind-intake-stage/status` 及其 V2-alpha first-measure `readyForMachinePrecheck` 只能作为历史工件,不得列为当前下一步或授权入口。
 - 不得默认开启学生端。
 - 不得提交或全局设置 `WESTERN_STRINGS_ENABLE_ORDINARY_AUTO_GATE=1`。
 
@@ -102,12 +104,16 @@
 
 - 决定文档为 `docs/western-strings-m3plus-rescope-decision.md`;颤音/装饰音音频检测、窗边界继续调参和粗状态分类器已退出发布链,只保留为研究证据。
 - 统一离线入口为 `npm run western:m3plus-rescope-gate`,输出 `data/experiments/western-strings-m3plus/rescope-gate/report.json`。
-- 无标记平拉 holdout:8 个可判、8 个正确、unsafe=0、4 个证据不足,precision=1.0。
-- 谱面标记区:14 个真实 tr/装饰音保护单元全部中性化,指控数=0;泛音中性化由规则与回归测试覆盖,当前没有计入这 14 个真实样本。
-- 人工 gold 揉弦/滑音中心音高:8 个目标中仅 3 个可判,覆盖率 `3/8=37.5%`;这 3 个全部正确、unsafe=0,另 5 个证据不足,所以 precision=1.0 不能写成高覆盖。
-- 高离散度兜底:3/3 输出 `insufficient_evidence`,指控数=0。
-- 当前 `m3plusPitchSafetyReady=true`,`m3plusModeReleaseReady=true` 仅表示**新口径离线闸门通过**;`studentGateReady=false`,`m3plusAutoFeedbackReady=false`,运行时仍未接线且默认关闭。
-- 17 个 round2 揉弦人工 gold 单元因旧报告没有稳定中心 f0 数值而未计入本次定量通过数;报告明确列为 unscored,没有伪造通过。
+- 无标记平拉 holdout:8 个可判、8 个与谱面意图一致、unsafe=0、4 个证据不足;这是受控离线安全 probe,不是整条发布链已通过。
+- 谱面保护区实际经过四区策略的只有 8 个 m3p holdout 单元,8/8 均中性且指控数=0。round2 人工记录另声明 6 个 tr 单元,但它们没有逐单元进入同一策略;因此只能记为 `evaluatedProtectedCount=8`,`declaredOnlyProtectedCount=6`,不得合写成“14 个全部中性化”。泛音中性化仍只由规则与回归测试覆盖。
+- 揉弦/滑音中心音高的 `3/8=37.5%` 只表示 8 个谱面意图目标中 3 个得到 `confirmed_center`,即 score-intent center agreement/decision coverage;它不是独立人工 intonation gold precision。当前独立逐音 intonation gold join=`0/8`,所以 agreement/precision 不可定义,其余 5 个为 `insufficient_evidence`。
+- round2 的 17 个揉弦单元只有“演奏了揉弦”的人工执行确认,没有与上述 8 个候选逐音连接的稳定中心音高标签,继续列为 unscored;不得拿它们补足独立音准 gold。
+- 高离散度用原始诊断独立枚举后,3/3 输出 `insufficient_evidence`,指控数=0。
+- 当前 v2 `releaseGateReady=false`,`offlineEvidenceReady=false`,`readyForMonitoredPilot=false`。离线 probe、gold-free runtime foundation、物理来源 runtime audit、发布授权和学生闸门必须分层报告;任何一层不得替代下一层。
+- gold-free runtime policy 只允许从谱面标记、pYIN 帧/有声率、中心/离散度和窗口边界作决定,不得读取 `expectedBehavior`、评测 split 或人工 gold。即使接线成功,保护区、低有声率、高离散度或缺字段仍须 fail-closed,候选与外层输出仍固定 `review_required`,`studentFacing=false`,`feedbackAuthorized=false`。
+- 最新物理 batch `strings-batch-mrq5lf8u-cr2dqk` 已产生 59/59 条合同有效的 M3+ 证据,score identity 完全一致,候选 artifact SHA-256=`3b6390877072d1e09591bc9f13f0e22f64b0f3602617cac1f7dd9ada7d7410b4`;`runtimeFoundationReady=true`,`runtimeAuditReady=true`,其中 46 条 `confirmed_center`、13 条 `insufficient_evidence`,没有自动或学生输出。物理审计固定并重哈希 5 个规范 source bindings(machine report、human gold、M3 core gate、rescope decision、evaluator),再核对物理 JSONL 尾批、完整 candidate artifact、score store/score identity、policy、analyzer(raw + CRLF-normalized SHA-256=`65ea46768bf23e51aac4083c3fd08fecbeb2d81d8af4effc5aaae482bc7a279d`)以及 Python/librosa/numpy/pYIN 参数;任一规范路径替换、同批多 ordinary item、runtime 未 ready 或 standalone candidate audit 缺 M3 runtime 都会 fail-closed。这只证明 gold-free review-only 接线可审计。
+- `project-status` 每次构建还会从当前磁盘重读候选 artifact、runtime policy、analyzer 和 rescope report,逐项重算 raw SHA-256;任一路径缺失、越界或内容漂移都会把 `physicalEvidenceCurrent/runtimeFoundationReady` 转红,并经同一 live-evidence 判定阻断 release review、decision 与 preflight。缓存 audit 与缓存 release report 彼此自洽不再足以放行。
+- `studentGateReady=false`,`m3plusAutoFeedbackReady=false` 保持不变;当前离线证据缺口是补齐 6 个 declared-only 保护单元使冻结库存达到 14/14 实际执行,并为 12 个平拉来源单元和 8 个揉弦/滑音目标提供可按 recording/measure/unit 连接的独立逐音 intonation gold。发布授权仍需在这些证据转绿后单独建立。
 - 双音 multi-f0 支线范围不变,不由本次单声部中心音高闸门放行。
 
 #### 历史执行证据(保留,不再决定发布)
@@ -115,13 +121,13 @@
 - 98 reviewed / 74 scored。
 - 历史 first-measure 复核集曾把 `slide-like`、`trill-like` 列为离线 release-ready；该结论现已被独立跨后端 holdout 覆盖，不再构成试点授权。
 - CREPE tiny/full + pYIN 的冻结物理阈值复验现按技法语义分别使用揉弦 4-8 Hz 周期能量、颤音上下音切换、装饰音开头短促上方音回归、滑音源到目标净移动。holdout 依次为揉弦 precision=`0.60`/recall=`0.75`、颤音 precision 不可定义/recall=`0.00`、装饰音 precision 不可定义/recall=`0.00`、滑音 precision=`1.00`/recall=`0.75`；四类均未达发布线，装饰音另有可靠正例不足。
-- 旧 `npm run western:m3plus-monitored-pilot-audit` 非零退出并报告 `m3plus-independent-mode-not-ready:slide-like` / `trill-like`;这些原因现在只记录历史检测器为何退出发布链,不再是新口径顶层 blocker。
+- 旧 detector 版 `npm run western:m3plus-monitored-pilot-audit` 曾非零退出并报告 `m3plus-independent-mode-not-ready:slide-like` / `trill-like`;这些原因只记录历史检测器为何退出发布链。当前同名 v2 审计改为核对 rescope 来源哈希、物理 batch 与 gold-free runtime contract,且 `runtimeFoundationReady=true`,`runtimeAuditReady=true`;当前审计 blocker 只来自 6 个 declared-only 保护单元和独立逐音 intonation gold/离线区未就绪,项目发布层另因独立授权关闭而 fail-closed,不再以模式名或 runtime audit 未完成作阻断理由。
 - control-ready mode `stable` 只作对照，不等于学生端自动放行。
 - `teacherReviewNeeded=false`。
 
 范围限制:
 
-- 只覆盖 first-measure + trusted-recording 的安全子集。
+- 2026-07-17 supersession 已撤销历史 first-measure + trusted-recording 的 slide/trill pilot authority;现有 12 条和旧复核包均已污染,不得复用为当前授权。未来发布证据必须登记全新录音+新曲目的 fresh-blind 包,且另过 v2 runtime audit 与显式授权链。
 - 旧 `slide-like`、`trill-like`、`variable-f0`、`ornament-candidate` 检测器均为 research-only;双音 `double-stop-candidate` 继续单独 review-only。
 - 默认学生端 M3+ 自动反馈仍关闭。
 
@@ -220,17 +226,17 @@ npm run western:project-gate
 
 ### 历史 V2-alpha 第一小节安全子集入场（superseded）
 
-已新增独立入场闸门:
+仅作历史复现的具名入口为:
 
 ```bash
-npm run western:fresh-blind-intake-init
-npm run western:fresh-blind-intake-status
+npm run western:historical-fresh-blind-intake-init
+npm run western:historical-fresh-blind-intake-status
 ```
 
-不再手改 `intake.json`。三个文件就位后由项目维护者运行原子化登记命令:
+历史复现也不得手改 `intake.json`。当时三个文件就位后使用的原子化登记命令现为:
 
 ```bash
-npm run western:fresh-blind-intake-stage -- --recording-id <new-recording-id> --piece-id <new-piece-id> --audio "<audio-path>" --score "<musicxml-or-mxl-path>" --score-display "<pdf-or-image-path>" --reviewed-by "<reviewer>"
+npm run western:historical-fresh-blind-intake-stage -- --recording-id <new-recording-id> --piece-id <new-piece-id> --audio "<audio-path>" --score "<musicxml-or-mxl-path>" --score-display "<pdf-or-image-path>" --reviewed-by "<reviewer>"
 ```
 
 该命令先审计临时清单；任何重复、解码失败、谱面解析失败或审核信息缺失都会保持正式 `intake.json` 不变。
@@ -288,7 +294,7 @@ npm run western:ordinary-auto-pass-precision-review-pack -- --recording-id <fres
 - `npm run test:western-project-gate`
 - `npm run build`
 
-以下命令仍可复跑历史证据,但不属于当前授权链:`npm run western:controlled-pilot-evidence-audit`、`npm run test:western-fresh-blind-intake`、`npm run western:fresh-blind-intake-status`。其中 `r2-08` 入场审计历史上曾通过且该授权已经消费;不得把其结果写成当前 dynamic-shadow pilot 或 release 批准。
+以下命令仍可复跑历史证据,但不属于当前授权链:`npm run western:controlled-pilot-evidence-audit`、`npm run test:western-fresh-blind-intake`、`npm run western:historical-fresh-blind-intake-status`。旧 `western:fresh-blind-intake-init/stage/status` 现在会在任何读写前非零退出,只有显式 `--historical-replay` 的具名别名可访问旧流程。其中 `r2-08` 入场审计历史上曾通过且该授权已经消费;不得把其结果写成当前 dynamic-shadow pilot 或 release 批准。
 
 `npm run western:project-gate` 当前仍以非零退出阻断默认发布,失败为:
 

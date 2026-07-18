@@ -1,6 +1,6 @@
 # Western Strings Review Policy
 
-Updated: 2026-07-10
+Updated: 2026-07-18
 
 This project must not use the user or a professional teacher as a debugging tool.
 Human review is a final adjudication step, not the first quality gate.
@@ -38,8 +38,12 @@ Use these before asking for any review:
 - `npm run western:project-status`
 - `npm run western:next-actions`
 - `npm run test:western-project-gate`
-- `npm run western:controlled-pilot-evidence-audit`
-- `npm run western:ordinary-monitored-pilot-audit`
+- `npm run western:ordinary-dynamic-shadow-runtime-preflight`
+- `npm run test:western-dynamic-shadow-policy`
+- `npm run test:western-offline-feature-audio`
+- `npm run test:western-alignment-preview`
+- `npm run test:western-m3plus-rescope-gate`
+- `npm run test:western-m3plus-runtime-policy`
 - `npm run western:m3plus-monitored-pilot-audit`
 - `npm run western:m4-gold-provenance-audit`
 - `npm run western:m4-independent-gold-workspace-audit`
@@ -49,30 +53,37 @@ Use these before asking for any review:
 
 ### Ordinary Upload
 
-`npm run western:ordinary-monitored-pilot-audit` must pass before any ordinary
-upload monitored pilot. A safe session is not enough for V2-alpha: raw model
-auto-pass rows must be separated from strict self-check eligible rows. Run
-`npm run western:controlled-pilot-evidence-audit` before any new professional
-review request. The current result has 100% precision on 11 strict self-check
-rows but only 4.00% whole-piece operational coverage, below the 20% floor. The
-joint threshold sweep found no confidence threshold that fixes the whole-piece
-scope. A narrower first-measure-only scope has now passed machine checks across
-five independent recordings: historical 12/12 and operational 11/11, with
-25.53% and 26.83% scoped coverage. `teacherReviewAllowed=true` applies only to
-one small fresh blind pack for that exact scope. Do not reuse existing labels,
-do not include later measures, and do not send a pack until audio playback,
-score location, controls, and scope membership pass machine QA. Raw model
-auto-pass rows outside the scope remain `review_required`.
+The current ordinary authority is the review-only dynamic-shadow path. Its
+pinned audio runtime passes the foundation preflight, but the live r3 artifact
+verifier is not implemented, r3 acceptance has not run, the causal-energy veto
+is not included in the frozen runtime, and `authorizationReady=false`. No
+ordinary monitored pilot or professional-review pack is authorized yet.
 
-Stage that fresh recording with `npm run western:fresh-blind-intake-stage`; it audits a temporary
-manifest and replaces the official intake only after every check passes. Confirm the persisted
-candidate with `npm run western:fresh-blind-intake-status`.
-The intake must use a new recording and, by default, a new piece/score; it also
-requires a clean-score approval, consent/license metadata, a resolvable violin
-part with a parseable first measure, decodable audio, and an existing score image/PDF. Any missing or reused
-evidence blocks staging and professional review.
-The ordinary precheck must use `--recording-id <fresh recordingId>` so accepted
-historical submissions cannot be selected by list order.
+The newer gap-penalty DTW plus causal-energy-veto research executor is a real
+positive result: after three-stage confirmation it reached 97.91% clean
+precision and 36.00% coverage, with `releaseCoverageReady=true` for the public
+synthetic-perturbation research gate. It does not set `studentGateReady` and is
+not wired as current pilot authority. Its main diagnostic contribution is that
+the old executor's whole-piece linear time mapping, rather than threshold
+tuning alone, was the principal coverage bottleneck.
+
+The old first-measure RF result (historical 12/12 and operational 11/11, with
+25.53% and 26.83% scoped coverage) is consumed and superseded. Its former
+`teacherReviewAllowed=true` and `western:controlled-pilot-evidence-audit`
+cannot authorize another pack. The legacy
+`western:fresh-blind-intake-*` aliases intentionally exit before reading or
+writing evidence. The `western:historical-fresh-blind-intake-*` aliases plus
+the exact `--historical-replay` flag exist only to reproduce that historical
+record; they cannot create current release authority.
+
+Round-3 is implementation-acceptance evidence, not release-blind evidence:
+`r3-01` has already been consumed by infrastructure replay, while `r3-02` and
+`r3-03` remain reserves that may be used only after the live verifier exists.
+The required current release contract is
+`ordinary-dynamic-shadow-full-score-fresh-blind-v1`, using a wholly new
+recording and new piece after implementation acceptance. Its runner and audit
+are not implemented, so there is currently nothing to stage or send for human
+review.
 
 ### M3+ Pitch Safety (rescope four-zone contract)
 
@@ -80,22 +91,34 @@ historical submissions cannot be selected by list order.
 monitored pilot. Since the 2026-07-17 rescope decision the audit no longer
 scores audio technique-mode detection; it audits the frozen holdout
 rescope-gate report (`npm run western:m3plus-rescope-gate`) against the
-four-zone pitch-safety contract (`m3plus-rescope-four-zone-v1`):
+four-zone pitch-safety contract (`m3plus-rescope-four-zone-v2`):
 
-- unmarked straight-tone zone: center-pitch precision >= 90%, zero unsafe
-  accusations
-- score-marked zone (tr/ornament/harmonic): zero accusations; every protected
-  unit stays `insufficient_evidence`
-- vibrato/slide zone (human-gold confirmed): center-pitch precision >= 90%,
-  zero unsafe accusations
+Regenerate that report only when its source evidence changes, then create a
+fresh controlled batch bound to the new report SHA. Release review uses
+`npm run test:western-m3plus-rescope-gate` and must not rewrite the report
+under an already-audited batch.
+
+- unmarked straight-tone zone: 12 expected source units; independent per-unit
+  intonation gold is currently 0/12, so precision is not authorized
+- score-marked zone (tr/ornament/harmonic): 14 protected units are frozen, but
+  only 8 have actual policy execution and 6 remain declared-only; every unit
+  must execute and remain `insufficient_evidence`
+- technique-center zone: 8 expected source units; independent per-unit
+  intonation gold is currently 0/8. The existing 3/8 score-intent agreement is
+  not intonation accuracy, and 17 round-2 vibrato gold units remain unscored
 - unstable fallback: every high-dispersion stress case becomes
   `insufficient_evidence`, zero accusations
-- rhythm/onset lane: inherits the unchanged M3 core gate (not re-scored here)
+- rhythm/onset lane: inherits the unchanged M3 core gate (not re-scored here),
+  whose evidence remains thin at only two error examples per class
 
 The retired first-measure `slide-like`/`trill-like` candidate-quality contract
-is superseded, not pending repair. Passing this audit authorizes preparing a
-monitored pilot only; the default student runtime stays disabled and the
-owner's explicit approval command chain is still required. This is not a
+is superseded, not pending repair. The current gold-free runtime foundation and
+physical runtime audit pass, but `offlineEvidenceReady=false` and
+`authorizationReady=false` because the frozen execution and independent-gold
+requirements above are incomplete. A passing runtime audit is only a physical
+evidence precondition; it does not by itself authorize a monitored pilot. The
+default student runtime stays disabled, both separately audited executors and
+the owner's explicit approval command chain remain required, and this is not a
 technique-name display feature.
 
 ### M4 OMR

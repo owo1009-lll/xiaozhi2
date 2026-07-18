@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Generate the round-3 recording etudes (fresh-blind + real-error takes).
+"""Generate round-3 implementation-acceptance reserves and real-error takes.
 
-Five NEW pieces (never used in rounds 1/2, per the fresh-blind default-new-
-piece rule), first position, single voice, erhu-player-friendly:
+Five pieces not used in rounds 1/2, first position, single voice, and
+erhu-player-friendly. None is current release fresh-blind evidence:
 
-  A (correct takes, fresh-blind intake):
-    r3-01  E minor  4/4  stepwise + small leaps
-    r3-02  A major  3/4  new meter for this project
-    r3-03  G major  4/4  broken thirds (new figure vs r2-02 stepwise)
+  A (correct takes, implementation acceptance only):
+    r3-01  E minor  4/4  consumed by infrastructure replay
+    r3-02  A major  3/4  reserve until the live verifier exists
+    r3-03  G major  4/4  reserve until the live verifier exists
   B (planted-error takes, real-error ground truth):
     r3-04  C major  4/4  6 planted errors (wrong/missing/extra/drag)
     r3-05  D major  4/4  6 planted errors
@@ -250,7 +250,7 @@ def annotated_copy(build_fn, entries, title_suffix="(错误标注版,仅供演�
 
 README = """# Round-3 录音任务:演奏要求
 
-两组共 5 首,均为**全新曲目**(fresh-blind 规则要求)。全部第一把位、单声部,按谱面速度记号用节拍器起速即可(允许自然波动,不必机械)。
+两组共 5 首,均为 round-3 实现验收或真实错误真值任务,**不是当前发布 fresh-blind 录音包**。全部第一把位、单声部,按谱面速度记号用节拍器起速即可(允许自然波动,不必机械)。
 
 ## 通用录音要求
 
@@ -258,10 +258,10 @@ README = """# Round-3 录音任务:演奏要求
 - 格式:m4a 或 wav,每首单独一个文件;
 - 命名:`r3-01.m4a` … `r3-05.m4a`(和谱号一致);
 - 每首**从头完整拉到尾**,中途拉错(A 组)不要停,继续拉完——自然状态就是我们要的分布;
-- 录完不要试听后重录多遍——**第一条完整可用的就交**(盲审要求自然样本);
+- 录完不要试听后重录多遍——**第一条完整可用的就交**(保留自然样本分布);
 - 交付时请附一句每首的录音日期与演奏者(登记元数据需要)。
 
-## A 组:r3-01 / r3-02 / r3-03(正确演奏,fresh-blind 用)
+## A 组:r3-01 / r3-02 / r3-03(正确演奏,实现验收储备用)
 
 按谱正确演奏即可,无需任何特殊处理。注意 r3-02 是 3/4 拍(本项目第一次用)。
 
@@ -276,7 +276,9 @@ README = """# Round-3 录音任务:演奏要求
 
 ## 提交后会发生什么
 
-- A 组走 fresh-blind 登记(`western:fresh-blind-intake-stage`),用于第一小节受控 pilot 盲审 + 新执行器全曲真考;
+- `r3-01` 已被基础设施回放消费,不能再作为独立验收或发布证据;
+- `r3-02` / `r3-03` 只在 live artifact verifier 实现后用于 dynamic-shadow 实现验收;一经使用即成为已消费证据;
+- A 组任何录音都不得调用已 superseded 的 first-measure intake,也不构成 pilot 或发布盲审证据。当前 full-score fresh-blind runner/audit(`ordinary-dynamic-shadow-full-score-fresh-blind-v1`)尚未实现;
 - B 组作为时值/多拉音等类别走出 review-only 的真实错误真值,以及注入预考(0/60)的终验;
 - 录音只进 `data/private/`,不进 git,不外发。
 """
