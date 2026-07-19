@@ -4,6 +4,7 @@ import {
   fetchWesternStudentGate,
   fetchWesternStudentSubmissions,
 } from "./researchApi.js";
+import { REPERTOIRE } from "./data/repertoire.js";
 
 const INSTRUMENTS = [
   { id: "violin", label: "小提琴" },
@@ -167,6 +168,21 @@ export default function WesternStudentApp() {
           onChange={(event) => setPiece(event.target.value)}
           aria-label="曲名"
         />
+        <select
+          className="western-repertoire-select"
+          value=""
+          onChange={(event) => { if (event.target.value) setPiece(event.target.value); }}
+          aria-label="从曲库选曲"
+        >
+          <option value="">从曲库选曲…</option>
+          {REPERTOIRE.map((group) => (
+            <optgroup key={group.level} label={group.level}>
+              {group.items.map((item) => (
+                <option key={item.title} value={item.title}>{item.title}</option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
         <p className="muted-copy">建议顺手拍一张这次练习用的谱子(可选),老师复核时能直接对着看。</p>
         <input
           ref={photoInputRef}

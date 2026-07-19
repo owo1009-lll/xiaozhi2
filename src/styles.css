@@ -214,6 +214,11 @@ button {
   min-width: 0;
 }
 
+.western-repertoire-select {
+  width: 100%;
+  margin-top: 10px;
+}
+
 .western-student-feedback {
   margin: 6px 0 0;
   padding: 8px 10px;
