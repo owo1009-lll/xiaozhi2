@@ -5,9 +5,7 @@
   "appendixAcceptanceComplete": false,
   "engineeringBlockingReasons": [],
   "externalBlockingReasons": [
-    "m4a-real-photo-positive-missing:10",
     "m4a-owner-measure-box-confirmation-not-ready",
-    "m4a-real-photo-poor-image-coverage-not-ready",
     "m4b-fresh-blind-intake-missing"
   ],
   "decisions": {

@@ -14,7 +14,7 @@ assert.equal(live.m4b.promotionOperationalReady, true);
 assert.equal(live.m4b.promotionReady, false);
 assert.equal(live.m4b.realAnnotationTargetBlocksPocPromotion, false);
 assert.equal(live.runtimeBoundary.failClosed, true);
-assert.ok(live.externalBlockingReasons.includes("m4a-real-photo-positive-missing:10"));
+assert.ok(live.externalBlockingReasons.includes("m4a-owner-measure-box-confirmation-not-ready"));
 assert.ok(live.externalBlockingReasons.includes("m4b-fresh-blind-intake-missing"));
 
 const completed = structuredClone(live);
@@ -24,7 +24,7 @@ const syntheticStatus = {
 };
 const documents = {
   projectPlan: "### C.1 闸门拆分\n### C.2 M4a 详细方案\n#### C.2.6 谱库规模化扩充计划\n#### C.2.7 负责人教材曲目总清单\n### C.3 M4b 详细方案\n#### C.3.3 晋升门槛\n### C.4 决策清单\nsynthetic-engineering\nm4b-fresh-blind-capture-pack\n~600–750 条目/乐章",
-  projectStatus: "m4bStructurePocEngineeringReady=true m4bStructurePocPromotionReady=false m4a-real-photo-positive-missing:10 m4b-fresh-blind-capture-pack",
+  projectStatus: "m4bStructurePocEngineeringReady=true m4bStructurePocPromotionReady=false m4a-owner-measure-box-confirmation-not-ready m4b-fresh-blind-capture-pack",
 };
 const baselineInput = {
   status: syntheticStatus,

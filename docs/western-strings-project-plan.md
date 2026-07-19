@@ -554,9 +554,9 @@
 | e | 音频仲裁哨兵接线 | 复用 0.6 agreement 闸 |
 | f | 三条 fail-closed 出口+测试(含伪造/错版/低质照片拒绝) | 房规:先写拒绝测试 |
 
-2026-07-19 工程状态:C.2a-f 已完成。`config/western-m4a-supported-edition-seeds.json` 冻结首批 3 个自制版本(r2-01/r2-06/r3-01)及 MuseScore Studio 4.7.4/150 dpi;`build:western-m4a-supported-editions` 可重复生成 MusicXML、标准 PNG 与系统/谱表/小节/音符坐标 sidecar 三元组,registry live audit 为 `validEntries=3/3`。`config/western-m4a-registration.json` 冻结 Python 3.11.9、NumPy 1.26.4、OpenCV 4.11.0.86、Pillow 12.2.0 及配准/结构/音频阈值;运行时已固化到 `data/tools/western-photo-score-audio-py311`,preflight 会拒绝包版本、路径、策略、阈值、实现或 OMR 引用漂移。主链已实现页面检测、单应/TPS、系统与小节线一致性质量闸、0.6 音频仲裁、系统/谱表/小节/音符坐标反投影及 review-only 诊断标注;三条 fail-closed 出口均有测试。`engineering-acceptance/report.json` 的 3 个确定性透视正例全部通过,4 个模糊/半页/错渲染器版本/不在库反例全部拦截,且 67/23/59 个诊断事件均与登记音符锚点一一反投影;live verifier 重算实现、策略、registry、输入、审计和标注图 SHA-256。此报告明确为 engineering-only,**不满足**下列真实屏拍冻结验收,不得据此打开 M4a。
+2026-07-19 工程状态:C.2a-f 已完成。`config/western-m4a-supported-edition-seeds.json` 冻结首批 3 个自制版本(r2-01/r2-06/r3-01)及 MuseScore Studio 4.7.4/150 dpi;`build:western-m4a-supported-editions` 可重复生成 MusicXML、标准 PNG 与系统/谱表/小节/音符坐标 sidecar 三元组,registry live audit 为 `validEntries=3/3`。`config/western-m4a-registration.json` 冻结 Python 3.11.9、NumPy 1.26.4、OpenCV 4.11.0.86、Pillow 12.2.0 及配准/结构/音频阈值;运行时已固化到 `data/tools/western-photo-score-audio-py311`,preflight 会拒绝包版本、路径、策略、阈值、实现或 OMR 引用漂移。主链已实现页面检测、单应/TPS、系统与小节线一致性质量闸、完整页投影可见性、0.6 音频仲裁、系统/谱表/小节/音符坐标反投影及 review-only 诊断标注;三条 fail-closed 出口均有测试。完整页投影可见性地板冻结为 0.75,用于拒绝虽能在上半页取得高质量匹配、但整页已伸出照片范围的截半页输入。`engineering-acceptance/report.json` 在本次策略/实现变更后重跑,3 个确定性透视正例全部通过,4 个模糊/半页/错渲染器版本/不在库反例全部拦截,且 67/23/59 个诊断事件均与登记音符锚点一一反投影;live verifier 重算实现、策略、registry、输入、审计和标注图 SHA-256。此报告明确为 engineering-only,**不满足**下列真实屏拍冻结验收,不得据此打开 M4a。
 
-2026-07-19 验收执行状态:冻结合同已固化为 `config/western-m4a-real-photo-acceptance.json`,阈值精确绑定 10 张/90%/负责人逐框 100%/错版至少 5 张且 0 漏放/低质 0 漏放。拍摄页见 `docs/m4a-real-photo-capture-pack/index.html`;十个文件名和角度任务固定为 r2-01×4、r2-06×3、r3-01×3。intake 默认从 `Downloads/m4a-photo-acceptance` 读取,拒绝无效图片签名和无显式 `--replace` 的异内容覆盖。现有 8 张 2026-07-17 旧渲染器/错曲真实屏拍已作为独立负例复跑,结果 `8/8` 拒绝、0 漏放。收到 10 张精确版本屏拍后,执行器才会自动派生每张的 gaussian-blur/half-page 两类低质集、生成诊断/小节框 overlay 与哈希绑定的负责人 review pack;负责人下载的签署 JSON 还要绑定当前 evidence digest,旧签署或缺任一逐框确认都会 fail-closed。live verifier 当前 `operationalReady=true`,`acceptanceReady=false`,明确缺口为 10 张正例及其后续逐框签署。
+2026-07-19 验收执行状态:冻结合同已固化为 `config/western-m4a-real-photo-acceptance.json`,阈值精确绑定 10 张/90%/负责人逐框 100%/错版至少 5 张且 0 漏放/低质 0 漏放。10 张精确登记版本私密屏拍已完成 intake 和 live 评测:`10/10` 配准通过;现有 8 张 2026-07-17 旧渲染器/错曲真实屏拍作为独立负例为 `8/8` 拒绝、0 漏放,无需追加错版照片。每张正片派生 gaussian-blur/half-page 两类低质集后为 `20/20` 拒绝、0 漏放。overlay 曾因 OpenCV hull 形状误解发生异常,现已修复并对畸形 polygon fail-closed。负责人 review pack 已绑定 evidence digest `5f8562ffda4df524be26b7a0afd4e470fe40823146c63539e351fe6612287f36`,共 10 个案例、189 个小节框;旧签署或缺任一逐框确认都会 fail-closed。live verifier 当前 `operationalReady=true`,`acceptanceReady=false`,唯一 M4a 缺口为负责人逐框 100% 签署。
 
 验收(冻结,达标才开 `M4aSupportedEditionRegistrationReady`):
 - 屏拍域:登记版本的真实屏拍 ≥10 张,配准通过率 ≥90%,反投影小节框逐一目检正确率 100%(负责人核);
@@ -739,6 +739,6 @@ POC → 扩大投入的前提,在 fresh-blind 集(≥30 张,≥6 曲目/版式,�
 |---|---|---|
 | 1 | 闸门拆分 M4a/M4b + `projectReleaseReady` 改绑 M4a | ✅ 2026-07-19 已签署并接线 |
 | 2 | C.3.3 晋升门槛数字冻结 | ✅ 2026-07-19 已签署并接入现场验签 |
-| 3 | M4a v1 工程开工(不依赖上两项,可先行) | ✅ C.2a-f 工程完成;真实验收等待 10 张精确版本屏拍+负责人逐框签署 |
+| 3 | M4a v1 工程开工(不依赖上两项,可先行) | ✅ C.2a-f 工程完成;10 张真实屏拍机器验收全绿,仅待负责人逐框签署 |
 
-附录 C 全量 live audit 由 `npm run audit:western-appendix-c` 执行，并由 `test:western-appendix-c` 覆盖两类伪造:把 C.3.2 的 100–300 张扩张数据目标重新塞回 C.3.3 POC 晋升前置，以及在缺 fresh-blind 证据时打开 M4b 自动采纳。当前审计结果为 `engineeringComplete=true`、`appendixAcceptanceComplete=false`:前者表示附录中的决策、工程、数据、验收和晋升执行面均已就位;后者只保留 M4a 真实屏拍/负责人逐框签署和 M4b fresh-blind 拍摄/结构标注两组外部输入。
+附录 C 全量 live audit 由 `npm run audit:western-appendix-c` 执行，并由 `test:western-appendix-c` 覆盖两类伪造:把 C.3.2 的 100–300 张扩张数据目标重新塞回 C.3.3 POC 晋升前置，以及在缺 fresh-blind 证据时打开 M4b 自动采纳。当前审计结果为 `engineeringComplete=true`、`appendixAcceptanceComplete=false`:前者表示附录中的决策、工程、数据、验收和晋升执行面均已就位;后者只保留 M4a 负责人对 189 个小节框的签署,以及 M4b fresh-blind 拍摄/结构标注两组外部输入。

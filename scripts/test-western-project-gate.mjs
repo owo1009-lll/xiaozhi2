@@ -1434,7 +1434,7 @@ if (m4.m4GateSplitDecisionReady === true) {
     && m4.m4aEngineeringAcceptanceReady === true
   ) {
     assert(m4.m4aRealPhotoAcceptanceOperationalReady === true);
-    assert(m4Failure.reason.some((reason) => String(reason).startsWith("m4a-real-photo-")));
+    assert(m4Failure.reason.some((reason) => String(reason).startsWith("m4a-")));
   } else if (m4.m4aSupportedEditionRegistryReady === true) {
     assert(m4Failure.reason.some((reason) => String(reason).includes("registration")));
   } else {
