@@ -7,6 +7,7 @@ const HealthPage = lazy(() => import("./HealthPage.jsx"));
 const TeacherValidationApp = lazy(() => import("./TeacherValidationApp.jsx"));
 const WesternStringsApp = lazy(() => import("./WesternStringsApp.jsx"));
 const WesternStudentApp = lazy(() => import("./WesternStudentApp.jsx"));
+const WesternScoreView = lazy(() => import("./WesternScoreView.jsx"));
 
 function getModeFromLocation() {
   if (typeof window === "undefined") return "strings";
@@ -16,6 +17,7 @@ function getModeFromLocation() {
   if (params.get("mode") === "teacher") return "teacher";
   if (params.get("mode") === "strings") return "strings";
   if (params.get("mode") === "strings-student") return "strings-student";
+  if (params.get("mode") === "strings-score") return "strings-score";
   if (params.get("mode") === "research") return "research";
   // No explicit mode: the public site defaults to the student page; the operator's
   // local machine defaults to the review console. Explicit ?mode= always wins.
@@ -41,6 +43,7 @@ export default function MainApp() {
       || nextMode === "teacher"
       || nextMode === "strings"
       || nextMode === "strings-student"
+      || nextMode === "strings-score"
     ) {
       url.searchParams.set("mode", nextMode);
     } else {
@@ -68,6 +71,8 @@ export default function MainApp() {
         <WesternStringsApp />
       ) : mode === "strings-student" ? (
         <WesternStudentApp />
+      ) : mode === "strings-score" ? (
+        <WesternScoreView />
       ) : mode === "score-issues" ? (
         <ScoreIssuePage />
       ) : (

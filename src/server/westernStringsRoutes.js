@@ -20,6 +20,7 @@ import {
   listWesternStudentSubmissions,
 } from "./westernStudentGateService.js";
 import {
+  buildScoreDiagnosis,
   findEditionCoordinates,
   findEditionRenderPath,
   listSupportedEditions,
@@ -200,6 +201,19 @@ export function createWesternStringsRouter({
       return res.json({ ok: true, coordinates });
     } catch (error) {
       return res.status(500).json({ ok: false, error: safeString(error?.message, "failed to read score coordinates.") });
+    }
+  });
+
+  router.get("/api/strings/score-diagnosis", async (req, res) => {
+    try {
+      const result = await buildScoreDiagnosis({
+        repoRoot,
+        pieceId: safeString(req.query?.pieceId),
+        editionId: safeString(req.query?.editionId),
+      });
+      return res.json(result);
+    } catch (error) {
+      return res.status(500).json({ ok: false, error: safeString(error?.message, "failed to build score diagnosis.") });
     }
   });
 

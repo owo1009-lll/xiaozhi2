@@ -16,6 +16,7 @@ export const STUDENT_PUBLIC_ALLOWLIST = Object.freeze([
   { method: "GET", path: "/api/strings/score-editions" },
   { method: "GET", path: "/api/strings/score-render" },
   { method: "GET", path: "/api/strings/score-coordinates" },
+  { method: "GET", path: "/api/strings/score-diagnosis" },
 ]);
 
 // Trust model: the backend must bind 127.0.0.1 in public mode so the ONLY way

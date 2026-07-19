@@ -1,0 +1,729 @@
+{
+ "generatedAt": "2026-07-19T11:37:22.531550+00:00",
+ "title": "score / r3-01",
+ "scorePath": "data\\experiments\\western-strings-m4a\\supported-editions\\editions\\r3-01\\self-authored-v1\\score.musicxml",
+ "audioPath": "data\\private\\western-strings-round3\\r3-01.m4a",
+ "audioRelPath": "r3-01.m4a",
+ "scoreNoteCount": 59,
+ "audioNoteCount": 63,
+ "verdictCounts": {
+  "confirmed": 59,
+  "pitch-mismatch": 0,
+  "no-audio-evidence": 0,
+  "beyond-recording": 0,
+  "anchor-uncertain": 0
+ },
+ "audioAgreementHeard": 1.0,
+ "pieceGate": "ok",
+ "notes": [
+  {
+   "measure": 1,
+   "beat": 1.0,
+   "scoreNoteNames": [
+    "E4"
+   ],
+   "audioNoteNames": [
+    "E4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.135
+  },
+  {
+   "measure": 1,
+   "beat": 2.0,
+   "scoreNoteNames": [
+    "F#4"
+   ],
+   "audioNoteNames": [
+    "F#4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.06
+  },
+  {
+   "measure": 1,
+   "beat": 3.0,
+   "scoreNoteNames": [
+    "G4"
+   ],
+   "audioNoteNames": [
+    "G4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.01
+  },
+  {
+   "measure": 1,
+   "beat": 4.0,
+   "scoreNoteNames": [
+    "A4"
+   ],
+   "audioNoteNames": [
+    "A4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.053
+  },
+  {
+   "measure": 2,
+   "beat": 1.0,
+   "scoreNoteNames": [
+    "B4"
+   ],
+   "audioNoteNames": [
+    "B4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.081
+  },
+  {
+   "measure": 2,
+   "beat": 2.0,
+   "scoreNoteNames": [
+    "A4"
+   ],
+   "audioNoteNames": [
+    "A4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.143
+  },
+  {
+   "measure": 2,
+   "beat": 3.0,
+   "scoreNoteNames": [
+    "G4"
+   ],
+   "audioNoteNames": [
+    "G4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.136
+  },
+  {
+   "measure": 2,
+   "beat": 4.0,
+   "scoreNoteNames": [
+    "F#4"
+   ],
+   "audioNoteNames": [
+    "F#4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.221
+  },
+  {
+   "measure": 3,
+   "beat": 1.0,
+   "scoreNoteNames": [
+    "E4"
+   ],
+   "audioNoteNames": [
+    "E4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.26
+  },
+  {
+   "measure": 3,
+   "beat": 2.0,
+   "scoreNoteNames": [
+    "G4"
+   ],
+   "audioNoteNames": [
+    "G4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.231
+  },
+  {
+   "measure": 3,
+   "beat": 3.0,
+   "scoreNoteNames": [
+    "B4"
+   ],
+   "audioNoteNames": [
+    "B4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.432
+  },
+  {
+   "measure": 3,
+   "beat": 4.0,
+   "scoreNoteNames": [
+    "E5"
+   ],
+   "audioNoteNames": [
+    "E5"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.506
+  },
+  {
+   "measure": 4,
+   "beat": 1.0,
+   "scoreNoteNames": [
+    "D5"
+   ],
+   "audioNoteNames": [
+    "D5"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.523
+  },
+  {
+   "measure": 4,
+   "beat": 3.0,
+   "scoreNoteNames": [
+    "B4"
+   ],
+   "audioNoteNames": [
+    "B4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.073
+  },
+  {
+   "measure": 5,
+   "beat": 1.0,
+   "scoreNoteNames": [
+    "C5"
+   ],
+   "audioNoteNames": [
+    "C5"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.376
+  },
+  {
+   "measure": 5,
+   "beat": 2.0,
+   "scoreNoteNames": [
+    "B4"
+   ],
+   "audioNoteNames": [
+    "B4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.243
+  },
+  {
+   "measure": 5,
+   "beat": 3.0,
+   "scoreNoteNames": [
+    "A4"
+   ],
+   "audioNoteNames": [
+    "A4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.145
+  },
+  {
+   "measure": 5,
+   "beat": 4.0,
+   "scoreNoteNames": [
+    "G4"
+   ],
+   "audioNoteNames": [
+    "G4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.119
+  },
+  {
+   "measure": 6,
+   "beat": 1.0,
+   "scoreNoteNames": [
+    "F#4"
+   ],
+   "audioNoteNames": [
+    "F#4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.125
+  },
+  {
+   "measure": 6,
+   "beat": 2.0,
+   "scoreNoteNames": [
+    "G4"
+   ],
+   "audioNoteNames": [
+    "G4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.004
+  },
+  {
+   "measure": 6,
+   "beat": 3.0,
+   "scoreNoteNames": [
+    "A4"
+   ],
+   "audioNoteNames": [
+    "A4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.127
+  },
+  {
+   "measure": 6,
+   "beat": 4.0,
+   "scoreNoteNames": [
+    "F#4"
+   ],
+   "audioNoteNames": [
+    "F#4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.283
+  },
+  {
+   "measure": 7,
+   "beat": 1.0,
+   "scoreNoteNames": [
+    "G4"
+   ],
+   "audioNoteNames": [
+    "G4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.334
+  },
+  {
+   "measure": 7,
+   "beat": 3.0,
+   "scoreNoteNames": [
+    "E4"
+   ],
+   "audioNoteNames": [
+    "E4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.161
+  },
+  {
+   "measure": 8,
+   "beat": 1.0,
+   "scoreNoteNames": [
+    "E4"
+   ],
+   "audioNoteNames": [
+    "E4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.645
+  },
+  {
+   "measure": 8,
+   "beat": 2.0,
+   "scoreNoteNames": [
+    "B4"
+   ],
+   "audioNoteNames": [
+    "B4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.501
+  },
+  {
+   "measure": 8,
+   "beat": 3.0,
+   "scoreNoteNames": [
+    "G4"
+   ],
+   "audioNoteNames": [
+    "G4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.403
+  },
+  {
+   "measure": 8,
+   "beat": 4.0,
+   "scoreNoteNames": [
+    "E5"
+   ],
+   "audioNoteNames": [
+    "E5"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.306
+  },
+  {
+   "measure": 9,
+   "beat": 1.0,
+   "scoreNoteNames": [
+    "D5"
+   ],
+   "audioNoteNames": [
+    "D5"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.174
+  },
+  {
+   "measure": 9,
+   "beat": 2.0,
+   "scoreNoteNames": [
+    "C5"
+   ],
+   "audioNoteNames": [
+    "C5"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.042
+  },
+  {
+   "measure": 9,
+   "beat": 3.0,
+   "scoreNoteNames": [
+    "B4"
+   ],
+   "audioNoteNames": [
+    "B4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.079
+  },
+  {
+   "measure": 9,
+   "beat": 4.0,
+   "scoreNoteNames": [
+    "A4"
+   ],
+   "audioNoteNames": [
+    "A4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.187
+  },
+  {
+   "measure": 10,
+   "beat": 1.0,
+   "scoreNoteNames": [
+    "B4"
+   ],
+   "audioNoteNames": [
+    "B4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.25
+  },
+  {
+   "measure": 10,
+   "beat": 3.0,
+   "scoreNoteNames": [
+    "G4"
+   ],
+   "audioNoteNames": [
+    "G4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.21
+  },
+  {
+   "measure": 11,
+   "beat": 1.0,
+   "scoreNoteNames": [
+    "A4"
+   ],
+   "audioNoteNames": [
+    "A4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.577
+  },
+  {
+   "measure": 11,
+   "beat": 2.0,
+   "scoreNoteNames": [
+    "B4"
+   ],
+   "audioNoteNames": [
+    "B4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.469
+  },
+  {
+   "measure": 11,
+   "beat": 3.0,
+   "scoreNoteNames": [
+    "C5"
+   ],
+   "audioNoteNames": [
+    "C5"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.394
+  },
+  {
+   "measure": 11,
+   "beat": 4.0,
+   "scoreNoteNames": [
+    "D5"
+   ],
+   "audioNoteNames": [
+    "D5"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.424
+  },
+  {
+   "measure": 12,
+   "beat": 1.0,
+   "scoreNoteNames": [
+    "E5"
+   ],
+   "audioNoteNames": [
+    "E5"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.2
+  },
+  {
+   "measure": 12,
+   "beat": 2.0,
+   "scoreNoteNames": [
+    "D5"
+   ],
+   "audioNoteNames": [
+    "D5"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.079
+  },
+  {
+   "measure": 12,
+   "beat": 3.0,
+   "scoreNoteNames": [
+    "C5"
+   ],
+   "audioNoteNames": [
+    "C5"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.065
+  },
+  {
+   "measure": 12,
+   "beat": 4.0,
+   "scoreNoteNames": [
+    "B4"
+   ],
+   "audioNoteNames": [
+    "B4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.138
+  },
+  {
+   "measure": 13,
+   "beat": 1.0,
+   "scoreNoteNames": [
+    "A4"
+   ],
+   "audioNoteNames": [
+    "A4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.225
+  },
+  {
+   "measure": 13,
+   "beat": 2.0,
+   "scoreNoteNames": [
+    "C5"
+   ],
+   "audioNoteNames": [
+    "C5"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.248
+  },
+  {
+   "measure": 13,
+   "beat": 3.0,
+   "scoreNoteNames": [
+    "E5"
+   ],
+   "audioNoteNames": [
+    "E5"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.419
+  },
+  {
+   "measure": 13,
+   "beat": 4.0,
+   "scoreNoteNames": [
+    "A4"
+   ],
+   "audioNoteNames": [
+    "A4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.563
+  },
+  {
+   "measure": 14,
+   "beat": 1.0,
+   "scoreNoteNames": [
+    "B4"
+   ],
+   "audioNoteNames": [
+    "B4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.591
+  },
+  {
+   "measure": 14,
+   "beat": 3.0,
+   "scoreNoteNames": [
+    "F#4"
+   ],
+   "audioNoteNames": [
+    "F#4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.142
+  },
+  {
+   "measure": 15,
+   "beat": 1.0,
+   "scoreNoteNames": [
+    "G4"
+   ],
+   "audioNoteNames": [
+    "G4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.354
+  },
+  {
+   "measure": 15,
+   "beat": 2.0,
+   "scoreNoteNames": [
+    "F#4"
+   ],
+   "audioNoteNames": [
+    "F#4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.349
+  },
+  {
+   "measure": 15,
+   "beat": 3.0,
+   "scoreNoteNames": [
+    "E4"
+   ],
+   "audioNoteNames": [
+    "E4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.123
+  },
+  {
+   "measure": 15,
+   "beat": 4.0,
+   "scoreNoteNames": [
+    "G4"
+   ],
+   "audioNoteNames": [
+    "G4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.027
+  },
+  {
+   "measure": 16,
+   "beat": 1.0,
+   "scoreNoteNames": [
+    "B4"
+   ],
+   "audioNoteNames": [
+    "B4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.094
+  },
+  {
+   "measure": 16,
+   "beat": 2.0,
+   "scoreNoteNames": [
+    "A4"
+   ],
+   "audioNoteNames": [
+    "A4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.111
+  },
+  {
+   "measure": 16,
+   "beat": 3.0,
+   "scoreNoteNames": [
+    "F#4"
+   ],
+   "audioNoteNames": [
+    "F#4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.254
+  },
+  {
+   "measure": 16,
+   "beat": 4.0,
+   "scoreNoteNames": [
+    "D#4"
+   ],
+   "audioNoteNames": [
+    "D#4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.375
+  },
+  {
+   "measure": 17,
+   "beat": 1.0,
+   "scoreNoteNames": [
+    "E4"
+   ],
+   "audioNoteNames": [
+    "E4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": -0.484
+  },
+  {
+   "measure": 17,
+   "beat": 3.0,
+   "scoreNoteNames": [
+    "B4"
+   ],
+   "audioNoteNames": [
+    "B4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.0
+  },
+  {
+   "measure": 18,
+   "beat": 1.0,
+   "scoreNoteNames": [
+    "E4"
+   ],
+   "audioNoteNames": [
+    "E4"
+   ],
+   "verdict": "confirmed",
+   "timingDeviationSec": 0.518
+  }
+ ],
+ "caveat": "research-only viewer; reuses the validated score-anchored verdict algorithm, no OMR/photo dependency, not the safety-gated production pipeline"
+}

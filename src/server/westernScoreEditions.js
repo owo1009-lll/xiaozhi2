@@ -82,3 +82,66 @@ export async function findEditionCoordinates({ repoRoot = process.cwd(), pieceId
     return null;
   }
 }
+
+// Pre-generated real diagnosis results (research-grade verdicts on old recordings,
+// used to test on-score localization until the safety-gated automatic pipeline
+// ships). Stored as verdict JSON only — never the recording audio.
+const VERDICT_LABELS = {
+  "pitch-mismatch": "音准不符",
+  "no-audio-evidence": "未听到 / 漏音",
+  "beyond-recording": "超出录音",
+  "anchor-uncertain": "对齐存疑",
+};
+
+async function readDiagnosis(repoRoot, pieceId) {
+  const piece = safeString(pieceId).trim();
+  if (!piece || piece.includes("/") || piece.includes("\\") || piece.includes("..")) return null;
+  const p = path.join(repoRoot, "data", "experiments", "western-strings-m4a", "score-diagnosis", `${piece}.json`);
+  try {
+    return JSON.parse(await fs.readFile(p, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+// Fuse per-note verdicts with the coordinate sidecar (same note order) into
+// on-score localization: each non-confirmed note becomes a boxed issue, and the
+// measures that contain them become highlighted measures.
+export async function buildScoreDiagnosis({ repoRoot = process.cwd(), pieceId = "", editionId = "" } = {}) {
+  const diagnosis = await readDiagnosis(repoRoot, pieceId);
+  const coords = await findEditionCoordinates({ repoRoot, pieceId, editionId });
+  if (!diagnosis || !coords) {
+    return { ok: true, hasData: false, pieceId: safeString(pieceId), noteIssues: [], measureIssues: [] };
+  }
+  const diagNotes = Array.isArray(diagnosis.notes) ? diagnosis.notes : [];
+  const coordNotes = Array.isArray(coords.notes) ? coords.notes : [];
+  const coordMeasures = Array.isArray(coords.measures) ? coords.measures : [];
+  const noteIssues = [];
+  const problemMeasures = new Map();
+  for (let i = 0; i < diagNotes.length && i < coordNotes.length; i++) {
+    const verdict = safeString(diagNotes[i].verdict).trim();
+    if (!verdict || verdict === "confirmed") continue;
+    const coordNote = coordNotes[i];
+    const label = VERDICT_LABELS[verdict] || verdict;
+    const measure = coordNote.globalMeasureIndex;
+    noteIssues.push({ bbox: coordNote.bboxNormalized, verdict, label, measure });
+    if (!problemMeasures.has(measure)) problemMeasures.set(measure, new Set());
+    problemMeasures.get(measure).add(label);
+  }
+  const measureIssues = [];
+  for (const [measure, labels] of problemMeasures) {
+    const coordMeasure = coordMeasures.find((m) => m.globalMeasureIndex === measure);
+    if (coordMeasure) {
+      measureIssues.push({ bbox: coordMeasure.bboxNormalized, measure, labels: Array.from(labels) });
+    }
+  }
+  return {
+    ok: true,
+    hasData: true,
+    pieceId: safeString(pieceId),
+    verdictCounts: diagnosis.verdictCounts || {},
+    audioAgreementHeard: diagnosis.audioAgreementHeard ?? null,
+    noteIssues,
+    measureIssues,
+  };
+}

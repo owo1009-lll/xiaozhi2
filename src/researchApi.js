@@ -13,12 +13,25 @@ const NO_STORE_REQUEST = { cache: "no-store" };
 // On localhost the backend serves the bundle itself, so requests stay same-origin
 // and this returns the plain relative path. Only the student-facing calls use it;
 // the operator consoles are used locally and keep same-origin relative paths.
-function studentApiUrl(pathname) {
+export function studentApiUrl(pathname) {
   if (typeof window === "undefined") return pathname;
   const host = window.location.hostname;
   if (host === "localhost" || host === "127.0.0.1" || host === "") return pathname;
   const base = import.meta.env?.VITE_API_BASE || `${window.location.protocol}//api.${host}`;
   return `${base.replace(/\/$/, "")}${pathname}`;
+}
+
+export async function fetchWesternScoreEditions() {
+  return readJson(await fetch(studentApiUrl("/api/strings/score-editions"), NO_STORE_REQUEST));
+}
+
+export async function fetchWesternScoreDiagnosis(pieceId) {
+  const suffix = `?pieceId=${encodeURIComponent(pieceId)}`;
+  return readJson(await fetch(studentApiUrl(`/api/strings/score-diagnosis${suffix}`), NO_STORE_REQUEST));
+}
+
+export function westernScoreRenderUrl(pieceId) {
+  return studentApiUrl(`/api/strings/score-render?pieceId=${encodeURIComponent(pieceId)}`);
 }
 
 export async function fetchPieces() {

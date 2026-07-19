@@ -219,6 +219,36 @@ button {
   margin-top: 10px;
 }
 
+/* 谱面定位视图 */
+.western-score-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.western-score-tab {
+  padding: 8px 16px; border-radius: 999px; font-size: 13px; cursor: pointer;
+  border: 1px solid var(--border); background: transparent; color: var(--text-muted);
+}
+.western-score-tab.is-active { background: var(--text); color: var(--surface); border-color: var(--text); font-weight: 600; }
+.western-score-summary {
+  background: rgba(203, 169, 106, 0.12);
+  border: 1px solid rgba(203, 169, 106, 0.3);
+  border-radius: 10px; padding: 10px 14px; font-size: 14px; margin-bottom: 14px; color: #8a6d2f;
+}
+.western-score-stage { position: relative; line-height: 0; border-radius: 10px; overflow: hidden; }
+.western-score-img { width: 100%; display: block; }
+.western-score-mbox {
+  position: absolute; box-sizing: border-box;
+  border: 2px solid #d6453e; border-radius: 3px; pointer-events: none;
+  background: rgba(214, 69, 62, 0.1);
+}
+.western-score-mlabel {
+  position: absolute; top: -18px; left: 0;
+  background: #d6453e; color: #fff; font-size: 11px; line-height: 1;
+  padding: 3px 7px; border-radius: 4px; white-space: nowrap;
+}
+.western-score-nbox {
+  position: absolute; box-sizing: border-box;
+  border: 2px solid #d6453e; border-radius: 50%; pointer-events: none;
+  box-shadow: 0 0 0 2px rgba(214, 69, 62, 0.25);
+}
+
 .western-student-feedback {
   margin: 6px 0 0;
   padding: 8px 10px;

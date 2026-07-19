@@ -55,6 +55,7 @@ assert.deepEqual(
   [
     "GET /api/health",
     "GET /api/strings/score-coordinates",
+    "GET /api/strings/score-diagnosis",
     "GET /api/strings/score-editions",
     "GET /api/strings/score-render",
     "GET /api/strings/student-gate",
