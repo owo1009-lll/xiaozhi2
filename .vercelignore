@@ -1,7 +1,7 @@
 # Vercel only builds the static frontend (vite -> dist). Keep the heavy backend,
 # models, private data, and Python runtime out of the deployment upload.
-data
-data.local
+/data
+/data.local
 models
 models.local
 python-service
