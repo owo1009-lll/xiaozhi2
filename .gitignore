@@ -137,3 +137,5 @@ models.local/
 tools.local/
 /scripts/verify_v3.py
 /scripts/verify_v5.py
+
+.vercel
