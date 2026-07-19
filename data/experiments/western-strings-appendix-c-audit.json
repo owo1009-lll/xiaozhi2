@@ -5,7 +5,6 @@
   "appendixAcceptanceComplete": false,
   "engineeringBlockingReasons": [],
   "externalBlockingReasons": [
-    "m4a-owner-measure-box-confirmation-not-ready",
     "m4b-fresh-blind-intake-missing"
   ],
   "decisions": {
@@ -18,7 +17,7 @@
     "runtimeReady": true,
     "engineeringReady": true,
     "realPhotoFlowOperationalReady": true,
-    "realPhotoAcceptanceReady": false,
+    "realPhotoAcceptanceReady": true,
     "scaleCatalog": {
       "documented": true,
       "continuousLifecycleTarget": true,

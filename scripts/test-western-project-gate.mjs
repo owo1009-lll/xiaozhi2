@@ -1425,31 +1425,36 @@ const m4Failure = fullGate.failures.find((failure) => failure.track === (
     ? "M4a supported-edition registration"
     : "M4 OMR automatic adoption"
 ));
-assert(m4Failure, "the required M4 track must remain fail-closed until its active contract is ready");
 if (m4.m4GateSplitDecisionReady === true) {
-  assert.equal(m4.m4aSupportedEditionRegistrationReady, false);
-  if (
-    m4.m4aSupportedEditionRegistryReady === true
-    && m4.m4aRegistrationRuntimeReady === true
-    && m4.m4aEngineeringAcceptanceReady === true
-  ) {
-    assert(m4.m4aRealPhotoAcceptanceOperationalReady === true);
-    assert(m4Failure.reason.some((reason) => String(reason).startsWith("m4a-")));
-  } else if (m4.m4aSupportedEditionRegistryReady === true) {
-    assert(m4Failure.reason.some((reason) => String(reason).includes("registration")));
+  if (m4.m4aSupportedEditionRegistrationReady === true) {
+    assert.equal(m4Failure, undefined, "a completed M4a contract must clear the required M4 track");
+    assert.equal(m4.m4aRealPhotoAcceptanceReady, true);
   } else {
-    assert(
-      m4Failure.reason.some((reason) => String(reason).includes("registry")),
-      "an invalid M4a supported-edition registry must remain fail-closed",
-    );
+    assert(m4Failure, "the required M4a track must remain fail-closed until its active contract is ready");
+    if (
+      m4.m4aSupportedEditionRegistryReady === true
+      && m4.m4aRegistrationRuntimeReady === true
+      && m4.m4aEngineeringAcceptanceReady === true
+    ) {
+      assert(m4.m4aRealPhotoAcceptanceOperationalReady === true);
+      assert(m4Failure.reason.some((reason) => String(reason).startsWith("m4a-")));
+    } else if (m4.m4aSupportedEditionRegistryReady === true) {
+      assert(m4Failure.reason.some((reason) => String(reason).includes("registration")));
+    } else {
+      assert(
+        m4Failure.reason.some((reason) => String(reason).includes("registry")),
+        "an invalid M4a supported-edition registry must remain fail-closed",
+      );
+    }
+    assert.equal(m4Failure.artifact, m4.artifacts.m4aRegistrationAuditJson);
   }
-  assert.equal(m4Failure.artifact, m4.artifacts.m4aRegistrationAuditJson);
   assert.equal(
     fullGate.failures.some((failure) => failure.track === "M4 OMR automatic adoption"),
     false,
     "M4b open-world OMR must remain separate from the signed M4a project binding",
   );
 } else {
+  assert(m4Failure, "the required M4 track must remain fail-closed until its active contract is ready");
   assert(
     m4Failure.reason.includes("m4-same-edition-homr-independent-page-count-below-floor"),
     "unsigned split must preserve the same-edition page-count blocker",

@@ -71,7 +71,7 @@ export function evaluateAppendixC({
   if (!containsAll(projectStatus || "", [
     "m4bStructurePocEngineeringReady=true",
     "m4bStructurePocPromotionReady=false",
-    "m4a-owner-measure-box-confirmation-not-ready",
+    "m4aSupportedEditionRegistrationReady=true",
     "m4b-fresh-blind-capture-pack",
   ])) {
     engineeringBlockingReasons.push("appendix-c-project-status-surface-incomplete");
