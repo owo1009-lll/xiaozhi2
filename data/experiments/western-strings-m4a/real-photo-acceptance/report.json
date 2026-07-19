@@ -1,7 +1,7 @@
 {
   "contract": "western-m4a-real-photo-acceptance-v1",
   "complete": true,
-  "acceptanceReady": false,
+  "acceptanceReady": true,
   "evidenceClass": "frozen-real-screen-photo-acceptance",
   "provenance": {
     "policy": "config/western-m4a-real-photo-acceptance.json",
@@ -26,16 +26,14 @@
   "checks": {
     "positivePhotoCount": true,
     "positivePassRate": true,
-    "ownerMeasureBoxConfirmation": false,
+    "ownerMeasureBoxConfirmation": true,
     "wrongEditionCount": true,
     "wrongEditionLeakCount": true,
     "poorImageCoverage": true,
     "poorImageLeakCount": true,
     "reviewOnlySafety": true
   },
-  "blockingReasons": [
-    "m4a-owner-measure-box-confirmation-not-ready"
-  ],
+  "blockingReasons": [],
   "evidenceDigest": "5f8562ffda4df524be26b7a0afd4e470fe40823146c63539e351fe6612287f36",
   "positiveCases": [
     {
@@ -1988,14 +1986,16 @@
     }
   ],
   "ownerReview": {
-    "ready": false,
-    "reason": "m4a-owner-measure-review-missing-or-invalid",
-    "error": "[Errno 2] No such file or directory: 'C:\\\\Users\\\\Administrator\\\\Downloads\\\\ai二胡\\\\data\\\\private\\\\western-strings-m4a-real-photo-acceptance\\\\owner-measure-review.json'",
-    "reviewer": "",
-    "reviewedAt": "",
-    "confirmedMeasureCount": 0,
+    "ready": true,
+    "reason": "ok",
+    "blockingReasons": [],
+    "source": "data/private/western-strings-m4a-real-photo-acceptance/owner-measure-review.json",
+    "sha256": "0264e5b37c5f6fda139023fb585b3a9117168aa90eb991ace6117f75b19f81b0",
+    "reviewer": "guanxingzhi (project owner)",
+    "reviewedAt": "2026-07-19T08:54:16.636Z",
+    "confirmedMeasureCount": 189,
     "expectedMeasureCount": 189,
-    "confirmationRate": 0.0
+    "confirmationRate": 1.0
   },
   "summary": {
     "positiveExpected": 10,
@@ -2009,7 +2009,7 @@
     "poorImageEvaluated": 20,
     "poorImageBlocked": 20,
     "poorImageLeakCount": 0,
-    "ownerConfirmedMeasures": 0,
+    "ownerConfirmedMeasures": 189,
     "ownerExpectedMeasures": 189
   },
   "safety": {
