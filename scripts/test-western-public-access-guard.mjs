@@ -54,6 +54,9 @@ assert.deepEqual(
   STUDENT_PUBLIC_ALLOWLIST.map((entry) => `${entry.method} ${entry.path}`).sort(),
   [
     "GET /api/health",
+    "GET /api/strings/score-coordinates",
+    "GET /api/strings/score-editions",
+    "GET /api/strings/score-render",
     "GET /api/strings/student-gate",
     "GET /api/strings/student-submissions",
     "POST /api/strings/analyze",

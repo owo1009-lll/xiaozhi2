@@ -11,6 +11,11 @@ export const STUDENT_PUBLIC_ALLOWLIST = Object.freeze([
   { method: "GET", path: "/api/strings/student-gate" },
   { method: "GET", path: "/api/strings/student-submissions" },
   { method: "POST", path: "/api/strings/analyze" },
+  // Reference score images + coordinate sidecars for the student score view
+  // (built-in supported editions only; reference material, not student data).
+  { method: "GET", path: "/api/strings/score-editions" },
+  { method: "GET", path: "/api/strings/score-render" },
+  { method: "GET", path: "/api/strings/score-coordinates" },
 ]);
 
 // Trust model: the backend must bind 127.0.0.1 in public mode so the ONLY way

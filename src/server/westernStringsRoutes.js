@@ -19,6 +19,11 @@ import {
   buildWesternStudentGateView,
   listWesternStudentSubmissions,
 } from "./westernStudentGateService.js";
+import {
+  findEditionCoordinates,
+  findEditionRenderPath,
+  listSupportedEditions,
+} from "./westernScoreEditions.js";
 
 function defaultParseIncomingPayload(req) {
   return req.body || {};
@@ -154,6 +159,47 @@ export function createWesternStringsRouter({
       return res.json(buildWesternStudentGateView());
     } catch (error) {
       return res.status(500).json({ ok: false, error: safeString(error?.message, "failed to build western strings student gate view.") });
+    }
+  });
+
+  router.get("/api/strings/score-editions", async (req, res) => {
+    try {
+      const result = await listSupportedEditions({ repoRoot });
+      return res.json(result);
+    } catch (error) {
+      return res.status(500).json({ ok: false, error: safeString(error?.message, "failed to list supported score editions.") });
+    }
+  });
+
+  router.get("/api/strings/score-render", async (req, res) => {
+    try {
+      const renderPath = await findEditionRenderPath({
+        repoRoot,
+        pieceId: safeString(req.query?.pieceId),
+        editionId: safeString(req.query?.editionId),
+      });
+      if (!renderPath) {
+        return res.status(404).json({ ok: false, error: "score render not found for this piece." });
+      }
+      return res.sendFile(renderPath);
+    } catch (error) {
+      return res.status(500).json({ ok: false, error: safeString(error?.message, "failed to read score render.") });
+    }
+  });
+
+  router.get("/api/strings/score-coordinates", async (req, res) => {
+    try {
+      const coordinates = await findEditionCoordinates({
+        repoRoot,
+        pieceId: safeString(req.query?.pieceId),
+        editionId: safeString(req.query?.editionId),
+      });
+      if (!coordinates) {
+        return res.status(404).json({ ok: false, error: "score coordinates not found for this piece." });
+      }
+      return res.json({ ok: true, coordinates });
+    } catch (error) {
+      return res.status(500).json({ ok: false, error: safeString(error?.message, "failed to read score coordinates.") });
     }
   });
 
