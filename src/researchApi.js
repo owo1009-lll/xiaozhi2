@@ -8,6 +8,19 @@ async function readJson(response) {
 
 const NO_STORE_REQUEST = { cache: "no-store" };
 
+// The student site is served from Vercel (the apex domain) while the analysis
+// backend runs on the operator's machine behind a tunnel at the `api.` subdomain.
+// On localhost the backend serves the bundle itself, so requests stay same-origin
+// and this returns the plain relative path. Only the student-facing calls use it;
+// the operator consoles are used locally and keep same-origin relative paths.
+function studentApiUrl(pathname) {
+  if (typeof window === "undefined") return pathname;
+  const host = window.location.hostname;
+  if (host === "localhost" || host === "127.0.0.1" || host === "") return pathname;
+  const base = import.meta.env?.VITE_API_BASE || `${window.location.protocol}//api.${host}`;
+  return `${base.replace(/\/$/, "")}${pathname}`;
+}
+
 export async function fetchPieces() {
   return readJson(await fetch("/api/erhu/pieces"));
 }
@@ -288,7 +301,7 @@ export async function fetchWesternStudentAnalysis(payload = {}) {
     const { audioFile, scorePhotoFile, ...rest } = payload;
     formData.append("payload", JSON.stringify(rest));
     return readJson(
-      await fetch("/api/strings/analyze", {
+      await fetch(studentApiUrl("/api/strings/analyze"), {
         method: "POST",
         body: formData,
       }),
@@ -304,7 +317,7 @@ export async function fetchWesternStudentAnalysis(payload = {}) {
 }
 
 export async function fetchWesternStudentGate() {
-  return readJson(await fetch("/api/strings/student-gate", NO_STORE_REQUEST));
+  return readJson(await fetch(studentApiUrl("/api/strings/student-gate"), NO_STORE_REQUEST));
 }
 
 export async function fetchWesternStudentSubmissions(params = {}) {
@@ -315,7 +328,7 @@ export async function fetchWesternStudentSubmissions(params = {}) {
     }
   }
   const suffix = searchParams.toString() ? `?${searchParams.toString()}` : "";
-  return readJson(await fetch(`/api/strings/student-submissions${suffix}`, NO_STORE_REQUEST));
+  return readJson(await fetch(studentApiUrl(`/api/strings/student-submissions${suffix}`), NO_STORE_REQUEST));
 }
 
 export async function fetchWesternControlledSubmissions(params = {}) {

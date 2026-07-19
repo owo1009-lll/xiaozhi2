@@ -81,6 +81,7 @@ import { createScoreRouter } from "./src/server/scoreRoutes.js";
 import { createTeacherValidationService } from "./src/server/teacherValidationService.js";
 import { createTeacherValidationRouter } from "./src/server/teacherValidationRoutes.js";
 import { createWesternStringsRouter } from "./src/server/westernStringsRoutes.js";
+import { createPublicAccessGuard } from "./src/server/publicAccessGuard.js";
 import {
   appendAnalysisToParticipant,
   buildValidationSummary,
@@ -151,6 +152,13 @@ const teacherValidationService = createTeacherValidationService({
 });
 
 app.use(express.json({ limit: "120mb" }));
+
+// When exposed to the internet through the Cloudflare tunnel, only the student
+// endpoints may answer public traffic; the full backend stays local-only.
+app.use(createPublicAccessGuard({
+  publicMode: safeBoolean(process.env.WESTERN_PUBLIC_MODE, false),
+  allowOrigins: safeString(process.env.WESTERN_PUBLIC_ORIGIN),
+}));
 
 function scoreStoreUsesSqlite() {
   if (SCORE_STORE_BACKEND === "sqlite" || SCORE_STORE_BACKEND === "sqlite3") return true;
@@ -4606,8 +4614,14 @@ app.get(/.*/, async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`AI Erhu prototype listening on http://localhost:${port}`);
+// In public mode the tunnel is the only intended way in, so bind loopback to
+// keep the port off other interfaces; that binding is what lets the guard trust
+// header-less (local) requests. Default (unset) keeps the prior all-interfaces
+// behaviour for local/LAN development.
+const bindHost = safeString(process.env.ERHU_BIND_HOST).trim();
+const listenArgs = bindHost ? [port, bindHost] : [port];
+app.listen(...listenArgs, () => {
+  console.log(`AI Erhu prototype listening on http://${bindHost || "localhost"}:${port}`);
   void recoverStaleJobsOnStartup();
   setTimeout(() => void backfillMissingTempos(), 30000);
 });

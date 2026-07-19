@@ -1,0 +1,18 @@
+# Vercel only builds the static frontend (vite -> dist). Keep the heavy backend,
+# models, private data, and Python runtime out of the deployment upload.
+data
+data.local
+models
+models.local
+python-service
+runs.local
+tools.local
+erhu-anchor-clips
+erhu-spotcheck
+erhu-teacher-pack-fusheng
+erhu-system-paper
+paper
+research-analysis
+音频
+*.log
+node_modules

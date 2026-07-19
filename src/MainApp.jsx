@@ -16,7 +16,12 @@ function getModeFromLocation() {
   if (params.get("mode") === "teacher") return "teacher";
   if (params.get("mode") === "strings") return "strings";
   if (params.get("mode") === "strings-student") return "strings-student";
-  return params.get("mode") === "research" ? "research" : "strings";
+  if (params.get("mode") === "research") return "research";
+  // No explicit mode: the public site defaults to the student page; the operator's
+  // local machine defaults to the review console. Explicit ?mode= always wins.
+  const host = window.location.hostname;
+  if (host === "localhost" || host === "127.0.0.1" || host === "") return "strings";
+  return "strings-student";
 }
 
 export default function MainApp() {

@@ -1,0 +1,14 @@
+# Cloudflare named-tunnel config for the analysis backend.
+# Copy to C:\Users\<you>\.cloudflared\config.yml and fill in the two placeholders
+# after `cloudflared tunnel create string-diag-api` (see docs/go-live-guide.md).
+#
+# It routes the api. subdomain to the local backend and refuses everything else,
+# so only https://api.stringinstrumentdiagnosis.icu is exposed — not the raw port.
+
+tunnel: REPLACE_WITH_TUNNEL_ID
+credentials-file: C:\Users\Administrator\.cloudflared\REPLACE_WITH_TUNNEL_ID.json
+
+ingress:
+  - hostname: api.stringinstrumentdiagnosis.icu
+    service: http://127.0.0.1:3000
+  - service: http_status:404
