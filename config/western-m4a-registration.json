@@ -28,6 +28,7 @@
     "minimumInliers": 16,
     "minimumInlierRatio": 0.2,
     "minimumReferenceGridCoverage": 0.2,
+    "minimumProjectedPageVisibility": 0.75,
     "minimumSystemConsistency": 1.0,
     "minimumBarlineConsistency": 0.6,
     "minimumPerSystemBarlineConsistency": 0.5,

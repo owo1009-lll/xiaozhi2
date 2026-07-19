@@ -2,12 +2,62 @@
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>M4a 小节框负责人复核</title><style>
 body{font-family:system-ui,"Microsoft YaHei",sans-serif;margin:0;background:#0f172a;color:#f8fafc}header{position:sticky;top:0;background:#111827;padding:12px 18px;z-index:2}main{max-width:1200px;margin:auto;padding:16px}article{background:#1e293b;padding:14px;border-radius:12px;margin:14px 0}img{width:100%;height:auto;background:white}label{display:block;padding:12px 0;font-size:18px}input{width:22px;height:22px;vertical-align:middle}button,input[type=text]{font-size:16px;padding:9px;margin:4px}code{color:#5eead4}</style></head>
-<body><header><strong>M4a 负责人逐框复核</strong> · evidence <code>4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945</code></header><main>
+<body><header><strong>M4a 负责人逐框复核</strong> · evidence <code>5f8562ffda4df524be26b7a0afd4e470fe40823146c63539e351fe6612287f36</code></header><main>
 <p>只确认蓝色小节框的位置；必须逐框查看。下载的 JSON 放入 Downloads 后运行 <code>npm run western:m4a-owner-review-intake</code>。</p>
 <p><input id="reviewer" type="text" placeholder="负责人姓名"><button id="download">全部勾选后下载签署 JSON</button></p>
-<p>尚无通过配准的真实照片，当前不能签署。</p>
+
+        <article data-case="m4a-positive-01" data-count="21">
+          <h2>m4a-positive-01 · 21 个小节框</h2>
+          <img src="../positive-cases/m4a-positive-01/measure-review-overlay.jpg" alt="m4a-positive-01 measure overlay">
+          <label><input type="checkbox"> 我已逐框核对，全部位置正确</label>
+        </article>
+        <article data-case="m4a-positive-02" data-count="21">
+          <h2>m4a-positive-02 · 21 个小节框</h2>
+          <img src="../positive-cases/m4a-positive-02/measure-review-overlay.jpg" alt="m4a-positive-02 measure overlay">
+          <label><input type="checkbox"> 我已逐框核对，全部位置正确</label>
+        </article>
+        <article data-case="m4a-positive-03" data-count="21">
+          <h2>m4a-positive-03 · 21 个小节框</h2>
+          <img src="../positive-cases/m4a-positive-03/measure-review-overlay.jpg" alt="m4a-positive-03 measure overlay">
+          <label><input type="checkbox"> 我已逐框核对，全部位置正确</label>
+        </article>
+        <article data-case="m4a-positive-04" data-count="21">
+          <h2>m4a-positive-04 · 21 个小节框</h2>
+          <img src="../positive-cases/m4a-positive-04/measure-review-overlay.jpg" alt="m4a-positive-04 measure overlay">
+          <label><input type="checkbox"> 我已逐框核对，全部位置正确</label>
+        </article>
+        <article data-case="m4a-positive-05" data-count="17">
+          <h2>m4a-positive-05 · 17 个小节框</h2>
+          <img src="../positive-cases/m4a-positive-05/measure-review-overlay.jpg" alt="m4a-positive-05 measure overlay">
+          <label><input type="checkbox"> 我已逐框核对，全部位置正确</label>
+        </article>
+        <article data-case="m4a-positive-06" data-count="17">
+          <h2>m4a-positive-06 · 17 个小节框</h2>
+          <img src="../positive-cases/m4a-positive-06/measure-review-overlay.jpg" alt="m4a-positive-06 measure overlay">
+          <label><input type="checkbox"> 我已逐框核对，全部位置正确</label>
+        </article>
+        <article data-case="m4a-positive-07" data-count="17">
+          <h2>m4a-positive-07 · 17 个小节框</h2>
+          <img src="../positive-cases/m4a-positive-07/measure-review-overlay.jpg" alt="m4a-positive-07 measure overlay">
+          <label><input type="checkbox"> 我已逐框核对，全部位置正确</label>
+        </article>
+        <article data-case="m4a-positive-08" data-count="18">
+          <h2>m4a-positive-08 · 18 个小节框</h2>
+          <img src="../positive-cases/m4a-positive-08/measure-review-overlay.jpg" alt="m4a-positive-08 measure overlay">
+          <label><input type="checkbox"> 我已逐框核对，全部位置正确</label>
+        </article>
+        <article data-case="m4a-positive-09" data-count="18">
+          <h2>m4a-positive-09 · 18 个小节框</h2>
+          <img src="../positive-cases/m4a-positive-09/measure-review-overlay.jpg" alt="m4a-positive-09 measure overlay">
+          <label><input type="checkbox"> 我已逐框核对，全部位置正确</label>
+        </article>
+        <article data-case="m4a-positive-10" data-count="18">
+          <h2>m4a-positive-10 · 18 个小节框</h2>
+          <img src="../positive-cases/m4a-positive-10/measure-review-overlay.jpg" alt="m4a-positive-10 measure overlay">
+          <label><input type="checkbox"> 我已逐框核对，全部位置正确</label>
+        </article>
 </main><script>
-const digest="4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945";
+const digest="5f8562ffda4df524be26b7a0afd4e470fe40823146c63539e351fe6612287f36";
 document.querySelector('#download').addEventListener('click',()=>{
  const reviewer=document.querySelector('#reviewer').value.trim();
  const articles=[...document.querySelectorAll('article')];

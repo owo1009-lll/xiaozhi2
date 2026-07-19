@@ -93,11 +93,19 @@ for (const [label, mutate, reason] of [
 
 const live = await auditM4aRealPhotoAcceptance();
 assert.equal(live.operationalReady, true, live.integrityBlockingReasons.join(", "));
-assert.equal(live.ready, false, "real-photo gate must remain closed before owner capture");
-assert.equal(live.summary.positiveAvailable, 0);
 assert.equal(live.summary.wrongEditionAvailable, 8);
 assert.equal(live.summary.wrongEditionBlocked, 8);
-assert(live.blockingReasons.includes("m4a-real-photo-positive-missing:10"));
+if (live.summary.positiveAvailable === 0) {
+  assert.equal(live.ready, false, "real-photo gate must remain closed before owner capture");
+  assert(live.blockingReasons.includes("m4a-real-photo-positive-missing:10"));
+} else {
+  assert.equal(live.summary.positiveAvailable, 10);
+  assert.equal(live.summary.positivePassed, 10);
+  assert.equal(live.summary.poorImageEvaluated, 20);
+  assert.equal(live.summary.poorImageBlocked, 20);
+  assert.equal(live.summary.poorImageLeakCount, 0);
+  assert(!live.blockingReasons.includes("m4a-real-photo-poor-image-leak-detected"));
+}
 
 const capturePack = await fs.readFile("docs/m4a-real-photo-capture-pack/index.html", "utf8");
 for (const task of config.positiveCaptureTasks) assert(capturePack.includes(task.caseId));
@@ -110,6 +118,6 @@ console.log(JSON.stringify({
     "eight-real-wrong-edition-screen-photos-blocked",
     "poor-image-and-safety-gates-fail-closed",
     "capture-pack-covers-all-ten-positive-tasks",
-    "live-gate-remains-closed-with-exact-missing-count",
+    "live-gate-supports-absent-or-complete-private-photo-evidence",
   ],
 }, null, 2));

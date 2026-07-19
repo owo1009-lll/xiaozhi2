@@ -7,7 +7,7 @@
     "policy": "config/western-m4a-real-photo-acceptance.json",
     "policySha256": "bd830445b918919e01ad56b1444bb1e28dbfba3411ae38f935f38e4cc730aa6e",
     "implementation": "scripts/western_m4a_registration.py",
-    "implementationSha256": "c7f30264aa097b975e1cee061dc34e66a0b4dfa72e001b553b5a8335c9507616",
+    "implementationSha256": "5075e235987763eeaa607e07193bcd1410ee2a0b223d312fa532acbcef39693e",
     "registry": "data/experiments/western-strings-m4a/supported-editions/registry.json",
     "registrySha256": "10a35688cfaad13d6510b6bbe3a9a9fbca3d0ecb0b1ee3b7dbdec3cb9ffd9c9c"
   },
@@ -24,131 +24,569 @@
     "maximumPoorImageLeakCount": 0
   },
   "checks": {
-    "positivePhotoCount": false,
-    "positivePassRate": false,
+    "positivePhotoCount": true,
+    "positivePassRate": true,
     "ownerMeasureBoxConfirmation": false,
     "wrongEditionCount": true,
     "wrongEditionLeakCount": true,
-    "poorImageCoverage": false,
+    "poorImageCoverage": true,
     "poorImageLeakCount": true,
     "reviewOnlySafety": true
   },
   "blockingReasons": [
-    "m4a-real-photo-positive-missing:10",
-    "m4a-owner-measure-box-confirmation-not-ready",
-    "m4a-real-photo-poor-image-coverage-not-ready"
+    "m4a-owner-measure-box-confirmation-not-ready"
   ],
-  "evidenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "evidenceDigest": "5f8562ffda4df524be26b7a0afd4e470fe40823146c63539e351fe6612287f36",
   "positiveCases": [
     {
       "caseId": "m4a-positive-01",
       "pieceId": "r2-01",
       "editionId": "self-authored-v1",
       "captureVariant": "near-frontal",
-      "available": false,
-      "ready": false,
-      "reason": "real-screen-photo-missing",
+      "available": true,
       "photo": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-01.jpg",
-      "audio": "data/private/western-strings-round2/r2-01.m4a"
+      "photoSha256": "c4f008be99137ee627f5d7a9237757394f2d8c7845b753cf2d6738c181f27dd2",
+      "audio": "data/private/western-strings-round2/r2-01.m4a",
+      "audioSha256": "59b3f5a163fc2d37a7e5c6375143b830d7d33e5c81465273b1a6c03fcd788d6c",
+      "ready": true,
+      "reason": "supported-edition-registration-ready",
+      "blockingReasons": [],
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": true,
+        "goodMatchCount": 478,
+        "inlierCount": 172,
+        "inlierRatio": 0.359833,
+        "referenceGridCoverage": 0.6875,
+        "projectedPageVisibility": 0.815468,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 1.0,
+        "structuralResidualNormalized": 0.00031962,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00087924,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 4,
+        "staves": 4,
+        "measures": 21,
+        "notes": 67
+      },
+      "feedbackProjection": {
+        "ready": true,
+        "expectedAnchorCount": 67,
+        "mappedAnchorCount": 67
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-01/audit.json",
+      "auditSha256": "22e5557f49df48ea570f8ff79967fcf09bb7e2db782ee1c47b082a749c746a80",
+      "diagnosticOverlay": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-01/diagnostic-overlay.jpg",
+      "diagnosticOverlaySha256": "a3ffac4bb83aa33ef9da60a17d9460c25fbc77f19bece4a442f34ae54ca8a05a",
+      "measureReviewOverlay": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-01/measure-review-overlay.jpg",
+      "measureReviewOverlaySha256": "551c7f2c140dfe9c8d49f9eed4d27a99c1e998a9c4ac95546954c033fecde381"
     },
     {
       "caseId": "m4a-positive-02",
       "pieceId": "r2-01",
       "editionId": "self-authored-v1",
       "captureVariant": "left-perspective",
-      "available": false,
-      "ready": false,
-      "reason": "real-screen-photo-missing",
+      "available": true,
       "photo": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-02.jpg",
-      "audio": "data/private/western-strings-round2/r2-01.m4a"
+      "photoSha256": "60be9ec7eea84eb261a526d79f7ac892e95a3edcd5020cb1189a21695b8c2ac6",
+      "audio": "data/private/western-strings-round2/r2-01.m4a",
+      "audioSha256": "59b3f5a163fc2d37a7e5c6375143b830d7d33e5c81465273b1a6c03fcd788d6c",
+      "ready": true,
+      "reason": "supported-edition-registration-ready",
+      "blockingReasons": [],
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": true,
+        "goodMatchCount": 342,
+        "inlierCount": 165,
+        "inlierRatio": 0.482456,
+        "referenceGridCoverage": 0.75,
+        "projectedPageVisibility": 0.875188,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 1.0,
+        "structuralResidualNormalized": 0.00029008,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00083926,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 4,
+        "staves": 4,
+        "measures": 21,
+        "notes": 67
+      },
+      "feedbackProjection": {
+        "ready": true,
+        "expectedAnchorCount": 67,
+        "mappedAnchorCount": 67
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-02/audit.json",
+      "auditSha256": "35fe2bce5cb22e1a0bcfb56b934665379fc4d77919e94c5d5226839f8b91961b",
+      "diagnosticOverlay": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-02/diagnostic-overlay.jpg",
+      "diagnosticOverlaySha256": "f4064bc1796386901e0bbbefe5b40c1a4064ddf094e3b1352fc4006eac2dea32",
+      "measureReviewOverlay": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-02/measure-review-overlay.jpg",
+      "measureReviewOverlaySha256": "89e2d72095fa58d1bf6bafe5f769f5b3b8c599f02d139fc960b832663d5d5afa"
     },
     {
       "caseId": "m4a-positive-03",
       "pieceId": "r2-01",
       "editionId": "self-authored-v1",
       "captureVariant": "right-perspective",
-      "available": false,
-      "ready": false,
-      "reason": "real-screen-photo-missing",
+      "available": true,
       "photo": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-03.jpg",
-      "audio": "data/private/western-strings-round2/r2-01.m4a"
+      "photoSha256": "21c3d76412585b6bf3b7a6d7ea899bb7a7090e14c0e2ab09620775dd3dc1b920",
+      "audio": "data/private/western-strings-round2/r2-01.m4a",
+      "audioSha256": "59b3f5a163fc2d37a7e5c6375143b830d7d33e5c81465273b1a6c03fcd788d6c",
+      "ready": true,
+      "reason": "supported-edition-registration-ready",
+      "blockingReasons": [],
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": true,
+        "goodMatchCount": 317,
+        "inlierCount": 151,
+        "inlierRatio": 0.476341,
+        "referenceGridCoverage": 0.75,
+        "projectedPageVisibility": 0.871955,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 1.0,
+        "structuralResidualNormalized": 0.00029467,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00073531,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 4,
+        "staves": 4,
+        "measures": 21,
+        "notes": 67
+      },
+      "feedbackProjection": {
+        "ready": true,
+        "expectedAnchorCount": 67,
+        "mappedAnchorCount": 67
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-03/audit.json",
+      "auditSha256": "5f88bbe7fcc958d3ea78db7b40ded531fcb54c1ba9898d679693b048f8ed31f1",
+      "diagnosticOverlay": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-03/diagnostic-overlay.jpg",
+      "diagnosticOverlaySha256": "5745b9b9c669c8e7b9a1499e0300acd0ec38d9856ce3bb82c08729d76f99714e",
+      "measureReviewOverlay": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-03/measure-review-overlay.jpg",
+      "measureReviewOverlaySha256": "5a5a028e0071e348126f3e7fef523171907d88cd403dd0ec558bc5392e00986e"
     },
     {
       "caseId": "m4a-positive-04",
       "pieceId": "r2-01",
       "editionId": "self-authored-v1",
       "captureVariant": "top-perspective",
-      "available": false,
-      "ready": false,
-      "reason": "real-screen-photo-missing",
+      "available": true,
       "photo": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-04.jpg",
-      "audio": "data/private/western-strings-round2/r2-01.m4a"
+      "photoSha256": "bb6880eb0fde8e48be3248831398849e383a00f44930e2e39bf74121b8dce4dd",
+      "audio": "data/private/western-strings-round2/r2-01.m4a",
+      "audioSha256": "59b3f5a163fc2d37a7e5c6375143b830d7d33e5c81465273b1a6c03fcd788d6c",
+      "ready": true,
+      "reason": "supported-edition-registration-ready",
+      "blockingReasons": [],
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": true,
+        "goodMatchCount": 346,
+        "inlierCount": 169,
+        "inlierRatio": 0.488439,
+        "referenceGridCoverage": 0.6875,
+        "projectedPageVisibility": 0.904125,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 1.0,
+        "structuralResidualNormalized": 0.00027865,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00101169,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 4,
+        "staves": 4,
+        "measures": 21,
+        "notes": 67
+      },
+      "feedbackProjection": {
+        "ready": true,
+        "expectedAnchorCount": 67,
+        "mappedAnchorCount": 67
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-04/audit.json",
+      "auditSha256": "db6932062f50850e992e87194294973628166fbdd25ea67b59491f04c0e7231e",
+      "diagnosticOverlay": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-04/diagnostic-overlay.jpg",
+      "diagnosticOverlaySha256": "3fc98c0526eb4b992542787a0dfcdf755be4f759545a8a948d6f19be1788c252",
+      "measureReviewOverlay": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-04/measure-review-overlay.jpg",
+      "measureReviewOverlaySha256": "3b97e81b76adfa5b015d06ddbc76978bd26d26d1d279deb7351eacdc3b0dc06c"
     },
     {
       "caseId": "m4a-positive-05",
       "pieceId": "r2-06",
       "editionId": "self-authored-v1",
       "captureVariant": "near-frontal",
-      "available": false,
-      "ready": false,
-      "reason": "real-screen-photo-missing",
+      "available": true,
       "photo": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-05.jpg",
-      "audio": "data/private/western-strings-round2/r2-06.m4a"
+      "photoSha256": "07b55b8a437d3e557f8baa440d82a0820e922b544a2c48968905a93108950d9a",
+      "audio": "data/private/western-strings-round2/r2-06.m4a",
+      "audioSha256": "d40c624bb3dbfd38fc83224541d0fe3c7eb383dcefbc7ec07fb42681c514e768",
+      "ready": true,
+      "reason": "supported-edition-registration-ready",
+      "blockingReasons": [],
+      "audioAgreement": 0.954545,
+      "registrationQuality": {
+        "ready": true,
+        "goodMatchCount": 332,
+        "inlierCount": 172,
+        "inlierRatio": 0.518072,
+        "referenceGridCoverage": 0.5,
+        "projectedPageVisibility": 0.898516,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 1.0,
+        "structuralResidualNormalized": 0.00031822,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00069745,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 2,
+        "staves": 2,
+        "measures": 17,
+        "notes": 23
+      },
+      "feedbackProjection": {
+        "ready": true,
+        "expectedAnchorCount": 23,
+        "mappedAnchorCount": 23
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-05/audit.json",
+      "auditSha256": "5f346214a0a6e7a1d36d6dc430ac7f40b5291c8cbc84a8fc63cc3b774ecd4400",
+      "diagnosticOverlay": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-05/diagnostic-overlay.jpg",
+      "diagnosticOverlaySha256": "39de04995ce07e77b868635ef5f7790d57db4ed48965bb86d334d11f741f5894",
+      "measureReviewOverlay": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-05/measure-review-overlay.jpg",
+      "measureReviewOverlaySha256": "5d6b2250c27947c0f017066c24107b2b69a061bc24d2b664749af9aa66ca5c26"
     },
     {
       "caseId": "m4a-positive-06",
       "pieceId": "r2-06",
       "editionId": "self-authored-v1",
       "captureVariant": "left-perspective",
-      "available": false,
-      "ready": false,
-      "reason": "real-screen-photo-missing",
+      "available": true,
       "photo": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-06.jpg",
-      "audio": "data/private/western-strings-round2/r2-06.m4a"
+      "photoSha256": "98b8303980e2f326acbc088bf44b8e30606e52963108766f1c59161c368a2b00",
+      "audio": "data/private/western-strings-round2/r2-06.m4a",
+      "audioSha256": "d40c624bb3dbfd38fc83224541d0fe3c7eb383dcefbc7ec07fb42681c514e768",
+      "ready": true,
+      "reason": "supported-edition-registration-ready",
+      "blockingReasons": [],
+      "audioAgreement": 0.954545,
+      "registrationQuality": {
+        "ready": true,
+        "goodMatchCount": 376,
+        "inlierCount": 185,
+        "inlierRatio": 0.492021,
+        "referenceGridCoverage": 0.5,
+        "projectedPageVisibility": 0.881072,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 1.0,
+        "structuralResidualNormalized": 0.00031356,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00074325,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 2,
+        "staves": 2,
+        "measures": 17,
+        "notes": 23
+      },
+      "feedbackProjection": {
+        "ready": true,
+        "expectedAnchorCount": 23,
+        "mappedAnchorCount": 23
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-06/audit.json",
+      "auditSha256": "e11bdb77878a03fc8bed5f8847a8c1f5b5befee5eadc9e60c748e8d531f84dd7",
+      "diagnosticOverlay": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-06/diagnostic-overlay.jpg",
+      "diagnosticOverlaySha256": "bccdc29821babc7cecc0e99074845f1d55a6f201da18712e74d23c040d7a940b",
+      "measureReviewOverlay": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-06/measure-review-overlay.jpg",
+      "measureReviewOverlaySha256": "d7b377401e7f456657be182cc04a280ae8fe3a378a80d03c1356fe06533b9574"
     },
     {
       "caseId": "m4a-positive-07",
       "pieceId": "r2-06",
       "editionId": "self-authored-v1",
       "captureVariant": "right-perspective",
-      "available": false,
-      "ready": false,
-      "reason": "real-screen-photo-missing",
+      "available": true,
       "photo": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-07.jpg",
-      "audio": "data/private/western-strings-round2/r2-06.m4a"
+      "photoSha256": "82d07df33fb2cde8a6c59eac8a49353b4435de0e667aeb9e6c1c6991a78b335a",
+      "audio": "data/private/western-strings-round2/r2-06.m4a",
+      "audioSha256": "d40c624bb3dbfd38fc83224541d0fe3c7eb383dcefbc7ec07fb42681c514e768",
+      "ready": true,
+      "reason": "supported-edition-registration-ready",
+      "blockingReasons": [],
+      "audioAgreement": 0.954545,
+      "registrationQuality": {
+        "ready": true,
+        "goodMatchCount": 276,
+        "inlierCount": 167,
+        "inlierRatio": 0.605072,
+        "referenceGridCoverage": 0.5,
+        "projectedPageVisibility": 0.89586,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 1.0,
+        "structuralResidualNormalized": 0.00031399,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00065849,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 2,
+        "staves": 2,
+        "measures": 17,
+        "notes": 23
+      },
+      "feedbackProjection": {
+        "ready": true,
+        "expectedAnchorCount": 23,
+        "mappedAnchorCount": 23
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-07/audit.json",
+      "auditSha256": "7c95ea9efb1a99fa7f19ebc525e99199e92d409e3865d059e5a6b401bd75cd23",
+      "diagnosticOverlay": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-07/diagnostic-overlay.jpg",
+      "diagnosticOverlaySha256": "5e278dbc9f613a57315bcd78eeed98bb7bab9c15c7f8d9463b1a1e9cc6f70abf",
+      "measureReviewOverlay": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-07/measure-review-overlay.jpg",
+      "measureReviewOverlaySha256": "39e09a16ec976b58d6e144882d49a999deac2053d5c424c43b212bda93d6863f"
     },
     {
       "caseId": "m4a-positive-08",
       "pieceId": "r3-01",
       "editionId": "self-authored-v1",
       "captureVariant": "near-frontal",
-      "available": false,
-      "ready": false,
-      "reason": "real-screen-photo-missing",
+      "available": true,
       "photo": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-08.jpg",
-      "audio": "data/private/western-strings-round3/r3-01.m4a"
+      "photoSha256": "6b7dfc74f6b9b39569af4b118f8211d2c4ddc47d53c7cc833a70ab915ba0e015",
+      "audio": "data/private/western-strings-round3/r3-01.m4a",
+      "audioSha256": "c714e81db43a303b0bec66d8ab6244cb2960995d2dd0a6bd90348e028a7bb99e",
+      "ready": true,
+      "reason": "supported-edition-registration-ready",
+      "blockingReasons": [],
+      "audioAgreement": 1.0,
+      "registrationQuality": {
+        "ready": true,
+        "goodMatchCount": 311,
+        "inlierCount": 162,
+        "inlierRatio": 0.5209,
+        "referenceGridCoverage": 0.5,
+        "projectedPageVisibility": 0.892418,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 1.0,
+        "structuralResidualNormalized": 0.00028738,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00072983,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 3,
+        "staves": 3,
+        "measures": 18,
+        "notes": 59
+      },
+      "feedbackProjection": {
+        "ready": true,
+        "expectedAnchorCount": 59,
+        "mappedAnchorCount": 59
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-08/audit.json",
+      "auditSha256": "3200c459f32553f42756f9ac674eed3a5ea2bedbfc71e1a879c811a54dde2871",
+      "diagnosticOverlay": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-08/diagnostic-overlay.jpg",
+      "diagnosticOverlaySha256": "521418ca7870af1b0af4965e94606864c4c832313e243f51a36111b97819e9fa",
+      "measureReviewOverlay": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-08/measure-review-overlay.jpg",
+      "measureReviewOverlaySha256": "666af8ec01e252e488ce8882cdff095df182d233fb44b3116dd30f141178cfc5"
     },
     {
       "caseId": "m4a-positive-09",
       "pieceId": "r3-01",
       "editionId": "self-authored-v1",
       "captureVariant": "left-perspective",
-      "available": false,
-      "ready": false,
-      "reason": "real-screen-photo-missing",
+      "available": true,
       "photo": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-09.jpg",
-      "audio": "data/private/western-strings-round3/r3-01.m4a"
+      "photoSha256": "ee65d93b0596c93e2ea73a2726adb866bc7eefdaaac94b2636a4d3ee772c7421",
+      "audio": "data/private/western-strings-round3/r3-01.m4a",
+      "audioSha256": "c714e81db43a303b0bec66d8ab6244cb2960995d2dd0a6bd90348e028a7bb99e",
+      "ready": true,
+      "reason": "supported-edition-registration-ready",
+      "blockingReasons": [],
+      "audioAgreement": 1.0,
+      "registrationQuality": {
+        "ready": true,
+        "goodMatchCount": 424,
+        "inlierCount": 156,
+        "inlierRatio": 0.367925,
+        "referenceGridCoverage": 0.5,
+        "projectedPageVisibility": 0.889642,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 1.0,
+        "structuralResidualNormalized": 0.00028442,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00062488,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 3,
+        "staves": 3,
+        "measures": 18,
+        "notes": 59
+      },
+      "feedbackProjection": {
+        "ready": true,
+        "expectedAnchorCount": 59,
+        "mappedAnchorCount": 59
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-09/audit.json",
+      "auditSha256": "dcf4fea3054180a933875adaea809299dffad0b499fd8318c710ace588f7a16d",
+      "diagnosticOverlay": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-09/diagnostic-overlay.jpg",
+      "diagnosticOverlaySha256": "f9453fd7c368cfe7cb3ac42f0e56edd981993361bec4b9f59eb385f1b926a6da",
+      "measureReviewOverlay": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-09/measure-review-overlay.jpg",
+      "measureReviewOverlaySha256": "8ea286079978b091f5c2d6b5233e7883beccef7659a028d1e38075b26851ef6c"
     },
     {
       "caseId": "m4a-positive-10",
       "pieceId": "r3-01",
       "editionId": "self-authored-v1",
       "captureVariant": "right-perspective",
-      "available": false,
-      "ready": false,
-      "reason": "real-screen-photo-missing",
+      "available": true,
       "photo": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-10.jpg",
-      "audio": "data/private/western-strings-round3/r3-01.m4a"
+      "photoSha256": "b2da4e0fb64f479b61b1ed575d5cb12d1d66203aad5867927cd9d98e1dd7c306",
+      "audio": "data/private/western-strings-round3/r3-01.m4a",
+      "audioSha256": "c714e81db43a303b0bec66d8ab6244cb2960995d2dd0a6bd90348e028a7bb99e",
+      "ready": true,
+      "reason": "supported-edition-registration-ready",
+      "blockingReasons": [],
+      "audioAgreement": 1.0,
+      "registrationQuality": {
+        "ready": true,
+        "goodMatchCount": 322,
+        "inlierCount": 145,
+        "inlierRatio": 0.450311,
+        "referenceGridCoverage": 0.5,
+        "projectedPageVisibility": 0.889532,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 1.0,
+        "structuralResidualNormalized": 0.00029052,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00074864,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 3,
+        "staves": 3,
+        "measures": 18,
+        "notes": 59
+      },
+      "feedbackProjection": {
+        "ready": true,
+        "expectedAnchorCount": 59,
+        "mappedAnchorCount": 59
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-10/audit.json",
+      "auditSha256": "2ea98bcdb29198fa5d3641d6d9bf7a96c77ae897573bcd8b78ef28fa62ba9cc2",
+      "diagnosticOverlay": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-10/diagnostic-overlay.jpg",
+      "diagnosticOverlaySha256": "452eba5822c7ff239273ba606a31e6ebb3750faee933a3f359b3b327a7b0e6d9",
+      "measureReviewOverlay": "data/experiments/western-strings-m4a/real-photo-acceptance/positive-cases/m4a-positive-10/measure-review-overlay.jpg",
+      "measureReviewOverlaySha256": "005c56a44d50d806366fcf6dbc2f33c807286998544db900a8a122e7a2f544b5"
     }
   ],
   "wrongEditionCases": [
@@ -174,6 +612,7 @@
         "inlierCount": 45,
         "inlierRatio": 0.245902,
         "referenceGridCoverage": 0.625,
+        "projectedPageVisibility": 1.0,
         "systemConsistency": 1.0,
         "barlineConsistency": 0.428571,
         "structuralResidualNormalized": 0.01022701,
@@ -202,7 +641,7 @@
       "automaticAdoptionAuthorized": false,
       "autoDiagnosisIssued": false,
       "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/wrong-edition-cases/m4a-wrong-edition-01-audit.json",
-      "auditSha256": "b10829930ccfa158dd668f5be339265e6f41690cde571d94d04185d63ec5a855"
+      "auditSha256": "c03b0c22ef560277bc0049867704263deb16e6d04a645ca94c3d7c0fd5d14915"
     },
     {
       "caseId": "m4a-wrong-edition-02",
@@ -226,6 +665,7 @@
         "inlierCount": 88,
         "inlierRatio": 0.419048,
         "referenceGridCoverage": 0.6875,
+        "projectedPageVisibility": 0.0,
         "systemConsistency": 1.0,
         "barlineConsistency": 0.047619,
         "structuralResidualNormalized": 0.01076318,
@@ -254,7 +694,7 @@
       "automaticAdoptionAuthorized": false,
       "autoDiagnosisIssued": false,
       "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/wrong-edition-cases/m4a-wrong-edition-02-audit.json",
-      "auditSha256": "7bad1ead4114313a5f07b66853547759e5578cf40557eab530d82eb60fb347c1"
+      "auditSha256": "79ee35e94464352e64279b7ecbe09f943ad1edb32b0fa97731e57bb95f80f094"
     },
     {
       "caseId": "m4a-wrong-edition-03",
@@ -278,6 +718,7 @@
         "inlierCount": 48,
         "inlierRatio": 0.209607,
         "referenceGridCoverage": 0.625,
+        "projectedPageVisibility": 0.0,
         "systemConsistency": 1.0,
         "barlineConsistency": 0.095238,
         "structuralResidualNormalized": 0.01083911,
@@ -306,7 +747,7 @@
       "automaticAdoptionAuthorized": false,
       "autoDiagnosisIssued": false,
       "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/wrong-edition-cases/m4a-wrong-edition-03-audit.json",
-      "auditSha256": "f05540850c551cc825f89a7da0887a134df880272c72de82673c5c1d7b6a822d"
+      "auditSha256": "defc6c21326f7983ce294516fdaf2bab067b557ec553c62e17875e581e7ed19b"
     },
     {
       "caseId": "m4a-wrong-edition-04",
@@ -330,6 +771,7 @@
         "inlierCount": 160,
         "inlierRatio": 0.492308,
         "referenceGridCoverage": 0.6875,
+        "projectedPageVisibility": 0.0,
         "systemConsistency": 1.0,
         "barlineConsistency": 0.0,
         "structuralResidualNormalized": 0.00977566,
@@ -358,7 +800,7 @@
       "automaticAdoptionAuthorized": false,
       "autoDiagnosisIssued": false,
       "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/wrong-edition-cases/m4a-wrong-edition-04-audit.json",
-      "auditSha256": "b83e8f66212abcb7d02749e2b740acb68e6b52b0c48cc46c4537867c4d70523e"
+      "auditSha256": "99bbfe1d7c3ca54fbcff45e730c991b853f326484507ff2fb0af55cf9763fe3e"
     },
     {
       "caseId": "m4a-wrong-edition-05",
@@ -382,6 +824,7 @@
         "inlierCount": 21,
         "inlierRatio": 0.148936,
         "referenceGridCoverage": 0.5,
+        "projectedPageVisibility": 0.0,
         "systemConsistency": 1.0,
         "barlineConsistency": 0.619048,
         "structuralResidualNormalized": 0.01020315,
@@ -410,7 +853,7 @@
       "automaticAdoptionAuthorized": false,
       "autoDiagnosisIssued": false,
       "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/wrong-edition-cases/m4a-wrong-edition-05-audit.json",
-      "auditSha256": "683603a4997b1d858f916d7be7845bcd421a7b46e31488d516a7dbcdb0a843ab"
+      "auditSha256": "f368d9468eb489be3eafd31edb86a38c576a31c21b3d90add3869332c3180790"
     },
     {
       "caseId": "m4a-wrong-edition-06",
@@ -434,6 +877,7 @@
         "inlierCount": 96,
         "inlierRatio": 0.482412,
         "referenceGridCoverage": 0.6875,
+        "projectedPageVisibility": 0.0,
         "systemConsistency": 1.0,
         "barlineConsistency": 0.0,
         "structuralResidualNormalized": 0.01065201,
@@ -462,7 +906,7 @@
       "automaticAdoptionAuthorized": false,
       "autoDiagnosisIssued": false,
       "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/wrong-edition-cases/m4a-wrong-edition-06-audit.json",
-      "auditSha256": "c9bfc2891ceda8b0c9d0761749096ab846b6680224314899c511c25854eb0576"
+      "auditSha256": "fa3958c8b0679fd8442f129f2d196d667c233742476121ad0dea2226967626ee"
     },
     {
       "caseId": "m4a-wrong-edition-07",
@@ -486,6 +930,7 @@
         "inlierCount": 28,
         "inlierRatio": 0.217054,
         "referenceGridCoverage": 0.625,
+        "projectedPageVisibility": 0.0,
         "systemConsistency": 1.0,
         "barlineConsistency": 0.0,
         "structuralResidualNormalized": 0.01070913,
@@ -514,7 +959,7 @@
       "automaticAdoptionAuthorized": false,
       "autoDiagnosisIssued": false,
       "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/wrong-edition-cases/m4a-wrong-edition-07-audit.json",
-      "auditSha256": "ef585210d6e6ba6264bcc4dfdce4c8f86b220f731780dc655b42f35375c092e6"
+      "auditSha256": "0f7b6062ce89587f5067ba6b82059c25d97b1b68aeb87c72234b6c3e5682a904"
     },
     {
       "caseId": "m4a-wrong-edition-08",
@@ -538,6 +983,7 @@
         "inlierCount": 27,
         "inlierRatio": 0.236842,
         "referenceGridCoverage": 0.5625,
+        "projectedPageVisibility": 1.0,
         "systemConsistency": 0.75,
         "barlineConsistency": 0.619048,
         "structuralResidualNormalized": 0.00966255,
@@ -566,10 +1012,981 @@
       "automaticAdoptionAuthorized": false,
       "autoDiagnosisIssued": false,
       "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/wrong-edition-cases/m4a-wrong-edition-08-audit.json",
-      "auditSha256": "7a6bc547fc926bcc6b1e18d5824fb8f61891d6ece9074282c71bf1a678335e24"
+      "auditSha256": "4eb5abe46d7ab1004000ff157cf0ad7476a64aaf68e5806a877a7a8b41c91cba"
     }
   ],
-  "poorImageCases": [],
+  "poorImageCases": [
+    {
+      "caseId": "m4a-positive-01:gaussian-blur",
+      "sourceCaseId": "m4a-positive-01",
+      "transform": "gaussian-blur",
+      "photo": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-01/gaussian-blur.jpg",
+      "photoSha256": "e7beb8f63fe1c0e2cd6d8d1e3dbe44112d8bc6326a0bb4539b483f8487ed2d7a",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 6,
+        "inlierCount": 0,
+        "inlierRatio": 0.0,
+        "referenceGridCoverage": 0.0,
+        "projectedPageVisibility": 0.0,
+        "systemConsistency": 0.0,
+        "barlineConsistency": 0.0,
+        "structuralResidualNormalized": 1.0,
+        "deformation": {
+          "model": "none",
+          "activated": false
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-01/gaussian-blur-audit.json",
+      "auditSha256": "6294d6a114400b4ed9a8157e3d2cc893b3c3bfd911d67a6710edf65a18519315"
+    },
+    {
+      "caseId": "m4a-positive-01:half-page-crop",
+      "sourceCaseId": "m4a-positive-01",
+      "transform": "half-page-crop",
+      "photo": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-01/half-page-crop.jpg",
+      "photoSha256": "be1d6fc1138a01053cd212b5ba96424a39228206c37b34533b0ea094aa9ff113",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 497,
+        "inlierCount": 162,
+        "inlierRatio": 0.325956,
+        "referenceGridCoverage": 0.5,
+        "projectedPageVisibility": 0.316786,
+        "systemConsistency": 0.5,
+        "barlineConsistency": 0.52381,
+        "structuralResidualNormalized": 0.00568818,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00113282,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-01/half-page-crop-audit.json",
+      "auditSha256": "58f06ca538ebffba9189b10fefa158ebb59df7c80b462aa166aaca84a17480e7"
+    },
+    {
+      "caseId": "m4a-positive-02:gaussian-blur",
+      "sourceCaseId": "m4a-positive-02",
+      "transform": "gaussian-blur",
+      "photo": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-02/gaussian-blur.jpg",
+      "photoSha256": "0cddc4e845744d145c361e30fe746b140ac36475896b2e423547cfa8d7926e99",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 4,
+        "inlierCount": 0,
+        "inlierRatio": 0.0,
+        "referenceGridCoverage": 0.0,
+        "projectedPageVisibility": 0.0,
+        "systemConsistency": 0.0,
+        "barlineConsistency": 0.0,
+        "structuralResidualNormalized": 1.0,
+        "deformation": {
+          "model": "none",
+          "activated": false
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-02/gaussian-blur-audit.json",
+      "auditSha256": "f6910cfd026decaeae233c3051bc47573284b7938d39b9b83982e721bca84e03"
+    },
+    {
+      "caseId": "m4a-positive-02:half-page-crop",
+      "sourceCaseId": "m4a-positive-02",
+      "transform": "half-page-crop",
+      "photo": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-02/half-page-crop.jpg",
+      "photoSha256": "e53a2d188967baaacd2ecbb5ed823fb2562599181627776ef1a462fd38ef735b",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 412,
+        "inlierCount": 160,
+        "inlierRatio": 0.38835,
+        "referenceGridCoverage": 0.5,
+        "projectedPageVisibility": 0.329648,
+        "systemConsistency": 0.5,
+        "barlineConsistency": 0.52381,
+        "structuralResidualNormalized": 0.00567682,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00091243,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-02/half-page-crop-audit.json",
+      "auditSha256": "5f6022ff6a29bf08afa28bb1b0a9e489017090463ae71318e32dba8f1b4e8f04"
+    },
+    {
+      "caseId": "m4a-positive-03:gaussian-blur",
+      "sourceCaseId": "m4a-positive-03",
+      "transform": "gaussian-blur",
+      "photo": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-03/gaussian-blur.jpg",
+      "photoSha256": "de5611a78dd51e488f10b0751e88c5f5f8c6ece6b2990dfffa6b12c8172c4481",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 15,
+        "inlierCount": 0,
+        "inlierRatio": 0.0,
+        "referenceGridCoverage": 0.0,
+        "projectedPageVisibility": 0.0,
+        "systemConsistency": 0.0,
+        "barlineConsistency": 0.0,
+        "structuralResidualNormalized": 1.0,
+        "deformation": {
+          "model": "none",
+          "activated": false
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-03/gaussian-blur-audit.json",
+      "auditSha256": "8c15757bf2745a7248d1e6166484c43c59689c3382f76789d6ba78da4d8c13d9"
+    },
+    {
+      "caseId": "m4a-positive-03:half-page-crop",
+      "sourceCaseId": "m4a-positive-03",
+      "transform": "half-page-crop",
+      "photo": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-03/half-page-crop.jpg",
+      "photoSha256": "41268b87e0fd80eaa7fd6865a34ce153acff4c4c86fcd7f4799c13b44540c8c4",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 418,
+        "inlierCount": 151,
+        "inlierRatio": 0.361244,
+        "referenceGridCoverage": 0.5,
+        "projectedPageVisibility": 0.31274,
+        "systemConsistency": 0.5,
+        "barlineConsistency": 0.52381,
+        "structuralResidualNormalized": 0.00568166,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00088629,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-03/half-page-crop-audit.json",
+      "auditSha256": "d54b4e3d51df0426493ca8d55849d542c308a6659b25255c1668381e79343cce"
+    },
+    {
+      "caseId": "m4a-positive-04:gaussian-blur",
+      "sourceCaseId": "m4a-positive-04",
+      "transform": "gaussian-blur",
+      "photo": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-04/gaussian-blur.jpg",
+      "photoSha256": "fe0330c606704bb1348215656ecbf4282bf8dbe318d466874c9e513cdd991897",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 6,
+        "inlierCount": 0,
+        "inlierRatio": 0.0,
+        "referenceGridCoverage": 0.0,
+        "projectedPageVisibility": 0.0,
+        "systemConsistency": 0.0,
+        "barlineConsistency": 0.0,
+        "structuralResidualNormalized": 1.0,
+        "deformation": {
+          "model": "none",
+          "activated": false
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-04/gaussian-blur-audit.json",
+      "auditSha256": "12bebb73e4b7ab1ae62299d567ed6b60ba6afd92c79745a0eca267f943a3de05"
+    },
+    {
+      "caseId": "m4a-positive-04:half-page-crop",
+      "sourceCaseId": "m4a-positive-04",
+      "transform": "half-page-crop",
+      "photo": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-04/half-page-crop.jpg",
+      "photoSha256": "a1b7747cd54c1591f352404eb0cfca9f2de19213ad8f9235d2204240b0fe81bf",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.955224,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 406,
+        "inlierCount": 172,
+        "inlierRatio": 0.423645,
+        "referenceGridCoverage": 0.5,
+        "projectedPageVisibility": 0.353772,
+        "systemConsistency": 0.5,
+        "barlineConsistency": 0.52381,
+        "structuralResidualNormalized": 0.00568227,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00130869,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-04/half-page-crop-audit.json",
+      "auditSha256": "3ccf0b04f32ed87129f3f2a37e7a63689b2cd59de98d6afb748a765cf8eab5b9"
+    },
+    {
+      "caseId": "m4a-positive-05:gaussian-blur",
+      "sourceCaseId": "m4a-positive-05",
+      "transform": "gaussian-blur",
+      "photo": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-05/gaussian-blur.jpg",
+      "photoSha256": "9057c60633a451b289631192af00c2b483289404ad71c25fe69a08a24dffa81a",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.954545,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 9,
+        "inlierCount": 0,
+        "inlierRatio": 0.0,
+        "referenceGridCoverage": 0.0,
+        "projectedPageVisibility": 0.0,
+        "systemConsistency": 0.0,
+        "barlineConsistency": 0.0,
+        "structuralResidualNormalized": 1.0,
+        "deformation": {
+          "model": "none",
+          "activated": false
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-05/gaussian-blur-audit.json",
+      "auditSha256": "94e4793bf518f48d4a849a9f9e1617ec99627a2a9f8dd2c5e96a09fa5e64d880"
+    },
+    {
+      "caseId": "m4a-positive-05:half-page-crop",
+      "sourceCaseId": "m4a-positive-05",
+      "transform": "half-page-crop",
+      "photo": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-05/half-page-crop.jpg",
+      "photoSha256": "2a68902e421c8b45e6dd5baf084ddc67ceec5ddde67719a07ef68b42159e2d34",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.954545,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 324,
+        "inlierCount": 170,
+        "inlierRatio": 0.524691,
+        "referenceGridCoverage": 0.5,
+        "projectedPageVisibility": 0.342991,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 1.0,
+        "structuralResidualNormalized": 0.00033029,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00095354,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-05/half-page-crop-audit.json",
+      "auditSha256": "fd09d9a31c85c70bac2534714cb03e3b4491059e04911b9fc6bd6a535af4d142"
+    },
+    {
+      "caseId": "m4a-positive-06:gaussian-blur",
+      "sourceCaseId": "m4a-positive-06",
+      "transform": "gaussian-blur",
+      "photo": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-06/gaussian-blur.jpg",
+      "photoSha256": "323493de2dfd3850dd1f7e44e61215a0e2e7bebf23bdefc0baa17cdb1a1aafe0",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.954545,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 3,
+        "inlierCount": 0,
+        "inlierRatio": 0.0,
+        "referenceGridCoverage": 0.0,
+        "projectedPageVisibility": 0.0,
+        "systemConsistency": 0.0,
+        "barlineConsistency": 0.0,
+        "structuralResidualNormalized": 1.0,
+        "deformation": {
+          "model": "none",
+          "activated": false
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-06/gaussian-blur-audit.json",
+      "auditSha256": "120da53017258ec8b29782f1cc8849a072450422b12883c38ed17e62bddf28b3"
+    },
+    {
+      "caseId": "m4a-positive-06:half-page-crop",
+      "sourceCaseId": "m4a-positive-06",
+      "transform": "half-page-crop",
+      "photo": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-06/half-page-crop.jpg",
+      "photoSha256": "ba1b93144005e2503312710fd1373e4e855bb66fcb1caae3a70fefe01e49612f",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.954545,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 402,
+        "inlierCount": 163,
+        "inlierRatio": 0.405473,
+        "referenceGridCoverage": 0.4375,
+        "projectedPageVisibility": 0.322895,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 0.823529,
+        "structuralResidualNormalized": 0.00238833,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00084082,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-06/half-page-crop-audit.json",
+      "auditSha256": "e40e59856dae82911fbbc1273344aa7d5aa4fdb848be3ea71e0d6c8d24ded964"
+    },
+    {
+      "caseId": "m4a-positive-07:gaussian-blur",
+      "sourceCaseId": "m4a-positive-07",
+      "transform": "gaussian-blur",
+      "photo": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-07/gaussian-blur.jpg",
+      "photoSha256": "ac1d3d2a52b2a4574282231d2befd1ebf28e3e69052995b6e9c737573e2f1af0",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.954545,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 29,
+        "inlierCount": 0,
+        "inlierRatio": 0.0,
+        "referenceGridCoverage": 0.0,
+        "projectedPageVisibility": 0.0,
+        "systemConsistency": 0.0,
+        "barlineConsistency": 0.0,
+        "structuralResidualNormalized": 1.0,
+        "deformation": {
+          "model": "none",
+          "activated": false
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-07/gaussian-blur-audit.json",
+      "auditSha256": "3734e4972cfc15f2416559df2770b2da05b7dfa826d13a8d428fb50e3ec1b14f"
+    },
+    {
+      "caseId": "m4a-positive-07:half-page-crop",
+      "sourceCaseId": "m4a-positive-07",
+      "transform": "half-page-crop",
+      "photo": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-07/half-page-crop.jpg",
+      "photoSha256": "d5484bb285c159bb266c61f6e8f1cbb9290c7bcac145519ced0678dfac559894",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 0.954545,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 278,
+        "inlierCount": 159,
+        "inlierRatio": 0.571942,
+        "referenceGridCoverage": 0.4375,
+        "projectedPageVisibility": 0.339359,
+        "systemConsistency": 1.0,
+        "barlineConsistency": 1.0,
+        "structuralResidualNormalized": 0.00042033,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00087753,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-07/half-page-crop-audit.json",
+      "auditSha256": "69954c22f683564c2b8cde3041bc6f0f1c8fb29d8186f82447ebe0cfbb1bbe3c"
+    },
+    {
+      "caseId": "m4a-positive-08:gaussian-blur",
+      "sourceCaseId": "m4a-positive-08",
+      "transform": "gaussian-blur",
+      "photo": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-08/gaussian-blur.jpg",
+      "photoSha256": "3d4cbb21600a12d9d61c5f72ed0356c964df92a62e27925c6140b7a738bb7e26",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 1.0,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 40,
+        "inlierCount": 0,
+        "inlierRatio": 0.0,
+        "referenceGridCoverage": 0.0,
+        "projectedPageVisibility": 0.0,
+        "systemConsistency": 0.0,
+        "barlineConsistency": 0.0,
+        "structuralResidualNormalized": 1.0,
+        "deformation": {
+          "model": "none",
+          "activated": false
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-08/gaussian-blur-audit.json",
+      "auditSha256": "9733715513042f2761ef8723f4ea6d96a30fab2089008cc37f2e58e8cc3d28b2"
+    },
+    {
+      "caseId": "m4a-positive-08:half-page-crop",
+      "sourceCaseId": "m4a-positive-08",
+      "transform": "half-page-crop",
+      "photo": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-08/half-page-crop.jpg",
+      "photoSha256": "5c2658a7048f31a7292208df3915ec4b2543d8d946344016f0f94a1cec121c8c",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 1.0,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 335,
+        "inlierCount": 142,
+        "inlierRatio": 0.423881,
+        "referenceGridCoverage": 0.5,
+        "projectedPageVisibility": 0.339137,
+        "systemConsistency": 0.666667,
+        "barlineConsistency": 0.611111,
+        "structuralResidualNormalized": 0.00393672,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00080745,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-08/half-page-crop-audit.json",
+      "auditSha256": "b0f4239fab16a1fdfb0af5eb713d5f0d67faa00b4ef4a25debbf00ac674e06d4"
+    },
+    {
+      "caseId": "m4a-positive-09:gaussian-blur",
+      "sourceCaseId": "m4a-positive-09",
+      "transform": "gaussian-blur",
+      "photo": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-09/gaussian-blur.jpg",
+      "photoSha256": "546c4de7df6b1981df7de71aedc13da5e325090f153e5ba9106e244adcbcdf31",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 1.0,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 21,
+        "inlierCount": 0,
+        "inlierRatio": 0.0,
+        "referenceGridCoverage": 0.0,
+        "projectedPageVisibility": 0.0,
+        "systemConsistency": 0.0,
+        "barlineConsistency": 0.0,
+        "structuralResidualNormalized": 1.0,
+        "deformation": {
+          "model": "none",
+          "activated": false
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-09/gaussian-blur-audit.json",
+      "auditSha256": "fc5cec751e4dc95f5c062ccccf47ac0c240b9ad87d2ad5f8c5b0a1306c899a24"
+    },
+    {
+      "caseId": "m4a-positive-09:half-page-crop",
+      "sourceCaseId": "m4a-positive-09",
+      "transform": "half-page-crop",
+      "photo": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-09/half-page-crop.jpg",
+      "photoSha256": "132a7fee77790949a2a5af36ddbd8eceacdb3c079dcf2f1ab6128e1d677fb9d0",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 1.0,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 456,
+        "inlierCount": 136,
+        "inlierRatio": 0.298246,
+        "referenceGridCoverage": 0.5,
+        "projectedPageVisibility": 0.340288,
+        "systemConsistency": 0.666667,
+        "barlineConsistency": 0.611111,
+        "structuralResidualNormalized": 0.00393418,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00089105,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-09/half-page-crop-audit.json",
+      "auditSha256": "24c55cb7eee395a3e1fbae66ccedf49a27fe8c0564cbe9d3ae79b14112123552"
+    },
+    {
+      "caseId": "m4a-positive-10:gaussian-blur",
+      "sourceCaseId": "m4a-positive-10",
+      "transform": "gaussian-blur",
+      "photo": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-10/gaussian-blur.jpg",
+      "photoSha256": "60ef7fe7e81156bfdbe5c0b800b8782d8d49e48c5adafb7fa442f0076b6cbd4a",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 1.0,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 33,
+        "inlierCount": 0,
+        "inlierRatio": 0.0,
+        "referenceGridCoverage": 0.0,
+        "projectedPageVisibility": 0.0,
+        "systemConsistency": 0.0,
+        "barlineConsistency": 0.0,
+        "structuralResidualNormalized": 1.0,
+        "deformation": {
+          "model": "none",
+          "activated": false
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-10/gaussian-blur-audit.json",
+      "auditSha256": "d87f73a1915b7f769e453c9f5901a8113205d3e07bc352512bd337709bc0fafe"
+    },
+    {
+      "caseId": "m4a-positive-10:half-page-crop",
+      "sourceCaseId": "m4a-positive-10",
+      "transform": "half-page-crop",
+      "photo": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-10/half-page-crop.jpg",
+      "photoSha256": "f84dca1ed95cef6b9900a1b0c126fe5aff4ac3a40a0ac8a6d1b2d7fe55497948",
+      "blocked": true,
+      "ready": false,
+      "reason": "supported-edition-registration-review-required",
+      "blockingReasons": [
+        "supported-edition-registration-review-required"
+      ],
+      "audioAgreement": 1.0,
+      "registrationQuality": {
+        "ready": false,
+        "goodMatchCount": 335,
+        "inlierCount": 141,
+        "inlierRatio": 0.420896,
+        "referenceGridCoverage": 0.5,
+        "projectedPageVisibility": 0.338297,
+        "systemConsistency": 0.666667,
+        "barlineConsistency": 0.611111,
+        "structuralResidualNormalized": 0.00393352,
+        "deformation": {
+          "model": "homography",
+          "eligible": false,
+          "activated": false,
+          "baselineResidualP90Normalized": 0.00092177,
+          "validationResidualImprovement": 0.0
+        }
+      },
+      "projectedCounts": {
+        "systems": 0,
+        "staves": 0,
+        "measures": 0,
+        "notes": 0
+      },
+      "feedbackProjection": {
+        "ready": false,
+        "expectedAnchorCount": 0,
+        "mappedAnchorCount": 0
+      },
+      "omrUsed": false,
+      "reviewRequired": true,
+      "studentFacing": false,
+      "automaticAdoptionAuthorized": false,
+      "autoDiagnosisIssued": false,
+      "audit": "data/experiments/western-strings-m4a/real-photo-acceptance/poor-image-cases/m4a-positive-10/half-page-crop-audit.json",
+      "auditSha256": "047425459bb6b7022bc43e36b4b4d0df34647c97098e4c249ad94030589a0e49"
+    }
+  ],
   "ownerReview": {
     "ready": false,
     "reason": "m4a-owner-measure-review-missing-or-invalid",
@@ -577,23 +1994,23 @@
     "reviewer": "",
     "reviewedAt": "",
     "confirmedMeasureCount": 0,
-    "expectedMeasureCount": 0,
+    "expectedMeasureCount": 189,
     "confirmationRate": 0.0
   },
   "summary": {
     "positiveExpected": 10,
-    "positiveAvailable": 0,
-    "positivePassed": 0,
-    "positivePassRate": 0.0,
+    "positiveAvailable": 10,
+    "positivePassed": 10,
+    "positivePassRate": 1.0,
     "wrongEditionAvailable": 8,
     "wrongEditionBlocked": 8,
     "wrongEditionLeakCount": 0,
-    "poorImageExpected": 0,
-    "poorImageEvaluated": 0,
-    "poorImageBlocked": 0,
+    "poorImageExpected": 20,
+    "poorImageEvaluated": 20,
+    "poorImageBlocked": 20,
     "poorImageLeakCount": 0,
     "ownerConfirmedMeasures": 0,
-    "ownerExpectedMeasures": 0
+    "ownerExpectedMeasures": 189
   },
   "safety": {
     "reviewRequired": true,

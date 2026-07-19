@@ -79,6 +79,7 @@ def summarize(
             "inlierCount": quality.get("inlierCount", 0),
             "inlierRatio": quality.get("inlierRatio", 0),
             "referenceGridCoverage": quality.get("referenceGridCoverage", 0),
+            "projectedPageVisibility": quality.get("projectedPageVisibility", 0),
             "systemConsistency": quality.get("systemConsistency", 0),
             "barlineConsistency": quality.get("barlineConsistency", 0),
             "structuralResidualNormalized": quality.get("structuralResidualNormalized", 1),

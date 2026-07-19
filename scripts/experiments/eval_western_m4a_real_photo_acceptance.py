@@ -65,6 +65,7 @@ def registration_summary(result: dict[str, Any]) -> dict[str, Any]:
             "inlierCount": quality.get("inlierCount", 0),
             "inlierRatio": quality.get("inlierRatio", 0),
             "referenceGridCoverage": quality.get("referenceGridCoverage", 0),
+            "projectedPageVisibility": quality.get("projectedPageVisibility", 0),
             "systemConsistency": quality.get("systemConsistency", 0),
             "barlineConsistency": quality.get("barlineConsistency", 0),
             "structuralResidualNormalized": quality.get("structuralResidualNormalized", 1),
@@ -87,17 +88,45 @@ def registration_summary(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def draw_measure_overlay(result: dict[str, Any], photo: Path, output: Path) -> None:
+def draw_measure_overlay(result: dict[str, Any], photo: Path, output: Path) -> dict[str, Any]:
     image = read_image(photo)
     if image is None:
         raise RuntimeError(f"unable to read accepted photo: {photo}")
+    polygons: list[tuple[dict[str, Any], np.ndarray]] = []
+    invalid_measure_ids: list[Any] = []
     for row in result.get("projectedCoordinates", {}).get("measures", []):
-        points = cv2.convexHull(np.array(row["polygonPixels"], dtype="float32")).astype("int32")
+        raw_points = np.asarray(row.get("polygonPixels", []), dtype="float32")
+        if (
+            raw_points.ndim != 2
+            or raw_points.shape[0] < 3
+            or raw_points.shape[1] != 2
+            or not np.isfinite(raw_points).all()
+        ):
+            invalid_measure_ids.append(row.get("globalMeasureIndex"))
+            continue
+        points = cv2.convexHull(raw_points).reshape(-1, 2).astype("int32")
+        if len(points) < 3:
+            invalid_measure_ids.append(row.get("globalMeasureIndex"))
+            continue
+        polygons.append((row, points))
+    if invalid_measure_ids:
+        return {
+            "ready": False,
+            "reason": "supported-edition-projected-measure-polygon-invalid",
+            "invalidMeasureIds": invalid_measure_ids,
+        }
+    for row, points in polygons:
         cv2.polylines(image, [points.reshape(-1, 1, 2)], True, (255, 120, 0), 3, cv2.LINE_AA)
         x, y = points[0]
         label = str(row.get("globalMeasureIndex", "?"))
         cv2.putText(image, label, (int(x), max(18, int(y) - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 80, 0), 2, cv2.LINE_AA)
     write_image(output, image, quality=92)
+    return {
+        "ready": True,
+        "reason": "ok",
+        "measureCount": len(polygons),
+        "invalidMeasureIds": [],
+    }
 
 
 def audio_evidence_for(
@@ -146,11 +175,17 @@ def run_positive(
         audio_evidence=evidence,
     )
     attach_feedback_and_annotation(result, evidence, photo, case_root / "diagnostic-overlay.jpg")
-    audit_path = case_root / "audit.json"
-    write_json(audit_path, result)
     measure_overlay = case_root / "measure-review-overlay.jpg"
     if result["ready"]:
-        draw_measure_overlay(result, photo, measure_overlay)
+        overlay_validation = draw_measure_overlay(result, photo, measure_overlay)
+        result["measureOverlayValidation"] = overlay_validation
+        if not overlay_validation["ready"]:
+            reason = overlay_validation["reason"]
+            result["ready"] = False
+            result["reason"] = reason
+            result["blockingReasons"] = sorted(set([*result.get("blockingReasons", []), reason]))
+    audit_path = case_root / "audit.json"
+    write_json(audit_path, result)
     summary = {
         "caseId": case_id,
         "pieceId": task["pieceId"],

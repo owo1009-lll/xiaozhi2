@@ -26,6 +26,7 @@
       "inliers": true,
       "inlierRatio": true,
       "referenceGridCoverage": true,
+      "projectedPageVisibility": true,
       "systemConsistency": true,
       "barlineConsistency": true,
       "structuralResidual": true
@@ -62,6 +63,7 @@
     "inlierCount": 260,
     "inlierRatio": 0.440678,
     "referenceGridCoverage": 0.75,
+    "projectedPageVisibility": 1.0,
     "systemConsistency": 1.0,
     "systemRows": [
       {

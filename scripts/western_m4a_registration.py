@@ -235,6 +235,40 @@ def grid_coverage(points: np.ndarray, width: int, height: int, cells: int = 4) -
     return len(set(zip(x.tolist(), y.tolist()))) / float(cells * cells)
 
 
+def projected_page_visibility(
+    reference_shape: tuple[int, int],
+    photo_shape: tuple[int, int],
+    homography: np.ndarray,
+) -> float:
+    reference_height, reference_width = reference_shape
+    photo_height, photo_width = photo_shape
+    reference_corners = np.float64(
+        [
+            [0, 0],
+            [reference_width - 1, 0],
+            [reference_width - 1, reference_height - 1],
+            [0, reference_height - 1],
+        ]
+    )
+    projected = perspective_points(reference_corners, homography)
+    if not np.isfinite(projected).all():
+        return 0.0
+    projected_hull = cv2.convexHull(projected.astype(np.float32))
+    projected_area = abs(float(cv2.contourArea(projected_hull)))
+    if projected_area <= 1.0:
+        return 0.0
+    photo_frame = np.float32(
+        [
+            [0, 0],
+            [photo_width - 1, 0],
+            [photo_width - 1, photo_height - 1],
+            [0, photo_height - 1],
+        ]
+    )
+    visible_area, _ = cv2.intersectConvexConvex(projected_hull, photo_frame)
+    return max(0.0, min(1.0, float(visible_area) / projected_area))
+
+
 def build_tps_if_helpful(
     reference_points: np.ndarray,
     query_points: np.ndarray,
@@ -439,6 +473,7 @@ def registration_quality(
             "inlierCount": 0,
             "inlierRatio": 0.0,
             "referenceGridCoverage": 0.0,
+            "projectedPageVisibility": 0.0,
             "systemConsistency": 0.0,
             "barlineConsistency": 0.0,
             "structuralResidualNormalized": 1.0,
@@ -473,6 +508,7 @@ def registration_quality(
             "inlierCount": 0,
             "inlierRatio": 0.0,
             "referenceGridCoverage": 0.0,
+            "projectedPageVisibility": 0.0,
             "systemConsistency": 0.0,
             "barlineConsistency": 0.0,
             "structuralResidualNormalized": 1.0,
@@ -499,6 +535,7 @@ def registration_quality(
             "inlierCount": 0,
             "inlierRatio": 0.0,
             "referenceGridCoverage": 0.0,
+            "projectedPageVisibility": 0.0,
             "systemConsistency": 0.0,
             "barlineConsistency": 0.0,
             "structuralResidualNormalized": 1.0,
@@ -514,6 +551,7 @@ def registration_quality(
     homography = transform_photo_inverse @ homography_work @ transform_reference_scale
     homography /= homography[2, 2]
     coverage = grid_coverage(reference_points, reference.shape[1], reference.shape[0])
+    page_visibility = projected_page_visibility(reference.shape[:2], photo.shape[:2], homography)
 
     system_rows = []
     for system in sidecar["systems"]:
@@ -552,6 +590,7 @@ def registration_quality(
             "inliers": inlier_count >= int(settings["minimumInliers"]),
             "inlierRatio": ratio >= float(settings["minimumInlierRatio"]),
             "referenceGridCoverage": coverage >= float(settings["minimumReferenceGridCoverage"]),
+            "projectedPageVisibility": page_visibility >= float(settings["minimumProjectedPageVisibility"]),
             "systemConsistency": system_consistency >= float(settings["minimumSystemConsistency"]),
             "barlineConsistency": (
                 barline >= float(settings["minimumBarlineConsistency"])
@@ -574,6 +613,7 @@ def registration_quality(
         "inlierCount": inlier_count,
         "inlierRatio": round(ratio, 6),
         "referenceGridCoverage": round(coverage, 6),
+        "projectedPageVisibility": round(page_visibility, 6),
         "systemConsistency": round(system_consistency, 6),
         "systemRows": system_rows,
         "barlineConsistency": round(barline, 6),

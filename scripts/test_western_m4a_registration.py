@@ -11,16 +11,19 @@ import numpy as np
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
+sys.path.insert(0, str(REPO / "scripts" / "experiments"))
 
 from western_m4a_registration import (  # noqa: E402
     apply_tps_residual,
     attach_feedback_and_annotation,
     evaluate_audio_sentinel,
     fit_tps_residual,
+    projected_page_visibility,
     read_image,
     register_supported_edition,
     write_image,
 )
+from eval_western_m4a_real_photo_acceptance import draw_measure_overlay  # noqa: E402
 
 
 REGISTRY_ROOT = REPO / "data" / "experiments" / "western-strings-m4a" / "supported-editions"
@@ -58,6 +61,15 @@ def audio_evidence(agreement: float) -> dict:
 
 
 def main() -> None:
+    identity = np.eye(3, dtype=np.float64)
+    require(
+        projected_page_visibility((100, 100), (100, 100), identity) > 0.99,
+        "a fully visible registered page must pass the visibility metric",
+    )
+    require(
+        projected_page_visibility((100, 100), (50, 100), identity) < 0.51,
+        "a half-page crop must fail the visibility metric",
+    )
     passed = evaluate_audio_sentinel(audio_evidence(0.6))
     require(passed["ready"] is True, "agreement exactly at 0.6 must pass")
     failed = evaluate_audio_sentinel(audio_evidence(0.599999))
@@ -89,6 +101,23 @@ def main() -> None:
         require(len(accepted["projectedCoordinates"]["notes"]) == 67, "all note boxes must project")
         require(accepted["omrUsed"] is False, "M4a main chain must not use OMR")
         require(accepted["studentFacing"] is False and accepted["reviewRequired"] is True, "runtime must remain review-only")
+
+        measure_overlay = temporary_root / "measure-overlay.jpg"
+        overlay_validation = draw_measure_overlay(accepted, correct_photo, measure_overlay)
+        require(overlay_validation["ready"] is True, "valid projected measure polygons must render")
+        require(measure_overlay.is_file(), "measure review overlay must be written")
+        invalid_overlay = temporary_root / "invalid-measure-overlay.jpg"
+        invalid_validation = draw_measure_overlay(
+            {
+                "projectedCoordinates": {
+                    "measures": [{"globalMeasureIndex": 1, "polygonPixels": [[1.0]]}],
+                },
+            },
+            correct_photo,
+            invalid_overlay,
+        )
+        require(invalid_validation["ready"] is False, "malformed measure polygons must fail closed")
+        require(not invalid_overlay.exists(), "malformed measure polygons must not emit a partial review overlay")
 
         projection_evidence = {
             "perNote": [
@@ -189,7 +218,9 @@ def main() -> None:
             "unknown-library-entry-fails-closed",
             "wrong-edition-audio-sentinel-fails-closed",
             "blurred-and-half-page-inputs-fail-closed",
+            "projected-page-visibility-rejects-partial-pages",
             "all-measure-and-note-coordinates-back-project",
+            "measure-overlay-normalizes-opencv-hull-shape-and-rejects-malformed-polygons",
             "every-diagnostic-event-projects-to-a-registered-note-anchor",
             "diagnostic-anchor-count-mismatch-fails-closed",
             "audio-agreement-floor-is-exactly-0.6",

@@ -1,7 +1,78 @@
 {
   "contract": "western-m4a-owner-measure-review-v1",
-  "evidenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "evidenceDigest": "5f8562ffda4df524be26b7a0afd4e470fe40823146c63539e351fe6612287f36",
   "reviewer": "",
   "reviewedAt": "",
-  "cases": []
+  "cases": [
+    {
+      "caseId": "m4a-positive-01",
+      "projectedMeasureCount": 21,
+      "confirmedMeasureCount": 0,
+      "allProjectedMeasureBoxesCorrect": false,
+      "note": ""
+    },
+    {
+      "caseId": "m4a-positive-02",
+      "projectedMeasureCount": 21,
+      "confirmedMeasureCount": 0,
+      "allProjectedMeasureBoxesCorrect": false,
+      "note": ""
+    },
+    {
+      "caseId": "m4a-positive-03",
+      "projectedMeasureCount": 21,
+      "confirmedMeasureCount": 0,
+      "allProjectedMeasureBoxesCorrect": false,
+      "note": ""
+    },
+    {
+      "caseId": "m4a-positive-04",
+      "projectedMeasureCount": 21,
+      "confirmedMeasureCount": 0,
+      "allProjectedMeasureBoxesCorrect": false,
+      "note": ""
+    },
+    {
+      "caseId": "m4a-positive-05",
+      "projectedMeasureCount": 17,
+      "confirmedMeasureCount": 0,
+      "allProjectedMeasureBoxesCorrect": false,
+      "note": ""
+    },
+    {
+      "caseId": "m4a-positive-06",
+      "projectedMeasureCount": 17,
+      "confirmedMeasureCount": 0,
+      "allProjectedMeasureBoxesCorrect": false,
+      "note": ""
+    },
+    {
+      "caseId": "m4a-positive-07",
+      "projectedMeasureCount": 17,
+      "confirmedMeasureCount": 0,
+      "allProjectedMeasureBoxesCorrect": false,
+      "note": ""
+    },
+    {
+      "caseId": "m4a-positive-08",
+      "projectedMeasureCount": 18,
+      "confirmedMeasureCount": 0,
+      "allProjectedMeasureBoxesCorrect": false,
+      "note": ""
+    },
+    {
+      "caseId": "m4a-positive-09",
+      "projectedMeasureCount": 18,
+      "confirmedMeasureCount": 0,
+      "allProjectedMeasureBoxesCorrect": false,
+      "note": ""
+    },
+    {
+      "caseId": "m4a-positive-10",
+      "projectedMeasureCount": 18,
+      "confirmedMeasureCount": 0,
+      "allProjectedMeasureBoxesCorrect": false,
+      "note": ""
+    }
+  ]
 }
