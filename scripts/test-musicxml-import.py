@@ -85,13 +85,18 @@ SAMPLE_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
 </score-partwise>
 """
 
+SAMPLE_VIOLIN_PIANO_MUSICXML = SAMPLE_MUSICXML.replace(
+    "<part-name>Erhu</part-name>",
+    "<part-name>Violin</part-name>",
+)
+
 
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise AssertionError(message)
 
 
-def assert_import_result(result, label: str) -> dict:
+def assert_import_result(result, label: str, expected_part: str = "Erhu") -> dict:
     piece_pack = result.piecePack or {}
     sections = piece_pack.get("sections") or []
     notes = [note for section in sections for note in (section.get("notes") or [])]
@@ -101,14 +106,14 @@ def assert_import_result(result, label: str) -> dict:
     require(bool(result.scoreId), f"{label} import should create a scoreId.")
     require(bool(piece_pack), f"{label} import should create a piecePack.")
     require(len(sections) >= 1, f"{label} import should create at least one section.")
-    require(len(notes) == 3, f"{label} import should retain the three erhu melody notes, got {len(notes)}.")
-    require([note.get("midiPitch") for note in notes] == [74, 76, 78], f"{label} import should retain erhu melody pitches only.")
-    require(result.selectedPart == "Erhu", f"Expected selectedPart Erhu for {label}, got {result.selectedPart!r}.")
-    require(part_candidates and part_candidates[0].get("label") == "Erhu", f"Erhu should rank ahead of piano in {label} candidates.")
-    require(part_candidates[0].get("selectionAmbiguous") is False, f"Explicit Erhu candidate should not be ambiguous in {label}.")
-    require(part_candidates[0].get("scoreGapToNext", 0) >= 0.9, f"Erhu-to-piano candidate gap should be explicit in {label}.")
+    require(len(notes) == 3, f"{label} import should retain the three target melody notes, got {len(notes)}.")
+    require([note.get("midiPitch") for note in notes] == [74, 76, 78], f"{label} import should retain target melody pitches only.")
+    require(result.selectedPart == expected_part, f"Expected selectedPart {expected_part} for {label}, got {result.selectedPart!r}.")
+    require(part_candidates and part_candidates[0].get("label") == expected_part, f"{expected_part} should rank ahead of piano in {label} candidates.")
+    require(part_candidates[0].get("selectionAmbiguous") is False, f"Target candidate should not be ambiguous in {label}.")
+    require(part_candidates[0].get("scoreGapToNext", 0) >= 0.9, f"Target-to-piano candidate gap should be explicit in {label}.")
     require(part_candidates[0].get("measureQuality", 0) > 0, f"Part candidate measure quality should be reported for {label}.")
-    require(result.selectedPartConfidence and result.selectedPartConfidence >= 0.7, f"Selected erhu part confidence should be usable for {label}.")
+    require(result.selectedPartConfidence and result.selectedPartConfidence >= 0.7, f"Selected target part confidence should be usable for {label}.")
     require(piece_pack.get("markingStats", {}).get("tempoChangeCount", 0) >= 1, f"Tempo marking should be preserved for {label}.")
     require(piece_pack.get("markingStats", {}).get("dynamicChangeCount", 0) >= 1, f"Dynamic marking should be preserved for {label}.")
 
@@ -165,8 +170,27 @@ def main() -> int:
             )
         )
 
+        violin_source = Path(tmp) / "violin-piano.musicxml"
+        violin_output_dir = Path(tmp) / "violin-piano-out"
+        violin_source.write_text(SAMPLE_VIOLIN_PIANO_MUSICXML, encoding="utf-8")
+        violin_result = analyzer.import_musicxml_score(
+            MusicXmlImportRequest(
+                jobId="violin-piano-import-test",
+                musicxmlPath=str(violin_source),
+                originalFilename=violin_source.name,
+                titleHint="Violin and Piano Import Test",
+                selectedPartHint="violin",
+                outputDir=str(violin_output_dir),
+            )
+        )
+
     musicxml_summary = assert_import_result(result, "MusicXML")
     mxl_summary = assert_import_result(mxl_result, "MXL")
+    violin_piano_summary = assert_import_result(
+        violin_result,
+        "Violin + Piano MusicXML",
+        expected_part="Violin",
+    )
 
     print(
         json.dumps(
@@ -174,6 +198,7 @@ def main() -> int:
                 "ok": True,
                 "musicxml": musicxml_summary,
                 "mxl": mxl_summary,
+                "violinPianoMusicxml": violin_piano_summary,
             },
             ensure_ascii=False,
             indent=2,

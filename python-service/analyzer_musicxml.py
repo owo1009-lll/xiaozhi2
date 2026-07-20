@@ -42,6 +42,17 @@ def is_piano_part_name(label: str) -> bool:
     )
 
 
+def is_violin_part_name(label: str) -> bool:
+    label_lower = label.lower()
+    normalized_label = normalize_part_label(label)
+    return (
+        "violin" in label_lower
+        or "violino" in label_lower
+        or normalized_label in {"vn", "vln", "vl"}
+        or "小提琴" in normalized_label
+    )
+
+
 def extract_musicxml_part_candidates(xml_text: str, selected_hint: str | None = None) -> list[dict[str, Any]]:
     if not xml_text.strip():
         return []
@@ -75,6 +86,7 @@ def extract_musicxml_part_candidates(xml_text: str, selected_hint: str | None = 
 
     candidates: list[dict[str, Any]] = []
     normalized_hint = normalize_part_label(selected_hint)
+    violin_hint = "violin" in normalized_hint or normalized_hint in {"vn", "vln", "vl", "小提琴"}
     for part_index, part, part_id, part_name in part_order:
         pitches: list[int] = []
         staff_indices: set[int] = set()
@@ -148,6 +160,8 @@ def extract_musicxml_part_candidates(xml_text: str, selected_hint: str | None = 
         normalized_name = normalize_part_label(part_name)
         name_lower = part_name.lower()
         erhu_name = ("erhu" in name_lower) or ("\u4e8c\u80e1" in part_name)
+        violin_name = is_violin_part_name(part_name)
+        explicit_target_name = erhu_name or (violin_name and violin_hint)
         piano_name = is_piano_part_name(part_name)
         voice_name = "voice" in name_lower or normalized_name == "voice"
         duplicate_label_count = normalized_label_counts.get(normalized_name, 0)
@@ -184,7 +198,7 @@ def extract_musicxml_part_candidates(xml_text: str, selected_hint: str | None = 
             )
         )
         safe_for_erhu_projection = bool(
-            erhu_name
+            explicit_target_name
             or (
                 note_count >= 4
                 and staff_count == 1
@@ -203,6 +217,7 @@ def extract_musicxml_part_candidates(xml_text: str, selected_hint: str | None = 
             + (0.14 if pitch_span <= 36 else -0.04)
             - chord_penalty
             + (0.25 if erhu_name else 0.0)
+            + (0.25 if violin_name and violin_hint else 0.0)
             + (0.08 if voice_name else 0.0)
             - (0.35 if piano_name else 0.0)
             - low_range_penalty
@@ -254,6 +269,7 @@ def extract_musicxml_part_candidates(xml_text: str, selected_hint: str | None = 
                 "isLikelyPiano": bool(piano_name or staff_count >= 2 or chord_ratio > 0.18),
                 "isGenericVoice": bool(is_generic_voice),
                 "explicitErhuName": bool(erhu_name),
+                "explicitViolinName": bool(violin_name),
                 "selectedHintMatch": selected_hint_match,
                 "isAfterExplicitPiano": bool(is_after_explicit_piano),
                 "isLikelyAccompanimentSplit": likely_accompaniment_split,
@@ -282,6 +298,7 @@ def extract_musicxml_part_candidates(xml_text: str, selected_hint: str | None = 
             and (
                 (bool(candidate.get("selectedHintMatch")) and not bool(next_candidate.get("selectedHintMatch")))
                 or (bool(candidate.get("explicitErhuName")) and not bool(next_candidate.get("explicitErhuName")))
+                or (bool(candidate.get("explicitViolinName")) and not bool(next_candidate.get("explicitViolinName")))
                 or (bool(candidate.get("safeForErhuProjection")) and not bool(next_candidate.get("safeForErhuProjection")))
                 or (
                     float(candidate.get("measureQuality", 0.0)) - float(next_candidate.get("measureQuality", 0.0)) >= 0.18
