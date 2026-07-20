@@ -115,11 +115,11 @@
 - 揉弦/滑音中心音高的 `3/8=37.5%` 只表示 8 个谱面意图目标中 3 个得到 `confirmed_center`,即 score-intent center agreement/decision coverage;它不是独立人工 intonation gold precision。2026-07-18 更新:负责人已逐单元标注独立 intonation gold(20 条,含 8 个揉弦/滑音目标),join=`8/8`,techniqueCenter 区按四区闸通过;旧 join=`0/8` 为历史状态。
 - round2 的 17 个揉弦单元只有“演奏了揉弦”的人工执行确认,没有与上述 8 个候选逐音连接的稳定中心音高标签,继续列为 unscored;不得拿它们补足独立音准 gold。
 - 高离散度用原始诊断独立枚举后,3/3 输出 `insufficient_evidence`,指控数=0。
-- 当前 v2(2026-07-18):`releaseGateReady=true`,`offlineEvidenceReady=true`,`readyForMonitoredPilot=true`;发布授权与学生闸门仍关闭。离线 probe、gold-free runtime foundation、物理来源 runtime audit、发布授权和学生闸门必须分层报告;任何一层不得替代下一层。
+- 当前 v2(2026-07-19 授权接线后):`releaseGateReady=true`,`offlineEvidenceReady=true`,`runtimeFoundationReady=true`,`runtimeAuditReady=true`,`authorizationReady=true`,`readyForMonitoredPilot=true`。受控试点已经可启动但尚未执行；默认学生闸门仍关闭。离线 probe、gold-free runtime foundation、物理来源 runtime audit、发布授权和学生闸门必须分层报告；任何一层不得替代下一层。
 - gold-free runtime policy 只允许从谱面标记、pYIN 帧/有声率、中心/离散度和窗口边界作决定,不得读取 `expectedBehavior`、评测 split 或人工 gold。即使接线成功,保护区、低有声率、高离散度或缺字段仍须 fail-closed,候选与外层输出仍固定 `review_required`,`studentFacing=false`,`feedbackAuthorized=false`。
 - 最新物理 batch `strings-batch-mrq5lf8u-cr2dqk` 已产生 59/59 条合同有效的 M3+ 证据,score identity 完全一致,候选 artifact SHA-256=`3b6390877072d1e09591bc9f13f0e22f64b0f3602617cac1f7dd9ada7d7410b4`;`runtimeFoundationReady=true`,`runtimeAuditReady=true`,其中 46 条 `confirmed_center`、13 条 `insufficient_evidence`,没有自动或学生输出。物理审计固定并重哈希 5 个规范 source bindings(machine report、human gold、M3 core gate、rescope decision、evaluator),再核对物理 JSONL 尾批、完整 candidate artifact、score store/score identity、policy、analyzer(raw + CRLF-normalized SHA-256=`65ea46768bf23e51aac4083c3fd08fecbeb2d81d8af4effc5aaae482bc7a279d`)以及 Python/librosa/numpy/pYIN 参数;任一规范路径替换、同批多 ordinary item、runtime 未 ready 或 standalone candidate audit 缺 M3 runtime 都会 fail-closed。这只证明 gold-free review-only 接线可审计。
 - `project-status` 每次构建还会从当前磁盘重读候选 artifact、runtime policy、analyzer 和 rescope report,逐项重算 raw SHA-256;任一路径缺失、越界或内容漂移都会把 `physicalEvidenceCurrent/runtimeFoundationReady` 转红,并经同一 live-evidence 判定阻断 release review、decision 与 preflight。缓存 audit 与缓存 release report 彼此自洽不再足以放行。
-- `studentGateReady=false`,`m3plusAutoFeedbackReady=false` 保持不变。2026-07-18 更新:上述离线证据缺口已全部关闭——6 个 declared-only 保护单元完成实际执行(14/14),12 个平拉来源单元与 8 个揉弦/滑音目标的独立逐音 intonation gold 已按 recording/measure/unit 连接(负责人标注)。剩余仅为发布授权,需按批准链单独建立。
+- `studentGateReady=false`,`m3plusAutoFeedbackReady=false` 保持不变。2026-07-18 的离线证据缺口已全部关闭——6 个 declared-only 保护单元完成实际执行(14/14),12 个平拉来源单元与 8 个揉弦/滑音目标的独立逐音 intonation gold 已按 recording/measure/unit 连接(负责人标注)；2026-07-19 发布授权也已完成。当前不再缺执行器、物理审计或授权，剩余边界是受控试点尚未实际执行以及默认学生运行时按设计保持 fail-closed。
 - 双音 multi-f0 支线范围不变,不由本次单声部中心音高闸门放行。
 
 #### 历史执行证据(保留,不再决定发布)

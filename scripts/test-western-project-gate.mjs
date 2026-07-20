@@ -455,6 +455,16 @@ assert.deepEqual(m3p04Repair?.unresolvedUnits?.map((item) => item.measure), [7, 
 const m3plusNextAction = status.nextActions.find((action) => action.track === "M3+ pitch safety rescope");
 if (m3plus.offlineEvidenceReady === true) {
   assert(m3plusNextAction?.action.includes("Keep the student runtime disabled"), "a green M3+ handoff must still pin the student runtime closed");
+  if (
+    m3plus.runtimeFoundationReady === true
+    && m3plus.runtimeAuditReady === true
+    && m3plus.authorizationReady === true
+    && m3plus.monitoredPilotAudit?.readyForMonitoredPilot === true
+  ) {
+    assert(m3plusNextAction?.action.includes("controlled pilot is ready to start"), "a fully green M3+ handoff must expose monitored-pilot readiness");
+    assert(!m3plusNextAction?.action.includes("not wired"), "a fully green M3+ handoff must not claim its executor or authorization is unwired");
+    assert.deepEqual(m3plusNextAction?.reason, ["m3plus-default-student-runtime-fail-closed"], "a fully green M3+ handoff must name only the intentional default-runtime boundary");
+  }
 } else {
   assert(m3plusNextAction?.action.includes("six declared-only protected units"), "M3+ handoff must name the unexecuted protected-unit gap");
   assert(m3plusNextAction?.action.includes("independent per-unit intonation gold"), "M3+ handoff must name the missing gold join");

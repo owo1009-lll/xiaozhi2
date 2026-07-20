@@ -412,7 +412,7 @@
 
 - The historical first-measure review result remains useful as a diagnostic snapshot, but it no longer authorizes a monitored pilot.
 - Cross-backend CREPE tiny/full + pYIN holdout now uses mode-specific physical evidence. Precision/recall is vibrato `0.60/0.75`, trill `null/0.00`, ornament `null/0.00` with insufficient reliable positives, and slide `1.00/0.75`.
-- At that historical detector checkpoint, `npm run western:m3plus-monitored-pilot-audit` returned `readyForMonitoredPilot=false` and the detector-scoped release field was false. This remains failure evidence for the retired detector route. The current four-zone v2 rescope is the evaluation contract, not release authority: the gold-free runtime foundation and physical runtime audit are complete and remain review-only, while the six declared-only protected units, independent per-note intonation gold/offline zones, and independent release authorization still block release; the student runtime stays off.
+- At that historical detector checkpoint, `npm run western:m3plus-monitored-pilot-audit` returned `readyForMonitoredPilot=false` and the detector-scoped release field was false. This remains failure evidence for the retired detector route. It no longer describes the current four-zone v2 route: the six declared-only protected units, independent per-note intonation gold joins, gold-free runtime foundation, physical runtime audit, and independent authorization were all completed by 2026-07-19. The controlled pilot is ready to start but has not run; the default student runtime remains off.
 
 # 2026-07-10 公开 Bach 语料扩展验证
 

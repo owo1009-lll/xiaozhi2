@@ -3428,13 +3428,29 @@ export function summarizeNextActions(
         || m3plus.reviewArtifacts.rescopeGateJson,
       reason: m3plus.blockingReasons,
     });
+  } else if (
+    !m3plus.studentGateReady
+    && m3plus.authorizationReady === true
+    && m3plus.monitoredPilotAudit?.readyForMonitoredPilot === true
+  ) {
+    actions.push({
+      priority: 2,
+      track: "M3+ pitch safety rescope",
+      action: "The respecified offline pitch-safety gate, review-only gold-free runtime, physical audit, and authorization all pass; the controlled pilot is ready to start. Keep the student runtime disabled by default and use the frozen controlled-pilot start workflow. Legacy technique detectors remain research-only.",
+      artifact: m3plus.monitoredPilotAudit?.source
+        || m3plus.rescopeGate?.source
+        || m3plus.reviewArtifacts.rescopeGateJson,
+      reason: ["m3plus-default-student-runtime-fail-closed"],
+    });
   } else if (!m3plus.studentGateReady) {
     actions.push({
       priority: 2,
       track: "M3+ pitch safety rescope",
-      action: "The respecified offline pitch-safety gate passes and the review-only gold-free runtime is wired and physically audited. Keep the student runtime disabled: the student/pilot executor and the release authorization are the parts that are not wired. Legacy technique detectors remain research-only.",
-      artifact: m3plus.rescopeGate?.source || m3plus.reviewArtifacts.rescopeGateJson,
-      reason: ["m3plus-runtime-disabled-by-default", "m3plus-student-executor-and-authorization-not-wired"],
+      action: "The respecified offline pitch-safety gate and review-only gold-free runtime pass, but the controlled pilot is not yet authorized. Keep the student runtime disabled and complete the frozen controlled-pilot authorization workflow. Legacy technique detectors remain research-only.",
+      artifact: m3plus.monitoredPilotAudit?.source
+        || m3plus.rescopeGate?.source
+        || m3plus.reviewArtifacts.rescopeGateJson,
+      reason: m3plus.blockingReasons,
     });
   }
   if (!m4Omr.m4OmrIndependentBenchmarkReady) {
