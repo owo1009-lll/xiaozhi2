@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "western-musicnet-yourmt3-instrument-aware-v1",
+  "evidenceId": "western-strings-musicnet-yourmt3-20260720",
+  "createdAt": "2026-07-20T15:55:24.254870+00:00",
+  "authority": "frozen-evaluation-summary",
+  "evidenceRole": "public-professional-diagnostic-challenger",
+  "sourceReport": {
+    "path": "data/experiments/western-strings-musicnet-yourmt3/report.json",
+    "sha256": "8e77c62f371e221f650b7efd254452241eac7302c38feafc783e949785b3812"
+  },
+  "maximumSecondsPerRecording": 60.0,
+  "selectionDiscipline": "select a zero-shift program projection and duration on MusicNet 2330; freeze before evaluating MusicNet 2334",
+  "source": {
+    "space": "https://huggingface.co/spaces/mimbres/YourMT3",
+    "commit": "5e66c1ea173a8186e0d20432b841d3180cc015b5",
+    "stableRelease": false,
+    "spaceLicenseDeclared": false,
+    "upstreamGithubLicense": "GPL-3.0"
+  },
+  "model": {
+    "checkpoint": "last.ckpt",
+    "checkpointSha256": "ae38e415c79efd5592dcb9b658cdb99ddb11d4c4e1eaa364cab04a052473fc25",
+    "checkpointLicenseDeclared": false
+  },
+  "datasetOverlapRisk": "MusicNet is among YourMT3 training/evaluation sources; this is architecture diagnostics, not independent release evidence.",
+  "gate": {
+    "precisionAt50msMin": 0.9,
+    "recallAt50msMin": 0.8,
+    "precisionAt100msMin": 0.9,
+    "recallAt100msMin": 0.85
+  },
+  "selectedCandidate": {
+    "programGroup": "all-strings",
+    "programs": [40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51],
+    "minimumDurationSeconds": 0.05,
+    "timeShiftSeconds": 0.0
+  },
+  "holdout": {
+    "aggregate": {
+      "50ms": {
+        "referenceNotes": 199,
+        "estimatedNotes": 162,
+        "matchedNotes": 140,
+        "precision": 0.8641975308641975,
+        "recall": 0.7035175879396985,
+        "f1": 0.775623268698061
+      },
+      "100ms": {
+        "referenceNotes": 199,
+        "estimatedNotes": 162,
+        "matchedNotes": 156,
+        "precision": 0.9629629629629629,
+        "recall": 0.7839195979899497,
+        "f1": 0.8642659279778393
+      },
+      "300ms": {
+        "referenceNotes": 199,
+        "estimatedNotes": 162,
+        "matchedNotes": 160,
+        "precision": 0.9876543209876543,
+        "recall": 0.8040201005025126,
+        "f1": 0.886426592797784
+      }
+    }
+  },
+  "timingCalibrationProbe": {
+    "timeShiftSeconds": 0.06,
+    "development50msF1": 0.5736040609137055,
+    "holdout50msF1": 0.3890410958904109,
+    "accepted": false,
+    "reason": "single-recording-global-time-shift-did-not-generalize"
+  },
+  "holdoutGateChecks": {
+    "precisionAt50ms": false,
+    "recallAt50ms": false,
+    "precisionAt100ms": true,
+    "recallAt100ms": false
+  },
+  "accompaniedViolinRecognitionReady": false,
+  "productionAdoptionReady": false,
+  "studentReleaseEligible": false,
+  "blockingReasons": [
+    "yourmt3-accompanied-violin-gate-failed",
+    "yourmt3-space-and-checkpoint-license-unresolved",
+    "yourmt3-musicnet-training-overlap-risk",
+    "student-domain-evidence-not-covered"
+  ]
+}
