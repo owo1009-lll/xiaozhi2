@@ -1,0 +1,257 @@
+{
+  "contract": "western-m4-reused-photo-structure-recall-v1",
+  "createdAt": "2026-07-20T19:37:56.565212+00:00",
+  "evidenceRole": "one-shot-reused-five-photo-symbolic-structure-diagnostic",
+  "sourceBenchmark": "data/experiments/western-strings-m4/oemer-source-benchmark/oemer-source-benchmark.json",
+  "sourceBenchmarkSha256": "52b955dc42db4e5f722aa1a6f35d57eb05bceb024aa66064d08d1f913d645b46",
+  "diagnosticUseLedger": {
+    "formalLedgerUseCount": 1,
+    "uses": [
+      {
+        "useNumber": 1,
+        "purpose": "M4 decoder handoff: one-shot notehead/stem/barline structure recall diagnosis",
+        "pieceCount": 5,
+        "inferenceRun": false,
+        "reusedFrozenOutputsOnly": true
+      }
+    ],
+    "historicalBaseline": {
+      "knownArtifactMentionCountBeforeFormalLedger": 30,
+      "knownArtifactPaths": [
+        "data/experiments/western-strings-m4/audio-rhythm-ranking/report.json",
+        "data/experiments/western-strings-m4/clarity-adaptation-photo-benchmark/clarity-source-benchmark.json",
+        "data/experiments/western-strings-m4/clarity-source-benchmark/clarity-source-benchmark.json",
+        "data/experiments/western-strings-m4/clarity-source-benchmark/metrics-preview.json",
+        "data/experiments/western-strings-m4/clarity-synth-photo-benchmark-r4/clarity-source-benchmark.json",
+        "data/experiments/western-strings-m4/clarity-synth-photo-benchmark-r6c/clarity-source-benchmark.json",
+        "data/experiments/western-strings-m4/clarity-synth-photo-benchmark/clarity-source-benchmark.json",
+        "data/experiments/western-strings-m4/doremi-clarity-photo-benchmark/clarity-source-benchmark.json",
+        "data/experiments/western-strings-m4/dual-evidence-gold-audit/report.json",
+        "data/experiments/western-strings-m4/engine-consensus-tolerance-sweep/report.json",
+        "data/experiments/western-strings-m4/engine-consensus/report.json",
+        "data/experiments/western-strings-m4/green-safety-audit/report.json",
+        "data/experiments/western-strings-m4/homr-fresh-sourcegold-revalidation-20260717/homr-source-benchmark.json",
+        "data/experiments/western-strings-m4/homr-pool-candidate/homr-pool-candidate.json",
+        "data/experiments/western-strings-m4/homr-source-benchmark/homr-source-benchmark.json",
+        "data/experiments/western-strings-m4/homr-source-benchmark/run-summary.json",
+        "data/experiments/western-strings-m4/independent-benchmark-audit.json",
+        "data/experiments/western-strings-m4/independent-real-jpg-variants/real-jpg-omr-summary.json",
+        "data/experiments/western-strings-m4/independent-real-photo-gold/independent-gold-manifest.json",
+        "data/experiments/western-strings-m4/independent-source-benchmark/omr-benchmark.json",
+        "data/experiments/western-strings-m4/measure-duration-normalization/report.json",
+        "data/experiments/western-strings-m4/oemer-dewarp-attribution/report.json",
+        "data/experiments/western-strings-m4/oemer-source-benchmark/oemer-source-benchmark.json",
+        "data/experiments/western-strings-m4/omr-benchmark.json",
+        "data/experiments/western-strings-m4/omr-readiness.json",
+        "data/experiments/western-strings-m4/p0-feedback-impact/report.json",
+        "data/experiments/western-strings-m4/p0-structure-gate/report.json",
+        "data/experiments/western-strings-m4/real-jpg-omr/real-jpg-omr-summary.json",
+        "data/experiments/western-strings-m4/rhythm-candidate-oracle/report.json",
+        "data/experiments/western-strings-m4/zeus-challenger/report.json"
+      ],
+      "interpretation": "Conservative repository-artifact inventory only; it is not an exact historical raw-image access or inference count because the set predates the formal ledger."
+    }
+  },
+  "method": {
+    "gold": "independent source-derived MusicXML, human identity/range approved",
+    "prediction": "frozen Oemer 0.1.8 MusicXML plus its coordinate sidecar; no inference rerun",
+    "alignment": "same pitch-sequence Levenshtein alignment as the frozen M4 benchmark",
+    "noteheadAssociationRecall": "aligned gold notes with an emitted coordinate-bearing draft note / gold pitched notes",
+    "stemAssociationRecall": "aligned gold notes carrying an explicit gold stem with an explicit draft stem / explicit gold stems",
+    "decodedBarlineBoundaryRecall": "internal gold note-to-note measure transitions whose aligned draft notes cross a draft measure boundary / internal gold transitions"
+  },
+  "aggregate": {
+    "pieceCount": 5,
+    "counts": {
+      "goldNoteheads": 1565,
+      "draftNoteheads": 1660,
+      "coordinateNoteheads": 1660,
+      "associatedNoteheads": 1538,
+      "pitchValidatedNoteheads": 1193,
+      "goldStemNotes": 1529,
+      "associatedStemNotes": 1502,
+      "directionCorrectStemNotes": 1420,
+      "goldInternalBarlineBoundaries": 157,
+      "recalledInternalBarlineBoundaries": 133,
+      "singleStepInternalBarlineBoundaries": 133
+    },
+    "metrics": {
+      "noteheadAssociationRecall": 0.982748,
+      "pitchValidatedNoteheadRecall": 0.7623,
+      "stemAssociationRecall": 0.982341,
+      "stemDirectionRecall": 0.928712,
+      "decodedBarlineBoundaryRecall": 0.847134,
+      "singleStepBarlineBoundaryRecall": 0.847134
+    }
+  },
+  "pixelSegmentationRecall": {
+    "notehead": null,
+    "stem": null,
+    "barline": null,
+    "evaluable": false,
+    "reason": "no independent same-edition pixel/coordinate mask gold; independent source engraving has different layout"
+  },
+  "limitations": [
+    "Association recall is a symbolic upper-bound proxy, not pixel segmentation recall or precision.",
+    "A substituted pitch can still count as a notehead association because this audit isolates structural survival.",
+    "Stem XML output proves decoder association, not that every stem pixel was correctly segmented.",
+    "Barline recall measures decoded internal boundaries; it does not localize barline pixels.",
+    "These five repeatedly viewed pages are diagnostic-only and permanently ineligible for fresh-blind promotion or tuning."
+  ],
+  "freshBlindEligible": false,
+  "tuningAuthorized": false,
+  "studentGateReady": false,
+  "automaticAdoptionAuthorized": false,
+  "rows": [
+    {
+      "pieceId": "violin-ex05",
+      "goldPath": "data/experiments/western-strings-m4/independent-real-photo-gold/violin-ex05.independent-source-gold.musicxml",
+      "goldSha256": "a3121645d9273f6ad1ac3c9d15e3893375953d745c002b8444c7dbab20f4056c",
+      "draftPath": "data/experiments/western-strings-m4/oemer-source-benchmark/violin-ex05/omr-sk120-trimmed/violin-ex05-up2-trimmed.musicxml",
+      "draftSha256": "3aff4f24bd2fe340e886ff6abd0597b684d43fdb359ce38e23a03cb968115168",
+      "coordinateSidecarPath": "data/experiments/western-strings-m4/oemer-source-benchmark/violin-ex05/omr-sk120-trimmed/violin-ex05-up2-trimmed.coordinates.json",
+      "coordinateSidecarSha256": "b8779d99053c1228cd35eb1a6f347d312d440b23488cbc266d1f5efda873926e",
+      "counts": {
+        "goldNoteheads": 288,
+        "draftNoteheads": 289,
+        "coordinateNoteheads": 289,
+        "associatedNoteheads": 288,
+        "pitchValidatedNoteheads": 210,
+        "goldStemNotes": 263,
+        "associatedStemNotes": 263,
+        "directionCorrectStemNotes": 251,
+        "goldInternalBarlineBoundaries": 49,
+        "recalledInternalBarlineBoundaries": 47,
+        "singleStepInternalBarlineBoundaries": 47
+      },
+      "metrics": {
+        "noteheadAssociationRecall": 1.0,
+        "pitchValidatedNoteheadRecall": 0.729167,
+        "stemAssociationRecall": 1.0,
+        "stemDirectionRecall": 0.954373,
+        "decodedBarlineBoundaryRecall": 0.959184,
+        "singleStepBarlineBoundaryRecall": 0.959184
+      }
+    },
+    {
+      "pieceId": "violin-ex08",
+      "goldPath": "data/experiments/western-strings-m4/independent-real-photo-gold/violin-ex08.independent-source-gold.musicxml",
+      "goldSha256": "b717c246f6921b747bf610a020f3bc56596b2bbe057e21c90e3810e26a8cfa82",
+      "draftPath": "data/experiments/western-strings-m4/oemer-source-benchmark/violin-ex08/omr-sk120/violin-ex08-up2.musicxml",
+      "draftSha256": "f85bd563c7323ad04149ea3d26035ccbc41e5b09f95322a1ae646104dd38212b",
+      "coordinateSidecarPath": "data/experiments/western-strings-m4/oemer-source-benchmark/violin-ex08/omr-sk120/violin-ex08-up2.coordinates.json",
+      "coordinateSidecarSha256": "3cb92146e8b94a0e1048150047cd3431e6626121c6dd3a399103ba8d9bdce1ea",
+      "counts": {
+        "goldNoteheads": 341,
+        "draftNoteheads": 361,
+        "coordinateNoteheads": 361,
+        "associatedNoteheads": 341,
+        "pitchValidatedNoteheads": 289,
+        "goldStemNotes": 330,
+        "associatedStemNotes": 330,
+        "directionCorrectStemNotes": 313,
+        "goldInternalBarlineBoundaries": 39,
+        "recalledInternalBarlineBoundaries": 33,
+        "singleStepInternalBarlineBoundaries": 33
+      },
+      "metrics": {
+        "noteheadAssociationRecall": 1.0,
+        "pitchValidatedNoteheadRecall": 0.847507,
+        "stemAssociationRecall": 1.0,
+        "stemDirectionRecall": 0.948485,
+        "decodedBarlineBoundaryRecall": 0.846154,
+        "singleStepBarlineBoundaryRecall": 0.846154
+      }
+    },
+    {
+      "pieceId": "violin-ex09",
+      "goldPath": "data/experiments/western-strings-m4/independent-real-photo-gold/violin-ex09.independent-source-gold.musicxml",
+      "goldSha256": "09c5c994f8f33aab93394ce60c4a396c7cba3e10a0332cebe31b981328bbc041",
+      "draftPath": "data/experiments/western-strings-m4/oemer-source-benchmark/violin-ex09/omr-sk120/violin-ex09-up2.musicxml",
+      "draftSha256": "d52dfc524d80f3ce124880ad15f6518b625d7a3758aac6cdedcc6beca0709894",
+      "coordinateSidecarPath": "data/experiments/western-strings-m4/oemer-source-benchmark/violin-ex09/omr-sk120/violin-ex09-up2.coordinates.json",
+      "coordinateSidecarSha256": "f02edca2c80a00452ed55e42f6747b0d1322c9f7baebb3504672913e1c1188d9",
+      "counts": {
+        "goldNoteheads": 288,
+        "draftNoteheads": 363,
+        "coordinateNoteheads": 363,
+        "associatedNoteheads": 264,
+        "pitchValidatedNoteheads": 149,
+        "goldStemNotes": 288,
+        "associatedStemNotes": 264,
+        "directionCorrectStemNotes": 247,
+        "goldInternalBarlineBoundaries": 17,
+        "recalledInternalBarlineBoundaries": 8,
+        "singleStepInternalBarlineBoundaries": 8
+      },
+      "metrics": {
+        "noteheadAssociationRecall": 0.916667,
+        "pitchValidatedNoteheadRecall": 0.517361,
+        "stemAssociationRecall": 0.916667,
+        "stemDirectionRecall": 0.857639,
+        "decodedBarlineBoundaryRecall": 0.470588,
+        "singleStepBarlineBoundaryRecall": 0.470588
+      }
+    },
+    {
+      "pieceId": "violin-ex10",
+      "goldPath": "data/experiments/western-strings-m4/independent-real-photo-gold/violin-ex10.independent-source-gold.musicxml",
+      "goldSha256": "27e3588754f58e7da12c6a9d63a4a379531cc8291545598f14e4c501704c3e19",
+      "draftPath": "data/experiments/western-strings-m4/oemer-source-benchmark/violin-ex10/omr-sk120/violin-ex10-up2.musicxml",
+      "draftSha256": "a29ddbdb0f96a6685b4a3e54c9b8534ad7bf2f6f55cc7ee98880f4a205d9ae41",
+      "coordinateSidecarPath": "data/experiments/western-strings-m4/oemer-source-benchmark/violin-ex10/omr-sk120/violin-ex10-up2.coordinates.json",
+      "coordinateSidecarSha256": "78eaf322243e263889f068191c25fc941d467a5cbe0cf49f89cb2c45c22e194d",
+      "counts": {
+        "goldNoteheads": 324,
+        "draftNoteheads": 323,
+        "coordinateNoteheads": 323,
+        "associatedNoteheads": 322,
+        "pitchValidatedNoteheads": 250,
+        "goldStemNotes": 324,
+        "associatedStemNotes": 322,
+        "directionCorrectStemNotes": 302,
+        "goldInternalBarlineBoundaries": 26,
+        "recalledInternalBarlineBoundaries": 21,
+        "singleStepInternalBarlineBoundaries": 21
+      },
+      "metrics": {
+        "noteheadAssociationRecall": 0.993827,
+        "pitchValidatedNoteheadRecall": 0.771605,
+        "stemAssociationRecall": 0.993827,
+        "stemDirectionRecall": 0.932099,
+        "decodedBarlineBoundaryRecall": 0.807692,
+        "singleStepBarlineBoundaryRecall": 0.807692
+      }
+    },
+    {
+      "pieceId": "violin-ex12",
+      "goldPath": "data/experiments/western-strings-m4/independent-real-photo-gold/violin-ex12.independent-source-gold.musicxml",
+      "goldSha256": "a4b328ec0922a78195f01ef550346e74d5d3763f1416d6f6345e57dc4e25bc82",
+      "draftPath": "data/experiments/western-strings-m4/oemer-source-benchmark/violin-ex12/omr-sk120/violin-ex12-up2.musicxml",
+      "draftSha256": "fdccd89841d659248b902d462b5c692d259de2ef1cd3b3a24a44ace5e35a370c",
+      "coordinateSidecarPath": "data/experiments/western-strings-m4/oemer-source-benchmark/violin-ex12/omr-sk120/violin-ex12-up2.coordinates.json",
+      "coordinateSidecarSha256": "95673536f3cf7f97d0e95a49efbcdd880f85e156fc7abcec401625d79247e57e",
+      "counts": {
+        "goldNoteheads": 324,
+        "draftNoteheads": 324,
+        "coordinateNoteheads": 324,
+        "associatedNoteheads": 323,
+        "pitchValidatedNoteheads": 295,
+        "goldStemNotes": 324,
+        "associatedStemNotes": 323,
+        "directionCorrectStemNotes": 307,
+        "goldInternalBarlineBoundaries": 26,
+        "recalledInternalBarlineBoundaries": 24,
+        "singleStepInternalBarlineBoundaries": 24
+      },
+      "metrics": {
+        "noteheadAssociationRecall": 0.996914,
+        "pitchValidatedNoteheadRecall": 0.910494,
+        "stemAssociationRecall": 0.996914,
+        "stemDirectionRecall": 0.947531,
+        "decodedBarlineBoundaryRecall": 0.923077,
+        "singleStepBarlineBoundaryRecall": 0.923077
+      }
+    }
+  ]
+}
