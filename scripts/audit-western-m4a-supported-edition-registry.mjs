@@ -14,7 +14,6 @@ export const M4A_SUPPORTED_EDITION_REGISTRY_PATH = path.join(
 );
 
 const APPROVED_LICENSE_STATUSES = new Set(["self-authored", "public-domain", "local-only"]);
-const SEMANTIC_MASK_NAMES = ["stem", "beam", "notehead", "barline"];
 
 function sha256(bytes) {
   return crypto.createHash("sha256").update(bytes).digest("hex");
@@ -149,43 +148,6 @@ async function auditEntry(entry, registryRoot, registryRendererVersion) {
     }
   }
 
-  let semanticMaskReady = true;
-  for (const name of SEMANTIC_MASK_NAMES) {
-    const metadata = entry?.semanticMasks?.[name];
-    const absolute = safeArtifactPath(registryRoot, metadata?.path);
-    if (!absolute) {
-      blockingReasons.push("m4a-registry-semantic-mask-path-invalid");
-      semanticMaskReady = false;
-      continue;
-    }
-    try {
-      const bytes = await fs.readFile(absolute);
-      const dimensions = parsePngDimensions(bytes);
-      const renderDimensions = bytesByKind.has("render")
-        ? parsePngDimensions(bytesByKind.get("render"))
-        : null;
-      if (!/^[a-f0-9]{64}$/.test(String(metadata?.sha256 || ""))
-        || sha256(bytes) !== metadata.sha256) {
-        blockingReasons.push("m4a-registry-semantic-mask-hash-mismatch");
-        semanticMaskReady = false;
-      }
-      if (!dimensions || !renderDimensions
-        || dimensions.width !== renderDimensions.width
-        || dimensions.height !== renderDimensions.height) {
-        blockingReasons.push("m4a-registry-semantic-mask-size-mismatch");
-        semanticMaskReady = false;
-      }
-      if (!Number.isInteger(metadata?.elementCount) || metadata.elementCount < 0
-        || !Number.isInteger(metadata?.foregroundPixelCount) || metadata.foregroundPixelCount < 0
-        || (metadata.elementCount === 0) !== (metadata.foregroundPixelCount === 0)) {
-        blockingReasons.push("m4a-registry-semantic-mask-count-invalid");
-        semanticMaskReady = false;
-      }
-    } catch {
-      blockingReasons.push("m4a-registry-semantic-mask-artifact-missing");
-      semanticMaskReady = false;
-    }
-  }
 
   let coordinateAudit = { ready: false, blockingReasons: ["m4a-registry-coordinate-sidecar-invalid"] };
   if (bytesByKind.has("coordinate-sidecar")) {
@@ -211,7 +173,6 @@ async function auditEntry(entry, registryRoot, registryRendererVersion) {
       bytesByKind.has(kind) && !uniqueReasons.includes(`m4a-registry-${kind}-hash-mismatch`)
     )),
     coordinateSidecarReady: coordinateAudit.ready,
-    semanticMaskReady,
     humanConfirmationReady,
     licenseReady,
     blockingReasons: uniqueReasons,

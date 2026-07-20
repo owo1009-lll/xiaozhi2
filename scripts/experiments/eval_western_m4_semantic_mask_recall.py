@@ -18,6 +18,7 @@ from build_western_m4b_structure_dataset import augment_page, split_for
 
 REPO = Path(__file__).resolve().parents[2]
 REGISTRY_PATH = REPO / "data/experiments/western-strings-m4a/supported-editions/registry.json"
+MASK_REGISTRY_PATH = REPO / "data/experiments/western-strings-m4a/supported-editions/semantic-mask-registry.json"
 DATASET_CONFIG = REPO / "config/western-m4b-dataset.json"
 DATASET_ROOT = REPO / "data/experiments/western-strings-m4b/dataset"
 OUTPUT_ROOT = REPO / "data/experiments/western-strings-m4/semantic-mask-recall"
@@ -225,12 +226,21 @@ def main() -> int:
     os.environ.setdefault("OMP_NUM_THREADS", "1")
     os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
     registry = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
+    mask_registry = json.loads(MASK_REGISTRY_PATH.read_text(encoding="utf-8"))
+    masks_by_identity = {
+        (row["pieceId"], row["editionId"]): row["semanticMasks"]
+        for row in mask_registry["entries"]
+    }
     config = json.loads(DATASET_CONFIG.read_text(encoding="utf-8"))
     registry_root = REGISTRY_PATH.parent
     rows = []
     for entry_index, entry in enumerate(registry["entries"]):
         if entry["pieceId"] not in EVALUATED_PIECES:
             continue
+        entry = {
+            **entry,
+            "semanticMasks": masks_by_identity[(entry["pieceId"], entry["editionId"])],
+        }
         render_path = registry_root / entry["renderPath"]
         render_size = Image.open(render_path).size
         render_masks = {
@@ -257,6 +267,7 @@ def main() -> int:
         "evidenceRole": "render-and-synthetic-pixel-segmentation-diagnostic",
         "sources": {
             "registry": {"path": portable(REGISTRY_PATH), "sha256": sha256(REGISTRY_PATH)},
+            "semanticMaskRegistry": {"path": portable(MASK_REGISTRY_PATH), "sha256": sha256(MASK_REGISTRY_PATH)},
             "datasetConfig": {"path": portable(DATASET_CONFIG), "sha256": sha256(DATASET_CONFIG)},
         },
         "runtime": {"oemerVersion": importlib.metadata.version("oemer")},

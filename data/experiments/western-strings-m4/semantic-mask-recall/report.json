@@ -4,7 +4,11 @@
   "sources": {
     "registry": {
       "path": "data/experiments/western-strings-m4a/supported-editions/registry.json",
-      "sha256": "c70e3961dcc65dbd959c6457cd8970705f4066df1cdc21d12f757fc614a6e86d"
+      "sha256": "10a35688cfaad13d6510b6bbe3a9a9fbca3d0ecb0b1ee3b7dbdec3cb9ffd9c9c"
+    },
+    "semanticMaskRegistry": {
+      "path": "data/experiments/western-strings-m4a/supported-editions/semantic-mask-registry.json",
+      "sha256": "451a6d2424086e10e2ee4a431843b043e2c083620c154e2efc5abc37512bb232"
     },
     "datasetConfig": {
       "path": "config/western-m4b-dataset.json",

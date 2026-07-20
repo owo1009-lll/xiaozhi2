@@ -30,9 +30,23 @@ def main() -> int:
     require(len(polygon) == 1 and len(polygon[0]) == 4, "polygon path sampling")
 
     registry_root = REPO / "data/experiments/western-strings-m4a/supported-editions"
-    registry = json.loads((registry_root / "registry.json").read_text(encoding="utf-8"))
+    registry = json.loads((registry_root / "semantic-mask-registry.json").read_text(encoding="utf-8"))
+    product_registry = json.loads((registry_root / "registry.json").read_text(encoding="utf-8"))
+    require(registry["contract"] == "western-m4-semantic-mask-registry-v1", "contract")
+    product_entries = {
+        (entry["pieceId"], entry["editionId"]): entry
+        for entry in product_registry["entries"]
+    }
+    mask_entries = {
+        (entry["pieceId"], entry["editionId"]): entry
+        for entry in registry["entries"]
+    }
+    require(mask_entries.keys() == product_entries.keys(), "product registry identity set")
     expected_names = {"stem", "beam", "notehead", "barline"}
     for entry in registry["entries"]:
+        product_entry = product_entries[(entry["pieceId"], entry["editionId"])]
+        require(entry["renderPath"] == product_entry["renderPath"], "product render path")
+        require(entry["renderSha256"] == product_entry["renderSha256"], "product render hash")
         render_size = Image.open(registry_root / entry["renderPath"]).size
         require(set(entry["semanticMasks"]) == expected_names, "mask set")
         for name, metadata in entry["semanticMasks"].items():
@@ -48,7 +62,13 @@ def main() -> int:
             )
     print(json.dumps({
         "ok": True,
-        "checks": ["svg-path-rasterization", "four-mask-set", "render-size", "hash-and-pixel-count"],
+        "checks": [
+            "svg-path-rasterization",
+            "product-registry-render-link",
+            "four-mask-set",
+            "render-size",
+            "hash-and-pixel-count",
+        ],
         "beamEvaluable": any(
             entry["semanticMasks"]["beam"]["elementCount"] > 0
             for entry in registry["entries"]

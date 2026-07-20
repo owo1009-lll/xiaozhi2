@@ -32,6 +32,7 @@ OUTPUT_ROOT = (
 REGISTRY_CONTRACT = "western-m4a-supported-edition-registry-v1"
 SIDECAR_CONTRACT = "western-m4a-render-coordinate-sidecar-v1"
 SEED_CONTRACT = "western-m4a-supported-edition-seeds-v1"
+MASK_REGISTRY_CONTRACT = "western-m4-semantic-mask-registry-v1"
 MASK_CLASSES = {
     "stem": "Stem",
     "beam": "Beam",
@@ -565,7 +566,6 @@ def build_entry(
         write_bytes_if_changed(render_path, png.read_bytes())
         sidecar = build_sidecar(svg, render_path, measures, piece_id, edition_id, renderer)
         mask_summary = build_semantic_masks(svg, render_path, mask_paths)
-        sidecar["semanticMasks"] = mask_summary
         write_bytes_if_changed(sidecar_path, json_bytes(sidecar))
 
     return {
@@ -613,10 +613,29 @@ def main() -> None:
         "version": actual_version,
         "dpi": int(seeds["renderer"]["dpi"]),
     }
-    entries = [
+    built_entries = [
         build_entry(row, seeds["catalogApproval"], executable, renderer)
         for row in seeds["entries"]
     ]
+    entries = [
+        {key: value for key, value in row.items() if key != "semanticMasks"}
+        for row in built_entries
+    ]
+    mask_registry = {
+        "contract": MASK_REGISTRY_CONTRACT,
+        "generatedBy": "scripts/experiments/build_western_m4a_supported_editions.py",
+        "renderer": renderer,
+        "entries": [
+            {
+                "pieceId": row["pieceId"],
+                "editionId": row["editionId"],
+                "renderPath": row["renderPath"],
+                "renderSha256": row["renderSha256"],
+                "semanticMasks": row["semanticMasks"],
+            }
+            for row in built_entries
+        ],
+    }
     registry = {
         "contract": REGISTRY_CONTRACT,
         "generatedBy": "scripts/experiments/build_western_m4a_supported_editions.py",
@@ -626,6 +645,7 @@ def main() -> None:
     }
     registry_path = OUTPUT_ROOT / "registry.json"
     write_bytes_if_changed(registry_path, json_bytes(registry))
+    write_bytes_if_changed(OUTPUT_ROOT / "semantic-mask-registry.json", json_bytes(mask_registry))
     print(
         json.dumps(
             {
