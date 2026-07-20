@@ -1782,6 +1782,12 @@ export function summarizePublicModelValidation({
   const alignmentEngineeringGatePassed = phenicxAlignment?.ok === true
     && phenicxAlignment?.alignmentGatePassed === true;
   const alignmentPolyphonicGatePassed = phenicxAlignment?.polyphonicSubgroupGate?.passed === true;
+  const phenicxRecognition = phenicxAlignment?.recognition || null;
+  const phenicxRecognitionReportAvailable = phenicxRecognition?.evidenceType
+    === "independent-audio-event-recognition-against-manual-note-gold"
+    && phenicxRecognition?.scoreUsedDuringInference === false;
+  const phenicxPolyphonicRecognitionGatePassed = phenicxRecognitionReportAvailable
+    && phenicxRecognition?.polyphonicRecognitionGate?.passed === true;
   const recognitionCalibrationV2Ready = muscCalibration?.ok === true
     && muscCalibration?.calibrationV2Ready === true;
   const recognitionCalibrationV3Ready = muscCalibration?.ok === true
@@ -1793,7 +1799,8 @@ export function summarizePublicModelValidation({
     && muscFresh?.freshConfirmationPassed === true
     && muscFresh?.muscV3CoreGatePassed === true;
   const doubleStopAutoFeedbackReady = muscFresh?.doubleStopAutoFeedbackEligible === true
-    && alignmentPolyphonicGatePassed;
+    && alignmentPolyphonicGatePassed
+    && phenicxPolyphonicRecognitionGatePassed;
   const weakLabelSourceReady = violinMidiAudit?.ok === true
     && violinMidiAudit?.readyAsWeakLabelSource === true;
   const independentRecognitionBenchmarkReady = violinMidiAudit?.ok === true
@@ -1811,6 +1818,11 @@ export function summarizePublicModelValidation({
     blockingReasons.push("phenicx-fresh-external-confirmation-required");
   }
   if (!alignmentPolyphonicGatePassed) blockingReasons.push("phenicx-polyphonic-alignment-gate-failed");
+  if (!phenicxRecognitionReportAvailable) {
+    blockingReasons.push("phenicx-polyphonic-recognition-report-missing");
+  } else if (!phenicxPolyphonicRecognitionGatePassed) {
+    blockingReasons.push("phenicx-polyphonic-recognition-gate-failed");
+  }
   if (!muscCalibration) blockingReasons.push("musc-calibration-report-missing");
   else if (!recognitionCalibrationV2Ready) blockingReasons.push("musc-v2-calibration-gate-failed");
   if (!muscFresh) blockingReasons.push("musc-fresh-confirmation-report-missing");
@@ -1849,6 +1861,15 @@ export function summarizePublicModelValidation({
       monophonicV2Ready: recognitionFreshV2Ready,
       monophonicV3Ready: recognitionFreshV3Ready,
       doubleStopAutoFeedbackReady,
+      phenicxHumanGold: {
+        reportAvailable: phenicxRecognitionReportAvailable,
+        scoreUsedDuringInference: phenicxRecognition?.scoreUsedDuringInference === true,
+        selectedFilter: phenicxRecognition?.selectedFilter || {},
+        development: phenicxRecognition?.development || {},
+        holdout: phenicxRecognition?.holdout || {},
+        gate: phenicxRecognition?.polyphonicRecognitionGate || {},
+        protocolCaveat: phenicxRecognition?.protocolCaveat || "",
+      },
       postprocessing: muscFresh?.postprocessing || muscCalibration?.selectedPostprocessing || {},
       coreMetrics: muscFresh?.aggregate?.monophonicCore?.musc || {},
       doubleStopStressMetrics: muscFresh?.aggregate?.doubleStopStressReviewOnly?.musc || {},

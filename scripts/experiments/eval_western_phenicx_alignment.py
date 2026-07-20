@@ -22,6 +22,11 @@ from eval_western_strings_m0_bach10 import (  # noqa: E402
     basic_pitch_events,
     predict_basic_pitch_assignment,
 )
+from eval_western_bach_violin_basic_pitch_transcription import (  # noqa: E402
+    evaluate_tolerance as evaluate_recognition_tolerance,
+    filter_events as filter_recognition_events,
+    metrics_from_counts as recognition_metrics_from_counts,
+)
 
 
 DEFAULT_ADAPTER = (
@@ -46,6 +51,16 @@ GATE = {
     "p90OnsetErrorMaxExclusive": 0.500,
     "hitAt300msMin": 0.850,
     "coverageMin": 0.800,
+}
+RECOGNITION_FILTER_CONFIDENCES = (0.30, 0.35, 0.40, 0.45, 0.50)
+RECOGNITION_FILTER_MIN_DURATIONS = (0.03, 0.05, 0.07, 0.09, 0.12)
+RECOGNITION_ONSET_TOLERANCES = (0.05, 0.10, 0.30)
+POLYPHONIC_RECOGNITION_GATE = {
+    "precisionAt50msMin": 0.90,
+    "recallAt50msMin": 0.80,
+    "precisionAt100msMin": 0.90,
+    "recallAt100msMin": 0.85,
+    "doubleStopRecallAt100msMin": 0.80,
 }
 
 
@@ -305,6 +320,118 @@ def evaluate_gate(metrics: dict[str, Any]) -> dict[str, Any]:
     return {"passed": all(checks.values()), "checks": checks, "thresholds": GATE}
 
 
+def evaluate_polyphonic_recognition_gate(
+    metrics: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    strict = metrics.get("50ms") or {}
+    tolerant = metrics.get("100ms") or {}
+    checks = {
+        "precisionAt50ms": (finite_number(strict.get("precision")) or 0.0)
+        >= POLYPHONIC_RECOGNITION_GATE["precisionAt50msMin"],
+        "recallAt50ms": (finite_number(strict.get("recall")) or 0.0)
+        >= POLYPHONIC_RECOGNITION_GATE["recallAt50msMin"],
+        "precisionAt100ms": (finite_number(tolerant.get("precision")) or 0.0)
+        >= POLYPHONIC_RECOGNITION_GATE["precisionAt100msMin"],
+        "recallAt100ms": (finite_number(tolerant.get("recall")) or 0.0)
+        >= POLYPHONIC_RECOGNITION_GATE["recallAt100msMin"],
+        "doubleStopRecallAt100ms": (
+            finite_number(tolerant.get("doubleStopRecall")) or 0.0
+        )
+        >= POLYPHONIC_RECOGNITION_GATE["doubleStopRecallAt100msMin"],
+    }
+    return {
+        "passed": all(checks.values()),
+        "checks": checks,
+        "thresholds": POLYPHONIC_RECOGNITION_GATE,
+    }
+
+
+def recognition_filter_key(candidate: dict[str, Any]) -> tuple[float, ...]:
+    development = candidate["development"]
+    strict = development["50ms"]
+    tolerant = development["100ms"]
+    gate = evaluate_polyphonic_recognition_gate(development)
+    return (
+        float(gate["passed"]),
+        float(tolerant.get("f1") or -1.0),
+        float(tolerant.get("doubleStopRecall") or -1.0),
+        float(strict.get("f1") or -1.0),
+        -float(candidate["minConfidence"]),
+        -float(candidate["minDurationSeconds"]),
+    )
+
+
+def select_recognition_filter(candidates: list[dict[str, Any]]) -> dict[str, Any]:
+    if not candidates:
+        raise ValueError("no-recognition-filter-candidates")
+    return max(candidates, key=recognition_filter_key)
+
+
+def recognition_reference_rows(source_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {
+            "goldTime": float(row["goldOnset"]),
+            "goldOffset": float(row["goldOffset"]),
+            "midi": int(row["midi"]),
+            "doubleStop": int(row.get("goldChordSize") or 1) >= 2,
+        }
+        for row in source_rows
+    ]
+
+
+def summarize_recognition_corpus(
+    items: list[dict[str, Any]],
+    min_confidence: float,
+    min_duration: float,
+) -> dict[str, dict[str, Any]]:
+    by_tolerance: dict[str, list[tuple[dict[str, Any], int, int]]] = {
+        f"{int(round(tolerance * 1000))}ms": []
+        for tolerance in RECOGNITION_ONSET_TOLERANCES
+    }
+    for item in items:
+        references = recognition_reference_rows(item["sourceRows"])
+        filtered = filter_recognition_events(
+            item["events"], min_confidence, min_duration
+        )
+        double_reference = sum(bool(row["doubleStop"]) for row in references)
+        single_reference = len(references) - double_reference
+        for tolerance in RECOGNITION_ONSET_TOLERANCES:
+            key = f"{int(round(tolerance * 1000))}ms"
+            metrics = evaluate_recognition_tolerance(references, filtered, tolerance)
+            double_matched = round(
+                float(metrics.get("doubleStopRecall") or 0.0) * double_reference
+            )
+            single_matched = round(
+                float(metrics.get("singleNoteRecall") or 0.0) * single_reference
+            )
+            by_tolerance[key].append(
+                (metrics, int(single_matched), int(double_matched))
+            )
+
+    output: dict[str, dict[str, Any]] = {}
+    for key, rows in by_tolerance.items():
+        reference_notes = sum(int(row[0]["referenceNotes"]) for row in rows)
+        estimated_notes = sum(int(row[0]["estimatedNotes"]) for row in rows)
+        matched_notes = sum(int(row[0]["matchedNotes"]) for row in rows)
+        single_reference = sum(
+            sum(int(source.get("goldChordSize") or 1) < 2 for source in item["sourceRows"])
+            for item in items
+        )
+        double_reference = sum(
+            sum(int(source.get("goldChordSize") or 1) >= 2 for source in item["sourceRows"])
+            for item in items
+        )
+        metrics = recognition_metrics_from_counts(
+            reference_notes, estimated_notes, matched_notes
+        )
+        single_matched = sum(row[1] for row in rows)
+        double_matched = sum(row[2] for row in rows)
+        metrics["singleNoteRecall"] = safe_rate(single_matched, single_reference)
+        metrics["doubleStopRecall"] = safe_rate(double_matched, double_reference)
+        output[key] = metrics
+    return output
+
+
 def selection_key(method_report: dict[str, Any]) -> tuple[float, ...]:
     metrics = method_report["development"]
     gate = evaluate_gate(metrics)
@@ -369,6 +496,18 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"{metrics['medianOnsetError']} | {metrics['p90OnsetError']} | "
             f"{metrics['hitAt300ms']} | {str(metrics['gate']['passed']).lower()} |"
         )
+    recognition = report.get("recognition") or {}
+    if recognition:
+        lines.extend(
+            [
+                "",
+                "## Independent Basic Pitch Recognition",
+                "",
+                f"- selectedFilter: {recognition['selectedFilter']}",
+                f"- polyphonicRecognitionGatePassed: {str(recognition['polyphonicRecognitionGate']['passed']).lower()}",
+                f"- holdout: {recognition['holdout']}",
+            ]
+        )
     lines.append("")
     return "\n".join(lines)
 
@@ -393,6 +532,7 @@ def main() -> int:
     all_rows: list[dict[str, Any]] = []
     failures: list[dict[str, str]] = []
     piece_method_rows: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    recognition_items: list[dict[str, Any]] = []
     cache_dir = output_dir / "cache" / "basic-pitch"
     for piece_index, piece_manifest in enumerate(adapter["pieces"], start=1):
         piece = str(piece_manifest["piece"])
@@ -402,6 +542,14 @@ def main() -> int:
             source_rows, notes = load_notes(Path(piece_manifest["notesPath"]), piece)
             audio_path = Path(piece_manifest["audio"]["outputPath"])
             events = basic_pitch_events(audio_path, cache_dir)
+            recognition_items.append(
+                {
+                    "piece": piece,
+                    "split": split,
+                    "sourceRows": source_rows,
+                    "events": events,
+                }
+            )
             basic_predictions = predict_basic_pitch_assignment(notes, events)
             parangonar_predictions, parangonar_details = predict_parangonar(source_rows, events)
             fallback_predictions = fill_missing_predictions(
@@ -463,6 +611,47 @@ def main() -> int:
 
     selected_method = select_method(method_reports)
     selected = method_reports[selected_method]
+    recognition_candidates = []
+    development_recognition_items = [
+        item for item in recognition_items if item["split"] == "development"
+    ]
+    for min_confidence in RECOGNITION_FILTER_CONFIDENCES:
+        for min_duration in RECOGNITION_FILTER_MIN_DURATIONS:
+            recognition_candidates.append(
+                {
+                    "minConfidence": min_confidence,
+                    "minDurationSeconds": min_duration,
+                    "development": summarize_recognition_corpus(
+                        development_recognition_items,
+                        min_confidence,
+                        min_duration,
+                    ),
+                }
+            )
+    selected_recognition_filter = select_recognition_filter(recognition_candidates)
+    recognition_min_confidence = float(
+        selected_recognition_filter["minConfidence"]
+    )
+    recognition_min_duration = float(
+        selected_recognition_filter["minDurationSeconds"]
+    )
+    recognition_holdout = summarize_recognition_corpus(
+        [item for item in recognition_items if item["split"] == "holdout"],
+        recognition_min_confidence,
+        recognition_min_duration,
+    )
+    recognition_per_piece = {
+        item["piece"]: {
+            "split": item["split"],
+            "metrics": summarize_recognition_corpus(
+                [item], recognition_min_confidence, recognition_min_duration
+            ),
+        }
+        for item in recognition_items
+    }
+    polyphonic_recognition_gate = evaluate_polyphonic_recognition_gate(
+        recognition_holdout
+    )
     holdout_piece_gates = [
         metrics["gate"]["passed"]
         for metrics in selected["pieces"].values()
@@ -492,6 +681,29 @@ def main() -> int:
         },
         "alignmentGatePassed": alignment_gate_passed,
         "polyphonicSubgroupGate": polyphonic_subgroup_gate,
+        "recognition": {
+            "model": "basic-pitch",
+            "evidenceType": "independent-audio-event-recognition-against-manual-note-gold",
+            "scoreUsedDuringInference": False,
+            "selectionPolicy": "select confidence and minimum duration on Mozart/Beethoven development only; evaluate Mahler/Bruckner holdout once",
+            "selectedFilter": {
+                "minConfidence": recognition_min_confidence,
+                "minDurationSeconds": recognition_min_duration,
+            },
+            "development": selected_recognition_filter["development"],
+            "holdout": recognition_holdout,
+            "perPiece": recognition_per_piece,
+            "candidateCount": len(recognition_candidates),
+            "developmentPassingCandidateCount": sum(
+                evaluate_polyphonic_recognition_gate(candidate["development"])[
+                    "passed"
+                ]
+                for candidate in recognition_candidates
+            ),
+            "polyphonicRecognitionGate": polyphonic_recognition_gate,
+            "studentReleaseEligible": False,
+            "protocolCaveat": "The PHENICX holdout had already been inspected for alignment and during an exploratory recognition feasibility probe before this formal report was added. Treat this as sequential engineering evidence and require a fresh external corpus before promotion.",
+        },
         "firstPassBeforeFallback": {
             "selectedMethod": "parangonar-basic-pitch",
             "holdout": method_reports["parangonar-basic-pitch"]["holdout"],

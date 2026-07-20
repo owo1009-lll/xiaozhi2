@@ -143,6 +143,63 @@ class WesternPhenicxAlignmentEvalTest(unittest.TestCase):
                 [{"normalizedScoreOnset": 1.0}], []
             )
 
+    def test_recognition_gate_requires_strict_timing_and_double_stop_recall(self) -> None:
+        passing = {
+            "50ms": {"precision": 0.90, "recall": 0.80},
+            "100ms": {
+                "precision": 0.90,
+                "recall": 0.85,
+                "doubleStopRecall": 0.80,
+            },
+        }
+        self.assertTrue(MODULE.evaluate_polyphonic_recognition_gate(passing)["passed"])
+        for tolerance, field in (
+            ("50ms", "precision"),
+            ("50ms", "recall"),
+            ("100ms", "precision"),
+            ("100ms", "recall"),
+            ("100ms", "doubleStopRecall"),
+        ):
+            failing = {key: dict(value) for key, value in passing.items()}
+            failing[tolerance][field] -= 0.01
+            self.assertFalse(
+                MODULE.evaluate_polyphonic_recognition_gate(failing)["passed"],
+                f"{tolerance}:{field}",
+            )
+
+    def test_recognition_filter_selection_uses_development_only(self) -> None:
+        candidates = [
+            {
+                "minConfidence": 0.4,
+                "minDurationSeconds": 0.05,
+                "development": {
+                    "50ms": {"precision": 0.91, "recall": 0.81, "f1": 0.86},
+                    "100ms": {
+                        "precision": 0.92,
+                        "recall": 0.86,
+                        "f1": 0.89,
+                        "doubleStopRecall": 0.81,
+                    },
+                },
+                "holdout": {"100ms": {"f1": 0.0}},
+            },
+            {
+                "minConfidence": 0.3,
+                "minDurationSeconds": 0.03,
+                "development": {
+                    "50ms": {"precision": 0.80, "recall": 0.70, "f1": 0.75},
+                    "100ms": {
+                        "precision": 0.85,
+                        "recall": 0.75,
+                        "f1": 0.80,
+                        "doubleStopRecall": 0.70,
+                    },
+                },
+                "holdout": {"100ms": {"f1": 1.0}},
+            },
+        ]
+        self.assertEqual(MODULE.select_recognition_filter(candidates), candidates[0])
+
 
 if __name__ == "__main__":
     unittest.main()

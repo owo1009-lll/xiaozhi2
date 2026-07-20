@@ -359,6 +359,8 @@ npm run western:ordinary-auto-pass-precision-review-pack -- --recording-id <fres
 
 PHENICX 适配器与人工 gold 工程闸门现已通过。2026-07-20 新增严格 score-only 的同谱面起音聚合：只按 `normalizedScoreOnset` 分组并共享最早预测起音，不读取 `goldOnset` 或 `goldChordSize`。该候选由 development 指标选出为 `parangonar-fallback-chord-onset-consensus`；在 Mahler/Bruckner holdout 上达到 coverage 1.000、median 28.3ms、p90 303.9ms、`hit@300ms=0.8978`，两首逐曲均过闸；复音子组也通过同一冻结门槛（coverage 1.000、median 41.5ms、p90 306.4ms、`hit@300ms=0.884`）。但 holdout 在该候选提出前已被查看，故结果仍属于顺序工程证据，必须另用新外部数据冻结确认；`doubleStopAutoFeedbackReady=false`、`studentReleaseEligible=false`，不得表述为复音识别完成、完美对齐或学生域完成。
 
+同日补上了此前缺失的**独立音频识别**尺：Basic Pitch 只读音频，不借谱面候选，在 Mozart/Beethoven development 上扫描 25 组置信度/最短时长组合，0 组通过冻结的 50ms、100ms 与复音 recall 门槛。development 选出的 `minConfidence=0.35/minDuration=0.03s` 在 Mahler/Bruckner holdout 上为：50ms P/R=`77.24%/60.77%`；100ms P/R=`93.11%/73.25%`，其中复音 recall=`54.8%`；300ms P/R=`95.99%/75.51%`。`phenicx-polyphonic-recognition-gate-failed` 因此成为明确阻碍：当前问题不再能归因于对齐，继续只调 Basic Pitch 后处理也没有开发集过线点，下一轮必须换复音识别架构或取得新的独立模型证据。
+
 ## 9. MUSC 识别与开放弱标签扩展(2026-07-10)
 
 MTG MUSC 预训练模型已完成 eval-only 接入。默认 127.7ms 最短音长在快速乐章漏音,因此仅用 Emil development 六曲做 48 组后处理校准,冻结为 `onset=0.5/frame=0.4/min=60ms`。未参与校准的 Oliver Colbentson 单声部核心 2,301 音符达到 precision@100ms=0.9142、recall@100ms=0.9396,`freshConfirmationPassed=true`;50ms precision=0.8025,所以 V3 严格门未过。双音压力仍 review-only,学生发布仍为 false。详见 [western-strings-musc-validation.md](western-strings-musc-validation.md)。
@@ -377,7 +379,7 @@ MTG MUSC 预训练模型已完成 eval-only 接入。默认 127.7ms 最短音长
 - `studentReleaseEligible=false`。
 - `nearPerfectReady=false`。
 
-因此公开专业单声部录音可以继续作为 V2 研究候选和开发基线；PHENICX 的复音**对齐**子组工程门已过，但双音**识别**、50ms V3、真实学生错误域和“完美识别”仍未达到。弱标签只能用于后续训练扩展，不能替代新外部人工 gold。
+因此公开专业单声部录音可以继续作为 V2 研究候选和开发基线；PHENICX 的复音**对齐**子组工程门已过，但无谱面独立复音**识别**在 100ms 只有 54.8% recall，双音自动反馈、50ms V3、真实学生错误域和“完美识别”仍未达到。弱标签只能用于后续训练扩展，不能替代新外部人工 gold。
 
 ## 11. HF2 域外复音压力进度(2026-07-13)
 

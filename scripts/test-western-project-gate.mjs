@@ -162,6 +162,31 @@ assert.equal(
   "public professional recordings must never enable the student release gate",
 );
 assert.ok(status.publicModelValidation, "public model validation status must always be present");
+assert.equal(
+  status.publicModelValidation.recognition?.phenicxHumanGold?.reportAvailable,
+  true,
+  "project status must expose the PHENICX independent human-gold recognition benchmark",
+);
+assert.equal(
+  status.publicModelValidation.recognition?.phenicxHumanGold?.scoreUsedDuringInference,
+  false,
+  "PHENICX recognition must not use the score during audio event inference",
+);
+assert.equal(
+  status.publicModelValidation.recognition?.phenicxHumanGold?.holdout?.["100ms"]?.precision,
+  0.9311246730601569,
+  "project status must expose the frozen PHENICX holdout recognition precision",
+);
+assert.equal(
+  status.publicModelValidation.recognition?.phenicxHumanGold?.holdout?.["100ms"]?.doubleStopRecall,
+  0.548,
+  "project status must expose the measured PHENICX polyphonic recall deficit",
+);
+assert.equal(
+  status.publicModelValidation.recognition?.phenicxHumanGold?.gate?.passed,
+  false,
+  "PHENICX independent recognition must stay closed below the frozen recall floors",
+);
 assert.ok(status.measureFeedbackAudit, "project status must expose the measure-feedback safety audit");
 assert.equal(status.measureFeedbackAudit.measureAggregationReleaseReady, false, "measure aggregation must stay closed when safe coverage is below 20%");
 assert.equal(status.measureFeedbackAudit.studentGateReady, false, "eval-only measure aggregation must never directly open student feedback");
@@ -228,6 +253,11 @@ const syntheticPublicValidation = summarizePublicModelValidation({
     alignmentGatePassed: true,
     freshExternalConfirmationRequired: true,
     polyphonicSubgroupGate: { passed: false },
+    recognition: {
+      evidenceType: "independent-audio-event-recognition-against-manual-note-gold",
+      scoreUsedDuringInference: false,
+      polyphonicRecognitionGate: { passed: false },
+    },
   },
   muscCalibration: {
     ok: true,

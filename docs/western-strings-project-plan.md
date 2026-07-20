@@ -436,6 +436,7 @@
 - PHENICX 适配器已完成并通过确定性复跑:`adapterReady=true`,4/4 混音、0 clipping、2,969 行映射保留、重复生成 SHA-256 一致。固定分组为 development=Mozart/Beethoven、holdout=Mahler/Bruckner。
 - 人工 gold 工程闸门已通过。2026-07-20 由 development 选出的 `parangonar-fallback-chord-onset-consensus` 只按谱面 `normalizedScoreOnset` 共享最早预测起音，不读取人工 `goldOnset`/`goldChordSize`；在 PHENICX holdout 上 coverage 1.000、median 28.3ms、p90 303.9ms、`hit@300ms=0.8978`，且两首 holdout 逐曲通过。
 - 复音对齐子组现也通过同一工程门槛：coverage 1.000、median 41.5ms、p90 306.4ms、`hit@300ms=0.884`。但 holdout 在该候选提出前已经被查看，当前仍是顺序工程证据；必须冻结该组合并用新外部人工 gold 确认，且不得把“复音对齐通过”混写成“双音识别完成”或据此开放学生自动反馈。
+- 独立音频识别基线也已补齐：Basic Pitch 不借谱面推理，25 组 development-only 置信度/时长组合中 0 组通过冻结门槛；选中组合在 holdout 的 100ms P/R=`93.11%/73.25%`、复音 recall=`54.8%`，50ms P/R=`77.24%/60.77%`。这证明现阶段的主要缺口是复音识别而非对齐；停止继续调同一 Basic Pitch 后处理，后续 Route B 必须评测不同复音转写架构，并仍需新外部人工 gold 冻结确认。
 
 # 2026-07-10 MUSC 识别与 Violin MIDI 弱标签阶段
 
