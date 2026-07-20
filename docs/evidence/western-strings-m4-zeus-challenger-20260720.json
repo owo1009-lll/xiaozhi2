@@ -1,13 +1,13 @@
 {
   "contract": "western-m4-zeus-camera-challenger-eval-v1",
   "evidenceId": "western-strings-m4-zeus-challenger-20260720",
-  "createdAt": "2026-07-20T15:31:57.902963+00:00",
+  "createdAt": "2026-07-20T16:39:30.741362+00:00",
   "authority": "frozen-evaluation-summary",
   "evaluationRole": "research-challenger-only",
   "runtimeEffect": "none",
   "sourceReport": {
     "path": "data/experiments/western-strings-m4/zeus-challenger/report.json",
-    "sha256": "dbd6645d2db862cb77fe82fb18fe1c02bf102e828c42ca94dafc3ac136d86f6b"
+    "sha256": "c70d28b6998b37f4f20948021b9782e31e00c48f3c19501fa4d4d7dc8d485278"
   },
   "source": {
     "repository": "https://github.com/ufal/olimpic-icdar24",
@@ -24,6 +24,7 @@
     "frozenPageCount": 5,
     "staffCropCount": 32,
     "strictPageCount": 5,
+    "segmentationReadyPageCount": 4,
     "segmentationReady": false
   },
   "thresholds": {
@@ -44,12 +45,20 @@
     "strictPagePassCount": 0,
     "strictPageCount": 5,
     "strictPagePassRate": 0.0,
+    "segmentationReadyPageCount": 4,
     "segmentationReady": false,
     "passesFrozenRealPhotoGate": false
+  },
+  "interpretation": {
+    "architectureFit": "invalid-grandstaff-model-on-single-staff-crops",
+    "generalCameraOmrCapabilityClaimValid": false,
+    "segmentationFailureIsPrimaryCause": false,
+    "validClaim": "The released Zeus GrandStaff checkpoint is not a valid runtime candidate for single-staff violin photos.",
+    "invalidClaim": "These metrics establish the capability ceiling of camera OMR."
   },
   "decision": {
     "keepAsRuntimeCandidate": false,
     "studentGateReady": false,
-    "reason": "zeus-camera-challenger-below-frozen-real-photo-gate"
+    "reason": "zeus-grandstaff-model-input-domain-mismatch"
   }
 }

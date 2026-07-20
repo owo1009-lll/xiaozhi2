@@ -980,6 +980,9 @@ assert.equal(m4.zeusChallenger?.summary?.pitchRecall, 0.091374, "M4 status must 
 assert.equal(m4.zeusChallenger?.summary?.onsetQuarterAccuracy, 0.001278, "M4 status must expose Zeus frozen onset accuracy");
 assert.equal(m4.zeusChallenger?.summary?.measureAccuracy, 0.054313, "M4 status must expose Zeus frozen measure accuracy");
 assert.equal(m4.zeusChallenger?.summary?.strictPagePassCount, 0, "Zeus must remain at zero strict real-photo passes");
+assert.equal(m4.zeusChallenger?.summary?.segmentationReadyPageCount, 4, "Zeus status must distinguish the four ready page segmentations from the aggregate all-pages flag");
+assert.equal(m4.zeusChallenger?.interpretation?.generalCameraOmrCapabilityClaimValid, false, "the mismatched GrandStaff run must not be cited as a general camera-OMR capability ceiling");
+assert.equal(m4.zeusChallenger?.interpretation?.segmentationFailureIsPrimaryCause, false, "the Zeus failure must not be misattributed to staff segmentation");
 assert.equal(m4.zeusChallenger?.studentGateReady, false, "Zeus research evidence must never open the student gate");
 assert(
   m4.automaticAdoptionBlockingReasons.includes("m4-zeus-camera-challenger-below-complete-score-floor"),

@@ -44,6 +44,15 @@ def test_aggregate_passes_only_with_all_frozen_thresholds() -> None:
         row(0.99, 0.99, 0.99, 0.99, False),
     ]
     assert MODULE.aggregate(two_failed_pages)["passesFrozenRealPhotoGate"] is False
+    assert MODULE.aggregate(one_failed_page)["segmentationReadyPageCount"] == 10
+
+
+def test_segmentation_count_is_not_hidden_by_all_pages_flag() -> None:
+    rows = [row(0.5, 0.5, 0.5, 0.5, False) for _ in range(5)]
+    rows[-1]["segmentationReady"] = False
+    report = MODULE.aggregate(rows)
+    assert report["segmentationReadyPageCount"] == 4
+    assert report["segmentationReady"] is False
 
 
 def test_aggregate_does_not_infer_student_release() -> None:
@@ -53,5 +62,6 @@ def test_aggregate_does_not_infer_student_release() -> None:
 
 if __name__ == "__main__":
     test_aggregate_passes_only_with_all_frozen_thresholds()
+    test_segmentation_count_is_not_hidden_by_all_pages_flag()
     test_aggregate_does_not_infer_student_release()
     print("western M4 Zeus challenger tests passed")

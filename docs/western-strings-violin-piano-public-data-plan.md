@@ -1,13 +1,13 @@
 # 小提琴＋钢琴伴奏：公开数据与双域验收计划
 
-更新：2026-07-20
+更新：2026-07-21
 
 ## 当前结论
 
 必须把“谱面里有钢琴声部”和“录音里有钢琴伴奏”当成两个独立域，不得用单声部结果互相外推。
 
 - **结构化 MusicXML/MXL：可处理。** 新增 Violin + Piano 回归已以 `selectedPartHint=violin` 选中 Violin，置信度 0.96，仅保留 3/3 个目标小提琴音，钢琴和弦未混入。
-- **未登记的小提琴＋钢琴拍照谱：不可声称能稳定处理。** M4a 只能处理已登记版本；M4b 开放域 OMR 仍未晋升。新增 OLiMPiC/Zeus camera challenger 在 5 张冻结小提琴真照片上仅得 pitch P/R=`8.05%/9.14%`、onset-quarter=`0.13%`、measure=`5.43%`、严格整页=`0/5`，已淘汰且未接运行时。多谱表页仍需先做系统/谱表/大谱表括号检测，再裁出小提琴谱表识别；钢琴谱表只作小节线和系统结构旁证。
+- **未登记的小提琴＋钢琴拍照谱：不可声称能稳定处理。** M4a 只能处理已登记版本；M4b 开放域 OMR 仍未晋升。Oemer 0.1.8 早已把整页照片（仅 2× 放大；不做 staff crop）用于同一 5 张冻结手机实拍 source-gold 的正式评测，本日复跑仍为 pitch P/R=`71.87%/76.23%`、onset-quarter=`5.43%`、measure=`18.21%`、严格整页=`0/5`；5/5 可输出且都有坐标 sidecar，但远低于自动采纳门槛。“v3 池无 Oemer”仅指未进入运行时候选池，不是未测试。OLiMPiC/Zeus 的 `8.05%/9.14%` 来自 GrandStaff checkpoint 被喂单谱表 crop 后幻觉低音声部的选型错配，只能用于淘汰该 checkpoint，不能作为照片 OMR 上限或 Oemer 基线。现成开源系统路线已经落入失败分支，产品继续使用 M4a，M4b 只作长期研究。
 - **小提琴＋钢琴混音：识别显著改善，但当前仍不可用于自动反馈。** MusicNet 公开“Accompanied Violin”上，原 Basic Pitch 未见演奏者 holdout 的 100ms P/R=`34.47%/49.81%`、双音 recall=`7.37%`。新增 YourMT3+ instrument-aware challenger 在各 60 秒诊断片段上达到 50ms P/R=`86.42%/70.35%`、100ms P/R=`96.30%/78.39%`；100ms precision 已过线，但 50ms 两项和 100ms recall 仍未过冻结门槛。开发录音上选出的 `+60ms` 偏移在 holdout 反向恶化，已拒绝，不用调参泄漏包装合格。
 
 可复跑命令：
@@ -20,6 +20,8 @@ npm run western:musicnet-yourmt3
 npm run test:western-musicnet-yourmt3
 npm run western:m4-zeus-challenger
 npm run test:western-m4-zeus-challenger
+npm run western:m4-oemer-benchmark
+npm run test:western-m4-oemer-benchmark
 ```
 
 本地报告：`data/experiments/western-strings-musicnet-accompanied-violin/report.json`、`data/experiments/western-strings-musicnet-yourmt3/report.json` 和 `data/experiments/western-strings-m4/zeus-challenger/report.json`。原始录音、模型、缓存和报告位于 gitignored `data/`，只提交去原始数据的冻结证据摘要。
@@ -32,6 +34,8 @@ npm run test:western-m4-zeus-challenger
 2. **OpenScore String Quartets（CC0）**：用于小提琴谱表内容、多声部标签和作品级拆分，不与同作品渲染变体跨 train/holdout。
 3. **OLiMPiC / GrandStaff-LMX（OLiMPiC 为 CC BY-SA）**：用于钢琴大谱表、真实扫描和线性化 MusicXML 结构预训练。不将其钢琴内容指标写成小提琴识别指标。
 4. **实际小提琴＋钢琴版本**：只从有清晰逐项权利的公版/CC 来源纳入，每件保留 URL、license、edition、下载日期和 SHA-256。不从“网上可下载”推导“可训练/可分发”。
+
+Camera-PrIMuS 的 87,678 个样本来自对渲染 PNG 的 GraphicsMagick 合成滤镜退化，不是真机照片，也没有可直接用于本项目的公开预训练权重。它比当前少量参数增广更丰富，可以作为另立训练项目时的合成预训练参考；但摩尔纹、手机 ISP 和纸张非刚性形变仍必须用独立真机照片验证。由于 Oemer 已在真照片上远低于门槛，当前不启动“先用 Camera-PrIMuS 微调 Oemer”这项数据工程。
 
 DoReMi 干净数字谱适配已证明可提高数字谱 token accuracy，却使冻结真照片的 measure 从官方 Clarity 10.10% 降到 6.65%。因此不再重复“只加干净公开谱”；新训练必须对准多谱表结构与拍摄域。
 

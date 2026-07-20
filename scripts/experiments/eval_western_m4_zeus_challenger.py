@@ -328,6 +328,9 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
     gold = totals["goldNotes"]
     draft = totals["draftNotes"]
     strict_count = sum(int(bool(row.get("strictPass"))) for row in rows)
+    segmentation_ready_count = sum(
+        int(bool(row.get("segmentationReady"))) for row in rows
+    )
     strict_rate = strict_count / len(rows) if rows else 0.0
     result = {
         **totals,
@@ -338,6 +341,7 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "strictPagePassCount": strict_count,
         "strictPageCount": len(rows),
         "strictPagePassRate": round(strict_rate, 6),
+        "segmentationReadyPageCount": segmentation_ready_count,
         "segmentationReady": all(bool(row.get("segmentationReady")) for row in rows),
     }
     result["passesFrozenRealPhotoGate"] = (
@@ -463,6 +467,18 @@ def main(argv: list[str] | None = None) -> int:
         },
         "thresholds": THRESHOLDS,
         "summary": summary,
+        "interpretation": {
+            "architectureFit": "invalid-grandstaff-model-on-single-staff-crops",
+            "generalCameraOmrCapabilityClaimValid": False,
+            "segmentationFailureIsPrimaryCause": False,
+            "validClaim": (
+                "The released Zeus GrandStaff checkpoint is not a valid "
+                "runtime candidate for single-staff violin photos."
+            ),
+            "invalidClaim": (
+                "These metrics establish the capability ceiling of camera OMR."
+            ),
+        },
         "rows": rows,
         "decision": {
             "keepAsRuntimeCandidate": bool(summary["passesFrozenRealPhotoGate"]),
@@ -470,7 +486,7 @@ def main(argv: list[str] | None = None) -> int:
             "reason": (
                 "frozen-real-photo-gate-passed-but-runtime-governance-not-reviewed"
                 if summary["passesFrozenRealPhotoGate"]
-                else "zeus-camera-challenger-below-frozen-real-photo-gate"
+                else "zeus-grandstaff-model-input-domain-mismatch"
             ),
         },
     }

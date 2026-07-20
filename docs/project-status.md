@@ -1,6 +1,6 @@
 # 西洋弦乐练习诊断项目状态快照
 
-更新时间: 2026-07-20
+更新时间: 2026-07-21
 
 本文件是当前主线状态快照。实时判断仍以命令为准:
 
@@ -14,7 +14,10 @@
 
 ## 2026-07-19 当前分支刷新
 
-- **2026-07-20 M4b 相机模型 challenger 已冻结并淘汰:** OLiMPiC/Zeus camera GrandStaff 模型在现有 5 张冻结 source-gold 真照片上评测 32 个谱表裁片，pitch P/R=`8.05%/9.14%`、onset-quarter=`0.13%`、measure=`5.43%`、严格整页=`0/5`，且页面分割本身未全过。该模型的钢琴大谱表/相机域不能外推为小提琴开放域能力，`keepAsRuntimeCandidate=false`，未接入运行时。M4b 仍为 synthetic engineering ready、真实晋升不合格；唯一能改变晋升结论的证据仍是冻结包要求的至少 30 张、6 版式、3 设备 fresh-blind 真照片和逐页结构标注，公开数字谱不能替代这组物理证据。
+- **2026-07-21 Camera-PrIMuS 证据域勘误:** Camera-PrIMuS 的 87,678 个单声部 incipit 是用 GraphicsMagick 对渲染 PNG 做滤镜序列后得到的合成相机退化，不是真机拍摄集；公开材料也没有可直接拿来跑本项目的预训练权重。它可以作为大规模合成鲁棒性预训练方法参考，但不能覆盖摩尔纹、手机 ISP 和纸张非刚性形变，也不能代替 M4b fresh-blind 真照片验收。现有手册原已把它放在“合成为主”段，本次把这一边界改成显式文字，禁止再称为真实照片数据。
+- **2026-07-21 Oemer 前提纠正与复跑:** “v3 池当前无 Oemer”只表示受控 v3 **运行时候选池**没有接入 Oemer，不表示它没有评测。Oemer 0.1.8 自 2026-07-16 起已有正式 `independent-source-gold` 基准、坐标 sidecar 和门禁测试；本日按同一冻结 5 张手机实拍（含摩尔纹/透视）复跑仍为 5/5 可输出，pitch P/R=`71.87%/76.23%`、onset-quarter=`5.43%`、measure=`18.21%`、严格整页=`0/5`。因此建议中的结果分叉已经落在“现成开源系统远低于门槛”一支：当前任意拍照自动采纳路线继续判定不合格，产品只押已通过验收的 M4a；M4b 保留为非上线 blocker 的长期研究线。Zeus `8%` 是另一错误域模型的有效淘汰证据，不作为主基线，但也不删除或作废。
+
+- **2026-07-20 M4b Zeus challenger 已冻结为“选型不匹配”负证据:** OLiMPiC/Zeus camera **GrandStaff** 模型被用于现有 5 张冻结 source-gold 小提琴真照片的 32 个单谱表裁片，得到 pitch P/R=`8.05%/9.14%`、onset-quarter=`0.13%`、measure=`5.43%`、严格整页=`0/5`。输出反复生成不存在的 `clef:F4 staff:2`、`voice:5`、`backup` 和低音区音符，说明主因是钢琴大谱表模型与单行小提琴输入不匹配；这些数字只支持淘汰该 checkpoint，**不能**作为相机 OMR 能力上限。切分页级结果实际为 `4/5` 就绪，汇总 `segmentationReady=false` 只是 all-pages AND，被 `violin-ex10` 一页拉低，切分不是主因。`keepAsRuntimeCandidate=false`，未接入运行时。M4b 仍为 synthetic engineering ready、真实晋升不合格；唯一能改变晋升结论的证据仍是冻结包要求的至少 30 张、6 版式、3 设备 fresh-blind 真照片和逐页结构标注，公开数字谱不能替代这组物理证据。
 - **2026-07-20 伴奏识别架构 challenger 有实质提升但仍未过门:** YourMT3+ 多乐器 checkpoint 在 MusicNet 两条伴奏小提琴各 60 秒诊断上，以 2330 开发、2334 未见演奏者 holdout 冻结选择 all-strings/最小时值 50ms/零全局偏移。holdout 的 50ms P/R=`86.42%/70.35%`，100ms P/R=`96.30%/78.39%`；相较 Basic Pitch 的 100ms `34.47%/49.81%` 明显改善，但仍未同时达到冻结门槛 50ms `90%/80%` 与 100ms `90%/85%`。在开发录音选出的 `+60ms` 校准使 holdout 50ms F1 从 `77.56%` 降到 `38.90%`，已按不可泛化拒绝。另有 checkpoint/Space 许可未声明及 MusicNet 训练重叠风险，因此 `recognitionReady=false`、`productionAdoptionReady=false`、`studentReleaseEligible=false`。
 - **公开专业单声部 V2 与学生端资格继续分层:** 现有公开专业单声部证据仍只支持 `publicProfessionalMonophonicV2CandidateReady=true` 的研究候选结论。公开数据继续训练或过门也不能自动把 `studentReleaseEligible` 改成 true；学生端合格必须补全全新真实学生录音、逐音人工 gold、独立 fresh-blind 验收和显式发布授权。当前录音尚未到位时，这一项是外部证据 blocker，不得以公开专业数据或放宽阈值代签。
 
@@ -222,7 +225,7 @@
 2. **M3 duration/extra 定量补证(2026-07-18 已完成):** 量化合同已冻结为 `western-duration-extra-quantization-v1`(单位: 相对 IOI 偏差比/时值比/±3s 同音高未匹配事件;容差全部复用已冻结数值 0.15/0.15/3.0,零新调参;unsafe=目标与后继均被 6-guard shadow 选中即"完全不可见";分种子聚合含显式最差种子)。消费结果:v2 六套注入集 drag 4/24 不可见(20/24 timing 可见)、extra 0/30 不可见、wrong/missing 硬漏放 0/60 复现;r3-04/05 负责人确认真值 drag 0/2 不可见、extra 1/3 不可见(真实重复音被合并吸收的诚实案例);自然学生域 5 条干净录音 mean coverage 0.8656、timing flag 负担 7.67%、extra 负担 2.33%。duration/extra 仍为 review-only,该证据 preGateOnly。命令: `npm run western:duration-extra-quantization` / `npm run test:western-duration-extra-quantization`。
 3. **fresh-blind 证据(2026-07-18 已完成,带诚实星号):** `ordinary-dynamic-shadow-full-score-fresh-blind-v1` 已实现并实跑,消费一位从未参与调参的新演奏者对原 8 首曲目的完整录音,三层分级(clean-full 覆盖率过冻结地板、technique-safety 58 标记区 0 指控、error-reference-only 明确标注非精度证据),7 项伪造/篡改测试全过,详见上方"2026-07-15 第二轮更新"小节。**星号:** 沿用旧曲目而非全新曲目,只满足受控试点门槛,不满足更严格的"全新录音+全新曲目"发布级要求——真要做后者仍需另录新曲目重复本合同。
 4. **授权接线(2026-07-19 已完成):** 负责人在对话中口头"认"接受第③项证据并再次确认"批"过受控试点。`authorizationReady`(ordinary 与 M3+ 两轨)原为代码里硬编码的 `false`(无任何产物驱动),现改为从负责人常备批准文件(`data/experiments/western-strings-controlled-pilot-approval.json`)派生:文件须 `pilotApproved===true`、`approvedTracks` 含该轨、`scopeContract` 精确匹配当前 `western-ordinary-dynamic-shadow-release-v1+m3plus-rescope-four-zone-v2`、两项安全确认为真、`approvedBy`/`approvedAt` 非空——五类缺陷分别独立报出各自 blocking reason(见 `scripts/test-western-status-track-authorization.mjs` 10 个场景)。**设计上刻意粗粒度**:只绑定 scope-contract 版本号,不绑定逐条证据摘要——证据新鲜度已由 `r3AcceptanceReady`/`freshBlindEvidence.ready`/M3+ 五区闸门独立、逐次重算把关,两者外部相与(AND),任何一侧过期都会让 `readyForControlledPilot`/`readyToStartControlledPilot` 重新转红。授权接线后链式 rebind(release review → decision packet → start preflight → project gate)全部确认:`readyForControlledPilot=true`,`readyToStartControlledPilot=true`,`okToStartControlledPilot=true`。**这只代表受控试点现在"可以启动",并未执行**;`studentGateReady`/`automaticAdoptionReady` 两轨均保持结构性硬编码 `false`,与授权状态完全无关,学生端三个运行时开关未受任何影响。
-5. **后排 M4 坐标补强:** v3 池当前无 Oemer;HOMR 在 12 份历史缓存中赢 8 份,但输出仍是无 bbox 的音符列表。可复用 Oemer sidecar 的设计经验为 HOMR 增加坐标适配器,同时先建立一小批人工坐标 gold/误差标尺;当前 `coordinateGoldReady=false`,不得仅凭“框数等于音符数”把列表反馈升级成像素框选。
+5. **后排 M4 坐标补强:** v3 运行时候选池当前无 Oemer,但 Oemer 已在冻结 5 页 source-gold 上正式评测并保留 5/5 坐标 sidecar;“未入池”不得误读为“未测试”。HOMR 在 12 份历史缓存中赢 8 份,但输出仍是无 bbox 的音符列表。可复用 Oemer sidecar 的设计经验为 HOMR 增加坐标适配器,同时先建立一小批人工坐标 gold/误差标尺;当前 `coordinateGoldReady=false`,不得仅凭“框数等于音符数”把列表反馈升级成像素框选。
 6. **低成本照片域扩证(负责人约 15 分钟,非当前 fail-closed blocker):** `r2-camera-photo-benchmark` 现有 8 张其实是与生成器字节相同的 clean render;另有 8 张真实屏拍须继续按 `screen-photo-of-pdf` 单独分域。若把 8 页打印后逐页手机拍摄,构造 gold 可直接沿用,可将纸拍 source-gold 从 5 行扩到 13 行,但必须先过输入域分类再计 `CameraPhotoRows`。可顺手提交 Op.45 四项复核 JSON 将同版 gold 页数从 1 增至 2;因候选起点来自 HOMR,该页仍不能计作 HOMR 自身独立自动采纳证据。
 
 ### 录音需求封顶承诺(2026-07-19,负责人质询后确立)

@@ -3330,6 +3330,7 @@ async function buildM4OmrStatus() {
       input: zeusChallenger.input || {},
       thresholds: zeusChallenger.thresholds || {},
       summary: zeusChallenger.summary || {},
+      interpretation: zeusChallenger.interpretation || {},
       decision: zeusChallenger.decision || {},
       studentGateReady: false,
     } : {
