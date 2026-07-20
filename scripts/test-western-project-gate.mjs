@@ -187,6 +187,30 @@ assert.equal(
   false,
   "PHENICX independent recognition must stay closed below the frozen recall floors",
 );
+assert.equal(
+  status.publicModelValidation.recognition?.accompaniedViolin?.reportAvailable,
+  true,
+  "project status must expose the public MusicNet accompanied-violin benchmark",
+);
+assert.equal(
+  status.publicModelValidation.recognition?.accompaniedViolin?.holdout?.aggregate?.["100ms"]?.precision,
+  0.3447368421052632,
+  "project status must expose the frozen accompanied-violin holdout precision",
+);
+assert.equal(
+  status.publicModelValidation.recognition?.accompaniedViolin?.holdout?.aggregate?.["100ms"]?.doubleStopRecall,
+  0.07368421052631578,
+  "project status must expose the accompanied double-stop deficit",
+);
+assert.equal(
+  status.publicModelValidation.gates.accompaniedViolinRecognitionReady,
+  false,
+  "accompanied violin must remain closed below all frozen recognition floors",
+);
+assert(
+  status.publicModelValidation.blockingReasons.includes("musicnet-accompanied-violin-recognition-gate-failed"),
+  "failed accompanied-violin recognition must remain visible as a public-model blocker",
+);
 assert.ok(status.measureFeedbackAudit, "project status must expose the measure-feedback safety audit");
 assert.equal(status.measureFeedbackAudit.measureAggregationReleaseReady, false, "measure aggregation must stay closed when safe coverage is below 20%");
 assert.equal(status.measureFeedbackAudit.studentGateReady, false, "eval-only measure aggregation must never directly open student feedback");

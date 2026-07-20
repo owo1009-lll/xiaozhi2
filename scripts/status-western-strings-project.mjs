@@ -59,6 +59,12 @@ const VIOLIN_MIDI_AUDIT = path.join(
   "experiments",
   "western-strings-violin-midi-dataset-audit.json",
 );
+const MUSICNET_ACCOMPANIED_VIOLIN_REPORT = path.join(
+  "data",
+  "experiments",
+  "western-strings-musicnet-accompanied-violin",
+  "report.json",
+);
 const V2_ALPHA_MIN_PRECISION = 0.9;
 const V2_ALPHA_MIN_COVERAGE = 0.2;
 const ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE = path.join(
@@ -1778,6 +1784,7 @@ export function summarizePublicModelValidation({
   muscCalibration = null,
   muscFresh = null,
   violinMidiAudit = null,
+  musicnetAccompaniedViolin = null,
 } = {}) {
   const alignmentEngineeringGatePassed = phenicxAlignment?.ok === true
     && phenicxAlignment?.alignmentGatePassed === true;
@@ -1805,6 +1812,12 @@ export function summarizePublicModelValidation({
     && violinMidiAudit?.readyAsWeakLabelSource === true;
   const independentRecognitionBenchmarkReady = violinMidiAudit?.ok === true
     && violinMidiAudit?.readyAsIndependentRecognitionBenchmark === true;
+  const accompaniedViolinReportAvailable = musicnetAccompaniedViolin?.schemaVersion
+    === "western-musicnet-accompanied-violin-v1"
+    && musicnetAccompaniedViolin?.evidenceType
+      === "independent-full-mix-audio-event-recognition-against-instrument-labelled-note-gold";
+  const accompaniedViolinRecognitionReady = accompaniedViolinReportAvailable
+    && musicnetAccompaniedViolin?.accompaniedViolinRecognitionReady === true;
   const publicProfessionalMonophonicV2CandidateReady = alignmentEngineeringGatePassed
     && recognitionCalibrationV2Ready
     && recognitionFreshV2Ready;
@@ -1834,6 +1847,11 @@ export function summarizePublicModelValidation({
   if (!independentRecognitionBenchmarkReady) {
     blockingReasons.push("violin-midi-not-independent-recognition-gold");
   }
+  if (!accompaniedViolinReportAvailable) {
+    blockingReasons.push("musicnet-accompanied-violin-report-missing");
+  } else if (!accompaniedViolinRecognitionReady) {
+    blockingReasons.push("musicnet-accompanied-violin-recognition-gate-failed");
+  }
   blockingReasons.push("student-domain-evidence-not-covered");
   return {
     scope: "public-professional-violin-eval-only",
@@ -1842,6 +1860,7 @@ export function summarizePublicModelValidation({
       muscCalibration: MUSC_CALIBRATION_REPORT.replace(/\\/g, "/"),
       muscFreshConfirmation: MUSC_FRESH_REPORT.replace(/\\/g, "/"),
       violinMidiAudit: VIOLIN_MIDI_AUDIT.replace(/\\/g, "/"),
+      musicnetAccompaniedViolin: MUSICNET_ACCOMPANIED_VIOLIN_REPORT.replace(/\\/g, "/"),
     },
     alignment: {
       reportAvailable: Boolean(phenicxAlignment),
@@ -1870,6 +1889,15 @@ export function summarizePublicModelValidation({
         gate: phenicxRecognition?.polyphonicRecognitionGate || {},
         protocolCaveat: phenicxRecognition?.protocolCaveat || "",
       },
+      accompaniedViolin: {
+        reportAvailable: accompaniedViolinReportAvailable,
+        selectedFilter: musicnetAccompaniedViolin?.selectedFilter || {},
+        development: musicnetAccompaniedViolin?.development || {},
+        holdout: musicnetAccompaniedViolin?.holdout || {},
+        gateChecks: musicnetAccompaniedViolin?.holdoutGateChecks || {},
+        ready: accompaniedViolinRecognitionReady,
+        studentReleaseEligible: false,
+      },
       postprocessing: muscFresh?.postprocessing || muscCalibration?.selectedPostprocessing || {},
       coreMetrics: muscFresh?.aggregate?.monophonicCore?.musc || {},
       doubleStopStressMetrics: muscFresh?.aggregate?.doubleStopStressReviewOnly?.musc || {},
@@ -1885,6 +1913,7 @@ export function summarizePublicModelValidation({
       publicProfessionalMonophonicV2CandidateReady,
       publicProfessionalMonophonicV3Ready,
       doubleStopAutoFeedbackReady,
+      accompaniedViolinRecognitionReady,
       studentReleaseEligible: false,
       nearPerfectReady: false,
     },
@@ -3703,6 +3732,7 @@ export async function buildProjectStatus(args = {}) {
     muscCalibration,
     muscFresh,
     violinMidiAudit,
+    musicnetAccompaniedViolin,
     measurePolicyAudit,
     measureJointEvidenceAudit,
     dynamicPerturbationGate,
@@ -3722,6 +3752,7 @@ export async function buildProjectStatus(args = {}) {
     readJson(MUSC_CALIBRATION_REPORT),
     readJson(MUSC_FRESH_REPORT),
     readJson(VIOLIN_MIDI_AUDIT),
+    readJson(MUSICNET_ACCOMPANIED_VIOLIN_REPORT),
     readJson(MEASURE_POLICY_AUDIT),
     readJson(MEASURE_JOINT_EVIDENCE_AUDIT),
     readJson(DYNAMIC_PERTURBATION_GATE),
@@ -3737,6 +3768,7 @@ export async function buildProjectStatus(args = {}) {
     muscCalibration,
     muscFresh,
     violinMidiAudit,
+    musicnetAccompaniedViolin,
   });
   const runtimeStudentGate = {
     ordinaryUploadAutoFeedbackReady: false,

@@ -361,6 +361,8 @@ PHENICX 适配器与人工 gold 工程闸门现已通过。2026-07-20 新增严�
 
 同日补上了此前缺失的**独立音频识别**尺：Basic Pitch 只读音频，不借谱面候选，在 Mozart/Beethoven development 上扫描 25 组置信度/最短时长组合，0 组通过冻结的 50ms、100ms 与复音 recall 门槛。development 选出的 `minConfidence=0.35/minDuration=0.03s` 在 Mahler/Bruckner holdout 上为：50ms P/R=`77.24%/60.77%`；100ms P/R=`93.11%/73.25%`，其中复音 recall=`54.8%`；300ms P/R=`95.99%/75.51%`。`phenicx-polyphonic-recognition-gate-failed` 因此成为明确阻碍：当前问题不再能归因于对齐，继续只调 Basic Pitch 后处理也没有开发集过线点，下一轮必须换复音识别架构或取得新的独立模型证据。
 
+2026-07-20 又将“小提琴＋钢琴”拆成谱面和音频两个独立域。MusicXML 回归现能以 0.96 置信度选中 Violin 并排除 Piano；这只证明结构化谱的声部选择，不改变 M4b 开放域拍照 OMR 未晋升的事实。音频侧新增 MusicNet 两条“Accompanied Violin”混音独立识别尺：在 2330 development 选出 `minConfidence=0.40/minDuration=0.03s`，冻结后的未见演奏者 2334 holdout 于 100ms 仅 P/R=`34.47%/49.81%`、双音 recall=`7.37%`，300ms P/R=`37.72%/54.50%`，四项门槛全失败。新阻碍为 `musicnet-accompanied-violin-recognition-gate-failed`；下一 challenger 应是带乐器 token 的 MT3 类架构/目标源隔离，不再继续扫同一 Basic Pitch 阈值。数据、许可和冻结门槛见 [小提琴＋钢琴公开数据计划](western-strings-violin-piano-public-data-plan.md)。
+
 ## 9. MUSC 识别与开放弱标签扩展(2026-07-10)
 
 MTG MUSC 预训练模型已完成 eval-only 接入。默认 127.7ms 最短音长在快速乐章漏音,因此仅用 Emil development 六曲做 48 组后处理校准,冻结为 `onset=0.5/frame=0.4/min=60ms`。未参与校准的 Oliver Colbentson 单声部核心 2,301 音符达到 precision@100ms=0.9142、recall@100ms=0.9396,`freshConfirmationPassed=true`;50ms precision=0.8025,所以 V3 严格门未过。双音压力仍 review-only,学生发布仍为 false。详见 [western-strings-musc-validation.md](western-strings-musc-validation.md)。
