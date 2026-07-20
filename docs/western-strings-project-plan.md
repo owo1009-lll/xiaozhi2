@@ -176,6 +176,7 @@
 - **当前执行状态(2026-07-15):** `npm run western:m4-independent-benchmark-audit` 与 `western:m4-preflight` 已将证据拆开。独立 render/scan/photo 三域达到研究报告下限,故 `m4OmrAccuracyClaimReady=true`;严格逐谱仅 12/32,真实照片独立源谱 gold 严格通过 0/5(P/R=`84.7%/71.5%`),故 `m4OmrAutomaticAdoptionReady=false`,`m4OmrAutoScoreReady=false`。5×3 预处理 sweep 中 `up2` 最好;`up3` 和 Otsu 总体退化,没有可接生产的参数改进。既有 12 条混合 benchmark 中 8 条为人工批准未改草稿、4 条为独立编辑 gold;均无需重复复核。当前 `humanTask=none`,也不能打开自动运行时。实时事实以 `npm run western:m4-preflight` 和 `npm run western:project-status` 为准。
 - **运行时置信探针(2026-07-15):** `npm run western:m4-omr-confidence-probe` 只使用识别规模、页数和 Audiveris 日志等运行时可见特征,按 6 个 BWV 作品留一。LR/RF AUC=0.567/0.800;RF 最佳观察点 precision=0.80、coverage=0.156,没有达到 0.90/0.20 的安全子集。该负结果已接入独立审计,禁止用自报置信绕过逐谱精度门槛。
 - **更强引擎对照(2026-07-16 更新):** `npm run western:m4-oemer-benchmark` 已在同一 5 份真实照片 source-gold 上评测 Oemer 0.1.8。`ex05` 的播放器黑边曾导致错误 3 tracks/builder 断言；仅对该明确失败采用固定行均值裁边重试后，Oemer 达到 5/5 输出。全 5 份 P/R=`71.9%/76.2%`、onset/measure=`5.4%/18.2%`,严格通过 `0/5`;同 5 份 Audiveris 为 P/R=`85.5%/72.1%`。fallback 解决崩溃和坐标缺失，但 precision/节奏结构不足，不能替换 Audiveris。模型训练时 `scikit-learn 1.2.0` 与本机 1.8.0 的兼容性已用精确 1.2.0 复跑排除。该比较保持 eval-only、`studentGateReady=false`。
+- **Oemer 几何归因(2026-07-21):** `western:m4-oemer-dewarp-attribution` 使用上述同一 full-page/up2 输入逐页隔离推理，比较 Oemer 原始 staff mask 与其内置 `estimate_coords/griddata/cv2.remap` 后的 mask。5/5 Jacobian 无折叠；可比较 3 页的直线度 p90 均改善，但五线组平均恢复率前后同为 `85.88%`，interline CV p90 反而 5/5 恶化。该结果否定“只是缺 dewarp”的归因，不支持立即重写 TPS。MusicXML 没有像素 stem/beam gold，预测端也不序列化 beam 元素，因此现阶段不能报告 stem/beam 分割召回率；必须先补独立像素结构标注。
 - **HOMR 坐标后续:** 当前 v3 候选池不含 Oemer;Oemer 只保留为 eval 基准与坐标 sidecar 先例。HOMR 在 12 份历史池候选中赢 8 份,却只给无框音符列表。后排任务是为 HOMR 建 bbox/版面坐标适配器并制作独立人工坐标 gold;`coordinateGoldReady=false` 时不得把音符列表反馈宣称为像素定位反馈。
 - **Transformer 引擎对照与闸门修正(2026-07-15 历史首跑;2026-07-17 已复验):** 首跑四舍五入值曾为 pitch P/R=`89.0%/96.2%`,onset-quarter/measure=`30.7%/79.0%`。当前权威口径是 ONNX Runtime 1.27.0 从零复验的 `88.33%/95.78%/30.03%/79.04%`,完整 score gate 仍为 `0/5`。pitch-only 假通过证明自动采纳必须同时满足 pitch precision/recall 与 onset/measure;HOMR 只获 `controlled-offline-review-only` 候选池批准。
 - **同版人工 gold 与照片域复验(2026-07-17 修正):** 《北京的金山上》172 音人工 MusicXML 与三引擎输出已统一复算；HOMR 的 P/R=`98.84%/98.84%`、onset/measure=`100%/100%`。全新目录非复用重跑得到逐字节相同的 HOMR MusicXML，故该页结果可重复；但输入是已拉直、无透视和手写干扰的干净谱页图，不是原始弯曲手机照片，证据域必须标为 clean-page/scan，不能外推为照片域。冻结 5 张独立 source-gold 照片以当前 ONNX Runtime 1.27.0 fresh 重跑为 pitch P/R=`88.33%/95.78%`、onset/measure=`30.03%/79.04%`、严格 `0/5`。因此 M4 照片域仍未过关，`automaticAdoptionReady=false`,`studentGateReady=false`；只有拿原始手机照片配同版独立 gold 复测，才可计入照片域采纳样本。
@@ -489,7 +490,7 @@
 | onset 2.17% 的域校正 | 50 个可比小节中 33 个属"记谱尺度不同但节奏比例一致"的版本混杂伪失败 | project-status 2026-07-16 审计 |
 | 两次拍照域监督适配(Bach/DoReMi) | 均在真实照片结构指标上退化,已拒绝 | route-b-clarity-adaptation-report |
 
-**核心推断:失败主要在拍摄几何域(透视/弯曲/光照)与版本混杂,不在内容识别能力。** 同版+平整输入下现有引擎接近满分。因此:消掉几何与版本两个变量的 M4a 立即可行;真正的开放域识别(M4b)是独立的长期研究题。
+**2026-07-21 归因修正:** 失败不能再单归因于拍摄几何与版本混杂。32 张 clean render 平均 pitch P/R=`96.85%/93.78%`，pitch 双门仅 `12/32`；onset-quarter/measure 门分别仅 `8/32`、`10/32`，四项同时通过只有 `6/32`，且 pitch 通过页中仍有 `6/12` 结构失败。因此结构重建缺口在 clean 域已经存在，几何只能解释照片域的附加损失。M4a 仍因消掉开放域识别变量而可行；M4b 则必须分别验证 clean 结构能力、照片几何和真机域泛化，不能假设把照片拉平就会自动合格。
 
 ### C.1 闸门拆分(2026-07-19 已签署)
 
@@ -714,11 +715,11 @@
 - **M4a 作为免费数据引擎(本方案新增)**:每张配准成功的照片,把库内结构框反投影 = 零人工的真实照片结构标签;配准失败照片进主动学习难例池。先跑 M4a 再启 M4b 标注,实际人工量预计远低于 300 张。
 - **冻结集**:现有 5 张 source-gold 照片永不入训练;8 张屏拍照片显式分配(默认隔离入测试);另建 ≥30–50 张按曲目版本/设备/拍摄批次隔离的 fresh-blind 集。MUSCIMA++ 只借"记谱图"形式化(手写域数据不可直接用)。
 
-2026-07-19 数据工程状态:合成优先管线已实现并冻结为 `western-m4b-structure-dataset-policy-v1`。当前从 3 个 M4a registry 真值页确定性生成 60 张相机退化页,每张同时带 pageCorners、系统、谱表/五线、小节线及类型、小节框、拍号区域标签,退化覆盖透视、正弦曲率、阴影、模糊、JPEG、背景与手写干扰;拆分固定为 train/calibration/synthetic-test=`36/12/12`。live verifier 重算全部 60 对图片/标签 SHA-256。现有 5 张 source-gold 与 8 张屏拍已逐文件冻结为 test-only 且 `trainingEligible=false`;fresh-blind 也由同一规则禁止训练泄漏。M4a 验收成功照片将进入 auto-labeled 候选,失败照片只进 active-learning review pool;当前两者均为 0,未伪造真实训练数据。真实结构标签目标仍为 `0/100–300`,fresh-blind 仍为 `0/30`、`0/6` 版式、`0/3` 设备。浏览器结构标注器位于 `docs/m4b-structure-labeler/index.html`,fresh intake 会逐文件绑定照片 SHA、标签、曲目/版式、设备和拍摄批次,并拒绝任何与合成/冻结测试照片复用的字节。
+2026-07-21 数据工程状态:合成优先管线保持 `western-m4b-structure-dataset-policy-v1` 和 60 页规模，拆分仍为 train/calibration/synthetic-test=`36/12/12`。针对旧冻结集最大弯曲仅 `8.61px` 的覆盖不足，曲率合同已提高为训练绝对 `0–60px`、标定 `20–60px`、冻结测试 `50–60px`；本轮测试实际为 `50.18–59.24px`，并扩大页边安全余量以避免裁页伪影。live verifier 重算全部 60 对图片/标签 SHA-256。现有 5 张 source-gold 与 8 张屏拍仍逐文件冻结为 test-only 且 `trainingEligible=false`；fresh-blind 同样禁止训练泄漏。真实结构标签目标仍为 `0/100–300`，fresh-blind 仍为 `0/30`、`0/6` 版式、`0/3` 设备。
 
 2026-07-19 结构 POC 工程状态:四层链路已实现为 `western-m4b-explicit-structure-poc-policy-v1`。归一化层复用 M4a 页面检测/单应并追加三次多项式页边弯曲展平;结构层显式输出五线谱线、谱表/系统、小节线、小节框和拍号区域;解码层对谱表基数、小节线顺序/间距、拍号-时值和跨谱表合法性做确定性检查，冲突一律 `structure-review-required`;内容层仅将带坐标的 HOMR/Audiveris/Oemer 候选归属到结构小节，至少两引擎一致才保留，且固定 `shadowOnly=true`、`productionCandidatePool=false`、`studentFacing=false`。
 
-已按冻结 synthetic-test 拆分独立评测 12 张合成相机退化页:224 个小节框的 P/R/F1 均为 1.000，系统数+逐系统小节数完全正确为 12/12，拍号区域 F1=1.000，12 页拍号-时值冲突注入全部落 `structure-review-required`。`audit:western-m4b-structure-poc` 会重算汇总指标、重读每页 result/overlay/原图哈希，并强制合成报告不得把 `promotionReady` 改绿。**诚实边界:** 证据类固定为 `synthetic-engineering-only`;这 12 页只来自 3 个登记自制版本，拍号区域仍使用 calibration 拆分定出的归一化页面几何先验，因此满分只证明工程链与合成域可用，不证明开放域泛化。当前 `engineeringReady=true`、`promotionOperationalReady=true`、`promotionReady=false`;唯一晋升评测只读下节签署后的 fresh-blind 输入。C.3.2 的 100–300 张真实标注是 POC 过门后扩大投入的数据目标，不是 C.3.3 的循环前置条件。
+已按加压后的冻结 synthetic-test 独立评测 12 张合成相机退化页。单纯把允许曲率从 `24px` 放宽到 `60px` 时，整页仅 `7/12`，证明旧失败不只是阈值裁剪；加入上/下页边双向选优、弱谱线高召回与右端终止小节线保护后，224 个小节框为 TP/FP/FN=`223/1/1`、P/R/F1 均=`0.995536`，系统数+逐系统小节数完全正确 `12/12`，拍号区域 F1=`1.000`，冲突注入 `12/12`。`ready` 同时要求标签提供期望谱表数且恢复率 `>=0.90`，未知或不足均 fail-closed。**诚实边界:** 证据类仍固定为 `synthetic-engineering-only`；它证明的是更强曲率合成域工程闭环，不证明摩尔纹、手机 ISP、纸张非正弦形变或开放域泛化。当前 `engineeringReady=true`、`promotionOperationalReady=true`、`promotionReady=false`；唯一晋升评测仍只读下节签署后的 fresh-blind 输入。
 
 #### C.3.3 晋升门槛(✅ 2026-07-19 已签署冻结,不得因结果回调)
 
