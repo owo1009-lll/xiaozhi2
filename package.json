@@ -124,6 +124,8 @@
     "test:western-m4-zeus-challenger": "py -3.11 scripts\\test_western_m4_zeus_challenger.py",
     "test:western-m4-omr-confidence-probe": "py -3.11 scripts\\test-western-m4-omr-confidence-probe.py",
     "test:western-m4-oemer-benchmark": "py -3.11 scripts\\test-western-m4-oemer-benchmark.py",
+    "western:m4-oemer-dewarp-attribution": "py -3.11 scripts\\experiments\\audit_western_m4_oemer_dewarp.py",
+    "test:western-m4-oemer-dewarp-attribution": "py -3.11 scripts\\test_western_m4_oemer_dewarp.py",
     "test:western-m4-homr-benchmark": "py -3.11 scripts\\test-western-m4-homr-benchmark.py",
     "western:homr-evidence-freeze": "node scripts\\freeze-western-strings-homr-evidence.mjs",
     "western:homr-evidence-check": "node scripts\\freeze-western-strings-homr-evidence.mjs --check",

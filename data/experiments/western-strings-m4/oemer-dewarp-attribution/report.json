@@ -1,0 +1,485 @@
+{
+  "contract": "western-m4-oemer-dewarp-attribution-v1",
+  "createdAt": "2026-07-20T17:32:39.093102+00:00",
+  "evidenceRole": "reused-five-page-diagnostic-only",
+  "sourceBenchmark": "data/experiments/western-strings-m4/oemer-source-benchmark/oemer-source-benchmark.json",
+  "sourceBenchmarkSha256": "52b955dc42db4e5f722aa1a6f35d57eb05bceb024aa66064d08d1f913d645b46",
+  "rows": [
+    {
+      "pieceId": "violin-ex09",
+      "input": "data/experiments/western-strings-m4/oemer-source-benchmark/violin-ex09/violin-ex09-up2.png",
+      "inputSha256": "7028dc322f91a5102525d82be73662ee51ead11d81e7636a6c6b5b20ebe14b30",
+      "expectedStaffCount": 11,
+      "expectedStaffCountEvidence": "diagnostic-visual-count-not-signed-coordinate-gold",
+      "beforeDewarp": {
+        "zoneCount": 20,
+        "completeZoneCount": 1,
+        "recoveredFiveLineGroupsByZone": [
+          10,
+          5,
+          9,
+          7,
+          8,
+          9,
+          8,
+          8,
+          8,
+          7,
+          8,
+          8,
+          8,
+          5,
+          4,
+          8,
+          7,
+          4,
+          11,
+          5
+        ],
+        "recoveredStaffCountMedian": 8.0,
+        "fiveLineGroupRecoveryRate": 0.727273,
+        "staffLineStraightnessP90Pixels": null,
+        "interlineCoefficientOfVariationMedian": 0.04,
+        "interlineCoefficientOfVariationP90": 0.219362
+      },
+      "afterDewarp": {
+        "zoneCount": 20,
+        "completeZoneCount": 0,
+        "recoveredFiveLineGroupsByZone": [
+          10,
+          7,
+          9,
+          8,
+          7,
+          9,
+          7,
+          9,
+          8,
+          8,
+          9,
+          7,
+          8,
+          6,
+          4,
+          9,
+          7,
+          4,
+          10,
+          3
+        ],
+        "recoveredStaffCountMedian": 8.0,
+        "fiveLineGroupRecoveryRate": 0.727273,
+        "staffLineStraightnessP90Pixels": null,
+        "interlineCoefficientOfVariationMedian": 0.090909,
+        "interlineCoefficientOfVariationP90": 0.317396
+      },
+      "mappingJacobian": {
+        "sampleCount": 3675528,
+        "foldCount": 0,
+        "foldRate": 0.0,
+        "p01": 0.6875,
+        "median": 1.0,
+        "p99": 1.375
+      },
+      "symbolicStructureCountProxy": {
+        "gold": {
+          "pitchedNotes": 288,
+          "stemElements": 288,
+          "beamElements": 576
+        },
+        "prediction": {
+          "pitchedNotes": 363,
+          "stemElements": 363,
+          "beamElements": 0
+        },
+        "isPixelSegmentationRecall": false
+      }
+    },
+    {
+      "pieceId": "violin-ex05",
+      "input": "data/experiments/western-strings-m4/oemer-source-benchmark/violin-ex05/violin-ex05-up2-trimmed.png",
+      "inputSha256": "122eac0def1cc069705633da8a92bed0cd7de994ab03a1fa1d6a4e502569b2d7",
+      "expectedStaffCount": 10,
+      "expectedStaffCountEvidence": "diagnostic-visual-count-not-signed-coordinate-gold",
+      "beforeDewarp": {
+        "zoneCount": 20,
+        "completeZoneCount": 8,
+        "recoveredFiveLineGroupsByZone": [
+          7,
+          10,
+          10,
+          10,
+          9,
+          10,
+          7,
+          9,
+          10,
+          9,
+          8,
+          9,
+          9,
+          7,
+          10,
+          9,
+          10,
+          10,
+          5,
+          0
+        ],
+        "recoveredStaffCountMedian": 9.0,
+        "fiveLineGroupRecoveryRate": 0.9,
+        "staffLineStraightnessP90Pixels": 0.762256,
+        "interlineCoefficientOfVariationMedian": 0.062578,
+        "interlineCoefficientOfVariationP90": 0.094211
+      },
+      "afterDewarp": {
+        "zoneCount": 20,
+        "completeZoneCount": 7,
+        "recoveredFiveLineGroupsByZone": [
+          7,
+          10,
+          10,
+          10,
+          9,
+          10,
+          7,
+          9,
+          9,
+          9,
+          8,
+          9,
+          9,
+          7,
+          10,
+          9,
+          10,
+          10,
+          5,
+          0
+        ],
+        "recoveredStaffCountMedian": 9.0,
+        "fiveLineGroupRecoveryRate": 0.9,
+        "staffLineStraightnessP90Pixels": 0.737902,
+        "interlineCoefficientOfVariationMedian": 0.065032,
+        "interlineCoefficientOfVariationP90": 0.121626
+      },
+      "mappingJacobian": {
+        "sampleCount": 3675238,
+        "foldCount": 0,
+        "foldRate": 0.0,
+        "p01": 0.857147,
+        "median": 1.0,
+        "p99": 1.083374
+      },
+      "symbolicStructureCountProxy": {
+        "gold": {
+          "pitchedNotes": 288,
+          "stemElements": 263,
+          "beamElements": 264
+        },
+        "prediction": {
+          "pitchedNotes": 289,
+          "stemElements": 289,
+          "beamElements": 0
+        },
+        "isPixelSegmentationRecall": false
+      }
+    },
+    {
+      "pieceId": "violin-ex08",
+      "input": "data/experiments/western-strings-m4/oemer-source-benchmark/violin-ex08/violin-ex08-up2.png",
+      "inputSha256": "d001d6c042ffb34a7ca10a6b0d01c5c1b3f2ce0bc61f59be888e53e661148d7d",
+      "expectedStaffCount": 10,
+      "expectedStaffCountEvidence": "diagnostic-visual-count-not-signed-coordinate-gold",
+      "beforeDewarp": {
+        "zoneCount": 20,
+        "completeZoneCount": 12,
+        "recoveredFiveLineGroupsByZone": [
+          9,
+          9,
+          10,
+          10,
+          7,
+          10,
+          10,
+          10,
+          10,
+          8,
+          10,
+          8,
+          9,
+          10,
+          10,
+          10,
+          10,
+          9,
+          10,
+          5
+        ],
+        "recoveredStaffCountMedian": 10.0,
+        "fiveLineGroupRecoveryRate": 1.0,
+        "staffLineStraightnessP90Pixels": 1.395133,
+        "interlineCoefficientOfVariationMedian": 0.043478,
+        "interlineCoefficientOfVariationP90": 0.088957
+      },
+      "afterDewarp": {
+        "zoneCount": 20,
+        "completeZoneCount": 12,
+        "recoveredFiveLineGroupsByZone": [
+          9,
+          8,
+          10,
+          10,
+          8,
+          10,
+          10,
+          10,
+          10,
+          8,
+          10,
+          9,
+          9,
+          10,
+          10,
+          10,
+          10,
+          9,
+          10,
+          5
+        ],
+        "recoveredStaffCountMedian": 10.0,
+        "fiveLineGroupRecoveryRate": 1.0,
+        "staffLineStraightnessP90Pixels": 1.374171,
+        "interlineCoefficientOfVariationMedian": 0.070566,
+        "interlineCoefficientOfVariationP90": 0.120736
+      },
+      "mappingJacobian": {
+        "sampleCount": 3675528,
+        "foldCount": 0,
+        "foldRate": 0.0,
+        "p01": 0.916626,
+        "median": 1.0,
+        "p99": 1.090942
+      },
+      "symbolicStructureCountProxy": {
+        "gold": {
+          "pitchedNotes": 341,
+          "stemElements": 330,
+          "beamElements": 330
+        },
+        "prediction": {
+          "pitchedNotes": 361,
+          "stemElements": 361,
+          "beamElements": 0
+        },
+        "isPixelSegmentationRecall": false
+      }
+    },
+    {
+      "pieceId": "violin-ex10",
+      "input": "data/experiments/western-strings-m4/oemer-source-benchmark/violin-ex10/violin-ex10-up2.png",
+      "inputSha256": "543e6697fda32749b31eaad2aa3b98efdbd9ee489263aebea194115fd0086552",
+      "expectedStaffCount": 9,
+      "expectedStaffCountEvidence": "diagnostic-visual-count-not-signed-coordinate-gold",
+      "beforeDewarp": {
+        "zoneCount": 20,
+        "completeZoneCount": 2,
+        "recoveredFiveLineGroupsByZone": [
+          7,
+          7,
+          6,
+          6,
+          9,
+          7,
+          8,
+          9,
+          6,
+          6,
+          8,
+          7,
+          8,
+          8,
+          8,
+          5,
+          4,
+          6,
+          6,
+          7
+        ],
+        "recoveredStaffCountMedian": 7.0,
+        "fiveLineGroupRecoveryRate": 0.777778,
+        "staffLineStraightnessP90Pixels": null,
+        "interlineCoefficientOfVariationMedian": 0.067686,
+        "interlineCoefficientOfVariationP90": 0.298683
+      },
+      "afterDewarp": {
+        "zoneCount": 20,
+        "completeZoneCount": 2,
+        "recoveredFiveLineGroupsByZone": [
+          6,
+          7,
+          6,
+          5,
+          9,
+          7,
+          8,
+          9,
+          6,
+          6,
+          8,
+          7,
+          6,
+          7,
+          7,
+          6,
+          5,
+          5,
+          6,
+          5
+        ],
+        "recoveredStaffCountMedian": 6.0,
+        "fiveLineGroupRecoveryRate": 0.666667,
+        "staffLineStraightnessP90Pixels": null,
+        "interlineCoefficientOfVariationMedian": 0.106044,
+        "interlineCoefficientOfVariationP90": 0.3
+      },
+      "mappingJacobian": {
+        "sampleCount": 3675528,
+        "foldCount": 0,
+        "foldRate": 0.0,
+        "p01": 0.818207,
+        "median": 0.997803,
+        "p99": 1.230011
+      },
+      "symbolicStructureCountProxy": {
+        "gold": {
+          "pitchedNotes": 324,
+          "stemElements": 324,
+          "beamElements": 648
+        },
+        "prediction": {
+          "pitchedNotes": 323,
+          "stemElements": 323,
+          "beamElements": 0
+        },
+        "isPixelSegmentationRecall": false
+      }
+    },
+    {
+      "pieceId": "violin-ex12",
+      "input": "data/experiments/western-strings-m4/oemer-source-benchmark/violin-ex12/violin-ex12-up2.png",
+      "inputSha256": "a9ce2dd3ac51e1c6260d4e7f4a75e7a257a97d6c5ddb8bfdaa7fb0156bd555f0",
+      "expectedStaffCount": 9,
+      "expectedStaffCountEvidence": "diagnostic-visual-count-not-signed-coordinate-gold",
+      "beforeDewarp": {
+        "zoneCount": 20,
+        "completeZoneCount": 8,
+        "recoveredFiveLineGroupsByZone": [
+          1,
+          9,
+          7,
+          9,
+          9,
+          8,
+          8,
+          9,
+          9,
+          7,
+          9,
+          8,
+          7,
+          7,
+          8,
+          8,
+          8,
+          9,
+          9,
+          7
+        ],
+        "recoveredStaffCountMedian": 8.0,
+        "fiveLineGroupRecoveryRate": 0.888889,
+        "staffLineStraightnessP90Pixels": 1.393518,
+        "interlineCoefficientOfVariationMedian": 0.064282,
+        "interlineCoefficientOfVariationP90": 0.096864
+      },
+      "afterDewarp": {
+        "zoneCount": 20,
+        "completeZoneCount": 13,
+        "recoveredFiveLineGroupsByZone": [
+          1,
+          9,
+          7,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          8,
+          9,
+          9,
+          9,
+          7,
+          9,
+          8,
+          8,
+          9,
+          9,
+          7
+        ],
+        "recoveredStaffCountMedian": 9.0,
+        "fiveLineGroupRecoveryRate": 1.0,
+        "staffLineStraightnessP90Pixels": 0.810077,
+        "interlineCoefficientOfVariationMedian": 0.075307,
+        "interlineCoefficientOfVariationP90": 0.131468
+      },
+      "mappingJacobian": {
+        "sampleCount": 3675518,
+        "foldCount": 0,
+        "foldRate": 0.0,
+        "p01": 0.909058,
+        "median": 1.0,
+        "p99": 1.090942
+      },
+      "symbolicStructureCountProxy": {
+        "gold": {
+          "pitchedNotes": 324,
+          "stemElements": 324,
+          "beamElements": 324
+        },
+        "prediction": {
+          "pitchedNotes": 324,
+          "stemElements": 324,
+          "beamElements": 0
+        },
+        "isPixelSegmentationRecall": false
+      }
+    }
+  ],
+  "aggregate": {
+    "pageCount": 5,
+    "pagesWithComparableStraightness": 3,
+    "pagesStraightnessImproved": 3,
+    "pagesFiveLineRecoveryImproved": 1,
+    "pagesFiveLineRecoveryWorsened": 1,
+    "pagesFiveLineRecoveryUnchanged": 3,
+    "pagesInterlineCvImproved": 0,
+    "pagesInterlineCvWorsened": 5,
+    "pagesWithMappingFolds": 0,
+    "meanFiveLineRecoveryBefore": 0.858788,
+    "meanFiveLineRecoveryAfter": 0.858788
+  },
+  "limitations": [
+    "The five pages are reused diagnostics and cannot qualify a fresh-blind promotion.",
+    "Expected staff counts are visual diagnostic counts, not signed coordinate gold.",
+    "MusicXML stem/beam element counts are symbolic coverage proxies, not pixel segmentation recall.",
+    "Pixel-level stem/beam recall remains unavailable until independent mask gold exists."
+  ],
+  "interpretation": {
+    "dewarpMissingIsPrimaryCause": false,
+    "reason": "Oemer dewarp improves measurable line straightness without improving mean five-line recovery; interline CV worsens on all five pages and the existing onset/measure benchmark remains far below threshold.",
+    "nextAction": "Prioritize clean-domain rhythm/measure reconstruction and obtain independent pixel stem/beam gold before training or rewriting another dewarp model."
+  },
+  "studentGateReady": false,
+  "automaticAdoptionAuthorized": false
+}
