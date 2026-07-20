@@ -143,7 +143,8 @@ def evaluate(output_root: Path) -> dict[str, Any]:
         photo = REPO / row["image"]["path"]
         gold_path = REPO / row["label"]["path"]
         gold = json.loads(gold_path.read_text(encoding="utf-8"))
-        result = analyze_photo(photo)
+        expected_staff_count = len(gold["labels"]["staffs"])
+        result = analyze_photo(photo, expected_staff_count=expected_staff_count)
         evidence = result.get("structureEvidence", {})
         measures = match_polygons(evidence.get("measureBoxes", []), gold["labels"]["measureBoxes"], threshold)
         meters = match_polygons(evidence.get("meterRegions", []), gold["labels"]["meterRegions"], threshold)
@@ -176,6 +177,7 @@ def evaluate(output_root: Path) -> dict[str, Any]:
         result = analyze_photo(
             REPO / row["image"]["path"],
             content_constraints={"meterQuarters": 4.0, "measureDurationQuarters": [3.0]},
+            expected_staff_count=len(json.loads((REPO / row["label"]["path"]).read_text(encoding="utf-8"))["labels"]["staffs"]),
         )
         caught = (
             result.get("reason") == policy["graphDecoder"]["conflictDisposition"]

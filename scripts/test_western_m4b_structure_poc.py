@@ -24,21 +24,24 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-def synthetic_test_photo() -> Path:
+def synthetic_test_case() -> tuple[Path, int]:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     row = next(row for row in manifest["syntheticRows"] if row["split"] == "synthetic-test")
-    return REPO / row["image"]["path"]
+    label = json.loads((REPO / row["label"]["path"]).read_text(encoding="utf-8"))
+    return REPO / row["image"]["path"], len(label["labels"]["staffs"])
 
 
 def main() -> int:
     policy = load_policy()
-    result = analyze_photo(synthetic_test_photo())
+    photo, expected_staff_count = synthetic_test_case()
+    result = analyze_photo(photo, expected_staff_count=expected_staff_count)
     require(result["ready"] is True, "known synthetic case should produce a structure candidate")
     require(result["reason"] == policy["graphDecoder"]["candidateDisposition"], "candidate disposition drifted")
     require(result["structureReviewRequired"] is False, "clean structure should have no detected conflict")
     require(result["reviewRequired"] is True, "POC candidates must remain review-only")
     require(result["studentFacing"] is False, "POC must never be student-facing")
     require(result["automaticAdoptionAuthorized"] is False, "POC must never authorize adoption")
+    require(result["normalization"]["staffRecovery"]["ready"] is True, "staff recovery must be verified")
     evidence = result["structureEvidence"]
     require(len(evidence["systems"]) == 4, "known case system count drifted")
     require(len(evidence["measureBoxes"]) == 21, "known case measure count drifted")
@@ -72,6 +75,14 @@ def main() -> int:
     require(challenger["shadowOnly"] is True, "challenger must remain shadow-only")
     require(challenger["productionCandidatePool"] is False, "challenger must not enter production")
     require(challenger["studentFacing"] is False, "challenger must not face students")
+
+    unverified = analyze_photo(photo)
+    require(unverified["ready"] is False, "missing expected staff count must fail closed")
+    require("staff-recovery-unverified" in unverified["blockingReasons"], "unverified staff recovery reason missing")
+
+    incomplete = analyze_photo(photo, expected_staff_count=expected_staff_count + 2)
+    require(incomplete["ready"] is False, "incomplete staff recovery must fail closed")
+    require("staff-recovery-below-threshold" in incomplete["blockingReasons"], "incomplete staff recovery reason missing")
 
     with tempfile.TemporaryDirectory() as temporary:
         missing = Path(temporary) / "missing.jpg"

@@ -21,7 +21,7 @@ from western_m4a_registration import detect_page, read_image  # noqa: E402
 
 
 POLICY_PATH = REPO / "config" / "western-m4b-structure-poc.json"
-RESULT_CONTRACT = "western-m4b-explicit-structure-result-v1"
+RESULT_CONTRACT = "western-m4b-explicit-structure-result-v2"
 
 
 def sha256(path: Path) -> str:
@@ -391,6 +391,36 @@ def decode_structure_graph(
     staffs = evidence.get("staffs", [])
     barlines = evidence.get("barlines", [])
     measures = evidence.get("measureBoxes", [])
+    expected_staff_count = None
+    if content_constraints:
+        expected_staff_count = content_constraints.get("expectedStaffCount")
+    recovered_staff_count = len(staffs)
+    minimum_staff_recovery_rate = float(settings["minimumStaffRecoveryRate"])
+    if not isinstance(expected_staff_count, int) or expected_staff_count <= 0:
+        staff_recovery = {
+            "verified": False,
+            "ready": False,
+            "reason": "expected-staff-count-missing",
+            "expectedStaffCount": None,
+            "recoveredStaffCount": recovered_staff_count,
+            "recoveryRate": None,
+            "minimumRecoveryRate": minimum_staff_recovery_rate,
+        }
+        conflicts.append("staff-recovery-unverified")
+    else:
+        recovery_rate = min(recovered_staff_count, expected_staff_count) / expected_staff_count
+        recovery_ready = recovery_rate >= minimum_staff_recovery_rate
+        staff_recovery = {
+            "verified": True,
+            "ready": recovery_ready,
+            "reason": "ok" if recovery_ready else "staff-recovery-below-threshold",
+            "expectedStaffCount": expected_staff_count,
+            "recoveredStaffCount": recovered_staff_count,
+            "recoveryRate": round(recovery_rate, 6),
+            "minimumRecoveryRate": minimum_staff_recovery_rate,
+        }
+        if not recovery_ready:
+            conflicts.append("staff-recovery-below-threshold")
     if not systems:
         conflicts.append("no-system-evidence")
     if len(staffs) != len(systems):
@@ -432,6 +462,7 @@ def decode_structure_graph(
             "measureCount": len(measures),
             "meterRegionCount": len(evidence.get("meterRegions", [])),
         },
+        "staffRecovery": staff_recovery,
         "silentGuess": False,
         "reviewRequired": True,
         "studentFacing": False,
@@ -503,6 +534,7 @@ def analyze_photo(
     *,
     content_constraints: dict[str, Any] | None = None,
     engine_candidates: list[dict[str, Any]] | None = None,
+    expected_staff_count: int | None = None,
 ) -> dict[str, Any]:
     policy = load_policy()
     image = read_image(photo_path)
@@ -530,7 +562,10 @@ def analyze_photo(
         }
     evidence = detect_explicit_structure(normalized, policy)
     add_original_coordinates(evidence, normalized)
-    graph = decode_structure_graph(evidence, policy, content_constraints)
+    constraints = dict(content_constraints or {})
+    if expected_staff_count is not None:
+        constraints["expectedStaffCount"] = expected_staff_count
+    graph = decode_structure_graph(evidence, policy, constraints)
     challenger = shadow_content_challenger(graph, evidence, engine_candidates or [], policy)
     return {
         "contract": RESULT_CONTRACT,
@@ -545,6 +580,7 @@ def analyze_photo(
             "pageDetection": normalized["pageDetection"],
             "curvature": normalized["curvature"],
             "rectifiedSize": [normalized["width"], normalized["height"]],
+            "staffRecovery": graph["staffRecovery"],
         },
         "structureEvidence": evidence,
         "structureGraph": graph,
@@ -561,9 +597,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--photo", required=True)
     parser.add_argument("--out", required=True)
+    parser.add_argument("--expected-staff-count", type=int)
     args = parser.parse_args()
     photo = Path(args.photo).resolve()
-    result = analyze_photo(photo)
+    result = analyze_photo(photo, expected_staff_count=args.expected_staff_count)
     output = Path(args.out).resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

@@ -32,7 +32,8 @@
     "candidateDisposition": "structure-candidate-review-required",
     "silentGuessAllowed": false,
     "meterDurationToleranceQuarters": 0.001,
-    "crossStaffBarlineToleranceInterlines": 1.0
+    "crossStaffBarlineToleranceInterlines": 1.0,
+    "minimumStaffRecoveryRate": 0.9
   },
   "contentChallenger": {
     "engines": [

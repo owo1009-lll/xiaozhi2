@@ -277,8 +277,8 @@ def evaluate() -> dict[str, Any]:
     exact_count = 0
     case_audits = []
     for item in valid_rows:
-        result = analyze_photo(item["photo"])
         labels = item["label"]["labels"]
+        result = analyze_photo(item["photo"], expected_staff_count=len(labels["staffs"]))
         evidence = result.get("structureEvidence", {})
         measure = match_polygons(evidence.get("measureBoxes", []), labels["measureBoxes"], iou_threshold)
         meter = match_polygons(evidence.get("meterRegions", []), labels["meterRegions"], iou_threshold)
@@ -304,6 +304,7 @@ def evaluate() -> dict[str, Any]:
         result = analyze_photo(
             item["photo"],
             content_constraints={"meterQuarters": 4.0, "measureDurationQuarters": [3.0]},
+            expected_staff_count=len(item["label"]["labels"]["staffs"]),
         )
         caught = (
             result.get("reason") == policy["graphDecoder"]["conflictDisposition"]
