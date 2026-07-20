@@ -997,6 +997,10 @@ if (m4.m4OemerBenchmarkComplete) {
   assert.equal(m4.oemerBenchmark?.coordinateAdapter?.readyRows, 5, "Oemer coordinate sidecars must cover all frozen rows");
   assert.equal(m4.oemerBenchmark?.comparison?.oemer?.strictPassRows, 0, "Oemer must not be promoted above its measured strict result");
 }
+assert.equal(m4.m4OemerDewarpAttributionComplete, true, "Oemer dewarp attribution must cover all five frozen pages");
+assert.equal(m4.m4OemerDewarpPrimaryCauseSupported, false, "Oemer dewarp must not be promoted as the primary cause without evidence");
+assert.equal(m4.oemerDewarpAttribution?.studentGateReady, false, "Oemer dewarp diagnostics must remain outside the student gate");
+assert.equal(m4.oemerDewarpAttribution?.automaticAdoptionAuthorized, false, "Oemer dewarp diagnostics must not authorize adoption");
 if (m4.m4EngineConsensusPilotSafeSubsetFound) {
   const consensus = m4.engineConsensus?.summaries?.allAvailablePitchLocalOnset25;
   const coordinateConsensus = m4.engineConsensus?.summaries?.coordinateReadyAllAvailablePitchLocalOnset25;

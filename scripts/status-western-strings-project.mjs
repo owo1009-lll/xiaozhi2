@@ -1229,6 +1229,13 @@ const M4_OEMER_BENCHMARK = path.join(
   "oemer-source-benchmark",
   "oemer-source-benchmark.json",
 );
+const M4_OEMER_DEWARP_ATTRIBUTION = path.join(
+  "data",
+  "experiments",
+  "western-strings-m4",
+  "oemer-dewarp-attribution",
+  "report.json",
+);
 const M4_HOMR_BENCHMARK = path.join(
   "docs",
   "evidence",
@@ -2931,6 +2938,7 @@ async function buildM4OmrStatus() {
   const benchmark = await readJson(M4_BENCHMARK);
   const independentBenchmark = await readJson(M4_INDEPENDENT_BENCHMARK_AUDIT);
   const oemerBenchmark = await readJson(M4_OEMER_BENCHMARK);
+  const oemerDewarpAttribution = await readJson(M4_OEMER_DEWARP_ATTRIBUTION);
   const homrEvidence = await readJson(M4_HOMR_BENCHMARK);
   const zeusChallenger = await readJson(M4_ZEUS_CHALLENGER);
   const homrBenchmark = homrEvidenceToBenchmark(homrEvidence);
@@ -3080,6 +3088,11 @@ async function buildM4OmrStatus() {
     m4OmrAutomaticAdoptionReady: automaticAdoptionReady,
     m4OemerBenchmarkComplete: oemerBenchmark?.complete === true,
     m4OemerAutomaticAdoptionReady: oemerBenchmark?.gate?.automaticAdoptionReady === true,
+    m4OemerDewarpAttributionComplete:
+      oemerDewarpAttribution?.contract === "western-m4-oemer-dewarp-attribution-v1"
+      && oemerDewarpAttribution?.aggregate?.pageCount === 5,
+    m4OemerDewarpPrimaryCauseSupported:
+      oemerDewarpAttribution?.interpretation?.dewarpMissingIsPrimaryCause === true,
     m4HomrBenchmarkComplete: homrBenchmark?.complete === true,
     m4HomrAutomaticAdoptionReady: homrBenchmark?.gate?.automaticAdoptionReady === true,
     m4HomrLicenseReviewReady: homrLicenseReviewReady,
@@ -3200,6 +3213,7 @@ async function buildM4OmrStatus() {
       benchmarkJson: M4_BENCHMARK.replace(/\\/g, "/"),
       independentBenchmarkJson: M4_INDEPENDENT_BENCHMARK_AUDIT.replace(/\\/g, "/"),
       oemerBenchmarkJson: M4_OEMER_BENCHMARK.replace(/\\/g, "/"),
+      oemerDewarpAttributionJson: M4_OEMER_DEWARP_ATTRIBUTION.replace(/\\/g, "/"),
       homrBenchmarkJson: M4_HOMR_BENCHMARK.replace(/\\/g, "/"),
       zeusChallengerJson: M4_ZEUS_CHALLENGER.replace(/\\/g, "/"),
       homrReviewRecordJson: HOMR_REVIEW_RECORD.replace(/\\/g, "/"),
@@ -3415,6 +3429,14 @@ async function buildM4OmrStatus() {
             }))
         : [],
       productionPolicyChanged: adaptiveInterlineProbe.productionPolicyChanged === true,
+    } : null,
+    oemerDewarpAttribution: oemerDewarpAttribution ? {
+      evidenceRole: oemerDewarpAttribution.evidenceRole || "",
+      aggregate: oemerDewarpAttribution.aggregate || {},
+      interpretation: oemerDewarpAttribution.interpretation || {},
+      limitations: oemerDewarpAttribution.limitations || [],
+      studentGateReady: oemerDewarpAttribution.studentGateReady === true,
+      automaticAdoptionAuthorized: oemerDewarpAttribution.automaticAdoptionAuthorized === true,
     } : null,
     focusedSymbolGold: focusedSymbolGold?.summary || null,
     audioRhythmRanking: audioRhythmRanking ? {
