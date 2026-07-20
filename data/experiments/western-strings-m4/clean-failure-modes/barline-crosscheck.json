@@ -1,0 +1,765 @@
+{
+  "contract": "western-m4-clean-barline-crosscheck-v1",
+  "evidenceRole": "clean-render-raw-barline-vs-semantic-svg-root-cause-diagnostic",
+  "thresholds": {
+    "decodingLockMinNormalFailureShare": 0.8,
+    "positionToleranceWidthRatio": 0.012
+  },
+  "aggregate": {
+    "measureFailedPieceCount": 22,
+    "barlineNormalPieceCount": 4,
+    "barlineAbnormalPieceCount": 18,
+    "barlineNormalFailureShare": 0.181818,
+    "barlineRecallNormalPieceCount": 19,
+    "barlineRecallNormalFailureShare": 0.863636,
+    "barlinePrecisionNormalPieceCount": 5,
+    "barlinePrecisionNormalFailureShare": 0.227273,
+    "missingBarlinePieceCount": 3,
+    "missingBarlineFailureShare": 0.136364,
+    "extraBarlinePieceCount": 17,
+    "extraBarlineFailureShare": 0.772727,
+    "decodingPrimaryCauseLocked": false,
+    "barlineDetectionComponentRemainsMaterial": true
+  },
+  "method": {
+    "gold": "Verovio SVG barLine path centres from the exact clean render",
+    "prediction": "Audiveris raw barline Inter median coordinates from the matching OMR sheet",
+    "normalDefinition": "every page has one-to-one position matches with no missing or extra raw barline",
+    "recallNormalDefinition": "every SVG barline has a position-matched raw Audiveris barline; extras are reported separately",
+    "scope": "diagnostic only; no photo-domain or student-runtime claim"
+  },
+  "studentGateReady": false,
+  "runtimeEffect": "none",
+  "rows": [
+    {
+      "pieceId": "bwv1001_mov1",
+      "measureAccuracy": 0.838346,
+      "measureMode": "measure-count-mismatch-other",
+      "barlineRecallNormal": true,
+      "barlinePrecisionNormal": true,
+      "barlineDetectionNormal": true,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 17,
+          "predictedBarlineCount": 17,
+          "matchedBarlineCount": 17,
+          "recall": 1.0,
+          "precision": 1.0,
+          "positionTolerancePixels": 42.336,
+          "normal": true
+        },
+        {
+          "page": 2,
+          "goldBarlineCount": 6,
+          "predictedBarlineCount": 6,
+          "matchedBarlineCount": 6,
+          "recall": 1.0,
+          "precision": 1.0,
+          "positionTolerancePixels": 42.336,
+          "normal": true
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1001_mov2",
+      "measureAccuracy": 0.204308,
+      "measureMode": "measure-count-mismatch-other",
+      "barlineRecallNormal": true,
+      "barlinePrecisionNormal": false,
+      "barlineDetectionNormal": false,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 32,
+          "predictedBarlineCount": 33,
+          "matchedBarlineCount": 32,
+          "recall": 1.0,
+          "precision": 0.969697,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        },
+        {
+          "page": 2,
+          "goldBarlineCount": 32,
+          "predictedBarlineCount": 32,
+          "matchedBarlineCount": 32,
+          "recall": 1.0,
+          "precision": 1.0,
+          "positionTolerancePixels": 42.336,
+          "normal": true
+        },
+        {
+          "page": 3,
+          "goldBarlineCount": 28,
+          "predictedBarlineCount": 28,
+          "matchedBarlineCount": 28,
+          "recall": 1.0,
+          "precision": 1.0,
+          "positionTolerancePixels": 42.336,
+          "normal": true
+        },
+        {
+          "page": 4,
+          "goldBarlineCount": 3,
+          "predictedBarlineCount": 3,
+          "matchedBarlineCount": 3,
+          "recall": 1.0,
+          "precision": 1.0,
+          "positionTolerancePixels": 42.336,
+          "normal": true
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1001_mov3",
+      "measureAccuracy": 0.714567,
+      "measureMode": "measure-count-mismatch-pickup",
+      "barlineRecallNormal": true,
+      "barlinePrecisionNormal": false,
+      "barlineDetectionNormal": false,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 18,
+          "predictedBarlineCount": 19,
+          "matchedBarlineCount": 18,
+          "recall": 1.0,
+          "precision": 0.947368,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        },
+        {
+          "page": 2,
+          "goldBarlineCount": 3,
+          "predictedBarlineCount": 3,
+          "matchedBarlineCount": 3,
+          "recall": 1.0,
+          "precision": 1.0,
+          "positionTolerancePixels": 42.336,
+          "normal": true
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1001_mov4",
+      "measureAccuracy": 0.8633,
+      "measureMode": "measure-count-mismatch-other",
+      "barlineRecallNormal": true,
+      "barlinePrecisionNormal": false,
+      "barlineDetectionNormal": false,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 96,
+          "predictedBarlineCount": 96,
+          "matchedBarlineCount": 96,
+          "recall": 1.0,
+          "precision": 1.0,
+          "positionTolerancePixels": 42.336,
+          "normal": true
+        },
+        {
+          "page": 2,
+          "goldBarlineCount": 44,
+          "predictedBarlineCount": 45,
+          "matchedBarlineCount": 44,
+          "recall": 1.0,
+          "precision": 0.977778,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1002_mov1",
+      "measureAccuracy": 0.888476,
+      "measureMode": "same-count-duration-reconstruction",
+      "barlineRecallNormal": true,
+      "barlinePrecisionNormal": true,
+      "barlineDetectionNormal": true,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 22,
+          "predictedBarlineCount": 22,
+          "matchedBarlineCount": 22,
+          "recall": 1.0,
+          "precision": 1.0,
+          "positionTolerancePixels": 42.336,
+          "normal": true
+        },
+        {
+          "page": 2,
+          "goldBarlineCount": 10,
+          "predictedBarlineCount": 10,
+          "matchedBarlineCount": 10,
+          "recall": 1.0,
+          "precision": 1.0,
+          "positionTolerancePixels": 42.336,
+          "normal": true
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1002_mov2",
+      "measureAccuracy": 0.305263,
+      "measureMode": "measure-count-mismatch-other",
+      "barlineRecallNormal": true,
+      "barlinePrecisionNormal": false,
+      "barlineDetectionNormal": false,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 29,
+          "predictedBarlineCount": 30,
+          "matchedBarlineCount": 29,
+          "recall": 1.0,
+          "precision": 0.966667,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1002_mov5",
+      "measureAccuracy": 0.097015,
+      "measureMode": "measure-count-mismatch-other",
+      "barlineRecallNormal": true,
+      "barlinePrecisionNormal": false,
+      "barlineDetectionNormal": false,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 36,
+          "predictedBarlineCount": 42,
+          "matchedBarlineCount": 36,
+          "recall": 1.0,
+          "precision": 0.857143,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1002_mov7",
+      "measureAccuracy": 0.050373,
+      "measureMode": "measure-count-mismatch-repeat-handling",
+      "barlineRecallNormal": false,
+      "barlinePrecisionNormal": false,
+      "barlineDetectionNormal": false,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 56,
+          "predictedBarlineCount": 60,
+          "matchedBarlineCount": 56,
+          "recall": 1.0,
+          "precision": 0.933333,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        },
+        {
+          "page": 2,
+          "goldBarlineCount": 17,
+          "predictedBarlineCount": 15,
+          "matchedBarlineCount": 15,
+          "recall": 0.882353,
+          "precision": 1.0,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1003_mov1",
+      "measureAccuracy": 0.907776,
+      "measureMode": "same-count-duration-reconstruction",
+      "barlineRecallNormal": true,
+      "barlinePrecisionNormal": false,
+      "barlineDetectionNormal": false,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 15,
+          "predictedBarlineCount": 15,
+          "matchedBarlineCount": 15,
+          "recall": 1.0,
+          "precision": 1.0,
+          "positionTolerancePixels": 42.336,
+          "normal": true
+        },
+        {
+          "page": 2,
+          "goldBarlineCount": 9,
+          "predictedBarlineCount": 10,
+          "matchedBarlineCount": 9,
+          "recall": 1.0,
+          "precision": 0.9,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1003_mov2",
+      "measureAccuracy": 0.449789,
+      "measureMode": "measure-count-mismatch-other",
+      "barlineRecallNormal": true,
+      "barlinePrecisionNormal": false,
+      "barlineDetectionNormal": false,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 65,
+          "predictedBarlineCount": 65,
+          "matchedBarlineCount": 65,
+          "recall": 1.0,
+          "precision": 1.0,
+          "positionTolerancePixels": 42.336,
+          "normal": true
+        },
+        {
+          "page": 2,
+          "goldBarlineCount": 63,
+          "predictedBarlineCount": 63,
+          "matchedBarlineCount": 63,
+          "recall": 1.0,
+          "precision": 1.0,
+          "positionTolerancePixels": 42.336,
+          "normal": true
+        },
+        {
+          "page": 3,
+          "goldBarlineCount": 67,
+          "predictedBarlineCount": 69,
+          "matchedBarlineCount": 67,
+          "recall": 1.0,
+          "precision": 0.971014,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        },
+        {
+          "page": 4,
+          "goldBarlineCount": 65,
+          "predictedBarlineCount": 65,
+          "matchedBarlineCount": 65,
+          "recall": 1.0,
+          "precision": 1.0,
+          "positionTolerancePixels": 42.336,
+          "normal": true
+        },
+        {
+          "page": 5,
+          "goldBarlineCount": 30,
+          "predictedBarlineCount": 31,
+          "matchedBarlineCount": 30,
+          "recall": 1.0,
+          "precision": 0.967742,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1003_mov3",
+      "measureAccuracy": 0.598608,
+      "measureMode": "measure-count-mismatch-pickup",
+      "barlineRecallNormal": true,
+      "barlinePrecisionNormal": false,
+      "barlineDetectionNormal": false,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 34,
+          "predictedBarlineCount": 36,
+          "matchedBarlineCount": 34,
+          "recall": 1.0,
+          "precision": 0.944444,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1004_mov2",
+      "measureAccuracy": 0.004608,
+      "measureMode": "measure-count-mismatch-other",
+      "barlineRecallNormal": true,
+      "barlinePrecisionNormal": false,
+      "barlineDetectionNormal": false,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 59,
+          "predictedBarlineCount": 60,
+          "matchedBarlineCount": 59,
+          "recall": 1.0,
+          "precision": 0.983333,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1004_mov3",
+      "measureAccuracy": 0.035599,
+      "measureMode": "measure-count-mismatch-other",
+      "barlineRecallNormal": true,
+      "barlinePrecisionNormal": false,
+      "barlineDetectionNormal": false,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 35,
+          "predictedBarlineCount": 38,
+          "matchedBarlineCount": 35,
+          "recall": 1.0,
+          "precision": 0.921053,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1004_mov4",
+      "measureAccuracy": 0.532967,
+      "measureMode": "measure-count-mismatch-pickup",
+      "barlineRecallNormal": true,
+      "barlinePrecisionNormal": false,
+      "barlineDetectionNormal": false,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 28,
+          "predictedBarlineCount": 29,
+          "matchedBarlineCount": 28,
+          "recall": 1.0,
+          "precision": 0.965517,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        },
+        {
+          "page": 2,
+          "goldBarlineCount": 17,
+          "predictedBarlineCount": 17,
+          "matchedBarlineCount": 17,
+          "recall": 1.0,
+          "precision": 1.0,
+          "positionTolerancePixels": 42.336,
+          "normal": true
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1004_mov5",
+      "measureAccuracy": 0.005097,
+      "measureMode": "measure-count-mismatch-inline-meter",
+      "barlineRecallNormal": false,
+      "barlinePrecisionNormal": false,
+      "barlineDetectionNormal": false,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 51,
+          "predictedBarlineCount": 52,
+          "matchedBarlineCount": 50,
+          "recall": 0.980392,
+          "precision": 0.961538,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        },
+        {
+          "page": 2,
+          "goldBarlineCount": 34,
+          "predictedBarlineCount": 35,
+          "matchedBarlineCount": 34,
+          "recall": 1.0,
+          "precision": 0.971429,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        },
+        {
+          "page": 3,
+          "goldBarlineCount": 54,
+          "predictedBarlineCount": 63,
+          "matchedBarlineCount": 54,
+          "recall": 1.0,
+          "precision": 0.857143,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        },
+        {
+          "page": 4,
+          "goldBarlineCount": 49,
+          "predictedBarlineCount": 54,
+          "matchedBarlineCount": 49,
+          "recall": 1.0,
+          "precision": 0.907407,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        },
+        {
+          "page": 5,
+          "goldBarlineCount": 52,
+          "predictedBarlineCount": 55,
+          "matchedBarlineCount": 52,
+          "recall": 1.0,
+          "precision": 0.945455,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        },
+        {
+          "page": 6,
+          "goldBarlineCount": 20,
+          "predictedBarlineCount": 21,
+          "matchedBarlineCount": 20,
+          "recall": 1.0,
+          "precision": 0.952381,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1005_mov1",
+      "measureAccuracy": 0.038801,
+      "measureMode": "measure-count-mismatch-inline-meter",
+      "barlineRecallNormal": true,
+      "barlinePrecisionNormal": false,
+      "barlineDetectionNormal": false,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 48,
+          "predictedBarlineCount": 54,
+          "matchedBarlineCount": 48,
+          "recall": 1.0,
+          "precision": 0.888889,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1005_mov2",
+      "measureAccuracy": 0.05239,
+      "measureMode": "measure-count-mismatch-other",
+      "barlineRecallNormal": true,
+      "barlinePrecisionNormal": false,
+      "barlineDetectionNormal": false,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 60,
+          "predictedBarlineCount": 62,
+          "matchedBarlineCount": 60,
+          "recall": 1.0,
+          "precision": 0.967742,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        },
+        {
+          "page": 2,
+          "goldBarlineCount": 53,
+          "predictedBarlineCount": 54,
+          "matchedBarlineCount": 53,
+          "recall": 1.0,
+          "precision": 0.981481,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        },
+        {
+          "page": 3,
+          "goldBarlineCount": 60,
+          "predictedBarlineCount": 63,
+          "matchedBarlineCount": 60,
+          "recall": 1.0,
+          "precision": 0.952381,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        },
+        {
+          "page": 4,
+          "goldBarlineCount": 51,
+          "predictedBarlineCount": 52,
+          "matchedBarlineCount": 51,
+          "recall": 1.0,
+          "precision": 0.980769,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        },
+        {
+          "page": 5,
+          "goldBarlineCount": 53,
+          "predictedBarlineCount": 57,
+          "matchedBarlineCount": 53,
+          "recall": 1.0,
+          "precision": 0.929825,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        },
+        {
+          "page": 6,
+          "goldBarlineCount": 56,
+          "predictedBarlineCount": 57,
+          "matchedBarlineCount": 56,
+          "recall": 1.0,
+          "precision": 0.982456,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        },
+        {
+          "page": 7,
+          "goldBarlineCount": 23,
+          "predictedBarlineCount": 24,
+          "matchedBarlineCount": 23,
+          "recall": 1.0,
+          "precision": 0.958333,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1006_mov1",
+      "measureAccuracy": 0.897248,
+      "measureMode": "same-count-duration-reconstruction",
+      "barlineRecallNormal": true,
+      "barlinePrecisionNormal": true,
+      "barlineDetectionNormal": true,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 48,
+          "predictedBarlineCount": 48,
+          "matchedBarlineCount": 48,
+          "recall": 1.0,
+          "precision": 1.0,
+          "positionTolerancePixels": 42.336,
+          "normal": true
+        },
+        {
+          "page": 2,
+          "goldBarlineCount": 48,
+          "predictedBarlineCount": 48,
+          "matchedBarlineCount": 48,
+          "recall": 1.0,
+          "precision": 1.0,
+          "positionTolerancePixels": 42.336,
+          "normal": true
+        },
+        {
+          "page": 3,
+          "goldBarlineCount": 43,
+          "predictedBarlineCount": 43,
+          "matchedBarlineCount": 43,
+          "recall": 1.0,
+          "precision": 1.0,
+          "positionTolerancePixels": 42.336,
+          "normal": true
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1006_mov2",
+      "measureAccuracy": 0.32526,
+      "measureMode": "measure-count-mismatch-other",
+      "barlineRecallNormal": true,
+      "barlinePrecisionNormal": false,
+      "barlineDetectionNormal": false,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 29,
+          "predictedBarlineCount": 32,
+          "matchedBarlineCount": 29,
+          "recall": 1.0,
+          "precision": 0.90625,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1006_mov3",
+      "measureAccuracy": 0.718954,
+      "measureMode": "measure-count-mismatch-other",
+      "barlineRecallNormal": true,
+      "barlinePrecisionNormal": false,
+      "barlineDetectionNormal": false,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 54,
+          "predictedBarlineCount": 54,
+          "matchedBarlineCount": 54,
+          "recall": 1.0,
+          "precision": 1.0,
+          "positionTolerancePixels": 42.336,
+          "normal": true
+        },
+        {
+          "page": 2,
+          "goldBarlineCount": 50,
+          "predictedBarlineCount": 51,
+          "matchedBarlineCount": 50,
+          "recall": 1.0,
+          "precision": 0.980392,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1006_mov4",
+      "measureAccuracy": 0.929907,
+      "measureMode": "same-count-duration-reconstruction",
+      "barlineRecallNormal": true,
+      "barlinePrecisionNormal": true,
+      "barlineDetectionNormal": true,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 37,
+          "predictedBarlineCount": 37,
+          "matchedBarlineCount": 37,
+          "recall": 1.0,
+          "precision": 1.0,
+          "positionTolerancePixels": 42.336,
+          "normal": true
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1006_mov7",
+      "measureAccuracy": 0.948949,
+      "measureMode": "measure-count-mismatch-repeat-handling",
+      "barlineRecallNormal": false,
+      "barlinePrecisionNormal": true,
+      "barlineDetectionNormal": false,
+      "pages": [
+        {
+          "page": 1,
+          "goldBarlineCount": 37,
+          "predictedBarlineCount": 35,
+          "matchedBarlineCount": 35,
+          "recall": 0.945946,
+          "precision": 1.0,
+          "positionTolerancePixels": 42.336,
+          "normal": false
+        }
+      ]
+    }
+  ],
+  "sources": {
+    "attribution": {
+      "path": "data/experiments/western-strings-m4/clean-failure-modes/structure-attribution.json",
+      "sha256": "4f6e18cadc57b764d4c073ba221a31620064ac35f77eb152997adaaecc75a742"
+    },
+    "noteAudit": {
+      "path": "data/experiments/western-strings-m4/render-gold-omr/render-gold-note-level-audit.json",
+      "sha256": "caffd2ffe4ecbe6d2e735248abd1aa0d937232b40339ab5729b138a22cf284a7"
+    }
+  }
+}

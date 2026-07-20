@@ -122,6 +122,8 @@
     "test:western-m4-clean-failure-modes": "node scripts\\test-western-m4-clean-failure-modes.mjs",
     "western:m4-clean-structure-attribution": "py -3.11 scripts\\experiments\\audit_western_m4_clean_structure_failures.py",
     "test:western-m4-clean-structure-attribution": "py -3.11 scripts\\experiments\\test_audit_western_m4_clean_structure_failures.py",
+    "western:m4-clean-barline-crosscheck": "py -3.11 scripts\\experiments\\audit_western_m4_clean_barline_crosscheck.py",
+    "test:western-m4-clean-barline-crosscheck": "py -3.11 scripts\\experiments\\test_audit_western_m4_clean_barline_crosscheck.py",
     "western:m4-zeus-challenger": "py -3.11 scripts\\experiments\\eval_western_m4_zeus_challenger.py",
     "test:western-m4-zeus-challenger": "py -3.11 scripts\\test_western_m4_zeus_challenger.py",
     "test:western-m4-omr-confidence-probe": "py -3.11 scripts\\test-western-m4-omr-confidence-probe.py",
