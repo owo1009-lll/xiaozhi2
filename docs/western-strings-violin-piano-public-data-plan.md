@@ -7,8 +7,8 @@
 必须把“谱面里有钢琴声部”和“录音里有钢琴伴奏”当成两个独立域，不得用单声部结果互相外推。
 
 - **结构化 MusicXML/MXL：可处理。** 新增 Violin + Piano 回归已以 `selectedPartHint=violin` 选中 Violin，置信度 0.96，仅保留 3/3 个目标小提琴音，钢琴和弦未混入。
-- **未登记的小提琴＋钢琴拍照谱：不可声称能稳定处理。** M4a 只能处理已登记版本；M4b 开放域 OMR 仍未晋升。多谱表页需先做系统/谱表/大谱表括号检测，再裁出小提琴谱表识别；钢琴谱表只作小节线和系统结构旁证。
-- **小提琴＋钢琴混音：当前不可用于自动反馈。** MusicNet 公开“Accompanied Violin”两条完整录音上，现有 Basic Pitch 直读混音的未见演奏者 holdout 在 100ms 为 P/R=`34.47%/49.81%`，双音 recall=`7.37%`；300ms 也仅 P/R=`37.72%/54.50%`。钢琴与小提琴同音高时还可能被误计为小提琴命中，所以这些数字并不会低估风险。
+- **未登记的小提琴＋钢琴拍照谱：不可声称能稳定处理。** M4a 只能处理已登记版本；M4b 开放域 OMR 仍未晋升。新增 OLiMPiC/Zeus camera challenger 在 5 张冻结小提琴真照片上仅得 pitch P/R=`8.05%/9.14%`、onset-quarter=`0.13%`、measure=`5.43%`、严格整页=`0/5`，已淘汰且未接运行时。多谱表页仍需先做系统/谱表/大谱表括号检测，再裁出小提琴谱表识别；钢琴谱表只作小节线和系统结构旁证。
+- **小提琴＋钢琴混音：识别显著改善，但当前仍不可用于自动反馈。** MusicNet 公开“Accompanied Violin”上，原 Basic Pitch 未见演奏者 holdout 的 100ms P/R=`34.47%/49.81%`、双音 recall=`7.37%`。新增 YourMT3+ instrument-aware challenger 在各 60 秒诊断片段上达到 50ms P/R=`86.42%/70.35%`、100ms P/R=`96.30%/78.39%`；100ms precision 已过线，但 50ms 两项和 100ms recall 仍未过冻结门槛。开发录音上选出的 `+60ms` 偏移在 holdout 反向恶化，已拒绝，不用调参泄漏包装合格。
 
 可复跑命令：
 
@@ -16,9 +16,13 @@
 npm run test:musicxml-import
 npm run western:musicnet-accompanied-violin
 npm run test:western-musicnet-accompanied-violin
+npm run western:musicnet-yourmt3
+npm run test:western-musicnet-yourmt3
+npm run western:m4-zeus-challenger
+npm run test:western-m4-zeus-challenger
 ```
 
-本地报告：`data/experiments/western-strings-musicnet-accompanied-violin/report.json`。原始录音、缓存和报告位于 gitignored `data/`，不进入仓库。
+本地报告：`data/experiments/western-strings-musicnet-accompanied-violin/report.json`、`data/experiments/western-strings-musicnet-yourmt3/report.json` 和 `data/experiments/western-strings-m4/zeus-challenger/report.json`。原始录音、模型、缓存和报告位于 gitignored `data/`，只提交去原始数据的冻结证据摘要。
 
 ## 公开数据的正确用法
 
@@ -35,7 +39,7 @@ DoReMi 干净数字谱适配已证明可提高数字谱 token accuracy，却使�
 
 1. **MusicNet（Zenodo 记录 CC BY 4.0）**：330 条古典录音、11 类乐器和超过 100 万个音符标签；先作为带乐器 ID 的多乐器训练/基准。官方说明标签仍约有 4% 误差，不得写成纯人工无噪声 gold。
 2. **URMP**：官方同时给混音、独立乐器分轨、MIDI 和音符标注，适合做“混音→目标小提琴”的分离/转写对照。先做全量曲目与许可清单审计，未核清的条目只作评测，不进训练。
-3. **架构顺序**：第一 challenger 用 MT3 多乐器预训练模型输出带 instrument token 的音符，仅保留 violin track 再进入现有跟谱/诊断。MT3 代码为 Apache-2.0，但权重与依赖仍要单独固定和审计。YourMT3+ 作为第二研究 challenger，仓库为 GPL-3.0，未完成正式许可记录前不接生产。
+3. **架构结果与边界**：已用 YourMT3+ 多乐器 checkpoint 输出带 instrument token 的音符，并冻结为 all-strings 投影后进入评测。该 checkpoint 把 100ms precision 提到 96.30%，但 recall 仅 78.39%。其上游 GitHub 为 GPL-3.0，Hugging Face Space 与 checkpoint 未声明独立许可，且训练/评测来源包含 MusicNet；因此它只作架构诊断，不能作为独立发布证据或生产依赖。官方 MT3 仍可作研究对照，但旧 T5X/JAX 栈和 checkpoint/部署审计成本不改变学生域验收要求。
 
 ## 冻结验收门槛
 
@@ -55,6 +59,6 @@ DoReMi 干净数字谱适配已证明可提高数字谱 token accuracy，却使�
 
 ## 下一步
 
-1. 先跑 MT3 官方多乐器 checkpoint 对同两条 MusicNet 的冻结 challenger，不在 holdout 上调参。
-2. 谱面线将 OpenScore Lieder 转为系统/谱表/括号标签，只训结构前置；小提琴内容继续用 CC0 弦乐谱与独立真照片验收。
-3. 若 MT3 仍不过门，再评估 MusicNetEM/目标条件转写微调，不继续扫 Basic Pitch 后处理阈值。
+1. 音频线下一位候选应采用许可清楚、与 release holdout 无训练重叠的目标条件转写或“分离小提琴→单声部 V2”架构；先用 URMP 独立分轨审计建立可定位的钢琴串扰/漏检子组，不继续扫单录音偏移或 Basic Pitch 后处理阈值。
+2. 谱面线先用 OpenScore Lieder 训练系统/谱表/括号结构前置，再在作品和版本隔离的真实拍摄域做迁移；Zeus 负结果证明不能直接把钢琴大谱表 camera checkpoint 当作小提琴内容模型。
+3. M4b 晋升仍须执行现成 capture pack 的至少 30 张/6 版式/3 设备真照片与逐页结构标注；V2 学生端仍须全新真实学生录音、逐音人工 gold、fresh-blind 验收和显式发布授权。两者都不能由公开专业数据代替。

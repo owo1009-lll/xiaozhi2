@@ -1,6 +1,6 @@
 # 西洋弦乐练习诊断项目状态快照
 
-更新时间: 2026-07-19 03:18 +08:00
+更新时间: 2026-07-20
 
 本文件是当前主线状态快照。实时判断仍以命令为准:
 
@@ -13,6 +13,10 @@
 二胡线已经冻结为论文证据、困难案例和共享模块来源。当前产品主线是西洋弓弦乐, 小提琴优先, 大提琴后续独立验证。
 
 ## 2026-07-19 当前分支刷新
+
+- **2026-07-20 M4b 相机模型 challenger 已冻结并淘汰:** OLiMPiC/Zeus camera GrandStaff 模型在现有 5 张冻结 source-gold 真照片上评测 32 个谱表裁片，pitch P/R=`8.05%/9.14%`、onset-quarter=`0.13%`、measure=`5.43%`、严格整页=`0/5`，且页面分割本身未全过。该模型的钢琴大谱表/相机域不能外推为小提琴开放域能力，`keepAsRuntimeCandidate=false`，未接入运行时。M4b 仍为 synthetic engineering ready、真实晋升不合格；唯一能改变晋升结论的证据仍是冻结包要求的至少 30 张、6 版式、3 设备 fresh-blind 真照片和逐页结构标注，公开数字谱不能替代这组物理证据。
+- **2026-07-20 伴奏识别架构 challenger 有实质提升但仍未过门:** YourMT3+ 多乐器 checkpoint 在 MusicNet 两条伴奏小提琴各 60 秒诊断上，以 2330 开发、2334 未见演奏者 holdout 冻结选择 all-strings/最小时值 50ms/零全局偏移。holdout 的 50ms P/R=`86.42%/70.35%`，100ms P/R=`96.30%/78.39%`；相较 Basic Pitch 的 100ms `34.47%/49.81%` 明显改善，但仍未同时达到冻结门槛 50ms `90%/80%` 与 100ms `90%/85%`。在开发录音选出的 `+60ms` 校准使 holdout 50ms F1 从 `77.56%` 降到 `38.90%`，已按不可泛化拒绝。另有 checkpoint/Space 许可未声明及 MusicNet 训练重叠风险，因此 `recognitionReady=false`、`productionAdoptionReady=false`、`studentReleaseEligible=false`。
+- **公开专业单声部 V2 与学生端资格继续分层:** 现有公开专业单声部证据仍只支持 `publicProfessionalMonophonicV2CandidateReady=true` 的研究候选结论。公开数据继续训练或过门也不能自动把 `studentReleaseEligible` 改成 true；学生端合格必须补全全新真实学生录音、逐音人工 gold、独立 fresh-blind 验收和显式发布授权。当前录音尚未到位时，这一项是外部证据 blocker，不得以公开专业数据或放宽阈值代签。
 
 - **M4b 结构 POC 现已完成工程闭环:** 四层主链已落地为页面/透视/弯曲归一化、显式五线谱/系统/小节线/小节框/拍号区域证据、确定性结构图冲突解码、以及坐标可归属的多引擎 shadow challenger。冻结 synthetic-test 12/12 页上小节框 F1=1.000、整页结构完全正确率=1.000、拍号区域 F1=1.000、冲突注入转 `structure-review-required`=12/12。live audit 重算指标并验证每页 result/overlay/原图哈希，伪造合成证据晋升、学生端边界和空数据晋升均会 fail-closed。当前 `m4bStructurePocEngineeringReady=true`、`m4bStructurePocPromotionOperationalReady=true`，但这仍只是 `synthetic-engineering-only`；真实 fresh-blind 为 0/30 页、0/6 版式、0/3 设备，所以 `m4bStructurePocPromotionReady=false`、`m4bOpenWorldOmrAutomaticAdoptionReady=false`。C.3.2 的 100–300 张真实结构标注是晋升后扩大数据投入的目标，不得反向写成 POC 晋升前置条件。
 - **M4b 外部数据入口已收口:** `docs/m4b-fresh-blind-capture-pack/index.html` 冻结 6 版式×6 姿态的 36 个拍摄槽位和 3 台物理设备分配，并直达结构标注器。`western:m4b-fresh-blind-intake` 会验证版式源指纹、设备去重、图片-标注 SHA-256 绑定、冻结决定和 test-only 确认，且不提供覆盖旧样本的 `--replace` 逃生口。因此当前剩下的 M4b blocker 是真实拍摄+逐页结构标注本身，不再是缺采集/入库/评测工具。

@@ -211,6 +211,39 @@ assert(
   status.publicModelValidation.blockingReasons.includes("musicnet-accompanied-violin-recognition-gate-failed"),
   "failed accompanied-violin recognition must remain visible as a public-model blocker",
 );
+assert.equal(
+  status.publicModelValidation.recognition?.accompaniedViolinChallenger?.reportAvailable,
+  true,
+  "project status must expose the frozen YourMT3 instrument-aware challenger",
+);
+assert.equal(
+  status.publicModelValidation.recognition?.accompaniedViolinChallenger?.holdout?.aggregate?.["50ms"]?.precision,
+  0.8641975308641975,
+  "project status must expose the frozen YourMT3 50ms holdout precision",
+);
+assert.equal(
+  status.publicModelValidation.recognition?.accompaniedViolinChallenger?.holdout?.aggregate?.["100ms"]?.recall,
+  0.7839195979899497,
+  "project status must expose the unresolved YourMT3 100ms recall deficit",
+);
+assert.equal(
+  status.publicModelValidation.recognition?.accompaniedViolinChallenger?.timingCalibrationProbe?.accepted,
+  false,
+  "a per-recording timing shift that does not generalize must stay rejected",
+);
+assert.equal(
+  status.publicModelValidation.recognition?.accompaniedViolinChallenger?.recognitionReady,
+  false,
+  "YourMT3 challenger must stay closed below all frozen recognition floors",
+);
+assert(
+  status.publicModelValidation.blockingReasons.includes("yourmt3-accompanied-violin-gate-failed"),
+  "YourMT3 gate failure must remain visible in the public-model blockers",
+);
+assert(
+  status.publicModelValidation.blockingReasons.includes("yourmt3-space-and-checkpoint-license-unresolved"),
+  "an undeclared checkpoint license must block production adoption",
+);
 assert.ok(status.measureFeedbackAudit, "project status must expose the measure-feedback safety audit");
 assert.equal(status.measureFeedbackAudit.measureAggregationReleaseReady, false, "measure aggregation must stay closed when safe coverage is below 20%");
 assert.equal(status.measureFeedbackAudit.studentGateReady, false, "eval-only measure aggregation must never directly open student feedback");
@@ -940,6 +973,18 @@ assert.equal(m4.independentBenchmark?.realPhotoGold?.aggregate?.precision, 0.847
 assert.equal(m4.independentBenchmark?.realPhotoGold?.aggregate?.recall, 0.715016, "M4 must expose the measured real-photo pitch recall");
 assert.equal(m4.independentBenchmark?.realPhotoGold?.aggregate?.onsetQuarterAccuracy, 0.021725, "M4 must expose real-photo onset accuracy");
 assert.equal(m4.independentBenchmark?.realPhotoGold?.aggregate?.measureAccuracy, 0.438339, "M4 must expose real-photo measure accuracy");
+assert.equal(m4.m4ZeusChallengerEvaluated, true, "M4 status must expose the frozen Zeus camera-model challenger");
+assert.equal(m4.m4ZeusChallengerRetained, false, "Zeus must not enter the runtime pool below the frozen real-photo gate");
+assert.equal(m4.zeusChallenger?.summary?.pitchPrecision, 0.080473, "M4 status must expose Zeus frozen pitch precision");
+assert.equal(m4.zeusChallenger?.summary?.pitchRecall, 0.091374, "M4 status must expose Zeus frozen pitch recall");
+assert.equal(m4.zeusChallenger?.summary?.onsetQuarterAccuracy, 0.001278, "M4 status must expose Zeus frozen onset accuracy");
+assert.equal(m4.zeusChallenger?.summary?.measureAccuracy, 0.054313, "M4 status must expose Zeus frozen measure accuracy");
+assert.equal(m4.zeusChallenger?.summary?.strictPagePassCount, 0, "Zeus must remain at zero strict real-photo passes");
+assert.equal(m4.zeusChallenger?.studentGateReady, false, "Zeus research evidence must never open the student gate");
+assert(
+  m4.automaticAdoptionBlockingReasons.includes("m4-zeus-camera-challenger-below-complete-score-floor"),
+  "the rejected Zeus challenger must remain visible as an M4 automatic-adoption blocker",
+);
 if (m4.m4OemerBenchmarkComplete) {
   assert.equal(m4.m4OemerAutomaticAdoptionReady, false, "Oemer source-gold comparison must not open automatic adoption");
   assert.equal(m4.oemerBenchmark?.studentGateReady, false, "Oemer eval-only comparison must never open the student gate");

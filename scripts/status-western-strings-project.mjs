@@ -65,6 +65,11 @@ const MUSICNET_ACCOMPANIED_VIOLIN_REPORT = path.join(
   "western-strings-musicnet-accompanied-violin",
   "report.json",
 );
+const MUSICNET_YOURMT3_CHALLENGER = path.join(
+  "docs",
+  "evidence",
+  "western-strings-musicnet-yourmt3-20260720.json",
+);
 const V2_ALPHA_MIN_PRECISION = 0.9;
 const V2_ALPHA_MIN_COVERAGE = 0.2;
 const ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE = path.join(
@@ -1229,6 +1234,11 @@ const M4_HOMR_BENCHMARK = path.join(
   "evidence",
   "western-strings-homr-sourcegold-20260717.json",
 );
+const M4_ZEUS_CHALLENGER = path.join(
+  "docs",
+  "evidence",
+  "western-strings-m4-zeus-challenger-20260720.json",
+);
 const HOMR_REVIEW_RECORD = path.join(
   "config", "third-party", "homr-0.7.0-review.json",
 );
@@ -1785,6 +1795,7 @@ export function summarizePublicModelValidation({
   muscFresh = null,
   violinMidiAudit = null,
   musicnetAccompaniedViolin = null,
+  musicnetYourmt3 = null,
 } = {}) {
   const alignmentEngineeringGatePassed = phenicxAlignment?.ok === true
     && phenicxAlignment?.alignmentGatePassed === true;
@@ -1818,6 +1829,11 @@ export function summarizePublicModelValidation({
       === "independent-full-mix-audio-event-recognition-against-instrument-labelled-note-gold";
   const accompaniedViolinRecognitionReady = accompaniedViolinReportAvailable
     && musicnetAccompaniedViolin?.accompaniedViolinRecognitionReady === true;
+  const yourmt3ReportAvailable = musicnetYourmt3?.schemaVersion
+    === "western-musicnet-yourmt3-instrument-aware-v1"
+    && musicnetYourmt3?.evidenceRole === "public-professional-diagnostic-challenger";
+  const yourmt3RecognitionReady = yourmt3ReportAvailable
+    && musicnetYourmt3?.accompaniedViolinRecognitionReady === true;
   const publicProfessionalMonophonicV2CandidateReady = alignmentEngineeringGatePassed
     && recognitionCalibrationV2Ready
     && recognitionFreshV2Ready;
@@ -1852,6 +1868,9 @@ export function summarizePublicModelValidation({
   } else if (!accompaniedViolinRecognitionReady) {
     blockingReasons.push("musicnet-accompanied-violin-recognition-gate-failed");
   }
+  if (yourmt3ReportAvailable) {
+    blockingReasons.push(...(musicnetYourmt3.blockingReasons || []));
+  }
   blockingReasons.push("student-domain-evidence-not-covered");
   return {
     scope: "public-professional-violin-eval-only",
@@ -1861,6 +1880,7 @@ export function summarizePublicModelValidation({
       muscFreshConfirmation: MUSC_FRESH_REPORT.replace(/\\/g, "/"),
       violinMidiAudit: VIOLIN_MIDI_AUDIT.replace(/\\/g, "/"),
       musicnetAccompaniedViolin: MUSICNET_ACCOMPANIED_VIOLIN_REPORT.replace(/\\/g, "/"),
+      musicnetYourmt3Challenger: MUSICNET_YOURMT3_CHALLENGER.replace(/\\/g, "/"),
     },
     alignment: {
       reportAvailable: Boolean(phenicxAlignment),
@@ -1897,6 +1917,17 @@ export function summarizePublicModelValidation({
         gateChecks: musicnetAccompaniedViolin?.holdoutGateChecks || {},
         ready: accompaniedViolinRecognitionReady,
         studentReleaseEligible: false,
+      },
+      accompaniedViolinChallenger: {
+        reportAvailable: yourmt3ReportAvailable,
+        selectedCandidate: musicnetYourmt3?.selectedCandidate || {},
+        holdout: musicnetYourmt3?.holdout || {},
+        gateChecks: musicnetYourmt3?.holdoutGateChecks || {},
+        timingCalibrationProbe: musicnetYourmt3?.timingCalibrationProbe || {},
+        recognitionReady: yourmt3RecognitionReady,
+        productionAdoptionReady: musicnetYourmt3?.productionAdoptionReady === true,
+        studentReleaseEligible: false,
+        blockers: musicnetYourmt3?.blockingReasons || [],
       },
       postprocessing: muscFresh?.postprocessing || muscCalibration?.selectedPostprocessing || {},
       coreMetrics: muscFresh?.aggregate?.monophonicCore?.musc || {},
@@ -2901,6 +2932,7 @@ async function buildM4OmrStatus() {
   const independentBenchmark = await readJson(M4_INDEPENDENT_BENCHMARK_AUDIT);
   const oemerBenchmark = await readJson(M4_OEMER_BENCHMARK);
   const homrEvidence = await readJson(M4_HOMR_BENCHMARK);
+  const zeusChallenger = await readJson(M4_ZEUS_CHALLENGER);
   const homrBenchmark = homrEvidenceToBenchmark(homrEvidence);
   const homrReview = await readJson(HOMR_REVIEW_RECORD);
   const homrReviewSha256 = await sha256FileOrEmpty(HOMR_REVIEW_RECORD);
@@ -2955,6 +2987,10 @@ async function buildM4OmrStatus() {
       ? ["m4-oemer-source-benchmark-below-floor"] : []),
     ...(!automaticAdoptionReady && homrBenchmark?.complete === true && homrBenchmark?.gate?.automaticAdoptionReady !== true
       ? ["m4-homr-source-benchmark-below-complete-score-floor"] : []),
+    ...(!automaticAdoptionReady
+      && zeusChallenger?.contract === "western-m4-zeus-camera-challenger-eval-v1"
+      && zeusChallenger?.summary?.passesFrozenRealPhotoGate !== true
+      ? ["m4-zeus-camera-challenger-below-complete-score-floor"] : []),
     ...(!automaticAdoptionReady
       && sameEditionBenchmark?.candidate?.observedStrictPass === true
       && sameEditionBenchmark?.candidate?.automaticAdoptionReady !== true
@@ -3051,6 +3087,10 @@ async function buildM4OmrStatus() {
     m4HomrDeploymentPreflightReady: homrDeploymentPreflightReady,
     m4HomrProductionPoolReady: homrProductionPoolReady,
     m4HomrMainlineExecutable: false,
+    m4ZeusChallengerEvaluated:
+      zeusChallenger?.contract === "western-m4-zeus-camera-challenger-eval-v1",
+    m4ZeusChallengerRetained:
+      zeusChallenger?.decision?.keepAsRuntimeCandidate === true,
     m4SameEditionBenchmarkEvaluated: sameEditionBenchmark?.goldIdentity?.sameGoldVerified === true,
     m4SameEditionHomrStrictPositive:
       sameEditionBenchmark?.candidate?.engine === "homr"
@@ -3161,6 +3201,7 @@ async function buildM4OmrStatus() {
       independentBenchmarkJson: M4_INDEPENDENT_BENCHMARK_AUDIT.replace(/\\/g, "/"),
       oemerBenchmarkJson: M4_OEMER_BENCHMARK.replace(/\\/g, "/"),
       homrBenchmarkJson: M4_HOMR_BENCHMARK.replace(/\\/g, "/"),
+      zeusChallengerJson: M4_ZEUS_CHALLENGER.replace(/\\/g, "/"),
       homrReviewRecordJson: HOMR_REVIEW_RECORD.replace(/\\/g, "/"),
       photoScoreDeploymentConfigJson: PHOTO_SCORE_DEPLOYMENT_CONFIG.replace(/\\/g, "/"),
       photoScoreDeploymentPreflightJson: PHOTO_SCORE_DEPLOYMENT_PREFLIGHT.replace(/\\/g, "/"),
@@ -3279,6 +3320,21 @@ async function buildM4OmrStatus() {
       missing: true,
       complete: false,
       automaticAdoptionReady: false,
+      studentGateReady: false,
+    },
+    zeusChallenger: zeusChallenger ? {
+      source: M4_ZEUS_CHALLENGER.replace(/\\/g, "/"),
+      evaluationRole: zeusChallenger.evaluationRole || "",
+      runtimeEffect: zeusChallenger.runtimeEffect || "none",
+      sourceModel: zeusChallenger.model || {},
+      input: zeusChallenger.input || {},
+      thresholds: zeusChallenger.thresholds || {},
+      summary: zeusChallenger.summary || {},
+      decision: zeusChallenger.decision || {},
+      studentGateReady: false,
+    } : {
+      source: M4_ZEUS_CHALLENGER.replace(/\\/g, "/"),
+      missing: true,
       studentGateReady: false,
     },
     sameEditionBenchmark: sameEditionBenchmark ? {
@@ -3733,6 +3789,7 @@ export async function buildProjectStatus(args = {}) {
     muscFresh,
     violinMidiAudit,
     musicnetAccompaniedViolin,
+    musicnetYourmt3,
     measurePolicyAudit,
     measureJointEvidenceAudit,
     dynamicPerturbationGate,
@@ -3753,6 +3810,7 @@ export async function buildProjectStatus(args = {}) {
     readJson(MUSC_FRESH_REPORT),
     readJson(VIOLIN_MIDI_AUDIT),
     readJson(MUSICNET_ACCOMPANIED_VIOLIN_REPORT),
+    readJson(MUSICNET_YOURMT3_CHALLENGER),
     readJson(MEASURE_POLICY_AUDIT),
     readJson(MEASURE_JOINT_EVIDENCE_AUDIT),
     readJson(DYNAMIC_PERTURBATION_GATE),
@@ -3769,6 +3827,7 @@ export async function buildProjectStatus(args = {}) {
     muscFresh,
     violinMidiAudit,
     musicnetAccompaniedViolin,
+    musicnetYourmt3,
   });
   const runtimeStudentGate = {
     ordinaryUploadAutoFeedbackReady: false,
