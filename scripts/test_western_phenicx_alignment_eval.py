@@ -123,6 +123,26 @@ class WesternPhenicxAlignmentEvalTest(unittest.TestCase):
             [1.0, 2.0, 3.0],
         )
 
+    def test_chord_consensus_uses_earliest_available_onset(self) -> None:
+        rows = [
+            {"normalizedScoreOnset": 1.0},
+            {"normalizedScoreOnset": 1.0},
+            {"normalizedScoreOnset": 1.0},
+            {"normalizedScoreOnset": 2.0},
+        ]
+        self.assertEqual(
+            MODULE.apply_earliest_chord_onset_consensus(
+                rows, [None, 1.25, 9.0, 4.0]
+            ),
+            [1.25, 1.25, 1.25, 4.0],
+        )
+
+    def test_chord_consensus_rejects_prediction_count_mismatch(self) -> None:
+        with self.assertRaisesRegex(ValueError, "chord-consensus-prediction-count-mismatch"):
+            MODULE.apply_earliest_chord_onset_consensus(
+                [{"normalizedScoreOnset": 1.0}], []
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

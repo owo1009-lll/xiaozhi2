@@ -357,7 +357,7 @@ npm run western:ordinary-auto-pass-precision-review-pack -- --recording-id <fres
 
 下一环节 PHENICX 数据许可、下载和结构审计已通过:`readyForAlignmentBenchmark=true`,4/4 作品、22 条同步小提琴分轨、2,969 个逐乐器人工对齐音符。完整边界和进入条件见 [western-strings-phenicx-validation.md](western-strings-phenicx-validation.md)。
 
-PHENICX 适配器与人工 gold 工程闸门现已通过。development 选出的 `parangonar-with-basic-fallback` 在 Mahler/Bruckner holdout 上达到 coverage 1.000、median 32.9ms、p90 352.6ms、`hit@300ms=0.8834`,两首逐曲均过闸。复音子组仍未过(`hit@300ms=0.836`,p90 536.3ms),且 fallback 加入前已查看过第一轮 holdout,因此必须另用新外部数据冻结确认;`studentReleaseEligible=false`,不得表述为完美对齐或学生域完成。
+PHENICX 适配器与人工 gold 工程闸门现已通过。2026-07-20 新增严格 score-only 的同谱面起音聚合：只按 `normalizedScoreOnset` 分组并共享最早预测起音，不读取 `goldOnset` 或 `goldChordSize`。该候选由 development 指标选出为 `parangonar-fallback-chord-onset-consensus`；在 Mahler/Bruckner holdout 上达到 coverage 1.000、median 28.3ms、p90 303.9ms、`hit@300ms=0.8978`，两首逐曲均过闸；复音子组也通过同一冻结门槛（coverage 1.000、median 41.5ms、p90 306.4ms、`hit@300ms=0.884`）。但 holdout 在该候选提出前已被查看，故结果仍属于顺序工程证据，必须另用新外部数据冻结确认；`doubleStopAutoFeedbackReady=false`、`studentReleaseEligible=false`，不得表述为复音识别完成、完美对齐或学生域完成。
 
 ## 9. MUSC 识别与开放弱标签扩展(2026-07-10)
 
@@ -377,7 +377,7 @@ MTG MUSC 预训练模型已完成 eval-only 接入。默认 127.7ms 最短音长
 - `studentReleaseEligible=false`。
 - `nearPerfectReady=false`。
 
-因此公开专业单声部录音可以继续作为 V2 研究候选和开发基线;双音、50ms V3、真实学生错误域和“完美识别”仍未达到。弱标签只能用于后续训练扩展,不能替代新外部人工 gold。
+因此公开专业单声部录音可以继续作为 V2 研究候选和开发基线；PHENICX 的复音**对齐**子组工程门已过，但双音**识别**、50ms V3、真实学生错误域和“完美识别”仍未达到。弱标签只能用于后续训练扩展，不能替代新外部人工 gold。
 
 ## 11. HF2 域外复音压力进度(2026-07-13)
 

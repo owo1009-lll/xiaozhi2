@@ -39,6 +39,7 @@ METHODS = (
     "basic-pitch-dtw",
     "parangonar-basic-pitch",
     "parangonar-with-basic-fallback",
+    "parangonar-fallback-chord-onset-consensus",
 )
 GATE = {
     "medianOnsetErrorMaxExclusive": 0.150,
@@ -185,6 +186,27 @@ def fill_missing_predictions(
     if len(primary) != len(fallback):
         raise ValueError("fallback-prediction-count-mismatch")
     return [fallback_value if value is None else value for value, fallback_value in zip(primary, fallback)]
+
+
+def apply_earliest_chord_onset_consensus(
+    rows: list[dict[str, Any]], predictions: list[float | None]
+) -> list[float | None]:
+    if len(rows) != len(predictions):
+        raise ValueError("chord-consensus-prediction-count-mismatch")
+    output = list(predictions)
+    chord_groups: dict[float, list[int]] = {}
+    for index, row in enumerate(rows):
+        chord_groups.setdefault(float(row["normalizedScoreOnset"]), []).append(index)
+    for indices in chord_groups.values():
+        if len(indices) < 2:
+            continue
+        available = [output[index] for index in indices if output[index] is not None]
+        if not available:
+            continue
+        shared_onset = min(float(value) for value in available)
+        for index in indices:
+            output[index] = shared_onset
+    return output
 
 
 def build_result_rows(
@@ -382,6 +404,9 @@ def main() -> int:
             events = basic_pitch_events(audio_path, cache_dir)
             basic_predictions = predict_basic_pitch_assignment(notes, events)
             parangonar_predictions, parangonar_details = predict_parangonar(source_rows, events)
+            fallback_predictions = fill_missing_predictions(
+                parangonar_predictions, basic_predictions
+            )
             predictions: dict[str, tuple[list[float | None], list[dict[str, Any] | None] | None]] = {
                 "linear-duration": (
                     predict_linear_duration(source_rows, float(piece_manifest["audio"]["durationSeconds"])),
@@ -390,8 +415,14 @@ def main() -> int:
                 "basic-pitch-dtw": (basic_predictions, None),
                 "parangonar-basic-pitch": (parangonar_predictions, parangonar_details),
                 "parangonar-with-basic-fallback": (
-                    fill_missing_predictions(parangonar_predictions, basic_predictions),
+                    fallback_predictions,
                     parangonar_details,
+                ),
+                "parangonar-fallback-chord-onset-consensus": (
+                    apply_earliest_chord_onset_consensus(
+                        source_rows, fallback_predictions
+                    ),
+                    None,
                 ),
             }
             piece_method_rows[piece] = {}
@@ -468,7 +499,8 @@ def main() -> int:
                 method_reports["parangonar-basic-pitch"]["holdout"]
             ),
         },
-        "protocolCaveat": "The first holdout result was inspected before the missing-only fallback candidate was added. The fallback rule was justified and selected on development data, but this is sequential engineering evidence rather than an untouched one-shot holdout.",
+        "candidateRationale": "For notes sharing normalizedScoreOnset, use the earliest available predicted onset as their shared onset. The transform reads score timing only (never goldOnset or goldChordSize), and candidate selection uses development metrics only.",
+        "protocolCaveat": "The holdout result had already been inspected before the missing-only fallback and chord-onset consensus candidates were added. Both transformations use fixed score-side structure and are selected on development data, but this remains sequential engineering evidence rather than an untouched one-shot holdout.",
         "freshExternalConfirmationRequired": True,
         "studentReleaseEligible": False,
         "studentReleaseBlocker": "public-professional-ensemble-section-domain-only",

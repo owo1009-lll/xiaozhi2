@@ -434,8 +434,8 @@
 - `violin.txt` 是整个小提琴声部复音 gold;必须混合每部作品全部 violin 分轨,不得拿单分轨对整声部 gold。
 - 数据前置状态为 `readyForAlignmentBenchmark=true`;详细适配与模型闸门见 `docs/western-strings-phenicx-validation.md`。
 - PHENICX 适配器已完成并通过确定性复跑:`adapterReady=true`,4/4 混音、0 clipping、2,969 行映射保留、重复生成 SHA-256 一致。固定分组为 development=Mozart/Beethoven、holdout=Mahler/Bruckner。
-- 人工 gold 工程闸门已通过:`parangonar-with-basic-fallback` 在 PHENICX holdout 上 coverage 1.000、median 32.9ms、p90 352.6ms、`hit@300ms=0.8834`,且两首 holdout 逐曲通过。
-- 复音子组仍未过同一闸门,第一轮 holdout 也在 fallback 加入前被查看过。下一步进入 Violin Etudes/F0 时冻结该组合,只做外部确认与识别评测;不得回用 PHENICX 调参,不得开放复音/学生自动反馈。
+- 人工 gold 工程闸门已通过。2026-07-20 由 development 选出的 `parangonar-fallback-chord-onset-consensus` 只按谱面 `normalizedScoreOnset` 共享最早预测起音，不读取人工 `goldOnset`/`goldChordSize`；在 PHENICX holdout 上 coverage 1.000、median 28.3ms、p90 303.9ms、`hit@300ms=0.8978`，且两首 holdout 逐曲通过。
+- 复音对齐子组现也通过同一工程门槛：coverage 1.000、median 41.5ms、p90 306.4ms、`hit@300ms=0.884`。但 holdout 在该候选提出前已经被查看，当前仍是顺序工程证据；必须冻结该组合并用新外部人工 gold 确认，且不得把“复音对齐通过”混写成“双音识别完成”或据此开放学生自动反馈。
 
 # 2026-07-10 MUSC 识别与 Violin MIDI 弱标签阶段
 
