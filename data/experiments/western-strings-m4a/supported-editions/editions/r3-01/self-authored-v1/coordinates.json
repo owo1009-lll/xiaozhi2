@@ -2054,5 +2054,27 @@
         0.4663626
       ]
     }
-  ]
+  ],
+  "semanticMasks": {
+    "stem": {
+      "elementClass": "Stem",
+      "elementCount": 58,
+      "foregroundPixelCount": 1960
+    },
+    "beam": {
+      "elementClass": "Beam",
+      "elementCount": 0,
+      "foregroundPixelCount": 0
+    },
+    "notehead": {
+      "elementClass": "Note",
+      "elementCount": 59,
+      "foregroundPixelCount": 7847
+    },
+    "barline": {
+      "elementClass": "BarLine",
+      "elementCount": 18,
+      "foregroundPixelCount": 1574
+    }
+  }
 }

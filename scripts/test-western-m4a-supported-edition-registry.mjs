@@ -14,6 +14,7 @@ assert.equal(live.counts.validEntries, 3);
 assert.equal(live.counts.invalidEntries, 0);
 assert(live.entries.every((entry) => entry.tripletIntegrityReady));
 assert(live.entries.every((entry) => entry.coordinateSidecarReady));
+assert(live.entries.every((entry) => entry.semanticMaskReady));
 assert(live.entries.every((entry) => entry.humanConfirmationReady));
 assert(live.entries.every((entry) => entry.licenseReady));
 
@@ -56,6 +57,13 @@ await withRegistryCopy(async ({ copyRoot, registry }) => {
   await fs.appendFile(target, " ", "utf8");
 }, "m4a-registry-coordinate-sidecar-hash-mismatch");
 
+await withRegistryCopy(async ({ copyRoot, registry }) => {
+  const target = path.join(copyRoot, registry.entries[0].semanticMasks.stem.path);
+  const bytes = await fs.readFile(target);
+  bytes[bytes.length - 1] ^= 0xff;
+  await fs.writeFile(target, bytes);
+}, "m4a-registry-semantic-mask-hash-mismatch");
+
 await withRegistryCopy(async (context) => {
   context.registry.entries[0].confirmedBy = "";
   await writeRegistry(context);
@@ -90,6 +98,7 @@ console.log(JSON.stringify({
     "human-confirmation-and-license-enforced",
     "artifact-path-escape-rejected",
     "coordinate-sidecar-schema-and-bounds-verified",
+    "semantic-mask-hashes-and-dimensions-verified",
     "forged-triplet-artifacts-rejected",
   ],
   counts: live.counts,

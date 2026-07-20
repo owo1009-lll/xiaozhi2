@@ -23,7 +23,37 @@
       "renderPath": "editions/r2-01/self-authored-v1/render-page-01.png",
       "renderSha256": "db9535c03bb923852885f4d2668a1985bf863a9df43ed4d5083daf577986ca3e",
       "coordinateSidecarPath": "editions/r2-01/self-authored-v1/coordinates.json",
-      "coordinateSidecarSha256": "b30bffd2af13b1978fd907507ec07b49fc4b9b8c44fd1061ced2f65b354cee88",
+      "coordinateSidecarSha256": "80ccd2cdcfc1a4c4680e70066795dc926083b9325ef5e86feaf267e692910977",
+      "semanticMasks": {
+        "stem": {
+          "path": "editions/r2-01/self-authored-v1/stem-mask-page-01.png",
+          "sha256": "45468ca24d7c7f4d4ede0fbe8b2d76d263033cc633d0f205b239fbbd66b70a04",
+          "elementClass": "Stem",
+          "elementCount": 64,
+          "foregroundPixelCount": 2187
+        },
+        "beam": {
+          "path": "editions/r2-01/self-authored-v1/beam-mask-page-01.png",
+          "sha256": "7b54e7e1b20390794eac662279aeb2f7b6ac5acea2ba374b2021b3754d81c785",
+          "elementClass": "Beam",
+          "elementCount": 0,
+          "foregroundPixelCount": 0
+        },
+        "notehead": {
+          "path": "editions/r2-01/self-authored-v1/notehead-mask-page-01.png",
+          "sha256": "58fb9cd9ef54c319e9e63233784c4e7c773236737391bb4316b2f8da0c889abc",
+          "elementClass": "Note",
+          "elementCount": 67,
+          "foregroundPixelCount": 8932
+        },
+        "barline": {
+          "path": "editions/r2-01/self-authored-v1/barline-mask-page-01.png",
+          "sha256": "a65e842982627267674c4606586266783d463f13d5ce5e77bbe9b37f95f9a344",
+          "elementClass": "BarLine",
+          "elementCount": 21,
+          "foregroundPixelCount": 1818
+        }
+      },
       "rendererVersion": "4.7.4",
       "confirmedBy": "guanxingzhi (project owner)",
       "confirmedAt": "2026-07-19T01:22:15+08:00",
@@ -42,7 +72,37 @@
       "renderPath": "editions/r2-06/self-authored-v1/render-page-01.png",
       "renderSha256": "ebab85fa2d0ab000ac4730727c3e3fb085f86b7c85b3fcb671d0e306e6454c36",
       "coordinateSidecarPath": "editions/r2-06/self-authored-v1/coordinates.json",
-      "coordinateSidecarSha256": "6885832678c8ea6c5b30d1e988e3d747ba916d2ecbfa93fdb09b3d6af17ce817",
+      "coordinateSidecarSha256": "5d412f34461bc8b25f22340daa26e2b2d0cd214f48bbc6862ee140cc0f59391b",
+      "semanticMasks": {
+        "stem": {
+          "path": "editions/r2-06/self-authored-v1/stem-mask-page-01.png",
+          "sha256": "12922e4c892df5726e12985fe1a49ce3bac81f1f864b3cba8417afab080c1b3b",
+          "elementClass": "Stem",
+          "elementCount": 12,
+          "foregroundPixelCount": 407
+        },
+        "beam": {
+          "path": "editions/r2-06/self-authored-v1/beam-mask-page-01.png",
+          "sha256": "7b54e7e1b20390794eac662279aeb2f7b6ac5acea2ba374b2021b3754d81c785",
+          "elementClass": "Beam",
+          "elementCount": 0,
+          "foregroundPixelCount": 0
+        },
+        "notehead": {
+          "path": "editions/r2-06/self-authored-v1/notehead-mask-page-01.png",
+          "sha256": "37e05e797f574a568f897c7a5371a387303e9a568e9f0a0d8deb2b0049ea295f",
+          "elementClass": "Note",
+          "elementCount": 23,
+          "foregroundPixelCount": 3397
+        },
+        "barline": {
+          "path": "editions/r2-06/self-authored-v1/barline-mask-page-01.png",
+          "sha256": "ef462afeeca4ce064a46c76a258855ce43ecf979fc0eb55c9be983c04ffe8de3",
+          "elementClass": "BarLine",
+          "elementCount": 17,
+          "foregroundPixelCount": 1480
+        }
+      },
       "rendererVersion": "4.7.4",
       "confirmedBy": "guanxingzhi (project owner)",
       "confirmedAt": "2026-07-19T01:22:15+08:00",
@@ -61,7 +121,37 @@
       "renderPath": "editions/r3-01/self-authored-v1/render-page-01.png",
       "renderSha256": "46f1ed94b21a7c608a8e09e0c7232177faebe4d94b18371b84ed876fa8a87c6f",
       "coordinateSidecarPath": "editions/r3-01/self-authored-v1/coordinates.json",
-      "coordinateSidecarSha256": "307bd83af7e67fcf784f93881c6a0ce2568a0a81b9b5e51e463a1c1b30eac961",
+      "coordinateSidecarSha256": "4e8e0620621aa1305fc56cf1840ac2014090016587c0889a364f201551970ebf",
+      "semanticMasks": {
+        "stem": {
+          "path": "editions/r3-01/self-authored-v1/stem-mask-page-01.png",
+          "sha256": "fd7894326338d1e6ffe8a502e907b3d42989d47873eb4dfc020960e31f5ef886",
+          "elementClass": "Stem",
+          "elementCount": 58,
+          "foregroundPixelCount": 1960
+        },
+        "beam": {
+          "path": "editions/r3-01/self-authored-v1/beam-mask-page-01.png",
+          "sha256": "7b54e7e1b20390794eac662279aeb2f7b6ac5acea2ba374b2021b3754d81c785",
+          "elementClass": "Beam",
+          "elementCount": 0,
+          "foregroundPixelCount": 0
+        },
+        "notehead": {
+          "path": "editions/r3-01/self-authored-v1/notehead-mask-page-01.png",
+          "sha256": "2f792655a389b944d92838bb6c5fdea7c13958a93cfc55c3a68fe6e893588b03",
+          "elementClass": "Note",
+          "elementCount": 59,
+          "foregroundPixelCount": 7847
+        },
+        "barline": {
+          "path": "editions/r3-01/self-authored-v1/barline-mask-page-01.png",
+          "sha256": "a46ce594a43559ced343250448c2dc5f4b0b50f60c6f0a4d449a0330ef70937f",
+          "elementClass": "BarLine",
+          "elementCount": 18,
+          "foregroundPixelCount": 1574
+        }
+      },
       "rendererVersion": "4.7.4",
       "confirmedBy": "guanxingzhi (project owner)",
       "confirmedAt": "2026-07-19T01:22:15+08:00",

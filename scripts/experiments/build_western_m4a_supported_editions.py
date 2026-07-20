@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the M4a supported-edition registry and hash-bound render triplets."""
+"""Build the M4a supported-edition registry, coordinates, and semantic masks."""
 
 from __future__ import annotations
 
@@ -17,6 +17,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
+from PIL import Image, ImageDraw
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SEED_PATH = REPO_ROOT / "config" / "western-m4a-supported-edition-seeds.json"
@@ -30,6 +32,12 @@ OUTPUT_ROOT = (
 REGISTRY_CONTRACT = "western-m4a-supported-edition-registry-v1"
 SIDECAR_CONTRACT = "western-m4a-render-coordinate-sidecar-v1"
 SEED_CONTRACT = "western-m4a-supported-edition-seeds-v1"
+MASK_CLASSES = {
+    "stem": "Stem",
+    "beam": "Beam",
+    "notehead": "Note",
+    "barline": "BarLine",
+}
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -171,6 +179,117 @@ def points(value: str) -> list[tuple[float, float]]:
     if len(numbers) % 2:
         raise RuntimeError("odd coordinate count in MuseScore SVG")
     return list(zip(numbers[::2], numbers[1::2]))
+
+
+def svg_path_polygons(value: str, curve_steps: int = 20) -> list[list[tuple[float, float]]]:
+    tokens = re.findall(r"[A-Za-z]|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?", value)
+    polygons: list[list[tuple[float, float]]] = []
+    polygon: list[tuple[float, float]] = []
+    cursor = (0.0, 0.0)
+    index = 0
+    command = ""
+
+    def number() -> float:
+        nonlocal index
+        if index >= len(tokens) or re.fullmatch(r"[A-Za-z]", tokens[index]):
+            raise RuntimeError("missing coordinate in MuseScore SVG path")
+        result = float(tokens[index])
+        index += 1
+        return result
+
+    while index < len(tokens):
+        if re.fullmatch(r"[A-Za-z]", tokens[index]):
+            command = tokens[index]
+            index += 1
+        if command == "M":
+            if polygon:
+                polygons.append(polygon)
+            cursor = (number(), number())
+            polygon = [cursor]
+            command = "L"
+        elif command == "L":
+            cursor = (number(), number())
+            polygon.append(cursor)
+        elif command == "C":
+            control_1 = (number(), number())
+            control_2 = (number(), number())
+            endpoint = (number(), number())
+            start = cursor
+            for step in range(1, curve_steps + 1):
+                t = step / curve_steps
+                inverse = 1.0 - t
+                polygon.append(
+                    (
+                        inverse**3 * start[0]
+                        + 3 * inverse**2 * t * control_1[0]
+                        + 3 * inverse * t**2 * control_2[0]
+                        + t**3 * endpoint[0],
+                        inverse**3 * start[1]
+                        + 3 * inverse**2 * t * control_1[1]
+                        + 3 * inverse * t**2 * control_2[1]
+                        + t**3 * endpoint[1],
+                    )
+                )
+            cursor = endpoint
+        elif command in {"Z", "z"}:
+            if polygon:
+                polygons.append(polygon)
+                polygon = []
+            command = ""
+        else:
+            raise RuntimeError(f"unsupported MuseScore mask path command: {command}")
+    if polygon:
+        polygons.append(polygon)
+    return polygons
+
+
+def build_semantic_masks(
+    svg_path: Path,
+    png_path: Path,
+    output_paths: dict[str, Path],
+) -> dict[str, dict[str, Any]]:
+    root = ET.parse(svg_path).getroot()
+    view_box = [float(row) for row in root.attrib["viewBox"].split()]
+    width, height = png_dimensions(png_path)
+    scale_x, scale_y = width / view_box[2], height / view_box[3]
+    result: dict[str, dict[str, Any]] = {}
+    for mask_name, element_class in MASK_CLASSES.items():
+        canvas = Image.new("L", (width, height), 0)
+        draw = ImageDraw.Draw(canvas)
+        elements = [row for row in root.iter() if row.attrib.get("class") == element_class]
+        for element in elements:
+            tag = local_name(element.tag)
+            if tag in {"polyline", "polygon"}:
+                raw_points = points(element.attrib.get("points", ""))
+                scaled = [(round(x * scale_x), round(y * scale_y)) for x, y in raw_points]
+                if tag == "polygon" or element.attrib.get("fill", "none") != "none":
+                    draw.polygon(scaled, fill=255)
+                else:
+                    stroke = float(element.attrib.get("stroke-width", "1"))
+                    draw.line(
+                        scaled,
+                        fill=255,
+                        width=max(1, round(stroke * (scale_x + scale_y) / 2)),
+                        joint="curve",
+                    )
+            elif tag == "path":
+                for polygon in svg_path_polygons(element.attrib.get("d", "")):
+                    scaled = [(round(x * scale_x), round(y * scale_y)) for x, y in polygon]
+                    if len(scaled) >= 3:
+                        draw.polygon(scaled, fill=255)
+            else:
+                raise RuntimeError(f"unsupported MuseScore {element_class} element: {tag}")
+        output = output_paths[mask_name]
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix(output.suffix + ".tmp")
+        canvas.save(temporary, format="PNG", optimize=True)
+        temporary.replace(output)
+        result[mask_name] = {
+            "elementClass": element_class,
+            "elementCount": len(elements),
+            "foregroundPixelCount": int(sum(canvas.histogram()[1:])),
+        }
+    return result
 
 
 def path_bbox(value: str) -> list[float]:
@@ -433,6 +552,9 @@ def build_entry(
     score_path = entry_root / "score.musicxml"
     render_path = entry_root / "render-page-01.png"
     sidecar_path = entry_root / "coordinates.json"
+    mask_paths = {
+        name: entry_root / f"{name}-mask-page-01.png" for name in MASK_CLASSES
+    }
 
     source_bytes = source.read_bytes()
     write_bytes_if_changed(score_path, source_bytes)
@@ -442,6 +564,8 @@ def build_entry(
             raise RuntimeError(f"unsafe stroke:currentColor render detected for {piece_id}")
         write_bytes_if_changed(render_path, png.read_bytes())
         sidecar = build_sidecar(svg, render_path, measures, piece_id, edition_id, renderer)
+        mask_summary = build_semantic_masks(svg, render_path, mask_paths)
+        sidecar["semanticMasks"] = mask_summary
         write_bytes_if_changed(sidecar_path, json_bytes(sidecar))
 
     return {
@@ -454,6 +578,14 @@ def build_entry(
         "renderSha256": sha256_bytes(render_path.read_bytes()),
         "coordinateSidecarPath": relative_to_registry(sidecar_path),
         "coordinateSidecarSha256": sha256_bytes(sidecar_path.read_bytes()),
+        "semanticMasks": {
+            name: {
+                "path": relative_to_registry(mask_paths[name]),
+                "sha256": sha256_bytes(mask_paths[name].read_bytes()),
+                **mask_summary[name],
+            }
+            for name in MASK_CLASSES
+        },
         "rendererVersion": renderer["version"],
         "confirmedBy": catalog_approval["confirmedBy"],
         "confirmedAt": catalog_approval["confirmedAt"],

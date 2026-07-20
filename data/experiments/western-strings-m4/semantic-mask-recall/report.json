@@ -1,0 +1,225 @@
+{
+  "contract": "western-m4-oemer-semantic-mask-recall-v1",
+  "evidenceRole": "render-and-synthetic-pixel-segmentation-diagnostic",
+  "sources": {
+    "registry": {
+      "path": "data/experiments/western-strings-m4a/supported-editions/registry.json",
+      "sha256": "c70e3961dcc65dbd959c6457cd8970705f4066df1cdc21d12f757fc614a6e86d"
+    },
+    "datasetConfig": {
+      "path": "config/western-m4b-dataset.json",
+      "sha256": "b13a906d448338b4831ddf94acb428acd53673b59c3ccee4df736bbce26b32b5"
+    }
+  },
+  "runtime": {
+    "oemerVersion": "0.1.8"
+  },
+  "method": {
+    "gold": "MuseScore SVG semantic classes rasterized at render resolution",
+    "prediction": "Oemer raw segmentation; built-in dewarp applied identically to prediction and gold",
+    "tolerancePixels": 2,
+    "nonExclusiveLayers": [
+      "stems_rests",
+      "symbols"
+    ]
+  },
+  "aggregate": {
+    "clean-render": {
+      "caseCount": 1,
+      "classes": {
+        "stem": {
+          "caseCount": 1,
+          "evaluableCaseCount": 1,
+          "evaluable": true,
+          "goldPixelCount": 3647,
+          "microExactRecall": 0.28544,
+          "microTolerantRecall": 0.973677
+        },
+        "beam": {
+          "caseCount": 1,
+          "evaluableCaseCount": 0,
+          "evaluable": false,
+          "goldPixelCount": 0,
+          "microExactRecall": null,
+          "microTolerantRecall": null
+        },
+        "notehead": {
+          "caseCount": 1,
+          "evaluableCaseCount": 1,
+          "evaluable": true,
+          "goldPixelCount": 15279,
+          "microExactRecall": 0.728647,
+          "microTolerantRecall": 0.980234
+        },
+        "barline": {
+          "caseCount": 1,
+          "evaluableCaseCount": 1,
+          "evaluable": true,
+          "goldPixelCount": 3040,
+          "microExactRecall": 0.213816,
+          "microTolerantRecall": 0.937171
+        }
+      }
+    },
+    "synthetic-test": {
+      "caseCount": 1,
+      "classes": {
+        "stem": {
+          "caseCount": 1,
+          "evaluableCaseCount": 1,
+          "evaluable": true,
+          "goldPixelCount": 2760,
+          "microExactRecall": 0.41087,
+          "microTolerantRecall": 0.963406
+        },
+        "beam": {
+          "caseCount": 1,
+          "evaluableCaseCount": 0,
+          "evaluable": false,
+          "goldPixelCount": 0,
+          "microExactRecall": null,
+          "microTolerantRecall": null
+        },
+        "notehead": {
+          "caseCount": 1,
+          "evaluableCaseCount": 1,
+          "evaluable": true,
+          "goldPixelCount": 11560,
+          "microExactRecall": 0.76981,
+          "microTolerantRecall": 0.982007
+        },
+        "barline": {
+          "caseCount": 1,
+          "evaluableCaseCount": 1,
+          "evaluable": true,
+          "goldPixelCount": 2138,
+          "microExactRecall": 0.260992,
+          "microTolerantRecall": 0.928438
+        }
+      }
+    }
+  },
+  "limitations": [
+    "Evidence covers clean renders and deterministic synthetic-test images only, never real photos.",
+    "The three registered scores contain no Beam SVG elements, so beam recall is not evaluable and is not treated as 100%.",
+    "Oemer stems_rests and symbols layers are not class-exclusive; their pixel recall is valid for coverage diagnosis but cannot establish class precision.",
+    "The registered pages are known engineering diagnostics, not fresh-blind promotion evidence.",
+    "The current inference audit evaluates the r2-01 clean/synthetic pair; masks for the other registered pages are generated but not scored here."
+  ],
+  "studentGateReady": false,
+  "automaticAdoptionAuthorized": false,
+  "rows": [
+    {
+      "caseId": "r2-01",
+      "domain": "clean-render",
+      "input": "data/experiments/western-strings-m4a/supported-editions/editions/r2-01/self-authored-v1/render-page-01.png",
+      "inputSha256": "db9535c03bb923852885f4d2668a1985bf863a9df43ed4d5083daf577986ca3e",
+      "predictionSize": [
+        1612,
+        2280
+      ],
+      "dewarpAppliedToPredictionAndGold": true,
+      "augmentation": null,
+      "classes": {
+        "stem": {
+          "predictionLayer": "stems_rests",
+          "predictionLayerClassExclusive": false,
+          "evaluable": true,
+          "goldPixelCount": 3647,
+          "exactMatchedPixelCount": 1041,
+          "tolerantMatchedPixelCount": 3551,
+          "exactRecall": 0.28544,
+          "tolerantRecall": 0.973677
+        },
+        "beam": {
+          "predictionLayer": "symbols",
+          "predictionLayerClassExclusive": false,
+          "evaluable": false,
+          "reason": "zero-positive-gold-pixels",
+          "goldPixelCount": 0,
+          "exactRecall": null,
+          "tolerantRecall": null
+        },
+        "notehead": {
+          "predictionLayer": "notehead",
+          "predictionLayerClassExclusive": true,
+          "evaluable": true,
+          "goldPixelCount": 15279,
+          "exactMatchedPixelCount": 11133,
+          "tolerantMatchedPixelCount": 14977,
+          "exactRecall": 0.728647,
+          "tolerantRecall": 0.980234
+        },
+        "barline": {
+          "predictionLayer": "stems_rests",
+          "predictionLayerClassExclusive": false,
+          "evaluable": true,
+          "goldPixelCount": 3040,
+          "exactMatchedPixelCount": 650,
+          "tolerantMatchedPixelCount": 2849,
+          "exactRecall": 0.213816,
+          "tolerantRecall": 0.937171
+        }
+      }
+    },
+    {
+      "caseId": "r2-01-s17",
+      "domain": "synthetic-test",
+      "input": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-01-self-authored-v1-s17/photo.jpg",
+      "inputSha256": "e92d432163f6839f8882ce2eadebc5391cac043b76adb2fd6914fe3fbd6d2cdb",
+      "predictionSize": [
+        1638,
+        2243
+      ],
+      "dewarpAppliedToPredictionAndGold": true,
+      "augmentation": {
+        "backgroundValue": 30,
+        "curveAmplitudePixels": 55.3207,
+        "shadowStrength": 0.0402,
+        "handwritingStrokeCount": 2,
+        "jpegQuality": 62
+      },
+      "classes": {
+        "stem": {
+          "predictionLayer": "stems_rests",
+          "predictionLayerClassExclusive": false,
+          "evaluable": true,
+          "goldPixelCount": 2760,
+          "exactMatchedPixelCount": 1134,
+          "tolerantMatchedPixelCount": 2659,
+          "exactRecall": 0.41087,
+          "tolerantRecall": 0.963406
+        },
+        "beam": {
+          "predictionLayer": "symbols",
+          "predictionLayerClassExclusive": false,
+          "evaluable": false,
+          "reason": "zero-positive-gold-pixels",
+          "goldPixelCount": 0,
+          "exactRecall": null,
+          "tolerantRecall": null
+        },
+        "notehead": {
+          "predictionLayer": "notehead",
+          "predictionLayerClassExclusive": true,
+          "evaluable": true,
+          "goldPixelCount": 11560,
+          "exactMatchedPixelCount": 8899,
+          "tolerantMatchedPixelCount": 11352,
+          "exactRecall": 0.76981,
+          "tolerantRecall": 0.982007
+        },
+        "barline": {
+          "predictionLayer": "stems_rests",
+          "predictionLayerClassExclusive": false,
+          "evaluable": true,
+          "goldPixelCount": 2138,
+          "exactMatchedPixelCount": 558,
+          "tolerantMatchedPixelCount": 1985,
+          "exactRecall": 0.260992,
+          "tolerantRecall": 0.928438
+        }
+      }
+    }
+  ]
+}
