@@ -11,6 +11,7 @@ assert.equal(baseline.ready, true, baseline.blockingReasons.join(", "));
 
 for (const [label, mutate, reason] of [
   ["split drift", (row) => { row.config.synthetic.splitsByVariant.train = 11; }, "m4b-synthetic-split-policy-drift"],
+  ["curve stress drift", (row) => { row.config.synthetic.curveAmplitudePixelsBySplit["synthetic-test"].minimumAbsolute = 10; }, "m4b-synthetic-curve-stress-policy-drift"],
   ["source gold leak", (row) => { row.manifest.frozenSourceGoldRows[0].trainingEligible = true; }, "m4b-source-gold-training-leak"],
   ["screen leak", (row) => { row.manifest.frozenScreenPhotoRows[0].trainingEligible = true; }, "m4b-screen-photo-training-leak"],
   ["synthetic row removed", (row) => { row.manifest.syntheticRows.pop(); }, "m4b-synthetic-row-count-mismatch"],
@@ -31,6 +32,8 @@ const live = await auditM4bDataset();
 assert.equal(live.ready, true, live.blockingReasons.join(", "));
 assert.equal(live.counts.synthetic, 60);
 assert.deepEqual(live.counts.syntheticSplits, { train: 36, calibration: 12, "synthetic-test": 12 });
+assert(live.counts.syntheticCurveAmplitudePixelsBySplit["synthetic-test"].minimumAbsolute >= 50);
+assert(live.counts.syntheticCurveAmplitudePixelsBySplit["synthetic-test"].maximumAbsolute <= 60);
 assert.equal(live.counts.frozenSourceGoldTestOnly, 5);
 assert.equal(live.counts.frozenScreenPhotoTestOnly, 8);
 assert.equal(live.realAnnotationTargetReady, false);

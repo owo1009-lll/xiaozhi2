@@ -1,7 +1,7 @@
 {
   "contract": "western-m4b-structure-dataset-manifest-v1",
   "policy": "config/western-m4b-dataset.json",
-  "policySha256": "e375884c215e6d9cfd3947e4678d5ea51e61ecb99f8d305ad6ed3790d676cb92",
+  "policySha256": "b13a906d448338b4831ddf94acb428acd53673b59c3ccee4df736bbce26b32b5",
   "syntheticRows": [
     {
       "caseId": "r2-01-self-authored-v1-s01",
@@ -10,13 +10,43 @@
       "split": "train",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s01/photo.jpg",
-        "sha256": "fdf87a8f5ecf0e077d61c00c8debe5ed5d2769c7b1f6614360d8193b32117df5",
-        "bytes": 91079
+        "sha256": "e2b9c4756dfcea353e8b16c8ce42b4cf01b273fba367b4ce467e9a130b346ca4",
+        "bytes": 48249
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s01/structure.json",
-        "sha256": "47ce88d60bc4e4ea9f861dce703f62fed29d593e0ed856cc75b0ff92fc367070",
-        "bytes": 8128
+        "sha256": "83bf555a214b114ed469f7cd52240bd200ee48631bebb37ec6a2245fe4ed7d94",
+        "bytes": 8142
+      },
+      "counts": {
+        "systems": 4,
+        "staffs": 4,
+        "barlines": 21,
+        "measures": 21,
+        "meterRegions": 1
+      },
+      "augmentation": {
+        "backgroundValue": 31,
+        "curveAmplitudePixels": -48.2646,
+        "shadowStrength": 0.2104,
+        "handwritingStrokeCount": 1,
+        "jpegQuality": 72
+      }
+    },
+    {
+      "caseId": "r2-01-self-authored-v1-s02",
+      "pieceId": "r2-01",
+      "editionId": "self-authored-v1",
+      "split": "train",
+      "image": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s02/photo.jpg",
+        "sha256": "0f995f9bb95899492bb1feb7096d95d4468cde24f8728de48a941265e255de08",
+        "bytes": 53627
+      },
+      "label": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s02/structure.json",
+        "sha256": "e864e79fad820b4457dc52570f55f173b44754be6ee8a44baea473c4c0cc7d60",
+        "bytes": 8138
       },
       "counts": {
         "systems": 4,
@@ -27,40 +57,10 @@
       },
       "augmentation": {
         "backgroundValue": 15,
-        "curveAmplitudePixels": 7.6886,
-        "shadowStrength": 0.0894,
+        "curveAmplitudePixels": 37.5442,
+        "shadowStrength": 0.1315,
         "handwritingStrokeCount": 2,
-        "jpegQuality": 94
-      }
-    },
-    {
-      "caseId": "r2-01-self-authored-v1-s02",
-      "pieceId": "r2-01",
-      "editionId": "self-authored-v1",
-      "split": "train",
-      "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s02/photo.jpg",
-        "sha256": "e4a4c7e35801efd59ef1e97956183535adbdd467fcd5a8488a0c2f039d5bd2d9",
-        "bytes": 62708
-      },
-      "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s02/structure.json",
-        "sha256": "9e0087c045a1a31342f384a53b74631e2b3dc4b4260b81eebf00d2b12332fdbb",
-        "bytes": 8146
-      },
-      "counts": {
-        "systems": 4,
-        "staffs": 4,
-        "barlines": 21,
-        "measures": 21,
-        "meterRegions": 1
-      },
-      "augmentation": {
-        "backgroundValue": 38,
-        "curveAmplitudePixels": 7.5421,
-        "shadowStrength": 0.1653,
-        "handwritingStrokeCount": 1,
-        "jpegQuality": 76
+        "jpegQuality": 71
       }
     },
     {
@@ -70,12 +70,12 @@
       "split": "train",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s03/photo.jpg",
-        "sha256": "489a88cb10070699ccadc674974a4c74aa85d9b06167546e0719638b2a2c379e",
-        "bytes": 54615
+        "sha256": "612ec13b8d1b7e4544548559b3009038dcdb3f43c86f10bd7f52c30571349fe7",
+        "bytes": 54999
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s03/structure.json",
-        "sha256": "5e1e18d7eb22e67f3293724ee981f6d7e73ae417dcd5bd00a047b0b097371565",
+        "sha256": "24ed4d2fcc1ba44e7e8c04a61c24d64500242187f4baab223aaa46d39def1615",
         "bytes": 8139
       },
       "counts": {
@@ -86,11 +86,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 37,
-        "curveAmplitudePixels": 2.2465,
-        "shadowStrength": 0.2355,
-        "handwritingStrokeCount": 0,
-        "jpegQuality": 68
+        "backgroundValue": 44,
+        "curveAmplitudePixels": 15.4801,
+        "shadowStrength": 0.0371,
+        "handwritingStrokeCount": 3,
+        "jpegQuality": 72
       }
     },
     {
@@ -100,13 +100,13 @@
       "split": "train",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s04/photo.jpg",
-        "sha256": "69bb526f493db0b14c48b52e76cbb5b8d6330b84b00aa00a41fc8677fe99b439",
-        "bytes": 55552
+        "sha256": "3068b3e3bd747456e6c050b524ec4fbb3befce5109618507efe7fde0a40376b9",
+        "bytes": 47202
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s04/structure.json",
-        "sha256": "1d5f53368b154407fed4a2505e1edd147f9389152a5d4657dfc13a16a3563a38",
-        "bytes": 8119
+        "sha256": "4ff7c777e911885ab615e14cd47c2acca73ac71a93adeac2a5ede78dd1e671fb",
+        "bytes": 8142
       },
       "counts": {
         "systems": 4,
@@ -116,11 +116,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 22,
-        "curveAmplitudePixels": -5.1041,
-        "shadowStrength": 0.1024,
-        "handwritingStrokeCount": 2,
-        "jpegQuality": 68
+        "backgroundValue": 21,
+        "curveAmplitudePixels": 57.0289,
+        "shadowStrength": 0.2102,
+        "handwritingStrokeCount": 1,
+        "jpegQuality": 75
       }
     },
     {
@@ -130,13 +130,13 @@
       "split": "train",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s05/photo.jpg",
-        "sha256": "544e794442c96f410b7dc68d52f08f8d5ec5f9d29229561055ee40ab0e2accce",
-        "bytes": 53233
+        "sha256": "b30152c63810e974ab76bfce274a6d1af9dae2d161c19e4f5bb3231e41aa5719",
+        "bytes": 59610
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s05/structure.json",
-        "sha256": "2f4cc033b1591839d16ae216d2a38963082d9638d602fa657d835b5a4bd3ab9e",
-        "bytes": 8131
+        "sha256": "a094df548d96f2391250af07b4f0ac95cf795496f902e5308e9bd0a9d9514f02",
+        "bytes": 8147
       },
       "counts": {
         "systems": 4,
@@ -146,11 +146,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 18,
-        "curveAmplitudePixels": 9.5105,
-        "shadowStrength": 0.1386,
-        "handwritingStrokeCount": 2,
-        "jpegQuality": 82
+        "backgroundValue": 33,
+        "curveAmplitudePixels": -11.5086,
+        "shadowStrength": 0.0378,
+        "handwritingStrokeCount": 1,
+        "jpegQuality": 78
       }
     },
     {
@@ -160,13 +160,13 @@
       "split": "train",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s06/photo.jpg",
-        "sha256": "c9fdae1371fd68b8683734e2c36ea988eb9cc620a4f5c01c749ccf99e71110de",
-        "bytes": 66408
+        "sha256": "56c7d2729e33444c00ad7cd5902e955cb50e8214faddfb51d600002589408953",
+        "bytes": 66702
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s06/structure.json",
-        "sha256": "1a26cde6a2387d294cc01208694cd26c51817ea5550cbb81441b44bf47b7710b",
-        "bytes": 8123
+        "sha256": "f4deabf30f27945adc1fd739515233611a86249d704006f9e5b0b6b47bfab3bb",
+        "bytes": 8136
       },
       "counts": {
         "systems": 4,
@@ -176,11 +176,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 13,
-        "curveAmplitudePixels": -5.5831,
-        "shadowStrength": 0.0908,
-        "handwritingStrokeCount": 0,
-        "jpegQuality": 83
+        "backgroundValue": 27,
+        "curveAmplitudePixels": -52.3264,
+        "shadowStrength": 0.1839,
+        "handwritingStrokeCount": 1,
+        "jpegQuality": 84
       }
     },
     {
@@ -190,13 +190,13 @@
       "split": "train",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s07/photo.jpg",
-        "sha256": "b2eb7a7b1071a68ec42aebad3ee84db09b679d195e01d8b5b235ead050c04018",
-        "bytes": 84334
+        "sha256": "f0959a46f0f3c645e3b92e2937f509b319d563706725c0201f323ce32be59ad9",
+        "bytes": 53559
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s07/structure.json",
-        "sha256": "d18e0fd177aa9c302a9207fcdf5baec7be2d1591177147d095bee20836b2dc6e",
-        "bytes": 8141
+        "sha256": "c864916fece9faa4e91da13ae53b2cb6bbbcb141c099399f93e4e47329c4b899",
+        "bytes": 8138
       },
       "counts": {
         "systems": 4,
@@ -206,11 +206,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 19,
-        "curveAmplitudePixels": 4.2058,
-        "shadowStrength": 0.2143,
-        "handwritingStrokeCount": 2,
-        "jpegQuality": 88
+        "backgroundValue": 39,
+        "curveAmplitudePixels": 23.9557,
+        "shadowStrength": 0.1325,
+        "handwritingStrokeCount": 3,
+        "jpegQuality": 68
       }
     },
     {
@@ -220,13 +220,13 @@
       "split": "train",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s08/photo.jpg",
-        "sha256": "1dce4cd1eb9eea8ab84503eb1c303a7886fb191798efdf4311d2c4ac89779b9a",
-        "bytes": 72517
+        "sha256": "4df66340bfc473927cfa20f34395a870193981e8c0da1c043d30e110004d66bf",
+        "bytes": 68279
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s08/structure.json",
-        "sha256": "67d5d02f2d7b520bd5416c68ade16fc8d83c4c17994930b06007d7fecc7a989c",
-        "bytes": 8120
+        "sha256": "dfc767b2a633379fbb5d68656960a2f38e1b675fecdbb7333ec31d9de5e9790b",
+        "bytes": 8143
       },
       "counts": {
         "systems": 4,
@@ -236,10 +236,10 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 35,
-        "curveAmplitudePixels": 3.4892,
-        "shadowStrength": 0.2103,
-        "handwritingStrokeCount": 1,
+        "backgroundValue": 17,
+        "curveAmplitudePixels": 52.1393,
+        "shadowStrength": 0.1654,
+        "handwritingStrokeCount": 3,
         "jpegQuality": 87
       }
     },
@@ -250,13 +250,13 @@
       "split": "train",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s09/photo.jpg",
-        "sha256": "4f2e21dc0ccd1f16a75ee024cea62eddfa25703de570b0db0d12b5c8eaa3ab35",
-        "bytes": 60117
+        "sha256": "bc15ad26a71b61bf82eb63d4351bf268dd4c5d6c535b1d28957906a39ed32292",
+        "bytes": 67560
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s09/structure.json",
-        "sha256": "8ea249b8a2af3b250f6a4ec422ba5731911ab3d613b1f2d3d6ea8b4acbcc247b",
-        "bytes": 8132
+        "sha256": "00bc780e102c56eb32ca1174d35fe2a1f738ed4fa3ec4f41e7a2d289522dc82e",
+        "bytes": 8148
       },
       "counts": {
         "systems": 4,
@@ -266,11 +266,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 34,
-        "curveAmplitudePixels": 5.2247,
-        "shadowStrength": 0.1394,
-        "handwritingStrokeCount": 3,
-        "jpegQuality": 71
+        "backgroundValue": 64,
+        "curveAmplitudePixels": -59.1404,
+        "shadowStrength": 0.1061,
+        "handwritingStrokeCount": 1,
+        "jpegQuality": 84
       }
     },
     {
@@ -280,13 +280,13 @@
       "split": "train",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s10/photo.jpg",
-        "sha256": "f1d5e301472efea813a351582512551c62c1d431bae66f9508e90e634a4c3816",
-        "bytes": 86530
+        "sha256": "bddf320cfb96314719804155b8c7b3715a539fff19949fb96f7e882386be946f",
+        "bytes": 55399
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s10/structure.json",
-        "sha256": "8da95fc56b8b773700c7ace6f055511a2bb8801587238cab0775604fcfc7066c",
-        "bytes": 8137
+        "sha256": "ca903a5b1cb6aaee6ce91b64adb6cddd0acb3e7f878360c879dddcfa9fc48c51",
+        "bytes": 8133
       },
       "counts": {
         "systems": 4,
@@ -296,11 +296,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 45,
-        "curveAmplitudePixels": -9.726,
-        "shadowStrength": 0.2782,
-        "handwritingStrokeCount": 0,
-        "jpegQuality": 90
+        "backgroundValue": 23,
+        "curveAmplitudePixels": 0.2853,
+        "shadowStrength": 0.2556,
+        "handwritingStrokeCount": 3,
+        "jpegQuality": 72
       }
     },
     {
@@ -310,13 +310,13 @@
       "split": "train",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s11/photo.jpg",
-        "sha256": "4c6ce8bcc8df7c36996886772081a458fef56bcfd31df04caaa4813801e3dd77",
-        "bytes": 51542
+        "sha256": "5775b4d79ce88842025ee00c89a9e1305d2761fec25701c7f39bad59c6efa808",
+        "bytes": 54728
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s11/structure.json",
-        "sha256": "d9c544f9b785344716aa8a11375c7b9f61024be8422e30f1b1c74954eec9da4a",
-        "bytes": 8118
+        "sha256": "026365f6ccc3e47d3b167b77f6abe52423d8cd6af2c6b2b300fc02460dd1aad6",
+        "bytes": 8129
       },
       "counts": {
         "systems": 4,
@@ -326,9 +326,9 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 12,
-        "curveAmplitudePixels": 7.3582,
-        "shadowStrength": 0.1092,
+        "backgroundValue": 13,
+        "curveAmplitudePixels": -0.2614,
+        "shadowStrength": 0.0636,
         "handwritingStrokeCount": 1,
         "jpegQuality": 71
       }
@@ -340,13 +340,13 @@
       "split": "train",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s12/photo.jpg",
-        "sha256": "b2fc16065749a8e0c7e665f888f121e0bf37e152536237fdfcf23d5118852690",
-        "bytes": 62174
+        "sha256": "18ae6831a07b59af13b6bb7af041d42c25abd59d0fa5844c83125d40bebdef5a",
+        "bytes": 55751
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-01-self-authored-v1-s12/structure.json",
-        "sha256": "beff493448cfae649e63d9638b6c24ab6dfcbff9ac71a20f7cae50e5ec90e7f8",
-        "bytes": 8135
+        "sha256": "1dcff3ba87c1a52ff5dac8dc990d14aa7e2c4ca89c425479ca6e26a1032f6083",
+        "bytes": 8134
       },
       "counts": {
         "systems": 4,
@@ -356,11 +356,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 65,
-        "curveAmplitudePixels": -8.4352,
-        "shadowStrength": 0.1827,
-        "handwritingStrokeCount": 1,
-        "jpegQuality": 74
+        "backgroundValue": 37,
+        "curveAmplitudePixels": 55.8851,
+        "shadowStrength": 0.0015,
+        "handwritingStrokeCount": 2,
+        "jpegQuality": 71
       }
     },
     {
@@ -370,13 +370,13 @@
       "split": "calibration",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r2-01-self-authored-v1-s13/photo.jpg",
-        "sha256": "e47c3cdfb733384e523d820fab26bf3ed1eed34e81f4d48a3c8762fa5c18ffec",
-        "bytes": 70210
+        "sha256": "0e79e553c62d09f993ab09281c64a077c2679e1fd4671de30bfa475c58f6743f",
+        "bytes": 73537
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r2-01-self-authored-v1-s13/structure.json",
-        "sha256": "f8c1a4b7d724a79cd33f4af00aab7b4f494b4585a93edee4b0a54ad594e66eee",
-        "bytes": 8126
+        "sha256": "800da2475df5b0d02a12d5e9449b40fb3c4566a8cc5452b71f3b179f0d60211c",
+        "bytes": 8156
       },
       "counts": {
         "systems": 4,
@@ -386,11 +386,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 65,
-        "curveAmplitudePixels": 0.1303,
-        "shadowStrength": 0.102,
-        "handwritingStrokeCount": 2,
-        "jpegQuality": 84
+        "backgroundValue": 59,
+        "curveAmplitudePixels": 23.1974,
+        "shadowStrength": 0.0523,
+        "handwritingStrokeCount": 1,
+        "jpegQuality": 88
       }
     },
     {
@@ -400,13 +400,13 @@
       "split": "calibration",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r2-01-self-authored-v1-s14/photo.jpg",
-        "sha256": "5d060afa350f6cf19b305dd45318b11b6fd5043e0728e67ff844ef789bbfe086",
-        "bytes": 82188
+        "sha256": "77476674f55139d67c72f7a1f65807dbc278a3c2785735ac07504562a66a0f99",
+        "bytes": 42712
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r2-01-self-authored-v1-s14/structure.json",
-        "sha256": "ce3cfa363ba702e04bab308ecb86f2bc512f30cce543853329ba59f24c353c74",
-        "bytes": 8132
+        "sha256": "624a779142320e3508c15531f1d1526f9c3c00613ad603d26dd6c28941ec529a",
+        "bytes": 8120
       },
       "counts": {
         "systems": 4,
@@ -416,11 +416,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 68,
-        "curveAmplitudePixels": 3.1956,
-        "shadowStrength": 0.1927,
-        "handwritingStrokeCount": 0,
-        "jpegQuality": 90
+        "backgroundValue": 25,
+        "curveAmplitudePixels": 26.9286,
+        "shadowStrength": 0.1279,
+        "handwritingStrokeCount": 2,
+        "jpegQuality": 63
       }
     },
     {
@@ -430,13 +430,13 @@
       "split": "calibration",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r2-01-self-authored-v1-s15/photo.jpg",
-        "sha256": "85c049780f668263074985b95b6af2a5c59439b3dd40687649b15cabcf1f1964",
-        "bytes": 53349
+        "sha256": "ab744f1a59bda7868cbe30e4104a92136ff4b328468fd978182de9e14a16b03e",
+        "bytes": 52932
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r2-01-self-authored-v1-s15/structure.json",
-        "sha256": "7d77a055a80368688a6c0129a0fc80ac332a6fa3a386fddffa0da1ed41856a99",
-        "bytes": 8152
+        "sha256": "6c97241ef1402a1c9592bf09cb5a97fde05ea8e7f6a1be8b1db3983ab0483717",
+        "bytes": 8131
       },
       "counts": {
         "systems": 4,
@@ -446,11 +446,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 56,
-        "curveAmplitudePixels": -5.4941,
-        "shadowStrength": 0.0421,
+        "backgroundValue": 69,
+        "curveAmplitudePixels": 53.1882,
+        "shadowStrength": 0.2666,
         "handwritingStrokeCount": 0,
-        "jpegQuality": 69
+        "jpegQuality": 80
       }
     },
     {
@@ -460,13 +460,13 @@
       "split": "calibration",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r2-01-self-authored-v1-s16/photo.jpg",
-        "sha256": "64db50eaaee9c3a354d219642d3e4a92bb4615b29dc2cca848bed00ce3ec8f58",
-        "bytes": 55419
+        "sha256": "137d3f51fbf00cc7665adf65a14e4a45be8fd8b6fd85061c9140102d8e84a682",
+        "bytes": 71187
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r2-01-self-authored-v1-s16/structure.json",
-        "sha256": "9255445a59395bdea2c5e78662dccc7683c42ac57f4ef8c3f33ef2902ec60fe3",
-        "bytes": 8151
+        "sha256": "2a998a4351e824bc0c2c1c50a4dfbf254d8d2608df009cb3040c0026d0a4f43b",
+        "bytes": 8150
       },
       "counts": {
         "systems": 4,
@@ -476,9 +476,9 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 32,
-        "curveAmplitudePixels": -6.8141,
-        "shadowStrength": 0.0812,
+        "backgroundValue": 43,
+        "curveAmplitudePixels": -54.4938,
+        "shadowStrength": 0.0051,
         "handwritingStrokeCount": 1,
         "jpegQuality": 85
       }
@@ -490,102 +490,12 @@
       "split": "synthetic-test",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-01-self-authored-v1-s17/photo.jpg",
-        "sha256": "2b6283abfccaec5f8befadd1fb0494b22755c8f7dfd161c5d34fc4a811e1e103",
-        "bytes": 99347
+        "sha256": "e92d432163f6839f8882ce2eadebc5391cac043b76adb2fd6914fe3fbd6d2cdb",
+        "bytes": 40223
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-01-self-authored-v1-s17/structure.json",
-        "sha256": "ad3cb2ba21eacbd699484ed0fea9e4936b0defd4b179e52e3315733937e69ca3",
-        "bytes": 8154
-      },
-      "counts": {
-        "systems": 4,
-        "staffs": 4,
-        "barlines": 21,
-        "measures": 21,
-        "meterRegions": 1
-      },
-      "augmentation": {
-        "backgroundValue": 61,
-        "curveAmplitudePixels": -5.2255,
-        "shadowStrength": 0.146,
-        "handwritingStrokeCount": 3,
-        "jpegQuality": 95
-      }
-    },
-    {
-      "caseId": "r2-01-self-authored-v1-s18",
-      "pieceId": "r2-01",
-      "editionId": "self-authored-v1",
-      "split": "synthetic-test",
-      "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-01-self-authored-v1-s18/photo.jpg",
-        "sha256": "654b8016240d0e5b8e2349ed81081864d67a2fabfde843733747ae82d7d018ef",
-        "bytes": 61577
-      },
-      "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-01-self-authored-v1-s18/structure.json",
-        "sha256": "1f83b517e9908fa3ec4ed590b1e5a18f191c2b1bfa749d9e4c972444cce499f7",
-        "bytes": 8140
-      },
-      "counts": {
-        "systems": 4,
-        "staffs": 4,
-        "barlines": 21,
-        "measures": 21,
-        "meterRegions": 1
-      },
-      "augmentation": {
-        "backgroundValue": 13,
-        "curveAmplitudePixels": 8.156,
-        "shadowStrength": 0.2318,
-        "handwritingStrokeCount": 2,
-        "jpegQuality": 77
-      }
-    },
-    {
-      "caseId": "r2-01-self-authored-v1-s19",
-      "pieceId": "r2-01",
-      "editionId": "self-authored-v1",
-      "split": "synthetic-test",
-      "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-01-self-authored-v1-s19/photo.jpg",
-        "sha256": "934375d28330f18c905084bf8cfdaa7e1bfd1d620847615206aeb659cae87ee2",
-        "bytes": 92962
-      },
-      "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-01-self-authored-v1-s19/structure.json",
-        "sha256": "df86a0d6ac059449e445546f3ea2d970f03532be77e95a98f9efddc59457227f",
-        "bytes": 8163
-      },
-      "counts": {
-        "systems": 4,
-        "staffs": 4,
-        "barlines": 21,
-        "measures": 21,
-        "meterRegions": 1
-      },
-      "augmentation": {
-        "backgroundValue": 17,
-        "curveAmplitudePixels": 3.5606,
-        "shadowStrength": 0.1321,
-        "handwritingStrokeCount": 3,
-        "jpegQuality": 94
-      }
-    },
-    {
-      "caseId": "r2-01-self-authored-v1-s20",
-      "pieceId": "r2-01",
-      "editionId": "self-authored-v1",
-      "split": "synthetic-test",
-      "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-01-self-authored-v1-s20/photo.jpg",
-        "sha256": "2d28a63d55ea038d67c7028406f376da860b12c1c1533ebbee145a0abdae3ad5",
-        "bytes": 50252
-      },
-      "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-01-self-authored-v1-s20/structure.json",
-        "sha256": "d0fa74ef6cc22b3a0f8b38c75124ac19437a3d82b234251c7c3ecee82aafe89b",
+        "sha256": "db218d8ea059b2c3a6de8ad43bbdaaf343f0e9f5215da475fbcce4fb7ed93f64",
         "bytes": 8165
       },
       "counts": {
@@ -596,11 +506,101 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 41,
-        "curveAmplitudePixels": -6.9718,
-        "shadowStrength": 0.2134,
+        "backgroundValue": 30,
+        "curveAmplitudePixels": 55.3207,
+        "shadowStrength": 0.0402,
+        "handwritingStrokeCount": 2,
+        "jpegQuality": 62
+      }
+    },
+    {
+      "caseId": "r2-01-self-authored-v1-s18",
+      "pieceId": "r2-01",
+      "editionId": "self-authored-v1",
+      "split": "synthetic-test",
+      "image": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-01-self-authored-v1-s18/photo.jpg",
+        "sha256": "ad6c5a912a4baa2f33c81e07e18341f40d1acb21ce71c2018b013fc340e8fecb",
+        "bytes": 56605
+      },
+      "label": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-01-self-authored-v1-s18/structure.json",
+        "sha256": "27b15531d44d5173be558209bee35b7f4a3fa0ab76cd7f8e89af3ab68e3ee3be",
+        "bytes": 8157
+      },
+      "counts": {
+        "systems": 4,
+        "staffs": 4,
+        "barlines": 21,
+        "measures": 21,
+        "meterRegions": 1
+      },
+      "augmentation": {
+        "backgroundValue": 21,
+        "curveAmplitudePixels": 53.3767,
+        "shadowStrength": 0.2689,
+        "handwritingStrokeCount": 3,
+        "jpegQuality": 69
+      }
+    },
+    {
+      "caseId": "r2-01-self-authored-v1-s19",
+      "pieceId": "r2-01",
+      "editionId": "self-authored-v1",
+      "split": "synthetic-test",
+      "image": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-01-self-authored-v1-s19/photo.jpg",
+        "sha256": "737e73284fc0dd67a482b08bff94a6d543c24dd9aa4f0ef393a3aa42399f4449",
+        "bytes": 60905
+      },
+      "label": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-01-self-authored-v1-s19/structure.json",
+        "sha256": "856c2a9f540cd3cc5c79dd7d6bba77500b2839be77d5ab17f7f52d6c82fe5b5a",
+        "bytes": 8160
+      },
+      "counts": {
+        "systems": 4,
+        "staffs": 4,
+        "barlines": 21,
+        "measures": 21,
+        "meterRegions": 1
+      },
+      "augmentation": {
+        "backgroundValue": 52,
+        "curveAmplitudePixels": 53.4208,
+        "shadowStrength": 0.2691,
         "handwritingStrokeCount": 1,
-        "jpegQuality": 76
+        "jpegQuality": 85
+      }
+    },
+    {
+      "caseId": "r2-01-self-authored-v1-s20",
+      "pieceId": "r2-01",
+      "editionId": "self-authored-v1",
+      "split": "synthetic-test",
+      "image": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-01-self-authored-v1-s20/photo.jpg",
+        "sha256": "af07334ab9917d602a623d6a686fc99852485a116583033af73bdd5010188644",
+        "bytes": 78558
+      },
+      "label": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-01-self-authored-v1-s20/structure.json",
+        "sha256": "9ce55b57bb49660e3eaf721edfb9b1630102cee64cfb0b2816d851382961ff9f",
+        "bytes": 8144
+      },
+      "counts": {
+        "systems": 4,
+        "staffs": 4,
+        "barlines": 21,
+        "measures": 21,
+        "meterRegions": 1
+      },
+      "augmentation": {
+        "backgroundValue": 16,
+        "curveAmplitudePixels": 52.7643,
+        "shadowStrength": 0.1901,
+        "handwritingStrokeCount": 3,
+        "jpegQuality": 88
       }
     },
     {
@@ -610,13 +610,13 @@
       "split": "train",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s01/photo.jpg",
-        "sha256": "665ec5bcbd08db088f0dfabd4cc12835945f877ee5949297445fce2ff4699cee",
-        "bytes": 51068
+        "sha256": "c639abe0d381ffdea5174dd797850bf1431725c259f2efb4ceca550e0bdca0bd",
+        "bytes": 42887
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s01/structure.json",
-        "sha256": "69cb4cda4342bc88431e00b9785a61c4c70da172e6bd3e1c80e606df91722227",
-        "bytes": 6238
+        "sha256": "10c63ba10735676a0267922b5cfe2733f340e7b96ad14d9a6fbcf0c4eb50ee43",
+        "bytes": 6226
       },
       "counts": {
         "systems": 2,
@@ -626,11 +626,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 24,
-        "curveAmplitudePixels": -0.718,
-        "shadowStrength": 0.1539,
-        "handwritingStrokeCount": 1,
-        "jpegQuality": 81
+        "backgroundValue": 37,
+        "curveAmplitudePixels": 57.3095,
+        "shadowStrength": 0.1165,
+        "handwritingStrokeCount": 2,
+        "jpegQuality": 76
       }
     },
     {
@@ -640,13 +640,13 @@
       "split": "train",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s02/photo.jpg",
-        "sha256": "3e10a4a605667d13e60d62b61733cc2ad814d5e1496e6fbb4f7140d0cd8a5461",
-        "bytes": 41426
+        "sha256": "4b6d6cceb720c111b468827a8d67567707d6cec43729b336e94ecca9032f895a",
+        "bytes": 49976
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s02/structure.json",
-        "sha256": "19cb8b6f60e7da59ade2820335b42c0f8a91276c44c3516637d282e6a653fe20",
-        "bytes": 6227
+        "sha256": "54c7dfea5cef46469be5e172442c67d26a8f3389fdd8f8752c85a1670847c350",
+        "bytes": 6239
       },
       "counts": {
         "systems": 2,
@@ -656,11 +656,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 48,
-        "curveAmplitudePixels": 3.3926,
-        "shadowStrength": 0.2794,
+        "backgroundValue": 16,
+        "curveAmplitudePixels": 15.0228,
+        "shadowStrength": 0.1736,
         "handwritingStrokeCount": 3,
-        "jpegQuality": 66
+        "jpegQuality": 88
       }
     },
     {
@@ -670,192 +670,12 @@
       "split": "train",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s03/photo.jpg",
-        "sha256": "21454982aa495b3b2d00feb25b4749c91af9c4270ac0474e1fcb60f098a35798",
-        "bytes": 44848
+        "sha256": "d83a7283820fcea0af0970197ede34ca3f7a5e7309c7e280cf04cedbc3c0ea4f",
+        "bytes": 55478
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s03/structure.json",
-        "sha256": "c0f1063eb2394ce964f74eced21321aecd1b8df3d4e8850b1ffa191e3959986c",
-        "bytes": 6239
-      },
-      "counts": {
-        "systems": 2,
-        "staffs": 2,
-        "barlines": 17,
-        "measures": 17,
-        "meterRegions": 1
-      },
-      "augmentation": {
-        "backgroundValue": 57,
-        "curveAmplitudePixels": -4.6541,
-        "shadowStrength": 0.002,
-        "handwritingStrokeCount": 3,
-        "jpegQuality": 65
-      }
-    },
-    {
-      "caseId": "r2-06-self-authored-v1-s04",
-      "pieceId": "r2-06",
-      "editionId": "self-authored-v1",
-      "split": "train",
-      "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s04/photo.jpg",
-        "sha256": "2cd395b0b6486e3fd9634df3688a9378aed5c74d5b4317d751f5df20e156545c",
-        "bytes": 71811
-      },
-      "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s04/structure.json",
-        "sha256": "eea59d7ce9e1877b546899afe061a34aba2b54ea826d4cef220d5cb2cc7ed933",
-        "bytes": 6239
-      },
-      "counts": {
-        "systems": 2,
-        "staffs": 2,
-        "barlines": 17,
-        "measures": 17,
-        "meterRegions": 1
-      },
-      "augmentation": {
-        "backgroundValue": 58,
-        "curveAmplitudePixels": 7.5963,
-        "shadowStrength": 0.0294,
-        "handwritingStrokeCount": 3,
-        "jpegQuality": 95
-      }
-    },
-    {
-      "caseId": "r2-06-self-authored-v1-s05",
-      "pieceId": "r2-06",
-      "editionId": "self-authored-v1",
-      "split": "train",
-      "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s05/photo.jpg",
-        "sha256": "8352a373d4d91638a8747ee16ed21f67f9a8298b204439ae9ee977ba7ac16ca3",
-        "bytes": 61434
-      },
-      "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s05/structure.json",
-        "sha256": "b333386452f99d2244c82f8a20fb78a02c6d42974be76ac6b5538e2250916004",
-        "bytes": 6223
-      },
-      "counts": {
-        "systems": 2,
-        "staffs": 2,
-        "barlines": 17,
-        "measures": 17,
-        "meterRegions": 1
-      },
-      "augmentation": {
-        "backgroundValue": 40,
-        "curveAmplitudePixels": 8.1391,
-        "shadowStrength": 0.0986,
-        "handwritingStrokeCount": 0,
-        "jpegQuality": 88
-      }
-    },
-    {
-      "caseId": "r2-06-self-authored-v1-s06",
-      "pieceId": "r2-06",
-      "editionId": "self-authored-v1",
-      "split": "train",
-      "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s06/photo.jpg",
-        "sha256": "4fef0632daa844065201844d011f848b68f7b90305e81f59873a2c0feb38a92a",
-        "bytes": 51967
-      },
-      "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s06/structure.json",
-        "sha256": "5f2fcce1a93f6d557edadce9a671713f52c53504bfa91003b8bd561fd01f4889",
-        "bytes": 6236
-      },
-      "counts": {
-        "systems": 2,
-        "staffs": 2,
-        "barlines": 17,
-        "measures": 17,
-        "meterRegions": 1
-      },
-      "augmentation": {
-        "backgroundValue": 53,
-        "curveAmplitudePixels": 2.2503,
-        "shadowStrength": 0.0503,
-        "handwritingStrokeCount": 0,
-        "jpegQuality": 82
-      }
-    },
-    {
-      "caseId": "r2-06-self-authored-v1-s07",
-      "pieceId": "r2-06",
-      "editionId": "self-authored-v1",
-      "split": "train",
-      "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s07/photo.jpg",
-        "sha256": "8d570c2f92dd7d89e05f9b37c46aa9a037cde5de8bcf70292c824df4c6ae25a5",
-        "bytes": 52082
-      },
-      "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s07/structure.json",
-        "sha256": "246046e9319937127480f589e936307b36b0eaa5522d26896c6f7ca9f3c32e74",
-        "bytes": 6238
-      },
-      "counts": {
-        "systems": 2,
-        "staffs": 2,
-        "barlines": 17,
-        "measures": 17,
-        "meterRegions": 1
-      },
-      "augmentation": {
-        "backgroundValue": 29,
-        "curveAmplitudePixels": 4.407,
-        "shadowStrength": 0.057,
-        "handwritingStrokeCount": 2,
-        "jpegQuality": 83
-      }
-    },
-    {
-      "caseId": "r2-06-self-authored-v1-s08",
-      "pieceId": "r2-06",
-      "editionId": "self-authored-v1",
-      "split": "train",
-      "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s08/photo.jpg",
-        "sha256": "fc15dc45f0eeed646ccbbc60818fbf0ac4e0aee9fb8720086513e7afb610dcdb",
-        "bytes": 71280
-      },
-      "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s08/structure.json",
-        "sha256": "3445bfe450ce348c8685152b1e196c2730a1c6ca91035689513d2bd8954ff0e9",
-        "bytes": 6236
-      },
-      "counts": {
-        "systems": 2,
-        "staffs": 2,
-        "barlines": 17,
-        "measures": 17,
-        "meterRegions": 1
-      },
-      "augmentation": {
-        "backgroundValue": 46,
-        "curveAmplitudePixels": 2.6463,
-        "shadowStrength": 0.1828,
-        "handwritingStrokeCount": 2,
-        "jpegQuality": 94
-      }
-    },
-    {
-      "caseId": "r2-06-self-authored-v1-s09",
-      "pieceId": "r2-06",
-      "editionId": "self-authored-v1",
-      "split": "train",
-      "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s09/photo.jpg",
-        "sha256": "00a327783b0da9394d25061f0fa0f32ff7824affd41304085bda56895e8d372e",
-        "bytes": 53800
-      },
-      "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s09/structure.json",
-        "sha256": "712799b0dc7addf72c6cb70878de05fb24add2757047c3f165647c067e7fdc9f",
+        "sha256": "67eaa9ed747553a707aa101fa7a49495900a9cad35fc7d611167130ba4bed678",
         "bytes": 6242
       },
       "counts": {
@@ -866,11 +686,191 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 65,
-        "curveAmplitudePixels": -1.1605,
-        "shadowStrength": 0.1322,
+        "backgroundValue": 29,
+        "curveAmplitudePixels": 44.9314,
+        "shadowStrength": 0.0695,
+        "handwritingStrokeCount": 0,
+        "jpegQuality": 88
+      }
+    },
+    {
+      "caseId": "r2-06-self-authored-v1-s04",
+      "pieceId": "r2-06",
+      "editionId": "self-authored-v1",
+      "split": "train",
+      "image": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s04/photo.jpg",
+        "sha256": "9355ffe33db0487335c7681ea970c0e36eb7ebdb8c98b94e187cb98511a7cf7b",
+        "bytes": 53551
+      },
+      "label": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s04/structure.json",
+        "sha256": "659eeec964ffccb731b4a1cc6ca843998a3a6ce385a6871c15fd07a533214b9f",
+        "bytes": 6234
+      },
+      "counts": {
+        "systems": 2,
+        "staffs": 2,
+        "barlines": 17,
+        "measures": 17,
+        "meterRegions": 1
+      },
+      "augmentation": {
+        "backgroundValue": 28,
+        "curveAmplitudePixels": 11.9277,
+        "shadowStrength": 0.0401,
+        "handwritingStrokeCount": 0,
+        "jpegQuality": 86
+      }
+    },
+    {
+      "caseId": "r2-06-self-authored-v1-s05",
+      "pieceId": "r2-06",
+      "editionId": "self-authored-v1",
+      "split": "train",
+      "image": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s05/photo.jpg",
+        "sha256": "c6f1d340bce1039eb2588fde2570386977039fea78cf70ddc487a60f3e919f59",
+        "bytes": 48500
+      },
+      "label": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s05/structure.json",
+        "sha256": "6e7c2af157162d55e470c96edf4b15cd0f49ec95b49a9a64bae03b7a3d4952fb",
+        "bytes": 6237
+      },
+      "counts": {
+        "systems": 2,
+        "staffs": 2,
+        "barlines": 17,
+        "measures": 17,
+        "meterRegions": 1
+      },
+      "augmentation": {
+        "backgroundValue": 35,
+        "curveAmplitudePixels": -58.4193,
+        "shadowStrength": 0.151,
         "handwritingStrokeCount": 1,
-        "jpegQuality": 80
+        "jpegQuality": 81
+      }
+    },
+    {
+      "caseId": "r2-06-self-authored-v1-s06",
+      "pieceId": "r2-06",
+      "editionId": "self-authored-v1",
+      "split": "train",
+      "image": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s06/photo.jpg",
+        "sha256": "d2311413ab8dffd9eb08c4f506de671080f6f6de635b041fa2638d83397249c4",
+        "bytes": 37267
+      },
+      "label": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s06/structure.json",
+        "sha256": "6ca6ee4db9f6c85928a2925439668523478e8e36727b5274d720ab1dad66001d",
+        "bytes": 6241
+      },
+      "counts": {
+        "systems": 2,
+        "staffs": 2,
+        "barlines": 17,
+        "measures": 17,
+        "meterRegions": 1
+      },
+      "augmentation": {
+        "backgroundValue": 51,
+        "curveAmplitudePixels": -32.7207,
+        "shadowStrength": 0.0643,
+        "handwritingStrokeCount": 0,
+        "jpegQuality": 73
+      }
+    },
+    {
+      "caseId": "r2-06-self-authored-v1-s07",
+      "pieceId": "r2-06",
+      "editionId": "self-authored-v1",
+      "split": "train",
+      "image": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s07/photo.jpg",
+        "sha256": "961e2445874e8ccf35d69cba1043c15d52f1fe69ff256259e7ffe9bdeed259fe",
+        "bytes": 47722
+      },
+      "label": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s07/structure.json",
+        "sha256": "66b68dd16aa3fa2d3c1bef8e6cc7073336e39ac5fbb276064119f82fff0fe389",
+        "bytes": 6241
+      },
+      "counts": {
+        "systems": 2,
+        "staffs": 2,
+        "barlines": 17,
+        "measures": 17,
+        "meterRegions": 1
+      },
+      "augmentation": {
+        "backgroundValue": 13,
+        "curveAmplitudePixels": 1.3263,
+        "shadowStrength": 0.1117,
+        "handwritingStrokeCount": 0,
+        "jpegQuality": 79
+      }
+    },
+    {
+      "caseId": "r2-06-self-authored-v1-s08",
+      "pieceId": "r2-06",
+      "editionId": "self-authored-v1",
+      "split": "train",
+      "image": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s08/photo.jpg",
+        "sha256": "13cfcaa30a481f694b54e581c40db09fbebd4d0b1d58b1eeef1b756074cba035",
+        "bytes": 40848
+      },
+      "label": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s08/structure.json",
+        "sha256": "51e8f6e70247201bdc4ea273a090dda462be4ea78d3ad32dd19148524edd5ecb",
+        "bytes": 6235
+      },
+      "counts": {
+        "systems": 2,
+        "staffs": 2,
+        "barlines": 17,
+        "measures": 17,
+        "meterRegions": 1
+      },
+      "augmentation": {
+        "backgroundValue": 37,
+        "curveAmplitudePixels": 18.1984,
+        "shadowStrength": 0.1509,
+        "handwritingStrokeCount": 2,
+        "jpegQuality": 68
+      }
+    },
+    {
+      "caseId": "r2-06-self-authored-v1-s09",
+      "pieceId": "r2-06",
+      "editionId": "self-authored-v1",
+      "split": "train",
+      "image": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s09/photo.jpg",
+        "sha256": "e230e220bf27e8738d51aafa7a8d24bd4b581a4d64c4e8f42c9ea2d03dbbd91e",
+        "bytes": 41163
+      },
+      "label": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s09/structure.json",
+        "sha256": "bf87663cc12b5ec3a87e2b3b7351fc96f7cc030a9a9730645dbd8c7a6fecbc5a",
+        "bytes": 6240
+      },
+      "counts": {
+        "systems": 2,
+        "staffs": 2,
+        "barlines": 17,
+        "measures": 17,
+        "meterRegions": 1
+      },
+      "augmentation": {
+        "backgroundValue": 41,
+        "curveAmplitudePixels": -2.492,
+        "shadowStrength": 0.2392,
+        "handwritingStrokeCount": 1,
+        "jpegQuality": 82
       }
     },
     {
@@ -880,13 +880,13 @@
       "split": "train",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s10/photo.jpg",
-        "sha256": "e066962eb1a7ea337b6a3d6c1af6df85f06545f835e1273a560cf00e2231a0fd",
-        "bytes": 39923
+        "sha256": "6627602b94b52799a9445f7695ff06f4efc23c1f4c3435b1e1d58a3757795527",
+        "bytes": 51779
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s10/structure.json",
-        "sha256": "1149f1e1d1dbaf0019a08d3eadb4ce2b40b78427821ebfced1e9f7b61038a6a6",
-        "bytes": 6239
+        "sha256": "f66bf7cb70d2e089faac1a97d7690aa3a751b584af21787bda7732b01b1b87b6",
+        "bytes": 6245
       },
       "counts": {
         "systems": 2,
@@ -896,11 +896,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 27,
-        "curveAmplitudePixels": -1.1548,
-        "shadowStrength": 0.1396,
-        "handwritingStrokeCount": 3,
-        "jpegQuality": 78
+        "backgroundValue": 13,
+        "curveAmplitudePixels": 23.4445,
+        "shadowStrength": 0.1155,
+        "handwritingStrokeCount": 1,
+        "jpegQuality": 82
       }
     },
     {
@@ -910,13 +910,13 @@
       "split": "train",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s11/photo.jpg",
-        "sha256": "c6c12a2378f8c175c19a44bb18c9efb9ffee0e3ad4932e77f34cfaa232699403",
-        "bytes": 46726
+        "sha256": "5079fae00372c4e160083c8a970759e374656fb08a05f558bf0a7c0e5ebc8b0e",
+        "bytes": 46731
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s11/structure.json",
-        "sha256": "2dc4a972a7be4f407db55844ca4d8e5978bd0f96ee2f08355afc35c6457c692b",
-        "bytes": 6236
+        "sha256": "0438c3b9096f2e3809b5aa6cc2ed28998af89ab5729cadbaef79bfbe3ad6fb1d",
+        "bytes": 6238
       },
       "counts": {
         "systems": 2,
@@ -926,11 +926,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 62,
-        "curveAmplitudePixels": -9.3558,
-        "shadowStrength": 0.0041,
-        "handwritingStrokeCount": 1,
-        "jpegQuality": 76
+        "backgroundValue": 50,
+        "curveAmplitudePixels": 13.1644,
+        "shadowStrength": 0.1368,
+        "handwritingStrokeCount": 0,
+        "jpegQuality": 84
       }
     },
     {
@@ -940,13 +940,13 @@
       "split": "train",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s12/photo.jpg",
-        "sha256": "c71bbb50e3e326a28840ccbee0184c640cfbd0a32eaee13c0bc7224bd111be39",
-        "bytes": 43779
+        "sha256": "4907ac064aa52a49157e0f7440d922b1874495b732b65a1bc2d4c3db1e3538ad",
+        "bytes": 41452
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r2-06-self-authored-v1-s12/structure.json",
-        "sha256": "8edf344e053e1671d4d2cc6dcab93cec8430c9ae4816da9a9ed40b672c3bffe7",
-        "bytes": 6243
+        "sha256": "48b86a029740fdc8edbcb3f97d7defce5ca714cef65b6c8c85393c9116f12556",
+        "bytes": 6250
       },
       "counts": {
         "systems": 2,
@@ -956,11 +956,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 53,
-        "curveAmplitudePixels": 3.1955,
-        "shadowStrength": 0.0005,
-        "handwritingStrokeCount": 2,
-        "jpegQuality": 66
+        "backgroundValue": 48,
+        "curveAmplitudePixels": 21.2415,
+        "shadowStrength": 0.1404,
+        "handwritingStrokeCount": 0,
+        "jpegQuality": 68
       }
     },
     {
@@ -970,13 +970,13 @@
       "split": "calibration",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r2-06-self-authored-v1-s13/photo.jpg",
-        "sha256": "4a0346b74a7686bbc7dbfc312a8935472c44c0109e53a90292c43f68e1da36b1",
-        "bytes": 51594
+        "sha256": "42d56c8643042560447eaa562a5827fee8c8ff7d507def772303f4104903e638",
+        "bytes": 55136
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r2-06-self-authored-v1-s13/structure.json",
-        "sha256": "1071e1619caa4d1a2d2751cb3927bec839510c442ed4e8153af7fef3ba7e37de",
-        "bytes": 6212
+        "sha256": "3381c31aee7f25c3ce635b227d6267feedae463317a5053fed3011fbcc7cf7c1",
+        "bytes": 6257
       },
       "counts": {
         "systems": 2,
@@ -986,9 +986,9 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 44,
-        "curveAmplitudePixels": 9.1273,
-        "shadowStrength": 0.0726,
+        "backgroundValue": 48,
+        "curveAmplitudePixels": -56.7338,
+        "shadowStrength": 0.0257,
         "handwritingStrokeCount": 1,
         "jpegQuality": 86
       }
@@ -1000,73 +1000,13 @@
       "split": "calibration",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r2-06-self-authored-v1-s14/photo.jpg",
-        "sha256": "a16fca555eaa6a96c05f33a03d5366af2d824c8b581e948da1f1038c0967087b",
-        "bytes": 44974
+        "sha256": "dabf9d109e55b83962f7e40e80f92c26c659ce4b95cfb9e7c8ee9253ea1da948",
+        "bytes": 47566
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r2-06-self-authored-v1-s14/structure.json",
-        "sha256": "c7ec115bc54181d15d217abdf12eb9be48d6dbe8c3150dd0da33ebbc493b94de",
-        "bytes": 6243
-      },
-      "counts": {
-        "systems": 2,
-        "staffs": 2,
-        "barlines": 17,
-        "measures": 17,
-        "meterRegions": 1
-      },
-      "augmentation": {
-        "backgroundValue": 44,
-        "curveAmplitudePixels": -6.442,
-        "shadowStrength": 0.0972,
-        "handwritingStrokeCount": 1,
-        "jpegQuality": 64
-      }
-    },
-    {
-      "caseId": "r2-06-self-authored-v1-s15",
-      "pieceId": "r2-06",
-      "editionId": "self-authored-v1",
-      "split": "calibration",
-      "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r2-06-self-authored-v1-s15/photo.jpg",
-        "sha256": "a75b976fc502aedba78ddc089f873ce83372e5cf5853922f02d9174bfe9c59b6",
-        "bytes": 59210
-      },
-      "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r2-06-self-authored-v1-s15/structure.json",
-        "sha256": "b84d81504b5ae58e734af667abd890c3b1a4c49d523aecf19d03a77453b4702c",
-        "bytes": 6236
-      },
-      "counts": {
-        "systems": 2,
-        "staffs": 2,
-        "barlines": 17,
-        "measures": 17,
-        "meterRegions": 1
-      },
-      "augmentation": {
-        "backgroundValue": 18,
-        "curveAmplitudePixels": 5.8654,
-        "shadowStrength": 0.0684,
-        "handwritingStrokeCount": 2,
-        "jpegQuality": 92
-      }
-    },
-    {
-      "caseId": "r2-06-self-authored-v1-s16",
-      "pieceId": "r2-06",
-      "editionId": "self-authored-v1",
-      "split": "calibration",
-      "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r2-06-self-authored-v1-s16/photo.jpg",
-        "sha256": "6478c290a3473155f819420823ddc7ef03dd7383ab8d6c9c93b21c85a433ceb1",
-        "bytes": 36785
-      },
-      "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r2-06-self-authored-v1-s16/structure.json",
-        "sha256": "f875f9052e8705eab29c972abb6b1a508eb64b701191cc2985c396b59b606da2",
-        "bytes": 6243
+        "sha256": "bee2d58d59a1c752845bc9b65d724bb805f81d9f4c71fea671a540294d3366af",
+        "bytes": 6235
       },
       "counts": {
         "systems": 2,
@@ -1077,26 +1017,26 @@
       },
       "augmentation": {
         "backgroundValue": 29,
-        "curveAmplitudePixels": -1.1863,
-        "shadowStrength": 0.038,
+        "curveAmplitudePixels": -44.8399,
+        "shadowStrength": 0.0308,
         "handwritingStrokeCount": 1,
-        "jpegQuality": 69
+        "jpegQuality": 83
       }
     },
     {
-      "caseId": "r2-06-self-authored-v1-s17",
+      "caseId": "r2-06-self-authored-v1-s15",
       "pieceId": "r2-06",
       "editionId": "self-authored-v1",
-      "split": "synthetic-test",
+      "split": "calibration",
       "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-06-self-authored-v1-s17/photo.jpg",
-        "sha256": "2bbd0218461c8f0a9b57d4ae045c8e4fd627e2c95771246788c47f226d1872c1",
-        "bytes": 48140
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r2-06-self-authored-v1-s15/photo.jpg",
+        "sha256": "f75a9dc44835624e1efb21a0ed71c8614a2b326bca3fe8f044cd688e0d583f4b",
+        "bytes": 42944
       },
       "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-06-self-authored-v1-s17/structure.json",
-        "sha256": "ffd02e6de7e03f916eda9fa02eb4e05c1db74d82fad402870074a273ce2cf84a",
-        "bytes": 6239
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r2-06-self-authored-v1-s15/structure.json",
+        "sha256": "45b8229696e799e17e916987f66a85326c30b56e851e6d712b86294b063cb406",
+        "bytes": 6245
       },
       "counts": {
         "systems": 2,
@@ -1106,11 +1046,71 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 13,
-        "curveAmplitudePixels": -0.4303,
-        "shadowStrength": 0.095,
-        "handwritingStrokeCount": 3,
-        "jpegQuality": 76
+        "backgroundValue": 67,
+        "curveAmplitudePixels": -25.3437,
+        "shadowStrength": 0.0495,
+        "handwritingStrokeCount": 0,
+        "jpegQuality": 71
+      }
+    },
+    {
+      "caseId": "r2-06-self-authored-v1-s16",
+      "pieceId": "r2-06",
+      "editionId": "self-authored-v1",
+      "split": "calibration",
+      "image": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r2-06-self-authored-v1-s16/photo.jpg",
+        "sha256": "915af6a2d848982d85791497b33560f43f08c295c7e6ab13ef0e59c5a97fdd88",
+        "bytes": 48982
+      },
+      "label": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r2-06-self-authored-v1-s16/structure.json",
+        "sha256": "cd264505c46471de5c12f136ef5e9651901c2a05e4808f00eaf29c8c66dad4fb",
+        "bytes": 6237
+      },
+      "counts": {
+        "systems": 2,
+        "staffs": 2,
+        "barlines": 17,
+        "measures": 17,
+        "meterRegions": 1
+      },
+      "augmentation": {
+        "backgroundValue": 30,
+        "curveAmplitudePixels": 53.7166,
+        "shadowStrength": 0.047,
+        "handwritingStrokeCount": 0,
+        "jpegQuality": 78
+      }
+    },
+    {
+      "caseId": "r2-06-self-authored-v1-s17",
+      "pieceId": "r2-06",
+      "editionId": "self-authored-v1",
+      "split": "synthetic-test",
+      "image": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-06-self-authored-v1-s17/photo.jpg",
+        "sha256": "1ff64ea5aed2d1a063695f3af1bcbd9a6c966028d40ddca9fe81dd624e964ef4",
+        "bytes": 44455
+      },
+      "label": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-06-self-authored-v1-s17/structure.json",
+        "sha256": "061ae7873f1d087eae4c40b5aac40f8471ed1ee6c369e133e5c895edf9b3ff03",
+        "bytes": 6244
+      },
+      "counts": {
+        "systems": 2,
+        "staffs": 2,
+        "barlines": 17,
+        "measures": 17,
+        "meterRegions": 1
+      },
+      "augmentation": {
+        "backgroundValue": 59,
+        "curveAmplitudePixels": 59.2394,
+        "shadowStrength": 0.1992,
+        "handwritingStrokeCount": 1,
+        "jpegQuality": 65
       }
     },
     {
@@ -1120,12 +1120,42 @@
       "split": "synthetic-test",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-06-self-authored-v1-s18/photo.jpg",
-        "sha256": "436fbb812be07278486b34711eabf2666cf20208785892d926b1d7b087467dcb",
-        "bytes": 57515
+        "sha256": "96e9f1e032cdefb59a473bb37c183afd46e4a9cb7e1d5fbc35059778354bc68d",
+        "bytes": 62423
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-06-self-authored-v1-s18/structure.json",
-        "sha256": "57949973ba11b4b3cc067d28b709deb1de6b53c74ba38ba27eaf1b4ec89a0b14",
+        "sha256": "21c59f5b33f2d653b3b460063a5a63c35ed4163a758a57c82077f5a966227e9b",
+        "bytes": 6244
+      },
+      "counts": {
+        "systems": 2,
+        "staffs": 2,
+        "barlines": 17,
+        "measures": 17,
+        "meterRegions": 1
+      },
+      "augmentation": {
+        "backgroundValue": 66,
+        "curveAmplitudePixels": 58.7174,
+        "shadowStrength": 0.1058,
+        "handwritingStrokeCount": 0,
+        "jpegQuality": 89
+      }
+    },
+    {
+      "caseId": "r2-06-self-authored-v1-s19",
+      "pieceId": "r2-06",
+      "editionId": "self-authored-v1",
+      "split": "synthetic-test",
+      "image": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-06-self-authored-v1-s19/photo.jpg",
+        "sha256": "8ad073629bd9c13b59ed63436dc7add5369c7b3d01b5a73ca1a990bb557e2d20",
+        "bytes": 40034
+      },
+      "label": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-06-self-authored-v1-s19/structure.json",
+        "sha256": "c67bcc3133ba9d3d0d3a290d65ae6ccba767c76b238953293c88d973d1c02644",
         "bytes": 6246
       },
       "counts": {
@@ -1136,41 +1166,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 65,
-        "curveAmplitudePixels": 7.4424,
-        "shadowStrength": 0.046,
-        "handwritingStrokeCount": 1,
-        "jpegQuality": 94
-      }
-    },
-    {
-      "caseId": "r2-06-self-authored-v1-s19",
-      "pieceId": "r2-06",
-      "editionId": "self-authored-v1",
-      "split": "synthetic-test",
-      "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-06-self-authored-v1-s19/photo.jpg",
-        "sha256": "66e68e248ced3c0edc4623fdcc1f1373c9e5fde56227bdb67412a989b7bb5f56",
-        "bytes": 39370
-      },
-      "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-06-self-authored-v1-s19/structure.json",
-        "sha256": "d549c1edb421796f5aec6bfac0af5a40c05d32afb59b592b78b843a89054a713",
-        "bytes": 6233
-      },
-      "counts": {
-        "systems": 2,
-        "staffs": 2,
-        "barlines": 17,
-        "measures": 17,
-        "meterRegions": 1
-      },
-      "augmentation": {
-        "backgroundValue": 25,
-        "curveAmplitudePixels": 4.7693,
-        "shadowStrength": 0.0181,
-        "handwritingStrokeCount": 3,
-        "jpegQuality": 70
+        "backgroundValue": 13,
+        "curveAmplitudePixels": 54.8445,
+        "shadowStrength": 0.0499,
+        "handwritingStrokeCount": 0,
+        "jpegQuality": 62
       }
     },
     {
@@ -1180,13 +1180,13 @@
       "split": "synthetic-test",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-06-self-authored-v1-s20/photo.jpg",
-        "sha256": "06027432b76b69d6b3270242bbae039251046ab463d08900ebdd094d4089d4a4",
-        "bytes": 59120
+        "sha256": "dd3a34b47b54ad1e227e2df3ed8287b469de67ffff257a3c6716171325cad120",
+        "bytes": 39629
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-06-self-authored-v1-s20/structure.json",
-        "sha256": "5d397bb59fe0ff186482918c5e60e9b9f2bc101cb3f47741af196a4ea4e6b6b0",
-        "bytes": 6247
+        "sha256": "d0e3a9d63a7038b393d1c74cdf13d4d5e9a0b680d8ec3f13fd53c077cb1c31ac",
+        "bytes": 6249
       },
       "counts": {
         "systems": 2,
@@ -1196,11 +1196,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 56,
-        "curveAmplitudePixels": 9.0213,
-        "shadowStrength": 0.0184,
+        "backgroundValue": 24,
+        "curveAmplitudePixels": -58.6601,
+        "shadowStrength": 0.0551,
         "handwritingStrokeCount": 0,
-        "jpegQuality": 91
+        "jpegQuality": 67
       }
     },
     {
@@ -1210,13 +1210,13 @@
       "split": "train",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s01/photo.jpg",
-        "sha256": "f43c1ece8269e62e09bec1f7ff87305a5da64c835bd0c271ae4d7f8898339702",
-        "bytes": 55575
+        "sha256": "e2a7465f1e114424f47be382d5dbbe6496dd3a63912c5a0d52cd4aa428a6b45d",
+        "bytes": 46597
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s01/structure.json",
-        "sha256": "79ece6b10d9e00173b7531c13aade0f131a555a8582893d84db293ad5ec82691",
-        "bytes": 6909
+        "sha256": "67edffa4ed6daf2ba90738bee7f753cc4d8cb1c9d16b938b2e0e5fa0ad2cf2ad",
+        "bytes": 6933
       },
       "counts": {
         "systems": 3,
@@ -1226,11 +1226,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 13,
-        "curveAmplitudePixels": -7.2801,
-        "shadowStrength": 0.0955,
+        "backgroundValue": 61,
+        "curveAmplitudePixels": -21.366,
+        "shadowStrength": 0.1516,
         "handwritingStrokeCount": 1,
-        "jpegQuality": 73
+        "jpegQuality": 68
       }
     },
     {
@@ -1240,13 +1240,13 @@
       "split": "train",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s02/photo.jpg",
-        "sha256": "874740c36b9c429c66066ae26155d712b02cb65f651b0b4f5d7c4085034882d8",
-        "bytes": 68497
+        "sha256": "c2c0e842fa224a1f436bca4a5da87316021f277b31d61d0a656bab3af9241abf",
+        "bytes": 72576
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s02/structure.json",
-        "sha256": "69e4b987310f4fbe11ce86cba1a10eca43af88250bd7a9248ce80beb6c7908e4",
-        "bytes": 6912
+        "sha256": "02e83c3019c75a2c39db8f5c132cde7f9630fa0b5fcc2f3cdcd5ed56079ff80a",
+        "bytes": 6925
       },
       "counts": {
         "systems": 3,
@@ -1256,11 +1256,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 52,
-        "curveAmplitudePixels": 1.5852,
-        "shadowStrength": 0.1933,
-        "handwritingStrokeCount": 1,
-        "jpegQuality": 90
+        "backgroundValue": 27,
+        "curveAmplitudePixels": 53.3499,
+        "shadowStrength": 0.0281,
+        "handwritingStrokeCount": 2,
+        "jpegQuality": 95
       }
     },
     {
@@ -1270,13 +1270,13 @@
       "split": "train",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s03/photo.jpg",
-        "sha256": "2ff11ab81176b7a6420504207b27cae1da02460a41ebd3ce2ac6d92367e2c2c4",
-        "bytes": 47839
+        "sha256": "cf8e83187de3afaa0ae5f0f8044f713f09d3434662dbc7786132bdf4b1904897",
+        "bytes": 59603
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s03/structure.json",
-        "sha256": "5269ca9d84f020f81853cc39ce9487d9c760e023ea08e511a1a676eea273dcdc",
-        "bytes": 6922
+        "sha256": "01d2085139ca556717c15211f783e4cc9937d921d2788aba62ba7f90bc761157",
+        "bytes": 6919
       },
       "counts": {
         "systems": 3,
@@ -1286,9 +1286,9 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 68,
-        "curveAmplitudePixels": 1.7134,
-        "shadowStrength": 0.035,
+        "backgroundValue": 32,
+        "curveAmplitudePixels": 56.6473,
+        "shadowStrength": 0.0836,
         "handwritingStrokeCount": 0,
         "jpegQuality": 83
       }
@@ -1300,162 +1300,12 @@
       "split": "train",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s04/photo.jpg",
-        "sha256": "44281d093b89fa95ca6b274a4d31670b8d03b2b9ad9598d50007db3894056d8b",
-        "bytes": 70919
+        "sha256": "5986a3aea0e2a4eaa7a542f539114e80b9a187f618e3a5e2245476d9b06b6356",
+        "bytes": 48592
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s04/structure.json",
-        "sha256": "a68f31f7181a301a9b973d95fb3aba1a6f2ea56dd4f5187a84e7a806fcbf11f9",
-        "bytes": 6927
-      },
-      "counts": {
-        "systems": 3,
-        "staffs": 3,
-        "barlines": 18,
-        "measures": 18,
-        "meterRegions": 1
-      },
-      "augmentation": {
-        "backgroundValue": 41,
-        "curveAmplitudePixels": -1.9872,
-        "shadowStrength": 0.1368,
-        "handwritingStrokeCount": 3,
-        "jpegQuality": 88
-      }
-    },
-    {
-      "caseId": "r3-01-self-authored-v1-s05",
-      "pieceId": "r3-01",
-      "editionId": "self-authored-v1",
-      "split": "train",
-      "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s05/photo.jpg",
-        "sha256": "af2a283c422f4ab2d606fd6e2e6afc25e570f214e036acac998082ad1b90fdd1",
-        "bytes": 104311
-      },
-      "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s05/structure.json",
-        "sha256": "98fd1aabd17c00569c87888ea5aa3825608167a9139cc1b662f549fbeed6c7ec",
-        "bytes": 6919
-      },
-      "counts": {
-        "systems": 3,
-        "staffs": 3,
-        "barlines": 18,
-        "measures": 18,
-        "meterRegions": 1
-      },
-      "augmentation": {
-        "backgroundValue": 19,
-        "curveAmplitudePixels": -5.6428,
-        "shadowStrength": 0.2252,
-        "handwritingStrokeCount": 3,
-        "jpegQuality": 95
-      }
-    },
-    {
-      "caseId": "r3-01-self-authored-v1-s06",
-      "pieceId": "r3-01",
-      "editionId": "self-authored-v1",
-      "split": "train",
-      "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s06/photo.jpg",
-        "sha256": "681f7913b11ed097c52237f3a878dc1b3c4b4958cbf6d1e455371599da0bbefc",
-        "bytes": 60550
-      },
-      "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s06/structure.json",
-        "sha256": "da01ae6c5c0ef142b2077b1c579166ed9d8347b792de046354b642989a9dda47",
-        "bytes": 6926
-      },
-      "counts": {
-        "systems": 3,
-        "staffs": 3,
-        "barlines": 18,
-        "measures": 18,
-        "meterRegions": 1
-      },
-      "augmentation": {
-        "backgroundValue": 65,
-        "curveAmplitudePixels": -8.4702,
-        "shadowStrength": 0.1911,
-        "handwritingStrokeCount": 0,
-        "jpegQuality": 81
-      }
-    },
-    {
-      "caseId": "r3-01-self-authored-v1-s07",
-      "pieceId": "r3-01",
-      "editionId": "self-authored-v1",
-      "split": "train",
-      "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s07/photo.jpg",
-        "sha256": "74dfc1419b7218d6694f8d54a2de40ec68018f2025cb57ce626b73bae2875211",
-        "bytes": 71789
-      },
-      "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s07/structure.json",
-        "sha256": "e4c16c7618b38aaa9554da4bacfcbb2cc74bab71c1d55294b56b715c9c9c095a",
-        "bytes": 6933
-      },
-      "counts": {
-        "systems": 3,
-        "staffs": 3,
-        "barlines": 18,
-        "measures": 18,
-        "meterRegions": 1
-      },
-      "augmentation": {
-        "backgroundValue": 14,
-        "curveAmplitudePixels": 2.9838,
-        "shadowStrength": 0.0401,
-        "handwritingStrokeCount": 2,
-        "jpegQuality": 93
-      }
-    },
-    {
-      "caseId": "r3-01-self-authored-v1-s08",
-      "pieceId": "r3-01",
-      "editionId": "self-authored-v1",
-      "split": "train",
-      "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s08/photo.jpg",
-        "sha256": "45c4960f4db7eef7d931114561bbb5702aed9ab96d7b7c75618bf40417758bf0",
-        "bytes": 42910
-      },
-      "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s08/structure.json",
-        "sha256": "b644d6aba7a3689cac80e6361a65f57efac2bc1cb8d9a458ecdf3bcf423982b6",
-        "bytes": 6932
-      },
-      "counts": {
-        "systems": 3,
-        "staffs": 3,
-        "barlines": 18,
-        "measures": 18,
-        "meterRegions": 1
-      },
-      "augmentation": {
-        "backgroundValue": 47,
-        "curveAmplitudePixels": 5.9255,
-        "shadowStrength": 0.0533,
-        "handwritingStrokeCount": 2,
-        "jpegQuality": 76
-      }
-    },
-    {
-      "caseId": "r3-01-self-authored-v1-s09",
-      "pieceId": "r3-01",
-      "editionId": "self-authored-v1",
-      "split": "train",
-      "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s09/photo.jpg",
-        "sha256": "05b80565949192f3304e2ad71a69d7ccc368713a6292a7a689651382b29ba200",
-        "bytes": 64931
-      },
-      "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s09/structure.json",
-        "sha256": "c3ea770ad9cfae80f873d9aa7608cf9d6f352f68a90eab4de785f17a9bbd25b0",
+        "sha256": "f0a8baf9f4520ce2eeebd69dc4ae71a30fe3dc13401ffad81f6a9a9563ff1c5b",
         "bytes": 6922
       },
       "counts": {
@@ -1466,27 +1316,27 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 14,
-        "curveAmplitudePixels": -4.9533,
-        "shadowStrength": 0.0733,
+        "backgroundValue": 49,
+        "curveAmplitudePixels": 56.5338,
+        "shadowStrength": 0.2671,
         "handwritingStrokeCount": 1,
-        "jpegQuality": 88
+        "jpegQuality": 65
       }
     },
     {
-      "caseId": "r3-01-self-authored-v1-s10",
+      "caseId": "r3-01-self-authored-v1-s05",
       "pieceId": "r3-01",
       "editionId": "self-authored-v1",
       "split": "train",
       "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s10/photo.jpg",
-        "sha256": "34e9e89bce6183410e9e045b390711f2b17707bc0710df05b70c7a63e9dc7371",
-        "bytes": 64282
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s05/photo.jpg",
+        "sha256": "b27f3c96eb57c7e0fbde3973990265a6d53b0f1144564e410b2ffa9a7e36c42c",
+        "bytes": 65172
       },
       "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s10/structure.json",
-        "sha256": "9540add169a937fc043459d4236e9483350360c61a0eae688b34a23a424df165",
-        "bytes": 6936
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s05/structure.json",
+        "sha256": "e80206307a55b2ba6fdc0ea052861e34272b14862a1c9cf30de6308eceb74eeb",
+        "bytes": 6914
       },
       "counts": {
         "systems": 3,
@@ -1496,26 +1346,86 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 26,
-        "curveAmplitudePixels": -4.6033,
-        "shadowStrength": 0.2367,
+        "backgroundValue": 25,
+        "curveAmplitudePixels": 58.8808,
+        "shadowStrength": 0.0573,
         "handwritingStrokeCount": 3,
-        "jpegQuality": 79
+        "jpegQuality": 88
       }
     },
     {
-      "caseId": "r3-01-self-authored-v1-s11",
+      "caseId": "r3-01-self-authored-v1-s06",
       "pieceId": "r3-01",
       "editionId": "self-authored-v1",
       "split": "train",
       "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s11/photo.jpg",
-        "sha256": "74f8a1c3caf989399f0d5ab032a3d03300b3bb6823e59e0f46dd27757d883d8d",
-        "bytes": 48914
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s06/photo.jpg",
+        "sha256": "e0c54577656be0e01e7a805c2ea41ec2910273b13440895b47f9d9f15d408f16",
+        "bytes": 57232
       },
       "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s11/structure.json",
-        "sha256": "d28b10c4410b115cb9cdc2c6fe1e3046ae6af6ed22f6188e7493af8ae384f867",
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s06/structure.json",
+        "sha256": "fb21d2abf864a211f09d9cc5d6f9c7cbb48cbcba6143584fa80f3a736a0fb588",
+        "bytes": 6914
+      },
+      "counts": {
+        "systems": 3,
+        "staffs": 3,
+        "barlines": 18,
+        "measures": 18,
+        "meterRegions": 1
+      },
+      "augmentation": {
+        "backgroundValue": 56,
+        "curveAmplitudePixels": 15.8653,
+        "shadowStrength": 0.0967,
+        "handwritingStrokeCount": 2,
+        "jpegQuality": 81
+      }
+    },
+    {
+      "caseId": "r3-01-self-authored-v1-s07",
+      "pieceId": "r3-01",
+      "editionId": "self-authored-v1",
+      "split": "train",
+      "image": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s07/photo.jpg",
+        "sha256": "8b363d6f21705cf95f40a7c351a57a577028e49cf868a382108acb334ef8e31c",
+        "bytes": 66463
+      },
+      "label": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s07/structure.json",
+        "sha256": "18b16b73103faf3007ecb36c7e33001044854da5ac8b8d9e212201e324644f2b",
+        "bytes": 6923
+      },
+      "counts": {
+        "systems": 3,
+        "staffs": 3,
+        "barlines": 18,
+        "measures": 18,
+        "meterRegions": 1
+      },
+      "augmentation": {
+        "backgroundValue": 38,
+        "curveAmplitudePixels": -23.9649,
+        "shadowStrength": 0.1293,
+        "handwritingStrokeCount": 0,
+        "jpegQuality": 89
+      }
+    },
+    {
+      "caseId": "r3-01-self-authored-v1-s08",
+      "pieceId": "r3-01",
+      "editionId": "self-authored-v1",
+      "split": "train",
+      "image": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s08/photo.jpg",
+        "sha256": "8572b7351c0929b6e83ffa536417d9429c7ddb1f70812c80905f797278632fa5",
+        "bytes": 57669
+      },
+      "label": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s08/structure.json",
+        "sha256": "d146ae64ee873dfab968da5dacf1be87c1b8f20baeed76320a036bc9791e9ca1",
         "bytes": 6921
       },
       "counts": {
@@ -1526,27 +1436,27 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 30,
-        "curveAmplitudePixels": -4.605,
-        "shadowStrength": 0.0128,
-        "handwritingStrokeCount": 2,
-        "jpegQuality": 63
+        "backgroundValue": 39,
+        "curveAmplitudePixels": 26.9278,
+        "shadowStrength": 0.1054,
+        "handwritingStrokeCount": 0,
+        "jpegQuality": 83
       }
     },
     {
-      "caseId": "r3-01-self-authored-v1-s12",
+      "caseId": "r3-01-self-authored-v1-s09",
       "pieceId": "r3-01",
       "editionId": "self-authored-v1",
       "split": "train",
       "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s12/photo.jpg",
-        "sha256": "1713a97c3f1a9930800745930e3fefd5be54e7d383f8b4308d9e14d825e80efd",
-        "bytes": 70613
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s09/photo.jpg",
+        "sha256": "c03cef77b8f7b7bf459f069c7e185f674eaa2f4f899f834eab50afb43136ae9b",
+        "bytes": 43517
       },
       "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s12/structure.json",
-        "sha256": "5975676569cd4a65bfb3af880d0b56a903281a40f18d7806204c5402ff775205",
-        "bytes": 6918
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s09/structure.json",
+        "sha256": "ec566a52dae848333f6ea012422554b0c3391f8c05018f554f31af460cf85247",
+        "bytes": 6912
       },
       "counts": {
         "systems": 3,
@@ -1556,57 +1466,27 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 19,
-        "curveAmplitudePixels": 3.5946,
-        "shadowStrength": 0.0989,
-        "handwritingStrokeCount": 3,
-        "jpegQuality": 93
-      }
-    },
-    {
-      "caseId": "r3-01-self-authored-v1-s13",
-      "pieceId": "r3-01",
-      "editionId": "self-authored-v1",
-      "split": "calibration",
-      "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r3-01-self-authored-v1-s13/photo.jpg",
-        "sha256": "725784e8bc17a01288455c8335eda2767396daba8af2b82ee53249308f4d78cb",
-        "bytes": 54270
-      },
-      "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r3-01-self-authored-v1-s13/structure.json",
-        "sha256": "4ee8ea6cb02f1b1755ff72da664436df851824a83476b271787a9ed9c39a5736",
-        "bytes": 6934
-      },
-      "counts": {
-        "systems": 3,
-        "staffs": 3,
-        "barlines": 18,
-        "measures": 18,
-        "meterRegions": 1
-      },
-      "augmentation": {
-        "backgroundValue": 28,
-        "curveAmplitudePixels": -1.253,
-        "shadowStrength": 0.2265,
+        "backgroundValue": 56,
+        "curveAmplitudePixels": 14.1595,
+        "shadowStrength": 0.0129,
         "handwritingStrokeCount": 1,
-        "jpegQuality": 72
+        "jpegQuality": 82
       }
     },
     {
-      "caseId": "r3-01-self-authored-v1-s14",
+      "caseId": "r3-01-self-authored-v1-s10",
       "pieceId": "r3-01",
       "editionId": "self-authored-v1",
-      "split": "calibration",
+      "split": "train",
       "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r3-01-self-authored-v1-s14/photo.jpg",
-        "sha256": "8a0fe4778ec76663b95a16ea54309163c264ba399b5fc1dd113e93af689dc0a2",
-        "bytes": 72182
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s10/photo.jpg",
+        "sha256": "2d8f23c54b036620f02c38e8dda6dfd33d100f7f890d7973158a4389cc2d6006",
+        "bytes": 47926
       },
       "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r3-01-self-authored-v1-s14/structure.json",
-        "sha256": "e56cdc550abb6e1c2fdac8473da6bbc15f566bd1ebf5ea7d50a6e989a4952918",
-        "bytes": 6915
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s10/structure.json",
+        "sha256": "1deee11273f5426129ef5049b483edad6dc26942ad0be16556de2ef7bfd3de58",
+        "bytes": 6903
       },
       "counts": {
         "systems": 3,
@@ -1616,57 +1496,27 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 14,
-        "curveAmplitudePixels": -7.7412,
-        "shadowStrength": 0.2167,
+        "backgroundValue": 32,
+        "curveAmplitudePixels": -59.5387,
+        "shadowStrength": 0.1107,
         "handwritingStrokeCount": 3,
-        "jpegQuality": 90
+        "jpegQuality": 65
       }
     },
     {
-      "caseId": "r3-01-self-authored-v1-s15",
+      "caseId": "r3-01-self-authored-v1-s11",
       "pieceId": "r3-01",
       "editionId": "self-authored-v1",
-      "split": "calibration",
+      "split": "train",
       "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r3-01-self-authored-v1-s15/photo.jpg",
-        "sha256": "a16e2e5fae11ad01f6b28b6989a153cf5e89c3d1ad48a7988cf24f6459e53053",
-        "bytes": 67308
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s11/photo.jpg",
+        "sha256": "351bc29e308148e92aec745bf39f7c10e414051bfe65dc8c91cb126a1029ba49",
+        "bytes": 60719
       },
       "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r3-01-self-authored-v1-s15/structure.json",
-        "sha256": "7f55e2e9c0a805b54d1f06caf040fb418fce7bcc89b5a08822a57e6cc5e8f5e9",
-        "bytes": 6924
-      },
-      "counts": {
-        "systems": 3,
-        "staffs": 3,
-        "barlines": 18,
-        "measures": 18,
-        "meterRegions": 1
-      },
-      "augmentation": {
-        "backgroundValue": 60,
-        "curveAmplitudePixels": 0.9703,
-        "shadowStrength": 0.0784,
-        "handwritingStrokeCount": 0,
-        "jpegQuality": 90
-      }
-    },
-    {
-      "caseId": "r3-01-self-authored-v1-s16",
-      "pieceId": "r3-01",
-      "editionId": "self-authored-v1",
-      "split": "calibration",
-      "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r3-01-self-authored-v1-s16/photo.jpg",
-        "sha256": "7ff120e88b1632f76efba29c426152a96595f3663214679095771cba9fb1e5a7",
-        "bytes": 50430
-      },
-      "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r3-01-self-authored-v1-s16/structure.json",
-        "sha256": "898ba8577f2bc83ddbeb411015ec1ed2631efbf143d9429604323914da7384ab",
-        "bytes": 6900
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s11/structure.json",
+        "sha256": "3b675d03a10edd775f91cc96417d3012eabebfca960962ad13d239cf8ce8f2e1",
+        "bytes": 6917
       },
       "counts": {
         "systems": 3,
@@ -1677,26 +1527,26 @@
       },
       "augmentation": {
         "backgroundValue": 12,
-        "curveAmplitudePixels": 9.348,
-        "shadowStrength": 0.1028,
-        "handwritingStrokeCount": 1,
-        "jpegQuality": 70
+        "curveAmplitudePixels": 58.1293,
+        "shadowStrength": 0.0378,
+        "handwritingStrokeCount": 0,
+        "jpegQuality": 81
       }
     },
     {
-      "caseId": "r3-01-self-authored-v1-s17",
+      "caseId": "r3-01-self-authored-v1-s12",
       "pieceId": "r3-01",
       "editionId": "self-authored-v1",
-      "split": "synthetic-test",
+      "split": "train",
       "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r3-01-self-authored-v1-s17/photo.jpg",
-        "sha256": "737a000ca725e6f64398df326f341f5e5b6999c6a8f4477116b3ae59e91e1181",
-        "bytes": 61767
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s12/photo.jpg",
+        "sha256": "3844fa7b2784c097be69b90281f1da3706df2338ada34abdd6d8c6006f28b64e",
+        "bytes": 45732
       },
       "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r3-01-self-authored-v1-s17/structure.json",
-        "sha256": "14d77b8a99ef2b3fae0b2f8ffb5f53ad9d16305e2efb14ff9acc40c3189791da",
-        "bytes": 6938
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/train/r3-01-self-authored-v1-s12/structure.json",
+        "sha256": "23123f4157676491a18c469559cde0f3b567054972ed74bd25af50b200b30b12",
+        "bytes": 6898
       },
       "counts": {
         "systems": 3,
@@ -1706,26 +1556,26 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 18,
-        "curveAmplitudePixels": 1.136,
-        "shadowStrength": 0.1528,
-        "handwritingStrokeCount": 0,
-        "jpegQuality": 87
+        "backgroundValue": 24,
+        "curveAmplitudePixels": 13.5061,
+        "shadowStrength": 0.1854,
+        "handwritingStrokeCount": 1,
+        "jpegQuality": 62
       }
     },
     {
-      "caseId": "r3-01-self-authored-v1-s18",
+      "caseId": "r3-01-self-authored-v1-s13",
       "pieceId": "r3-01",
       "editionId": "self-authored-v1",
-      "split": "synthetic-test",
+      "split": "calibration",
       "image": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r3-01-self-authored-v1-s18/photo.jpg",
-        "sha256": "cac471b7431c5753920a1a7cacad1ca7585a7e283f87d899ef714e3191eb9eaf",
-        "bytes": 61519
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r3-01-self-authored-v1-s13/photo.jpg",
+        "sha256": "2a7cddfee5b293c52b90cea3367e6c19e858682daeb8021707d870302f0e6528",
+        "bytes": 62691
       },
       "label": {
-        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r3-01-self-authored-v1-s18/structure.json",
-        "sha256": "8b4e61d5f400bf65076d083ef541e16b04aae1c8b7a62779e009b7929dc5f24e",
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r3-01-self-authored-v1-s13/structure.json",
+        "sha256": "217a62c31cf6e4a552cd711ec64c1fd61e66ce7c5e9a1df939b2ed962b919737",
         "bytes": 6924
       },
       "counts": {
@@ -1736,11 +1586,161 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 45,
-        "curveAmplitudePixels": -7.4114,
-        "shadowStrength": 0.2117,
-        "handwritingStrokeCount": 0,
-        "jpegQuality": 89
+        "backgroundValue": 42,
+        "curveAmplitudePixels": -43.7589,
+        "shadowStrength": 0.2218,
+        "handwritingStrokeCount": 3,
+        "jpegQuality": 85
+      }
+    },
+    {
+      "caseId": "r3-01-self-authored-v1-s14",
+      "pieceId": "r3-01",
+      "editionId": "self-authored-v1",
+      "split": "calibration",
+      "image": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r3-01-self-authored-v1-s14/photo.jpg",
+        "sha256": "45d48c68077114afe0dad2bd516d4e444f2f220b7c8ff99504f4a9f5deb281d7",
+        "bytes": 37024
+      },
+      "label": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r3-01-self-authored-v1-s14/structure.json",
+        "sha256": "d94140215c39f5ecdc19a6fe030c0f01c6500413b9297af1572d75f140d618e1",
+        "bytes": 6937
+      },
+      "counts": {
+        "systems": 3,
+        "staffs": 3,
+        "barlines": 18,
+        "measures": 18,
+        "meterRegions": 1
+      },
+      "augmentation": {
+        "backgroundValue": 27,
+        "curveAmplitudePixels": -47.4391,
+        "shadowStrength": 0.0533,
+        "handwritingStrokeCount": 3,
+        "jpegQuality": 62
+      }
+    },
+    {
+      "caseId": "r3-01-self-authored-v1-s15",
+      "pieceId": "r3-01",
+      "editionId": "self-authored-v1",
+      "split": "calibration",
+      "image": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r3-01-self-authored-v1-s15/photo.jpg",
+        "sha256": "ffc051227f475876953a0452c2a6ad10f366a5abf42d9078209e493689f0d1e1",
+        "bytes": 46359
+      },
+      "label": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r3-01-self-authored-v1-s15/structure.json",
+        "sha256": "bc8d0ad21e1ea02fbd9363434450b87430908ced0a41c86425a34fe6c5e34b1a",
+        "bytes": 6929
+      },
+      "counts": {
+        "systems": 3,
+        "staffs": 3,
+        "barlines": 18,
+        "measures": 18,
+        "meterRegions": 1
+      },
+      "augmentation": {
+        "backgroundValue": 59,
+        "curveAmplitudePixels": 31.4005,
+        "shadowStrength": 0.1123,
+        "handwritingStrokeCount": 1,
+        "jpegQuality": 77
+      }
+    },
+    {
+      "caseId": "r3-01-self-authored-v1-s16",
+      "pieceId": "r3-01",
+      "editionId": "self-authored-v1",
+      "split": "calibration",
+      "image": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r3-01-self-authored-v1-s16/photo.jpg",
+        "sha256": "961a665b19fa108c4cb87d7445b8c665a5f1d7832ecd8f7d5a15fce3da883e74",
+        "bytes": 83955
+      },
+      "label": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/calibration/r3-01-self-authored-v1-s16/structure.json",
+        "sha256": "ca7226b61fdc064aab4a9f7ea399a0eef8181068622d63dce6c7263157932974",
+        "bytes": 6937
+      },
+      "counts": {
+        "systems": 3,
+        "staffs": 3,
+        "barlines": 18,
+        "measures": 18,
+        "meterRegions": 1
+      },
+      "augmentation": {
+        "backgroundValue": 63,
+        "curveAmplitudePixels": 51.7635,
+        "shadowStrength": 0.2038,
+        "handwritingStrokeCount": 1,
+        "jpegQuality": 93
+      }
+    },
+    {
+      "caseId": "r3-01-self-authored-v1-s17",
+      "pieceId": "r3-01",
+      "editionId": "self-authored-v1",
+      "split": "synthetic-test",
+      "image": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r3-01-self-authored-v1-s17/photo.jpg",
+        "sha256": "03e94aa3d3a899a71d029d78ef8950ecb12da45161edd3ed7adccf40720d36c2",
+        "bytes": 62273
+      },
+      "label": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r3-01-self-authored-v1-s17/structure.json",
+        "sha256": "467cbb51e08aaee588d30a5cfb804f27ee24ec47ba7be9409f4c9d8a37cedd59",
+        "bytes": 6929
+      },
+      "counts": {
+        "systems": 3,
+        "staffs": 3,
+        "barlines": 18,
+        "measures": 18,
+        "meterRegions": 1
+      },
+      "augmentation": {
+        "backgroundValue": 20,
+        "curveAmplitudePixels": -57.7742,
+        "shadowStrength": 0.1118,
+        "handwritingStrokeCount": 2,
+        "jpegQuality": 88
+      }
+    },
+    {
+      "caseId": "r3-01-self-authored-v1-s18",
+      "pieceId": "r3-01",
+      "editionId": "self-authored-v1",
+      "split": "synthetic-test",
+      "image": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r3-01-self-authored-v1-s18/photo.jpg",
+        "sha256": "d88233f715c825a0a594d7851edaa2568fa0ec13c246292702f1bc08c2839fb9",
+        "bytes": 58131
+      },
+      "label": {
+        "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r3-01-self-authored-v1-s18/structure.json",
+        "sha256": "dbd60ef4f86983b3455aa1990854f8dfbde296e454852361698225d9be57d780",
+        "bytes": 6940
+      },
+      "counts": {
+        "systems": 3,
+        "staffs": 3,
+        "barlines": 18,
+        "measures": 18,
+        "meterRegions": 1
+      },
+      "augmentation": {
+        "backgroundValue": 61,
+        "curveAmplitudePixels": 51.0235,
+        "shadowStrength": 0.0229,
+        "handwritingStrokeCount": 3,
+        "jpegQuality": 78
       }
     },
     {
@@ -1750,13 +1750,13 @@
       "split": "synthetic-test",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r3-01-self-authored-v1-s19/photo.jpg",
-        "sha256": "e573fb83201bdade4d0c183059ea574807b3651e787e77904ed4b2fbad342a1a",
-        "bytes": 73984
+        "sha256": "4e5bc904f8991abbb9f0e75fba4340f6e3a1d1a0d8c35088b50bcbbf93556e04",
+        "bytes": 64193
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r3-01-self-authored-v1-s19/structure.json",
-        "sha256": "a234c2019e94b46312f3aadcf34dfa0cf1c68822d28099036a8f49888e0268ba",
-        "bytes": 6921
+        "sha256": "76d789581fa7c23645d3c7f5472833acaef3a72ca54eac1349fe54852e2c68c6",
+        "bytes": 6939
       },
       "counts": {
         "systems": 3,
@@ -1766,11 +1766,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 58,
-        "curveAmplitudePixels": 2.0756,
-        "shadowStrength": 0.1117,
+        "backgroundValue": 68,
+        "curveAmplitudePixels": 50.1775,
+        "shadowStrength": 0.0117,
         "handwritingStrokeCount": 1,
-        "jpegQuality": 91
+        "jpegQuality": 84
       }
     },
     {
@@ -1780,13 +1780,13 @@
       "split": "synthetic-test",
       "image": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r3-01-self-authored-v1-s20/photo.jpg",
-        "sha256": "7c0cd0404dcdeca316de5d727a29dfc6d45c9518e96749aa2af8fe989d52a018",
-        "bytes": 51125
+        "sha256": "cb3a16292ead27e621992cc6ed4184838612f6ef3f8e022acb9319278e5f3060",
+        "bytes": 36229
       },
       "label": {
         "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r3-01-self-authored-v1-s20/structure.json",
-        "sha256": "0fcd5df046b70d2abc35cdaeaccaeda2ab455306d67ac9215bd4d2ea9275159c",
-        "bytes": 6934
+        "sha256": "55cdfefb34a50659faa7b0930d65d5c9dc4db258c9ed14811ca44eeb2791fc54",
+        "bytes": 6933
       },
       "counts": {
         "systems": 3,
@@ -1796,11 +1796,11 @@
         "meterRegions": 1
       },
       "augmentation": {
-        "backgroundValue": 53,
-        "curveAmplitudePixels": 0.6379,
-        "shadowStrength": 0.1454,
-        "handwritingStrokeCount": 0,
-        "jpegQuality": 74
+        "backgroundValue": 32,
+        "curveAmplitudePixels": 56.6949,
+        "shadowStrength": 0.1695,
+        "handwritingStrokeCount": 2,
+        "jpegQuality": 63
       }
     }
   ],
@@ -1927,7 +1927,88 @@
       "photoBytes": 14747854
     }
   ],
-  "m4aAutoLabeledRows": [],
+  "m4aAutoLabeledRows": [
+    {
+      "caseId": "m4a-positive-01",
+      "photoPath": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-01.jpg",
+      "photoSha256": "c4f008be99137ee627f5d7a9237757394f2d8c7845b753cf2d6738c181f27dd2",
+      "role": "auto-labeled-real-train-candidate",
+      "trainingEligible": true,
+      "sourceEvidenceDigest": "5f8562ffda4df524be26b7a0afd4e470fe40823146c63539e351fe6612287f36"
+    },
+    {
+      "caseId": "m4a-positive-02",
+      "photoPath": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-02.jpg",
+      "photoSha256": "60be9ec7eea84eb261a526d79f7ac892e95a3edcd5020cb1189a21695b8c2ac6",
+      "role": "auto-labeled-real-train-candidate",
+      "trainingEligible": true,
+      "sourceEvidenceDigest": "5f8562ffda4df524be26b7a0afd4e470fe40823146c63539e351fe6612287f36"
+    },
+    {
+      "caseId": "m4a-positive-03",
+      "photoPath": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-03.jpg",
+      "photoSha256": "21c3d76412585b6bf3b7a6d7ea899bb7a7090e14c0e2ab09620775dd3dc1b920",
+      "role": "auto-labeled-real-train-candidate",
+      "trainingEligible": true,
+      "sourceEvidenceDigest": "5f8562ffda4df524be26b7a0afd4e470fe40823146c63539e351fe6612287f36"
+    },
+    {
+      "caseId": "m4a-positive-04",
+      "photoPath": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-04.jpg",
+      "photoSha256": "bb6880eb0fde8e48be3248831398849e383a00f44930e2e39bf74121b8dce4dd",
+      "role": "auto-labeled-real-train-candidate",
+      "trainingEligible": true,
+      "sourceEvidenceDigest": "5f8562ffda4df524be26b7a0afd4e470fe40823146c63539e351fe6612287f36"
+    },
+    {
+      "caseId": "m4a-positive-05",
+      "photoPath": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-05.jpg",
+      "photoSha256": "07b55b8a437d3e557f8baa440d82a0820e922b544a2c48968905a93108950d9a",
+      "role": "auto-labeled-real-train-candidate",
+      "trainingEligible": true,
+      "sourceEvidenceDigest": "5f8562ffda4df524be26b7a0afd4e470fe40823146c63539e351fe6612287f36"
+    },
+    {
+      "caseId": "m4a-positive-06",
+      "photoPath": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-06.jpg",
+      "photoSha256": "98b8303980e2f326acbc088bf44b8e30606e52963108766f1c59161c368a2b00",
+      "role": "auto-labeled-real-train-candidate",
+      "trainingEligible": true,
+      "sourceEvidenceDigest": "5f8562ffda4df524be26b7a0afd4e470fe40823146c63539e351fe6612287f36"
+    },
+    {
+      "caseId": "m4a-positive-07",
+      "photoPath": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-07.jpg",
+      "photoSha256": "82d07df33fb2cde8a6c59eac8a49353b4435de0e667aeb9e6c1c6991a78b335a",
+      "role": "auto-labeled-real-train-candidate",
+      "trainingEligible": true,
+      "sourceEvidenceDigest": "5f8562ffda4df524be26b7a0afd4e470fe40823146c63539e351fe6612287f36"
+    },
+    {
+      "caseId": "m4a-positive-08",
+      "photoPath": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-08.jpg",
+      "photoSha256": "6b7dfc74f6b9b39569af4b118f8211d2c4ddc47d53c7cc833a70ab915ba0e015",
+      "role": "auto-labeled-real-train-candidate",
+      "trainingEligible": true,
+      "sourceEvidenceDigest": "5f8562ffda4df524be26b7a0afd4e470fe40823146c63539e351fe6612287f36"
+    },
+    {
+      "caseId": "m4a-positive-09",
+      "photoPath": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-09.jpg",
+      "photoSha256": "ee65d93b0596c93e2ea73a2726adb866bc7eefdaaac94b2636a4d3ee772c7421",
+      "role": "auto-labeled-real-train-candidate",
+      "trainingEligible": true,
+      "sourceEvidenceDigest": "5f8562ffda4df524be26b7a0afd4e470fe40823146c63539e351fe6612287f36"
+    },
+    {
+      "caseId": "m4a-positive-10",
+      "photoPath": "data/private/western-strings-m4a-real-photo-acceptance/positive/m4a-positive-10.jpg",
+      "photoSha256": "b2da4e0fb64f479b61b1ed575d5cb12d1d66203aad5867927cd9d98e1dd7c306",
+      "role": "auto-labeled-real-train-candidate",
+      "trainingEligible": true,
+      "sourceEvidenceDigest": "5f8562ffda4df524be26b7a0afd4e470fe40823146c63539e351fe6612287f36"
+    }
+  ],
   "activeLearningRows": [],
   "freshBlindRows": []
 }

@@ -5,12 +5,12 @@
   "realAnnotationTargetReady": false,
   "freshBlindReady": false,
   "manifest": "data/experiments/western-strings-m4b/dataset/manifest.json",
-  "manifestSha256": "fdf2eb261221b3fde77e2a2d7ddb86f5107d1a1064d5f33d7c726244c36e117e",
+  "manifestSha256": "e207a36d877111145a11caed8518040149423b07e0ef05ce1770bb09b09ad898",
   "provenance": {
     "policy": "config/western-m4b-dataset.json",
-    "policySha256": "e375884c215e6d9cfd3947e4678d5ea51e61ecb99f8d305ad6ed3790d676cb92",
+    "policySha256": "b13a906d448338b4831ddf94acb428acd53673b59c3ccee4df736bbce26b32b5",
     "builder": "scripts/experiments/build_western_m4b_structure_dataset.py",
-    "builderSha256": "f89f717b9d94f23b333c7f0785c78f312bf9b866d27adec9d7f8f166bdf2a393"
+    "builderSha256": "dd38eea79b9512fd693032554b201f6d867315b9d30a9f4dc77d173d6114a398"
   },
   "artifacts": {
     "labelSchema": {
@@ -31,9 +31,23 @@
       "calibration": 12,
       "synthetic-test": 12
     },
+    "syntheticCurveAmplitudePixelsBySplit": {
+      "train": {
+        "minimumAbsolute": 0.2614,
+        "maximumAbsolute": 59.5387
+      },
+      "calibration": {
+        "minimumAbsolute": 23.1974,
+        "maximumAbsolute": 56.7338
+      },
+      "synthetic-test": {
+        "minimumAbsolute": 50.1775,
+        "maximumAbsolute": 59.2394
+      }
+    },
     "frozenSourceGoldTestOnly": 5,
     "frozenScreenPhotoTestOnly": 8,
-    "m4aAutoLabeled": 0,
+    "m4aAutoLabeled": 10,
     "activeLearning": 0,
     "freshBlind": 0,
     "freshBlindPiecesOrLayouts": 0,

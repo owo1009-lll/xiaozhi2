@@ -17,6 +17,20 @@
       "train": 12,
       "calibration": 4,
       "synthetic-test": 4
+    },
+    "curveAmplitudePixelsBySplit": {
+      "train": {
+        "minimumAbsolute": 0,
+        "maximumAbsolute": 60
+      },
+      "calibration": {
+        "minimumAbsolute": 20,
+        "maximumAbsolute": 60
+      },
+      "synthetic-test": {
+        "minimumAbsolute": 50,
+        "maximumAbsolute": 60
+      }
     }
   },
   "realAnnotation": {

@@ -50,6 +50,17 @@ export function evaluateM4bDataset({ config, manifest, report }) {
   ) {
     blockingReasons.push("m4b-synthetic-split-policy-drift");
   }
+  const curvePolicy = config?.synthetic?.curveAmplitudePixelsBySplit;
+  if (
+    curvePolicy?.train?.minimumAbsolute !== 0
+    || curvePolicy?.train?.maximumAbsolute !== 60
+    || curvePolicy?.calibration?.minimumAbsolute !== 20
+    || curvePolicy?.calibration?.maximumAbsolute !== 60
+    || curvePolicy?.["synthetic-test"]?.minimumAbsolute !== 50
+    || curvePolicy?.["synthetic-test"]?.maximumAbsolute !== 60
+  ) {
+    blockingReasons.push("m4b-synthetic-curve-stress-policy-drift");
+  }
   if (config?.realAnnotation?.minimumTarget !== 100 || config?.realAnnotation?.maximumTarget !== 300) {
     blockingReasons.push("m4b-real-annotation-target-drift");
   }
@@ -83,6 +94,17 @@ export function evaluateM4bDataset({ config, manifest, report }) {
   ]));
   if (splitCounts.train !== 36 || splitCounts.calibration !== 12 || splitCounts["synthetic-test"] !== 12) {
     blockingReasons.push("m4b-synthetic-manifest-split-mismatch");
+  }
+  for (const [split, range] of Object.entries(curvePolicy || {})) {
+    const amplitudes = synthetic
+      .filter((row) => row.split === split)
+      .map((row) => Math.abs(Number(row.augmentation?.curveAmplitudePixels)));
+    if (
+      amplitudes.length === 0
+      || amplitudes.some((value) => !Number.isFinite(value) || value < range.minimumAbsolute || value > range.maximumAbsolute)
+    ) {
+      blockingReasons.push(`m4b-synthetic-curve-stress-range-invalid:${split}`);
+    }
   }
   if (sourceGold.length !== 5 || sourceGold.some((row) => row.trainingEligible !== false || row.role !== "frozen-source-gold-test-only")) {
     blockingReasons.push("m4b-source-gold-training-leak");

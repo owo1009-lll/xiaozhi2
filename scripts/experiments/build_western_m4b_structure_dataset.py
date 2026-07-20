@@ -144,12 +144,22 @@ def transform_gold(gold: dict[str, Any], homography: np.ndarray, curve_amplitude
     return output
 
 
-def augment_page(image: np.ndarray, rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray, float, dict[str, Any]]:
+def augment_page(
+    image: np.ndarray,
+    rng: np.random.Generator,
+    curve_range: dict[str, float],
+) -> tuple[np.ndarray, np.ndarray, float, dict[str, Any]]:
     source_height, source_width = image.shape[:2]
     output_width, output_height = 920, 1260
-    margin_x, margin_y = 75, 55
+    minimum_curve = float(curve_range["minimumAbsolute"])
+    maximum_curve = float(curve_range["maximumAbsolute"])
+    if not 0 <= minimum_curve <= maximum_curve:
+        raise ValueError(f"invalid curve amplitude range: {curve_range}")
+    curve_sign = -1.0 if rng.random() < 0.5 else 1.0
+    curve_amplitude = curve_sign * float(rng.uniform(minimum_curve, maximum_curve))
+    margin_x, margin_y = 75, 125
     jitter_x = output_width * 0.045
-    jitter_y = output_height * 0.035
+    jitter_y = 25
     target = np.float32([
         [margin_x + rng.uniform(-jitter_x, jitter_x), margin_y + rng.uniform(-jitter_y, jitter_y)],
         [output_width - margin_x + rng.uniform(-jitter_x, jitter_x), margin_y + rng.uniform(-jitter_y, jitter_y)],
@@ -163,7 +173,6 @@ def augment_page(image: np.ndarray, rng: np.random.Generator) -> tuple[np.ndarra
     warped = cv2.warpPerspective(image, homography, (output_width, output_height), borderValue=(background_value,) * 3)
     mask = cv2.warpPerspective(np.full((source_height, source_width), 255, dtype=np.uint8), homography, (output_width, output_height))
     canvas[mask > 0] = warped[mask > 0]
-    curve_amplitude = float(rng.uniform(-10.0, 10.0))
     grid_x, grid_y = np.meshgrid(np.arange(output_width, dtype=np.float32), np.arange(output_height, dtype=np.float32))
     map_y = grid_y - curve_amplitude * np.sin(np.pi * grid_x / max(1, output_width - 1))
     canvas = cv2.remap(canvas, grid_x, map_y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(background_value,) * 3)
@@ -227,10 +236,11 @@ def build_synthetic(config: dict[str, Any], output_root: Path) -> list[dict[str,
         gold = structure_gold(sidecar)
         for variant_index in range(variants):
             rng = np.random.default_rng(int(config["synthetic"]["seed"]) + entry_index * 1000 + variant_index)
-            augmented, homography, curve_amplitude, augmentation = augment_page(image, rng)
+            split = split_for(variant_index, split_counts)
+            curve_range = config["synthetic"]["curveAmplitudePixelsBySplit"][split]
+            augmented, homography, curve_amplitude, augmentation = augment_page(image, rng, curve_range)
             transformed = transform_gold(gold, homography, curve_amplitude, augmented.shape[1], augmented.shape[0])
             case_id = f"{entry['pieceId']}-{entry['editionId']}-s{variant_index + 1:02d}"
-            split = split_for(variant_index, split_counts)
             case_root = synthetic_root / split / case_id
             image_path = case_root / "photo.jpg"
             label_path = case_root / "structure.json"
@@ -401,6 +411,13 @@ def main() -> None:
         split: sum(row["split"] == split for row in synthetic)
         for split in config["synthetic"]["splitsByVariant"]
     }
+    curve_ranges = {
+        split: {
+            "minimumAbsolute": round(min(abs(float(row["augmentation"]["curveAmplitudePixels"])) for row in synthetic if row["split"] == split), 4),
+            "maximumAbsolute": round(max(abs(float(row["augmentation"]["curveAmplitudePixels"])) for row in synthetic if row["split"] == split), 4),
+        }
+        for split in config["synthetic"]["splitsByVariant"]
+    }
     report = {
         "contract": "western-m4b-structure-dataset-report-v1",
         "complete": True,
@@ -422,6 +439,7 @@ def main() -> None:
         "counts": {
             "synthetic": len(synthetic),
             "syntheticSplits": split_counts,
+            "syntheticCurveAmplitudePixelsBySplit": curve_ranges,
             "frozenSourceGoldTestOnly": len(source_gold),
             "frozenScreenPhotoTestOnly": len(screen_photos),
             "m4aAutoLabeled": len(m4a_success),
