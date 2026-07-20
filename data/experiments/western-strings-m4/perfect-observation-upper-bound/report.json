@@ -1,0 +1,1301 @@
+{
+  "contract": "western-m4-perfect-observation-upper-bound-v1",
+  "evidenceRole": "clean-render-post-segmentation-decoder-upper-bound",
+  "sources": {
+    "noteAudit": {
+      "path": "data/experiments/western-strings-m4/render-gold-omr/render-gold-note-level-audit.json",
+      "sha256": "caffd2ffe4ecbe6d2e735248abd1aa0d937232b40339ab5729b138a22cf284a7"
+    },
+    "attribution": {
+      "path": "data/experiments/western-strings-m4/clean-failure-modes/structure-attribution.json",
+      "sha256": "4f6e18cadc57b764d4c073ba221a31620064ac35f77eb152997adaaecc75a742"
+    },
+    "maskManifest": {
+      "path": "data/experiments/western-strings-m4/perfect-observation-upper-bound/mask-manifest.json",
+      "sha256": "40d0baa5fdecf830fdf4c120333d3b09bfb1df8855aaf593b2554d0538fdc1ea"
+    }
+  },
+  "thresholds": {
+    "strictPerPieceMetricMin": 0.95,
+    "cleanStopLossPerPiecePassRateMin": 0.8,
+    "onsetToleranceQuarters": 0.25,
+    "maskWhiteThreshold": 250
+  },
+  "baselineAudiveris": {
+    "pieceCount": 32,
+    "onsetPassedPieceCount": 8,
+    "measurePassedPieceCount": 10,
+    "onsetPassedPieceRate": 0.25,
+    "measurePassedPieceRate": 0.3125
+  },
+  "perfectObservationOemer": {
+    "requestedPieceCount": 32,
+    "decodedPieceCount": 29,
+    "failedPieceCount": 3,
+    "goldNotes": 22356,
+    "draftNotes": 22598,
+    "pitchPrecision": 0.59908,
+    "pitchRecall": 0.605565,
+    "onsetQuarterAccuracy": 0.027017,
+    "measureAccuracy": 0.420424,
+    "onsetPassedPieceCount": 0,
+    "onsetPassedPieceRate": 0.0,
+    "measurePassedPieceCount": 4,
+    "measurePassedPieceRate": 0.137931,
+    "structurePassedPieceCount": 0,
+    "structurePassedPieceRate": 0.0
+  },
+  "branchDecision": {
+    "clean80TargetReached": false,
+    "route": "constraint-solver-poc",
+    "reason": "perfect segmentation remains below the clean target; post-segmentation classification/decoding is defective"
+  },
+  "method": {
+    "observation": "five exact Verovio SVG-derived segmentation layers replace both Oemer UNet outputs",
+    "staffObservation": "Staff/Line objects are built directly from the exact five-line mask; Oemer staff recovery is bypassed.",
+    "decoder": "unchanged Oemer 0.1.8 note/group/symbol/rhythm extraction and MusicXML builder",
+    "domains": [
+      "clean-digital-render"
+    ]
+  },
+  "runtime": {
+    "oemerVersion": "0.1.8",
+    "scikitLearnVersion": "1.8.0",
+    "compatibilityEvidence": "docs/western-strings-m4-omr-independent-benchmark.md records byte-identical Oemer MusicXML under sklearn 1.2.0, 1.2.2, and 1.8.0"
+  },
+  "limitations": [
+    "The baseline is Audiveris while the upper bound is Oemer; the comparison selects a Route-B decoder branch, not an within-engine gain claim.",
+    "Perfect segmentation removes pixel detection error but retains Oemer morphology, SVM symbol classification, grouping, rhythm parsing, and MusicXML construction.",
+    "No real-photo image is used for tuning or iteration in this experiment."
+  ],
+  "studentGateReady": false,
+  "automaticAdoptionAuthorized": false,
+  "rows": [
+    {
+      "pieceId": "bwv1001_mov1",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 9,
+          "noteheadCount": 426,
+          "noteGroupCount": 399,
+          "barlineCount": 18,
+          "restCount": 12,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1001_mov1/page-01.musicxml"
+        },
+        {
+          "page": 2,
+          "staffCount": 2,
+          "noteheadCount": 107,
+          "noteGroupCount": 99,
+          "barlineCount": 7,
+          "restCount": 1,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1001_mov1/page-02.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 532,
+        "draftNotes": 527,
+        "pitchExact": 283,
+        "onsetExact": 15,
+        "measureExact": 136,
+        "missingNotes": 60,
+        "extraNotes": 55,
+        "pitchPrecision": 0.537002,
+        "pitchRecall": 0.531955,
+        "onsetQuarterAccuracy": 0.028195,
+        "measureAccuracy": 0.255639,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1001_mov2",
+      "status": "error",
+      "error": "TypeError:iteration over a 0-d array",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 10,
+          "noteheadCount": 529,
+          "noteGroupCount": 491,
+          "barlineCount": 35,
+          "restCount": 72,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1001_mov2/page-01.musicxml"
+        },
+        {
+          "page": 2,
+          "staffCount": 10,
+          "noteheadCount": 570,
+          "noteGroupCount": 486,
+          "barlineCount": 32,
+          "restCount": 26,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1001_mov2/page-02.musicxml"
+        },
+        {
+          "page": 3,
+          "staffCount": 10,
+          "noteheadCount": 486,
+          "noteGroupCount": 451,
+          "barlineCount": 31,
+          "restCount": 22,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1001_mov2/page-03.musicxml"
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1001_mov3",
+      "status": "error",
+      "error": "TypeError:iteration over a 0-d array",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 9,
+          "noteheadCount": 478,
+          "noteGroupCount": 442,
+          "barlineCount": 17,
+          "restCount": 76,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1001_mov3/page-01.musicxml"
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1001_mov4",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 12,
+          "noteheadCount": 555,
+          "noteGroupCount": 553,
+          "barlineCount": 103,
+          "restCount": 2,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1001_mov4/page-01.musicxml"
+        },
+        {
+          "page": 2,
+          "staffCount": 6,
+          "noteheadCount": 256,
+          "noteGroupCount": 255,
+          "barlineCount": 46,
+          "restCount": 1,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1001_mov4/page-02.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 812,
+        "draftNotes": 811,
+        "pitchExact": 561,
+        "onsetExact": 1,
+        "measureExact": 348,
+        "missingNotes": 2,
+        "extraNotes": 1,
+        "pitchPrecision": 0.691739,
+        "pitchRecall": 0.690887,
+        "onsetQuarterAccuracy": 0.001232,
+        "measureAccuracy": 0.428571,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1002_mov1",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 9,
+          "noteheadCount": 372,
+          "noteGroupCount": 362,
+          "barlineCount": 23,
+          "restCount": 6,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1002_mov1/page-01.musicxml"
+        },
+        {
+          "page": 2,
+          "staffCount": 4,
+          "noteheadCount": 166,
+          "noteGroupCount": 164,
+          "barlineCount": 10,
+          "restCount": 3,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1002_mov1/page-02.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 538,
+        "draftNotes": 537,
+        "pitchExact": 362,
+        "onsetExact": 1,
+        "measureExact": 436,
+        "missingNotes": 37,
+        "extraNotes": 36,
+        "pitchPrecision": 0.674115,
+        "pitchRecall": 0.672862,
+        "onsetQuarterAccuracy": 0.001859,
+        "measureAccuracy": 0.810409,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1002_mov2",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 9,
+          "noteheadCount": 380,
+          "noteGroupCount": 380,
+          "barlineCount": 31,
+          "restCount": 3,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1002_mov2/page-01.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 380,
+        "draftNotes": 380,
+        "pitchExact": 231,
+        "onsetExact": 1,
+        "measureExact": 380,
+        "missingNotes": 0,
+        "extraNotes": 0,
+        "pitchPrecision": 0.607895,
+        "pitchRecall": 0.607895,
+        "onsetQuarterAccuracy": 0.002632,
+        "measureAccuracy": 1.0,
+        "onsetPassed": false,
+        "measurePassed": true,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1002_mov3",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 12,
+          "noteheadCount": 421,
+          "noteGroupCount": 421,
+          "barlineCount": 76,
+          "restCount": 2,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1002_mov3/page-01.musicxml"
+        },
+        {
+          "page": 2,
+          "staffCount": 2,
+          "noteheadCount": 56,
+          "noteGroupCount": 55,
+          "barlineCount": 12,
+          "restCount": 2,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1002_mov3/page-02.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 476,
+        "draftNotes": 477,
+        "pitchExact": 285,
+        "onsetExact": 4,
+        "measureExact": 7,
+        "missingNotes": 1,
+        "extraNotes": 2,
+        "pitchPrecision": 0.597484,
+        "pitchRecall": 0.598739,
+        "onsetQuarterAccuracy": 0.008403,
+        "measureAccuracy": 0.014706,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1002_mov4",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 12,
+          "noteheadCount": 502,
+          "noteGroupCount": 502,
+          "barlineCount": 47,
+          "restCount": 2,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1002_mov4/page-01.musicxml"
+        },
+        {
+          "page": 2,
+          "staffCount": 11,
+          "noteheadCount": 453,
+          "noteGroupCount": 453,
+          "barlineCount": 42,
+          "restCount": 0,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1002_mov4/page-02.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 955,
+        "draftNotes": 955,
+        "pitchExact": 576,
+        "onsetExact": 1,
+        "measureExact": 899,
+        "missingNotes": 0,
+        "extraNotes": 0,
+        "pitchPrecision": 0.603141,
+        "pitchRecall": 0.603141,
+        "onsetQuarterAccuracy": 0.001047,
+        "measureAccuracy": 0.941361,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1002_mov5",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 6,
+          "noteheadCount": 271,
+          "noteGroupCount": 204,
+          "barlineCount": 37,
+          "restCount": 4,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1002_mov5/page-01.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 268,
+        "draftNotes": 271,
+        "pitchExact": 82,
+        "onsetExact": 13,
+        "measureExact": 140,
+        "missingNotes": 15,
+        "extraNotes": 18,
+        "pitchPrecision": 0.302583,
+        "pitchRecall": 0.30597,
+        "onsetQuarterAccuracy": 0.048507,
+        "measureAccuracy": 0.522388,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1002_mov6",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 9,
+          "noteheadCount": 299,
+          "noteGroupCount": 299,
+          "barlineCount": 39,
+          "restCount": 3,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1002_mov6/page-01.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 299,
+        "draftNotes": 299,
+        "pitchExact": 176,
+        "onsetExact": 72,
+        "measureExact": 282,
+        "missingNotes": 0,
+        "extraNotes": 0,
+        "pitchPrecision": 0.588629,
+        "pitchRecall": 0.588629,
+        "onsetQuarterAccuracy": 0.240803,
+        "measureAccuracy": 0.943144,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1002_mov7",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 11,
+          "noteheadCount": 419,
+          "noteGroupCount": 358,
+          "barlineCount": 56,
+          "restCount": 4,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1002_mov7/page-01.musicxml"
+        },
+        {
+          "page": 2,
+          "staffCount": 4,
+          "noteheadCount": 121,
+          "noteGroupCount": 109,
+          "barlineCount": 17,
+          "restCount": 1,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1002_mov7/page-02.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 536,
+        "draftNotes": 540,
+        "pitchExact": 226,
+        "onsetExact": 124,
+        "measureExact": 166,
+        "missingNotes": 26,
+        "extraNotes": 30,
+        "pitchPrecision": 0.418519,
+        "pitchRecall": 0.421642,
+        "onsetQuarterAccuracy": 0.231343,
+        "measureAccuracy": 0.309701,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1002_mov8",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 12,
+          "noteheadCount": 401,
+          "noteGroupCount": 394,
+          "barlineCount": 52,
+          "restCount": 2,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1002_mov8/page-01.musicxml"
+        },
+        {
+          "page": 2,
+          "staffCount": 5,
+          "noteheadCount": 154,
+          "noteGroupCount": 153,
+          "barlineCount": 22,
+          "restCount": 2,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1002_mov8/page-02.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 554,
+        "draftNotes": 555,
+        "pitchExact": 329,
+        "onsetExact": 1,
+        "measureExact": 420,
+        "missingNotes": 4,
+        "extraNotes": 5,
+        "pitchPrecision": 0.592793,
+        "pitchRecall": 0.593863,
+        "onsetQuarterAccuracy": 0.001805,
+        "measureAccuracy": 0.758123,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1003_mov1",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 9,
+          "noteheadCount": 369,
+          "noteGroupCount": 357,
+          "barlineCount": 17,
+          "restCount": 15,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1003_mov1/page-01.musicxml"
+        },
+        {
+          "page": 2,
+          "staffCount": 4,
+          "noteheadCount": 184,
+          "noteGroupCount": 181,
+          "barlineCount": 10,
+          "restCount": 2,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1003_mov1/page-02.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 553,
+        "draftNotes": 551,
+        "pitchExact": 377,
+        "onsetExact": 6,
+        "measureExact": 475,
+        "missingNotes": 43,
+        "extraNotes": 41,
+        "pitchPrecision": 0.684211,
+        "pitchRecall": 0.681736,
+        "onsetQuarterAccuracy": 0.01085,
+        "measureAccuracy": 0.858951,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1003_mov2",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 10,
+          "noteheadCount": 540,
+          "noteGroupCount": 481,
+          "barlineCount": 68,
+          "restCount": 30,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1003_mov2/page-01.musicxml"
+        },
+        {
+          "page": 2,
+          "staffCount": 10,
+          "noteheadCount": 534,
+          "noteGroupCount": 496,
+          "barlineCount": 62,
+          "restCount": 39,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1003_mov2/page-02.musicxml"
+        },
+        {
+          "page": 3,
+          "staffCount": 10,
+          "noteheadCount": 548,
+          "noteGroupCount": 495,
+          "barlineCount": 69,
+          "restCount": 54,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1003_mov2/page-03.musicxml"
+        },
+        {
+          "page": 4,
+          "staffCount": 10,
+          "noteheadCount": 503,
+          "noteGroupCount": 468,
+          "barlineCount": 68,
+          "restCount": 53,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1003_mov2/page-04.musicxml"
+        },
+        {
+          "page": 5,
+          "staffCount": 5,
+          "noteheadCount": 246,
+          "noteGroupCount": 222,
+          "barlineCount": 26,
+          "restCount": 35,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1003_mov2/page-05.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 2370,
+        "draftNotes": 2371,
+        "pitchExact": 1370,
+        "onsetExact": 0,
+        "measureExact": 171,
+        "missingNotes": 155,
+        "extraNotes": 156,
+        "pitchPrecision": 0.577815,
+        "pitchRecall": 0.578059,
+        "onsetQuarterAccuracy": 0.0,
+        "measureAccuracy": 0.072152,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1003_mov3",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 7,
+          "noteheadCount": 438,
+          "noteGroupCount": 394,
+          "barlineCount": 35,
+          "restCount": 19,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1003_mov3/page-01.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 431,
+        "draftNotes": 438,
+        "pitchExact": 202,
+        "onsetExact": 11,
+        "measureExact": 214,
+        "missingNotes": 50,
+        "extraNotes": 57,
+        "pitchPrecision": 0.461187,
+        "pitchRecall": 0.468677,
+        "onsetQuarterAccuracy": 0.025522,
+        "measureAccuracy": 0.49652,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1003_mov4",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 12,
+          "noteheadCount": 537,
+          "noteGroupCount": 536,
+          "barlineCount": 38,
+          "restCount": 2,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1003_mov4/page-01.musicxml"
+        },
+        {
+          "page": 2,
+          "staffCount": 11,
+          "noteheadCount": 485,
+          "noteGroupCount": 485,
+          "barlineCount": 28,
+          "restCount": 1,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1003_mov4/page-02.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 1021,
+        "draftNotes": 1022,
+        "pitchExact": 869,
+        "onsetExact": 8,
+        "measureExact": 728,
+        "missingNotes": 0,
+        "extraNotes": 1,
+        "pitchPrecision": 0.850294,
+        "pitchRecall": 0.851126,
+        "onsetQuarterAccuracy": 0.007835,
+        "measureAccuracy": 0.713026,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1004_mov1",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 12,
+          "noteheadCount": 545,
+          "noteGroupCount": 544,
+          "barlineCount": 39,
+          "restCount": 5,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1004_mov1/page-01.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 547,
+        "draftNotes": 545,
+        "pitchExact": 449,
+        "onsetExact": 1,
+        "measureExact": 317,
+        "missingNotes": 3,
+        "extraNotes": 1,
+        "pitchPrecision": 0.823853,
+        "pitchRecall": 0.820841,
+        "onsetQuarterAccuracy": 0.001828,
+        "measureAccuracy": 0.579525,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1004_mov2",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 11,
+          "noteheadCount": 435,
+          "noteGroupCount": 427,
+          "barlineCount": 61,
+          "restCount": 3,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1004_mov2/page-01.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 434,
+        "draftNotes": 435,
+        "pitchExact": 326,
+        "onsetExact": 1,
+        "measureExact": 427,
+        "missingNotes": 5,
+        "extraNotes": 6,
+        "pitchPrecision": 0.749425,
+        "pitchRecall": 0.751152,
+        "onsetQuarterAccuracy": 0.002304,
+        "measureAccuracy": 0.983871,
+        "onsetPassed": false,
+        "measurePassed": true,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1004_mov3",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 7,
+          "noteheadCount": 314,
+          "noteGroupCount": 282,
+          "barlineCount": 38,
+          "restCount": 5,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1004_mov3/page-01.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 309,
+        "draftNotes": 314,
+        "pitchExact": 178,
+        "onsetExact": 5,
+        "measureExact": 64,
+        "missingNotes": 17,
+        "extraNotes": 22,
+        "pitchPrecision": 0.566879,
+        "pitchRecall": 0.576052,
+        "onsetQuarterAccuracy": 0.016181,
+        "measureAccuracy": 0.20712,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1004_mov4",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 12,
+          "noteheadCount": 531,
+          "noteGroupCount": 531,
+          "barlineCount": 30,
+          "restCount": 2,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1004_mov4/page-01.musicxml"
+        },
+        {
+          "page": 2,
+          "staffCount": 8,
+          "noteheadCount": 379,
+          "noteGroupCount": 379,
+          "barlineCount": 18,
+          "restCount": 1,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1004_mov4/page-02.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 910,
+        "draftNotes": 910,
+        "pitchExact": 738,
+        "onsetExact": 1,
+        "measureExact": 910,
+        "missingNotes": 0,
+        "extraNotes": 0,
+        "pitchPrecision": 0.810989,
+        "pitchRecall": 0.810989,
+        "onsetQuarterAccuracy": 0.001099,
+        "measureAccuracy": 1.0,
+        "onsetPassed": false,
+        "measurePassed": true,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1004_mov5",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 11,
+          "noteheadCount": 541,
+          "noteGroupCount": 477,
+          "barlineCount": 53,
+          "restCount": 22,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1004_mov5/page-01.musicxml"
+        },
+        {
+          "page": 2,
+          "staffCount": 11,
+          "noteheadCount": 526,
+          "noteGroupCount": 514,
+          "barlineCount": 36,
+          "restCount": 6,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1004_mov5/page-02.musicxml"
+        },
+        {
+          "page": 3,
+          "staffCount": 10,
+          "noteheadCount": 549,
+          "noteGroupCount": 416,
+          "barlineCount": 52,
+          "restCount": 0,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1004_mov5/page-03.musicxml"
+        },
+        {
+          "page": 4,
+          "staffCount": 11,
+          "noteheadCount": 637,
+          "noteGroupCount": 544,
+          "barlineCount": 51,
+          "restCount": 25,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1004_mov5/page-04.musicxml"
+        },
+        {
+          "page": 5,
+          "staffCount": 11,
+          "noteheadCount": 634,
+          "noteGroupCount": 524,
+          "barlineCount": 52,
+          "restCount": 0,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1004_mov5/page-05.musicxml"
+        },
+        {
+          "page": 6,
+          "staffCount": 6,
+          "noteheadCount": 260,
+          "noteGroupCount": 225,
+          "barlineCount": 19,
+          "restCount": 1,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1004_mov5/page-06.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 3139,
+        "draftNotes": 3147,
+        "pitchExact": 1878,
+        "onsetExact": 14,
+        "measureExact": 460,
+        "missingNotes": 143,
+        "extraNotes": 151,
+        "pitchPrecision": 0.596759,
+        "pitchRecall": 0.59828,
+        "onsetQuarterAccuracy": 0.00446,
+        "measureAccuracy": 0.146543,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1005_mov1",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 10,
+          "noteheadCount": 573,
+          "noteGroupCount": 451,
+          "barlineCount": 46,
+          "restCount": 10,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1005_mov1/page-01.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 567,
+        "draftNotes": 573,
+        "pitchExact": 230,
+        "onsetExact": 22,
+        "measureExact": 38,
+        "missingNotes": 38,
+        "extraNotes": 44,
+        "pitchPrecision": 0.401396,
+        "pitchRecall": 0.405644,
+        "onsetQuarterAccuracy": 0.038801,
+        "measureAccuracy": 0.067019,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1005_mov2",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 11,
+          "noteheadCount": 511,
+          "noteGroupCount": 374,
+          "barlineCount": 59,
+          "restCount": 28,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1005_mov2/page-01.musicxml"
+        },
+        {
+          "page": 2,
+          "staffCount": 12,
+          "noteheadCount": 480,
+          "noteGroupCount": 426,
+          "barlineCount": 53,
+          "restCount": 2,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1005_mov2/page-02.musicxml"
+        },
+        {
+          "page": 3,
+          "staffCount": 11,
+          "noteheadCount": 550,
+          "noteGroupCount": 369,
+          "barlineCount": 62,
+          "restCount": 5,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1005_mov2/page-03.musicxml"
+        },
+        {
+          "page": 4,
+          "staffCount": 11,
+          "noteheadCount": 482,
+          "noteGroupCount": 400,
+          "barlineCount": 56,
+          "restCount": 3,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1005_mov2/page-04.musicxml"
+        },
+        {
+          "page": 5,
+          "staffCount": 12,
+          "noteheadCount": 488,
+          "noteGroupCount": 419,
+          "barlineCount": 60,
+          "restCount": 7,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1005_mov2/page-05.musicxml"
+        },
+        {
+          "page": 6,
+          "staffCount": 11,
+          "noteheadCount": 522,
+          "noteGroupCount": 400,
+          "barlineCount": 56,
+          "restCount": 17,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1005_mov2/page-06.musicxml"
+        },
+        {
+          "page": 7,
+          "staffCount": 5,
+          "noteheadCount": 199,
+          "noteGroupCount": 155,
+          "barlineCount": 20,
+          "restCount": 7,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1005_mov2/page-07.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 3054,
+        "draftNotes": 3232,
+        "pitchExact": 1762,
+        "onsetExact": 152,
+        "measureExact": 17,
+        "missingNotes": 151,
+        "extraNotes": 329,
+        "pitchPrecision": 0.545173,
+        "pitchRecall": 0.576948,
+        "onsetQuarterAccuracy": 0.049771,
+        "measureAccuracy": 0.005566,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1005_mov3",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 9,
+          "noteheadCount": 416,
+          "noteGroupCount": 396,
+          "barlineCount": 23,
+          "restCount": 74,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1005_mov3/page-01.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 415,
+        "draftNotes": 416,
+        "pitchExact": 266,
+        "onsetExact": 5,
+        "measureExact": 113,
+        "missingNotes": 41,
+        "extraNotes": 42,
+        "pitchPrecision": 0.639423,
+        "pitchRecall": 0.640964,
+        "onsetQuarterAccuracy": 0.012048,
+        "measureAccuracy": 0.272289,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1005_mov4",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 12,
+          "noteheadCount": 557,
+          "noteGroupCount": 557,
+          "barlineCount": 52,
+          "restCount": 2,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1005_mov4/page-01.musicxml"
+        },
+        {
+          "page": 2,
+          "staffCount": 12,
+          "noteheadCount": 572,
+          "noteGroupCount": 572,
+          "barlineCount": 52,
+          "restCount": 0,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1005_mov4/page-02.musicxml"
+        },
+        {
+          "page": 3,
+          "staffCount": 2,
+          "noteheadCount": 67,
+          "noteGroupCount": 67,
+          "barlineCount": 7,
+          "restCount": 1,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1005_mov4/page-03.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 1196,
+        "draftNotes": 1196,
+        "pitchExact": 1072,
+        "onsetExact": 10,
+        "measureExact": 1142,
+        "missingNotes": 0,
+        "extraNotes": 0,
+        "pitchPrecision": 0.896321,
+        "pitchRecall": 0.896321,
+        "onsetQuarterAccuracy": 0.008361,
+        "measureAccuracy": 0.954849,
+        "onsetPassed": false,
+        "measurePassed": true,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1006_mov1",
+      "status": "error",
+      "error": "ValueError:8 is not a valid Key",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 12,
+          "noteheadCount": 566,
+          "noteGroupCount": 566,
+          "barlineCount": 56,
+          "restCount": 1,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1006_mov1/page-01.musicxml"
+        },
+        {
+          "page": 2,
+          "staffCount": 12,
+          "noteheadCount": 576,
+          "noteGroupCount": 573,
+          "barlineCount": 52,
+          "restCount": 0,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1006_mov1/page-02.musicxml"
+        }
+      ]
+    },
+    {
+      "pieceId": "bwv1006_mov2",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 8,
+          "noteheadCount": 299,
+          "noteGroupCount": 256,
+          "barlineCount": 26,
+          "restCount": 48,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1006_mov2/page-01.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 289,
+        "draftNotes": 299,
+        "pitchExact": 61,
+        "onsetExact": 2,
+        "measureExact": 121,
+        "missingNotes": 7,
+        "extraNotes": 17,
+        "pitchPrecision": 0.204013,
+        "pitchRecall": 0.211073,
+        "onsetQuarterAccuracy": 0.00692,
+        "measureAccuracy": 0.418685,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1006_mov3",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 11,
+          "noteheadCount": 385,
+          "noteGroupCount": 360,
+          "barlineCount": 56,
+          "restCount": 3,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1006_mov3/page-01.musicxml"
+        },
+        {
+          "page": 2,
+          "staffCount": 11,
+          "noteheadCount": 393,
+          "noteGroupCount": 359,
+          "barlineCount": 53,
+          "restCount": 4,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1006_mov3/page-02.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 765,
+        "draftNotes": 778,
+        "pitchExact": 253,
+        "onsetExact": 29,
+        "measureExact": 529,
+        "missingNotes": 24,
+        "extraNotes": 37,
+        "pitchPrecision": 0.325193,
+        "pitchRecall": 0.330719,
+        "onsetQuarterAccuracy": 0.037908,
+        "measureAccuracy": 0.691503,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1006_mov4",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 6,
+          "noteheadCount": 218,
+          "noteGroupCount": 185,
+          "barlineCount": 37,
+          "restCount": 8,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1006_mov4/page-01.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 214,
+        "draftNotes": 218,
+        "pitchExact": 71,
+        "onsetExact": 26,
+        "measureExact": 56,
+        "missingNotes": 5,
+        "extraNotes": 9,
+        "pitchPrecision": 0.325688,
+        "pitchRecall": 0.331776,
+        "onsetQuarterAccuracy": 0.121495,
+        "measureAccuracy": 0.261682,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1006_mov5",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 6,
+          "noteheadCount": 193,
+          "noteGroupCount": 177,
+          "barlineCount": 36,
+          "restCount": 4,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1006_mov5/page-01.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 184,
+        "draftNotes": 193,
+        "pitchExact": 57,
+        "onsetExact": 33,
+        "measureExact": 10,
+        "missingNotes": 2,
+        "extraNotes": 11,
+        "pitchPrecision": 0.295337,
+        "pitchRecall": 0.309783,
+        "onsetQuarterAccuracy": 0.179348,
+        "measureAccuracy": 0.054348,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1006_mov6",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 9,
+          "noteheadCount": 275,
+          "noteGroupCount": 272,
+          "barlineCount": 40,
+          "restCount": 2,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1006_mov6/page-01.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 275,
+        "draftNotes": 275,
+        "pitchExact": 117,
+        "onsetExact": 44,
+        "measureExact": 144,
+        "missingNotes": 2,
+        "extraNotes": 2,
+        "pitchPrecision": 0.425455,
+        "pitchRecall": 0.425455,
+        "onsetQuarterAccuracy": 0.16,
+        "measureAccuracy": 0.523636,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    },
+    {
+      "pieceId": "bwv1006_mov7",
+      "status": "ok",
+      "pages": [
+        {
+          "page": 1,
+          "staffCount": 9,
+          "noteheadCount": 333,
+          "noteGroupCount": 333,
+          "barlineCount": 43,
+          "restCount": 2,
+          "output": "data/experiments/western-strings-m4/perfect-observation-upper-bound/decoded/bwv1006_mov7/page-01.musicxml"
+        }
+      ],
+      "metrics": {
+        "goldNotes": 333,
+        "draftNotes": 333,
+        "pitchExact": 151,
+        "onsetExact": 1,
+        "measureExact": 249,
+        "missingNotes": 0,
+        "extraNotes": 0,
+        "pitchPrecision": 0.453453,
+        "pitchRecall": 0.453453,
+        "onsetQuarterAccuracy": 0.003003,
+        "measureAccuracy": 0.747748,
+        "onsetPassed": false,
+        "measurePassed": false,
+        "structurePassed": false
+      }
+    }
+  ]
+}
