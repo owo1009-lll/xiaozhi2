@@ -283,6 +283,8 @@
     "test:western-m4a-semantic-masks": "py -3.11 scripts\\test_western_m4a_semantic_masks.py",
     "western:m4-semantic-mask-recall": "py -3.11 scripts\\experiments\\eval_western_m4_semantic_mask_recall.py",
     "test:western-m4-semantic-mask-recall": "py -3.11 scripts\\test_western_m4_semantic_mask_recall.py",
+    "western:m4-real-degradation-gap": "py -3.11 scripts\\experiments\\audit_western_m4_real_degradation_gap.py",
+    "test:western-m4-real-degradation-gap": "py -3.11 scripts\\test_western_m4_real_degradation_gap.py",
     "build:western-m4a-supported-editions": "powershell -ExecutionPolicy Bypass -File scripts\\run-python.ps1 scripts\\experiments\\build_western_m4a_supported_editions.py",
     "test:western-m4a-registration": "data\\tools\\western-photo-score-audio-py311\\Scripts\\python.exe scripts\\test_western_m4a_registration.py",
     "preflight:western-m4a-registration": "node scripts\\preflight-western-m4a-registration.mjs",

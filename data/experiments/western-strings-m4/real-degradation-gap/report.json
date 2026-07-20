@@ -1,0 +1,255 @@
+{
+  "contract": "western-m4-real-degradation-gap-audit-v1",
+  "evidenceRole": "reused-real-failure-vs-frozen-synthetic-diagnostic",
+  "sources": {
+    "datasetConfig": {
+      "path": "config/western-m4b-dataset.json",
+      "sha256": "b13a906d448338b4831ddf94acb428acd53673b59c3ccee4df736bbce26b32b5"
+    },
+    "augmentationSelection": {
+      "path": "config/western-m4b-next-augmentation.json",
+      "sha256": "028d8cdc6dbeaa0aadacbb7ced1c21b2020d485da2990bf74365c1ed37a56059"
+    },
+    "syntheticTestCount": 12
+  },
+  "syntheticTestDistribution": {
+    "laplacianVariance": {
+      "minimum": 30.147638,
+      "median": 372.85817,
+      "maximum": 551.628784
+    },
+    "illuminationP90P10OverMedian": {
+      "minimum": 0.722532,
+      "median": 0.919673,
+      "maximum": 1.138458
+    },
+    "overexposedFraction": {
+      "minimum": 0.000868,
+      "median": 0.112422,
+      "maximum": 0.659588
+    },
+    "underexposedFraction": {
+      "minimum": 0.000136,
+      "median": 0.001329,
+      "maximum": 0.378805
+    },
+    "chromaHighFrequencyRms": {
+      "minimum": 0.0,
+      "median": 0.073507,
+      "maximum": 0.184952
+    },
+    "localInkFraction": {
+      "minimum": 0.102552,
+      "median": 0.114274,
+      "maximum": 0.12844
+    }
+  },
+  "targets": [
+    {
+      "pieceId": "violin-ex09",
+      "path": "data/private/western-strings-m2/violin-ex09-score.jpg",
+      "sha256": "02350714ac2e7928ccd94d5c7cf5cc6c86c9cb0bc5f26aa0a0046d017adfa90b",
+      "metrics": {
+        "laplacianVariance": 797.655029,
+        "illuminationP90P10OverMedian": 0.314795,
+        "overexposedFraction": 7e-06,
+        "underexposedFraction": 0.0,
+        "chromaHighFrequencyRms": 0.38216,
+        "localInkFraction": 0.174562
+      },
+      "relativeToSyntheticTest": {
+        "laplacianVariance": "above-synthetic-maximum",
+        "illuminationP90P10OverMedian": "below-synthetic-minimum",
+        "overexposedFraction": "below-synthetic-minimum",
+        "underexposedFraction": "below-synthetic-minimum",
+        "chromaHighFrequencyRms": "above-synthetic-maximum",
+        "localInkFraction": "above-synthetic-maximum"
+      }
+    },
+    {
+      "pieceId": "violin-ex10",
+      "path": "data/private/western-strings-m2/violin-ex10-score.jpg",
+      "sha256": "eb72eda7e9fa4fc42b26d6455e1eda456eb0faca9029abe0d98a8372e9f11aa1",
+      "metrics": {
+        "laplacianVariance": 864.035583,
+        "illuminationP90P10OverMedian": 0.415934,
+        "overexposedFraction": 3e-06,
+        "underexposedFraction": 0.0,
+        "chromaHighFrequencyRms": 0.342734,
+        "localInkFraction": 0.165406
+      },
+      "relativeToSyntheticTest": {
+        "laplacianVariance": "above-synthetic-maximum",
+        "illuminationP90P10OverMedian": "below-synthetic-minimum",
+        "overexposedFraction": "below-synthetic-minimum",
+        "underexposedFraction": "below-synthetic-minimum",
+        "chromaHighFrequencyRms": "above-synthetic-maximum",
+        "localInkFraction": "above-synthetic-maximum"
+      }
+    }
+  ],
+  "findings": {
+    "chromaticScreenMoireGap": true,
+    "denseLayoutGap": true,
+    "blurGap": false,
+    "overexposureGap": false,
+    "illuminationGap": false,
+    "selectedNextPixelAugmentation": "chromatic-screen-moire",
+    "separateSourceDiversityAction": "add-dense-public-single-staff-layouts",
+    "reason": "Both failures exceed the frozen synthetic maximum for chroma high-frequency RMS and local ink density; neither is below the synthetic sharpness minimum or above its overexposure/illumination maxima. Select chromatic screen moire as the next pixel augmentation and treat dense layout as source-content expansion, not an image filter."
+  },
+  "limitations": [
+    "The two real photos are reused diagnostics and cannot qualify fresh-blind promotion.",
+    "Laplacian variance can be inflated by moire and dense notation, so it rules out an obvious blur-only gap but is not a perceptual sharpness score.",
+    "Local ink fraction is a layout/content-density proxy; it must not be simulated by simply darkening pixels.",
+    "No private image bytes are copied into this report."
+  ],
+  "studentGateReady": false,
+  "automaticAdoptionAuthorized": false,
+  "syntheticRows": [
+    {
+      "caseId": "r2-01-self-authored-v1-s17",
+      "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-01-self-authored-v1-s17/photo.jpg",
+      "metrics": {
+        "laplacianVariance": 42.073822,
+        "illuminationP90P10OverMedian": 0.918241,
+        "overexposedFraction": 0.340232,
+        "underexposedFraction": 0.000181,
+        "chromaHighFrequencyRms": 0.060475,
+        "localInkFraction": 0.12844
+      }
+    },
+    {
+      "caseId": "r2-01-self-authored-v1-s18",
+      "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-01-self-authored-v1-s18/photo.jpg",
+      "metrics": {
+        "laplacianVariance": 526.382812,
+        "illuminationP90P10OverMedian": 0.982649,
+        "overexposedFraction": 0.005663,
+        "underexposedFraction": 0.207598,
+        "chromaHighFrequencyRms": 0.086539,
+        "localInkFraction": 0.12074
+      }
+    },
+    {
+      "caseId": "r2-01-self-authored-v1-s19",
+      "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-01-self-authored-v1-s19/photo.jpg",
+      "metrics": {
+        "laplacianVariance": 114.317856,
+        "illuminationP90P10OverMedian": 0.919014,
+        "overexposedFraction": 0.000868,
+        "underexposedFraction": 0.000688,
+        "chromaHighFrequencyRms": 0.090259,
+        "localInkFraction": 0.112192
+      }
+    },
+    {
+      "caseId": "r2-01-self-authored-v1-s20",
+      "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-01-self-authored-v1-s20/photo.jpg",
+      "metrics": {
+        "laplacianVariance": 511.463013,
+        "illuminationP90P10OverMedian": 1.029682,
+        "overexposedFraction": 0.041773,
+        "underexposedFraction": 0.330102,
+        "chromaHighFrequencyRms": 0.184952,
+        "localInkFraction": 0.120473
+      }
+    },
+    {
+      "caseId": "r2-06-self-authored-v1-s17",
+      "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-06-self-authored-v1-s17/photo.jpg",
+      "metrics": {
+        "laplacianVariance": 366.483429,
+        "illuminationP90P10OverMedian": 0.847032,
+        "overexposedFraction": 0.031245,
+        "underexposedFraction": 0.001048,
+        "chromaHighFrequencyRms": 0.013806,
+        "localInkFraction": 0.102552
+      }
+    },
+    {
+      "caseId": "r2-06-self-authored-v1-s18",
+      "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-06-self-authored-v1-s18/photo.jpg",
+      "metrics": {
+        "laplacianVariance": 379.23291,
+        "illuminationP90P10OverMedian": 0.754483,
+        "overexposedFraction": 0.123259,
+        "underexposedFraction": 0.000906,
+        "chromaHighFrequencyRms": 0.0,
+        "localInkFraction": 0.105447
+      }
+    },
+    {
+      "caseId": "r2-06-self-authored-v1-s19",
+      "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-06-self-authored-v1-s19/photo.jpg",
+      "metrics": {
+        "laplacianVariance": 408.583588,
+        "illuminationP90P10OverMedian": 1.138458,
+        "overexposedFraction": 0.27603,
+        "underexposedFraction": 0.378805,
+        "chromaHighFrequencyRms": 0.0,
+        "localInkFraction": 0.106918
+      }
+    },
+    {
+      "caseId": "r2-06-self-authored-v1-s20",
+      "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r2-06-self-authored-v1-s20/photo.jpg",
+      "metrics": {
+        "laplacianVariance": 144.912582,
+        "illuminationP90P10OverMedian": 0.920332,
+        "overexposedFraction": 0.288151,
+        "underexposedFraction": 0.00055,
+        "chromaHighFrequencyRms": 0.0,
+        "localInkFraction": 0.115314
+      }
+    },
+    {
+      "caseId": "r3-01-self-authored-v1-s17",
+      "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r3-01-self-authored-v1-s17/photo.jpg",
+      "metrics": {
+        "laplacianVariance": 196.36937,
+        "illuminationP90P10OverMedian": 1.049649,
+        "overexposedFraction": 0.101585,
+        "underexposedFraction": 0.344395,
+        "chromaHighFrequencyRms": 0.144331,
+        "localInkFraction": 0.114346
+      }
+    },
+    {
+      "caseId": "r3-01-self-authored-v1-s18",
+      "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r3-01-self-authored-v1-s18/photo.jpg",
+      "metrics": {
+        "laplacianVariance": 551.628784,
+        "illuminationP90P10OverMedian": 0.734266,
+        "overexposedFraction": 0.659588,
+        "underexposedFraction": 0.00161,
+        "chromaHighFrequencyRms": 0.115564,
+        "localInkFraction": 0.114958
+      }
+    },
+    {
+      "caseId": "r3-01-self-authored-v1-s19",
+      "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r3-01-self-authored-v1-s19/photo.jpg",
+      "metrics": {
+        "laplacianVariance": 549.772034,
+        "illuminationP90P10OverMedian": 0.722532,
+        "overexposedFraction": 0.658955,
+        "underexposedFraction": 0.001809,
+        "chromaHighFrequencyRms": 0.124586,
+        "localInkFraction": 0.114201
+      }
+    },
+    {
+      "caseId": "r3-01-self-authored-v1-s20",
+      "path": "data/experiments/western-strings-m4b/dataset/synthetic/synthetic-test/r3-01-self-authored-v1-s20/photo.jpg",
+      "metrics": {
+        "laplacianVariance": 30.147638,
+        "illuminationP90P10OverMedian": 0.930812,
+        "overexposedFraction": 0.032714,
+        "underexposedFraction": 0.000136,
+        "chromaHighFrequencyRms": 0.035378,
+        "localInkFraction": 0.114114
+      }
+    }
+  ]
+}

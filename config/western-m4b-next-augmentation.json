@@ -1,0 +1,9 @@
+{
+  "contract": "western-m4b-next-augmentation-selection-v1",
+  "status": "selected-not-applied-to-frozen-splits",
+  "type": "chromatic-screen-moire",
+  "evidenceReport": "data/experiments/western-strings-m4/real-degradation-gap/report.json",
+  "applyTo": "future-train-and-calibration-only",
+  "freshBlindAndFrozenSyntheticTestUnchanged": true,
+  "separateSourceDiversityAction": "add-dense-public-single-staff-layouts"
+}
