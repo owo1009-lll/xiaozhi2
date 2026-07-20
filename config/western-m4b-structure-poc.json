@@ -6,10 +6,10 @@
     "adaptiveThresholdBlockSize": 35,
     "adaptiveThresholdC": 15,
     "curvaturePolynomialDegree": 3,
-    "maximumAcceptedResidualCurvePixels": 24
+    "maximumAcceptedResidualCurvePixels": 60
   },
   "structureVision": {
-    "minimumStaffLineInkFraction": 0.32,
+    "minimumStaffLineInkFraction": 0.18,
     "rowPeakMergeGapPixels": 2,
     "minimumInterlinePixels": 5,
     "maximumInterlinePixels": 14,
@@ -20,6 +20,7 @@
     "barlineMinimumHeightFraction": 0.74,
     "barlineMinimumLeftOffsetFraction": 0.1,
     "barlineMinimumPageLeftFraction": 0.2,
+    "barlineMaximumPageRightFraction": 0.96,
     "barlineMergeGapPixels": 2,
     "minimumMeasureWidthInterlines": 5.0,
     "meterRegionLeftInterlines": 4.5,

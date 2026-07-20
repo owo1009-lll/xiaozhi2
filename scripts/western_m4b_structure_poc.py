@@ -60,23 +60,40 @@ def estimate_and_flatten_curvature(
     height, width = gray.shape
     bright = gray > 135
     xs = np.arange(width, dtype=np.float64)
-    top = np.zeros(width, dtype=np.float64)
-    valid = np.zeros(width, dtype=bool)
     search_height = max(30, min(height // 8, 140))
+    traces = {"top": np.zeros(width, dtype=np.float64), "bottom": np.zeros(width, dtype=np.float64)}
+    valid = {"top": np.zeros(width, dtype=bool), "bottom": np.zeros(width, dtype=bool)}
     for x in range(width):
-        rows = np.flatnonzero(bright[:search_height, x])
-        if rows.size:
-            top[x] = float(rows[0])
-            valid[x] = True
-    central = valid & (xs >= width * 0.04) & (xs <= width * 0.96)
-    if central.sum() < max(20, degree + 2):
+        top_rows = np.flatnonzero(bright[:search_height, x])
+        if top_rows.size:
+            traces["top"][x] = float(top_rows[0])
+            valid["top"][x] = True
+        bottom_rows = np.flatnonzero(bright[height - search_height :, x])
+        if bottom_rows.size:
+            traces["bottom"][x] = float(height - search_height + bottom_rows[-1])
+            valid["bottom"][x] = True
+
+    candidates = []
+    for edge in ("top", "bottom"):
+        central = valid[edge] & (xs >= width * 0.04) & (xs <= width * 0.96)
+        if central.sum() < max(20, degree + 2):
+            continue
+        normalized_x = (xs[central] / max(1, width - 1)) * 2.0 - 1.0
+        coefficients = np.polyfit(normalized_x, traces[edge][central], degree)
+        fitted = np.polyval(coefficients, (xs / max(1, width - 1)) * 2.0 - 1.0)
+        edge_shift = fitted - float(np.median(fitted))
+        candidates.append({
+            "edge": edge,
+            "shift": edge_shift,
+            "residual": float(np.max(edge_shift) - np.min(edge_shift)),
+            "coefficients": coefficients,
+        })
+    if not candidates:
         shift = np.zeros(width, dtype=np.float32)
         return rectified, shift, {"model": "none", "ready": True, "residualCurvePixels": 0.0}
-    normalized_x = (xs[central] / max(1, width - 1)) * 2.0 - 1.0
-    coefficients = np.polyfit(normalized_x, top[central], degree)
-    fitted = np.polyval(coefficients, (xs / max(1, width - 1)) * 2.0 - 1.0)
-    shift = fitted - float(np.median(fitted))
-    residual = float(np.max(shift) - np.min(shift))
+    selected = max(candidates, key=lambda row: row["residual"])
+    shift = selected["shift"]
+    residual = selected["residual"]
     shift = np.clip(shift, -maximum_pixels, maximum_pixels).astype(np.float32)
     grid_x, grid_y = np.meshgrid(np.arange(width, dtype=np.float32), np.arange(height, dtype=np.float32))
     map_y = grid_y + shift[None, :]
@@ -90,10 +107,14 @@ def estimate_and_flatten_curvature(
     )
     return flattened, shift, {
         "model": "page-edge-polynomial-dewarp",
+        "selectedEdge": selected["edge"],
         "degree": degree,
         "ready": residual <= maximum_pixels * 2.0,
         "residualCurvePixels": round(residual, 4),
-        "coefficients": [round(float(value), 8) for value in coefficients],
+        "coefficients": [round(float(value), 8) for value in selected["coefficients"]],
+        "edgeResidualCurvePixels": {
+            row["edge"]: round(float(row["residual"]), 4) for row in candidates
+        },
     }
 
 
@@ -277,11 +298,17 @@ def detect_explicit_structure(normalized: dict[str, Any], policy: dict[str, Any]
             staff_x1 + (staff_x2 - staff_x1) * float(settings["barlineMinimumLeftOffsetFraction"]),
             width * float(settings["barlineMinimumPageLeftFraction"]),
         )
-        x_candidates = [row for row in x_candidates if minimum_x <= row["x"] <= staff_x2 + interline]
+        maximum_x = max(
+            staff_x2 + interline,
+            width * float(settings["barlineMaximumPageRightFraction"]),
+        )
+        x_candidates = [row for row in x_candidates if minimum_x <= row["x"] <= maximum_x]
         x_candidates = prune_close_barline_candidates(
             x_candidates,
             interline * float(settings["minimumMeasureWidthInterlines"]),
         )
+        if x_candidates:
+            staff_x2 = max(staff_x2, float(x_candidates[-1]["x"]))
         staff = {
             "staffIndex": system_index,
             "systemIndex": system_index,

@@ -27,15 +27,15 @@
   ],
   "provenance": {
     "structurePolicy": "config/western-m4b-structure-poc.json",
-    "structurePolicySha256": "82132d409911d4f149e8db4c27b0dc5cee436012a78f48fc51ffdb5eb6d125e3",
+    "structurePolicySha256": "f74a183cf9de6fe327bdeaaf5bcf902587c6d0fde84db1557a6f0f5318fd4c7e",
     "datasetPolicy": "config/western-m4b-dataset.json",
-    "datasetPolicySha256": "e375884c215e6d9cfd3947e4678d5ea51e61ecb99f8d305ad6ed3790d676cb92",
+    "datasetPolicySha256": "b13a906d448338b4831ddf94acb428acd53673b59c3ccee4df736bbce26b32b5",
     "signedDecision": "data/experiments/western-strings-m4b-poc-promotion-threshold-decision.json",
     "signedDecisionSha256": "346290358828f255ef41f1076afe510c413c8d66983e3786bbcff45bed4f8602",
     "intake": "data/private/western-strings-m4b-fresh-blind/intake.json",
     "intakePresent": false,
     "evaluator": "scripts/experiments/eval_western_m4b_fresh_blind_promotion.py",
-    "evaluatorSha256": "c0417fea464766c5cd02e90e6dc46d77ec39a2e05b3c98f1e813bfb5cc894ed3"
+    "evaluatorSha256": "6f96253a43e6ac9e811feea086926deac6081a9fb626334033469d5593f384fa"
   },
   "boundary": {
     "expandedInvestmentOnly": true,
