@@ -10,7 +10,13 @@ export const STUDENT_PUBLIC_ALLOWLIST = Object.freeze([
   { method: "GET", path: "/api/health" },
   { method: "GET", path: "/api/strings/student-gate" },
   { method: "GET", path: "/api/strings/student-submissions" },
+  // The Mini Program polls this status-only endpoint after WeChat's asynchronous
+  // image safety callback. It never returns user media or moderation details.
+  { method: "GET", path: "/api/strings/content-safety-status" },
   { method: "POST", path: "/api/strings/analyze" },
+  // WeChat verifies this URL and posts `mediaCheckAsync` results here.
+  { method: "GET", path: "/api/wechat/content-safety-callback" },
+  { method: "POST", path: "/api/wechat/content-safety-callback" },
   // Reference score images + coordinate sidecars for the student score view
   // (built-in supported editions only; reference material, not student data).
   { method: "GET", path: "/api/strings/score-editions" },
@@ -41,6 +47,10 @@ export function createPublicAccessGuard({
     .map((value) => value.trim())
     .filter(Boolean);
 
+  function isTemporaryContentSafetyMediaRequest(req) {
+    return req.method === "GET" && /^\/api\/wechat\/content-safety-media\/[A-Za-z0-9_-]{24,160}$/.test(req.path);
+  }
+
   return function publicAccessGuard(req, res, next) {
     if (!publicMode) return next();
     if (!isTunnelRequest(req)) return next();
@@ -58,7 +68,7 @@ export function createPublicAccessGuard({
       return res.sendStatus(204);
     }
 
-    if (allowed.has(`${req.method} ${req.path}`)) {
+    if (allowed.has(`${req.method} ${req.path}`) || isTemporaryContentSafetyMediaRequest(req)) {
       return next();
     }
 

@@ -20,6 +20,10 @@ import {
   listWesternStudentSubmissions,
 } from "./westernStudentGateService.js";
 import {
+  CONTENT_SAFETY_UNAVAILABLE_MESSAGE,
+  ContentSafetyError,
+} from "./wechatContentSafety.js";
+import {
   buildScoreDiagnosis,
   findEditionCoordinates,
   findEditionRenderPath,
@@ -65,8 +69,36 @@ export function createWesternStringsRouter({
   persistPayloadAudio = defaultPersistAudio,
   persistUploadedScorePhotoFile = defaultPersistScorePhoto,
   persistPayloadScorePhoto = defaultPersistScorePhoto,
+  contentSafety = null,
 } = {}) {
   const router = express.Router();
+
+  async function buildStudentAnalysis(parsed) {
+    const { isWechatMiniProgram, wechatLoginCode, ...submissionPayload } = parsed || {};
+    return buildWesternStudentAnalysis({
+      repoRoot,
+      dataset: submissionPayload.dataset,
+      piece: submissionPayload.piece,
+      limit: submissionPayload.limit,
+      recordingId: submissionPayload.recordingId,
+      submissionPayload,
+    });
+  }
+
+  if (typeof contentSafety?.setReleaseSubmission === "function") {
+    contentSafety.setReleaseSubmission(async (submission) => buildStudentAnalysis(submission));
+  }
+
+  function sendAnalyzeError(res, error) {
+    const isSafetyError = error instanceof ContentSafetyError;
+    return res.status(Number(error?.statusCode) || 500).json({
+      ok: false,
+      error: isSafetyError
+        ? error.message
+        : safeString(error?.message, "failed to build western strings student analysis."),
+      ...(isSafetyError ? { code: error.code } : {}),
+    });
+  }
 
   router.get("/api/strings/alignment-preview", async (req, res) => {
     try {
@@ -115,6 +147,8 @@ export function createWesternStringsRouter({
     }
     return {
       ...parsed,
+      isWechatMiniProgram: safeString(payload?.clientPlatform).trim() === "wechat-mini-program",
+      wechatLoginCode: safeString(payload?.wechatLoginCode).trim(),
       audioPath: persistedAudio.audioPath || parsed.audioPath,
       audioHash: persistedAudio.audioHash || parsed.audioHash,
       audioSubmission: uploadedAudio
@@ -128,6 +162,35 @@ export function createWesternStringsRouter({
     };
   }
 
+  router.get("/api/wechat/content-safety-callback", async (req, res) => {
+    if (!contentSafety) return res.sendStatus(404);
+    try {
+      const echo = await contentSafety.verifyCallbackUrl(req.query || {});
+      if (!echo) return res.sendStatus(403);
+      return res.type("text/plain").send(echo);
+    } catch {
+      return res.sendStatus(403);
+    }
+  });
+
+  router.post("/api/wechat/content-safety-callback", async (req, res) => {
+    if (!contentSafety) return res.sendStatus(404);
+    const result = await contentSafety.receiveCallback({ query: req.query || {}, body: req.body || {} });
+    return result.ok ? res.type("text/plain").send("success") : res.sendStatus(result.statusCode || 403);
+  });
+
+  router.get("/api/wechat/content-safety-media/:token", async (req, res) => {
+    if (!contentSafety) return res.sendStatus(404);
+    return contentSafety.sendPendingMedia({ token: req.params.token, res });
+  });
+
+  router.get("/api/strings/content-safety-status", async (req, res) => {
+    if (!contentSafety) {
+      return res.status(503).json({ ok: false, error: CONTENT_SAFETY_UNAVAILABLE_MESSAGE });
+    }
+    return res.json({ ok: true, ...(await contentSafety.getPublicStatus(safeString(req.query?.ticket).trim())) });
+  });
+
   const analyzeHandlers = [];
   if (upload?.fields) {
     analyzeHandlers.push(upload.fields([
@@ -140,17 +203,28 @@ export function createWesternStringsRouter({
   analyzeHandlers.push(async (req, res) => {
     try {
       const parsed = await parseStudentSubmission(req);
-      const analysis = await buildWesternStudentAnalysis({
-        repoRoot,
-        dataset: parsed.dataset,
-        piece: parsed.piece,
-        limit: parsed.limit,
-        recordingId: parsed.recordingId,
-        submissionPayload: parsed,
-      });
+      if (parsed.isWechatMiniProgram) {
+        if (!contentSafety) throw new ContentSafetyError(CONTENT_SAFETY_UNAVAILABLE_MESSAGE);
+        const moderation = await contentSafety.moderateMiniProgramSubmission({
+          loginCode: parsed.wechatLoginCode,
+          content: parsed.piece,
+          submission: (() => {
+            const { isWechatMiniProgram, wechatLoginCode, ...submission } = parsed;
+            return submission;
+          })(),
+        });
+        if (moderation.status === "pending") {
+          return res.status(202).json({
+            ok: true,
+            moderationPending: true,
+            moderationTicket: moderation.ticket,
+          });
+        }
+      }
+      const analysis = await buildStudentAnalysis(parsed);
       return res.json({ ok: true, analysis });
     } catch (error) {
-      return res.status(Number(error?.statusCode) || 500).json({ ok: false, error: safeString(error?.message, "failed to build western strings student analysis.") });
+      return sendAnalyzeError(res, error);
     }
   });
   router.post("/api/strings/analyze", ...analyzeHandlers);

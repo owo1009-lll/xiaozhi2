@@ -82,6 +82,7 @@ import { createTeacherValidationService } from "./src/server/teacherValidationSe
 import { createTeacherValidationRouter } from "./src/server/teacherValidationRoutes.js";
 import { createWesternStringsRouter } from "./src/server/westernStringsRoutes.js";
 import { createPublicAccessGuard } from "./src/server/publicAccessGuard.js";
+import { createWechatContentSafetyService } from "./src/server/wechatContentSafety.js";
 import {
   appendAnalysisToParticipant,
   buildValidationSummary,
@@ -112,6 +113,10 @@ const PIECE_PASS_DIR = path.join(DATA_DIR, "piece-pass");
 const TEACHER_VALIDATION_PACKS_DIR = path.join(DATA_DIR, "teacher-validation", "packs");
 const AUDIO_CACHE_DIR = path.join(DATA_DIR, "analysis-audio-cache");
 const SCORE_PHOTO_CACHE_DIR = path.join(DATA_DIR, "analysis-score-photo-cache");
+const wechatContentSafetyService = createWechatContentSafetyService({
+  dataDir: DATA_DIR,
+  scorePhotoCacheDir: SCORE_PHOTO_CACHE_DIR,
+});
 const SECTION_DETECTION_CACHE_DIR = path.join(DATA_DIR, "section-detection-cache");
 const SECTION_ANALYSIS_CACHE_DIR = path.join(DATA_DIR, "section-analysis-cache");
 const PERF_TRACE_FILE = path.join(DATA_DIR, "perf-trace.log");
@@ -121,7 +126,9 @@ const STORE_ARCHIVE_DIR = path.join(DATA_DIR, "store-archive");
 const SCORE_STORE_LIMITS = readScoreStoreLimits(process.env);
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 40 * 1024 * 1024 },
+  // A 10 MB image becomes about 13.4 MB when the Mini Program sends it as a
+  // base64 field alongside the audio multipart upload.
+  limits: { fileSize: 40 * 1024 * 1024, fieldSize: 14 * 1024 * 1024 },
 });
 const SCORE_IMPORT_TASK_GATE = createTaskGate({
   name: "score-import",
@@ -4592,6 +4599,7 @@ app.use(createWesternStringsRouter({
   persistPayloadAudio,
   persistUploadedScorePhotoFile,
   persistPayloadScorePhoto,
+  contentSafety: wechatContentSafetyService,
 }));
 
 const noStoreStaticOptions = {
