@@ -270,6 +270,8 @@
     "test:western-segment-onset-candidate": "py -3.11 scripts\\test-western-segment-onset-candidate.py",
     "western:policy-c-waveform-absence": "py -3.11 scripts\\experiments\\eval_western_policy_c_waveform_absence.py",
     "test:western-policy-c-waveform-absence": "py -3.11 scripts\\test-western-policy-c-waveform-absence.py",
+    "western:round5-targeted-intake": "py -3.11 scripts\\status_western_round5_targeted_intake.py",
+    "test:western-round5-targeted-intake": "py -3.11 scripts\\test-western-round5-targeted-intake.py",
     "test:western-ordinary-audio-runtime": "node scripts\\test-western-ordinary-audio-runtime.mjs",
     "test:western-dynamic-shadow-policy": "node scripts\\run-western-ordinary-audio-python.mjs --script scripts\\test-western-dynamic-shadow-policy.py --",
     "test:western-offline-feature-audio": "node scripts\\run-western-ordinary-audio-python.mjs --script scripts\\test-western-offline-feature-audio.py --",

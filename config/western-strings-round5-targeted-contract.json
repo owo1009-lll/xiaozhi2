@@ -1,0 +1,27 @@
+{
+  "contractVersion": "western-round5-targeted-diagnosis-intake-v1",
+  "allowedSplits": ["calibration", "fresh-blind"],
+  "allowedGates": ["merged_substitution", "missing", "extra", "drag"],
+  "allowedLabels": ["positive", "confusion_negative"],
+  "minimums": {
+    "performers": 2,
+    "devices": 3,
+    "rooms": 2,
+    "positivePerGate": 12,
+    "freshBlindPositivePerGate": 6,
+    "confusionNegativePerGate": 24,
+    "freshBlindConfusionNegativePerGate": 12
+  },
+  "privacy": {
+    "requiredConsent": "yes",
+    "requiredLicenseStatus": "local-only",
+    "requiredPathPrefix": "data/private/western-strings-round5/"
+  },
+  "promotion": {
+    "minPrecision": 0.9,
+    "minRecall": 0.5,
+    "maxStrictFalseAccusations": 0,
+    "studentFacing": false,
+    "automaticAuthorizationGranted": false
+  }
+}
