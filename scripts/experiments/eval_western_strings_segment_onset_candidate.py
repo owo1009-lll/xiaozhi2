@@ -182,7 +182,12 @@ def estimate_note_windows(take: dict[str, Any], audio_duration: float) -> list[t
     return windows
 
 
-def onset_peak_counts(item: dict[str, Any], delta: float, wait: int) -> list[int]:
+def onset_peak_counts(
+    item: dict[str, Any],
+    delta: float,
+    wait: int,
+    pitch_conditioned: bool = False,
+) -> list[int]:
     envelope = item["onsetEnvelope"]
     sample_rate = item["sampleRate"]
     peak_frames = librosa.util.peak_pick(
@@ -195,10 +200,29 @@ def onset_peak_counts(item: dict[str, Any], delta: float, wait: int) -> list[int
         wait=wait,
     )
     peak_times = librosa.frames_to_time(peak_frames, sr=sample_rate)
-    return [
-        int(np.sum((peak_times >= start) & (peak_times < end)))
-        for start, end in item["windows"]
-    ]
+    counts = []
+    for index, (start, end) in enumerate(item["windows"]):
+        local_peaks = peak_times[(peak_times >= start) & (peak_times < end)]
+        if pitch_conditioned:
+            target_midi = item["targetMidis"][index]
+            supporting_events = [
+                event
+                for event in item["events"]
+                if int(event["midi"]) == target_midi
+                and float(event["start"]) < end
+                and float(event["end"]) > start
+            ]
+            local_peaks = np.asarray([
+                peak
+                for peak in local_peaks
+                if any(
+                    float(event["start"]) <= peak + 0.12
+                    and float(event["end"]) >= peak - 0.04
+                    for event in supporting_events
+                )
+            ])
+        counts.append(len(local_peaks))
+    return counts
 
 
 def prepare_onset_sets(names: list[str]) -> list[dict[str, Any]]:
@@ -209,23 +233,132 @@ def prepare_onset_sets(names: list[str]) -> list[dict[str, Any]]:
         take = analyze_take(PRIVATE / f"{piece}.musicxml", audio)
         _, extra = injected_truth(name)
         waveform, sample_rate = librosa.load(audio, sr=22050, mono=True)
+        onset_envelope = librosa.onset.onset_strength(y=waveform, sr=sample_rate)
         prepared.append({
             "name": name,
             "extra": extra,
+            "targetMidis": [int(note["midi"]) for note in take["notes"]],
+            "events": take["events"],
+            "unassigned": take["unassigned"],
             "sampleRate": sample_rate,
-            "onsetEnvelope": librosa.onset.onset_strength(y=waveform, sr=sample_rate),
+            "onsetEnvelope": onset_envelope,
+            "onsetFrameTimes": librosa.frames_to_time(
+                np.arange(len(onset_envelope)),
+                sr=sample_rate,
+            ),
             "windows": estimate_note_windows(take, len(waveform) / sample_rate),
         })
     return prepared
 
 
-def evaluate_onset_configuration(prepared: list[dict[str, Any]], delta: float, wait: int) -> dict[str, Any]:
+def interior_attack_scores(item: dict[str, Any]) -> list[float]:
+    envelope = np.asarray(item["onsetEnvelope"])
+    frame_times = np.asarray(item["onsetFrameTimes"])
+    scores = []
+    for start, end in item["windows"]:
+        duration = end - start
+        all_values = envelope[(frame_times >= start) & (frame_times < end)]
+        interior_values = envelope[
+            (frame_times >= start + max(0.12, duration * 0.20))
+            & (frame_times < end - max(0.06, duration * 0.08))
+        ]
+        if all_values.size == 0 or interior_values.size == 0:
+            scores.append(0.0)
+            continue
+        scores.append(float(np.max(interior_values) / max(float(np.max(all_values)), 1e-9)))
+    return scores
+
+
+def evaluate_interior_attack(
+    prepared: list[dict[str, Any]],
+    ratio_floor: float,
+) -> dict[str, Any]:
     total = 0
     offset = 0
     positives: set[int] = set()
     flags: set[int] = set()
     for item in prepared:
-        counts = onset_peak_counts(item, delta, wait)
+        local_flags = {
+            index
+            for index, score in enumerate(interior_attack_scores(item))
+            if score >= ratio_floor
+        }
+        flags.update(index + offset for index in local_flags)
+        positives.update(index + offset for index in item["extra"])
+        total += len(item["windows"])
+        offset += len(item["windows"])
+    return {"ratioFloor": ratio_floor, **metrics(flags, positives, total)}
+
+
+def sweep_interior_attack(
+    dev_names: list[str],
+    holdout_names: list[str],
+) -> dict[str, Any]:
+    dev = prepare_onset_sets(dev_names)
+    holdout = prepare_onset_sets(holdout_names)
+    results = [
+        evaluate_interior_attack(dev, round(value, 2))
+        for value in np.arange(0.30, 1.0, 0.05)
+    ]
+    selected = max(
+        results,
+        key=lambda row: (
+            row["jointFloorReady"],
+            row["precision"],
+            row["recall"],
+            -row["falsePositive"],
+        ),
+    )
+    return {
+        "candidateDefinition": (
+            "maximum interior onset-strength divided by maximum onset-strength "
+            "inside the aligned score-note window"
+        ),
+        "configurationCount": len(results),
+        "jointFloorConfigurationCount": sum(row["jointFloorReady"] for row in results),
+        "selectedDevelopmentConfiguration": selected,
+        "syntheticHoldout": evaluate_interior_attack(holdout, selected["ratioFloor"]),
+    }
+
+
+def evaluate_unassigned_edit_path(prepared: list[dict[str, Any]]) -> dict[str, Any]:
+    total = 0
+    offset = 0
+    positives: set[int] = set()
+    flags: set[int] = set()
+    per_set = []
+    for item in prepared:
+        local_flags = set()
+        for index, ((start, end), target_midi) in enumerate(
+            zip(item["windows"], item["targetMidis"])
+        ):
+            if any(
+                int(event["midi"]) == target_midi
+                and start <= float(event["start"]) < end
+                for event in item["unassigned"]
+            ):
+                local_flags.add(index)
+        local_metrics = metrics(local_flags, item["extra"], len(item["windows"]))
+        per_set.append({"set": item["name"], **local_metrics})
+        flags.update(index + offset for index in local_flags)
+        positives.update(index + offset for index in item["extra"])
+        total += len(item["windows"])
+        offset += len(item["windows"])
+    return {"pooled": metrics(flags, positives, total), "sets": per_set}
+
+
+def evaluate_onset_configuration(
+    prepared: list[dict[str, Any]],
+    delta: float,
+    wait: int,
+    pitch_conditioned: bool = False,
+) -> dict[str, Any]:
+    total = 0
+    offset = 0
+    positives: set[int] = set()
+    flags: set[int] = set()
+    for item in prepared:
+        counts = onset_peak_counts(item, delta, wait, pitch_conditioned)
         local_flags = {index for index, count in enumerate(counts) if count >= 2}
         flags.update(index + offset for index in local_flags)
         positives.update(index + offset for index in item["extra"])
@@ -234,11 +367,15 @@ def evaluate_onset_configuration(prepared: list[dict[str, Any]], delta: float, w
     return {"delta": delta, "wait": wait, **metrics(flags, positives, total)}
 
 
-def sweep_onset_count(dev_names: list[str], holdout_names: list[str]) -> dict[str, Any]:
+def sweep_onset_count(
+    dev_names: list[str],
+    holdout_names: list[str],
+    pitch_conditioned: bool = False,
+) -> dict[str, Any]:
     dev = prepare_onset_sets(dev_names)
     holdout = prepare_onset_sets(holdout_names)
     results = [
-        evaluate_onset_configuration(dev, round(delta, 2), wait)
+        evaluate_onset_configuration(dev, round(delta, 2), wait, pitch_conditioned)
         for delta in np.arange(0.05, 1.51, 0.05)
         for wait in (1, 2, 4, 6, 8)
     ]
@@ -247,15 +384,40 @@ def sweep_onset_count(dev_names: list[str], holdout_names: list[str]) -> dict[st
         results,
         key=lambda row: (row["jointFloorReady"], row["precision"], row["recall"], -row["falsePositive"]),
     )
-    holdout_result = evaluate_onset_configuration(holdout, selected["delta"], selected["wait"])
+    holdout_result = evaluate_onset_configuration(
+        holdout,
+        selected["delta"],
+        selected["wait"],
+        pitch_conditioned,
+    )
     return {
         "selectionDomain": "r2-01 waveform-injection-v2 (3 seeds)",
         "positiveClass": "extra-note only",
-        "candidateDefinition": "two or more generic onset peaks inside an aligned score-note window",
+        "candidateDefinition": (
+            "two or more onset peaks supported by an overlapping exact-pitch event "
+            "inside an aligned score-note window"
+            if pitch_conditioned
+            else "two or more generic onset peaks inside an aligned score-note window"
+        ),
         "configurationCount": len(results),
         "jointFloorConfigurationCount": len(qualifying),
         "selectedDevelopmentConfiguration": selected,
         "holdout": holdout_result,
+    }
+
+
+def evaluate_unassigned_edit_path_split(
+    dev_names: list[str],
+    holdout_names: list[str],
+) -> dict[str, Any]:
+    return {
+        "candidateDefinition": (
+            "an unassigned exact-pitch Basic Pitch event starts inside the aligned "
+            "score-note window"
+        ),
+        "positiveClass": "extra-note only",
+        "syntheticDevelopment": evaluate_unassigned_edit_path(prepare_onset_sets(dev_names)),
+        "syntheticHoldout": evaluate_unassigned_edit_path(prepare_onset_sets(holdout_names)),
     }
 
 
@@ -273,6 +435,13 @@ def main() -> int:
         "round4InspectedReal": evaluate_timing_duration_round4(),
     }
     onset_count = sweep_onset_count(dev_names, holdout_names)
+    pitch_conditioned_onset = sweep_onset_count(
+        dev_names,
+        holdout_names,
+        pitch_conditioned=True,
+    )
+    unassigned_edit_path = evaluate_unassigned_edit_path_split(dev_names, holdout_names)
+    interior_attack = sweep_interior_attack(dev_names, holdout_names)
     synthetic_ready = timing_duration["syntheticDevelopment"]["pooled"]["jointFloorReady"]
     holdout_ready = timing_duration["syntheticHoldout"]["pooled"]["jointFloorReady"]
     round4_ready = timing_duration["round4InspectedReal"]["pooled"]["jointFloorReady"]
@@ -286,18 +455,39 @@ def main() -> int:
         "jointFloor": {"precision": PRECISION_FLOOR, "recall": RECALL_FLOOR},
         "timingDurationConjunction": timing_duration,
         "genericOnsetCount": onset_count,
+        "pitchConditionedOnsetCount": pitch_conditioned_onset,
+        "unassignedEventEditPath": unassigned_edit_path,
+        "interiorAttackRatio": interior_attack,
         "findings": {
             "timingDurationSyntheticReady": synthetic_ready and holdout_ready,
             "timingDurationRound4Ready": round4_ready,
             "syntheticToRealGeneralizationReady": synthetic_ready and holdout_ready and round4_ready,
             "genericOnsetCountReady": onset_count["jointFloorConfigurationCount"] > 0,
+            "pitchConditionedOnsetCountSyntheticReady": (
+                pitch_conditioned_onset["jointFloorConfigurationCount"] > 0
+                and pitch_conditioned_onset["holdout"]["jointFloorReady"]
+            ),
+            "unassignedEventEditPathSyntheticReady": (
+                unassigned_edit_path["syntheticDevelopment"]["pooled"]["jointFloorReady"]
+                and unassigned_edit_path["syntheticHoldout"]["pooled"]["jointFloorReady"]
+            ),
+            "interiorAttackRatioSyntheticReady": (
+                interior_attack["jointFloorConfigurationCount"] > 0
+                and interior_attack["syntheticHoldout"]["jointFloorReady"]
+            ),
         },
         "blockingReasons": [
             "timing-duration-synthetic-to-real-generalization-failed",
             "generic-onset-count-no-joint-floor",
+            "pitch-conditioned-onset-count-no-joint-floor",
+            "unassigned-event-edit-path-no-joint-floor",
+            "interior-attack-ratio-no-joint-floor",
             "fresh-blind-independent-positive-evidence-missing",
         ],
-        "nextCandidate": "pitch-conditioned re-articulation/edit-path evidence; do not use generic onset peaks alone",
+        "nextCandidate": (
+            "targeted real re-articulation labels plus a learned segment/edit-path model; "
+            "stop adding single handcrafted onset features"
+        ),
     }
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     (OUT_DIR / "report.json").write_text(
@@ -306,6 +496,9 @@ def main() -> int:
     )
     round4 = timing_duration["round4InspectedReal"]["pooled"]
     onset_dev = onset_count["selectedDevelopmentConfiguration"]
+    pitch_onset_dev = pitch_conditioned_onset["selectedDevelopmentConfiguration"]
+    edit_dev = unassigned_edit_path["syntheticDevelopment"]["pooled"]
+    interior_dev = interior_attack["selectedDevelopmentConfiguration"]
     lines = [
         "# Segment/onset candidate diagnostic",
         "",
@@ -324,6 +517,13 @@ def main() -> int:
         f"- configurations meeting the joint floor: {onset_count['jointFloorConfigurationCount']}",
         f"- best development result: {onset_dev['precision']:.2%} precision / {onset_dev['recall']:.2%} recall",
         "- conclusion: generic onset peaks alone are not a safe extra-note detector",
+        "",
+        "## Additional handcrafted extra-note candidates",
+        "",
+        f"- pitch-conditioned onset count: development P/R {pitch_onset_dev['precision']:.2%}/{pitch_onset_dev['recall']:.2%}; no joint-floor configuration",
+        f"- unassigned-event edit path: development P/R {edit_dev['precision']:.2%}/{edit_dev['recall']:.2%}",
+        f"- interior attack ratio: development P/R {interior_dev['precision']:.2%}/{interior_dev['recall']:.2%}; no joint-floor configuration",
+        "- conclusion: stop stacking single handcrafted attack features; require targeted real labels and a learned segment/edit-path model",
         "",
     ]
     (OUT_DIR / "report.md").write_text("\n".join(lines), encoding="utf-8")
