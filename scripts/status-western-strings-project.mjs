@@ -115,6 +115,11 @@ const ROUND5_SEGMENT_EDIT_PATH_REPORT = path.join(
   "western-strings-round5-segment-edit-path",
   "report.json",
 );
+const ROUND5_SEGMENT_EDIT_PATH_SMOKE = path.join(
+  "docs",
+  "evidence",
+  "western-strings-round5-segment-edit-path-smoke-20260722.json",
+);
 const ROUND5_TARGETED_CONTRACT_VERSION = "western-round5-targeted-diagnosis-intake-v1";
 const ORDINARY_DYNAMIC_CONTRACT_VERSION = "western-ordinary-dynamic-shadow-candidate-v1";
 const ORDINARY_DYNAMIC_POLICY_VERSION = "western-ordinary-dynamic-shadow-policy-v1";
@@ -1602,10 +1607,11 @@ export async function summarizeRound5TargetedIntake({
   reportPath = ROUND5_TARGETED_REPORT,
   modelReportPath = ROUND5_SEGMENT_EDIT_PATH_REPORT,
 } = {}) {
-  const [contract, report, modelReport, contractSha256, manifestSha256, truthSha256] = await Promise.all([
+  const [contract, report, modelReport, smokeEvidence, contractSha256, manifestSha256, truthSha256] = await Promise.all([
     readJson(contractPath),
     readJson(reportPath),
     readJson(modelReportPath),
+    readJson(ROUND5_SEGMENT_EDIT_PATH_SMOKE),
     sha256FileOrEmpty(contractPath),
     sha256FileOrEmpty(manifestPath),
     sha256FileOrEmpty(truthPath),
@@ -1685,6 +1691,15 @@ export async function summarizeRound5TargetedIntake({
       ? ["round5-segment-edit-path-model-artifact-stale"]
       : []),
   ]);
+  const smokeEvidenceValid = Boolean(
+    smokeEvidence?.contract === "western-round5-segment-edit-path-smoke-v1"
+      && smokeEvidence?.evidenceRole === "architecture-smoke-preGateOnly"
+      && smokeEvidence?.promotionEvidenceEligible === false
+      && smokeEvidence?.reviewAssistPromotionReady === false
+      && smokeEvidence?.automaticAccusationReady === false
+      && smokeEvidence?.studentFacing === false
+      && smokeEvidence?.productionAdoptionReady === false,
+  );
   return {
     contract: contract?.contractVersion || ROUND5_TARGETED_CONTRACT_VERSION,
     source: String(reportPath).replace(/\\/g, "/"),
@@ -1718,6 +1733,21 @@ export async function summarizeRound5TargetedIntake({
       ),
       modelArtifactCurrent,
       evaluation: modelReport?.evaluation || null,
+      smokeDiagnostic: {
+        source: ROUND5_SEGMENT_EDIT_PATH_SMOKE.replace(/\\/g, "/"),
+        evidenceValid: smokeEvidenceValid,
+        architectureCandidateRetained: smokeEvidence?.architectureCandidateRetained === true,
+        structuralRound4Union: smokeEvidence?.structuralAlignment?.round4Union || null,
+        acousticRound4Union: smokeEvidence?.acousticAugmented?.round4Union || null,
+        promotionEvidenceEligible: false,
+        blockingReasons: normalizedReasonList([
+          ...(!smokeEvidence ? ["round5-segment-edit-path-smoke-evidence-missing"] : []),
+          ...(smokeEvidence && !smokeEvidenceValid
+            ? ["round5-segment-edit-path-smoke-evidence-invalid"]
+            : []),
+          ...(smokeEvidence?.blockingReasons || []),
+        ]),
+      },
       studentFacing: false,
       automaticAccusationReady: false,
       productionAdoptionReady: false,
@@ -3846,7 +3876,7 @@ export function summarizeNextActions(
     actions.push({
       priority: 1,
       track: "Ordinary diagnosis recall",
-      action: "Policy C remains two-layer teacher review assistance; strict confirmed recall is still 2/12. The inspected merged-substitution pattern only raises a diagnostic ceiling to 3/12. Timing+duration failed synthetic-to-real transfer; generic onset count, pitch-conditioned onset count, unassigned-event edit-path, and interior-attack ratio all miss the 90% precision / 50% recall floor. Direct RMS learns synthetic digital silence and recalls 0/3 real missing notes; target-pitch absence recalls 3/3 but also flags the other 4 authoritative assignment gaps (42.86% precision). Do not promote any of them. Stop adding single thresholds: collect fresh real confusion pairs under the Round-5 targeted intake contract (`npm run western:round5-targeted-intake`), then run the live-bound segment insert/delete/substitute candidate (`npm run western:round5-segment-edit-path`).",
+      action: "Policy C remains two-layer teacher review assistance; strict confirmed recall is still 2/12. The inspected merged-substitution pattern only raises a diagnostic ceiling to 3/12. Timing+duration, generic/pitch-conditioned onset, unassigned-event edit path, direct RMS, and target-pitch absence all fail transfer or precision. A fixed five-note random-forest smoke test also failed: structural Round 4 P/R=45.45%/41.67% (5/12, 6/253 false accusations); adding fixed RMS/pYIN/onset fell to 33.33%/8.33% (1/12, 2/253) with zero correct-gate hits. Do not promote or keep tuning this model family. Collect fresh real confusion pairs under `npm run western:round5-targeted-intake`; run `npm run western:round5-segment-edit-path` only as the frozen baseline, then compare an explicit temporal operation-path model on the untouched fresh-blind split.",
       artifact: shadow.policyCReviewAssistEvidence.source,
       reason: normalizedReasonList([
         "policy-c-auto-accusation-closed",

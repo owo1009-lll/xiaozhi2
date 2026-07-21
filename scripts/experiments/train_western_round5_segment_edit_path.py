@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 import joblib
+import librosa
 import numpy as np
 from music21 import converter
 from sklearn.ensemble import RandomForestClassifier
@@ -120,9 +121,131 @@ def _number(value: Any, missing: float = 0.0) -> float:
     return missing if value is None else float(value)
 
 
+def prepare_acoustic_context(audio_path: Path) -> dict[str, Any]:
+    waveform, sample_rate = librosa.load(audio_path, sr=22050, mono=True)
+    hop_length = 512
+    onset_envelope = librosa.onset.onset_strength(
+        y=waveform,
+        sr=sample_rate,
+        hop_length=hop_length,
+    )
+    onset_times = librosa.frames_to_time(
+        np.arange(len(onset_envelope)),
+        sr=sample_rate,
+        hop_length=hop_length,
+    )
+    peak_frames = librosa.util.peak_pick(
+        onset_envelope,
+        pre_max=3,
+        post_max=3,
+        pre_avg=3,
+        post_avg=5,
+        delta=0.20,
+        wait=2,
+    )
+    f0, voiced, voiced_probability = librosa.pyin(
+        waveform,
+        fmin=librosa.note_to_hz("G3"),
+        fmax=librosa.note_to_hz("E7"),
+        sr=sample_rate,
+        frame_length=2048,
+        hop_length=hop_length,
+    )
+    f0_midi = np.full_like(f0, np.nan, dtype=np.float64)
+    finite = np.isfinite(f0)
+    f0_midi[finite] = librosa.hz_to_midi(f0[finite])
+    return {
+        "waveform": waveform,
+        "sampleRate": sample_rate,
+        "onsetEnvelope": onset_envelope,
+        "onsetTimes": onset_times,
+        "onsetPeakTimes": librosa.frames_to_time(
+            peak_frames,
+            sr=sample_rate,
+            hop_length=hop_length,
+        ),
+        "pitchTimes": librosa.frames_to_time(
+            np.arange(len(f0_midi)),
+            sr=sample_rate,
+            hop_length=hop_length,
+        ),
+        "f0Midi": f0_midi,
+        "voiced": voiced,
+        "voicedProbability": voiced_probability,
+    }
+
+
+def acoustic_window_features(
+    context: dict[str, Any] | None,
+    start: float,
+    end: float,
+    target_midi: int,
+) -> dict[str, float]:
+    empty = {
+        "acousticAvailable": 0.0,
+        "targetRmsDb": -120.0,
+        "targetPeakDb": -120.0,
+        "targetOnsetMean": 0.0,
+        "targetOnsetMax": 0.0,
+        "targetInteriorAttackRatio": 0.0,
+        "targetOnsetPeakCount": 0.0,
+        "targetVoicedFrameRatio": 0.0,
+        "targetPitchOccupancy": 0.0,
+        "targetNearPitchOccupancy": 0.0,
+        "targetMeanVoicedProbability": 0.0,
+    }
+    if not context or end <= start:
+        return empty
+    waveform = context["waveform"]
+    sample_rate = int(context["sampleRate"])
+    sample_start = max(0, int(round(start * sample_rate)))
+    sample_end = min(len(waveform), int(round(end * sample_rate)))
+    segment = waveform[sample_start:sample_end]
+    if segment.size == 0:
+        return empty
+    rms = float(np.sqrt(np.mean(np.square(segment, dtype=np.float64))))
+    peak = float(np.max(np.abs(segment)))
+    onset_mask = (context["onsetTimes"] >= start) & (context["onsetTimes"] < end)
+    onset_values = context["onsetEnvelope"][onset_mask]
+    duration = end - start
+    interior_mask = (
+        (context["onsetTimes"] >= start + max(0.12, duration * 0.20))
+        & (context["onsetTimes"] < end - max(0.06, duration * 0.08))
+    )
+    interior_values = context["onsetEnvelope"][interior_mask]
+    onset_max = float(np.max(onset_values)) if onset_values.size else 0.0
+    pitch_mask = (context["pitchTimes"] >= start) & (context["pitchTimes"] < end)
+    local_f0 = context["f0Midi"][pitch_mask]
+    local_voiced = context["voiced"][pitch_mask]
+    local_probability = context["voicedProbability"][pitch_mask]
+    finite_f0 = local_f0[np.isfinite(local_f0)]
+    return {
+        "acousticAvailable": 1.0,
+        "targetRmsDb": float(20.0 * np.log10(max(rms, 1e-6))),
+        "targetPeakDb": float(20.0 * np.log10(max(peak, 1e-6))),
+        "targetOnsetMean": float(np.mean(onset_values)) if onset_values.size else 0.0,
+        "targetOnsetMax": onset_max,
+        "targetInteriorAttackRatio": (
+            float(np.max(interior_values)) / max(onset_max, 1e-9)
+            if interior_values.size else 0.0
+        ),
+        "targetOnsetPeakCount": float(np.sum(
+            (context["onsetPeakTimes"] >= start) & (context["onsetPeakTimes"] < end)
+        )),
+        "targetVoicedFrameRatio": float(np.mean(local_voiced)) if local_voiced.size else 0.0,
+        "targetPitchOccupancy": float(np.mean(np.abs(finite_f0 - target_midi) <= 0.5))
+        if finite_f0.size else 0.0,
+        "targetNearPitchOccupancy": float(np.mean(np.abs(finite_f0 - target_midi) <= 2.0))
+        if finite_f0.size else 0.0,
+        "targetMeanVoicedProbability": float(np.nanmean(local_probability))
+        if local_probability.size and np.any(np.isfinite(local_probability)) else 0.0,
+    }
+
+
 def extract_segment_features(
     take: dict[str, Any],
     note_index: int,
+    acoustic_context: dict[str, Any] | None = None,
 ) -> dict[str, float]:
     rows = take["rows"]
     notes = take["notes"]
@@ -175,6 +298,13 @@ def extract_segment_features(
             int(notes[note_index + 1]["midi"]) - target_midi
         ) if note_index + 1 < len(notes) else 0.0,
     }
+    if acoustic_context is not None:
+        features.update(acoustic_window_features(
+            acoustic_context,
+            target_start,
+            target_end,
+            target_midi,
+        ))
     for offset in range(-2, 3):
         key = f"n_m{abs(offset)}" if offset < 0 else f"n_p{offset}" if offset > 0 else "n_0"
         index = note_index + offset

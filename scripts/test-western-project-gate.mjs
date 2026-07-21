@@ -735,6 +735,23 @@ assert.equal(round5TargetedIntake?.automaticAuthorizationGranted, false);
 assert.equal(round5TargetedIntake?.segmentEditPathCandidate?.studentFacing, false);
 assert.equal(round5TargetedIntake?.segmentEditPathCandidate?.automaticAccusationReady, false);
 assert.equal(round5TargetedIntake?.segmentEditPathCandidate?.productionAdoptionReady, false);
+assert.equal(round5TargetedIntake?.segmentEditPathCandidate?.smokeDiagnostic?.evidenceValid, true);
+assert.equal(
+  round5TargetedIntake?.segmentEditPathCandidate?.smokeDiagnostic?.architectureCandidateRetained,
+  false,
+);
+assert.equal(
+  round5TargetedIntake?.segmentEditPathCandidate?.smokeDiagnostic?.structuralRound4Union?.truePositive,
+  5,
+);
+assert.equal(
+  round5TargetedIntake?.segmentEditPathCandidate?.smokeDiagnostic?.structuralRound4Union?.falsePositive,
+  6,
+);
+assert.equal(
+  round5TargetedIntake?.segmentEditPathCandidate?.smokeDiagnostic?.acousticRound4Union?.truePositive,
+  1,
+);
 const rhythmChannel = controlled.ordinaryDynamicShadow?.rhythmChannelEvidence;
 assert.equal(rhythmChannel?.contract, "western-round4-relative-ioi-diagnostic-v1");
 assert.equal(rhythmChannel?.scope, "preGateOnly-diagnostic");

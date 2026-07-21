@@ -275,6 +275,7 @@
     "test:western-round5-project-status": "node scripts/test-western-round5-project-status.mjs",
     "western:round5-segment-edit-path": "py -3.11 scripts\\experiments\\train_western_round5_segment_edit_path.py",
     "test:western-round5-segment-edit-path": "py -3.11 scripts\\test-western-round5-segment-edit-path.py",
+    "western:round5-segment-edit-path-smoke": "py -3.11 scripts\\experiments\\eval_western_round5_segment_edit_path_smoke.py",
     "test:western-ordinary-audio-runtime": "node scripts\\test-western-ordinary-audio-runtime.mjs",
     "test:western-dynamic-shadow-policy": "node scripts\\run-western-ordinary-audio-python.mjs --script scripts\\test-western-dynamic-shadow-policy.py --",
     "test:western-offline-feature-audio": "node scripts\\run-western-ordinary-audio-python.mjs --script scripts\\test-western-offline-feature-audio.py --",

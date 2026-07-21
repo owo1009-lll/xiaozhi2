@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "contract": "western-round5-segment-edit-path-smoke-v1",
+  "evidenceRole": "architecture-smoke-preGateOnly",
+  "generatedDate": "2026-07-22",
+  "sourceBinding": {
+    "fileCount": 28,
+    "aggregateSha256": "f4cd752af6f890f9d43c9b281b6683b0eed6c1a2e26ee8cae8bcb3992bef1158"
+  },
+  "splitDiscipline": {
+    "calibration": "r2-01 waveform-injection-v2, three correlated seeds",
+    "syntheticHoldout": "r2-08 waveform-injection-v2, three correlated seeds",
+    "realDiagnostic": "inspected Round 4; never fresh-blind"
+  },
+  "jointFloor": {
+    "minPrecision": 0.9,
+    "minRecall": 0.5,
+    "maxStrictFalseAccusations": 0
+  },
+  "structuralAlignment": {
+    "syntheticAllGatesReady": false,
+    "syntheticHoldout": {
+      "merged_substitution": {"precision": 1.0, "recall": 0.4, "falsePositive": 0, "ready": false},
+      "missing": {"precision": 1.0, "recall": 0.866667, "falsePositive": 0, "ready": true},
+      "extra": {"precision": 0.888889, "recall": 0.533333, "falsePositive": 1, "ready": false},
+      "drag": {"precision": 0.5, "recall": 0.166667, "falsePositive": 2, "ready": false}
+    },
+    "round4Union": {
+      "truePositive": 5,
+      "falsePositive": 6,
+      "falseNegative": 7,
+      "trueNegative": 247,
+      "precision": 0.454545,
+      "recall": 0.416667,
+      "jointFloorReady": false
+    },
+    "round4ByGate": {
+      "merged_substitution": {"truePositive": 0, "falsePositive": 2, "precision": 0.0, "recall": 0.0},
+      "missing": {"truePositive": 3, "falsePositive": 5, "precision": 0.375, "recall": 1.0},
+      "extra": {"truePositive": 1, "falsePositive": 0, "precision": 1.0, "recall": 0.333333},
+      "drag": {"truePositive": 0, "falsePositive": 0, "precision": 0.0, "recall": 0.0}
+    }
+  },
+  "acousticAugmented": {
+    "syntheticAllGatesReady": false,
+    "round4Union": {
+      "truePositive": 1,
+      "falsePositive": 2,
+      "falseNegative": 11,
+      "trueNegative": 251,
+      "precision": 0.333333,
+      "recall": 0.083333,
+      "jointFloorReady": false
+    },
+    "correctGateTruePositive": 0
+  },
+  "architectureCandidateRetained": false,
+  "promotionEvidenceEligible": false,
+  "reviewAssistPromotionReady": false,
+  "automaticAccusationReady": false,
+  "studentFacing": false,
+  "productionAdoptionReady": false,
+  "blockingReasons": [
+    "segment-model-structural-synthetic-piece-holdout-failed",
+    "segment-model-structural-synthetic-to-real-transfer-failed",
+    "segment-model-acoustic-synthetic-piece-holdout-failed",
+    "segment-model-acoustic-synthetic-to-real-transfer-failed",
+    "round5-independent-real-confusion-pairs-missing",
+    "round4-inspected-not-promotion-eligible"
+  ]
+}
