@@ -47,3 +47,5 @@ Policy C 的 assignment gap 也补做了直接波形归因：
 - pYIN 目标音高占用率在合成为 P/R=100%/73.33%、100%/80.00%，round4 为 42.86%/100%：3 个真实漏音和另外 4 个 authoritative assignment gaps 都没有目标音高帧，不能区分漏音、错音、滑音或对齐失败。
 
 因此当前不再追加单阈值或单一手工特征。下一轮数据必须直接覆盖真实混淆对，模型单位改为连续片段上的插入/删除/替代 edit-path。
+
+Round 5 intake 已接入总项目状态并做实时哈希绑定。当前 `ready=false`、`bindingCurrent=true`：合同本身与已生成报告一致，唯一输入 blocker 是私密 `manifest.csv` 和 `position-truth.json` 尚未到位。文件新增或改动后若未重跑 `npm run western:round5-targeted-intake`，总状态会以 stale reason 关闭，而不会继续沿用旧报告。
