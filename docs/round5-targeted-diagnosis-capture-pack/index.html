@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Round 5 定向诊断录制与真值包</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui,"Microsoft YaHei",sans-serif; background:#07111f; color:#e5eef9; }
+    body { max-width:1180px; margin:auto; padding:24px; line-height:1.6; }
+    h1,h2 { color:#7dd3fc; }
+    .warning,.ok { padding:14px; border-radius:10px; margin:14px 0; }
+    .warning { border:1px solid #fb923c; background:#43140766; }
+    .ok { border:1px solid #34d399; background:#064e3b55; }
+    button { color:white; background:#0369a1; border:0; padding:10px 14px; border-radius:7px; cursor:pointer; margin:4px; }
+    code { background:#172033; padding:2px 5px; border-radius:4px; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th,td { border:1px solid #334155; padding:7px; text-align:left; vertical-align:top; }
+    th { background:#172033; position:sticky; top:0; }
+    details { margin:4px 0; }
+  </style>
+</head>
+<body>
+  <h1>Round 5 定向诊断录制与真值包</h1>
+  <p>这 12 条录音槽位正好覆盖冻结合同的最低分母：每类 12 个真实错误、24 个混淆负例，其中 fresh-blind 各保留 6/12；同时覆盖 2 名演奏者、3 台设备和 2 个房间。</p>
+  <div class="warning"><strong>盲测红线：</strong>先下载并登记新曲目和位置，再录音。calibration 与 fresh-blind 不得复用曲目，也不得复用同一个演奏者-设备-房间组合。模板中的 <code>replace-*</code> 曲目 ID 必须替换。任何新包结果都不得用于回调已经冻结的阈值。</div>
+  <div class="ok"><strong>安全边界：</strong>下载或完成本包不会开启自动判分。每条录音只有在逐音复核全部演奏错误后，才可把 <code>completeErrorInventory</code> 从 <code>false</code> 改成 <code>true</code>。</div>
+
+  <p>
+    <button id="manifest">下载 manifest.csv</button>
+    <button id="truth">下载 position-truth.json</button>
+    <button id="tasks-json">下载录制任务 JSON</button>
+  </p>
+
+  <h2>完成顺序</h2>
+  <ol>
+    <li>为 12 个槽位各选一份此前未进入 Round4/调参的单声部 MusicXML；两个 split 的曲目完全分开。</li>
+    <li>每条录音在 4 个不同谱音位置分别制造 wrong/missing/extra/drag，并另选 8 个互不重复的正常混淆位置。</li>
+    <li>按表中 performer/device/room 分配录制无损 WAV；不要把同一遍演奏复制成多个设备样本。</li>
+    <li>逐条试听，在 truth JSON 填入 12 个互不重复的 <code>measure/beat/scoreMidi/asPerformed</code>；若出现计划外错误，也必须新增事件。</li>
+    <li>全部复核后才签署 <code>completeErrorInventory=true</code>，把文件放入 <code>data/private/western-strings-round5/</code>。</li>
+    <li>运行 <code>npm run western:round5-targeted-intake</code>；通过后再运行 <code>npm run western:round5-segment-edit-path</code>。</li>
+  </ol>
+
+  <h2>12 条冻结槽位</h2>
+  <table>
+    <thead><tr><th>录音</th><th>split</th><th>演奏者/设备/房间</th><th>曲目占位</th><th>每条 12 个事件槽</th></tr></thead>
+    <tbody id="tasks"></tbody>
+  </table>
+
+  <script type="module">
+    import { contractVersion, manifestTemplateCsv, tasks, truthTemplate } from "./capture-plan.mjs";
+
+    function download(name, text, type) {
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(new Blob([text], { type }));
+      link.download = name;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+    document.querySelector("#manifest").onclick = () => download(
+      "manifest.csv", manifestTemplateCsv(), "text/csv;charset=utf-8",
+    );
+    document.querySelector("#truth").onclick = () => download(
+      "position-truth.json", `${JSON.stringify(truthTemplate(), null, 2)}\n`, "application/json",
+    );
+    document.querySelector("#tasks-json").onclick = () => download(
+      "round5-recording-tasks.json",
+      `${JSON.stringify({ contractVersion, tasks }, null, 2)}\n`,
+      "application/json",
+    );
+    document.querySelector("#tasks").innerHTML = tasks.map((task) => {
+      const positives = task.eventSlots.filter((event) => event.label === "positive");
+      const negatives = task.eventSlots.filter((event) => event.label === "confusion_negative");
+      return `<tr>
+        <td><code>${task.recordingId}</code><br>${task.audioPath.split("/").at(-1)}</td>
+        <td>${task.split}</td>
+        <td>${task.performerId}<br>${task.deviceId}<br>${task.roomId}</td>
+        <td><code>${task.pieceId}</code><br>${task.scorePath.split("/").at(-1)}</td>
+        <td><details><summary>${positives.length} 正例 + ${negatives.length} 混淆负例</summary>${task.eventSlots.map((event) => `${event.gate} · ${event.label}${event.confusionKind ? ` · ${event.confusionKind}` : ""}`).join("<br>")}</details></td>
+      </tr>`;
+    }).join("");
+  </script>
+</body>
+</html>

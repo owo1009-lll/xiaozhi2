@@ -1,1 +1,13 @@
 recordingId,pieceId,performerId,deviceId,roomId,split,audioPath,scorePath,consent,licenseStatus
+r5-cal-01,replace-cal-piece-01,performer-1,device-1,room-1,calibration,data/private/western-strings-round5/r5-cal-01.wav,data/private/western-strings-round5/r5-cal-01.musicxml,yes,local-only
+r5-cal-02,replace-cal-piece-02,performer-2,device-1,room-1,calibration,data/private/western-strings-round5/r5-cal-02.wav,data/private/western-strings-round5/r5-cal-02.musicxml,yes,local-only
+r5-cal-03,replace-cal-piece-03,performer-1,device-2,room-1,calibration,data/private/western-strings-round5/r5-cal-03.wav,data/private/western-strings-round5/r5-cal-03.musicxml,yes,local-only
+r5-cal-04,replace-cal-piece-04,performer-2,device-2,room-1,calibration,data/private/western-strings-round5/r5-cal-04.wav,data/private/western-strings-round5/r5-cal-04.musicxml,yes,local-only
+r5-cal-05,replace-cal-piece-05,performer-1,device-3,room-1,calibration,data/private/western-strings-round5/r5-cal-05.wav,data/private/western-strings-round5/r5-cal-05.musicxml,yes,local-only
+r5-cal-06,replace-cal-piece-06,performer-2,device-3,room-1,calibration,data/private/western-strings-round5/r5-cal-06.wav,data/private/western-strings-round5/r5-cal-06.musicxml,yes,local-only
+r5-fresh-01,replace-fresh-piece-01,performer-1,device-1,room-2,fresh-blind,data/private/western-strings-round5/r5-fresh-01.wav,data/private/western-strings-round5/r5-fresh-01.musicxml,yes,local-only
+r5-fresh-02,replace-fresh-piece-02,performer-2,device-1,room-2,fresh-blind,data/private/western-strings-round5/r5-fresh-02.wav,data/private/western-strings-round5/r5-fresh-02.musicxml,yes,local-only
+r5-fresh-03,replace-fresh-piece-03,performer-1,device-2,room-2,fresh-blind,data/private/western-strings-round5/r5-fresh-03.wav,data/private/western-strings-round5/r5-fresh-03.musicxml,yes,local-only
+r5-fresh-04,replace-fresh-piece-04,performer-2,device-2,room-2,fresh-blind,data/private/western-strings-round5/r5-fresh-04.wav,data/private/western-strings-round5/r5-fresh-04.musicxml,yes,local-only
+r5-fresh-05,replace-fresh-piece-05,performer-1,device-3,room-2,fresh-blind,data/private/western-strings-round5/r5-fresh-05.wav,data/private/western-strings-round5/r5-fresh-05.musicxml,yes,local-only
+r5-fresh-06,replace-fresh-piece-06,performer-2,device-3,room-2,fresh-blind,data/private/western-strings-round5/r5-fresh-06.wav,data/private/western-strings-round5/r5-fresh-06.musicxml,yes,local-only

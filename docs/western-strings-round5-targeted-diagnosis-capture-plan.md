@@ -13,6 +13,8 @@
 
 每条必须记录 `recordingId / measure / beat / scoreMidi / kind / asPerformed`，并保留未压缩母音频或无损 WAV 派生文件。建议覆盖至少 2 名演奏者、3 台手机麦、2 个房间；同一演奏者/设备/曲目组合不得同时进入 calibration 和 fresh-blind。
 
+现有可执行采集包位于 `docs/round5-targeted-diagnosis-capture-pack/index.html`。它冻结了 12 条录音槽位：calibration/fresh-blind 各 6 条；每条恰好包含四类各 1 个正例和各 2 个互不重复混淆负例。因此总计每类 12 个正例/24 个负例，fresh-blind 每类 6/12，正好达到合同下限。槽位使用 2 名演奏者×3 台设备，并以两个房间隔离 split 上下文；`replace-*` 曲目 ID 仍必须由采集者换成两个 split 间不重叠的新曲目。
+
 ## 冻结与验收
 
 1. 先登记曲目、错误位置、设备和 split，再开始任何阈值或模型选择。
@@ -21,12 +23,14 @@
 4. 未通过的子闸仍可保留为教师 `self_check_hint`，不得并入 `confirmed_issue`。
 5. 四类全部通过也不自动打开学生开关；仍需跨设备能量鲁棒性审计和具名发布授权。
 
-采集前先复制模板：
+采集前可直接打开 `docs/round5-targeted-diagnosis-capture-pack/index.html` 下载两个模板，或先运行 `npm run western:round5-capture-pack` 重建后再复制：
 
 - `docs/round5-targeted-diagnosis-capture-pack/manifest.template.csv` → `data/private/western-strings-round5/manifest.csv`
 - `docs/round5-targeted-diagnosis-capture-pack/truth.template.json` → `data/private/western-strings-round5/position-truth.json`
 
 随后运行 `npm run western:round5-targeted-intake`。当前无私密输入时应明确返回 `round5-manifest-missing` 与 `round5-position-truth-missing`；文件到位后它会检查分母、文件存在性、隐私路径、consent/license、曲目与演奏者-设备-房间 split 泄漏、逐事件字段以及 contract/manifest/truth SHA-256。`npm run western:project-status` 会把该结果显示在 `tracks.controlledCandidate.ordinaryDynamicShadow.round5TargetedIntake`，并在合同、清单或真值后续变化但报告未重跑时标记对应 `*-binding-stale`。只有 `ready=true` 且 `bindingCurrent=true` 才允许训练或 fresh-blind 评测，且该状态仍不授予学生端权限。
+
+模板默认把全部 `completeErrorInventory` 保持为 `false`，位置字段为空，因此不能误过 intake。逐条人工复核后才允许签署为 `true`。intake 还会拒绝非法 measure/beat/MIDI，以及同一录音内重复使用同一个 `measure/beat/scoreMidi` 位置来凑多个分母。
 
 ## 机器侧下一实现
 
