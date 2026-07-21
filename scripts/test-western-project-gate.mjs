@@ -768,6 +768,15 @@ assert.equal(temporalPath?.publicProfessionalStress?.assignmentGapCount, 936);
 assert.equal(temporalPath?.publicProfessionalStress?.refinedFlagCount, 595);
 assert.equal(temporalPath?.publicProfessionalStress?.falsePositiveCountAuthoritative, false);
 assert.equal(temporalPath?.publicProfessionalStress?.generalPurposeBurdenReady, false);
+assert.equal(temporalPath?.rhythmStructuralCandidateRetainedForFreshBlind, true);
+assert.equal(temporalPath?.rhythmStructuralRefinement?.syntheticHoldout?.truePositive, 15);
+assert.equal(temporalPath?.rhythmStructuralRefinement?.syntheticHoldout?.falsePositive, 0);
+assert.equal(temporalPath?.rhythmStructuralRefinement?.syntheticHoldout?.recall, 0.555556);
+assert.equal(temporalPath?.rhythmStructuralRefinement?.round4InspectedReal?.truePositive, 4);
+assert.equal(temporalPath?.rhythmStructuralRefinement?.round4InspectedReal?.falsePositive, 0);
+assert.equal(temporalPath?.rhythmStructuralRefinement?.naturalCleanStress?.falsePositive, 5);
+assert.equal(temporalPath?.rhythmStructuralRefinement?.naturalCleanStress?.hintRate, 0.017544);
+assert.equal(temporalPath?.rhythmStructuralRefinement?.automaticAccusationReady, false);
 const targetedGapRunner = temporalPath?.targetedFreshBlindRunner;
 assert.equal(targetedGapRunner?.contract, "western-round5-frozen-gap-refinement-v1");
 assert.equal(targetedGapRunner?.bindingCurrent, true);
@@ -780,6 +789,18 @@ assert.equal(targetedGapRunner?.promotionEvidenceEligible, false);
 assert.equal(targetedGapRunner?.reviewAssistPromotionReady, false);
 assert.equal(targetedGapRunner?.automaticAccusationReady, false);
 assert(targetedGapRunner?.blockingReasons?.includes("round5-targeted-intake-not-ready"));
+const targetedRhythmRunner = targetedGapRunner?.rhythmStructuralRefinement;
+assert.equal(
+  targetedRhythmRunner?.contract,
+  "western-round5-frozen-rhythm-structural-refinement-v1",
+);
+assert.equal(targetedRhythmRunner?.runnerWired, true);
+assert.equal(targetedRhythmRunner?.evaluationPerformed, false);
+assert.equal(targetedRhythmRunner?.outputSemantic, "self_check_hint");
+assert.equal(targetedRhythmRunner?.strictConfirmedRecallChanged, false);
+assert.equal(targetedRhythmRunner?.promotionEvidenceEligible, false);
+assert.equal(targetedRhythmRunner?.reviewAssistPromotionReady, false);
+assert.equal(targetedRhythmRunner?.automaticAccusationReady, false);
 assert.equal(temporalPath?.promotionEvidenceEligible, false);
 assert.equal(temporalPath?.studentFacing, false);
 assert.equal(temporalPath?.automaticAccusationReady, false);

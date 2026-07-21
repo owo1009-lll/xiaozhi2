@@ -8,6 +8,7 @@
 |---|---|---|---|
 | 合并替代音结构规则 | round4 新增命中 1 个 wrong，0/253 非故意位置 | 13 套外部集合 0 个独立正例 | 只作 development pre-gate；严格口径不从 2/12 晋升 |
 | relative-IOI + duration 合取 | r2-01 开发 P/R=95.45%/77.78%；r2-08 holdout 同为 95.45%/77.78% | 完整 round4 P/R=50.00%/66.67% | 合成到真实域迁移失败 |
+| IOI + 时值 + 置信度 + operation-path 结构合取 | 注入 calibration P/R=94.74%/66.67%；曲目 holdout P/R=100%/55.56% | 已查看 round4 P/R=100%/66.67%（drag 3/3、extra 1/3）；自然正确录音 5/285 提示，负担 1.75% | 仅冻结为 Round 5 `self_check_hint` 候选；形成于查看旧证据后，不占晋升分母 |
 | 通用波形 onset 峰计数 | 150 组参数均未过 P>=90%/R>=50%；开发最优 42.11%/53.33% | 合成 holdout 22.73%/33.33% | 止损，不再继续扫通用峰值参数 |
 
 复跑命令：
@@ -62,7 +63,7 @@ Round 5 intake 已接入总项目状态并做实时哈希绑定。当前 `ready=
 
 公开专业长曲压力给出了相反边界：Oliver Colbentson 两段 BWV1006 在正确展开反复记号后共有 2,301 个谱音，产生 936 个 assignment gap、595 个精炼提示，即 258.58 个提示/千音。由于没有逐音演奏错误人工 gold，这 595 个提示不能记作 FP；它们是实际可见的复核负担。故 `generalPurposeCandidateRetained=false`，该规则不得推广到任意专业长曲。它只保留为 Round 5 短篇学生混淆对的冻结候选，能否把正式确诊从 2/12 提高，仍只能由新的逐音人工真值 fresh-blind 决定。
 
-该候选已经接入 Round 5 targeted runner，而不是只留在回顾性脚本：参数固定为 synthetic calibration 选出的四组值，实际晋升只评 `merged_substitution`/`missing` 的 fresh-blind；输出语义固定为 `self_check_hint`，严格确诊口径不变。为避免只标少数混淆对却把所有未标位置误当真负例，合同新增每录音 `completeErrorInventory=true` 硬要求。当前 manifest/truth 尚缺，因此报告诚实停在 `runnerWired=true`、`evaluationPerformed=false`；数据到位后同一命令会按 precision≥0.90、recall≥0.50、strict FP=0 运行真闸。
+该候选已经接入 Round 5 targeted runner，而不是只留在回顾性脚本：gap 精炼参数固定为 synthetic calibration 选出的四组值，实际晋升只评 `merged_substitution`/`missing` 的 fresh-blind；新增的节奏结构合取也已作为同一执行器内的冻结子闸，只评 `extra`/`drag`，阈值固定为 relative-IOI `>0.15`、时值比 `>=1.20`、事件置信度 `>=0.75` 且 operation-path 同位置有候选。两者输出语义都固定为 `self_check_hint`，严格确诊口径不变。为避免只标少数混淆对却把所有未标位置误当真负例，合同新增每录音 `completeErrorInventory=true` 硬要求。当前 manifest/truth 尚缺，因此报告诚实停在 `runnerWired=true`、`evaluationPerformed=false`；数据到位后同一命令会按 precision≥0.90、recall≥0.50、strict FP=0 运行真闸。
 
 边界必须同时保留：这条精炼规则是在看过 Round 4 后形成，`strictConfirmedRecallUnchanged=true`，所以严格确诊仍是 `2/12`；当前仅 `candidateRetainedForFreshBlind=true`，`reviewAssistPromotionReady=false`、`automaticAccusationReady=false`。下一次 Round 5 fresh-blind 必须原样先测这条规则，不得先看新包再改成本或条件。可复跑：
 
