@@ -68,7 +68,8 @@
     "calibration": "r2-01 waveform-injection-v2, three correlated seeds",
     "syntheticHoldout": "r2-08 waveform-injection-v2, three correlated seeds",
     "realDiagnostic": "inspected Round 4; never fresh-blind",
-    "naturalCleanStress": "r2-01, r2-08, r3-01, r3-02, r3-03; negative burden only"
+    "naturalCleanStress": "r2-01, r2-08, r3-01, r3-02, r3-03; negative burden only",
+    "publicProfessionalStress": "two frozen Oliver Colbentson BWV1006 movements with <=5% double stops; unadjudicated burden proxy only"
   },
   "promotionThresholds": {
     "minPrecision": 0.9,
@@ -76,9 +77,24 @@
     "maxStrictFalseAccusations": 0
   },
   "sourceBinding": {
-    "fileCount": 44,
-    "aggregateSha256": "64df4e64ea7f4c6912c3592a5f62283c86eca69f903ef928c9bc0664dd824e87",
+    "fileCount": 51,
+    "aggregateSha256": "3378ba4d26fc7c8b1aa47aa07f7abca5eba8fd2724e8af8900e7400a36c69bda",
     "files": [
+      {
+        "path": "data/experiments/western-strings-bach-violin-basic-pitch-cache/oliver-colbentson_bwv1006_mov1.basic-pitch.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "06b0e30f0ac563c238bde3905d3acdbe691add12fb07c3789ffa9f4c5890fad3"
+      },
+      {
+        "path": "data/experiments/western-strings-bach-violin-basic-pitch-cache/oliver-colbentson_bwv1006_mov7.basic-pitch.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "ec9addc8b8a07f2fb177742ec907b73611cefd70cb80ddfe087ec7c4ec407622"
+      },
+      {
+        "path": "data/experiments/western-strings-bach-violin-dataset-audit.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "8d1ea66cf925a7f757ecb288219883fc83a71ea1a347a8d4a31a5427c2c1b327"
+      },
       {
         "path": "data/experiments/western-strings-injected-errors/r2-01-injected-v2-20260717.labels.json",
         "hashMode": "lf-normalized-sha256",
@@ -297,7 +313,27 @@
       {
         "path": "scripts/experiments/eval_western_round5_temporal_operation_path.py",
         "hashMode": "lf-normalized-sha256",
-        "sha256": "1e7022b84d307ca9219092404394339ce4e9a3cff215ac49a586802763808ee8"
+        "sha256": "3fce578ecee6de229657e0ba7cebaa806551622f1bb2feec9ca02de64e89830f"
+      },
+      {
+        "path": "音频/Bach独奏小提琴数据集/audio-by-movement/oliver-colbentson_bwv1006_mov1.mp3",
+        "hashMode": "raw-sha256",
+        "sha256": "80c68c7a34cdeb958a021d9a396b156cf3aa704ee57d524705fc2377762b023d"
+      },
+      {
+        "path": "音频/Bach独奏小提琴数据集/audio-by-movement/oliver-colbentson_bwv1006_mov7.mp3",
+        "hashMode": "raw-sha256",
+        "sha256": "de23360ea7e27204be02a5bf0e497662202538db6be93528141e3ea51643754d"
+      },
+      {
+        "path": "音频/Bach独奏小提琴数据集/bach-violin-dataset/scores/bwv1006/bwv1006_mov1.mxl",
+        "hashMode": "raw-sha256",
+        "sha256": "fa2c391e40cd00257b362e994b9260189781e6a3244347e20a74bf97c30a7464"
+      },
+      {
+        "path": "音频/Bach独奏小提琴数据集/bach-violin-dataset/scores/bwv1006/bwv1006_mov7.mxl",
+        "hashMode": "raw-sha256",
+        "sha256": "f51bcbd9f401e0b89b1c04abf1f32a447e77b4090630df24e0cbaa339106bfe5"
       }
     ]
   },
@@ -1678,6 +1714,34 @@
         }
       ]
     },
+    "publicProfessionalStress": {
+      "evidenceRole": "public-professional-unadjudicated-negative-burden-proxy",
+      "inputContract": "whole-performance score with repeats expanded before alignment",
+      "recordingCount": 2,
+      "scorePositionCount": 2301,
+      "assignmentGapCount": 936,
+      "refinedFlagCount": 595,
+      "refinedFlagsPer1000Positions": 258.583225,
+      "humanErrorGoldAvailable": false,
+      "falsePositiveCountAuthoritative": false,
+      "promotionEvidenceEligible": false,
+      "generalPurposeBurdenReady": false,
+      "recordings": [
+        {
+          "recordingId": "oliver-colbentson_bwv1006_mov1",
+          "scorePositionCount": 1635,
+          "assignmentGapCount": 779,
+          "refinedFlagCount": 525
+        },
+        {
+          "recordingId": "oliver-colbentson_bwv1006_mov7",
+          "scorePositionCount": 666,
+          "assignmentGapCount": 157,
+          "refinedFlagCount": 70
+        }
+      ],
+      "interpretation": "Every emitted hint is observable review burden, but cannot be labeled a false accusation without note-level human adjudication of performance/edition deviations. The observed burden is too large for general-purpose use; the candidate remains eligible only for the already-scoped short student fresh-blind test."
+    },
     "round4TwoLayerCombined": {
       "strictConfirmed": 2,
       "refinedSelfCheckHints": 4,
@@ -1690,10 +1754,12 @@
       "reviewAssistPromotionReady": false
     },
     "candidateRetainedForFreshBlind": true,
+    "generalPurposeCandidateRetained": false,
     "promotionBlockingReasons": [
       "gap-refinement-rule-round4-informed",
       "gap-refinement-fresh-blind-not-run",
-      "round5-independent-real-confusion-pairs-missing"
+      "round5-independent-real-confusion-pairs-missing",
+      "public-professional-negative-burden-not-cleared"
     ],
     "contaminationBoundary": "The refinement rule was formulated after inspecting Round 4. Its 6/12 result is a diagnostic ceiling, not fresh-blind evidence."
   },

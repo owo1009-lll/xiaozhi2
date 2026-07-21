@@ -41,7 +41,7 @@ def main() -> int:
         observed.append({
             "path": row["path"], "hashMode": row["hashMode"], "sha256": row["sha256"],
         })
-    canonical = json.dumps(observed, sort_keys=True, separators=(",", ":"))
+    canonical = json.dumps(observed, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     assert hashlib.sha256(canonical.encode()).hexdigest() == binding["aggregateSha256"]
     assert binding["fileCount"] == len(observed)
     assert REPORT.read_bytes() == EVIDENCE.read_bytes()
@@ -64,7 +64,21 @@ def main() -> int:
     assert refinement["candidateRetainedForFreshBlind"] is True
     assert refinement["naturalCleanStress"]["refined"]["falsePositive"] == 0
     assert len(refinement["naturalCleanStress"]["recordings"]) == 5
+    public_stress = refinement["publicProfessionalStress"]
+    assert public_stress["evidenceRole"] == "public-professional-unadjudicated-negative-burden-proxy"
+    assert public_stress["inputContract"] == "whole-performance score with repeats expanded before alignment"
+    assert public_stress["recordingCount"] == 2
+    assert public_stress["scorePositionCount"] == 2301
+    assert public_stress["assignmentGapCount"] == 936
+    assert public_stress["refinedFlagCount"] == 595
+    assert public_stress["refinedFlagsPer1000Positions"] == 258.583225
+    assert public_stress["humanErrorGoldAvailable"] is False
+    assert public_stress["falsePositiveCountAuthoritative"] is False
+    assert public_stress["generalPurposeBurdenReady"] is False
+    assert public_stress["promotionEvidenceEligible"] is False
+    assert refinement["generalPurposeCandidateRetained"] is False
     assert "gap-refinement-fresh-blind-not-run" in refinement["promotionBlockingReasons"]
+    assert "public-professional-negative-burden-not-cleared" in refinement["promotionBlockingReasons"]
 
     print(json.dumps({
         "ok": True,
@@ -73,6 +87,7 @@ def main() -> int:
             "raw-operation-path-rejected",
             "policy-c-gap-refinement-diagnostic-boundary",
             "strict-confirmed-recall-unchanged",
+            "public-professional-burden-not-mislabeled-as-false-positive",
             "student-and-automatic-gates-closed",
         ],
     }))

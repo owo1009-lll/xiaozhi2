@@ -23,12 +23,19 @@ import numpy as np
 from music21 import converter
 
 from eval_western_strings_duration_extra_quantization import (
+    EVENT_FILTER,
     INJECT_DIR,
     NATURAL_TAKES,
     PRIVATE,
     V2_SETS,
     analyze_take,
+    assign_basic_pitch_events,
+    build_rows,
+    filter_events,
+    score_notes,
+    shadow_selected,
 )
+from eval_western_bach_violin_basic_pitch_transcription import load_events
 from train_western_round5_segment_edit_path import (
     GATES,
     binary_metrics,
@@ -42,6 +49,12 @@ CONTRACT = "western-round5-temporal-operation-path-smoke-v1"
 ROUND4_MANIFEST = REPO / "data/private/western-strings-round4/manifest.csv"
 ROUND4_TRUTH = REPO / "data/private/western-strings-round4/error-positions.json"
 ROUND4_REPORT = REPO / "data/experiments/western-strings-round4/ordinary-fresh-blind/report.json"
+BACH_AUDIT = REPO / "data/experiments/western-strings-bach-violin-dataset-audit.json"
+BACH_BASIC_PITCH_CACHE = REPO / "data/experiments/western-strings-bach-violin-basic-pitch-cache"
+BACH_PUBLIC_STRESS_UNITS = {
+    "oliver-colbentson_bwv1006_mov1",
+    "oliver-colbentson_bwv1006_mov7",
+}
 OUT = REPO / "data/experiments/western-strings-round5-temporal-operation-path/report.json"
 EVIDENCE = REPO / "docs/evidence/western-strings-round5-temporal-operation-path-20260722.json"
 PROMOTION = {"minPrecision": 0.90, "minRecall": 0.50, "maxStrictFalseAccusations": 0}
@@ -385,6 +398,113 @@ def prepared_natural_clean() -> list[dict[str, Any]]:
     return output
 
 
+def prepared_public_professional_stress() -> list[dict[str, Any]]:
+    """Prepare frozen public Bach pairs without treating them as error gold.
+
+    These two Oliver Colbentson movements are the audit rows with at most 5%
+    double-stop reference notes.  Their existing Basic Pitch cache is reused;
+    no parameter selection or model fitting happens on these recordings.
+    """
+    rows = {
+        row["unit"]: row
+        for row in read_json(BACH_AUDIT)["rows"]
+        if row.get("unit") in BACH_PUBLIC_STRESS_UNITS
+    }
+    if set(rows) != BACH_PUBLIC_STRESS_UNITS:
+        missing = sorted(BACH_PUBLIC_STRESS_UNITS - set(rows))
+        raise RuntimeError(f"public-professional-stress-unit-missing:{','.join(missing)}")
+    output = []
+    for unit in sorted(BACH_PUBLIC_STRESS_UNITS):
+        metadata = rows[unit]
+        score_path = REPO / metadata["scorePath"]
+        audio_path = REPO / metadata["audioPath"]
+        # The student injection helper additionally enforces index isomorphism
+        # against its own MXL parser.  Public .mxl files need only the same
+        # flattened note representation; they have no injection-label index.
+        expanded_score = converter.parse(str(score_path)).expandRepeats()
+        notes = []
+        durations = []
+        for note in expanded_score.flatten().notes:
+            midis = sorted(int(pitch.midi) for pitch in note.pitches)
+            notes.append({
+                "midi": midis[0],
+                "midis": midis,
+                "scoreUnit": float(note.offset),
+                "scoreOnsetUnit": float(note.offset),
+            })
+            durations.append(max(0.125, float(note.quarterLength)))
+        events = filter_events(
+            load_events(BACH_BASIC_PITCH_CACHE, audio_path),
+            EVENT_FILTER["minConfidence"],
+            EVENT_FILTER["minDurationSeconds"],
+        )
+        take_rows = build_rows(notes, events)
+        for row in take_rows:
+            row["selected"] = shadow_selected(row)
+        assignments = assign_basic_pitch_events(notes, events)
+        matched = {assignment["eventIndex"] for assignment in assignments if assignment}
+        take = {
+            "notes": notes,
+            "rows": take_rows,
+            "events": events,
+            "unassigned": [event for index, event in enumerate(events) if index not in matched],
+        }
+        item = {
+            "recordingId": unit,
+            "pieceId": metadata["pieceId"],
+            "scorePath": score_path,
+            "audioPath": audio_path,
+            "cachePath": BACH_BASIC_PITCH_CACHE / f"{audio_path.stem}.basic-pitch.json",
+            "take": take,
+            "durations": durations,
+            "onset": onset_context(audio_path),
+            "truth": {gate: set() for gate in GATES},
+        }
+        output.append(item)
+    return output
+
+
+def summarize_unadjudicated_burden(result: dict[str, Any]) -> dict[str, Any]:
+    score_positions = sum(
+        sum(row["refined"][key] for key in (
+            "truePositive", "falsePositive", "falseNegative", "trueNegative"
+        ))
+        for row in result["recordings"]
+    )
+    assignment_gaps = sum(len(row["assignmentGaps"]) for row in result["recordings"])
+    refined_flags = sum(len(row["refinedSelfCheckHints"]) for row in result["recordings"])
+    return {
+        "evidenceRole": "public-professional-unadjudicated-negative-burden-proxy",
+        "inputContract": "whole-performance score with repeats expanded before alignment",
+        "recordingCount": len(result["recordings"]),
+        "scorePositionCount": score_positions,
+        "assignmentGapCount": assignment_gaps,
+        "refinedFlagCount": refined_flags,
+        "refinedFlagsPer1000Positions": round(1000.0 * refined_flags / max(1, score_positions), 6),
+        "humanErrorGoldAvailable": False,
+        "falsePositiveCountAuthoritative": False,
+        "promotionEvidenceEligible": False,
+        "generalPurposeBurdenReady": False,
+        "recordings": [
+            {
+                "recordingId": row["recordingId"],
+                "scorePositionCount": sum(row["refined"][key] for key in (
+                    "truePositive", "falsePositive", "falseNegative", "trueNegative"
+                )),
+                "assignmentGapCount": len(row["assignmentGaps"]),
+                "refinedFlagCount": len(row["refinedSelfCheckHints"]),
+            }
+            for row in result["recordings"]
+        ],
+        "interpretation": (
+            "Every emitted hint is observable review burden, but cannot be labeled a false "
+            "accusation without note-level human adjudication of performance/edition deviations. "
+            "The observed burden is too large for general-purpose use; the candidate remains "
+            "eligible only for the already-scoped short student fresh-blind test."
+        ),
+    }
+
+
 def evaluate(dataset: list[dict[str, Any]], params: Params) -> dict[str, Any]:
     pooled = {gate: {"truth": [], "predicted": []} for gate in GATES}
     union_truth: list[int] = []
@@ -583,7 +703,13 @@ def select_on_calibration(
 
 
 def source_binding() -> dict[str, Any]:
-    files = {ROUND4_MANIFEST, ROUND4_TRUTH, ROUND4_REPORT, Path(__file__).resolve()}
+    files = {
+        ROUND4_MANIFEST,
+        ROUND4_TRUTH,
+        ROUND4_REPORT,
+        BACH_AUDIT,
+        Path(__file__).resolve(),
+    }
     for name in V2_SETS:
         piece = name.split("-injected")[0]
         files.update({
@@ -598,6 +724,17 @@ def source_binding() -> dict[str, Any]:
     for _, score_path, audio_path in NATURAL_TAKES:
         files.add(score_path)
         files.add(audio_path)
+    bach_rows = {
+        row["unit"]: row
+        for row in read_json(BACH_AUDIT)["rows"]
+        if row.get("unit") in BACH_PUBLIC_STRESS_UNITS
+    }
+    for unit in sorted(BACH_PUBLIC_STRESS_UNITS):
+        metadata = bach_rows[unit]
+        audio_path = REPO / metadata["audioPath"]
+        files.add(audio_path)
+        files.add(REPO / metadata["scorePath"])
+        files.add(BACH_BASIC_PITCH_CACHE / f"{audio_path.stem}.basic-pitch.json")
     for recording in read_json(ROUND4_REPORT)["recordings"]:
         files.add(REPO / recording["candidateRowsPath"])
     ledger = []
@@ -608,7 +745,7 @@ def source_binding() -> dict[str, Any]:
             "hashMode": hash_mode,
             "sha256": digest,
         })
-    canonical = json.dumps(ledger, sort_keys=True, separators=(",", ":"))
+    canonical = json.dumps(ledger, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return {
         "fileCount": len(ledger),
         "aggregateSha256": hashlib.sha256(canonical.encode()).hexdigest(),
@@ -623,6 +760,7 @@ def main() -> int:
     holdout = prepared_injections(holdout_names)
     round4 = prepared_round4()
     natural_clean = prepared_natural_clean()
+    public_professional = prepared_public_professional_stress()
     selected, development_result, configurations = select_on_calibration(development)
     holdout_result = evaluate_gate_specific(holdout, selected)
     round4_result = evaluate_gate_specific(round4, selected)
@@ -630,6 +768,10 @@ def main() -> int:
     holdout_gap_refinement = evaluate_policy_c_gap_refinement(holdout, selected)
     round4_gap_refinement = evaluate_policy_c_gap_refinement(round4, selected)
     natural_clean_gap_refinement = evaluate_policy_c_gap_refinement(natural_clean, selected)
+    public_professional_gap_refinement = evaluate_policy_c_gap_refinement(public_professional, selected)
+    public_professional_burden = summarize_unadjudicated_burden(
+        public_professional_gap_refinement
+    )
     policy_c = read_json(ROUND4_REPORT)["policyCReviewAssist"]
     strict_true_positive = int(policy_c["planted"]["strictConfirmed"])
     strict_false_positive = int(policy_c["nonPlanted"]["strictFalseAccusations"])
@@ -667,6 +809,10 @@ def main() -> int:
             "syntheticHoldout": "r2-08 waveform-injection-v2, three correlated seeds",
             "realDiagnostic": "inspected Round 4; never fresh-blind",
             "naturalCleanStress": "r2-01, r2-08, r3-01, r3-02, r3-03; negative burden only",
+            "publicProfessionalStress": (
+                "two frozen Oliver Colbentson BWV1006 movements with <=5% double stops; "
+                "unadjudicated burden proxy only"
+            ),
         },
         "promotionThresholds": PROMOTION,
         "sourceBinding": source_binding(),
@@ -679,6 +825,7 @@ def main() -> int:
             "syntheticHoldout": holdout_gap_refinement,
             "round4InspectedReal": round4_gap_refinement,
             "naturalCleanStress": natural_clean_gap_refinement,
+            "publicProfessionalStress": public_professional_burden,
             "round4TwoLayerCombined": {
                 "strictConfirmed": strict_true_positive,
                 "refinedSelfCheckHints": refined_true_positive,
@@ -691,10 +838,12 @@ def main() -> int:
                 "reviewAssistPromotionReady": False,
             },
             "candidateRetainedForFreshBlind": gap_refinement_candidate_retained,
+            "generalPurposeCandidateRetained": False,
             "promotionBlockingReasons": [
                 "gap-refinement-rule-round4-informed",
                 "gap-refinement-fresh-blind-not-run",
                 "round5-independent-real-confusion-pairs-missing",
+                "public-professional-negative-burden-not-cleared",
             ],
             "contaminationBoundary": (
                 "The refinement rule was formulated after inspecting Round 4. "
@@ -722,6 +871,8 @@ def main() -> int:
         "round4Gates": round4_result["gates"],
         "round4PolicyCGapRefinement": report["policyCGapRefinement"]["round4TwoLayerCombined"],
         "naturalCleanRefinedFalsePositive": natural_clean_gap_refinement["refined"]["falsePositive"],
+        "publicProfessionalRefinedFlagCount": public_professional_burden["refinedFlagCount"],
+        "publicProfessionalScorePositionCount": public_professional_burden["scorePositionCount"],
         "gapRefinementCandidateRetainedForFreshBlind": gap_refinement_candidate_retained,
         "architectureCandidateRetained": retained,
         "report": str(OUT.relative_to(REPO)).replace("\\", "/"),
