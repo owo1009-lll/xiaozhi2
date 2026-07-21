@@ -87,6 +87,27 @@ def main() -> int:
     assert features["segmentGapCount"] == 0.0
     assert features["n_0AssignmentGap"] == 0.0
 
+    refinement_metrics = MODULE.frozen_gap_refinement_metrics([{
+        "recordingId": "synthetic-refinement",
+        "positionCount": 5,
+        "refined": {1, 2, 4},
+        "targetPositive": {1, 3},
+        "knownPositive": {1, 3, 4},
+        "positiveByGate": {
+            "merged_substitution": {1},
+            "missing": {3},
+            "extra": {4},
+            "drag": set(),
+        },
+    }])
+    assert refinement_metrics["truePositive"] == 1
+    assert refinement_metrics["falsePositive"] == 1
+    assert refinement_metrics["falseNegative"] == 1
+    assert refinement_metrics["trueNegative"] == 1
+    assert refinement_metrics["offScopeTrueErrorHints"] == 1
+    assert refinement_metrics["precision"] == 0.5
+    assert refinement_metrics["recall"] == 0.5
+
     with tempfile.TemporaryDirectory() as temp:
         root = Path(temp)
         contract = root / "contract.json"
@@ -103,6 +124,10 @@ def main() -> int:
         assert result["reviewAssistPromotionReady"] is False
         assert result["automaticAccusationReady"] is False
         assert result["studentFacing"] is False
+        assert result["frozenGapRefinement"]["runnerWired"] is True
+        assert result["frozenGapRefinement"]["evaluationPerformed"] is False
+        assert result["frozenGapRefinement"]["reviewAssistPromotionReady"] is False
+        assert result["frozenGapRefinement"]["automaticAccusationReady"] is False
         assert "round5-targeted-intake-not-ready" in result["blockingReasons"]
         assert not model.exists()
     print("western Round-5 segment edit-path tests passed")

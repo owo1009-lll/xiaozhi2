@@ -124,6 +124,7 @@ try {
   assert.equal(staged.calibrationOnly, true);
   assert.equal(staged.freshBlindEligible, false);
   const truth = JSON.parse(await fs.readFile(path.join(root, "draft", "position-truth.json"), "utf8"));
+  assert.equal(truth.recordings["rec-1"].completeErrorInventory, false);
   assert.equal(truth.recordings["rec-1"].events[0].gate, "merged_substitution");
   assert.equal(truth.recordings["rec-1"].events[0].label, "positive");
 

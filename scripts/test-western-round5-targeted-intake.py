@@ -47,6 +47,10 @@ def main() -> int:
                 "requiredLicenseStatus": "local-only",
                 "requiredPathPrefix": "data/private/western-strings-round5/",
             },
+            "truth": {
+                "requiredCompleteErrorInventory": True,
+                "completeErrorInventoryField": "completeErrorInventory",
+            },
         }
         write_json(contract_path, contract)
         missing = MODULE.validate(contract_path, manifest_path, truth_path)
@@ -89,10 +93,17 @@ def main() -> int:
                 if label == "confusion_negative":
                     event["confusionKind"] = "clean-control"
                 events.append(event)
-        write_json(truth_path, {
+        truth_payload = {
             "contractVersion": contract["contractVersion"],
             "recordings": {"r5-test": {"events": events}},
-        })
+        }
+        write_json(truth_path, truth_payload)
+        incomplete = MODULE.validate(contract_path, manifest_path, truth_path)
+        assert incomplete["ready"] is False
+        assert "round5-complete-error-inventory-missing:r5-test" in incomplete["blockingReasons"]
+
+        truth_payload["recordings"]["r5-test"]["completeErrorInventory"] = True
+        write_json(truth_path, truth_payload)
         ready = MODULE.validate(contract_path, manifest_path, truth_path)
         assert ready["ready"] is True, ready["blockingReasons"]
         assert ready["studentFacing"] is False

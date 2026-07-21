@@ -17,6 +17,10 @@
     "requiredLicenseStatus": "local-only",
     "requiredPathPrefix": "data/private/western-strings-round5/"
   },
+  "truth": {
+    "requiredCompleteErrorInventory": true,
+    "completeErrorInventoryField": "completeErrorInventory"
+  },
   "promotion": {
     "minPrecision": 0.9,
     "minRecall": 0.5,

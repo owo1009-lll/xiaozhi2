@@ -1,4 +1,8 @@
 {
   "contractVersion": "western-round5-targeted-diagnosis-intake-v1",
+  "recordingRequirements": {
+    "completeErrorInventory": true,
+    "meaning": "Every performed error in this recording has been position-labelled; unlisted score positions are ordinary-correct."
+  },
   "recordings": {}
 }

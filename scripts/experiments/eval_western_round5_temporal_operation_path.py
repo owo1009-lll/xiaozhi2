@@ -154,6 +154,14 @@ class Params:
         }
 
 
+FROZEN_PARAMS_BY_GATE = {
+    "merged_substitution": Params(0.45, 0.50, 0.80, 1.10, 0.20, 0.30, 0.70, 1.30, 0.15),
+    "missing": Params(0.45, 0.50, 0.80, 0.80, 0.45, 0.15, 0.70, 1.30, 0.15),
+    "extra": Params(0.55, 0.50, 0.80, 1.10, 0.20, 0.30, 0.85, 1.30, 0.15),
+    "drag": Params(0.45, 0.50, 0.80, 0.80, 0.20, 0.15, 0.70, 1.30, 0.15),
+}
+
+
 def duration_cost(observed: float, expected: float) -> float:
     return min(2.5, abs(math.log(max(observed, 1e-4) / max(expected, 1e-4))))
 
@@ -621,18 +629,10 @@ def evaluate_policy_c_gap_refinement(
             predictions[gate] = cache[params][gate]
         count = len(item["take"]["notes"])
         truth = set().union(*item["truth"].values())
-        gaps = set(item.get("policyCGapIndices") or {
-            index for index, row in enumerate(item["take"]["rows"])
-            if row.get("predictedTime") is None
-        })
-        gap_run_member = {
-            index for index in gaps if index - 1 in gaps or index + 1 in gaps
-        }
-        refined = {
-            index for index in gaps
-            if index in predictions["merged_substitution"]
-            or (index in predictions["missing"] and index in gap_run_member)
-        }
+        explicit_gaps = item.get("policyCGapIndices")
+        gaps, refined = policy_c_gap_refinement_indices(
+            item["take"], predictions, explicit_gaps
+        )
         truth_vector = np.asarray([int(index in truth) for index in range(count)])
         base_vector = np.asarray([int(index in gaps) for index in range(count)])
         refined_vector = np.asarray([int(index in refined) for index in range(count)])
@@ -660,6 +660,26 @@ def evaluate_policy_c_gap_refinement(
         "refined": binary_metrics(truth_array, refined_array),
         "recordings": per_recording,
     }
+
+
+def policy_c_gap_refinement_indices(
+    take: dict[str, Any],
+    predictions: dict[str, set[int]],
+    explicit_gaps: set[int] | None = None,
+) -> tuple[set[int], set[int]]:
+    gaps = set(explicit_gaps) if explicit_gaps is not None else {
+        index for index, row in enumerate(take["rows"])
+        if row.get("predictedTime") is None
+    }
+    gap_run_member = {
+        index for index in gaps if index - 1 in gaps or index + 1 in gaps
+    }
+    refined = {
+        index for index in gaps
+        if index in predictions["merged_substitution"]
+        or (index in predictions["missing"] and index in gap_run_member)
+    }
+    return gaps, refined
 
 
 def calibration_grid() -> list[Params]:
@@ -762,6 +782,9 @@ def main() -> int:
     natural_clean = prepared_natural_clean()
     public_professional = prepared_public_professional_stress()
     selected, development_result, configurations = select_on_calibration(development)
+    if selected != FROZEN_PARAMS_BY_GATE:
+        raise RuntimeError("frozen-temporal-operation-parameters-drift")
+    selected = FROZEN_PARAMS_BY_GATE
     holdout_result = evaluate_gate_specific(holdout, selected)
     round4_result = evaluate_gate_specific(round4, selected)
     calibration_gap_refinement = evaluate_policy_c_gap_refinement(development, selected)

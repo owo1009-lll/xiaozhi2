@@ -172,6 +172,7 @@ export async function stageReviewAssistCalibration({
       source: "teacher-reviewed-policy-c-calibration",
     });
     truthRecordings[recordingId] = {
+      completeErrorInventory: false,
       events: recordingRows.map(({ row, review }) => ({
         gate: review.gate,
         label: review.label,

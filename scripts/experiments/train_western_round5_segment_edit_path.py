@@ -32,7 +32,9 @@ from eval_western_strings_duration_extra_quantization import analyze_take  # noq
 
 
 CONTRACT = "western-round5-segment-edit-path-candidate-v1"
+FROZEN_GAP_REFINEMENT_CONTRACT = "western-round5-frozen-gap-refinement-v1"
 GATES = ("merged_substitution", "missing", "extra", "drag")
+GAP_REFINEMENT_TARGET_GATES = ("merged_substitution", "missing")
 DEFAULT_CONTRACT = REPO / "config/western-strings-round5-targeted-contract.json"
 DEFAULT_MANIFEST = REPO / "data/private/western-strings-round5/manifest.csv"
 DEFAULT_TRUTH = REPO / "data/private/western-strings-round5/position-truth.json"
@@ -384,6 +386,157 @@ def binary_metrics(truth: np.ndarray, predicted: np.ndarray) -> dict[str, Any]:
     }
 
 
+def frozen_gap_refinement_metrics(recordings: list[dict[str, Any]]) -> dict[str, Any]:
+    true_positive = false_positive = false_negative = true_negative = 0
+    off_scope_true_error_hints = 0
+    total_positions = 0
+    per_gate = {
+        gate: {"positive": 0, "detected": 0}
+        for gate in GAP_REFINEMENT_TARGET_GATES
+    }
+    per_recording = []
+    for recording in recordings:
+        refined = set(recording["refined"])
+        target_positive = set(recording["targetPositive"])
+        known_positive = set(recording["knownPositive"])
+        position_count = int(recording["positionCount"])
+        tp = len(refined & target_positive)
+        fp = len(refined - known_positive)
+        fn = len(target_positive - refined)
+        off_scope = len((refined & known_positive) - target_positive)
+        negative_count = position_count - len(known_positive)
+        true_positive += tp
+        false_positive += fp
+        false_negative += fn
+        true_negative += max(0, negative_count - fp)
+        off_scope_true_error_hints += off_scope
+        total_positions += position_count
+        for gate in GAP_REFINEMENT_TARGET_GATES:
+            positives = set(recording["positiveByGate"].get(gate, set()))
+            per_gate[gate]["positive"] += len(positives)
+            per_gate[gate]["detected"] += len(refined & positives)
+        per_recording.append({
+            "recordingId": recording["recordingId"],
+            "positionCount": position_count,
+            "targetPositiveCount": len(target_positive),
+            "knownPositiveCount": len(known_positive),
+            "refinedHintCount": len(refined),
+            "truePositive": tp,
+            "falsePositive": fp,
+            "offScopeTrueErrorHints": off_scope,
+        })
+    precision = true_positive / max(1, true_positive + false_positive)
+    recall = true_positive / max(1, true_positive + false_negative)
+    return {
+        "positionCount": total_positions,
+        "truePositive": true_positive,
+        "falsePositive": false_positive,
+        "falseNegative": false_negative,
+        "trueNegative": true_negative,
+        "offScopeTrueErrorHints": off_scope_true_error_hints,
+        "precision": round(precision, 6),
+        "recall": round(recall, 6),
+        "byTargetGate": {
+            gate: {
+                **counts,
+                "recall": round(counts["detected"] / max(1, counts["positive"]), 6),
+            }
+            for gate, counts in per_gate.items()
+        },
+        "recordings": per_recording,
+    }
+
+
+def evaluate_frozen_gap_refinement(
+    manifest_path: Path,
+    truth_path: Path,
+    promotion: dict[str, Any],
+) -> dict[str, Any]:
+    from eval_western_round5_temporal_operation_path import (  # noqa: PLC0415
+        FROZEN_PARAMS_BY_GATE,
+        note_durations,
+        onset_context,
+        policy_c_gap_refinement_indices,
+        predict_operations,
+    )
+
+    with manifest_path.open(encoding="utf-8-sig", newline="") as handle:
+        manifest = {row["recordingId"]: row for row in csv.DictReader(handle)}
+    truth = read_json(truth_path)["recordings"]
+    prepared_by_split = {"calibration": [], "fresh-blind": []}
+    for recording_id, truth_recording in truth.items():
+        metadata = manifest[recording_id]
+        score_path = REPO / metadata["scorePath"]
+        audio_path = REPO / metadata["audioPath"]
+        take = analyze_take(score_path, audio_path)
+        positions = score_positions(score_path)
+        if len(positions) != len(take["notes"]):
+            raise ValueError(f"round5-score-position-count-mismatch:{recording_id}")
+        prepared = {
+            "take": take,
+            "durations": note_durations(score_path),
+            "onset": onset_context(audio_path),
+        }
+        predictions = {}
+        prediction_cache = {}
+        for gate in GAP_REFINEMENT_TARGET_GATES:
+            params = FROZEN_PARAMS_BY_GATE[gate]
+            if params not in prediction_cache:
+                prediction_cache[params] = predict_operations(prepared, params)
+            predictions[gate] = prediction_cache[params][gate]
+        _, refined = policy_c_gap_refinement_indices(take, predictions)
+        known_positive = set()
+        positive_by_gate = {gate: set() for gate in GATES}
+        for event in truth_recording["events"]:
+            note_index = truth_note_index(positions, event)
+            if event["label"] == "positive":
+                known_positive.add(note_index)
+                positive_by_gate[event["gate"]].add(note_index)
+        target_positive = set().union(*(
+            positive_by_gate[gate] for gate in GAP_REFINEMENT_TARGET_GATES
+        ))
+        prepared_by_split[metadata["split"]].append({
+            "recordingId": recording_id,
+            "positionCount": len(positions),
+            "refined": refined,
+            "targetPositive": target_positive,
+            "knownPositive": known_positive,
+            "positiveByGate": positive_by_gate,
+        })
+    calibration = frozen_gap_refinement_metrics(prepared_by_split["calibration"])
+    fresh_blind = frozen_gap_refinement_metrics(prepared_by_split["fresh-blind"])
+    ready = (
+        fresh_blind["precision"] >= float(promotion["minPrecision"])
+        and fresh_blind["recall"] >= float(promotion["minRecall"])
+        and fresh_blind["falsePositive"] <= int(promotion["maxStrictFalseAccusations"])
+        and all(
+            fresh_blind["byTargetGate"][gate]["positive"] > 0
+            for gate in GAP_REFINEMENT_TARGET_GATES
+        )
+    )
+    return {
+        "contract": FROZEN_GAP_REFINEMENT_CONTRACT,
+        "runnerWired": True,
+        "evaluationPerformed": True,
+        "truthSemantics": "complete per-recording error inventory; every unlisted score position is ordinary-correct",
+        "targetGates": list(GAP_REFINEMENT_TARGET_GATES),
+        "outputSemantic": "self_check_hint",
+        "strictConfirmedRecallChanged": False,
+        "automaticAccusationReady": False,
+        "studentFacing": False,
+        "promotionEvidenceEligible": True,
+        "frozenParametersByGate": {
+            gate: FROZEN_PARAMS_BY_GATE[gate].as_dict()
+            for gate in GAP_REFINEMENT_TARGET_GATES
+        },
+        "promotionThresholds": promotion,
+        "calibrationDiagnosticOnly": calibration,
+        "freshBlind": fresh_blind,
+        "reviewAssistPromotionReady": ready,
+        "blockingReasons": [] if ready else ["round5-frozen-gap-refinement-gate-failed"],
+    }
+
+
 def train_and_evaluate(
     dataset: list[dict[str, Any]],
     promotion: dict[str, Any],
@@ -464,6 +617,18 @@ def run(
         "automaticAccusationReady": False,
         "studentFacing": False,
         "productionAdoptionReady": False,
+        "frozenGapRefinement": {
+            "contract": FROZEN_GAP_REFINEMENT_CONTRACT,
+            "runnerWired": True,
+            "evaluationPerformed": False,
+            "outputSemantic": "self_check_hint",
+            "strictConfirmedRecallChanged": False,
+            "automaticAccusationReady": False,
+            "studentFacing": False,
+            "promotionEvidenceEligible": False,
+            "reviewAssistPromotionReady": False,
+            "blockingReasons": ["round5-targeted-intake-not-ready"],
+        },
     }
     if intake_report.get("ready") is not True:
         report = {
@@ -477,6 +642,9 @@ def run(
         contract = read_json(contract_path)
         dataset = build_dataset(manifest_path, truth_path)
         evaluation, models = train_and_evaluate(dataset, contract["promotion"])
+        frozen_gap_refinement = evaluate_frozen_gap_refinement(
+            manifest_path, truth_path, contract["promotion"]
+        )
         model_path.parent.mkdir(parents=True, exist_ok=True)
         joblib.dump({
             "contract": CONTRACT,
@@ -494,6 +662,7 @@ def run(
                 "sha256": sha256(model_path),
             },
             "reviewAssistPromotionReady": all_ready,
+            "frozenGapRefinement": frozen_gap_refinement,
             "blockingReasons": [] if all_ready else sorted({
                 reason
                 for gate in evaluation["gates"].values()

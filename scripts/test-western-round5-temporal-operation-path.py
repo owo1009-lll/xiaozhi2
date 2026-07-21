@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
+import sys
 from pathlib import Path
 
 
 REPO = Path(__file__).resolve().parents[1]
 EVIDENCE = REPO / "docs/evidence/western-strings-round5-temporal-operation-path-20260722.json"
 REPORT = REPO / "data/experiments/western-strings-round5-temporal-operation-path/report.json"
+SCRIPT = REPO / "scripts/experiments/eval_western_round5_temporal_operation_path.py"
+sys.path.insert(0, str(REPO / "scripts/experiments"))
 
 
 def bound_sha256(path: Path, mode: str) -> str:
@@ -22,6 +26,25 @@ def bound_sha256(path: Path, mode: str) -> str:
 
 
 def main() -> int:
+    spec = importlib.util.spec_from_file_location("round5_temporal_operation_path", SCRIPT)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    assert set(module.FROZEN_PARAMS_BY_GATE) == set(module.GATES)
+    gaps, refined = module.policy_c_gap_refinement_indices(
+        {"rows": [
+            {"predictedTime": 0.0},
+            {"predictedTime": None},
+            {"predictedTime": None},
+            {"predictedTime": None},
+            {"predictedTime": 4.0},
+        ]},
+        {"merged_substitution": {1}, "missing": {2, 4}},
+    )
+    assert gaps == {1, 2, 3}
+    assert refined == {1, 2}
+
     evidence = json.loads(EVIDENCE.read_text(encoding="utf-8"))
     assert evidence["contract"] == "western-round5-temporal-operation-path-smoke-v1"
     assert evidence["scope"] == "architecture-smoke-preGateOnly"

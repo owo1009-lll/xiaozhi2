@@ -135,6 +135,12 @@ def validate(contract_path: Path, manifest_path: Path, truth_path: Path) -> dict
         if manifest is None:
             blockers.append(f"round5-truth-recording-not-in-manifest:{recording_id}")
             continue
+        complete_field = contract.get("truth", {}).get(
+            "completeErrorInventoryField", "completeErrorInventory"
+        )
+        if contract.get("truth", {}).get("requiredCompleteErrorInventory") is True:
+            if not isinstance(spec, dict) or spec.get(complete_field) is not True:
+                blockers.append(f"round5-complete-error-inventory-missing:{recording_id}")
         events = spec.get("events") if isinstance(spec, dict) else None
         if not isinstance(events, list):
             blockers.append(f"round5-truth-events-invalid:{recording_id}")
