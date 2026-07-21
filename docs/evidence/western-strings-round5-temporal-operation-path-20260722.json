@@ -78,7 +78,7 @@
   },
   "sourceBinding": {
     "fileCount": 51,
-    "aggregateSha256": "41659b31f5440aab41d4845bf0b03994cc2b22d9d0899f8c3795b32556795ea8",
+    "aggregateSha256": "a0952a589786a2dc3eb9a059ce002c0fc887a28de27a095eb8e8e40ca9649102",
     "files": [
       {
         "path": "data/experiments/western-strings-bach-violin-basic-pitch-cache/oliver-colbentson_bwv1006_mov1.basic-pitch.json",
@@ -313,7 +313,7 @@
       {
         "path": "scripts/experiments/eval_western_round5_temporal_operation_path.py",
         "hashMode": "lf-normalized-sha256",
-        "sha256": "539527a4f514eeb27aee857ed017f5bd98e64cb7bdd67d3e4835c31fb58b1f61"
+        "sha256": "222ee6f10da45d0f12a4e75a7f1c1b52ba0022ab8983b73d2d50692de8a7a08e"
       },
       {
         "path": "音频/Bach独奏小提琴数据集/audio-by-movement/oliver-colbentson_bwv1006_mov1.mp3",
@@ -1762,6 +1762,387 @@
       "public-professional-negative-burden-not-cleared"
     ],
     "contaminationBoundary": "The refinement rule was formulated after inspecting Round 4. Its 6/12 result is a diagnostic ceiling, not fresh-blind evidence."
+  },
+  "rhythmStructuralRefinement": {
+    "evidenceRole": "post-inspection-fresh-blind-candidate-only",
+    "rule": {
+      "relativeIoiDeviationGreaterThan": 0.15,
+      "eventDurationRatioAtLeast": 1.2,
+      "eventConfidenceAtLeast": 0.75,
+      "naturalCleanHintRateMax": 0.02
+    },
+    "positiveClass": [
+      "extra",
+      "drag"
+    ],
+    "outputSemantic": "self_check_hint",
+    "strictConfirmedRecallChanged": false,
+    "automaticAccusationReady": false,
+    "studentFacing": false,
+    "promotionEvidenceEligible": false,
+    "calibration": {
+      "truePositive": 18,
+      "falsePositive": 1,
+      "falseNegative": 9,
+      "trueNegative": 173,
+      "precision": 0.947368,
+      "recall": 0.666667,
+      "hintRate": 0.094527,
+      "jointReviewFloorReady": true,
+      "recordings": [
+        {
+          "recordingId": "r2-01-injected-v2-20260717",
+          "rhythmTruth": [
+            6,
+            11,
+            25,
+            29,
+            36,
+            48,
+            50,
+            54,
+            62
+          ],
+          "selfCheckHints": [
+            6,
+            11,
+            25,
+            29
+          ],
+          "truePositive": 4,
+          "falsePositive": 0,
+          "falseNegative": 5,
+          "trueNegative": 58,
+          "precision": 1.0,
+          "recall": 0.444444
+        },
+        {
+          "recordingId": "r2-01-injected-v2-20260718",
+          "rhythmTruth": [
+            12,
+            14,
+            18,
+            22,
+            28,
+            35,
+            38,
+            54,
+            65
+          ],
+          "selfCheckHints": [
+            14,
+            18,
+            22,
+            28,
+            32,
+            35,
+            38,
+            54,
+            65
+          ],
+          "truePositive": 8,
+          "falsePositive": 1,
+          "falseNegative": 1,
+          "trueNegative": 57,
+          "precision": 0.888889,
+          "recall": 0.888889
+        },
+        {
+          "recordingId": "r2-01-injected-v2-20260719",
+          "rhythmTruth": [
+            5,
+            14,
+            29,
+            36,
+            38,
+            42,
+            53,
+            55,
+            57
+          ],
+          "selfCheckHints": [
+            14,
+            29,
+            42,
+            53,
+            55,
+            57
+          ],
+          "truePositive": 6,
+          "falsePositive": 0,
+          "falseNegative": 3,
+          "trueNegative": 58,
+          "precision": 1.0,
+          "recall": 0.666667
+        }
+      ]
+    },
+    "syntheticHoldout": {
+      "truePositive": 15,
+      "falsePositive": 0,
+      "falseNegative": 12,
+      "trueNegative": 162,
+      "precision": 1.0,
+      "recall": 0.555556,
+      "hintRate": 0.079365,
+      "jointReviewFloorReady": true,
+      "recordings": [
+        {
+          "recordingId": "r2-08-injected-v2-20260717",
+          "rhythmTruth": [
+            1,
+            11,
+            13,
+            29,
+            32,
+            42,
+            46,
+            58,
+            61
+          ],
+          "selfCheckHints": [
+            1,
+            13,
+            29,
+            42
+          ],
+          "truePositive": 4,
+          "falsePositive": 0,
+          "falseNegative": 5,
+          "trueNegative": 54,
+          "precision": 1.0,
+          "recall": 0.444444
+        },
+        {
+          "recordingId": "r2-08-injected-v2-20260718",
+          "rhythmTruth": [
+            12,
+            14,
+            18,
+            22,
+            31,
+            33,
+            36,
+            38,
+            51
+          ],
+          "selfCheckHints": [
+            12,
+            14,
+            22,
+            31,
+            36
+          ],
+          "truePositive": 5,
+          "falsePositive": 0,
+          "falseNegative": 4,
+          "trueNegative": 54,
+          "precision": 1.0,
+          "recall": 0.555556
+        },
+        {
+          "recordingId": "r2-08-injected-v2-20260719",
+          "rhythmTruth": [
+            1,
+            5,
+            14,
+            22,
+            41,
+            50,
+            53,
+            55,
+            60
+          ],
+          "selfCheckHints": [
+            1,
+            5,
+            22,
+            53,
+            55,
+            60
+          ],
+          "truePositive": 6,
+          "falsePositive": 0,
+          "falseNegative": 3,
+          "trueNegative": 54,
+          "precision": 1.0,
+          "recall": 0.666667
+        }
+      ]
+    },
+    "round4InspectedReal": {
+      "truePositive": 4,
+      "falsePositive": 0,
+      "falseNegative": 2,
+      "trueNegative": 259,
+      "precision": 1.0,
+      "recall": 0.666667,
+      "hintRate": 0.015094,
+      "jointReviewFloorReady": true,
+      "recordings": [
+        {
+          "recordingId": "round4-r4-01",
+          "rhythmTruth": [],
+          "selfCheckHints": [],
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 0,
+          "trueNegative": 53,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        {
+          "recordingId": "round4-r4-02",
+          "rhythmTruth": [],
+          "selfCheckHints": [],
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 0,
+          "trueNegative": 59,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        {
+          "recordingId": "round4-r4-03",
+          "rhythmTruth": [],
+          "selfCheckHints": [],
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 0,
+          "trueNegative": 24,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        {
+          "recordingId": "round4-r4-04",
+          "rhythmTruth": [],
+          "selfCheckHints": [],
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 0,
+          "trueNegative": 44,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        {
+          "recordingId": "round4-r4-05",
+          "rhythmTruth": [
+            22,
+            34,
+            40
+          ],
+          "selfCheckHints": [
+            22,
+            40
+          ],
+          "truePositive": 2,
+          "falsePositive": 0,
+          "falseNegative": 1,
+          "trueNegative": 42,
+          "precision": 1.0,
+          "recall": 0.666667
+        },
+        {
+          "recordingId": "round4-r4-06",
+          "rhythmTruth": [
+            7,
+            26,
+            33
+          ],
+          "selfCheckHints": [
+            7,
+            26
+          ],
+          "truePositive": 2,
+          "falsePositive": 0,
+          "falseNegative": 1,
+          "trueNegative": 37,
+          "precision": 1.0,
+          "recall": 0.666667
+        }
+      ]
+    },
+    "naturalCleanStress": {
+      "truePositive": 0,
+      "falsePositive": 5,
+      "falseNegative": 0,
+      "trueNegative": 280,
+      "precision": 0.0,
+      "recall": 0.0,
+      "hintRate": 0.017544,
+      "jointReviewFloorReady": false,
+      "recordings": [
+        {
+          "recordingId": "r2-01",
+          "rhythmTruth": [],
+          "selfCheckHints": [],
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 0,
+          "trueNegative": 67,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        {
+          "recordingId": "r2-08",
+          "rhythmTruth": [],
+          "selfCheckHints": [],
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 0,
+          "trueNegative": 63,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        {
+          "recordingId": "r3-01",
+          "rhythmTruth": [],
+          "selfCheckHints": [
+            9
+          ],
+          "truePositive": 0,
+          "falsePositive": 1,
+          "falseNegative": 0,
+          "trueNegative": 58,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        {
+          "recordingId": "r3-02",
+          "rhythmTruth": [],
+          "selfCheckHints": [
+            27,
+            31,
+            34,
+            40
+          ],
+          "truePositive": 0,
+          "falsePositive": 4,
+          "falseNegative": 0,
+          "trueNegative": 41,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        {
+          "recordingId": "r3-03",
+          "rhythmTruth": [],
+          "selfCheckHints": [],
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 0,
+          "trueNegative": 51,
+          "precision": 0.0,
+          "recall": 0.0
+        }
+      ]
+    },
+    "candidateRetainedForFreshBlind": true,
+    "promotionBlockingReasons": [
+      "rhythm-structural-rule-existing-evidence-informed",
+      "rhythm-structural-fresh-blind-not-run",
+      "round5-independent-real-confusion-pairs-missing"
+    ],
+    "contaminationBoundary": "The conjunction was frozen only after synthetic, Round 4, and natural-clean evidence had been inspected. Its metrics are diagnostic and cannot promote it."
   },
   "architectureCandidateRetained": false,
   "blockingReasons": [

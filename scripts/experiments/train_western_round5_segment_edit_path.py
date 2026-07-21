@@ -33,8 +33,10 @@ from eval_western_strings_duration_extra_quantization import analyze_take  # noq
 
 CONTRACT = "western-round5-segment-edit-path-candidate-v1"
 FROZEN_GAP_REFINEMENT_CONTRACT = "western-round5-frozen-gap-refinement-v1"
+FROZEN_RHYTHM_REFINEMENT_CONTRACT = "western-round5-frozen-rhythm-structural-refinement-v1"
 GATES = ("merged_substitution", "missing", "extra", "drag")
 GAP_REFINEMENT_TARGET_GATES = ("merged_substitution", "missing")
+RHYTHM_REFINEMENT_TARGET_GATES = ("extra", "drag")
 DEFAULT_CONTRACT = REPO / "config/western-strings-round5-targeted-contract.json"
 DEFAULT_MANIFEST = REPO / "data/private/western-strings-round5/manifest.csv"
 DEFAULT_TRUTH = REPO / "data/private/western-strings-round5/position-truth.json"
@@ -386,18 +388,25 @@ def binary_metrics(truth: np.ndarray, predicted: np.ndarray) -> dict[str, Any]:
     }
 
 
-def frozen_gap_refinement_metrics(recordings: list[dict[str, Any]]) -> dict[str, Any]:
+def frozen_refinement_metrics(
+    recordings: list[dict[str, Any]],
+    target_gates: tuple[str, ...] = GAP_REFINEMENT_TARGET_GATES,
+    refinement_key: str = "refined",
+) -> dict[str, Any]:
     true_positive = false_positive = false_negative = true_negative = 0
     off_scope_true_error_hints = 0
     total_positions = 0
     per_gate = {
         gate: {"positive": 0, "detected": 0}
-        for gate in GAP_REFINEMENT_TARGET_GATES
+        for gate in target_gates
     }
     per_recording = []
     for recording in recordings:
-        refined = set(recording["refined"])
-        target_positive = set(recording["targetPositive"])
+        refined = set(recording[refinement_key])
+        target_positive = set().union(*(
+            set(recording["positiveByGate"].get(gate, set()))
+            for gate in target_gates
+        ))
         known_positive = set(recording["knownPositive"])
         position_count = int(recording["positionCount"])
         tp = len(refined & target_positive)
@@ -411,7 +420,7 @@ def frozen_gap_refinement_metrics(recordings: list[dict[str, Any]]) -> dict[str,
         true_negative += max(0, negative_count - fp)
         off_scope_true_error_hints += off_scope
         total_positions += position_count
-        for gate in GAP_REFINEMENT_TARGET_GATES:
+        for gate in target_gates:
             positives = set(recording["positiveByGate"].get(gate, set()))
             per_gate[gate]["positive"] += len(positives)
             per_gate[gate]["detected"] += len(refined & positives)
@@ -458,6 +467,8 @@ def evaluate_frozen_gap_refinement(
         onset_context,
         policy_c_gap_refinement_indices,
         predict_operations,
+        RHYTHM_REFINEMENT,
+        rhythm_structural_refinement_indices,
     )
 
     with manifest_path.open(encoding="utf-8-sig", newline="") as handle:
@@ -485,6 +496,7 @@ def evaluate_frozen_gap_refinement(
                 prediction_cache[params] = predict_operations(prepared, params)
             predictions[gate] = prediction_cache[params][gate]
         _, refined = policy_c_gap_refinement_indices(take, predictions)
+        rhythm_refined = rhythm_structural_refinement_indices(take, predictions)
         known_positive = set()
         positive_by_gate = {gate: set() for gate in GATES}
         for event in truth_recording["events"]:
@@ -492,19 +504,16 @@ def evaluate_frozen_gap_refinement(
             if event["label"] == "positive":
                 known_positive.add(note_index)
                 positive_by_gate[event["gate"]].add(note_index)
-        target_positive = set().union(*(
-            positive_by_gate[gate] for gate in GAP_REFINEMENT_TARGET_GATES
-        ))
         prepared_by_split[metadata["split"]].append({
             "recordingId": recording_id,
             "positionCount": len(positions),
             "refined": refined,
-            "targetPositive": target_positive,
+            "rhythmRefined": rhythm_refined,
             "knownPositive": known_positive,
             "positiveByGate": positive_by_gate,
         })
-    calibration = frozen_gap_refinement_metrics(prepared_by_split["calibration"])
-    fresh_blind = frozen_gap_refinement_metrics(prepared_by_split["fresh-blind"])
+    calibration = frozen_refinement_metrics(prepared_by_split["calibration"])
+    fresh_blind = frozen_refinement_metrics(prepared_by_split["fresh-blind"])
     ready = (
         fresh_blind["precision"] >= float(promotion["minPrecision"])
         and fresh_blind["recall"] >= float(promotion["minRecall"])
@@ -512,6 +521,22 @@ def evaluate_frozen_gap_refinement(
         and all(
             fresh_blind["byTargetGate"][gate]["positive"] > 0
             for gate in GAP_REFINEMENT_TARGET_GATES
+        )
+    )
+    rhythm_calibration = frozen_refinement_metrics(
+        prepared_by_split["calibration"], RHYTHM_REFINEMENT_TARGET_GATES, "rhythmRefined"
+    )
+    rhythm_fresh_blind = frozen_refinement_metrics(
+        prepared_by_split["fresh-blind"], RHYTHM_REFINEMENT_TARGET_GATES, "rhythmRefined"
+    )
+    rhythm_ready = (
+        rhythm_fresh_blind["precision"] >= float(promotion["minPrecision"])
+        and rhythm_fresh_blind["recall"] >= float(promotion["minRecall"])
+        and rhythm_fresh_blind["falsePositive"]
+            <= int(promotion["maxStrictFalseAccusations"])
+        and all(
+            rhythm_fresh_blind["byTargetGate"][gate]["positive"] > 0
+            for gate in RHYTHM_REFINEMENT_TARGET_GATES
         )
     )
     return {
@@ -533,6 +558,24 @@ def evaluate_frozen_gap_refinement(
         "calibrationDiagnosticOnly": calibration,
         "freshBlind": fresh_blind,
         "reviewAssistPromotionReady": ready,
+        "rhythmStructuralRefinement": {
+            "contract": FROZEN_RHYTHM_REFINEMENT_CONTRACT,
+            "runnerWired": True,
+            "evaluationPerformed": True,
+            "targetGates": list(RHYTHM_REFINEMENT_TARGET_GATES),
+            "rule": RHYTHM_REFINEMENT,
+            "outputSemantic": "self_check_hint",
+            "strictConfirmedRecallChanged": False,
+            "automaticAccusationReady": False,
+            "studentFacing": False,
+            "promotionEvidenceEligible": True,
+            "calibrationDiagnosticOnly": rhythm_calibration,
+            "freshBlind": rhythm_fresh_blind,
+            "reviewAssistPromotionReady": rhythm_ready,
+            "blockingReasons": [] if rhythm_ready else [
+                "round5-frozen-rhythm-structural-refinement-gate-failed"
+            ],
+        },
         "blockingReasons": [] if ready else ["round5-frozen-gap-refinement-gate-failed"],
     }
 
@@ -627,6 +670,19 @@ def run(
             "studentFacing": False,
             "promotionEvidenceEligible": False,
             "reviewAssistPromotionReady": False,
+            "rhythmStructuralRefinement": {
+                "contract": FROZEN_RHYTHM_REFINEMENT_CONTRACT,
+                "runnerWired": True,
+                "evaluationPerformed": False,
+                "targetGates": list(RHYTHM_REFINEMENT_TARGET_GATES),
+                "outputSemantic": "self_check_hint",
+                "strictConfirmedRecallChanged": False,
+                "automaticAccusationReady": False,
+                "studentFacing": False,
+                "promotionEvidenceEligible": False,
+                "reviewAssistPromotionReady": False,
+                "blockingReasons": ["round5-targeted-intake-not-ready"],
+            },
             "blockingReasons": ["round5-targeted-intake-not-ready"],
         },
     }

@@ -160,6 +160,12 @@ FROZEN_PARAMS_BY_GATE = {
     "extra": Params(0.55, 0.50, 0.80, 1.10, 0.20, 0.30, 0.85, 1.30, 0.15),
     "drag": Params(0.45, 0.50, 0.80, 0.80, 0.20, 0.15, 0.70, 1.30, 0.15),
 }
+RHYTHM_REFINEMENT = {
+    "relativeIoiDeviationGreaterThan": 0.15,
+    "eventDurationRatioAtLeast": 1.20,
+    "eventConfidenceAtLeast": 0.75,
+    "naturalCleanHintRateMax": 0.02,
+}
 
 
 def duration_cost(observed: float, expected: float) -> float:
@@ -682,6 +688,69 @@ def policy_c_gap_refinement_indices(
     return gaps, refined
 
 
+def rhythm_structural_refinement_indices(
+    take: dict[str, Any],
+    predictions: dict[str, set[int]],
+) -> set[int]:
+    operation_positions = set().union(*predictions.values())
+    return {
+        index
+        for index, row in enumerate(take["rows"])
+        if index in operation_positions
+        and row.get("relativeIoiDeviationRatio") is not None
+        and float(row["relativeIoiDeviationRatio"])
+            > RHYTHM_REFINEMENT["relativeIoiDeviationGreaterThan"]
+        and row.get("eventDurationRatio") is not None
+        and float(row["eventDurationRatio"])
+            >= RHYTHM_REFINEMENT["eventDurationRatioAtLeast"]
+        and row.get("eventConfidence") is not None
+        and float(row["eventConfidence"])
+            >= RHYTHM_REFINEMENT["eventConfidenceAtLeast"]
+    }
+
+
+def evaluate_rhythm_structural_refinement(
+    dataset: list[dict[str, Any]],
+    params_by_gate: dict[str, Params],
+) -> dict[str, Any]:
+    truth_values: list[int] = []
+    predicted_values: list[int] = []
+    per_recording = []
+    for item in dataset:
+        cache: dict[Params, dict[str, set[int]]] = {}
+        predictions = {}
+        for gate in GATES:
+            params = params_by_gate[gate]
+            if params not in cache:
+                cache[params] = predict_operations(item, params)
+            predictions[gate] = cache[params][gate]
+        truth = item["truth"]["extra"] | item["truth"]["drag"]
+        refined = rhythm_structural_refinement_indices(item["take"], predictions)
+        count = len(item["take"]["notes"])
+        local_truth = np.asarray([int(index in truth) for index in range(count)])
+        local_predicted = np.asarray([int(index in refined) for index in range(count)])
+        truth_values.extend(local_truth.tolist())
+        predicted_values.extend(local_predicted.tolist())
+        per_recording.append({
+            "recordingId": item["recordingId"],
+            "rhythmTruth": sorted(truth),
+            "selfCheckHints": sorted(refined),
+            **binary_metrics(local_truth, local_predicted),
+        })
+    metrics = binary_metrics(np.asarray(truth_values), np.asarray(predicted_values))
+    total = sum(metrics[key] for key in (
+        "truePositive", "falsePositive", "falseNegative", "trueNegative"
+    ))
+    metrics["hintRate"] = round(
+        (metrics["truePositive"] + metrics["falsePositive"]) / max(1, total), 6
+    )
+    metrics["jointReviewFloorReady"] = (
+        metrics["precision"] >= PROMOTION["minPrecision"]
+        and metrics["recall"] >= PROMOTION["minRecall"]
+    )
+    return {**metrics, "recordings": per_recording}
+
+
 def calibration_grid() -> list[Params]:
     return [
         Params(*values)
@@ -795,6 +864,10 @@ def main() -> int:
     public_professional_burden = summarize_unadjudicated_burden(
         public_professional_gap_refinement
     )
+    calibration_rhythm_refinement = evaluate_rhythm_structural_refinement(development, selected)
+    holdout_rhythm_refinement = evaluate_rhythm_structural_refinement(holdout, selected)
+    round4_rhythm_refinement = evaluate_rhythm_structural_refinement(round4, selected)
+    natural_clean_rhythm_refinement = evaluate_rhythm_structural_refinement(natural_clean, selected)
     policy_c = read_json(ROUND4_REPORT)["policyCReviewAssist"]
     strict_true_positive = int(policy_c["planted"]["strictConfirmed"])
     strict_false_positive = int(policy_c["nonPlanted"]["strictFalseAccusations"])
@@ -812,6 +885,13 @@ def main() -> int:
         and refined_true_positive >= 4
     )
     retained = holdout_result["union"]["jointFloorReady"] and round4_result["union"]["jointFloorReady"]
+    rhythm_candidate_retained = bool(
+        calibration_rhythm_refinement["jointReviewFloorReady"]
+        and holdout_rhythm_refinement["jointReviewFloorReady"]
+        and round4_rhythm_refinement["jointReviewFloorReady"]
+        and natural_clean_rhythm_refinement["hintRate"]
+            <= RHYTHM_REFINEMENT["naturalCleanHintRateMax"]
+    )
     report = {
         "schemaVersion": 1,
         "contract": CONTRACT,
@@ -873,6 +953,30 @@ def main() -> int:
                 "Its 6/12 result is a diagnostic ceiling, not fresh-blind evidence."
             ),
         },
+        "rhythmStructuralRefinement": {
+            "evidenceRole": "post-inspection-fresh-blind-candidate-only",
+            "rule": RHYTHM_REFINEMENT,
+            "positiveClass": ["extra", "drag"],
+            "outputSemantic": "self_check_hint",
+            "strictConfirmedRecallChanged": False,
+            "automaticAccusationReady": False,
+            "studentFacing": False,
+            "promotionEvidenceEligible": False,
+            "calibration": calibration_rhythm_refinement,
+            "syntheticHoldout": holdout_rhythm_refinement,
+            "round4InspectedReal": round4_rhythm_refinement,
+            "naturalCleanStress": natural_clean_rhythm_refinement,
+            "candidateRetainedForFreshBlind": rhythm_candidate_retained,
+            "promotionBlockingReasons": [
+                "rhythm-structural-rule-existing-evidence-informed",
+                "rhythm-structural-fresh-blind-not-run",
+                "round5-independent-real-confusion-pairs-missing",
+            ],
+            "contaminationBoundary": (
+                "The conjunction was frozen only after synthetic, Round 4, and natural-clean "
+                "evidence had been inspected. Its metrics are diagnostic and cannot promote it."
+            ),
+        },
         "architectureCandidateRetained": retained,
         "blockingReasons": [
             *([] if holdout_result["union"]["jointFloorReady"] else ["temporal-operation-path-synthetic-piece-holdout-failed"]),
@@ -896,6 +1000,9 @@ def main() -> int:
         "naturalCleanRefinedFalsePositive": natural_clean_gap_refinement["refined"]["falsePositive"],
         "publicProfessionalRefinedFlagCount": public_professional_burden["refinedFlagCount"],
         "publicProfessionalScorePositionCount": public_professional_burden["scorePositionCount"],
+        "round4RhythmStructuralRefinement": round4_rhythm_refinement,
+        "naturalCleanRhythmHintRate": natural_clean_rhythm_refinement["hintRate"],
+        "rhythmStructuralCandidateRetainedForFreshBlind": rhythm_candidate_retained,
         "gapRefinementCandidateRetainedForFreshBlind": gap_refinement_candidate_retained,
         "architectureCandidateRetained": retained,
         "report": str(OUT.relative_to(REPO)).replace("\\", "/"),

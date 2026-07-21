@@ -87,11 +87,11 @@ def main() -> int:
     assert features["segmentGapCount"] == 0.0
     assert features["n_0AssignmentGap"] == 0.0
 
-    refinement_metrics = MODULE.frozen_gap_refinement_metrics([{
+    synthetic_refinement_rows = [{
         "recordingId": "synthetic-refinement",
         "positionCount": 5,
         "refined": {1, 2, 4},
-        "targetPositive": {1, 3},
+        "rhythmRefined": {4},
         "knownPositive": {1, 3, 4},
         "positiveByGate": {
             "merged_substitution": {1},
@@ -99,7 +99,8 @@ def main() -> int:
             "extra": {4},
             "drag": set(),
         },
-    }])
+    }]
+    refinement_metrics = MODULE.frozen_refinement_metrics(synthetic_refinement_rows)
     assert refinement_metrics["truePositive"] == 1
     assert refinement_metrics["falsePositive"] == 1
     assert refinement_metrics["falseNegative"] == 1
@@ -107,6 +108,14 @@ def main() -> int:
     assert refinement_metrics["offScopeTrueErrorHints"] == 1
     assert refinement_metrics["precision"] == 0.5
     assert refinement_metrics["recall"] == 0.5
+    rhythm_metrics = MODULE.frozen_refinement_metrics(
+        synthetic_refinement_rows,
+        MODULE.RHYTHM_REFINEMENT_TARGET_GATES,
+        "rhythmRefined",
+    )
+    assert rhythm_metrics["truePositive"] == 1
+    assert rhythm_metrics["falsePositive"] == 0
+    assert rhythm_metrics["precision"] == 1.0
 
     with tempfile.TemporaryDirectory() as temp:
         root = Path(temp)
@@ -128,6 +137,11 @@ def main() -> int:
         assert result["frozenGapRefinement"]["evaluationPerformed"] is False
         assert result["frozenGapRefinement"]["reviewAssistPromotionReady"] is False
         assert result["frozenGapRefinement"]["automaticAccusationReady"] is False
+        rhythm_runner = result["frozenGapRefinement"]["rhythmStructuralRefinement"]
+        assert rhythm_runner["runnerWired"] is True
+        assert rhythm_runner["evaluationPerformed"] is False
+        assert rhythm_runner["reviewAssistPromotionReady"] is False
+        assert rhythm_runner["automaticAccusationReady"] is False
         assert "round5-targeted-intake-not-ready" in result["blockingReasons"]
         assert not model.exists()
     print("western Round-5 segment edit-path tests passed")

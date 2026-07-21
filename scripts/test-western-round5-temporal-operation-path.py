@@ -44,6 +44,16 @@ def main() -> int:
     )
     assert gaps == {1, 2, 3}
     assert refined == {1, 2}
+    rhythm = module.rhythm_structural_refinement_indices(
+        {"rows": [
+            {"relativeIoiDeviationRatio": 0.20, "eventDurationRatio": 1.30, "eventConfidence": 0.80},
+            {"relativeIoiDeviationRatio": 0.10, "eventDurationRatio": 1.30, "eventConfidence": 0.80},
+            {"relativeIoiDeviationRatio": 0.20, "eventDurationRatio": 1.10, "eventConfidence": 0.80},
+            {"relativeIoiDeviationRatio": 0.20, "eventDurationRatio": 1.30, "eventConfidence": 0.70},
+        ]},
+        {"merged_substitution": {0, 1, 2, 3}, "missing": set(), "extra": set(), "drag": set()},
+    )
+    assert rhythm == {0}
 
     evidence = json.loads(EVIDENCE.read_text(encoding="utf-8"))
     assert evidence["contract"] == "western-round5-temporal-operation-path-smoke-v1"
@@ -102,6 +112,23 @@ def main() -> int:
     assert refinement["generalPurposeCandidateRetained"] is False
     assert "gap-refinement-fresh-blind-not-run" in refinement["promotionBlockingReasons"]
     assert "public-professional-negative-burden-not-cleared" in refinement["promotionBlockingReasons"]
+    rhythm_refinement = evidence["rhythmStructuralRefinement"]
+    assert rhythm_refinement["outputSemantic"] == "self_check_hint"
+    assert rhythm_refinement["strictConfirmedRecallChanged"] is False
+    assert rhythm_refinement["automaticAccusationReady"] is False
+    assert rhythm_refinement["promotionEvidenceEligible"] is False
+    assert rhythm_refinement["calibration"]["truePositive"] == 18
+    assert rhythm_refinement["calibration"]["falsePositive"] == 1
+    assert rhythm_refinement["syntheticHoldout"]["truePositive"] == 15
+    assert rhythm_refinement["syntheticHoldout"]["falsePositive"] == 0
+    assert rhythm_refinement["syntheticHoldout"]["recall"] == 0.555556
+    assert rhythm_refinement["round4InspectedReal"]["truePositive"] == 4
+    assert rhythm_refinement["round4InspectedReal"]["falsePositive"] == 0
+    assert rhythm_refinement["round4InspectedReal"]["recall"] == 0.666667
+    assert rhythm_refinement["naturalCleanStress"]["falsePositive"] == 5
+    assert rhythm_refinement["naturalCleanStress"]["hintRate"] == 0.017544
+    assert rhythm_refinement["candidateRetainedForFreshBlind"] is True
+    assert "rhythm-structural-fresh-blind-not-run" in rhythm_refinement["promotionBlockingReasons"]
 
     print(json.dumps({
         "ok": True,
@@ -111,6 +138,7 @@ def main() -> int:
             "policy-c-gap-refinement-diagnostic-boundary",
             "strict-confirmed-recall-unchanged",
             "public-professional-burden-not-mislabeled-as-false-positive",
+            "rhythm-structural-refinement-fresh-blind-only",
             "student-and-automatic-gates-closed",
         ],
     }))
