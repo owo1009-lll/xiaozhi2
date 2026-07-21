@@ -67,7 +67,8 @@
   "splitDiscipline": {
     "calibration": "r2-01 waveform-injection-v2, three correlated seeds",
     "syntheticHoldout": "r2-08 waveform-injection-v2, three correlated seeds",
-    "realDiagnostic": "inspected Round 4; never fresh-blind"
+    "realDiagnostic": "inspected Round 4; never fresh-blind",
+    "naturalCleanStress": "r2-01, r2-08, r3-01, r3-02, r3-03; negative burden only"
   },
   "promotionThresholds": {
     "minPrecision": 0.9,
@@ -75,8 +76,8 @@
     "maxStrictFalseAccusations": 0
   },
   "sourceBinding": {
-    "fileCount": 36,
-    "aggregateSha256": "7392befd486f48386e61b00a7caf440d6a11e1fcc958afa596dbfa9779d395d9",
+    "fileCount": 44,
+    "aggregateSha256": "64df4e64ea7f4c6912c3592a5f62283c86eca69f903ef928c9bc0664dd824e87",
     "files": [
       {
         "path": "data/experiments/western-strings-injected-errors/r2-01-injected-v2-20260717.labels.json",
@@ -174,14 +175,54 @@
         "sha256": "c5ae26ff4d051c03a3310b710bc6134b857c78ff1e481ad4ef60184a37cccb45"
       },
       {
+        "path": "data/private/western-strings-round2/r2-01.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "59b3f5a163fc2d37a7e5c6375143b830d7d33e5c81465273b1a6c03fcd788d6c"
+      },
+      {
         "path": "data/private/western-strings-round2/r2-01.musicxml",
         "hashMode": "lf-normalized-sha256",
         "sha256": "c8452070f5bc54c04cc86de128175a0acac5bfa176ccadb99fdf5f0c9a0edbf2"
       },
       {
+        "path": "data/private/western-strings-round2/r2-08.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "ca8f0a16db7e36acd22e4c89b0494d9b9b62f45d0be35a0f7352ff28357f11ca"
+      },
+      {
         "path": "data/private/western-strings-round2/r2-08.musicxml",
         "hashMode": "lf-normalized-sha256",
         "sha256": "b12663085aa5f574996a639f561e43b47273abb86175b3742cc3465fd86132df"
+      },
+      {
+        "path": "data/private/western-strings-round3/r3-01.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "c714e81db43a303b0bec66d8ab6244cb2960995d2dd0a6bd90348e028a7bb99e"
+      },
+      {
+        "path": "data/private/western-strings-round3/r3-01.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "a7744530efefb818f3d4bff371894682f6777f658e293186ad08030ee443efd5"
+      },
+      {
+        "path": "data/private/western-strings-round3/r3-02.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "54960ce1b7b83ab1d1574dc81a437945334b4e00a6b7eb51212810e71f34a247"
+      },
+      {
+        "path": "data/private/western-strings-round3/r3-02.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "ef120608555956c229cd17218fd4f666abdb4c6f31a213665b51c97cf391ca95"
+      },
+      {
+        "path": "data/private/western-strings-round3/r3-03.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "979f2a5a227fe92bd856a92467bc2efc4eae4c057a5818d3dbe3c520504b475c"
+      },
+      {
+        "path": "data/private/western-strings-round3/r3-03.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "b619a229d729dcfe998f59581c34eec65ecd63c9a565f1a04b11d83418183493"
       },
       {
         "path": "data/private/western-strings-round4/error-positions.json",
@@ -256,7 +297,7 @@
       {
         "path": "scripts/experiments/eval_western_round5_temporal_operation_path.py",
         "hashMode": "lf-normalized-sha256",
-        "sha256": "bc062cd8a55a026f69465c1817d4d1cbd0bdf292e6a2f3ee7eab122aace68688"
+        "sha256": "1e7022b84d307ca9219092404394339ce4e9a3cff215ac49a586802763808ee8"
       }
     ]
   },
@@ -1499,6 +1540,140 @@
             "trueNegative": 34,
             "precision": 1.0,
             "recall": 0.5
+          }
+        }
+      ]
+    },
+    "naturalCleanStress": {
+      "rule": "assignment-gap AND (operation-path merged_substitution at same position OR operation-path missing inside adjacent assignment-gap run)",
+      "outputSemantic": "self_check_hint",
+      "automaticAccusationAuthorized": false,
+      "base": {
+        "truePositive": 0,
+        "falsePositive": 3,
+        "falseNegative": 0,
+        "trueNegative": 282,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "refined": {
+        "truePositive": 0,
+        "falsePositive": 0,
+        "falseNegative": 0,
+        "trueNegative": 285,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "recordings": [
+        {
+          "recordingId": "r2-01",
+          "assignmentGaps": [],
+          "refinedSelfCheckHints": [],
+          "base": {
+            "truePositive": 0,
+            "falsePositive": 0,
+            "falseNegative": 0,
+            "trueNegative": 67,
+            "precision": 0.0,
+            "recall": 0.0
+          },
+          "refined": {
+            "truePositive": 0,
+            "falsePositive": 0,
+            "falseNegative": 0,
+            "trueNegative": 67,
+            "precision": 0.0,
+            "recall": 0.0
+          }
+        },
+        {
+          "recordingId": "r2-08",
+          "assignmentGaps": [],
+          "refinedSelfCheckHints": [],
+          "base": {
+            "truePositive": 0,
+            "falsePositive": 0,
+            "falseNegative": 0,
+            "trueNegative": 63,
+            "precision": 0.0,
+            "recall": 0.0
+          },
+          "refined": {
+            "truePositive": 0,
+            "falsePositive": 0,
+            "falseNegative": 0,
+            "trueNegative": 63,
+            "precision": 0.0,
+            "recall": 0.0
+          }
+        },
+        {
+          "recordingId": "r3-01",
+          "assignmentGaps": [
+            23
+          ],
+          "refinedSelfCheckHints": [],
+          "base": {
+            "truePositive": 0,
+            "falsePositive": 1,
+            "falseNegative": 0,
+            "trueNegative": 58,
+            "precision": 0.0,
+            "recall": 0.0
+          },
+          "refined": {
+            "truePositive": 0,
+            "falsePositive": 0,
+            "falseNegative": 0,
+            "trueNegative": 59,
+            "precision": 0.0,
+            "recall": 0.0
+          }
+        },
+        {
+          "recordingId": "r3-02",
+          "assignmentGaps": [
+            35
+          ],
+          "refinedSelfCheckHints": [],
+          "base": {
+            "truePositive": 0,
+            "falsePositive": 1,
+            "falseNegative": 0,
+            "trueNegative": 44,
+            "precision": 0.0,
+            "recall": 0.0
+          },
+          "refined": {
+            "truePositive": 0,
+            "falsePositive": 0,
+            "falseNegative": 0,
+            "trueNegative": 45,
+            "precision": 0.0,
+            "recall": 0.0
+          }
+        },
+        {
+          "recordingId": "r3-03",
+          "assignmentGaps": [
+            20
+          ],
+          "refinedSelfCheckHints": [],
+          "base": {
+            "truePositive": 0,
+            "falsePositive": 1,
+            "falseNegative": 0,
+            "trueNegative": 50,
+            "precision": 0.0,
+            "recall": 0.0
+          },
+          "refined": {
+            "truePositive": 0,
+            "falsePositive": 0,
+            "falseNegative": 0,
+            "trueNegative": 51,
+            "precision": 0.0,
+            "recall": 0.0
           }
         }
       ]

@@ -62,6 +62,8 @@ def main() -> int:
     assert combined["automaticAccusationReady"] is False
     assert combined["reviewAssistPromotionReady"] is False
     assert refinement["candidateRetainedForFreshBlind"] is True
+    assert refinement["naturalCleanStress"]["refined"]["falsePositive"] == 0
+    assert len(refinement["naturalCleanStress"]["recordings"]) == 5
     assert "gap-refinement-fresh-blind-not-run" in refinement["promotionBlockingReasons"]
 
     print(json.dumps({

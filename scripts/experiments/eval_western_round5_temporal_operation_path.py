@@ -24,6 +24,7 @@ from music21 import converter
 
 from eval_western_strings_duration_extra_quantization import (
     INJECT_DIR,
+    NATURAL_TAKES,
     PRIVATE,
     V2_SETS,
     analyze_take,
@@ -375,6 +376,15 @@ def prepared_round4() -> list[dict[str, Any]]:
     return output
 
 
+def prepared_natural_clean() -> list[dict[str, Any]]:
+    output = []
+    for recording_id, score_path, audio_path in NATURAL_TAKES:
+        item = prepare_take(recording_id, recording_id, score_path, audio_path)
+        item["truth"] = {gate: set() for gate in GATES}
+        output.append(item)
+    return output
+
+
 def evaluate(dataset: list[dict[str, Any]], params: Params) -> dict[str, Any]:
     pooled = {gate: {"truth": [], "predicted": []} for gate in GATES}
     union_truth: list[int] = []
@@ -585,6 +595,9 @@ def source_binding() -> dict[str, Any]:
         for row in csv.DictReader(handle):
             files.add(REPO / row["scorePath"])
             files.add(REPO / row["audioPath"])
+    for _, score_path, audio_path in NATURAL_TAKES:
+        files.add(score_path)
+        files.add(audio_path)
     for recording in read_json(ROUND4_REPORT)["recordings"]:
         files.add(REPO / recording["candidateRowsPath"])
     ledger = []
@@ -609,12 +622,14 @@ def main() -> int:
     development = prepared_injections(dev_names)
     holdout = prepared_injections(holdout_names)
     round4 = prepared_round4()
+    natural_clean = prepared_natural_clean()
     selected, development_result, configurations = select_on_calibration(development)
     holdout_result = evaluate_gate_specific(holdout, selected)
     round4_result = evaluate_gate_specific(round4, selected)
     calibration_gap_refinement = evaluate_policy_c_gap_refinement(development, selected)
     holdout_gap_refinement = evaluate_policy_c_gap_refinement(holdout, selected)
     round4_gap_refinement = evaluate_policy_c_gap_refinement(round4, selected)
+    natural_clean_gap_refinement = evaluate_policy_c_gap_refinement(natural_clean, selected)
     policy_c = read_json(ROUND4_REPORT)["policyCReviewAssist"]
     strict_true_positive = int(policy_c["planted"]["strictConfirmed"])
     strict_false_positive = int(policy_c["nonPlanted"]["strictFalseAccusations"])
@@ -628,6 +643,7 @@ def main() -> int:
         holdout_gap_refinement["refined"]["falsePositive"] == 0
         and holdout_gap_refinement["refined"]["truePositive"] > 0
         and round4_gap_refinement["refined"]["falsePositive"] == 0
+        and natural_clean_gap_refinement["refined"]["falsePositive"] == 0
         and refined_true_positive >= 4
     )
     retained = holdout_result["union"]["jointFloorReady"] and round4_result["union"]["jointFloorReady"]
@@ -650,6 +666,7 @@ def main() -> int:
             "calibration": "r2-01 waveform-injection-v2, three correlated seeds",
             "syntheticHoldout": "r2-08 waveform-injection-v2, three correlated seeds",
             "realDiagnostic": "inspected Round 4; never fresh-blind",
+            "naturalCleanStress": "r2-01, r2-08, r3-01, r3-02, r3-03; negative burden only",
         },
         "promotionThresholds": PROMOTION,
         "sourceBinding": source_binding(),
@@ -661,6 +678,7 @@ def main() -> int:
             "calibration": calibration_gap_refinement,
             "syntheticHoldout": holdout_gap_refinement,
             "round4InspectedReal": round4_gap_refinement,
+            "naturalCleanStress": natural_clean_gap_refinement,
             "round4TwoLayerCombined": {
                 "strictConfirmed": strict_true_positive,
                 "refinedSelfCheckHints": refined_true_positive,
@@ -703,6 +721,7 @@ def main() -> int:
         "round4Union": round4_result["union"],
         "round4Gates": round4_result["gates"],
         "round4PolicyCGapRefinement": report["policyCGapRefinement"]["round4TwoLayerCombined"],
+        "naturalCleanRefinedFalsePositive": natural_clean_gap_refinement["refined"]["falsePositive"],
         "gapRefinementCandidateRetainedForFreshBlind": gap_refinement_candidate_retained,
         "architectureCandidateRetained": retained,
         "report": str(OUT.relative_to(REPO)).replace("\\", "/"),

@@ -1767,6 +1767,7 @@ export async function summarizeRound5TargetedIntake({
       && temporalEvidence?.productionAdoptionReady === false
       && temporalEvidence?.studentFacing === false
       && temporalGapRefinement?.candidateRetainedForFreshBlind === true
+      && temporalGapRefinement?.naturalCleanStress?.refined?.falsePositive === 0
       && temporalCombined?.strictConfirmed === 2
       && temporalCombined?.refinedSelfCheckHints === 4
       && temporalCombined?.falsePositive === 0
@@ -1833,6 +1834,7 @@ export async function summarizeRound5TargetedIntake({
         gapRefinementCandidateRetainedForFreshBlind:
           temporalGapRefinement?.candidateRetainedForFreshBlind === true,
         round4TwoLayerCombined: temporalCombined,
+        naturalCleanStress: temporalGapRefinement?.naturalCleanStress?.refined || null,
         promotionEvidenceEligible: false,
         studentFacing: false,
         automaticAccusationReady: false,

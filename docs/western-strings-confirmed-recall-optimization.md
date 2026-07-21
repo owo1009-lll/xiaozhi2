@@ -58,7 +58,7 @@ Round 5 intake 已接入总项目状态并做实时哈希绑定。当前 `ready=
 
 已实现并实测动态规划路径：对谱音与 Basic Pitch 事件显式允许 `match / insert / delete / merge / split`，512 组成本只在 r2-01 三个注入种子上选择，随后冻结投向 r2-08 曲目留出和已查看 Round 4。原始路径在 Round 4 能覆盖 `11/12`，但产生 `55/253` 非故意位置，precision 仅 `16.67%`；其中 extra 分支单独产生 53 个 FP。故原始架构明确 `architectureCandidateRetained=false`，不能以高召回掩盖误伤。
 
-路径仍提供了一个高价值的二级用途：只精炼 Policy C 已有的 assignment-gap 自查提示，而不自行扩大候选面。冻结规则为“assignment gap 且路径在同一位置判为 merged substitution，或路径在连续 gap run 内只选择一个 missing”。在注入 calibration/曲目留出上分别把 gap 命中从 11→10、12→10，均保持 0 FP；在已查看 Round 4 上把 4 TP/3 FP 精炼为 **4 TP/0 FP**。与原有 2 个严格确诊合并后的回顾性两层上限为 **6/12、0/253**。
+路径仍提供了一个高价值的二级用途：只精炼 Policy C 已有的 assignment-gap 自查提示，而不自行扩大候选面。冻结规则为“assignment gap 且路径在同一位置判为 merged substitution，或路径在连续 gap run 内只选择一个 missing”。在注入 calibration/曲目留出上分别把 gap 命中从 11→10、12→10，均保持 0 FP；在已查看 Round 4 上把 4 TP/3 FP 精炼为 **4 TP/0 FP**。与原有 2 个严格确诊合并后的回顾性两层上限为 **6/12、0/253**。再投 r2-01、r2-08、r3-01、r3-02、r3-03 五条自然正确录音，精炼提示同样为 **0 FP**；这补的是负例压力，不替代 fresh-blind 正例。
 
 边界必须同时保留：这条精炼规则是在看过 Round 4 后形成，`strictConfirmedRecallUnchanged=true`，所以严格确诊仍是 `2/12`；当前仅 `candidateRetainedForFreshBlind=true`，`reviewAssistPromotionReady=false`、`automaticAccusationReady=false`。下一次 Round 5 fresh-blind 必须原样先测这条规则，不得先看新包再改成本或条件。可复跑：
 

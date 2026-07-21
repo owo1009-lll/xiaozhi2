@@ -761,6 +761,7 @@ assert.equal(temporalPath?.gapRefinementCandidateRetainedForFreshBlind, true);
 assert.equal(temporalPath?.round4TwoLayerCombined?.truePositive, 6);
 assert.equal(temporalPath?.round4TwoLayerCombined?.falsePositive, 0);
 assert.equal(temporalPath?.round4TwoLayerCombined?.strictConfirmedRecallUnchanged, true);
+assert.equal(temporalPath?.naturalCleanStress?.falsePositive, 0);
 assert.equal(temporalPath?.promotionEvidenceEligible, false);
 assert.equal(temporalPath?.studentFacing, false);
 assert.equal(temporalPath?.automaticAccusationReady, false);
