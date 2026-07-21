@@ -88,6 +88,28 @@ const ROUND4_POLICY_C_REPORT = path.join(
   "ordinary-fresh-blind",
   "report.json",
 );
+const ROUND5_TARGETED_CONTRACT = path.join(
+  "config",
+  "western-strings-round5-targeted-contract.json",
+);
+const ROUND5_TARGETED_MANIFEST = path.join(
+  "data",
+  "private",
+  "western-strings-round5",
+  "manifest.csv",
+);
+const ROUND5_TARGETED_TRUTH = path.join(
+  "data",
+  "private",
+  "western-strings-round5",
+  "position-truth.json",
+);
+const ROUND5_TARGETED_REPORT = path.join(
+  "data",
+  "experiments",
+  "western-strings-round5-targeted-intake.json",
+);
+const ROUND5_TARGETED_CONTRACT_VERSION = "western-round5-targeted-diagnosis-intake-v1";
 const ORDINARY_DYNAMIC_CONTRACT_VERSION = "western-ordinary-dynamic-shadow-candidate-v1";
 const ORDINARY_DYNAMIC_POLICY_VERSION = "western-ordinary-dynamic-shadow-policy-v1";
 const ORDINARY_DYNAMIC_GATE_VERSION = "western-ordinary-dynamic-shadow-gate-v1-review-only";
@@ -1567,6 +1589,79 @@ async function readJson(filePath, fallback = null) {
   }
 }
 
+export async function summarizeRound5TargetedIntake({
+  contractPath = ROUND5_TARGETED_CONTRACT,
+  manifestPath = ROUND5_TARGETED_MANIFEST,
+  truthPath = ROUND5_TARGETED_TRUTH,
+  reportPath = ROUND5_TARGETED_REPORT,
+} = {}) {
+  const [contract, report, contractSha256, manifestSha256, truthSha256] = await Promise.all([
+    readJson(contractPath),
+    readJson(reportPath),
+    sha256FileOrEmpty(contractPath),
+    sha256FileOrEmpty(manifestPath),
+    sha256FileOrEmpty(truthPath),
+  ]);
+  const reportReasons = Array.isArray(report?.blockingReasons) ? report.blockingReasons : [];
+  const reportHashes = report?.hashes || {};
+  const contractBindingCurrent = Boolean(
+    contractSha256
+      && report
+      && String(reportHashes.contractSha256 || "").toLowerCase() === contractSha256,
+  );
+  const manifestBindingCurrent = manifestSha256
+    ? String(reportHashes.manifestSha256 || "").toLowerCase() === manifestSha256
+    : Boolean(report
+        && !reportHashes.manifestSha256
+        && reportReasons.includes("round5-manifest-missing"));
+  const truthBindingCurrent = truthSha256
+    ? String(reportHashes.truthSha256 || "").toLowerCase() === truthSha256
+    : Boolean(report
+        && !reportHashes.truthSha256
+        && reportReasons.includes("round5-position-truth-missing"));
+  const bindingCurrent = Boolean(
+    report && contractBindingCurrent && manifestBindingCurrent && truthBindingCurrent,
+  );
+  const blockingReasons = normalizedReasonList([
+    ...reportReasons,
+    ...(!contract ? ["round5-targeted-contract-missing"] : []),
+    ...(!report ? ["round5-targeted-intake-report-missing"] : []),
+    ...(contract && contract.contractVersion !== ROUND5_TARGETED_CONTRACT_VERSION
+      ? ["round5-targeted-contract-version-invalid"]
+      : []),
+    ...(report && report.contractVersion !== contract?.contractVersion
+      ? ["round5-targeted-report-contract-version-invalid"]
+      : []),
+    ...(report && (report.studentFacing !== false || report.automaticAuthorizationGranted !== false)
+      ? ["round5-targeted-safety-boundary-invalid"]
+      : []),
+    ...(report && !contractBindingCurrent ? ["round5-targeted-contract-binding-stale"] : []),
+    ...(report && !manifestBindingCurrent ? ["round5-targeted-manifest-binding-stale"] : []),
+    ...(report && !truthBindingCurrent ? ["round5-targeted-truth-binding-stale"] : []),
+  ]);
+  return {
+    contract: contract?.contractVersion || ROUND5_TARGETED_CONTRACT_VERSION,
+    source: String(reportPath).replace(/\\/g, "/"),
+    paths: {
+      contract: String(contractPath).replace(/\\/g, "/"),
+      manifest: String(manifestPath).replace(/\\/g, "/"),
+      truth: String(truthPath).replace(/\\/g, "/"),
+    },
+    ready: report?.ready === true && bindingCurrent && blockingReasons.length === 0,
+    bindingCurrent,
+    bindings: {
+      contract: contractBindingCurrent,
+      manifest: manifestBindingCurrent,
+      truth: truthBindingCurrent,
+    },
+    counts: report?.counts || {},
+    minimums: report?.minimums || contract?.minimums || {},
+    studentFacing: false,
+    automaticAuthorizationGranted: false,
+    blockingReasons,
+  };
+}
+
 function homrEvidenceToBenchmark(evidence) {
   const aggregate = evidence?.aggregate || {};
   const complete = Boolean(
@@ -2681,10 +2776,11 @@ async function auditOrdinaryReviewAssistRuntime() {
 
 async function buildOrdinaryDynamicShadowStatus() {
   const runtime = evaluateOrdinaryAudioRuntime();
-  const [acceptance, acceptanceArtifact, reviewAssistRuntime] = await Promise.all([
+  const [acceptance, acceptanceArtifact, reviewAssistRuntime, round5TargetedIntake] = await Promise.all([
     readJson(ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE),
     hashWorkspaceArtifact(ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE),
     auditOrdinaryReviewAssistRuntime(),
+    summarizeRound5TargetedIntake(),
   ]);
   const acceptanceValidation = validateOrdinaryDynamicShadowAcceptance(acceptance);
   // The schema-valid report only stays green while the live-artifact verifier
@@ -2783,6 +2879,7 @@ async function buildOrdinaryDynamicShadowStatus() {
       ]),
     },
     policyCReviewAssistRuntime: reviewAssistRuntime,
+    round5TargetedIntake,
     rhythmChannelEvidence: {
       contract: RHYTHM_CHANNEL_DIAGNOSTIC_CONTRACT,
       source: ROUND4_POLICY_C_REPORT.replace(/\\/g, "/"),

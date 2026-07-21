@@ -52,6 +52,9 @@ def main() -> int:
         missing = MODULE.validate(contract_path, manifest_path, truth_path)
         assert missing["ready"] is False
         assert "round5-manifest-missing" in missing["blockingReasons"]
+        assert missing["hashes"]["contractSha256"] == MODULE.sha256(contract_path)
+        assert missing["hashes"]["manifestSha256"] is None
+        assert missing["hashes"]["truthSha256"] is None
 
         private = manifest_path.parent
         private.mkdir(parents=True, exist_ok=True)
@@ -94,6 +97,9 @@ def main() -> int:
         assert ready["ready"] is True, ready["blockingReasons"]
         assert ready["studentFacing"] is False
         assert ready["automaticAuthorizationGranted"] is False
+        assert ready["hashes"]["contractSha256"] == MODULE.sha256(contract_path)
+        assert ready["hashes"]["manifestSha256"] == MODULE.sha256(manifest_path)
+        assert ready["hashes"]["truthSha256"] == MODULE.sha256(truth_path)
     print("western Round-5 targeted intake tests passed")
     return 0
 

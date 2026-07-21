@@ -49,8 +49,19 @@ def count_floor_issues(
 def validate(contract_path: Path, manifest_path: Path, truth_path: Path) -> dict[str, Any]:
     blockers: list[str] = []
     if not contract_path.exists():
-        return {"ready": False, "blockingReasons": ["round5-contract-missing"]}
+        return {
+            "ready": False,
+            "studentFacing": False,
+            "automaticAuthorizationGranted": False,
+            "hashes": {
+                "contractSha256": None,
+                "manifestSha256": None,
+                "truthSha256": None,
+            },
+            "blockingReasons": ["round5-contract-missing"],
+        }
     contract = read_json(contract_path)
+    contract_sha256 = sha256(contract_path)
     if not manifest_path.exists():
         blockers.append("round5-manifest-missing")
     if not truth_path.exists():
@@ -62,6 +73,11 @@ def validate(contract_path: Path, manifest_path: Path, truth_path: Path) -> dict
             "studentFacing": False,
             "automaticAuthorizationGranted": False,
             "blockingReasons": blockers,
+            "hashes": {
+                "contractSha256": contract_sha256,
+                "manifestSha256": None,
+                "truthSha256": None,
+            },
             "paths": {"manifest": rel(manifest_path), "truth": rel(truth_path)},
         }
 
@@ -199,7 +215,11 @@ def validate(contract_path: Path, manifest_path: Path, truth_path: Path) -> dict
             "freshBlindConfusionNegativeByGate": dict(fresh_negative),
         },
         "minimums": minimums,
-        "hashes": {"manifestSha256": sha256(manifest_path), "truthSha256": sha256(truth_path)},
+        "hashes": {
+            "contractSha256": contract_sha256,
+            "manifestSha256": sha256(manifest_path),
+            "truthSha256": sha256(truth_path),
+        },
         "paths": {"manifest": rel(manifest_path), "truth": rel(truth_path)},
         "blockingReasons": blockers,
     }

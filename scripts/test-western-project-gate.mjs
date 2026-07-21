@@ -724,6 +724,14 @@ assert.equal(
   policyCRuntime?.confirmedIssueCandidateCount + policyCRuntime?.selfCheckHintCount,
 );
 assert.deepEqual(policyCRuntime?.blockingReasons, []);
+const round5TargetedIntake = controlled.ordinaryDynamicShadow?.round5TargetedIntake;
+assert.equal(
+  round5TargetedIntake?.contract,
+  "western-round5-targeted-diagnosis-intake-v1",
+  "project status must expose the current Round-5 diagnosis intake contract",
+);
+assert.equal(round5TargetedIntake?.studentFacing, false);
+assert.equal(round5TargetedIntake?.automaticAuthorizationGranted, false);
 const rhythmChannel = controlled.ordinaryDynamicShadow?.rhythmChannelEvidence;
 assert.equal(rhythmChannel?.contract, "western-round4-relative-ioi-diagnostic-v1");
 assert.equal(rhythmChannel?.scope, "preGateOnly-diagnostic");
