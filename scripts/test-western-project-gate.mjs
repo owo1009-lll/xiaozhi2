@@ -751,6 +751,19 @@ assert.equal(
   round5TargetedIntake?.segmentEditPathCandidate?.smokeDiagnostic?.structuralRound4Union?.falsePositive,
   6,
 );
+const temporalPath = round5TargetedIntake?.segmentEditPathCandidate?.temporalOperationPathDiagnostic;
+assert.equal(temporalPath?.evidenceValid, true);
+assert.equal(temporalPath?.sourceBindingCurrent, true);
+assert.equal(temporalPath?.rawArchitectureCandidateRetained, false);
+assert.equal(temporalPath?.rawRound4Union?.truePositive, 11);
+assert.equal(temporalPath?.rawRound4Union?.falsePositive, 55);
+assert.equal(temporalPath?.gapRefinementCandidateRetainedForFreshBlind, true);
+assert.equal(temporalPath?.round4TwoLayerCombined?.truePositive, 6);
+assert.equal(temporalPath?.round4TwoLayerCombined?.falsePositive, 0);
+assert.equal(temporalPath?.round4TwoLayerCombined?.strictConfirmedRecallUnchanged, true);
+assert.equal(temporalPath?.promotionEvidenceEligible, false);
+assert.equal(temporalPath?.studentFacing, false);
+assert.equal(temporalPath?.automaticAccusationReady, false);
 assert.equal(
   round5TargetedIntake?.segmentEditPathCandidate?.smokeDiagnostic?.acousticRound4Union?.truePositive,
   1,

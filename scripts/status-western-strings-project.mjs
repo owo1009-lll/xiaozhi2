@@ -120,6 +120,11 @@ const ROUND5_SEGMENT_EDIT_PATH_SMOKE = path.join(
   "evidence",
   "western-strings-round5-segment-edit-path-smoke-20260722.json",
 );
+const ROUND5_TEMPORAL_OPERATION_PATH = path.join(
+  "docs",
+  "evidence",
+  "western-strings-round5-temporal-operation-path-20260722.json",
+);
 const ROUND5_TARGETED_CONTRACT_VERSION = "western-round5-targeted-diagnosis-intake-v1";
 const ORDINARY_DYNAMIC_CONTRACT_VERSION = "western-ordinary-dynamic-shadow-candidate-v1";
 const ORDINARY_DYNAMIC_POLICY_VERSION = "western-ordinary-dynamic-shadow-policy-v1";
@@ -1600,6 +1605,49 @@ async function readJson(filePath, fallback = null) {
   }
 }
 
+async function auditFlatEvidenceSourceBinding(evidence) {
+  const rows = Array.isArray(evidence?.sourceBinding?.files) ? evidence.sourceBinding.files : [];
+  const blockingReasons = [];
+  const observed = [];
+  if (!rows.length) blockingReasons.push("flat-evidence-source-binding-missing");
+  for (const [index, row] of rows.entries()) {
+    const source = await readWorkspaceArtifact(row?.path || "");
+    const expectedSha256 = String(row?.sha256 || "").toLowerCase();
+    const hashMode = String(row?.hashMode || "");
+    if (source.status !== "ok") {
+      blockingReasons.push(`flat-evidence-source-unreadable:${index}:${source.status}`);
+      continue;
+    }
+    if (!["raw-sha256", "lf-normalized-sha256"].includes(hashMode)) {
+      blockingReasons.push(`flat-evidence-source-hash-mode-invalid:${index}`);
+      continue;
+    }
+    const observedSha256 = hashMode === "lf-normalized-sha256"
+      ? crypto.createHash("sha256").update(
+          source.bytes.toString("utf8").replace(/\r\n?/g, "\n"),
+        ).digest("hex")
+      : source.sha256;
+    if (!/^[a-f0-9]{64}$/.test(expectedSha256) || observedSha256 !== expectedSha256) {
+      blockingReasons.push(`flat-evidence-source-sha-mismatch:${index}`);
+      continue;
+    }
+    observed.push({
+      path: String(row.path).replace(/\\/g, "/"),
+      hashMode,
+      sha256: observedSha256,
+    });
+  }
+  const aggregateSha256 = crypto.createHash("sha256").update(canonicalJson(observed)).digest("hex");
+  if (Number(evidence?.sourceBinding?.fileCount) !== rows.length) {
+    blockingReasons.push("flat-evidence-source-file-count-mismatch");
+  }
+  if (observed.length !== rows.length
+      || aggregateSha256 !== String(evidence?.sourceBinding?.aggregateSha256 || "").toLowerCase()) {
+    blockingReasons.push("flat-evidence-source-aggregate-mismatch");
+  }
+  return { ready: blockingReasons.length === 0, fileCount: rows.length, aggregateSha256, blockingReasons };
+}
+
 export async function summarizeRound5TargetedIntake({
   contractPath = ROUND5_TARGETED_CONTRACT,
   manifestPath = ROUND5_TARGETED_MANIFEST,
@@ -1607,15 +1655,22 @@ export async function summarizeRound5TargetedIntake({
   reportPath = ROUND5_TARGETED_REPORT,
   modelReportPath = ROUND5_SEGMENT_EDIT_PATH_REPORT,
 } = {}) {
-  const [contract, report, modelReport, smokeEvidence, contractSha256, manifestSha256, truthSha256] = await Promise.all([
+  const [
+    contract, report, modelReport, smokeEvidence, temporalEvidence,
+    contractSha256, manifestSha256, truthSha256,
+  ] = await Promise.all([
     readJson(contractPath),
     readJson(reportPath),
     readJson(modelReportPath),
     readJson(ROUND5_SEGMENT_EDIT_PATH_SMOKE),
+    readJson(ROUND5_TEMPORAL_OPERATION_PATH),
     sha256FileOrEmpty(contractPath),
     sha256FileOrEmpty(manifestPath),
     sha256FileOrEmpty(truthPath),
   ]);
+  const temporalSourceAudit = temporalEvidence
+    ? await auditFlatEvidenceSourceBinding(temporalEvidence)
+    : { ready: false, fileCount: 0, aggregateSha256: "", blockingReasons: ["temporal-operation-path-evidence-missing"] };
   const reportReasons = Array.isArray(report?.blockingReasons) ? report.blockingReasons : [];
   const reportHashes = report?.hashes || {};
   const contractBindingCurrent = Boolean(
@@ -1700,6 +1755,26 @@ export async function summarizeRound5TargetedIntake({
       && smokeEvidence?.studentFacing === false
       && smokeEvidence?.productionAdoptionReady === false,
   );
+  const temporalGapRefinement = temporalEvidence?.policyCGapRefinement || null;
+  const temporalCombined = temporalGapRefinement?.round4TwoLayerCombined || null;
+  const temporalEvidenceValid = Boolean(
+    temporalEvidence?.contract === "western-round5-temporal-operation-path-smoke-v1"
+      && temporalEvidence?.scope === "architecture-smoke-preGateOnly"
+      && temporalEvidence?.promotionEvidenceEligible === false
+      && temporalEvidence?.architectureCandidateRetained === false
+      && temporalEvidence?.reviewAssistPromotionReady === false
+      && temporalEvidence?.automaticAccusationReady === false
+      && temporalEvidence?.productionAdoptionReady === false
+      && temporalEvidence?.studentFacing === false
+      && temporalGapRefinement?.candidateRetainedForFreshBlind === true
+      && temporalCombined?.strictConfirmed === 2
+      && temporalCombined?.refinedSelfCheckHints === 4
+      && temporalCombined?.falsePositive === 0
+      && temporalCombined?.strictConfirmedRecallUnchanged === true
+      && temporalCombined?.automaticAccusationReady === false
+      && temporalCombined?.reviewAssistPromotionReady === false
+      && temporalSourceAudit.ready === true
+  );
   return {
     contract: contract?.contractVersion || ROUND5_TARGETED_CONTRACT_VERSION,
     source: String(reportPath).replace(/\\/g, "/"),
@@ -1746,6 +1821,28 @@ export async function summarizeRound5TargetedIntake({
             ? ["round5-segment-edit-path-smoke-evidence-invalid"]
             : []),
           ...(smokeEvidence?.blockingReasons || []),
+        ]),
+      },
+      temporalOperationPathDiagnostic: {
+        source: ROUND5_TEMPORAL_OPERATION_PATH.replace(/\\/g, "/"),
+        evidenceValid: temporalEvidenceValid,
+        sourceBindingCurrent: temporalSourceAudit.ready,
+        sourceFileCount: temporalSourceAudit.fileCount,
+        rawArchitectureCandidateRetained: temporalEvidence?.architectureCandidateRetained === true,
+        rawRound4Union: temporalEvidence?.round4InspectedReal?.union || null,
+        gapRefinementCandidateRetainedForFreshBlind:
+          temporalGapRefinement?.candidateRetainedForFreshBlind === true,
+        round4TwoLayerCombined: temporalCombined,
+        promotionEvidenceEligible: false,
+        studentFacing: false,
+        automaticAccusationReady: false,
+        blockingReasons: normalizedReasonList([
+          ...(!temporalEvidence ? ["temporal-operation-path-evidence-missing"] : []),
+          ...(temporalEvidence && !temporalEvidenceValid
+            ? ["temporal-operation-path-evidence-invalid"]
+            : []),
+          ...(temporalSourceAudit.blockingReasons || []),
+          ...(temporalGapRefinement?.promotionBlockingReasons || []),
         ]),
       },
       studentFacing: false,
@@ -3882,14 +3979,15 @@ export function summarizeNextActions(
     actions.push({
       priority: 1,
       track: "Ordinary diagnosis recall",
-      action: "Policy C remains two-layer teacher review assistance; strict confirmed recall is still 2/12. The inspected merged-substitution pattern only raises a diagnostic ceiling to 3/12. Timing+duration, generic/pitch-conditioned onset, unassigned-event edit path, direct RMS, and target-pitch absence all fail transfer or precision. A fixed five-note random-forest smoke test also failed: structural Round 4 P/R=45.45%/41.67% (5/12, 6/253 false accusations); adding fixed RMS/pYIN/onset fell to 33.33%/8.33% (1/12, 2/253) with zero correct-gate hits. Do not promote or keep tuning this model family. Collect fresh real confusion pairs under `npm run western:round5-targeted-intake`; run `npm run western:round5-segment-edit-path` only as the frozen baseline, then compare an explicit temporal operation-path model on the untouched fresh-blind split.",
-      artifact: shadow.policyCReviewAssistEvidence.source,
+      action: "Strict confirmed recall remains 2/12. The explicit temporal operation path has now been tested: raw use reaches 11/12 but causes 55/253 false positives and is rejected. Used only as an independent refiner for Policy C assignment-gap self-check hints, it retrospectively keeps all 4 useful hints and removes all 3 false hints, so the inspected Round-4 two-layer ceiling is 6/12 at 0/253 while strict-confirmed recall stays 2/12. Because that refinement rule was formulated after inspecting Round 4, it is not promotion evidence and is not wired to runtime. Freeze it unchanged, collect the Round-5 real confusion pairs, and make this the first candidate evaluated on the untouched fresh-blind split; do not resume single-threshold or fixed-RF tuning.",
+      artifact: ROUND5_TEMPORAL_OPERATION_PATH.replace(/\\/g, "/"),
       reason: normalizedReasonList([
         "policy-c-auto-accusation-closed",
         ...(shadow.rhythmChannelEvidence?.blockingReasons || ["relative-ioi-diagnostic-not-ready"]),
         ...(shadow.policyCReviewAssistEvidence.energyRobustnessReady === true
           ? []
           : ["policy-c-energy-robustness-not-ready"]),
+        "gap-refinement-fresh-blind-not-run",
       ]),
     });
   }
@@ -4428,8 +4526,8 @@ export async function buildProjectStatus(args = {}) {
           blockingReasons: [
             "historical-first-measure-intake-superseded",
             "fresh-blind-intake-status-missing",
-          ],
-        },
+        ],
+      },
     tracks: {
       controlledCandidate,
       m3plusPitchModes,
