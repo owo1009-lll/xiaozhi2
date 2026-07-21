@@ -279,6 +279,8 @@
     "western:round5-review-assist-calibration-pack": "node scripts\\export-western-round5-review-assist-calibration.mjs",
     "western:round5-review-assist-calibration-stage": "node scripts\\stage-western-round5-review-assist-calibration.mjs",
     "test:western-round5-review-assist-calibration": "node scripts\\test-western-round5-review-assist-calibration.mjs",
+    "western:round5-temporal-operation-path": "py -3.11 scripts\\experiments\\eval_western_round5_temporal_operation_path.py",
+    "test:western-round5-temporal-operation-path": "py -3.11 scripts\\test-western-round5-temporal-operation-path.py",
     "test:western-ordinary-audio-runtime": "node scripts\\test-western-ordinary-audio-runtime.mjs",
     "test:western-dynamic-shadow-policy": "node scripts\\run-western-ordinary-audio-python.mjs --script scripts\\test-western-dynamic-shadow-policy.py --",
     "test:western-offline-feature-audio": "node scripts\\run-western-ordinary-audio-python.mjs --script scripts\\test-western-offline-feature-audio.py --",
