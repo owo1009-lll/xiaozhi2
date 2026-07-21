@@ -53,3 +53,17 @@ Round 5 intake 已接入总项目状态并做实时哈希绑定。当前 `ready=
 片段模型入口也已落地：`western:round5-segment-edit-path` 只消费通过 intake 的 calibration/fresh-blind 分割，按 merged-substitution/missing/extra/drag 四个子闸分别训练固定随机森林，并以连续五音的局部 edit-path 证据评测。当前执行结果为 `intakeReady=false`、`trainingPerformed=false`、`reviewAssistPromotionReady=false`；这是缺真实输入的明确拒绝，不是模型失败数字。总状态还会复核模型报告引用的三份源哈希与模型工件哈希。
 
 在不占用晋升分母的架构烟测中，r2-01 注入训练、r2-08 曲目留出，再投已查看 Round 4：结构特征基线为 `5/12` 命中、`6/253` 非故意位置误指控，P/R=`45.45%/41.67%`；加入固定 RMS/pYIN/onset 后降为 `1/12 @ 2/253`、P/R=`33.33%/8.33%`，且四个正确 gate 的 TP 合计为 0。两种均 `architectureCandidateRetained=false`，不接复核台；固定随机森林只保留为将来真实数据上的基线，下一模型族必须显式学习连续时序操作路径，而不是继续叠声学手工特征。
+
+## 教师复核标签回流（calibration only）
+
+`policyCReviewAssistRuntime.ready=true` 只表示最新物理批次的 Policy C 契约和安全边界可审计，不表示该批次一定有候选。状态现已拆为 `mechanismReady`、`candidateAvailable`、`readyForReview`；当前最新批次 `outputCount=0`，所以机制就绪但没有当前候选。冻结 Round 4 的候选工件生成早于 Policy C 持久化接线，不能伪称已有物理决策字段。
+
+为回收这批已知但尚未结构化的教师判断，新增本机复核包：它先验证冻结报告、manifest、position truth 与六份候选工件的 SHA-256，再用当前冻结 Policy C 函数逐行重算。当前导出 **9 个可播放候选 / 4 条录音**，覆盖 2 个 `confirmed_issue` 与 7 个 `self_check_hint`；已知评测构成为 6 个故意错误位置加 3 个非故意混淆位置，但页面不会把评测真值预填给复核人。下载结果只能生成 calibration 草稿，硬编码 `freshBlindEligible=false`，不能补 fresh-blind 分母。
+
+```powershell
+npm run western:round5-review-assist-calibration-pack
+# 在 data/experiments/western-strings-round5-review-assist-calibration-pack/index.html 完成人工复核并下载 JSON
+npm run western:round5-review-assist-calibration-stage -- --completed data/experiments/western-strings-round5-review-assist-calibration-pack/round5-review-assist-calibration.completed.json
+```
+
+stage 工具要求每条正/负标签都有 gate、实际演奏描述和复核人，混淆负例还必须填写 `confusionKind`；每条录音必须补 performer/device/room、consent=`yes`、licenseStatus=`local-only`。它验证 ledger 与音频/乐谱源哈希后，只写 `data/private/western-strings-round5-review-assist-calibration-draft/`，不会自动合并正式 Round 5，也不会改变严格确诊 `2/12`。它的价值是形成真实的 6 正/3 混淆负例种子，指导下一次定向采集和时序 operation-path 模型，而不是制造新的晋升数字。

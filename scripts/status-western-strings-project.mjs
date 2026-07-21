@@ -2851,10 +2851,15 @@ async function auditOrdinaryReviewAssistRuntime() {
       || reviewAssist?.automaticAccusationAuthorized !== false) {
     blockingReasons.push("ordinary-review-assist-safety-boundary-invalid");
   }
+  const outputCount = Number(reviewAssist?.outputCount ?? 0);
+  const candidateAvailable = Number.isFinite(outputCount) && outputCount > 0;
   return {
     contract: ORDINARY_REVIEW_ASSIST_CONTRACT,
     source: batchRunsPath,
     ready: blockingReasons.length === 0,
+    mechanismReady: blockingReasons.length === 0,
+    candidateAvailable,
+    readyForReview: blockingReasons.length === 0 && candidateAvailable,
     reviewerOnly: reviewAssist?.reviewerOnly === true,
     studentFacing: false,
     automaticAccusationAuthorized: false,
@@ -2865,6 +2870,7 @@ async function auditOrdinaryReviewAssistRuntime() {
     selfCheckHintCount: reviewAssist?.selfCheckHintCount ?? null,
     outputCount: reviewAssist?.outputCount ?? null,
     previewCount: Array.isArray(latestItem?.reviewAssistPreview) ? latestItem.reviewAssistPreview.length : 0,
+    candidateAvailabilityReasons: candidateAvailable ? [] : ["ordinary-review-assist-current-batch-has-no-output"],
     blockingReasons: normalizedReasonList(blockingReasons),
   };
 }
