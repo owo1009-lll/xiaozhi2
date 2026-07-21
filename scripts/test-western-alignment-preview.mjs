@@ -17,8 +17,10 @@ import {
   applyOrdinaryControlledPilotScope,
   buildOfflineFeatureAnalyzerArgs,
   buildOrdinaryDynamicShadowReviewGate,
+  buildWesternOrdinaryReviewAssistDecision,
   buildWesternAlignmentPreview,
   buildWesternStudentAnalysis,
+  ORDINARY_REVIEW_ASSIST_CONTRACT,
   runWesternControlledSubmissionBatch,
 } from "../src/server/westernStringsAlignmentService.js";
 import { createWesternStringsRouter } from "../src/server/westernStringsRoutes.js";
@@ -84,6 +86,36 @@ function m3plusRuntimeCounts(candidateRows) {
     zoneCounts[zone] = (zoneCounts[zone] || 0) + 1;
   }
   return { decisionCounts, zoneCounts };
+}
+
+function testOrdinaryReviewAssistDecision() {
+  const confirmed = buildWesternOrdinaryReviewAssistDecision({
+    m3plusPitchSafetyEvidence: { decision: "issue_detected" },
+    m3plusTimingAssignmentAvailable: true,
+  });
+  assert.equal(confirmed.contract, ORDINARY_REVIEW_ASSIST_CONTRACT);
+  assert.equal(confirmed.outputSemantic, "confirmed_issue");
+  assert.equal(confirmed.requiresHumanReview, true);
+
+  const selfCheck = buildWesternOrdinaryReviewAssistDecision({
+    m3plusPitchSafetyEvidence: { decision: "confirmed_center" },
+    m3plusTimingAssignmentAvailable: false,
+  });
+  assert.equal(selfCheck.outputSemantic, "self_check_hint");
+  assert.equal(selfCheck.requiresHumanReview, true);
+
+  const noOutput = buildWesternOrdinaryReviewAssistDecision({
+    m3plusPitchSafetyEvidence: { decision: "confirmed_center" },
+    m3plusTimingAssignmentAvailable: true,
+  });
+  assert.equal(noOutput.outputSemantic, "no_issue_output");
+  assert.equal(noOutput.requiresHumanReview, false);
+
+  for (const decision of [confirmed, selfCheck, noOutput]) {
+    assert.equal(decision.reviewerOnly, true);
+    assert.equal(decision.automaticAccusationAuthorized, false);
+    assert.equal(decision.studentFacing, false);
+  }
 }
 
 function listen(server) {
@@ -542,6 +574,7 @@ async function testControlledSubmissionRoute() {
     assert.equal(body.ok, true);
     assert.equal(body.analysis.submissionAccepted, true);
     assert.equal(body.analysis.studentReady, false);
+    assert.equal(JSON.stringify(body.analysis).includes("reviewAssist"), false);
     assert.deepEqual(body.analysis.blockingReasons, ["controlled-submission-requires-offline-analysis"]);
     assert.equal(body.analysis.submission.scoreId, "score-test-clean");
     assert.equal(body.analysis.submission.audioSubmission.name, "student.wav");
@@ -840,6 +873,16 @@ async function testControlledSubmissionOfflineFeatureReviewBatch() {
     assert.equal(item.candidateGate.evaluatedCandidateCount, 3);
     assert.equal(item.candidateGate.autoPassCandidateCount, 0);
     assert.equal(item.candidateGate.reviewRequiredCandidateCount, 3);
+    assert.equal(item.candidateGate.reviewAssist.contract, ORDINARY_REVIEW_ASSIST_CONTRACT);
+    assert.equal(item.candidateGate.reviewAssist.reviewerOnly, true);
+    assert.equal(item.candidateGate.reviewAssist.studentFacing, false);
+    assert.equal(item.candidateGate.reviewAssist.automaticAccusationAuthorized, false);
+    assert.equal(
+      item.candidateGate.reviewAssist.outputCount,
+      item.candidateGate.reviewAssist.confirmedIssueCandidateCount
+        + item.candidateGate.reviewAssist.selfCheckHintCount,
+    );
+    assert.deepEqual(item.analysisSummary.reviewAssist, item.candidateGate.reviewAssist);
     const m3plusRuntime = item.candidateGate.m3plusPitchSafetyRuntime;
     assert.equal(m3plusRuntime.evaluationContract, "m3plus-rescope-four-zone-v2");
     assert.equal(m3plusRuntime.runtimeContract, "m3plus-gold-free-runtime-v1");
@@ -904,6 +947,27 @@ async function testControlledSubmissionOfflineFeatureReviewBatch() {
     assert(candidateRowsArtifact.candidateRows.every((candidate) => candidate.feedbackAuthorized === false));
     assert(candidateRowsArtifact.candidateRows.every((candidate) => candidate.m3plusPitchSafetyDecision.contractValid === true));
     assert(candidateRowsArtifact.candidateRows.every((candidate) => candidate.m3plusPitchSafetyDecision.studentFacing === false));
+    assert(candidateRowsArtifact.candidateRows.every((candidate) => candidate.reviewAssistDecision.contract === ORDINARY_REVIEW_ASSIST_CONTRACT));
+    assert(candidateRowsArtifact.candidateRows.every((candidate) => candidate.reviewAssistDecision.reviewerOnly === true));
+    assert(candidateRowsArtifact.candidateRows.every((candidate) => candidate.reviewAssistDecision.studentFacing === false));
+    assert(candidateRowsArtifact.candidateRows.every((candidate) => candidate.reviewAssistDecision.automaticAccusationAuthorized === false));
+    assert.deepEqual(
+      item.reviewAssistPreview,
+      candidateRowsArtifact.candidateRows
+        .filter((candidate) => candidate.reviewAssistDecision.requiresHumanReview === true)
+        .slice(0, 20)
+        .map((candidate) => ({
+          noteId: candidate.noteId,
+          noteIndex: Number(candidate.noteIndex),
+          measureIndex: Number(candidate.measureIndex),
+          beatStart: Number(candidate.beatStart),
+          midi: candidate.midi == null ? null : Number(candidate.midi),
+          predictedOnsetSeconds: candidate.predictedOnsetSeconds == null
+            ? null
+            : Number(candidate.predictedOnsetSeconds),
+          ...candidate.reviewAssistDecision,
+        })),
+    );
     assert.equal(candidateRowsArtifact.candidateRows[0].m3plusPitchSafetyEvidence.zone, "score_marked_neutral");
     assert.equal(candidateRowsArtifact.candidateRows[0].m3plusPitchSafetyEvidence.decision, "insufficient_evidence");
     assert.equal(candidateRowsArtifact.candidateRows[0].m3plusPitchSafetyEvidence.accusationIssued, false);
@@ -912,6 +976,15 @@ async function testControlledSubmissionOfflineFeatureReviewBatch() {
     assert.equal(candidateRowsArtifact.candidateRows[1].m3plusPitchSafetyEvidence.zone, "score_marked_neutral");
     assert.equal(candidateRowsArtifact.candidateRows[1].m3plusPitchSafetyEvidence.targetMidi, 69);
     assert.equal(candidateRowsArtifact.candidateRows[1].m3plusPitchSafetyEvidence.reason, "score-marked-region-neutralized");
+    const queueResponse = await fetch(`http://127.0.0.1:${port}/api/strings/controlled-submissions?limit=20`);
+    const queueBody = await queueResponse.json();
+    assert.equal(queueResponse.status, 200);
+    const queuedSubmission = queueBody.submissions.find(
+      (submission) => submission.submissionId === body.analysis.submission.submissionId,
+    );
+    assert(queuedSubmission);
+    assert.deepEqual(queuedSubmission.latestAnalysis.reviewAssist, item.candidateGate.reviewAssist);
+    assert.deepEqual(queuedSubmission.latestAnalysis.reviewAssistPreview, item.reviewAssistPreview);
     const savedBatchRun = await fs.readFile(path.join(tempRoot, "data", "experiments", "western-strings-m3", "controlled-submission-batch-runs.jsonl"), "utf8");
     const audit = auditControlledBatchRuns(savedBatchRun.trim().split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line)), {
       requireFeatureReview: true,
@@ -1904,6 +1977,7 @@ async function testControlledSubmissionOfflineFeatureConfidenceGateEnabled() {
 
 testHistoricalRfControlledPilotScopeTelemetry();
 testOrdinaryDynamicShadowReviewGate();
+testOrdinaryReviewAssistDecision();
 await testServiceDefaultNoLeakage();
 await testServiceEvaluationSummary();
 await testStudentSafeFailClosed();

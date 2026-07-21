@@ -97,6 +97,7 @@ const ORDINARY_DYNAMIC_RUNTIME_ID = "western-ordinary-dynamic-shadow-audio-py311
 const ORDINARY_DYNAMIC_MODEL_SHA256 = "c6595f299ff83c52e89555789f7e3e829a6a0f25b6a88f7e99073af5a2470dc4";
 const ORDINARY_DYNAMIC_ACCEPTANCE_RECORDINGS = ["r3-02", "r3-03"];
 const ORDINARY_DYNAMIC_ACCEPTANCE_LIVE_VERIFIER_IMPLEMENTED = true;
+const ORDINARY_REVIEW_ASSIST_CONTRACT = "western-round4-policy-c-review-assist-v1";
 const M3PLUS_RESCOPE_SCHEMA_VERSION = 2;
 const M3PLUS_RESCOPE_CONTRACT = "m3plus-rescope-four-zone-v2";
 const M3PLUS_RUNTIME_CONTRACT = "m3plus-gold-free-runtime-v1";
@@ -2614,11 +2615,76 @@ async function buildM3PlusStatus() {
   };
 }
 
+async function auditOrdinaryReviewAssistRuntime() {
+  const batchRunsPath = "data/experiments/western-strings-m3/controlled-submission-batch-runs.jsonl";
+  const batchRead = await readWorkspaceArtifact(batchRunsPath);
+  const blockingReasons = [];
+  let latestRun = null;
+  if (batchRead.status === "ok") {
+    const lines = batchRead.bytes.toString("utf8").replace(/^\uFEFF/, "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    try {
+      latestRun = lines.length ? JSON.parse(lines.at(-1)) : null;
+    } catch {
+      blockingReasons.push("ordinary-review-assist-latest-batch-invalid-json");
+    }
+  } else {
+    blockingReasons.push(`ordinary-review-assist-batch-runs-${batchRead.status}`);
+  }
+  if (!latestRun) blockingReasons.push("ordinary-review-assist-latest-batch-missing");
+
+  const audit = latestRun
+    ? auditControlledBatchRuns([latestRun], {
+        requireFeatureReview: true,
+        requireM3PlusRuntime: true,
+        sourceRoot: process.cwd(),
+        latestOnly: true,
+      })
+    : null;
+  if (audit?.ok !== true) {
+    blockingReasons.push(...(audit?.failures || []).map(
+      (failure) => `ordinary-review-assist-latest-batch-audit:${failure.code || "unknown"}`,
+    ));
+  }
+  const latestItem = (Array.isArray(latestRun?.items) ? latestRun.items : [])
+    .filter((item) => item?.kind !== "photo-score" && item?.analysisStatus === "offline_feature_review_ready")
+    .at(-1) || null;
+  const reviewAssist = latestItem?.candidateGate?.reviewAssist || null;
+  if (!latestItem) blockingReasons.push("ordinary-review-assist-feature-review-item-missing");
+  if (reviewAssist?.contract !== ORDINARY_REVIEW_ASSIST_CONTRACT) {
+    blockingReasons.push("ordinary-review-assist-contract-invalid");
+  }
+  if (reviewAssist?.reviewerOnly !== true
+      || reviewAssist?.studentFacing !== false
+      || reviewAssist?.automaticAccusationAuthorized !== false) {
+    blockingReasons.push("ordinary-review-assist-safety-boundary-invalid");
+  }
+  return {
+    contract: ORDINARY_REVIEW_ASSIST_CONTRACT,
+    source: batchRunsPath,
+    ready: blockingReasons.length === 0,
+    reviewerOnly: reviewAssist?.reviewerOnly === true,
+    studentFacing: false,
+    automaticAccusationAuthorized: false,
+    batchRunId: latestRun?.batchRunId || null,
+    candidateRowsPath: latestItem?.candidateRowsPath || null,
+    candidateRowsSha256: latestItem?.candidateRowsSha256 || null,
+    confirmedIssueCandidateCount: reviewAssist?.confirmedIssueCandidateCount ?? null,
+    selfCheckHintCount: reviewAssist?.selfCheckHintCount ?? null,
+    outputCount: reviewAssist?.outputCount ?? null,
+    previewCount: Array.isArray(latestItem?.reviewAssistPreview) ? latestItem.reviewAssistPreview.length : 0,
+    blockingReasons: normalizedReasonList(blockingReasons),
+  };
+}
+
 async function buildOrdinaryDynamicShadowStatus() {
   const runtime = evaluateOrdinaryAudioRuntime();
-  const [acceptance, acceptanceArtifact] = await Promise.all([
+  const [acceptance, acceptanceArtifact, reviewAssistRuntime] = await Promise.all([
     readJson(ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE),
     hashWorkspaceArtifact(ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE),
+    auditOrdinaryReviewAssistRuntime(),
   ]);
   const acceptanceValidation = validateOrdinaryDynamicShadowAcceptance(acceptance);
   // The schema-valid report only stays green while the live-artifact verifier
@@ -2716,6 +2782,7 @@ async function buildOrdinaryDynamicShadowStatus() {
           : []),
       ]),
     },
+    policyCReviewAssistRuntime: reviewAssistRuntime,
     rhythmChannelEvidence: {
       contract: RHYTHM_CHANNEL_DIAGNOSTIC_CONTRACT,
       source: ROUND4_POLICY_C_REPORT.replace(/\\/g, "/"),
@@ -3617,7 +3684,7 @@ export function summarizeNextActions(
     actions.push({
       priority: 1,
       track: "Ordinary diagnosis recall",
-      action: "Use Policy C now only as two-layer review assistance: existing issue_detected rows are confirmed candidates, while assignment gaps are self-check hints. Do not promote the current relative-IOI residual into timing feedback: all 227 observed threshold partitions fail the 90% precision / 50% recall joint floor. The next rhythm candidate must model segment-level onset count and insertion/deletion structure, then pass a new position-labelled fresh-blind gate; direct waveform-energy robustness also remains a separate prerequisite.",
+      action: "Policy C is now wired into the local teacher queue as two-layer review assistance: existing issue_detected rows are confirmed candidates, while assignment gaps are self-check hints; neither reaches the student automatically. Do not promote the current relative-IOI residual into timing feedback: all 227 observed threshold partitions fail the 90% precision / 50% recall joint floor. The next rhythm candidate must model segment-level onset count and insertion/deletion structure, then pass a new position-labelled fresh-blind gate; direct waveform-energy robustness also remains a separate prerequisite.",
       artifact: shadow.policyCReviewAssistEvidence.source,
       reason: normalizedReasonList([
         "policy-c-auto-accusation-closed",

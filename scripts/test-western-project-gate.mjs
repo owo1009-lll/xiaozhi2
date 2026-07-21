@@ -712,6 +712,18 @@ assert.equal(policyC?.nonPlanted?.selfCheckHints, 3);
 assert.equal(policyC?.nonPlanted?.total, 253);
 assert.equal(policyC?.energyRobustnessReady, false, "assignment-gap evidence is not waveform-energy robustness evidence");
 assert.deepEqual(policyC?.blockingReasons, []);
+const policyCRuntime = controlled.ordinaryDynamicShadow?.policyCReviewAssistRuntime;
+assert.equal(policyCRuntime?.contract, "western-round4-policy-c-review-assist-v1");
+assert.equal(policyCRuntime?.ready, true, "Policy C must be present in the latest physical teacher-review batch");
+assert.equal(policyCRuntime?.reviewerOnly, true);
+assert.equal(policyCRuntime?.studentFacing, false);
+assert.equal(policyCRuntime?.automaticAccusationAuthorized, false);
+assert.match(policyCRuntime?.candidateRowsSha256 || "", /^[a-f0-9]{64}$/);
+assert.equal(
+  policyCRuntime?.outputCount,
+  policyCRuntime?.confirmedIssueCandidateCount + policyCRuntime?.selfCheckHintCount,
+);
+assert.deepEqual(policyCRuntime?.blockingReasons, []);
 const rhythmChannel = controlled.ordinaryDynamicShadow?.rhythmChannelEvidence;
 assert.equal(rhythmChannel?.contract, "western-round4-relative-ioi-diagnostic-v1");
 assert.equal(rhythmChannel?.scope, "preGateOnly-diagnostic");

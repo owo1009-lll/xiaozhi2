@@ -53,6 +53,7 @@ const DYNAMIC_GATE_VERSION = "western-ordinary-dynamic-shadow-gate-v1-review-onl
 const DYNAMIC_CONTRACT_VERSION = "western-ordinary-dynamic-shadow-candidate-v1";
 const DYNAMIC_POLICY_VERSION = "western-ordinary-dynamic-shadow-policy-v1";
 const DYNAMIC_TIMING_MODE = "basic-pitch-dtw";
+const REVIEW_ASSIST_CONTRACT = "western-round4-policy-c-review-assist-v1";
 const BASIC_PITCH_MODEL_ARTIFACT_SHA256 = "c6595f299ff83c52e89555789f7e3e829a6a0f25b6a88f7e99073af5a2470dc4";
 const ORDINARY_AUDIO_RUNTIME_ID = "western-ordinary-dynamic-shadow-audio-py311";
 const ORDINARY_AUDIO_RUNTIME_CONFIG_SHA256 = "1f3a47f5cfe2b2d2e427be9a03ab43b4b4aa09a5db0edeed0b55e610a42ac6f9";
@@ -845,6 +846,24 @@ function auditDynamicCandidate(candidate, failures, {
       || decision.causalEnergyStatus !== "excluded-review-only") {
     pushFailure(failures, "feature-review-candidate-dynamic-contract-invalid", detail);
   }
+  const m3plusDecision = safeString(candidate?.m3plusPitchSafetyEvidence?.decision);
+  const strictConfirmedIssue = m3plusDecision === "issue_detected";
+  const selfCheckHint = !strictConfirmedIssue
+    && candidate?.m3plusTimingAssignmentAvailable !== true;
+  const expectedSemantic = strictConfirmedIssue
+    ? "confirmed_issue"
+    : selfCheckHint
+      ? "self_check_hint"
+      : "no_issue_output";
+  const reviewAssist = candidate?.reviewAssistDecision || {};
+  if (reviewAssist.contract !== REVIEW_ASSIST_CONTRACT
+      || reviewAssist.outputSemantic !== expectedSemantic
+      || reviewAssist.reviewerOnly !== true
+      || reviewAssist.requiresHumanReview !== (expectedSemantic !== "no_issue_output")
+      || reviewAssist.automaticAccusationAuthorized !== false
+      || reviewAssist.studentFacing !== false) {
+    pushFailure(failures, "feature-review-candidate-review-assist-invalid", detail);
+  }
 }
 
 export function auditFeatureReviewItem(item = {}, {
@@ -891,6 +910,13 @@ export function auditFeatureReviewItem(item = {}, {
     if (candidateGate.energyVetoIncluded !== false
         || candidateGate.causalEnergyStatus !== "excluded-review-only") {
       pushFailure(failures, "feature-review-dynamic-energy-state-invalid", { runIndex, itemIndex });
+    }
+    const reviewAssist = candidateGate.reviewAssist || {};
+    if (reviewAssist.contract !== REVIEW_ASSIST_CONTRACT
+        || reviewAssist.reviewerOnly !== true
+        || reviewAssist.studentFacing !== false
+        || reviewAssist.automaticAccusationAuthorized !== false) {
+      pushFailure(failures, "feature-review-gate-review-assist-invalid", { runIndex, itemIndex });
     }
     if (candidateGate.cacheProvenanceReady !== true
         || candidateGate.cacheArtifactVerified !== true
@@ -1103,6 +1129,47 @@ export function auditFeatureReviewItem(item = {}, {
             itemIndex,
             candidateIndex,
             source: "artifact",
+          });
+        }
+        const confirmedIssueCandidateCount = rows.filter(
+          (candidate) => candidate?.reviewAssistDecision?.outputSemantic === "confirmed_issue",
+        ).length;
+        const selfCheckHintCount = rows.filter(
+          (candidate) => candidate?.reviewAssistDecision?.outputSemantic === "self_check_hint",
+        ).length;
+        const outputCount = confirmedIssueCandidateCount + selfCheckHintCount;
+        const reviewAssist = candidateGate.reviewAssist || {};
+        if (reviewAssist.confirmedIssueCandidateCount !== confirmedIssueCandidateCount
+            || reviewAssist.selfCheckHintCount !== selfCheckHintCount
+            || reviewAssist.outputCount !== outputCount
+            || summary.reviewAssist?.confirmedIssueCandidateCount !== confirmedIssueCandidateCount
+            || summary.reviewAssist?.selfCheckHintCount !== selfCheckHintCount
+            || summary.reviewAssist?.outputCount !== outputCount) {
+          pushFailure(failures, "feature-review-review-assist-counts-mismatch", {
+            runIndex,
+            itemIndex,
+            candidateRowsPath,
+          });
+        }
+        const expectedPreview = rows
+          .filter((candidate) => candidate?.reviewAssistDecision?.requiresHumanReview === true)
+          .slice(0, 20)
+          .map((candidate) => ({
+            noteId: safeString(candidate.noteId),
+            noteIndex: Number(candidate.noteIndex),
+            measureIndex: Number(candidate.measureIndex),
+            beatStart: Number(candidate.beatStart),
+            midi: candidate.midi == null ? null : Number(candidate.midi),
+            predictedOnsetSeconds: candidate.predictedOnsetSeconds == null
+              ? null
+              : Number(candidate.predictedOnsetSeconds),
+            ...candidate.reviewAssistDecision,
+          }));
+        if (JSON.stringify(item.reviewAssistPreview || []) !== JSON.stringify(expectedPreview)) {
+          pushFailure(failures, "feature-review-review-assist-preview-mismatch", {
+            runIndex,
+            itemIndex,
+            candidateRowsPath,
           });
         }
       } catch (error) {

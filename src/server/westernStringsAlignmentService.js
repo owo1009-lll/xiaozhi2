@@ -30,6 +30,7 @@ const ORDINARY_AUDIO_RUNTIME_ID = "western-ordinary-dynamic-shadow-audio-py311";
 const ORDINARY_AUDIO_RUNTIME_CONFIG_SHA256 = "1f3a47f5cfe2b2d2e427be9a03ab43b4b4aa09a5db0edeed0b55e610a42ac6f9";
 const ORDINARY_AUDIO_RUNTIME_LOCK_SHA256 = "4120a811da1ecb1aa93ceabcbb5aa0b45a37c08e5ee3138d2b793e38f2828d04";
 const ORDINARY_DYNAMIC_SHADOW_CACHE_ROOT = "data/experiments/western-strings-m3/offline-basic-pitch-cache/";
+export const ORDINARY_REVIEW_ASSIST_CONTRACT = "western-round4-policy-c-review-assist-v1";
 const ORDINARY_DYNAMIC_SHADOW_POLICY = Object.freeze({
   deviationLimit: 0.15,
   minEventConfidence: 0.4,
@@ -83,6 +84,46 @@ const M3PLUS_PROTECTED_EXACT_MARKINGS = new Set([
   "turn",
 ]);
 const M3PLUS_GLISSANDO_MARKINGS = new Set(["gliss", "glissando", "portamento", "slide"]);
+
+export function buildWesternOrdinaryReviewAssistDecision(candidate = {}) {
+  const m3plusEvidence = candidate?.m3plusPitchSafetyEvidence || {};
+  const strictConfirmedIssue = safeString(m3plusEvidence.decision) === "issue_detected";
+  const selfCheckHint = !strictConfirmedIssue
+    && candidate?.m3plusTimingAssignmentAvailable !== true;
+  const outputSemantic = strictConfirmedIssue
+    ? "confirmed_issue"
+    : selfCheckHint
+      ? "self_check_hint"
+      : "no_issue_output";
+  return {
+    contract: ORDINARY_REVIEW_ASSIST_CONTRACT,
+    outputSemantic,
+    reviewerOnly: true,
+    requiresHumanReview: outputSemantic !== "no_issue_output",
+    automaticAccusationAuthorized: false,
+    studentFacing: false,
+    reason: strictConfirmedIssue
+      ? "m3plus-issue-detected"
+      : selfCheckHint
+        ? "basic-pitch-dtw-assignment-missing"
+        : "no-review-assist-output",
+  };
+}
+
+function projectReviewAssistCandidate(candidate) {
+  const decision = candidate.reviewAssistDecision || buildWesternOrdinaryReviewAssistDecision(candidate);
+  return {
+    noteId: safeString(candidate.noteId),
+    noteIndex: Number(candidate.noteIndex),
+    measureIndex: Number(candidate.measureIndex),
+    beatStart: Number(candidate.beatStart),
+    midi: candidate.midi == null ? null : Number(candidate.midi),
+    predictedOnsetSeconds: candidate.predictedOnsetSeconds == null
+      ? null
+      : Number(candidate.predictedOnsetSeconds),
+    ...decision,
+  };
+}
 
 export const WESTERN_ALIGNMENT_METHOD_PREFERENCE = [
   "parangonar-basic-pitch",
@@ -1812,7 +1853,7 @@ function latestReviewBySubmissionId(reviews) {
   return latest;
 }
 
-function decorateControlledSubmission(submission, latestReview = null) {
+function decorateControlledSubmission(submission, latestReview = null, latestAnalysis = null) {
   const submissionId = safeString(submission.submissionId).trim();
   const reviewAction = safeString(latestReview?.action).trim();
   const kind = safeString(submission.kind, submission.scorePhotoPath ? "photo-score" : "clean-score");
@@ -1832,6 +1873,17 @@ function decorateControlledSubmission(submission, latestReview = null) {
     status: reviewAction || safeString(submission.status, "review_required"),
     reason: safeString(latestReview?.reason || submission.reason),
     latestReview: latestReview || null,
+    latestAnalysis: latestAnalysis
+      ? {
+        batchRunId: safeString(latestAnalysis.batchRunId),
+        createdAt: safeString(latestAnalysis.createdAt),
+        analysisStatus: safeString(latestAnalysis.item?.analysisStatus),
+        reviewAssist: latestAnalysis.item?.candidateGate?.reviewAssist || null,
+        reviewAssistPreview: Array.isArray(latestAnalysis.item?.reviewAssistPreview)
+          ? latestAnalysis.item.reviewAssistPreview
+          : [],
+      }
+      : null,
     audioUrl: submissionId ? `/api/strings/controlled-submissions/${encodeURIComponent(submissionId)}/audio` : "",
     scorePhotoUrl: kind === "photo-score" && submissionId
       ? `/api/strings/controlled-submissions/${encodeURIComponent(submissionId)}/score-photo`
@@ -1840,11 +1892,32 @@ function decorateControlledSubmission(submission, latestReview = null) {
 }
 
 export async function listWesternControlledSubmissions({ repoRoot = process.cwd(), limit = 50 } = {}) {
-  const submissions = await readJsonlRecords(controlledSubmissionsPath(repoRoot));
-  const reviews = await readJsonlRecords(controlledSubmissionReviewsPath(repoRoot));
+  const [submissions, reviews, batchRuns] = await Promise.all([
+    readJsonlRecords(controlledSubmissionsPath(repoRoot)),
+    readJsonlRecords(controlledSubmissionReviewsPath(repoRoot)),
+    readJsonlRecords(controlledSubmissionBatchRunsPath(repoRoot)),
+  ]);
   const latest = latestReviewBySubmissionId(reviews);
+  const latestAnalysis = new Map();
+  for (const run of batchRuns) {
+    for (const item of run?.items || []) {
+      const submissionId = safeString(item?.submissionId).trim();
+      if (submissionId) latestAnalysis.set(submissionId, {
+        batchRunId: run.batchRunId,
+        createdAt: run.createdAt,
+        item,
+      });
+    }
+  }
   const decorated = submissions
-    .map((submission) => decorateControlledSubmission(submission, latest.get(safeString(submission.submissionId).trim()) || null))
+    .map((submission) => {
+      const submissionId = safeString(submission.submissionId).trim();
+      return decorateControlledSubmission(
+        submission,
+        latest.get(submissionId) || null,
+        latestAnalysis.get(submissionId) || null,
+      );
+    })
     .filter((submission) => submission.submissionId)
     .sort((left, right) => safeString(right.submittedAt).localeCompare(safeString(left.submittedAt)));
   const capped = limit > 0 ? decorated.slice(0, limit) : decorated;
@@ -1859,6 +1932,7 @@ export async function listWesternControlledSubmissions({ repoRoot = process.cwd(
     ok: true,
     source: path.relative(repoRoot, controlledSubmissionsPath(repoRoot)).replace(/\\/g, "/"),
     reviewSource: path.relative(repoRoot, controlledSubmissionReviewsPath(repoRoot)).replace(/\\/g, "/"),
+    batchSource: path.relative(repoRoot, controlledSubmissionBatchRunsPath(repoRoot)).replace(/\\/g, "/"),
     summary,
     submissions: capped,
   };
@@ -2015,6 +2089,7 @@ async function buildControlledBatchItem(repoRoot, submission, gateSnapshot, {
     candidateRowsSha256: safeString(replay.candidateRowsSha256),
     candidateGate: replay.candidateGate || null,
     candidatePreview: Array.isArray(replay.candidatePreview) ? replay.candidatePreview : [],
+    reviewAssistPreview: Array.isArray(replay.reviewAssistPreview) ? replay.reviewAssistPreview : [],
     recordingDiagnosis: replay.recordingDiagnosis || null,
     photoScoreDecision: safeString(replay.photoScoreDecision),
     photoScoreAuditPath: safeString(replay.photoScoreAuditPath),
@@ -2233,11 +2308,31 @@ async function buildControlledBatchOfflineFeatureAnalysis(repoRoot, submission, 
       scoreVerification,
       runtimeBindings: m3plusRuntimeBindings,
     });
+    const gatedCandidateRows = m3plusRuntime.rows.map((candidate) => ({
+      ...candidate,
+      reviewAssistDecision: buildWesternOrdinaryReviewAssistDecision(candidate),
+    }));
+    const reviewAssistRows = gatedCandidateRows.filter(
+      (candidate) => candidate.reviewAssistDecision.requiresHumanReview === true,
+    );
+    const reviewAssist = {
+      contract: ORDINARY_REVIEW_ASSIST_CONTRACT,
+      reviewerOnly: true,
+      studentFacing: false,
+      automaticAccusationAuthorized: false,
+      confirmedIssueCandidateCount: reviewAssistRows.filter(
+        (candidate) => candidate.reviewAssistDecision.outputSemantic === "confirmed_issue",
+      ).length,
+      selfCheckHintCount: reviewAssistRows.filter(
+        (candidate) => candidate.reviewAssistDecision.outputSemantic === "self_check_hint",
+      ).length,
+      outputCount: reviewAssistRows.length,
+    };
     const candidateGate = {
       ...dynamicShadow.gate,
       m3plusPitchSafetyRuntime: m3plusRuntime.gate,
+      reviewAssist,
     };
-    const gatedCandidateRows = m3plusRuntime.rows;
     const candidateRowsArtifact = await writeControlledSubmissionCandidateRows(repoRoot, {
       batchRunId,
       submissionId: submission.submissionId,
@@ -2276,6 +2371,7 @@ async function buildControlledBatchOfflineFeatureAnalysis(repoRoot, submission, 
         m3plusRuntimeEvidenceReady:
           candidateGate.m3plusPitchSafetyRuntime.runtimeEvidenceReady === true,
         m3plusFeedbackAuthorized: false,
+        reviewAssist,
         confidenceModelVersion: safeString(candidateGate.rfTelemetry?.modelVersion),
         confidenceThreshold: candidateGate.rfTelemetry?.threshold ?? null,
       },
@@ -2286,6 +2382,7 @@ async function buildControlledBatchOfflineFeatureAnalysis(repoRoot, submission, 
       analysisAudioSha256: expectedAudioSha256,
       candidateGate,
       candidatePreview: gatedCandidateRows.slice(0, 5),
+      reviewAssistPreview: reviewAssistRows.slice(0, 20).map(projectReviewAssistCandidate),
       recordingDiagnosis: {
         mode: "offline_feature_dynamic_shadow_review_only",
         scoreId,
@@ -2294,6 +2391,7 @@ async function buildControlledBatchOfflineFeatureAnalysis(repoRoot, submission, 
         autoDiagnosisIssued: false,
         autoPassCandidateCount: 0,
         shadowSelectedCandidateCount: candidateGate.shadowSelectedCandidateCount,
+        reviewAssistOutputCount: reviewAssist.outputCount,
         basicPitchCacheProvenance: candidateGate.basicPitchCacheProvenance,
       },
     };
