@@ -699,6 +699,33 @@ if (shadowAuthorizationReady) {
 // and must never be derived from it.
 assert.equal(controlled.ordinaryDynamicShadow?.studentGateReady, false, "authorization must never imply the student gate");
 assert.equal(controlled.ordinaryDynamicShadow?.automaticAdoptionReady, false, "authorization must never imply automatic adoption");
+const policyC = controlled.ordinaryDynamicShadow?.policyCReviewAssistEvidence;
+assert.equal(policyC?.contract, "western-round4-policy-c-review-assist-v1");
+assert.equal(policyC?.scope, "implementation-evidence-preGateOnly");
+assert.equal(policyC?.ready, true, "Policy C round-4 evidence must pass its live re-audit");
+assert.equal(policyC?.reviewAssistGateReady, true);
+assert.equal(policyC?.autoAccusationReady, false, "Policy C must never be promoted into automatic accusation");
+assert.equal(policyC?.planted?.detected, 6);
+assert.equal(policyC?.planted?.total, 12);
+assert.equal(policyC?.nonPlanted?.strictFalseAccusations, 0);
+assert.equal(policyC?.nonPlanted?.selfCheckHints, 3);
+assert.equal(policyC?.nonPlanted?.total, 253);
+assert.equal(policyC?.energyRobustnessReady, false, "assignment-gap evidence is not waveform-energy robustness evidence");
+assert.deepEqual(policyC?.blockingReasons, []);
+const rhythmChannel = controlled.ordinaryDynamicShadow?.rhythmChannelEvidence;
+assert.equal(rhythmChannel?.contract, "western-round4-relative-ioi-diagnostic-v1");
+assert.equal(rhythmChannel?.scope, "preGateOnly-diagnostic");
+assert.equal(rhythmChannel?.featureAvailablePositions, 246);
+assert.equal(rhythmChannel?.totalPositions, 265);
+assert.equal(rhythmChannel?.rhythmTargetTotal, 6);
+assert.equal(rhythmChannel?.frozenOperatingPoint?.truePositive, 5);
+assert.equal(rhythmChannel?.frozenOperatingPoint?.falsePositive, 37);
+assert.equal(rhythmChannel?.bestAtRecallFloor?.precision, 0.166667);
+assert.equal(rhythmChannel?.bestAtRecallFloor?.recall, 0.666667);
+assert.equal(rhythmChannel?.jointFloorReady, false);
+assert.equal(rhythmChannel?.reviewAssistReady, false);
+assert.equal(rhythmChannel?.autoAccusationReady, false);
+assert(rhythmChannel?.blockingReasons?.includes("no-simple-relative-ioi-threshold-meets-joint-floor"));
 assert.equal(status.freshBlindIntake?.readyForMachinePrecheck, false, "the historical first-measure intake must not remain actionable");
 assert.equal(status.freshBlindIntake?.historicalReadyForMachinePrecheck, true, "the old intake result may remain visible only as history");
 assert.equal(status.freshBlindIntake?.eligibleAsCurrentReleaseEvidence, false);
@@ -1478,6 +1505,12 @@ assert.equal(
 const fullGate = evaluateProjectGate(status, new Set(["ordinary", "m3plus", "m4"]));
 assert.equal(fullGate.projectReleaseReady, false, "full project gate must block until all required tracks are ready");
 assert(fullGate.failures.some((failure) => failure.track === "M2/M3 ordinary upload candidate gate"), "ordinary track failure should be reported");
+assert(
+  fullGate.failures
+    .find((failure) => failure.track === "M2/M3 ordinary upload candidate gate")
+    ?.reason?.includes("ordinary-dynamic-shadow-student-gate-closed"),
+  "a technically green ordinary track must still name the closed student gate",
+);
 assert.equal(
   fullGate.failures.find((failure) => failure.track === "M2/M3 ordinary upload candidate gate")?.artifact,
   "data/experiments/western-strings-m3/ordinary-dynamic-shadow-r3-acceptance/report.json",

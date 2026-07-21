@@ -26,9 +26,12 @@ export function evaluateProjectGate(status, requiredTracks) {
 
   const ordinaryDynamicShadow = controlled.ordinaryDynamicShadow || {};
   if (requiredTracks.has("ordinary") && ordinaryDynamicShadow.studentGateReady !== true) {
+    const ordinaryReasons = ordinaryDynamicShadow.blockingReasons || [];
     failures.push({
       track: "M2/M3 ordinary upload candidate gate",
-      reason: ordinaryDynamicShadow.blockingReasons || ["ordinary-dynamic-shadow-gate-not-ready"],
+      reason: ordinaryReasons.length
+        ? ordinaryReasons
+        : ["ordinary-dynamic-shadow-student-gate-closed"],
       artifact: ordinaryDynamicShadow.acceptanceEvidence?.source || "",
     });
   }

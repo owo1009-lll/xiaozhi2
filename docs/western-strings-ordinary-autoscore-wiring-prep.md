@@ -42,15 +42,17 @@ threshold): `data/experiments/western-strings-round4/ordinary-fresh-blind/report
 - clean-full tier: 2/2 clean takes above the 0.2 coverage floor
   (r4-01 = 0.906, r4-02 = 0.763)
 - technique-safety tier: 3 marked-zone rows, **0 accusations**
-- planted-error localization reference (new, preGateOnly — position ground
-  truth in `data/private/western-strings-round4/error-positions.json`):
-  - overall detection recall **8/12 (66.7%)**
-  - **wrong-pitch 3/3, missing 3/3** — pitch/presence errors localize perfectly
-  - extra 1/3, drag 1/3 — count/timing errors only partially caught (loose
-    duration-ratio heuristic; the pipeline has no reliable timing channel yet)
-  - false-positive rate on clean notes of the same takes **11/73 (15.1%)**,
-    driven by the duration heuristic and occasional `insufficient_evidence`,
-    **not** by `issue_detected` firing on clean notes
+- Policy C two-layer review-assist gate (preGateOnly, position truth in
+  `data/private/western-strings-round4/error-positions.json`):
+  - strict confirmed issues: **2/12**, with **0/253** false accusations
+  - assignment-gap self-check hints add **4/12**, with **3/253** non-planted hints
+  - combined review-assist recall **6/12 (50%)**; wrong 3/3, missing 3/3,
+    extra 0/3, drag 0/3
+  - `reviewAssistGateReady=true`, while `autoAccusationReady=false` and
+    `energyRobustnessReady=false`
+
+The self-check layer is an event-assignment-gap proxy, not a measured waveform
+energy rule. It may ask for a self-check but may not accuse the learner.
 
 Scope guard: this report is `implementation-evidence-preGateOnly`. It sets
 `authorizationReady: false` and does **not** by itself grant the separate
@@ -58,17 +60,21 @@ Scope guard: this report is `implementation-evidence-preGateOnly`. It sets
 
 ## 3. Blockers still standing in front of a flip
 
-1. **M3+ is closed.** `autoFeedback` needs `m3plusAutoFeedbackReady` too, and
-   the M3+ track is nowhere near ready (`m3plus-student-gate-closed`,
-   `m3plus-review-only-runtime-not-wired`). Ordinary alone changes nothing.
-2. **r3 acceptance live-artifact is stale.** `controlledCandidate` still carries
-   `ordinary-dynamic-shadow-r3-live-artifact-audit-failed`
-   (r3-02 / r3-03 score-store artifacts stale). The dynamic-shadow track cannot
-   claim a clean live chain until that is re-frozen.
-3. **Timing errors are not safely detectable.** extra/drag recall is 33% and the
-   15% clean-note false-positive rate means an auto-*accusation* posture on this
-   evidence would both miss real timing mistakes and wrongly flag clean notes.
-   The evidence supports **review-assist**, not full auto-scoring.
+1. **M3+ student release is closed.** The review-only runtime and physical batch
+   binding are current, but independent per-unit intonation gold is incomplete
+   and `m3plusAutoFeedbackReady=false`. Ordinary alone changes nothing.
+2. **Timing errors have no effective channel.** Policy C detects extra/drag at
+   0/6. Relative-IOI is populated on 246/265 positions, but its 0.15 threshold
+   catches 5/6 rhythm targets with 37 false positives; exhaustive threshold
+   search reaches only 16.67% best precision at recall >= 50%. A segment-level
+   onset-count/insertion-deletion model is required before timing claims.
+3. **Automatic accusation is below its floor.** Treating self-check hints as
+   accusations yields only 66.67% precision proxy, below the 90% floor; energy
+   robustness is also unproven.
+
+The r3 acceptance and live-artifact audit were re-frozen green on 2026-07-21.
+The release review, decision and start-preflight machine bindings are current;
+none of those facts opens the structurally separate student gate.
 
 ## 4. Recommended posture (needs no flip, no irreversible action)
 
@@ -78,9 +84,10 @@ notes/measures via `score-diagnosis`, and a teacher confirms before anything
 reaches the student. Round-4 shows this highlighting localizes wrong/missing
 notes reliably, which is exactly the assist a reviewer wants.
 
-A switch flip should only be proposed when: M3+ has its own passing gate, the r3
-live-artifact chain is re-frozen green, and a posture decision (review-assist
-vs. auto-accuse) is signed off. Until then this stays fail-closed by design.
+A switch flip should only be proposed when M3+ has complete independent gold,
+the timing/energy gaps have their own fresh-blind evidence, and an automatic
+output posture is explicitly approved. Until then this stays fail-closed by
+design.
 
 ## 5. If/when the owner approves (the actual change)
 

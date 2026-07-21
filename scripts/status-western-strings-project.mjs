@@ -16,6 +16,8 @@ import { auditOrdinaryDynamicShadowAcceptanceLiveArtifacts } from "./audit-weste
 import {
   FRESH_BLIND_CONTRACT,
   FRESH_BLIND_REPORT_RELATIVE_PATH,
+  POLICY_C_CONTRACT,
+  RHYTHM_CHANNEL_DIAGNOSTIC_CONTRACT,
   auditFreshBlindEvidence,
   auditFreshBlindEvidenceLiveArtifacts,
 } from "./eval-western-ordinary-fresh-blind.mjs";
@@ -77,6 +79,13 @@ const ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE = path.join(
   "experiments",
   "western-strings-m3",
   "ordinary-dynamic-shadow-r3-acceptance",
+  "report.json",
+);
+const ROUND4_POLICY_C_REPORT = path.join(
+  "data",
+  "experiments",
+  "western-strings-round4",
+  "ordinary-fresh-blind",
   "report.json",
 );
 const ORDINARY_DYNAMIC_CONTRACT_VERSION = "western-ordinary-dynamic-shadow-candidate-v1";
@@ -2628,6 +2637,18 @@ async function buildOrdinaryDynamicShadowStatus() {
     ? auditFreshBlindEvidenceLiveArtifacts({})
     : { ready: false, blockingReasons: ["fresh-blind-live-audit-skipped-evidence-not-ready"] };
   const freshBlindEvidenceReady = freshBlindReport.evidenceReady === true && freshBlindLiveAudit.ready === true;
+  // Policy C is a separate round-4, position-labelled review-assist gate. It
+  // must stay visible as preGateOnly evidence and must never inherit the
+  // ordinary release authorization or become a student-facing accusation.
+  const policyCLiveAudit = auditFreshBlindEvidenceLiveArtifacts({
+    reportPath: ROUND4_POLICY_C_REPORT,
+  });
+  const policyC = policyCLiveAudit.recomputed?.policyCReviewAssist || null;
+  const rhythmChannel = policyCLiveAudit.recomputed?.rhythmChannelDiagnostic || null;
+  const policyCReviewAssistReady = policyCLiveAudit.ready === true
+    && policyC?.contract === POLICY_C_CONTRACT
+    && policyC?.reviewAssistGateReady === true
+    && policyC?.autoAccusationReady === false;
   const trackAuthorization = await evaluateTrackAuthorization("ordinary");
   const authorizationReady = trackAuthorization.ready;
   return {
@@ -2667,6 +2688,53 @@ async function buildOrdinaryDynamicShadowStatus() {
       blockingReasons: normalizedReasonList([
         ...(freshBlindReport.blockingReasons || []),
         ...(freshBlindLiveAudit.blockingReasons || []),
+      ]),
+    },
+    policyCReviewAssistEvidence: {
+      contract: POLICY_C_CONTRACT,
+      source: ROUND4_POLICY_C_REPORT.replace(/\\/g, "/"),
+      scope: "implementation-evidence-preGateOnly",
+      ready: policyCReviewAssistReady,
+      reviewAssistGateReady: policyC?.reviewAssistGateReady === true,
+      autoAccusationReady: false,
+      planted: policyC?.planted || null,
+      nonPlanted: policyC?.nonPlanted || null,
+      combinedPrecisionProxy: policyC?.combinedPrecisionProxy ?? null,
+      energyRobustnessReady: policyC?.energyEvidence?.energyRobustnessReady === true,
+      outputSemantics: policyC?.outputSemantics || null,
+      blockingReasons: normalizedReasonList([
+        ...(policyCLiveAudit.blockingReasons || []),
+        ...(!policyC ? ["policy-c-review-assist-evidence-missing"] : []),
+        ...(policyC && policyC.contract !== POLICY_C_CONTRACT
+          ? ["policy-c-review-assist-contract-invalid"]
+          : []),
+        ...(policyC && policyC.reviewAssistGateReady !== true
+          ? ["policy-c-review-assist-gate-not-ready"]
+          : []),
+        ...(policyC?.autoAccusationReady === true
+          ? ["policy-c-auto-accusation-must-remain-closed"]
+          : []),
+      ]),
+    },
+    rhythmChannelEvidence: {
+      contract: RHYTHM_CHANNEL_DIAGNOSTIC_CONTRACT,
+      source: ROUND4_POLICY_C_REPORT.replace(/\\/g, "/"),
+      scope: "preGateOnly-diagnostic",
+      featureAvailablePositions: rhythmChannel?.sample?.featureAvailablePositions ?? 0,
+      totalPositions: rhythmChannel?.sample?.totalPositions ?? 0,
+      rhythmTargetTotal: rhythmChannel?.sample?.rhythmTargetTotal ?? 0,
+      evaluatedThresholdCount: rhythmChannel?.evaluatedThresholdCount ?? 0,
+      frozenOperatingPoint: rhythmChannel?.frozenOperatingPoint || null,
+      bestAtRecallFloor: rhythmChannel?.bestAtRecallFloor || null,
+      jointFloorReady: rhythmChannel?.jointFloorReady === true,
+      reviewAssistReady: false,
+      autoAccusationReady: false,
+      blockingReasons: normalizedReasonList([
+        ...(!rhythmChannel ? ["relative-ioi-diagnostic-evidence-missing"] : []),
+        ...(rhythmChannel?.contract !== RHYTHM_CHANNEL_DIAGNOSTIC_CONTRACT
+          ? ["relative-ioi-diagnostic-contract-invalid"]
+          : []),
+        ...(rhythmChannel?.blockingReasons || []),
       ]),
     },
     authorizationReady,
@@ -3537,6 +3605,27 @@ export function summarizeNextActions(
       action: "The r3 implementation acceptance and fresh-blind evidence both passed, but the dynamic shadow remains review-only by design. This needs the owner's explicit western-ordinary-dynamic-shadow-release-v1 authorization before any monitored pilot or student-facing promotion.",
       artifact: shadow.acceptanceEvidence?.source || ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE.replace(/\\/g, "/"),
       reason: ["ordinary-dynamic-shadow-authorization-closed"],
+    });
+  }
+  if (
+    shadow.policyCReviewAssistEvidence?.ready === true
+    && (
+      shadow.policyCReviewAssistEvidence.autoAccusationReady !== true
+      || shadow.rhythmChannelEvidence?.jointFloorReady !== true
+    )
+  ) {
+    actions.push({
+      priority: 1,
+      track: "Ordinary diagnosis recall",
+      action: "Use Policy C now only as two-layer review assistance: existing issue_detected rows are confirmed candidates, while assignment gaps are self-check hints. Do not promote the current relative-IOI residual into timing feedback: all 227 observed threshold partitions fail the 90% precision / 50% recall joint floor. The next rhythm candidate must model segment-level onset count and insertion/deletion structure, then pass a new position-labelled fresh-blind gate; direct waveform-energy robustness also remains a separate prerequisite.",
+      artifact: shadow.policyCReviewAssistEvidence.source,
+      reason: normalizedReasonList([
+        "policy-c-auto-accusation-closed",
+        ...(shadow.rhythmChannelEvidence?.blockingReasons || ["relative-ioi-diagnostic-not-ready"]),
+        ...(shadow.policyCReviewAssistEvidence.energyRobustnessReady === true
+          ? []
+          : ["policy-c-energy-robustness-not-ready"]),
+      ]),
     });
   }
   if (!m3plus.m3plusModeEvalReady) {
