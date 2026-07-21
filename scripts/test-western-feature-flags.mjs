@@ -22,5 +22,8 @@ assert(stringsRoutes.includes('router.post("/api/strings/analyze"'), "server sho
 assert(stringsRoutes.includes('router.post("/api/strings/review"'), "server should expose the M3-gated western strings review route");
 assert(researchApi.includes("fetchWesternAlignmentPreview"), "teacher backend may load the offline western strings preview");
 assert(researchApi.includes("saveWesternAlignmentPreviewReview"), "teacher backend may save offline western strings preview reviews");
+assert(stringsApp.includes("复核辅助：机器确诊候选"), "teacher queue should expose Policy C confirmed candidates");
+assert(stringsApp.includes("自查提示"), "teacher queue should distinguish Policy C self-check hints");
+assert(stringsApp.includes("仅供教师复核，不会自动发送给学生。"), "teacher queue should state the reviewer-only boundary");
 
 console.log(JSON.stringify({ ok: true, checks: ["western-strings-student-api-gated", "western-strings-ui-default-off"] }));

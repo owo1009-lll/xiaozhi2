@@ -20,6 +20,23 @@ function fileTitle(file) {
   return file.name.replace(/\.(musicxml|xml|mxl|mid|midi)$/i, "");
 }
 
+function ReviewAssistPanel({ reviewAssist, rows = [] }) {
+  if (!reviewAssist?.contract) return null;
+  return (
+    <div className="western-review-assist">
+      <strong>
+        复核辅助：机器确诊候选 {reviewAssist.confirmedIssueCandidateCount || 0} · 自查提示 {reviewAssist.selfCheckHintCount || 0}
+      </strong>
+      <span>仅供教师复核，不会自动发送给学生。</span>
+      {rows.map((row) => (
+        <span key={`${row.noteId}:${row.outputSemantic}`}>
+          第 {row.measureIndex} 小节 · 拍位 {Number(row.beatStart || 0) + 1} · MIDI {row.midi ?? "?"} · {row.outputSemantic === "confirmed_issue" ? "机器确诊候选" : "建议自查"}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function WesternStringsApp({ onBackToStudent }) {
   const musicXmlInputRef = useRef(null);
   const midiInputRef = useRef(null);
@@ -421,11 +438,17 @@ export default function WesternStringsApp({ onBackToStudent }) {
                 {(submissionBatchResult.items || []).length ? (
                   <div className="batch-result-list">
                     {(submissionBatchResult.items || []).slice(0, 5).map((item) => (
-                      <span key={item.submissionId}>
-                        {item.scoreId || item.scorePhotoSubmission?.name || "score"} · {item.analysisStatus} · candidates {item.candidateRowCount || 0} · decisions {item.decisionCount || 0} · auto {item.analysisSummary?.autoPassCount || 0}
-                        {item.photoScoreDecision ? ` · photo ${item.photoScoreDecision}` : ""}
-                        {item.candidateGate?.reason ? ` · gate ${item.candidateGate.reason}` : ""}
-                      </span>
+                      <div key={item.submissionId}>
+                        <span>
+                          {item.scoreId || item.scorePhotoSubmission?.name || "score"} · {item.analysisStatus} · candidates {item.candidateRowCount || 0} · decisions {item.decisionCount || 0} · auto {item.analysisSummary?.autoPassCount || 0}
+                          {item.photoScoreDecision ? ` · photo ${item.photoScoreDecision}` : ""}
+                          {item.candidateGate?.reason ? ` · gate ${item.candidateGate.reason}` : ""}
+                        </span>
+                        <ReviewAssistPanel
+                          reviewAssist={item.candidateGate?.reviewAssist}
+                          rows={item.reviewAssistPreview}
+                        />
+                      </div>
                     ))}
                   </div>
                 ) : null}
@@ -452,6 +475,10 @@ export default function WesternStringsApp({ onBackToStudent }) {
                       </a>
                     ) : null}
                     {submission.audioUrl ? <audio controls src={submission.audioUrl} /> : null}
+                    <ReviewAssistPanel
+                      reviewAssist={submission.latestAnalysis?.reviewAssist}
+                      rows={submission.latestAnalysis?.reviewAssistPreview}
+                    />
                   </div>
                   <button
                     type="button"

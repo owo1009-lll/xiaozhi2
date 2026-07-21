@@ -77,7 +77,7 @@ cloudflared tunnel run string-diag-api
 
 1. 浏览器打开 `https://stringinstrumentdiagnosis.icu` —— 应看到**学生上传页**(填曲名、传录音)。
 2. 传一条测试录音,提示"提交成功,老师复核后反馈"。
-3. 在这台机器打开 `http://localhost:3000/?mode=strings` —— 你的**复核台**,能看到刚才那条提交,可复核、写反馈、Release 放行。
+3. 在这台机器打开 `http://localhost:3000/?mode=strings` —— 你的**复核台**,能看到刚才那条提交以及机器生成的两层复核辅助：`机器确诊候选` 和 `自查提示`。两层都只供教师判断，不会自动发给学生；确认后仍由你写反馈、点 Release 放行。
 4. 回到学生页刷新"我的练习记录",看到放行的反馈。
 
 跑通这一圈,试点就上线了。

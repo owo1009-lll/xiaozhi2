@@ -1,7 +1,7 @@
 # Policy C 复核辅助真闸（2026-07-21 已完成）
 
-状态：已接入 round4 fresh-blind runner、live-artifact re-audit 和
-`western:project-status` 的 `preGateOnly` 证据层。没有修改学生运行时开关。
+状态：已接入 round4 fresh-blind runner、live-artifact re-audit、教师本机复核台和
+`western:project-status`。没有修改学生运行时开关。
 
 ## 冻结语义
 
@@ -52,6 +52,12 @@ Policy C 采用两层输出，不能把两层合并成“自动判错”：
 
 报告绑定 manifest、机器分析、位置真值和 `evidenceDigestSha256`；项目状态每次从磁盘重算并验证内容。当前项目状态节点为
 `tracks.controlledCandidate.ordinaryDynamicShadow.policyCReviewAssistEvidence`。
+
+教师复核运行时使用 `western-round4-policy-c-review-assist-v1` 契约：每个物理批次候选都持久化
+`confirmed_issue` / `self_check_hint` / `no_issue_output`，复核台只展示前两类；页面刷新后从最新批次工件恢复。
+候选工件审计会重算每行语义、汇总数量和预览，任一不一致即失败。该运行时状态见
+`tracks.controlledCandidate.ordinaryDynamicShadow.policyCReviewAssistRuntime`。公网守卫继续禁止访问受控批次和复核接口，
+学生提交响应也不含 `reviewAssist` 字段。
 
 ## 仍未完成
 
