@@ -9,6 +9,8 @@
   "manifestSha256": "31209e297f819218168cb341c69f2bef0e05770d91f042b44a0f167759ddf526",
   "machineAnalysisPath": "data/experiments/western-strings-round4/machine-analysis.json",
   "machineAnalysisSha256": "b4817e2e08cfd92c75dae4f99d91c4dc08ddfeb60887c6136c1698a6fbf77cca",
+  "positionTruthPath": "data/private/western-strings-round4/error-positions.json",
+  "positionTruthSha256": "15a26e30bbabfb4f28c8eb42e9968a12d751649c3ad0bfe4cbf39fcc18fc3e10",
   "recordingCount": 6,
   "tiers": {
     "cleanFull": {
@@ -117,7 +119,7 @@
         "round4-r4-06"
       ],
       "groundTruthPrecision": false,
-      "note": "exact error positions were not recorded; these numbers are informational only and must never be counted toward a precision or zero-dangerous-leak claim",
+      "note": "shadow-coverage numbers here are informational only and must never be counted toward a precision or zero-dangerous-leak claim; see positionLocalization for the preGateOnly planted-error recall reference",
       "rows": [
         {
           "recordingId": "round4-r4-05",
@@ -160,7 +162,199 @@
             "stable_center": 40
           }
         }
-      ]
+      ],
+      "positionLocalization": {
+        "scope": "preGateOnly-localization-reference",
+        "note": "review-only pipeline issues no student accusations; this measures whether the machine evidence diverges at ground-truth planted positions (recall) versus clean notes of the same take (false-positive control). It never authorizes the student runtime and is not a precision claim.",
+        "positionTruthPath": "data/private/western-strings-round4/error-positions.json",
+        "positionTruthSha256": "15a26e30bbabfb4f28c8eb42e9968a12d751649c3ad0bfe4cbf39fcc18fc3e10",
+        "channels": {
+          "durationRatioHigh": 1.6,
+          "durationRatioLow": 0.5
+        },
+        "plantedTotal": 12,
+        "plantedDetected": 8,
+        "overallDetectionRate": 0.6667,
+        "detectionByKind": {
+          "wrong": {
+            "planted": 3,
+            "detected": 3,
+            "rate": 1
+          },
+          "missing": {
+            "planted": 3,
+            "detected": 3,
+            "rate": 1
+          },
+          "extra": {
+            "planted": 3,
+            "detected": 1,
+            "rate": 0.3333
+          },
+          "drag": {
+            "planted": 3,
+            "detected": 1,
+            "rate": 0.3333
+          }
+        },
+        "cleanRowTotal": 73,
+        "cleanFalsePositive": 11,
+        "falsePositiveRate": 0.1507,
+        "perRecording": [
+          {
+            "recordingId": "round4-r4-05",
+            "scoreId": "score-mrukri11-3irrzl",
+            "plantedCount": 6,
+            "detectedCount": 4,
+            "cleanRowCount": 39,
+            "cleanFalsePositiveCount": 5,
+            "errors": [
+              {
+                "kind": "wrong",
+                "measure": 2,
+                "beat": 1,
+                "scorePitch": "D5",
+                "m3plusDecision": "issue_detected",
+                "eventDurationRatio": 0.903614,
+                "detected": true,
+                "pitchOrPresenceIssue": true,
+                "durationIssue": false
+              },
+              {
+                "kind": "wrong",
+                "measure": 9,
+                "beat": 2,
+                "scorePitch": "C5",
+                "m3plusDecision": "issue_detected",
+                "eventDurationRatio": 1.036145,
+                "detected": true,
+                "pitchOrPresenceIssue": true,
+                "durationIssue": false
+              },
+              {
+                "kind": "missing",
+                "measure": 5,
+                "beat": 3,
+                "scorePitch": "C5",
+                "m3plusDecision": "insufficient_evidence",
+                "eventDurationRatio": null,
+                "detected": true,
+                "pitchOrPresenceIssue": true,
+                "durationIssue": false
+              },
+              {
+                "kind": "extra",
+                "measure": 11,
+                "beat": 1,
+                "scorePitch": "C5",
+                "m3plusDecision": "confirmed_center",
+                "eventDurationRatio": 1.073622,
+                "detected": false,
+                "pitchOrPresenceIssue": false,
+                "durationIssue": false
+              },
+              {
+                "kind": "drag",
+                "measure": 7,
+                "beat": 1,
+                "scorePitch": "G4",
+                "m3plusDecision": "confirmed_center",
+                "eventDurationRatio": 1.338016,
+                "detected": false,
+                "pitchOrPresenceIssue": false,
+                "durationIssue": false
+              },
+              {
+                "kind": "drag",
+                "measure": 12,
+                "beat": 3,
+                "scorePitch": "A4",
+                "m3plusDecision": "confirmed_center",
+                "eventDurationRatio": 1.977236,
+                "detected": true,
+                "pitchOrPresenceIssue": false,
+                "durationIssue": true
+              }
+            ]
+          },
+          {
+            "recordingId": "round4-r4-06",
+            "scoreId": "score-mrukria4-u84gv1",
+            "plantedCount": 6,
+            "detectedCount": 4,
+            "cleanRowCount": 34,
+            "cleanFalsePositiveCount": 6,
+            "errors": [
+              {
+                "kind": "wrong",
+                "measure": 8,
+                "beat": 1,
+                "scorePitch": "C5",
+                "m3plusDecision": "insufficient_evidence",
+                "eventDurationRatio": null,
+                "detected": true,
+                "pitchOrPresenceIssue": true,
+                "durationIssue": false
+              },
+              {
+                "kind": "missing",
+                "measure": 4,
+                "beat": 2,
+                "scorePitch": "G4",
+                "m3plusDecision": "insufficient_evidence",
+                "eventDurationRatio": null,
+                "detected": true,
+                "pitchOrPresenceIssue": true,
+                "durationIssue": false
+              },
+              {
+                "kind": "missing",
+                "measure": 10,
+                "beat": 3,
+                "scorePitch": "D5",
+                "m3plusDecision": "insufficient_evidence",
+                "eventDurationRatio": null,
+                "detected": true,
+                "pitchOrPresenceIssue": true,
+                "durationIssue": false
+              },
+              {
+                "kind": "extra",
+                "measure": 3,
+                "beat": 3,
+                "scorePitch": "G4",
+                "m3plusDecision": "confirmed_center",
+                "eventDurationRatio": 2.27297,
+                "detected": true,
+                "pitchOrPresenceIssue": false,
+                "durationIssue": true
+              },
+              {
+                "kind": "extra",
+                "measure": 14,
+                "beat": 1,
+                "scorePitch": "C5",
+                "m3plusDecision": "confirmed_center",
+                "eventDurationRatio": 0.828526,
+                "detected": false,
+                "pitchOrPresenceIssue": false,
+                "durationIssue": false
+              },
+              {
+                "kind": "drag",
+                "measure": 11,
+                "beat": 1,
+                "scorePitch": "C5",
+                "m3plusDecision": "confirmed_center",
+                "eventDurationRatio": 1.475991,
+                "detected": false,
+                "pitchOrPresenceIssue": false,
+                "durationIssue": false
+              }
+            ]
+          }
+        ]
+      }
     }
   },
   "recordings": [
@@ -287,8 +481,136 @@
       }
     }
   ],
+  "policyCReviewAssist": {
+    "contract": "western-round4-policy-c-review-assist-v1",
+    "scope": "fresh-blind-review-assist-only",
+    "policyName": "Policy C",
+    "outputSemantics": {
+      "confirmed_issue": "Only the existing M3+ issue_detected decision may accuse.",
+      "self_check_hint": "A missing Basic Pitch/DTW assignment may ask the learner to self-check, but may not accuse.",
+      "insufficient_evidence": "All other uncertain evidence remains fail-closed."
+    },
+    "energyEvidence": {
+      "kind": "event-assignment-absence-proxy",
+      "waveformEnergyMeasured": false,
+      "energyRobustnessReady": false,
+      "note": "The frozen 6/12 result uses absence of a Basic Pitch/DTW assignment. It is energy-gated event evidence, not a direct waveform-energy measurement."
+    },
+    "thresholds": {
+      "minPlantedPositions": 12,
+      "minNonPlantedPositions": 250,
+      "minCombinedRecall": 0.5,
+      "maxSelfCheckHintFalsePositiveRate": 0.02,
+      "maxStrictFalseAccusations": 0,
+      "minAutoAccusationPrecision": 0.9
+    },
+    "planted": {
+      "total": 12,
+      "detected": 6,
+      "strictConfirmed": 2,
+      "selfCheckHints": 4,
+      "combinedRecall": 0.5,
+      "byKind": {
+        "wrong": {
+          "planted": 3,
+          "strictConfirmed": 2,
+          "selfCheckHints": 1,
+          "detected": 3,
+          "recall": 1
+        },
+        "missing": {
+          "planted": 3,
+          "strictConfirmed": 0,
+          "selfCheckHints": 3,
+          "detected": 3,
+          "recall": 1
+        },
+        "drag": {
+          "planted": 3,
+          "strictConfirmed": 0,
+          "selfCheckHints": 0,
+          "detected": 0,
+          "recall": 0
+        },
+        "extra": {
+          "planted": 3,
+          "strictConfirmed": 0,
+          "selfCheckHints": 0,
+          "detected": 0,
+          "recall": 0
+        }
+      }
+    },
+    "nonPlanted": {
+      "total": 253,
+      "strictFalseAccusations": 0,
+      "selfCheckHints": 3,
+      "selfCheckHintFalsePositiveRate": 0.011858
+    },
+    "combinedPrecisionProxy": 0.666667,
+    "checks": {
+      "plantedSampleReady": true,
+      "nonPlantedSampleReady": true,
+      "combinedRecallReady": true,
+      "selfCheckHintFalsePositiveRateReady": true,
+      "strictSafetyReady": true
+    },
+    "reviewAssistGateReady": true,
+    "autoAccusationPrecisionReady": false,
+    "autoAccusationReady": false,
+    "automaticAdoptionBlockingReasons": [
+      "policy-c-combined-precision-below-floor",
+      "policy-c-waveform-energy-robustness-not-proven",
+      "policy-c-extra-drag-diagnosis-out-of-scope",
+      "policy-c-student-runtime-authorization-closed"
+    ]
+  },
+  "rhythmChannelDiagnostic": {
+    "contract": "western-round4-relative-ioi-diagnostic-v1",
+    "scope": "preGateOnly-diagnostic",
+    "feature": "relativeIoiDeviationRatio",
+    "ruleFamily": "single-threshold-greater-than",
+    "thresholds": {
+      "frozenDeviationThreshold": 0.15,
+      "minPrecision": 0.9,
+      "minRecall": 0.5
+    },
+    "sample": {
+      "totalPositions": 265,
+      "featureAvailablePositions": 246,
+      "rhythmTargetTotal": 6,
+      "nonRhythmTargetTotal": 259,
+      "nonPlantedTotal": 253
+    },
+    "evaluatedThresholdCount": 227,
+    "frozenOperatingPoint": {
+      "threshold": 0.15,
+      "truePositive": 5,
+      "falseNegative": 1,
+      "falsePositive": 37,
+      "nonPlantedFalsePositive": 37,
+      "precision": 0.119048,
+      "recall": 0.833333
+    },
+    "bestAtRecallFloor": {
+      "threshold": 0.305892,
+      "truePositive": 4,
+      "falseNegative": 2,
+      "falsePositive": 20,
+      "nonPlantedFalsePositive": 20,
+      "precision": 0.166667,
+      "recall": 0.666667
+    },
+    "jointFloorReady": false,
+    "reviewAssistReady": false,
+    "autoAccusationReady": false,
+    "blockingReasons": [
+      "no-simple-relative-ioi-threshold-meets-joint-floor"
+    ],
+    "note": "The feature is populated, but its current local-tempo residual is not discriminative enough for drag/extra feedback."
+  },
   "evidenceReady": true,
   "blockingReasons": [],
-  "generatedAt": "2026-07-21T11:37:31.735Z",
-  "evidenceDigestSha256": "08c4b6a3ae730fd855113680b79bb2ec0380c767501543ff728f975d68dd17d3"
+  "generatedAt": "2026-07-21T15:50:09.517Z",
+  "evidenceDigestSha256": "a8e063dcc74eb380af3e95f3e7105c325ca76f2793406fc3e1839ca2319b85e6"
 }

@@ -14,8 +14,12 @@ import {
   CLEAN_COVERAGE_FLOOR,
   FRESH_BLIND_CONTRACT,
   FRESH_BLIND_REPORT_RELATIVE_PATH,
+  POLICY_C_CONTRACT,
+  RHYTHM_CHANNEL_DIAGNOSTIC_CONTRACT,
   auditFreshBlindEvidence,
   auditFreshBlindEvidenceLiveArtifacts,
+  evaluatePolicyCReviewAssist,
+  evaluateRhythmChannelDiagnostic,
 } from "./eval-western-ordinary-fresh-blind.mjs";
 
 function sha256(bytes) {
@@ -45,6 +49,81 @@ for (const row of realReport.tiers.cleanFull.rows) {
 }
 const realLiveAudit = auditFreshBlindEvidenceLiveArtifacts({});
 assert.equal(realLiveAudit.ready, true, `live audit of the real report must pass: ${JSON.stringify(realLiveAudit.blockingReasons)}`);
+
+// ---- Policy C exact frozen semantics ---------------------------------------
+// Lock the approved Round-4 operating point without depending on private
+// audio: 12 planted positions + 253 non-planted positions, two strict M3+
+// issues, four assignment-gap hints, and three non-planted hints.
+const policyRows = Array.from({ length: 265 }, (_, index) => ({
+  measureIndex: index + 1,
+  beatStart: 0,
+  m3plusDecision: "confirmed_center",
+  m3plusTimingAssignmentAvailable: true,
+  relativeIoiDeviationRatio: 0.05,
+}));
+policyRows[0].m3plusDecision = "issue_detected";
+policyRows[1].m3plusDecision = "issue_detected";
+for (const index of [2, 3, 4, 5, 12, 13, 14]) {
+  policyRows[index].m3plusDecision = "insufficient_evidence";
+  policyRows[index].m3plusTimingAssignmentAvailable = false;
+}
+const policyTruthErrors = [
+  ...[0, 1, 2].map((index) => ({ kind: "wrong", measure: index + 1, beat: 1 })),
+  ...[3, 4, 5].map((index) => ({ kind: "missing", measure: index + 1, beat: 1 })),
+  ...[6, 7, 8].map((index) => ({ kind: "extra", measure: index + 1, beat: 1 })),
+  ...[9, 10, 11].map((index) => ({ kind: "drag", measure: index + 1, beat: 1 })),
+];
+const policyC = evaluatePolicyCReviewAssist({
+  recordings: [{ recordingId: "round4-fixture", positionRows: policyRows }],
+  positionTruth: { recordings: { "round4-fixture": { errors: policyTruthErrors } } },
+});
+assert.equal(policyC.contract, POLICY_C_CONTRACT);
+assert.equal(policyC.planted.detected, 6);
+assert.equal(policyC.planted.total, 12);
+assert.equal(policyC.planted.strictConfirmed, 2);
+assert.equal(policyC.planted.selfCheckHints, 4);
+assert.equal(policyC.nonPlanted.total, 253);
+assert.equal(policyC.nonPlanted.strictFalseAccusations, 0);
+assert.equal(policyC.nonPlanted.selfCheckHints, 3);
+assert.equal(policyC.reviewAssistGateReady, true);
+assert.equal(policyC.autoAccusationPrecisionReady, false);
+assert.equal(policyC.autoAccusationReady, false);
+assert.equal(policyC.energyEvidence.waveformEnergyMeasured, false);
+assert.equal(policyC.energyEvidence.energyRobustnessReady, false);
+assert.equal(policyC.outputSemantics.self_check_hint.includes("may not accuse"), true);
+
+const noisyPolicyRows = structuredClone(policyRows);
+for (const index of [15, 16, 17]) {
+  noisyPolicyRows[index].m3plusDecision = "insufficient_evidence";
+  noisyPolicyRows[index].m3plusTimingAssignmentAvailable = false;
+}
+const noisyPolicyC = evaluatePolicyCReviewAssist({
+  recordings: [{ recordingId: "round4-fixture", positionRows: noisyPolicyRows }],
+  positionTruth: { recordings: { "round4-fixture": { errors: policyTruthErrors } } },
+});
+assert.equal(noisyPolicyC.reviewAssistGateReady, false, "Policy C must fail when hint false positives exceed 2%");
+
+// The relative-IOI field is populated but a simple threshold cannot meet the
+// joint precision/recall floor: five of six rhythm targets and 37 negatives
+// cross the frozen 0.15 point.
+for (const index of [6, 7, 8, 9, 10, ...Array.from({ length: 37 }, (_, offset) => offset + 12)]) {
+  policyRows[index].relativeIoiDeviationRatio = 0.2;
+}
+policyRows[11].relativeIoiDeviationRatio = 0.1;
+const rhythmDiagnostic = evaluateRhythmChannelDiagnostic({
+  recordings: [{ recordingId: "round4-fixture", positionRows: policyRows }],
+  positionTruth: { recordings: { "round4-fixture": { errors: policyTruthErrors } } },
+});
+assert.equal(rhythmDiagnostic.contract, RHYTHM_CHANNEL_DIAGNOSTIC_CONTRACT);
+assert.equal(rhythmDiagnostic.sample.totalPositions, 265);
+assert.equal(rhythmDiagnostic.sample.featureAvailablePositions, 265);
+assert.equal(rhythmDiagnostic.sample.rhythmTargetTotal, 6);
+assert.equal(rhythmDiagnostic.frozenOperatingPoint.truePositive, 5);
+assert.equal(rhythmDiagnostic.frozenOperatingPoint.falsePositive, 37);
+assert.equal(rhythmDiagnostic.jointFloorReady, false);
+assert.equal(rhythmDiagnostic.reviewAssistReady, false);
+assert.equal(rhythmDiagnostic.autoAccusationReady, false);
+assert(rhythmDiagnostic.blockingReasons.includes("no-simple-relative-ioi-threshold-meets-joint-floor"));
 
 // ---- synthetic fixture ------------------------------------------------------
 function writeCandidateArtifact(root, relPath, { rows, gateOverrides = {} }) {
