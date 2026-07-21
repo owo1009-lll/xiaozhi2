@@ -92,6 +92,7 @@ def main() -> int:
         "positionCount": 5,
         "refined": {1, 2, 4},
         "rhythmRefined": {4},
+        "rhythmStrict": {4},
         "knownPositive": {1, 3, 4},
         "positiveByGate": {
             "merged_substitution": {1},
@@ -116,6 +117,13 @@ def main() -> int:
     assert rhythm_metrics["truePositive"] == 1
     assert rhythm_metrics["falsePositive"] == 0
     assert rhythm_metrics["precision"] == 1.0
+    rhythm_strict_metrics = MODULE.frozen_refinement_metrics(
+        synthetic_refinement_rows,
+        MODULE.RHYTHM_REFINEMENT_TARGET_GATES,
+        "rhythmStrict",
+    )
+    assert rhythm_strict_metrics["truePositive"] == 1
+    assert rhythm_strict_metrics["falsePositive"] == 0
 
     with tempfile.TemporaryDirectory() as temp:
         root = Path(temp)
@@ -142,6 +150,14 @@ def main() -> int:
         assert rhythm_runner["evaluationPerformed"] is False
         assert rhythm_runner["reviewAssistPromotionReady"] is False
         assert rhythm_runner["automaticAccusationReady"] is False
+        strict_runner = rhythm_runner["strictIssueCandidate"]
+        assert strict_runner["contract"] == "western-round5-frozen-rhythm-strict-issue-candidate-v1"
+        assert strict_runner["runnerWired"] is True
+        assert strict_runner["evaluationPerformed"] is False
+        assert strict_runner["outputSemantic"] == "issue_detected_candidate"
+        assert strict_runner["automaticAccusationEvidenceReady"] is False
+        assert strict_runner["automaticAccusationReady"] is False
+        assert strict_runner["promotionEvidenceEligible"] is False
         assert "round5-targeted-intake-not-ready" in result["blockingReasons"]
         assert not model.exists()
     print("western Round-5 segment edit-path tests passed")

@@ -50,10 +50,20 @@ def main() -> int:
             {"relativeIoiDeviationRatio": 0.10, "eventDurationRatio": 1.30, "eventConfidence": 0.80},
             {"relativeIoiDeviationRatio": 0.20, "eventDurationRatio": 1.10, "eventConfidence": 0.80},
             {"relativeIoiDeviationRatio": 0.20, "eventDurationRatio": 1.30, "eventConfidence": 0.70},
+            {"relativeIoiDeviationRatio": 0.20, "eventDurationRatio": 1.25, "eventConfidence": 0.80},
         ]},
-        {"merged_substitution": {0, 1, 2, 3}, "missing": set(), "extra": set(), "drag": set()},
+        {"merged_substitution": {0, 1, 2, 3, 4}, "missing": set(), "extra": set(), "drag": set()},
     )
-    assert rhythm == {0}
+    assert rhythm == {0, 4}
+    rhythm_strict = module.rhythm_structural_refinement_indices(
+        {"rows": [
+            {"relativeIoiDeviationRatio": 0.20, "eventDurationRatio": 1.30, "eventConfidence": 0.80},
+            {"relativeIoiDeviationRatio": 0.20, "eventDurationRatio": 1.25, "eventConfidence": 0.80},
+        ]},
+        {"merged_substitution": {0, 1}, "missing": set(), "extra": set(), "drag": set()},
+        module.RHYTHM_STRICT_ISSUE_CANDIDATE,
+    )
+    assert rhythm_strict == {0}
 
     evidence = json.loads(EVIDENCE.read_text(encoding="utf-8"))
     assert evidence["contract"] == "western-round5-temporal-operation-path-smoke-v1"
@@ -129,6 +139,30 @@ def main() -> int:
     assert rhythm_refinement["naturalCleanStress"]["hintRate"] == 0.017544
     assert rhythm_refinement["candidateRetainedForFreshBlind"] is True
     assert "rhythm-structural-fresh-blind-not-run" in rhythm_refinement["promotionBlockingReasons"]
+    strict_candidate = evidence["rhythmStrictIssueCandidate"]
+    assert strict_candidate["outputSemantic"] == "issue_detected_candidate"
+    assert strict_candidate["rule"]["eventDurationRatioAtLeast"] == 1.3
+    assert strict_candidate["strictConfirmedRecallChanged"] is False
+    assert strict_candidate["automaticAccusationEvidenceReady"] is False
+    assert strict_candidate["automaticAccusationReady"] is False
+    assert strict_candidate["promotionEvidenceEligible"] is False
+    assert strict_candidate["calibration"]["truePositive"] == 18
+    assert strict_candidate["calibration"]["falsePositive"] == 0
+    assert strict_candidate["syntheticHoldout"]["truePositive"] == 14
+    assert strict_candidate["syntheticHoldout"]["falsePositive"] == 0
+    assert strict_candidate["syntheticHoldout"]["recall"] == 0.518519
+    assert strict_candidate["round4InspectedReal"]["truePositive"] == 4
+    assert strict_candidate["round4InspectedReal"]["falsePositive"] == 0
+    assert strict_candidate["naturalCleanStress"]["falsePositive"] == 0
+    assert strict_candidate["publicProfessionalStress"]["candidateCount"] == 13
+    assert strict_candidate["publicProfessionalStress"]["falsePositiveCountAuthoritative"] is False
+    assert strict_candidate["round4RecallLayers"]["strictPlusRhythmCandidate"]["truePositive"] == 6
+    assert strict_candidate["round4RecallLayers"]["strictPlusRhythmCandidate"]["falsePositive"] == 0
+    assert strict_candidate["round4RecallLayers"]["strictPlusRhythmAndGapSelfCheck"]["truePositive"] == 10
+    assert strict_candidate["round4RecallLayers"]["strictPlusRhythmAndGapSelfCheck"]["falsePositive"] == 0
+    assert strict_candidate["candidateRetainedForFreshBlind"] is True
+    assert strict_candidate["generalPurposeCandidateRetained"] is False
+    assert "rhythm-strict-fresh-blind-not-run" in strict_candidate["promotionBlockingReasons"]
 
     print(json.dumps({
         "ok": True,
@@ -139,6 +173,7 @@ def main() -> int:
             "strict-confirmed-recall-unchanged",
             "public-professional-burden-not-mislabeled-as-false-positive",
             "rhythm-structural-refinement-fresh-blind-only",
+            "rhythm-strict-issue-candidate-frozen-for-fresh-blind",
             "student-and-automatic-gates-closed",
         ],
     }))

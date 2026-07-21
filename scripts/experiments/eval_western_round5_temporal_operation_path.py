@@ -166,6 +166,12 @@ RHYTHM_REFINEMENT = {
     "eventConfidenceAtLeast": 0.75,
     "naturalCleanHintRateMax": 0.02,
 }
+RHYTHM_STRICT_ISSUE_CANDIDATE = {
+    "relativeIoiDeviationGreaterThan": RHYTHM_REFINEMENT["relativeIoiDeviationGreaterThan"],
+    "eventDurationRatioAtLeast": FROZEN_PARAMS_BY_GATE["drag"].drag_duration_ratio,
+    "eventConfidenceAtLeast": RHYTHM_REFINEMENT["eventConfidenceAtLeast"],
+    "knownNegativeFalseAccusationsMax": 0,
+}
 
 
 def duration_cost(observed: float, expected: float) -> float:
@@ -394,6 +400,11 @@ def prepared_round4() -> list[dict[str, Any]]:
             int(row["noteIndex"])
             for row in candidate_artifact["candidateRows"]
             if row.get("m3plusTimingAssignmentAvailable") is False
+        }
+        item["strictIssueIndices"] = {
+            int(row["noteIndex"])
+            for row in candidate_artifact["candidateRows"]
+            if row.get("m3plusPitchSafetyEvidence", {}).get("decision") == "issue_detected"
         }
         positions = score_positions(score_path)
         item["truth"] = {gate: set() for gate in GATES}
@@ -691,7 +702,9 @@ def policy_c_gap_refinement_indices(
 def rhythm_structural_refinement_indices(
     take: dict[str, Any],
     predictions: dict[str, set[int]],
+    rule: dict[str, float] | None = None,
 ) -> set[int]:
+    selected_rule = rule or RHYTHM_REFINEMENT
     operation_positions = set().union(*predictions.values())
     return {
         index
@@ -699,19 +712,20 @@ def rhythm_structural_refinement_indices(
         if index in operation_positions
         and row.get("relativeIoiDeviationRatio") is not None
         and float(row["relativeIoiDeviationRatio"])
-            > RHYTHM_REFINEMENT["relativeIoiDeviationGreaterThan"]
+            > selected_rule["relativeIoiDeviationGreaterThan"]
         and row.get("eventDurationRatio") is not None
         and float(row["eventDurationRatio"])
-            >= RHYTHM_REFINEMENT["eventDurationRatioAtLeast"]
+            >= selected_rule["eventDurationRatioAtLeast"]
         and row.get("eventConfidence") is not None
         and float(row["eventConfidence"])
-            >= RHYTHM_REFINEMENT["eventConfidenceAtLeast"]
+            >= selected_rule["eventConfidenceAtLeast"]
     }
 
 
 def evaluate_rhythm_structural_refinement(
     dataset: list[dict[str, Any]],
     params_by_gate: dict[str, Params],
+    rule: dict[str, float] | None = None,
 ) -> dict[str, Any]:
     truth_values: list[int] = []
     predicted_values: list[int] = []
@@ -725,7 +739,7 @@ def evaluate_rhythm_structural_refinement(
                 cache[params] = predict_operations(item, params)
             predictions[gate] = cache[params][gate]
         truth = item["truth"]["extra"] | item["truth"]["drag"]
-        refined = rhythm_structural_refinement_indices(item["take"], predictions)
+        refined = rhythm_structural_refinement_indices(item["take"], predictions, rule)
         count = len(item["take"]["notes"])
         local_truth = np.asarray([int(index in truth) for index in range(count)])
         local_predicted = np.asarray([int(index in refined) for index in range(count)])
@@ -749,6 +763,83 @@ def evaluate_rhythm_structural_refinement(
         and metrics["recall"] >= PROMOTION["minRecall"]
     )
     return {**metrics, "recordings": per_recording}
+
+
+def summarize_unadjudicated_rhythm_burden(result: dict[str, Any]) -> dict[str, Any]:
+    position_count = sum(
+        row["truePositive"] + row["falsePositive"]
+        + row["falseNegative"] + row["trueNegative"]
+        for row in result["recordings"]
+    )
+    candidate_count = sum(len(row["selfCheckHints"]) for row in result["recordings"])
+    return {
+        "evidenceRole": "public-professional-unadjudicated-accusation-burden-proxy",
+        "inputContract": "whole-performance score with repeats expanded before alignment",
+        "recordingCount": len(result["recordings"]),
+        "scorePositionCount": position_count,
+        "candidateCount": candidate_count,
+        "candidatesPer1000Positions": round(candidate_count * 1000 / max(1, position_count), 6),
+        "humanErrorGoldAvailable": False,
+        "falsePositiveCountAuthoritative": False,
+        "generalPurposeAutomaticAccusationReady": False,
+        "promotionEvidenceEligible": False,
+        "interpretation": (
+            "Every candidate is observable accusation burden, but cannot be labeled a false "
+            "accusation without note-level human adjudication. This stress cannot authorize "
+            "general-purpose use; only the scoped short-student fresh-blind may promote it."
+        ),
+    }
+
+
+def evaluate_round4_recall_layers(
+    dataset: list[dict[str, Any]],
+    params_by_gate: dict[str, Params],
+) -> dict[str, Any]:
+    layer_values = {
+        "existingStrict": {"truth": [], "predicted": []},
+        "strictPlusRhythmCandidate": {"truth": [], "predicted": []},
+        "strictPlusRhythmAndGapSelfCheck": {"truth": [], "predicted": []},
+    }
+    per_recording = []
+    for item in dataset:
+        cache: dict[Params, dict[str, set[int]]] = {}
+        predictions = {}
+        for gate in GATES:
+            params = params_by_gate[gate]
+            if params not in cache:
+                cache[params] = predict_operations(item, params)
+            predictions[gate] = cache[params][gate]
+        truth = set().union(*item["truth"].values())
+        strict = set(item.get("strictIssueIndices", set()))
+        rhythm = rhythm_structural_refinement_indices(
+            item["take"], predictions, RHYTHM_STRICT_ISSUE_CANDIDATE
+        )
+        _, gap = policy_c_gap_refinement_indices(
+            item["take"], predictions, item.get("policyCGapIndices")
+        )
+        layers = {
+            "existingStrict": strict,
+            "strictPlusRhythmCandidate": strict | rhythm,
+            "strictPlusRhythmAndGapSelfCheck": strict | rhythm | gap,
+        }
+        count = len(item["take"]["notes"])
+        for name, predicted in layers.items():
+            layer_values[name]["truth"].extend(int(index in truth) for index in range(count))
+            layer_values[name]["predicted"].extend(
+                int(index in predicted) for index in range(count)
+            )
+        per_recording.append({
+            "recordingId": item["recordingId"],
+            "existingStrictIndices": sorted(strict),
+            "rhythmStrictCandidateIndices": sorted(rhythm),
+            "gapSelfCheckIndices": sorted(gap),
+        })
+    return {
+        name: binary_metrics(
+            np.asarray(values["truth"]), np.asarray(values["predicted"])
+        )
+        for name, values in layer_values.items()
+    } | {"recordings": per_recording}
 
 
 def calibration_grid() -> list[Params]:
@@ -868,6 +959,25 @@ def main() -> int:
     holdout_rhythm_refinement = evaluate_rhythm_structural_refinement(holdout, selected)
     round4_rhythm_refinement = evaluate_rhythm_structural_refinement(round4, selected)
     natural_clean_rhythm_refinement = evaluate_rhythm_structural_refinement(natural_clean, selected)
+    calibration_rhythm_strict = evaluate_rhythm_structural_refinement(
+        development, selected, RHYTHM_STRICT_ISSUE_CANDIDATE
+    )
+    holdout_rhythm_strict = evaluate_rhythm_structural_refinement(
+        holdout, selected, RHYTHM_STRICT_ISSUE_CANDIDATE
+    )
+    round4_rhythm_strict = evaluate_rhythm_structural_refinement(
+        round4, selected, RHYTHM_STRICT_ISSUE_CANDIDATE
+    )
+    natural_clean_rhythm_strict = evaluate_rhythm_structural_refinement(
+        natural_clean, selected, RHYTHM_STRICT_ISSUE_CANDIDATE
+    )
+    public_professional_rhythm_strict = evaluate_rhythm_structural_refinement(
+        public_professional, selected, RHYTHM_STRICT_ISSUE_CANDIDATE
+    )
+    public_professional_rhythm_strict_burden = summarize_unadjudicated_rhythm_burden(
+        public_professional_rhythm_strict
+    )
+    round4_recall_layers = evaluate_round4_recall_layers(round4, selected)
     policy_c = read_json(ROUND4_REPORT)["policyCReviewAssist"]
     strict_true_positive = int(policy_c["planted"]["strictConfirmed"])
     strict_false_positive = int(policy_c["nonPlanted"]["strictFalseAccusations"])
@@ -891,6 +1001,16 @@ def main() -> int:
         and round4_rhythm_refinement["jointReviewFloorReady"]
         and natural_clean_rhythm_refinement["hintRate"]
             <= RHYTHM_REFINEMENT["naturalCleanHintRateMax"]
+    )
+    rhythm_strict_candidate_retained = bool(
+        calibration_rhythm_strict["jointReviewFloorReady"]
+        and calibration_rhythm_strict["falsePositive"] == 0
+        and holdout_rhythm_strict["jointReviewFloorReady"]
+        and holdout_rhythm_strict["falsePositive"] == 0
+        and round4_rhythm_strict["jointReviewFloorReady"]
+        and round4_rhythm_strict["falsePositive"] == 0
+        and natural_clean_rhythm_strict["falsePositive"]
+            <= RHYTHM_STRICT_ISSUE_CANDIDATE["knownNegativeFalseAccusationsMax"]
     )
     report = {
         "schemaVersion": 1,
@@ -977,6 +1097,39 @@ def main() -> int:
                 "evidence had been inspected. Its metrics are diagnostic and cannot promote it."
             ),
         },
+        "rhythmStrictIssueCandidate": {
+            "contract": "western-round5-rhythm-strict-issue-candidate-pre-gate-v1",
+            "evidenceRole": "post-inspection-fresh-blind-automatic-accusation-candidate-only",
+            "rule": RHYTHM_STRICT_ISSUE_CANDIDATE,
+            "positiveClass": ["extra", "drag"],
+            "outputSemantic": "issue_detected_candidate",
+            "strictConfirmedRecallChanged": False,
+            "automaticAccusationEvidenceReady": False,
+            "automaticAccusationReady": False,
+            "studentFacing": False,
+            "promotionEvidenceEligible": False,
+            "calibration": calibration_rhythm_strict,
+            "syntheticHoldout": holdout_rhythm_strict,
+            "round4InspectedReal": round4_rhythm_strict,
+            "naturalCleanStress": natural_clean_rhythm_strict,
+            "publicProfessionalStress": public_professional_rhythm_strict_burden,
+            "round4RecallLayers": round4_recall_layers,
+            "candidateRetainedForFreshBlind": rhythm_strict_candidate_retained,
+            "generalPurposeCandidateRetained": False,
+            "promotionBlockingReasons": [
+                "rhythm-strict-rule-existing-evidence-informed",
+                "rhythm-strict-fresh-blind-not-run",
+                "round5-independent-real-confusion-pairs-missing",
+                "public-professional-candidates-unadjudicated",
+                "student-runtime-authorization-closed",
+            ],
+            "contaminationBoundary": (
+                "The stricter duration ratio reuses the already-frozen operation-path value "
+                "1.30, but the decision to form this conjunction followed inspection of all "
+                "current evidence. The 6/12 strict-candidate and 10/12 three-layer results are "
+                "retrospective ceilings, not changed confirmed recall."
+            ),
+        },
         "architectureCandidateRetained": retained,
         "blockingReasons": [
             *([] if holdout_result["union"]["jointFloorReady"] else ["temporal-operation-path-synthetic-piece-holdout-failed"]),
@@ -1003,6 +1156,14 @@ def main() -> int:
         "round4RhythmStructuralRefinement": round4_rhythm_refinement,
         "naturalCleanRhythmHintRate": natural_clean_rhythm_refinement["hintRate"],
         "rhythmStructuralCandidateRetainedForFreshBlind": rhythm_candidate_retained,
+        "round4RhythmStrictIssueCandidate": round4_rhythm_strict,
+        "round4StrictPlusRhythmCandidate": (
+            round4_recall_layers["strictPlusRhythmCandidate"]
+        ),
+        "round4ThreeLayerCombined": (
+            round4_recall_layers["strictPlusRhythmAndGapSelfCheck"]
+        ),
+        "rhythmStrictIssueCandidateRetainedForFreshBlind": rhythm_strict_candidate_retained,
         "gapRefinementCandidateRetainedForFreshBlind": gap_refinement_candidate_retained,
         "architectureCandidateRetained": retained,
         "report": str(OUT.relative_to(REPO)).replace("\\", "/"),
