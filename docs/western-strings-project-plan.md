@@ -1,7 +1,7 @@
 # 弓弦乐器练习诊断平台 — 完整项目开发手册
 
 > 本文是**可交付开发执行**的完整项目计划(10 章)。战略与 M0–M5 闸门详见 [western-strings-migration-plan.md](western-strings-migration-plan.md);本手册在其上补全:资产盘点、M0 SOP+结果、M1–M5 工程拆解、后台/UI/API/schema 变更、数据集许可证、版本定义、论文产出对应、时间线/人力/停止条件。
-> **状态:M1 已完成并通过收口回归;M2 teacher-only preview 已接入;M2e 学生式事件扰动已通过 synthetic gate;M2f 真实学生录音 release gate 已于 2026-07-08 通过;M3 core diagnosis gate 已通过;最小 `/api/strings/analyze` / `/api/strings/review` 服务端闭环、gated preview UI、clean-score + audio 受控提交流、离线复核队列、fail-closed 批处理审计执行器已接入。** 离线/gated preview 已验证的核心类别只有 pitch / onset / missing;当前三项学生运行时开关仍全为 false,不向学生端输出这些诊断。duration 与 extra-note 仍为 review-only:6 套 drag/extra 波形注入集及逐音期望标签已经生成,但尚未被任何正式评测消费,且缺真实学生逐音真值;双音 `19/24` 是独立 double-stop recall,不得混写成 extra-note。普通 clean-score batch 当前无条件进入 Basic Pitch + gap-penalty DTW 的 dynamic-shadow 路径,输出全量候选 artifact 与审计摘要,所有候选仍为 `review_required`。旧 pYIN 线性映射、RF confidence scorer、first-measure release/approval/pilot 只保留为历史 telemetry,不再具有授权力。运行时默认且强制 fail-closed;它仍不是任意上传音频实时学生诊断器。二胡产品线已从默认产品范围移除;仅保留论文证据和西洋弦乐仍依赖的共享模块/数据。
+> **状态:M1 已完成并通过收口回归;M2 teacher-only preview 已接入;M2e 学生式事件扰动已通过 synthetic gate;M2f 真实学生录音 release gate 已于 2026-07-08 通过;M3 core diagnosis gate 已通过;最小 `/api/strings/analyze` / `/api/strings/review` 服务端闭环、gated preview UI、clean-score + audio 受控提交流、离线复核队列、fail-closed 批处理审计执行器已接入。** 离线/gated preview 已验证的核心类别只有 pitch / onset / missing;当前三项学生运行时开关仍全为 false,不向学生端输出这些诊断。duration 与 extra-note 仍为 review-only:冻结合同 `western-duration-extra-quantization-v1` 已正式消费 6 套 v2 注入集（drag 20/24 可见、extra 30/30 可见）及 r3-04/05 少量负责人确认真值（drag 2、extra 3），但“可见”不等于高精度分型，真实样本浓度仍不足，extra 还有 1/3 完全不可见;双音 `19/24` 是独立 double-stop recall,不得混写成 extra-note。普通 clean-score batch 当前无条件进入 Basic Pitch + gap-penalty DTW 的 dynamic-shadow 路径,输出全量候选 artifact 与审计摘要,所有候选仍为 `review_required`。旧 pYIN 线性映射、RF confidence scorer、first-measure release/approval/pilot 只保留为历史 telemetry,不再具有授权力。运行时默认且强制 fail-closed;它仍不是任意上传音频实时学生诊断器。二胡产品线已从默认产品范围移除;仅保留论文证据和西洋弦乐仍依赖的共享模块/数据。
 >
 > **范围变更(2026-07-09):** PDF/图片谱面 **OMR 识别**由原"Out(避免坎1)"上调为**主线路线内里程碑 M4**(详见第 3、6 章)。**判断层不变**(音高/节奏诊断仍是音频侧 M2/M3);OMR 只解决"谱面从哪来",且必须先过**note-level 精度闸门**才被信任,不达标的识别谱一律 fail-closed 退人工核对,**绝不直接进判断**——这是从二胡坎1吸取的纪律。
 >
@@ -129,14 +129,14 @@
 
 ### M3 — 基础教学诊断(core:音准/起音/漏音)
 - **当前 V2 core release 范围:** 音准偏差 / 起音时序 / 漏音 / 音高不稳 / 低置信警告。
-- **当前 review-only:** 时值过短/过长、extra-note。两者原因不同:已生成 6 套波形注入集（`r2-01/r2-08 × 3` 种子）,共含 24 个 drag 时值目标和 30 个 extra 目标以及逐音窗口/期望标签,但尚未被任何正式评测消费,也缺真实学生逐音真值。工具就位不等于 release 证据;双音 `19/24` 是 `r2-07` double-stop recall,不是 extra-note 指标。
+- **当前 review-only:** 时值过短/过长、extra-note。两者原因不同:冻结合同 `western-duration-extra-quantization-v1` 已消费 6 套 v2 波形注入集（`r2-01/r2-08 × 3` 种子）中的 24 个 drag 和 30 个 extra 目标，并纳入 r3-04/05 的负责人确认真值。v2 结果为 drag 20/24 timing 可见、extra 30/30 可见；真实小样本为 drag 2/2 可见、extra 2/3 可见。该结果只证明候选证据可见性，不证明高精度分型或学生发布资格；真实样本浓度仍薄。双音 `19/24` 是 `r2-07` double-stop recall,不是 extra-note 指标。
 - **多音口径澄清:** 多音/extra-note 本身可以由人工复核判断;本轮只是复核时没有发现多音错误样本,所以当前 release gate 没有覆盖它。后续要开放自动多音反馈,应补采或构造经人工确认的 extra-note 样本,而不是把多音视为不可判定类别。
 - **第一版建议阈值(必须由教师样本复验后才能 release):**
   - pitch: `abs(centsError) >= 35c` 进入 pitch issue;20-35c 默认 review hint,不直接给学生硬错。
   - onset: `abs(onsetErrorMs) >= 120ms` 进入 rhythm issue;legato/weak-onset 只给 review reason。
   - missing: 只在 M2 `auto_pass` 或教师确认的对齐范围内判定。
   - extra: 先在现有 30 个注入目标上冻结可重复量化口径并跑正式前置闸;再补经人工确认的真实 extra-note 场景。
-  - duration: 先按本手册执行项 5 定义可重复量化口径并消费现有 24 个 drag 注入目标;随后补真实学生逐音真值。两步完成前保持 review-only。
+  - duration: 可重复量化口径和 24 个 drag 注入目标已完成消费；下一步扩大独立真实学生逐音真值，并在 fresh-blind 上验证分型 precision/recall。过门前保持 review-only。
 - **frontend(学生端):** 高置信音诊断 + 谱面定位;低置信"需复核";reject 段明确提示。
 - **验收:** note-level 反馈落到谱面位置;低置信不反馈;教师复核可用 + 回流。
 
@@ -242,7 +242,7 @@
 
 **④ V2-alpha 产品范围(先不承诺完整教学系统):**
 - **支持:** clean MusicXML/MIDI + **单声部小提琴**音频 → 输出**音准 / 起音 / 漏音 / 低置信提示**。
-- **暂不开放硬反馈:** 时值 / extra-note。6 套注入集已把工具和期望标签准备好,但尚无正式消费报告与真实学生逐音真值;先冻结可重复量化口径并跑合成前置闸,再定向补真实样本。双音 recall 是独立 multi-f0 支线,不得与 extra-note 合并报告。
+- **暂不开放硬反馈:** 时值 / extra-note。6 套注入集已由冻结量化合同正式消费，且有 r3-04/05 的 2 个 drag、3 个 extra 真实逐音位置；但当前产物衡量的是“错误是否对现有 shadow 可见”，不是满足发布门槛的高精度分型器，真实样本也过少。下一步应扩大独立真实样本并做 fresh-blind 分型验收。双音 recall 是独立 multi-f0 支线,不得与 extra-note 合并报告。
 - **不支持:** 技巧自动判定、PDF 识谱、强 rubato / 多声部混音自动反馈、大提琴。
 - **auto_pass precision≥90% 硬门槛;coverage 作结果报告**。coverage <20% 时只能保持 teacher-only preview 或受限内部 alpha,不能命名为 V2-alpha;coverage 达到 20% 后仍以 precision 和 unsafe=0 为 release 硬门槛。
 
