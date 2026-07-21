@@ -172,6 +172,12 @@ RHYTHM_STRICT_ISSUE_CANDIDATE = {
     "eventConfidenceAtLeast": RHYTHM_REFINEMENT["eventConfidenceAtLeast"],
     "knownNegativeFalseAccusationsMax": 0,
 }
+GAP_STRICT_ISSUE_CANDIDATE = {
+    "targetGates": ["missing"],
+    "maxAssignmentGapCount": 5,
+    "maxAssignmentGapRate": 0.10,
+    "knownNegativeFalseAccusationsMax": 0,
+}
 
 
 def duration_cost(observed: float, expected: float) -> float:
@@ -699,6 +705,96 @@ def policy_c_gap_refinement_indices(
     return gaps, refined
 
 
+def gap_strict_issue_candidate_indices(
+    take: dict[str, Any],
+    predictions: dict[str, set[int]],
+    explicit_gaps: set[int] | None = None,
+) -> tuple[set[int], set[int], dict[str, Any]]:
+    gaps, refined = policy_c_gap_refinement_indices(take, predictions, explicit_gaps)
+    position_count = len(take["rows"])
+    gap_rate = len(gaps) / max(1, position_count)
+    scope_ready = (
+        len(gaps) <= GAP_STRICT_ISSUE_CANDIDATE["maxAssignmentGapCount"]
+        and gap_rate <= GAP_STRICT_ISSUE_CANDIDATE["maxAssignmentGapRate"]
+    )
+    return gaps, refined if scope_ready else set(), {
+        "positionCount": position_count,
+        "assignmentGapCount": len(gaps),
+        "assignmentGapRate": round(gap_rate, 6),
+        "scopeReady": scope_ready,
+        "blockingReasons": [] if scope_ready else [
+            "recording-alignment-health-guard-failed"
+        ],
+    }
+
+
+def evaluate_gap_strict_issue_candidate(
+    dataset: list[dict[str, Any]],
+    params_by_gate: dict[str, Params],
+) -> dict[str, Any]:
+    all_truth_values: list[int] = []
+    target_truth_values: list[int] = []
+    candidate_values: list[int] = []
+    per_recording = []
+    target_gates = tuple(GAP_STRICT_ISSUE_CANDIDATE["targetGates"])
+    target_positive = target_detected = 0
+    for item in dataset:
+        cache: dict[Params, dict[str, set[int]]] = {}
+        predictions = {}
+        for gate in GATES:
+            params = params_by_gate[gate]
+            if params not in cache:
+                cache[params] = predict_operations(item, params)
+            predictions[gate] = cache[params][gate]
+        all_truth = set().union(*item["truth"].values())
+        target_truth = set().union(*(item["truth"][gate] for gate in target_gates))
+        _, raw_refined = policy_c_gap_refinement_indices(
+            item["take"], predictions, item.get("policyCGapIndices")
+        )
+        gaps, candidates, health = gap_strict_issue_candidate_indices(
+            item["take"], predictions, item.get("policyCGapIndices")
+        )
+        count = len(item["take"]["notes"])
+        all_truth_values.extend(int(index in all_truth) for index in range(count))
+        target_truth_values.extend(int(index in target_truth) for index in range(count))
+        candidate_values.extend(int(index in candidates) for index in range(count))
+        target_positive += len(target_truth)
+        target_detected += len(candidates & target_truth)
+        per_recording.append({
+            "recordingId": item["recordingId"],
+            "alignmentHealth": health,
+            "rawRefinedCandidates": sorted(raw_refined),
+            "emittedCandidates": sorted(candidates),
+            "targetTruth": sorted(target_truth),
+            "offScopeTrueErrorCandidates": sorted((candidates & all_truth) - target_truth),
+        })
+    all_truth_array = np.asarray(all_truth_values)
+    target_truth_array = np.asarray(target_truth_values)
+    candidate_array = np.asarray(candidate_values)
+    safety = binary_metrics(all_truth_array, candidate_array)
+    target_metrics = binary_metrics(target_truth_array, candidate_array)
+    target_recall = target_detected / max(1, target_positive)
+    strict_false_positive = safety["falsePositive"]
+    precision = safety["precision"]
+    joint_ready = (
+        precision >= PROMOTION["minPrecision"]
+        and target_recall >= PROMOTION["minRecall"]
+        and strict_false_positive <= PROMOTION["maxStrictFalseAccusations"]
+    )
+    return {
+        "safetyAgainstAllKnownErrors": safety,
+        "targetGate": {
+            "gates": list(target_gates),
+            "positive": target_positive,
+            "detected": target_detected,
+            "recall": round(target_recall, 6),
+            "binaryDiagnostic": target_metrics,
+        },
+        "jointAutomaticEvidenceFloorReady": joint_ready,
+        "recordings": per_recording,
+    }
+
+
 def rhythm_structural_refinement_indices(
     take: dict[str, Any],
     predictions: dict[str, set[int]],
@@ -798,6 +894,7 @@ def evaluate_round4_recall_layers(
     layer_values = {
         "existingStrict": {"truth": [], "predicted": []},
         "strictPlusRhythmCandidate": {"truth": [], "predicted": []},
+        "strictPlusRhythmAndGapStrictCandidate": {"truth": [], "predicted": []},
         "strictPlusRhythmAndGapSelfCheck": {"truth": [], "predicted": []},
     }
     per_recording = []
@@ -817,9 +914,13 @@ def evaluate_round4_recall_layers(
         _, gap = policy_c_gap_refinement_indices(
             item["take"], predictions, item.get("policyCGapIndices")
         )
+        _, gap_strict, _ = gap_strict_issue_candidate_indices(
+            item["take"], predictions, item.get("policyCGapIndices")
+        )
         layers = {
             "existingStrict": strict,
             "strictPlusRhythmCandidate": strict | rhythm,
+            "strictPlusRhythmAndGapStrictCandidate": strict | rhythm | gap_strict,
             "strictPlusRhythmAndGapSelfCheck": strict | rhythm | gap,
         }
         count = len(item["take"]["notes"])
@@ -833,6 +934,7 @@ def evaluate_round4_recall_layers(
             "existingStrictIndices": sorted(strict),
             "rhythmStrictCandidateIndices": sorted(rhythm),
             "gapSelfCheckIndices": sorted(gap),
+            "gapStrictCandidateIndices": sorted(gap_strict),
         })
     return {
         name: binary_metrics(
@@ -955,6 +1057,13 @@ def main() -> int:
     public_professional_burden = summarize_unadjudicated_burden(
         public_professional_gap_refinement
     )
+    calibration_gap_strict = evaluate_gap_strict_issue_candidate(development, selected)
+    holdout_gap_strict = evaluate_gap_strict_issue_candidate(holdout, selected)
+    round4_gap_strict = evaluate_gap_strict_issue_candidate(round4, selected)
+    natural_clean_gap_strict = evaluate_gap_strict_issue_candidate(natural_clean, selected)
+    public_professional_gap_strict = evaluate_gap_strict_issue_candidate(
+        public_professional, selected
+    )
     calibration_rhythm_refinement = evaluate_rhythm_structural_refinement(development, selected)
     holdout_rhythm_refinement = evaluate_rhythm_structural_refinement(holdout, selected)
     round4_rhythm_refinement = evaluate_rhythm_structural_refinement(round4, selected)
@@ -993,6 +1102,17 @@ def main() -> int:
         and round4_gap_refinement["refined"]["falsePositive"] == 0
         and natural_clean_gap_refinement["refined"]["falsePositive"] == 0
         and refined_true_positive >= 4
+    )
+    public_gap_strict_emitted = sum(
+        len(row["emittedCandidates"])
+        for row in public_professional_gap_strict["recordings"]
+    )
+    gap_strict_candidate_retained = bool(
+        calibration_gap_strict["jointAutomaticEvidenceFloorReady"]
+        and holdout_gap_strict["jointAutomaticEvidenceFloorReady"]
+        and round4_gap_strict["jointAutomaticEvidenceFloorReady"]
+        and natural_clean_gap_strict["safetyAgainstAllKnownErrors"]["falsePositive"] == 0
+        and public_gap_strict_emitted == 0
     )
     retained = holdout_result["union"]["jointFloorReady"] and round4_result["union"]["jointFloorReady"]
     rhythm_candidate_retained = bool(
@@ -1071,6 +1191,50 @@ def main() -> int:
             "contaminationBoundary": (
                 "The refinement rule was formulated after inspecting Round 4. "
                 "Its 6/12 result is a diagnostic ceiling, not fresh-blind evidence."
+            ),
+        },
+        "gapStrictIssueCandidate": {
+            "contract": "western-round5-gap-strict-issue-candidate-pre-gate-v1",
+            "evidenceRole": "post-inspection-fresh-blind-automatic-accusation-candidate-only",
+            "rule": GAP_STRICT_ISSUE_CANDIDATE,
+            "outputSemantic": "issue_detected_candidate",
+            "strictConfirmedRecallChanged": False,
+            "automaticAccusationEvidenceReady": False,
+            "automaticAccusationReady": False,
+            "studentFacing": False,
+            "promotionEvidenceEligible": False,
+            "calibration": calibration_gap_strict,
+            "syntheticHoldout": holdout_gap_strict,
+            "round4InspectedReal": round4_gap_strict,
+            "naturalCleanStress": natural_clean_gap_strict,
+            "publicProfessionalStress": {
+                **public_professional_gap_strict,
+                "rawRefinedCandidateCount": public_professional_burden["refinedFlagCount"],
+                "emittedCandidateCount": public_gap_strict_emitted,
+                "scopeAcceptedRecordingCount": sum(
+                    row["alignmentHealth"]["scopeReady"]
+                    for row in public_professional_gap_strict["recordings"]
+                ),
+                "scopeRejectedRecordingCount": sum(
+                    not row["alignmentHealth"]["scopeReady"]
+                    for row in public_professional_gap_strict["recordings"]
+                ),
+                "humanErrorGoldAvailable": False,
+                "falsePositiveCountAuthoritative": False,
+                "generalPurposeAutomaticAccusationReady": False,
+            },
+            "candidateRetainedForFreshBlind": gap_strict_candidate_retained,
+            "generalPurposeCandidateRetained": False,
+            "promotionBlockingReasons": [
+                "gap-strict-scope-guard-existing-evidence-informed",
+                "gap-strict-fresh-blind-not-run",
+                "round5-independent-real-confusion-pairs-missing",
+                "student-runtime-authorization-closed",
+            ],
+            "contaminationBoundary": (
+                "The recording-level gap-count/rate health guard was formulated after current "
+                "student and public-professional evidence had been inspected. It may only be "
+                "evaluated unchanged on complete-inventory Round 5 fresh-blind recordings."
             ),
         },
         "rhythmStructuralRefinement": {
@@ -1165,6 +1329,8 @@ def main() -> int:
         ),
         "rhythmStrictIssueCandidateRetainedForFreshBlind": rhythm_strict_candidate_retained,
         "gapRefinementCandidateRetainedForFreshBlind": gap_refinement_candidate_retained,
+        "gapStrictIssueCandidateRetainedForFreshBlind": gap_strict_candidate_retained,
+        "round4GapStrictIssueCandidate": round4_gap_strict,
         "architectureCandidateRetained": retained,
         "report": str(OUT.relative_to(REPO)).replace("\\", "/"),
     }, ensure_ascii=False, indent=2))

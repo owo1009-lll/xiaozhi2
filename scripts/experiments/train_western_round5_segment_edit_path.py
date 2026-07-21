@@ -33,6 +33,7 @@ from eval_western_strings_duration_extra_quantization import analyze_take  # noq
 
 CONTRACT = "western-round5-segment-edit-path-candidate-v1"
 FROZEN_GAP_REFINEMENT_CONTRACT = "western-round5-frozen-gap-refinement-v1"
+FROZEN_GAP_STRICT_CONTRACT = "western-round5-frozen-gap-strict-issue-candidate-v1"
 FROZEN_RHYTHM_REFINEMENT_CONTRACT = "western-round5-frozen-rhythm-structural-refinement-v1"
 FROZEN_RHYTHM_STRICT_CONTRACT = "western-round5-frozen-rhythm-strict-issue-candidate-v1"
 GATES = ("merged_substitution", "missing", "extra", "drag")
@@ -464,6 +465,8 @@ def evaluate_frozen_gap_refinement(
 ) -> dict[str, Any]:
     from eval_western_round5_temporal_operation_path import (  # noqa: PLC0415
         FROZEN_PARAMS_BY_GATE,
+        GAP_STRICT_ISSUE_CANDIDATE,
+        gap_strict_issue_candidate_indices,
         note_durations,
         onset_context,
         policy_c_gap_refinement_indices,
@@ -498,6 +501,9 @@ def evaluate_frozen_gap_refinement(
                 prediction_cache[params] = predict_operations(prepared, params)
             predictions[gate] = prediction_cache[params][gate]
         _, refined = policy_c_gap_refinement_indices(take, predictions)
+        _, gap_strict, gap_strict_health = gap_strict_issue_candidate_indices(
+            take, predictions
+        )
         rhythm_refined = rhythm_structural_refinement_indices(take, predictions)
         rhythm_strict = rhythm_structural_refinement_indices(
             take, predictions, RHYTHM_STRICT_ISSUE_CANDIDATE
@@ -513,6 +519,8 @@ def evaluate_frozen_gap_refinement(
             "recordingId": recording_id,
             "positionCount": len(positions),
             "refined": refined,
+            "gapStrict": gap_strict,
+            "gapStrictHealth": gap_strict_health,
             "rhythmRefined": rhythm_refined,
             "rhythmStrict": rhythm_strict,
             "knownPositive": known_positive,
@@ -528,6 +536,19 @@ def evaluate_frozen_gap_refinement(
             fresh_blind["byTargetGate"][gate]["positive"] > 0
             for gate in GAP_REFINEMENT_TARGET_GATES
         )
+    )
+    gap_strict_calibration = frozen_refinement_metrics(
+        prepared_by_split["calibration"], ("missing",), "gapStrict"
+    )
+    gap_strict_fresh_blind = frozen_refinement_metrics(
+        prepared_by_split["fresh-blind"], ("missing",), "gapStrict"
+    )
+    gap_strict_evidence_ready = (
+        gap_strict_fresh_blind["precision"] >= float(promotion["minPrecision"])
+        and gap_strict_fresh_blind["recall"] >= float(promotion["minRecall"])
+        and gap_strict_fresh_blind["falsePositive"]
+            <= int(promotion["maxStrictFalseAccusations"])
+        and gap_strict_fresh_blind["byTargetGate"]["missing"]["positive"] > 0
     )
     rhythm_calibration = frozen_refinement_metrics(
         prepared_by_split["calibration"], RHYTHM_REFINEMENT_TARGET_GATES, "rhythmRefined"
@@ -580,6 +601,24 @@ def evaluate_frozen_gap_refinement(
         "calibrationDiagnosticOnly": calibration,
         "freshBlind": fresh_blind,
         "reviewAssistPromotionReady": ready,
+        "strictIssueCandidate": {
+            "contract": FROZEN_GAP_STRICT_CONTRACT,
+            "runnerWired": True,
+            "evaluationPerformed": True,
+            "targetGates": ["missing"],
+            "rule": GAP_STRICT_ISSUE_CANDIDATE,
+            "outputSemantic": "issue_detected_candidate",
+            "strictConfirmedRecallChanged": False,
+            "automaticAccusationEvidenceReady": gap_strict_evidence_ready,
+            "automaticAccusationReady": False,
+            "studentFacing": False,
+            "promotionEvidenceEligible": True,
+            "calibrationDiagnosticOnly": gap_strict_calibration,
+            "freshBlind": gap_strict_fresh_blind,
+            "blockingReasons": [] if gap_strict_evidence_ready else [
+                "round5-frozen-gap-strict-issue-candidate-gate-failed"
+            ],
+        },
         "rhythmStructuralRefinement": {
             "contract": FROZEN_RHYTHM_REFINEMENT_CONTRACT,
             "runnerWired": True,
@@ -710,6 +749,19 @@ def run(
             "studentFacing": False,
             "promotionEvidenceEligible": False,
             "reviewAssistPromotionReady": False,
+            "strictIssueCandidate": {
+                "contract": FROZEN_GAP_STRICT_CONTRACT,
+                "runnerWired": True,
+                "evaluationPerformed": False,
+                "targetGates": ["missing"],
+                "outputSemantic": "issue_detected_candidate",
+                "strictConfirmedRecallChanged": False,
+                "automaticAccusationEvidenceReady": False,
+                "automaticAccusationReady": False,
+                "studentFacing": False,
+                "promotionEvidenceEligible": False,
+                "blockingReasons": ["round5-targeted-intake-not-ready"],
+            },
             "rhythmStructuralRefinement": {
                 "contract": FROZEN_RHYTHM_REFINEMENT_CONTRACT,
                 "runnerWired": True,

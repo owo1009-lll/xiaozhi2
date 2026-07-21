@@ -44,6 +44,24 @@ def main() -> int:
     )
     assert gaps == {1, 2, 3}
     assert refined == {1, 2}
+    strict_gaps, strict_candidates, strict_health = module.gap_strict_issue_candidate_indices(
+        {"rows": [
+            {"predictedTime": 0.0},
+            {"predictedTime": None},
+            {"predictedTime": None},
+            *({"predictedTime": 3.0} for _ in range(17)),
+        ]},
+        {"merged_substitution": {1}, "missing": {2}, "extra": set(), "drag": set()},
+    )
+    assert strict_gaps == {1, 2}
+    assert strict_candidates == {1, 2}
+    assert strict_health["scopeReady"] is True
+    _, rejected_candidates, rejected_health = module.gap_strict_issue_candidate_indices(
+        {"rows": [{"predictedTime": None} for _ in range(6)]},
+        {"merged_substitution": set(range(6)), "missing": set(), "extra": set(), "drag": set()},
+    )
+    assert rejected_candidates == set()
+    assert rejected_health["scopeReady"] is False
     rhythm = module.rhythm_structural_refinement_indices(
         {"rows": [
             {"relativeIoiDeviationRatio": 0.20, "eventDurationRatio": 1.30, "eventConfidence": 0.80},
@@ -122,6 +140,32 @@ def main() -> int:
     assert refinement["generalPurposeCandidateRetained"] is False
     assert "gap-refinement-fresh-blind-not-run" in refinement["promotionBlockingReasons"]
     assert "public-professional-negative-burden-not-cleared" in refinement["promotionBlockingReasons"]
+    gap_strict = evidence["gapStrictIssueCandidate"]
+    assert gap_strict["outputSemantic"] == "issue_detected_candidate"
+    assert gap_strict["rule"]["targetGates"] == ["missing"]
+    assert gap_strict["rule"]["maxAssignmentGapCount"] == 5
+    assert gap_strict["rule"]["maxAssignmentGapRate"] == 0.1
+    assert gap_strict["strictConfirmedRecallChanged"] is False
+    assert gap_strict["automaticAccusationEvidenceReady"] is False
+    assert gap_strict["automaticAccusationReady"] is False
+    assert gap_strict["promotionEvidenceEligible"] is False
+    assert gap_strict["calibration"]["safetyAgainstAllKnownErrors"]["truePositive"] == 10
+    assert gap_strict["calibration"]["safetyAgainstAllKnownErrors"]["falsePositive"] == 0
+    assert gap_strict["calibration"]["targetGate"]["recall"] == 0.666667
+    assert gap_strict["syntheticHoldout"]["safetyAgainstAllKnownErrors"]["truePositive"] == 10
+    assert gap_strict["syntheticHoldout"]["safetyAgainstAllKnownErrors"]["falsePositive"] == 0
+    assert gap_strict["syntheticHoldout"]["targetGate"]["recall"] == 0.666667
+    assert gap_strict["round4InspectedReal"]["safetyAgainstAllKnownErrors"]["truePositive"] == 4
+    assert gap_strict["round4InspectedReal"]["safetyAgainstAllKnownErrors"]["falsePositive"] == 0
+    assert gap_strict["round4InspectedReal"]["targetGate"]["detected"] == 3
+    assert gap_strict["round4InspectedReal"]["targetGate"]["recall"] == 1.0
+    assert gap_strict["naturalCleanStress"]["safetyAgainstAllKnownErrors"]["falsePositive"] == 0
+    assert gap_strict["publicProfessionalStress"]["rawRefinedCandidateCount"] == 595
+    assert gap_strict["publicProfessionalStress"]["emittedCandidateCount"] == 0
+    assert gap_strict["publicProfessionalStress"]["scopeRejectedRecordingCount"] == 2
+    assert gap_strict["publicProfessionalStress"]["falsePositiveCountAuthoritative"] is False
+    assert gap_strict["candidateRetainedForFreshBlind"] is True
+    assert gap_strict["generalPurposeCandidateRetained"] is False
     rhythm_refinement = evidence["rhythmStructuralRefinement"]
     assert rhythm_refinement["outputSemantic"] == "self_check_hint"
     assert rhythm_refinement["strictConfirmedRecallChanged"] is False
@@ -158,6 +202,8 @@ def main() -> int:
     assert strict_candidate["publicProfessionalStress"]["falsePositiveCountAuthoritative"] is False
     assert strict_candidate["round4RecallLayers"]["strictPlusRhythmCandidate"]["truePositive"] == 6
     assert strict_candidate["round4RecallLayers"]["strictPlusRhythmCandidate"]["falsePositive"] == 0
+    assert strict_candidate["round4RecallLayers"]["strictPlusRhythmAndGapStrictCandidate"]["truePositive"] == 10
+    assert strict_candidate["round4RecallLayers"]["strictPlusRhythmAndGapStrictCandidate"]["falsePositive"] == 0
     assert strict_candidate["round4RecallLayers"]["strictPlusRhythmAndGapSelfCheck"]["truePositive"] == 10
     assert strict_candidate["round4RecallLayers"]["strictPlusRhythmAndGapSelfCheck"]["falsePositive"] == 0
     assert strict_candidate["candidateRetainedForFreshBlind"] is True
@@ -170,6 +216,7 @@ def main() -> int:
             "source-binding-current",
             "raw-operation-path-rejected",
             "policy-c-gap-refinement-diagnostic-boundary",
+            "gap-strict-issue-candidate-frozen-for-fresh-blind",
             "strict-confirmed-recall-unchanged",
             "public-professional-burden-not-mislabeled-as-false-positive",
             "rhythm-structural-refinement-fresh-blind-only",

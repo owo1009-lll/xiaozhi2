@@ -91,6 +91,7 @@ def main() -> int:
         "recordingId": "synthetic-refinement",
         "positionCount": 5,
         "refined": {1, 2, 4},
+        "gapStrict": {1, 3},
         "rhythmRefined": {4},
         "rhythmStrict": {4},
         "knownPositive": {1, 3, 4},
@@ -109,6 +110,16 @@ def main() -> int:
     assert refinement_metrics["offScopeTrueErrorHints"] == 1
     assert refinement_metrics["precision"] == 0.5
     assert refinement_metrics["recall"] == 0.5
+    gap_strict_metrics = MODULE.frozen_refinement_metrics(
+        synthetic_refinement_rows,
+        ("missing",),
+        "gapStrict",
+    )
+    assert gap_strict_metrics["truePositive"] == 1
+    assert gap_strict_metrics["falsePositive"] == 0
+    assert gap_strict_metrics["offScopeTrueErrorHints"] == 1
+    assert gap_strict_metrics["precision"] == 1.0
+    assert gap_strict_metrics["recall"] == 1.0
     rhythm_metrics = MODULE.frozen_refinement_metrics(
         synthetic_refinement_rows,
         MODULE.RHYTHM_REFINEMENT_TARGET_GATES,
@@ -145,6 +156,14 @@ def main() -> int:
         assert result["frozenGapRefinement"]["evaluationPerformed"] is False
         assert result["frozenGapRefinement"]["reviewAssistPromotionReady"] is False
         assert result["frozenGapRefinement"]["automaticAccusationReady"] is False
+        gap_strict_runner = result["frozenGapRefinement"]["strictIssueCandidate"]
+        assert gap_strict_runner["contract"] == "western-round5-frozen-gap-strict-issue-candidate-v1"
+        assert gap_strict_runner["runnerWired"] is True
+        assert gap_strict_runner["evaluationPerformed"] is False
+        assert gap_strict_runner["outputSemantic"] == "issue_detected_candidate"
+        assert gap_strict_runner["automaticAccusationEvidenceReady"] is False
+        assert gap_strict_runner["automaticAccusationReady"] is False
+        assert gap_strict_runner["promotionEvidenceEligible"] is False
         rhythm_runner = result["frozenGapRefinement"]["rhythmStructuralRefinement"]
         assert rhythm_runner["runnerWired"] is True
         assert rhythm_runner["evaluationPerformed"] is False
