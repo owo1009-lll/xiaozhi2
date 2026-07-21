@@ -80,16 +80,18 @@ def main() -> int:
                 "licenseStatus": "local-only",
             })
         events = []
+        position_index = 0
         for gate in contract["allowedGates"]:
             for label in contract["allowedLabels"]:
                 event = {
                     "gate": gate,
                     "label": label,
-                    "measure": 1,
+                    "measure": position_index + 1,
                     "beat": 1,
-                    "scoreMidi": 69,
+                    "scoreMidi": 60 + position_index,
                     "asPerformed": "test",
                 }
+                position_index += 1
                 if label == "confusion_negative":
                     event["confusionKind"] = "clean-control"
                 events.append(event)
@@ -111,6 +113,17 @@ def main() -> int:
         assert ready["hashes"]["contractSha256"] == MODULE.sha256(contract_path)
         assert ready["hashes"]["manifestSha256"] == MODULE.sha256(manifest_path)
         assert ready["hashes"]["truthSha256"] == MODULE.sha256(truth_path)
+
+        duplicate = dict(events[0])
+        duplicate["gate"] = "drag"
+        truth_payload["recordings"]["r5-test"]["events"].append(duplicate)
+        write_json(truth_path, truth_payload)
+        duplicated = MODULE.validate(contract_path, manifest_path, truth_path)
+        assert duplicated["ready"] is False
+        assert any(
+            reason.startswith("round5-truth-position-duplicate:r5-test:")
+            for reason in duplicated["blockingReasons"]
+        )
     print("western Round-5 targeted intake tests passed")
     return 0
 

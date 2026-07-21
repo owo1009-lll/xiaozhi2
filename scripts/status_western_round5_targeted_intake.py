@@ -145,8 +145,12 @@ def validate(contract_path: Path, manifest_path: Path, truth_path: Path) -> dict
         if not isinstance(events, list):
             blockers.append(f"round5-truth-events-invalid:{recording_id}")
             continue
+        used_positions: set[tuple[int, float, int]] = set()
         for event_index, event in enumerate(events):
             truth_event_count += 1
+            if not isinstance(event, dict):
+                blockers.append(f"round5-truth-event-invalid:{recording_id}:{event_index}")
+                continue
             gate = str(event.get("gate") or "")
             label = str(event.get("label") or "")
             if gate not in allowed_gates:
@@ -158,6 +162,28 @@ def validate(contract_path: Path, manifest_path: Path, truth_path: Path) -> dict
             for field in ("measure", "beat", "scoreMidi", "asPerformed"):
                 if event.get(field) in (None, ""):
                     blockers.append(f"round5-truth-field-missing:{recording_id}:{event_index}:{field}")
+            try:
+                measure = int(event.get("measure"))
+                beat = float(event.get("beat"))
+                score_midi = int(event.get("scoreMidi"))
+                if (
+                    float(event.get("measure")) != measure
+                    or measure < 1
+                    or beat <= 0
+                    or float(event.get("scoreMidi")) != score_midi
+                    or not 0 <= score_midi <= 127
+                ):
+                    raise ValueError
+            except (TypeError, ValueError):
+                blockers.append(f"round5-truth-position-invalid:{recording_id}:{event_index}")
+            else:
+                position = (measure, round(beat, 6), score_midi)
+                if position in used_positions:
+                    blockers.append(
+                        f"round5-truth-position-duplicate:{recording_id}:"
+                        f"{measure}:{beat:g}:{score_midi}"
+                    )
+                used_positions.add(position)
             if label == "confusion_negative" and not event.get("confusionKind"):
                 blockers.append(f"round5-confusion-kind-missing:{recording_id}:{event_index}")
             target = positive if label == "positive" else negative
