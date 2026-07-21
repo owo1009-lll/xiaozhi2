@@ -30,3 +30,20 @@ npm run test:western-segment-onset-candidate
 
 1. 现有集合只做开发和负例压力测试；
 2. 至少取得独立正例，并在全新 position-labelled fresh-blind 包上达到冻结的 precision>=90%、recall>=50%，才允许进入教师复核候选；学生自动指控仍需另行发布授权。
+
+## 进一步归因结果
+
+在通用 onset 失败后，又按同一 r2-01 development / r2-08 holdout 纪律检查了三种轻量 extra-note 候选：
+
+| 候选 | development P/R | holdout P/R | 结论 |
+|---|---:|---:|---|
+| onset 峰 + 同音高事件覆盖 | 50.00% / 53.33% | 21.05% / 26.67% | 无联合过门点 |
+| 未分配同音高事件 edit-path | 14.29% / 6.67% | 40.00% / 26.67% | 插入事件多被一对一对齐吸收，未留在 unassigned 集合 |
+| 窗内内部攻击比 | 24.00% / 80.00% | 36.67% / 73.33% | 召回高但普通弓段内部峰导致大量误报 |
+
+Policy C 的 assignment gap 也补做了直接波形归因：
+
+- RMS 缺失在合成 development/holdout 为 P/R=100%/73.33%、100%/60.00%，但选择阈值约 `-134.83dB`，说明只识别了数字静音；真实 round4 漏音召回 0/3。
+- pYIN 目标音高占用率在合成为 P/R=100%/73.33%、100%/80.00%，round4 为 42.86%/100%：3 个真实漏音和另外 4 个 authoritative assignment gaps 都没有目标音高帧，不能区分漏音、错音、滑音或对齐失败。
+
+因此当前不再追加单阈值或单一手工特征。下一轮数据必须直接覆盖真实混淆对，模型单位改为连续片段上的插入/删除/替代 edit-path。
