@@ -3684,7 +3684,7 @@ export function summarizeNextActions(
     actions.push({
       priority: 1,
       track: "Ordinary diagnosis recall",
-      action: "Policy C is now wired into the local teacher queue as two-layer review assistance: existing issue_detected rows are confirmed candidates, while assignment gaps are self-check hints; neither reaches the student automatically. Do not promote the current relative-IOI residual into timing feedback: all 227 observed threshold partitions fail the 90% precision / 50% recall joint floor. The next rhythm candidate must model segment-level onset count and insertion/deletion structure, then pass a new position-labelled fresh-blind gate; direct waveform-energy robustness also remains a separate prerequisite.",
+      action: "Policy C remains two-layer teacher review assistance; strict confirmed recall is still 2/12. The inspected Round-4 merged-substitution pattern raises only a diagnostic ceiling to 3/12 and lacks independent positive replication. A relative-IOI plus duration conjunction passed synthetic development/holdout but fell to 50% precision on full Round 4, while a 150-configuration generic onset-count sweep had no 90% precision / 50% recall operating point. Do not promote either. The next candidate must use pitch-conditioned re-articulation/insertion-deletion edit-path evidence, then pass independent-positive and new position-labelled fresh-blind gates; waveform-energy robustness remains separate.",
       artifact: shadow.policyCReviewAssistEvidence.source,
       reason: normalizedReasonList([
         "policy-c-auto-accusation-closed",
