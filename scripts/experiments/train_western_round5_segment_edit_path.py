@@ -1,0 +1,393 @@
+#!/usr/bin/env python3
+"""Train/evaluate the Round-5 segment edit-path candidate, fail-closed.
+
+The runner consumes only a validated Round-5 intake.  Calibration rows train
+four fixed binary classifiers; fresh-blind rows are evaluation-only.  It does
+not tune a threshold on fresh-blind data and never grants student-facing or
+automatic-accusation authority.
+"""
+from __future__ import annotations
+
+import argparse
+import csv
+import hashlib
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+import joblib
+import numpy as np
+from music21 import converter
+from sklearn.ensemble import RandomForestClassifier
+
+
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "scripts"))
+sys.path.insert(0, str(REPO / "scripts" / "experiments"))
+
+import status_western_round5_targeted_intake as intake  # noqa: E402
+from eval_western_strings_duration_extra_quantization import analyze_take  # noqa: E402
+
+
+CONTRACT = "western-round5-segment-edit-path-candidate-v1"
+GATES = ("merged_substitution", "missing", "extra", "drag")
+DEFAULT_CONTRACT = REPO / "config/western-strings-round5-targeted-contract.json"
+DEFAULT_MANIFEST = REPO / "data/private/western-strings-round5/manifest.csv"
+DEFAULT_TRUTH = REPO / "data/private/western-strings-round5/position-truth.json"
+DEFAULT_REPORT = REPO / "data/experiments/western-strings-round5-segment-edit-path/report.json"
+DEFAULT_MODEL = REPO / "data/experiments/western-strings-round5-segment-edit-path/model.joblib"
+MODEL_PARAMS = {
+    "n_estimators": 256,
+    "max_depth": 4,
+    "min_samples_leaf": 2,
+    "class_weight": "balanced_subsample",
+    "random_state": 20260722,
+    "n_jobs": 1,
+}
+
+
+def read_json(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def score_positions(score_path: Path) -> list[dict[str, Any]]:
+    stream = converter.parse(str(score_path))
+    positions = []
+    for index, note in enumerate(stream.flatten().notes):
+        midis = sorted(int(pitch.midi) for pitch in note.pitches)
+        positions.append({
+            "noteIndex": index,
+            "measure": int(note.measureNumber or 0),
+            "beat": float(note.beat),
+            "scoreMidi": midis[0],
+        })
+    return positions
+
+
+def truth_note_index(
+    positions: list[dict[str, Any]],
+    event: dict[str, Any],
+) -> int:
+    matches = [
+        row["noteIndex"]
+        for row in positions
+        if row["measure"] == int(event["measure"])
+        and abs(row["beat"] - float(event["beat"])) <= 1e-4
+        and row["scoreMidi"] == int(event["scoreMidi"])
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            "round5-truth-position-not-unique:"
+            f"measure={event.get('measure')}:beat={event.get('beat')}:"
+            f"midi={event.get('scoreMidi')}:matches={len(matches)}"
+        )
+    return matches[0]
+
+
+def estimate_note_windows(take: dict[str, Any]) -> list[tuple[float, float]]:
+    notes = take["notes"]
+    rows = take["rows"]
+    anchors = [
+        (float(note["scoreUnit"]), float(row["predictedTime"]))
+        for note, row in zip(notes, rows)
+        if row.get("predictedTime") is not None
+    ]
+    if len(anchors) < 2:
+        return [(0.0, 0.0) for _ in notes]
+    anchor_score = np.asarray([item[0] for item in anchors])
+    anchor_time = np.asarray([item[1] for item in anchors])
+    score_units = np.asarray([float(note["scoreUnit"]) for note in notes])
+    estimated = np.interp(score_units, anchor_score, anchor_time)
+    positive_gaps = np.diff(estimated)
+    positive_gaps = positive_gaps[positive_gaps > 1e-6]
+    fallback = float(np.median(positive_gaps)) if positive_gaps.size else 0.5
+    windows = []
+    for index, onset in enumerate(estimated):
+        previous = estimated[index - 1] if index else onset - fallback
+        following = estimated[index + 1] if index + 1 < len(estimated) else onset + fallback
+        start = max(0.0, float((previous + onset) / 2.0))
+        end = max(start, float((onset + following) / 2.0))
+        windows.append((start, end))
+    return windows
+
+
+def _number(value: Any, missing: float = 0.0) -> float:
+    return missing if value is None else float(value)
+
+
+def extract_segment_features(
+    take: dict[str, Any],
+    note_index: int,
+) -> dict[str, float]:
+    rows = take["rows"]
+    notes = take["notes"]
+    windows = estimate_note_windows(take)
+    target_midi = int(notes[note_index]["midi"])
+    target_start, target_end = windows[note_index]
+    left = max(0, note_index - 2)
+    right = min(len(rows), note_index + 3)
+    segment_start = windows[left][0]
+    segment_end = windows[right - 1][1]
+    target_events = [
+        event for event in take["events"]
+        if float(event["start"]) < target_end and float(event["end"]) > target_start
+    ]
+    target_unassigned = [
+        event for event in take["unassigned"]
+        if float(event["start"]) < target_end and float(event["end"]) > target_start
+    ]
+    segment_unassigned = [
+        event for event in take["unassigned"]
+        if segment_start <= float(event["start"]) < segment_end
+    ]
+    segment_rows = rows[left:right]
+    available_ioi = [
+        float(row["relativeIoiDeviationRatio"])
+        for row in segment_rows
+        if row.get("relativeIoiDeviationRatio") is not None
+    ]
+    features: dict[str, float] = {
+        "targetWindowEventCount": float(len(target_events)),
+        "targetWindowPitchDiversity": float(len({int(event["midi"]) for event in target_events})),
+        "targetUnassignedCount": float(len(target_unassigned)),
+        "targetUnassignedExactPitchCount": float(sum(
+            int(event["midi"]) == target_midi for event in target_unassigned
+        )),
+        "targetUnassignedNearPitchCount": float(sum(
+            0 < abs(int(event["midi"]) - target_midi) <= 2 for event in target_unassigned
+        )),
+        "segmentUnassignedCount": float(len(segment_unassigned)),
+        "segmentGapCount": float(sum(row.get("predictedTime") is None for row in segment_rows)),
+        "segmentPitchMismatchCount": float(sum(
+            row.get("pitchDistanceSemitones") not in (None, 0) for row in segment_rows
+        )),
+        "segmentMaxIoiDeviation": max(available_ioi, default=0.0),
+        "segmentMeanIoiDeviation": float(np.mean(available_ioi)) if available_ioi else 0.0,
+        "scorePreviousInterval": float(
+            target_midi - int(notes[note_index - 1]["midi"])
+        ) if note_index else 0.0,
+        "scoreNextInterval": float(
+            int(notes[note_index + 1]["midi"]) - target_midi
+        ) if note_index + 1 < len(notes) else 0.0,
+    }
+    for offset in range(-2, 3):
+        key = f"n_m{abs(offset)}" if offset < 0 else f"n_p{offset}" if offset > 0 else "n_0"
+        index = note_index + offset
+        if not 0 <= index < len(rows):
+            features.update({
+                f"{key}OutOfRange": 1.0,
+                f"{key}AssignmentGap": 1.0,
+                f"{key}PitchDistance": 12.0,
+                f"{key}Confidence": 0.0,
+                f"{key}IoiMissing": 1.0,
+                f"{key}IoiDeviation": 0.0,
+                f"{key}DurationMissing": 1.0,
+                f"{key}DurationRatio": 0.0,
+            })
+            continue
+        row = rows[index]
+        features.update({
+            f"{key}OutOfRange": 0.0,
+            f"{key}AssignmentGap": float(row.get("predictedTime") is None),
+            f"{key}PitchDistance": _number(row.get("pitchDistanceSemitones"), 12.0),
+            f"{key}Confidence": _number(row.get("eventConfidence")),
+            f"{key}IoiMissing": float(row.get("relativeIoiDeviationRatio") is None),
+            f"{key}IoiDeviation": _number(row.get("relativeIoiDeviationRatio")),
+            f"{key}DurationMissing": float(row.get("eventDurationRatio") is None),
+            f"{key}DurationRatio": _number(row.get("eventDurationRatio")),
+        })
+    return features
+
+
+def build_dataset(
+    manifest_path: Path,
+    truth_path: Path,
+) -> list[dict[str, Any]]:
+    with manifest_path.open(encoding="utf-8-sig", newline="") as handle:
+        manifest = {row["recordingId"]: row for row in csv.DictReader(handle)}
+    truth = read_json(truth_path)["recordings"]
+    dataset = []
+    for recording_id, truth_recording in truth.items():
+        metadata = manifest[recording_id]
+        score_path = REPO / metadata["scorePath"]
+        audio_path = REPO / metadata["audioPath"]
+        take = analyze_take(score_path, audio_path)
+        positions = score_positions(score_path)
+        if len(positions) != len(take["notes"]):
+            raise ValueError(f"round5-score-position-count-mismatch:{recording_id}")
+        for event in truth_recording["events"]:
+            note_index = truth_note_index(positions, event)
+            dataset.append({
+                "recordingId": recording_id,
+                "pieceId": metadata["pieceId"],
+                "performerId": metadata["performerId"],
+                "deviceId": metadata["deviceId"],
+                "roomId": metadata["roomId"],
+                "split": metadata["split"],
+                "gate": event["gate"],
+                "label": event["label"],
+                "noteIndex": note_index,
+                "features": extract_segment_features(take, note_index),
+            })
+    return dataset
+
+
+def binary_metrics(truth: np.ndarray, predicted: np.ndarray) -> dict[str, Any]:
+    true_positive = int(np.sum((truth == 1) & (predicted == 1)))
+    false_positive = int(np.sum((truth == 0) & (predicted == 1)))
+    false_negative = int(np.sum((truth == 1) & (predicted == 0)))
+    true_negative = int(np.sum((truth == 0) & (predicted == 0)))
+    precision = true_positive / max(1, true_positive + false_positive)
+    recall = true_positive / max(1, true_positive + false_negative)
+    return {
+        "truePositive": true_positive,
+        "falsePositive": false_positive,
+        "falseNegative": false_negative,
+        "trueNegative": true_negative,
+        "precision": round(precision, 6),
+        "recall": round(recall, 6),
+    }
+
+
+def train_and_evaluate(
+    dataset: list[dict[str, Any]],
+    promotion: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, RandomForestClassifier]]:
+    feature_names = sorted({
+        feature
+        for row in dataset
+        for feature in row["features"]
+    })
+    models = {}
+    results = {}
+    for gate in GATES:
+        calibration = [row for row in dataset if row["gate"] == gate and row["split"] == "calibration"]
+        fresh = [row for row in dataset if row["gate"] == gate and row["split"] == "fresh-blind"]
+        y_calibration = np.asarray([int(row["label"] == "positive") for row in calibration])
+        y_fresh = np.asarray([int(row["label"] == "positive") for row in fresh])
+        if len(calibration) == 0 or len(fresh) == 0 or len(set(y_calibration.tolist())) != 2:
+            results[gate] = {
+                "ready": False,
+                "calibrationRows": len(calibration),
+                "freshBlindRows": len(fresh),
+                "blockingReasons": [f"round5-segment-model-class-support-missing:{gate}"],
+            }
+            continue
+        x_calibration = np.asarray([
+            [float(row["features"].get(name, 0.0)) for name in feature_names]
+            for row in calibration
+        ])
+        x_fresh = np.asarray([
+            [float(row["features"].get(name, 0.0)) for name in feature_names]
+            for row in fresh
+        ])
+        model = RandomForestClassifier(**MODEL_PARAMS)
+        model.fit(x_calibration, y_calibration)
+        predicted = (model.predict_proba(x_fresh)[:, 1] >= 0.5).astype(int)
+        metrics = binary_metrics(y_fresh, predicted)
+        ready = (
+            metrics["precision"] >= float(promotion["minPrecision"])
+            and metrics["recall"] >= float(promotion["minRecall"])
+            and metrics["falsePositive"] <= int(promotion["maxStrictFalseAccusations"])
+        )
+        results[gate] = {
+            "ready": ready,
+            "calibrationRows": len(calibration),
+            "freshBlindRows": len(fresh),
+            "decisionThreshold": 0.5,
+            **metrics,
+            "blockingReasons": [] if ready else [f"round5-segment-model-gate-failed:{gate}"],
+        }
+        models[gate] = model
+    return {
+        "featureNames": feature_names,
+        "modelType": "fixed-random-forest-binary-per-gate",
+        "modelParams": MODEL_PARAMS,
+        "gates": results,
+        "allGatesReady": all(results.get(gate, {}).get("ready") is True for gate in GATES),
+    }, models
+
+
+def run(
+    contract_path: Path,
+    manifest_path: Path,
+    truth_path: Path,
+    report_path: Path,
+    model_path: Path,
+) -> dict[str, Any]:
+    intake.REPO = REPO
+    intake_report = intake.validate(contract_path, manifest_path, truth_path)
+    source_hashes = intake_report.get("hashes", {})
+    base = {
+        "schemaVersion": 1,
+        "contract": CONTRACT,
+        "intakeContractVersion": intake_report.get("contractVersion"),
+        "sourceHashes": source_hashes,
+        "intakeReady": intake_report.get("ready") is True,
+        "trainingPerformed": False,
+        "reviewAssistPromotionReady": False,
+        "automaticAccusationReady": False,
+        "studentFacing": False,
+        "productionAdoptionReady": False,
+    }
+    if intake_report.get("ready") is not True:
+        report = {
+            **base,
+            "blockingReasons": [
+                "round5-targeted-intake-not-ready",
+                *intake_report.get("blockingReasons", []),
+            ],
+        }
+    else:
+        contract = read_json(contract_path)
+        dataset = build_dataset(manifest_path, truth_path)
+        evaluation, models = train_and_evaluate(dataset, contract["promotion"])
+        model_path.parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump({
+            "contract": CONTRACT,
+            "featureNames": evaluation["featureNames"],
+            "models": models,
+        }, model_path)
+        all_ready = evaluation["allGatesReady"]
+        report = {
+            **base,
+            "trainingPerformed": True,
+            "datasetRows": len(dataset),
+            "evaluation": evaluation,
+            "modelArtifact": {
+                "path": str(model_path.resolve().relative_to(REPO.resolve())).replace("\\", "/"),
+                "sha256": sha256(model_path),
+            },
+            "reviewAssistPromotionReady": all_ready,
+            "blockingReasons": [] if all_ready else sorted({
+                reason
+                for gate in evaluation["gates"].values()
+                for reason in gate.get("blockingReasons", [])
+            }),
+        }
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return report
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--contract", type=Path, default=DEFAULT_CONTRACT)
+    parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    parser.add_argument("--truth", type=Path, default=DEFAULT_TRUTH)
+    parser.add_argument("--report", type=Path, default=DEFAULT_REPORT)
+    parser.add_argument("--model", type=Path, default=DEFAULT_MODEL)
+    parser.add_argument("--require-trained", action="store_true")
+    args = parser.parse_args()
+    report = run(args.contract, args.manifest, args.truth, args.report, args.model)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return 1 if args.require_trained and not report["trainingPerformed"] else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

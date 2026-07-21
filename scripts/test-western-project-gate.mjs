@@ -732,6 +732,9 @@ assert.equal(
 );
 assert.equal(round5TargetedIntake?.studentFacing, false);
 assert.equal(round5TargetedIntake?.automaticAuthorizationGranted, false);
+assert.equal(round5TargetedIntake?.segmentEditPathCandidate?.studentFacing, false);
+assert.equal(round5TargetedIntake?.segmentEditPathCandidate?.automaticAccusationReady, false);
+assert.equal(round5TargetedIntake?.segmentEditPathCandidate?.productionAdoptionReady, false);
 const rhythmChannel = controlled.ordinaryDynamicShadow?.rhythmChannelEvidence;
 assert.equal(rhythmChannel?.contract, "western-round4-relative-ioi-diagnostic-v1");
 assert.equal(rhythmChannel?.scope, "preGateOnly-diagnostic");

@@ -16,6 +16,7 @@ try {
   const manifestPath = path.join(root, "manifest.csv");
   const truthPath = path.join(root, "truth.json");
   const reportPath = path.join(root, "report.json");
+  const modelReportPath = path.join(root, "model-report.json");
   const contract = {
     contractVersion: "western-round5-targeted-diagnosis-intake-v1",
     minimums: { positivePerGate: 12 },
@@ -34,9 +35,24 @@ try {
     },
     blockingReasons: ["round5-manifest-missing", "round5-position-truth-missing"],
   })}\n`);
+  await fs.writeFile(modelReportPath, `${JSON.stringify({
+    contract: "western-round5-segment-edit-path-candidate-v1",
+    intakeReady: false,
+    trainingPerformed: false,
+    reviewAssistPromotionReady: false,
+    automaticAccusationReady: false,
+    studentFacing: false,
+    productionAdoptionReady: false,
+    sourceHashes: {
+      contractSha256: sha256(contractBytes),
+      manifestSha256: null,
+      truthSha256: null,
+    },
+    blockingReasons: ["round5-targeted-intake-not-ready"],
+  })}\n`);
 
   const missing = await summarizeRound5TargetedIntake({
-    contractPath, manifestPath, truthPath, reportPath,
+    contractPath, manifestPath, truthPath, reportPath, modelReportPath,
   });
   assert.equal(missing.bindingCurrent, true);
   assert.equal(missing.ready, false);
@@ -44,6 +60,9 @@ try {
   assert.equal(missing.automaticAuthorizationGranted, false);
   assert(missing.blockingReasons.includes("round5-manifest-missing"));
   assert(missing.blockingReasons.includes("round5-position-truth-missing"));
+  assert.equal(missing.segmentEditPathCandidate.bindingCurrent, true);
+  assert.equal(missing.segmentEditPathCandidate.trainingPerformed, false);
+  assert.equal(missing.segmentEditPathCandidate.reviewAssistPromotionReady, false);
 
   const manifestBytes = Buffer.from("recordingId\nr5-test\n", "utf8");
   const truthBytes = Buffer.from('{"recordings":{}}\n', "utf8");
@@ -63,14 +82,18 @@ try {
   })}\n`);
 
   const ready = await summarizeRound5TargetedIntake({
-    contractPath, manifestPath, truthPath, reportPath,
+    contractPath, manifestPath, truthPath, reportPath, modelReportPath,
   });
   assert.equal(ready.bindingCurrent, true);
   assert.equal(ready.ready, true);
+  assert.equal(ready.segmentEditPathCandidate.bindingCurrent, false);
+  assert(ready.segmentEditPathCandidate.blockingReasons.includes(
+    "round5-segment-edit-path-source-binding-stale",
+  ));
 
   await fs.writeFile(truthPath, '{"recordings":{"changed":{}}}\n', "utf8");
   const stale = await summarizeRound5TargetedIntake({
-    contractPath, manifestPath, truthPath, reportPath,
+    contractPath, manifestPath, truthPath, reportPath, modelReportPath,
   });
   assert.equal(stale.bindingCurrent, false);
   assert.equal(stale.ready, false);

@@ -109,6 +109,12 @@ const ROUND5_TARGETED_REPORT = path.join(
   "experiments",
   "western-strings-round5-targeted-intake.json",
 );
+const ROUND5_SEGMENT_EDIT_PATH_REPORT = path.join(
+  "data",
+  "experiments",
+  "western-strings-round5-segment-edit-path",
+  "report.json",
+);
 const ROUND5_TARGETED_CONTRACT_VERSION = "western-round5-targeted-diagnosis-intake-v1";
 const ORDINARY_DYNAMIC_CONTRACT_VERSION = "western-ordinary-dynamic-shadow-candidate-v1";
 const ORDINARY_DYNAMIC_POLICY_VERSION = "western-ordinary-dynamic-shadow-policy-v1";
@@ -1594,10 +1600,12 @@ export async function summarizeRound5TargetedIntake({
   manifestPath = ROUND5_TARGETED_MANIFEST,
   truthPath = ROUND5_TARGETED_TRUTH,
   reportPath = ROUND5_TARGETED_REPORT,
+  modelReportPath = ROUND5_SEGMENT_EDIT_PATH_REPORT,
 } = {}) {
-  const [contract, report, contractSha256, manifestSha256, truthSha256] = await Promise.all([
+  const [contract, report, modelReport, contractSha256, manifestSha256, truthSha256] = await Promise.all([
     readJson(contractPath),
     readJson(reportPath),
+    readJson(modelReportPath),
     sha256FileOrEmpty(contractPath),
     sha256FileOrEmpty(manifestPath),
     sha256FileOrEmpty(truthPath),
@@ -1639,6 +1647,44 @@ export async function summarizeRound5TargetedIntake({
     ...(report && !manifestBindingCurrent ? ["round5-targeted-manifest-binding-stale"] : []),
     ...(report && !truthBindingCurrent ? ["round5-targeted-truth-binding-stale"] : []),
   ]);
+  const modelHashes = modelReport?.sourceHashes || {};
+  const modelSourceBindingCurrent = Boolean(
+    modelReport
+      && String(modelHashes.contractSha256 || "").toLowerCase() === contractSha256
+      && (manifestSha256
+        ? String(modelHashes.manifestSha256 || "").toLowerCase() === manifestSha256
+        : !modelHashes.manifestSha256)
+      && (truthSha256
+        ? String(modelHashes.truthSha256 || "").toLowerCase() === truthSha256
+        : !modelHashes.truthSha256),
+  );
+  const modelArtifact = modelReport?.trainingPerformed === true
+    ? await hashWorkspaceArtifact(modelReport?.modelArtifact?.path || "")
+    : { sha256: "", status: "not-trained" };
+  const modelArtifactCurrent = modelReport?.trainingPerformed === true
+    ? Boolean(
+        modelArtifact.status === "ok"
+          && String(modelReport?.modelArtifact?.sha256 || "").toLowerCase() === modelArtifact.sha256,
+      )
+    : false;
+  const modelBlockingReasons = normalizedReasonList([
+    ...(modelReport?.blockingReasons || []),
+    ...(!modelReport ? ["round5-segment-edit-path-report-missing"] : []),
+    ...(modelReport && modelReport.contract !== "western-round5-segment-edit-path-candidate-v1"
+      ? ["round5-segment-edit-path-contract-invalid"]
+      : []),
+    ...(modelReport && (
+      modelReport.studentFacing !== false
+        || modelReport.automaticAccusationReady !== false
+        || modelReport.productionAdoptionReady !== false
+    ) ? ["round5-segment-edit-path-safety-boundary-invalid"] : []),
+    ...(modelReport && !modelSourceBindingCurrent
+      ? ["round5-segment-edit-path-source-binding-stale"]
+      : []),
+    ...(modelReport?.trainingPerformed === true && !modelArtifactCurrent
+      ? ["round5-segment-edit-path-model-artifact-stale"]
+      : []),
+  ]);
   return {
     contract: contract?.contractVersion || ROUND5_TARGETED_CONTRACT_VERSION,
     source: String(reportPath).replace(/\\/g, "/"),
@@ -1658,6 +1704,25 @@ export async function summarizeRound5TargetedIntake({
     minimums: report?.minimums || contract?.minimums || {},
     studentFacing: false,
     automaticAuthorizationGranted: false,
+    segmentEditPathCandidate: {
+      contract: "western-round5-segment-edit-path-candidate-v1",
+      source: String(modelReportPath).replace(/\\/g, "/"),
+      bindingCurrent: modelSourceBindingCurrent,
+      intakeReady: modelReport?.intakeReady === true,
+      trainingPerformed: modelReport?.trainingPerformed === true,
+      reviewAssistPromotionReady: Boolean(
+        modelReport?.reviewAssistPromotionReady === true
+          && modelSourceBindingCurrent
+          && modelArtifactCurrent
+          && modelBlockingReasons.length === 0,
+      ),
+      modelArtifactCurrent,
+      evaluation: modelReport?.evaluation || null,
+      studentFacing: false,
+      automaticAccusationReady: false,
+      productionAdoptionReady: false,
+      blockingReasons: modelBlockingReasons,
+    },
     blockingReasons,
   };
 }
@@ -3781,7 +3846,7 @@ export function summarizeNextActions(
     actions.push({
       priority: 1,
       track: "Ordinary diagnosis recall",
-      action: "Policy C remains two-layer teacher review assistance; strict confirmed recall is still 2/12. The inspected merged-substitution pattern only raises a diagnostic ceiling to 3/12. Timing+duration failed synthetic-to-real transfer; generic onset count, pitch-conditioned onset count, unassigned-event edit-path, and interior-attack ratio all miss the 90% precision / 50% recall floor. Direct RMS learns synthetic digital silence and recalls 0/3 real missing notes; target-pitch absence recalls 3/3 but also flags the other 4 authoritative assignment gaps (42.86% precision). Do not promote any of them. Stop adding single thresholds: collect fresh real confusion pairs under the Round-5 targeted intake contract (`npm run western:round5-targeted-intake`) and train/evaluate a segment-level insert/delete/substitute edit-path model under a new position-labelled fresh-blind gate.",
+      action: "Policy C remains two-layer teacher review assistance; strict confirmed recall is still 2/12. The inspected merged-substitution pattern only raises a diagnostic ceiling to 3/12. Timing+duration failed synthetic-to-real transfer; generic onset count, pitch-conditioned onset count, unassigned-event edit-path, and interior-attack ratio all miss the 90% precision / 50% recall floor. Direct RMS learns synthetic digital silence and recalls 0/3 real missing notes; target-pitch absence recalls 3/3 but also flags the other 4 authoritative assignment gaps (42.86% precision). Do not promote any of them. Stop adding single thresholds: collect fresh real confusion pairs under the Round-5 targeted intake contract (`npm run western:round5-targeted-intake`), then run the live-bound segment insert/delete/substitute candidate (`npm run western:round5-segment-edit-path`).",
       artifact: shadow.policyCReviewAssistEvidence.source,
       reason: normalizedReasonList([
         "policy-c-auto-accusation-closed",
