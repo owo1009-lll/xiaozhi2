@@ -21,6 +21,13 @@
 4. 未通过的子闸仍可保留为教师 `self_check_hint`，不得并入 `confirmed_issue`。
 5. 四类全部通过也不自动打开学生开关；仍需跨设备能量鲁棒性审计和具名发布授权。
 
+采集前先复制模板：
+
+- `docs/round5-targeted-diagnosis-capture-pack/manifest.template.csv` → `data/private/western-strings-round5/manifest.csv`
+- `docs/round5-targeted-diagnosis-capture-pack/truth.template.json` → `data/private/western-strings-round5/position-truth.json`
+
+随后运行 `npm run western:round5-targeted-intake`。当前无私密输入时应明确返回 `round5-manifest-missing` 与 `round5-position-truth-missing`；文件到位后它会检查分母、文件存在性、隐私路径、consent/license、曲目与演奏者-设备-房间 split 泄漏、逐事件字段以及 manifest/truth SHA-256。只有 `ready=true` 才允许训练或 fresh-blind 评测，且该状态仍不授予学生端权限。
+
 ## 机器侧下一实现
 
 输入为连续 3–5 个谱音片段及对应音频，不再逐音独立分类。候选输出固定为 `match / insert / delete / substitute / timing-boundary-uncertain`，并把置信不足统一回退到 segment-level 自查提示。现有 round4 和注入集只用于开发诊断与回归，禁止计入新的 fresh-blind 晋升分母。
