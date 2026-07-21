@@ -9,6 +9,7 @@
 | 合并替代音结构规则 | round4 新增命中 1 个 wrong，0/253 非故意位置 | 13 套外部集合 0 个独立正例 | 只作 development pre-gate；严格口径不从 2/12 晋升 |
 | relative-IOI + duration 合取 | r2-01 开发 P/R=95.45%/77.78%；r2-08 holdout 同为 95.45%/77.78% | 完整 round4 P/R=50.00%/66.67% | 合成到真实域迁移失败 |
 | IOI + 时值 + 置信度 + operation-path 结构合取 | 注入 calibration P/R=94.74%/66.67%；曲目 holdout P/R=100%/55.56% | 已查看 round4 P/R=100%/66.67%（drag 3/3、extra 1/3）；自然正确录音 5/285 提示，负担 1.75% | 仅冻结为 Round 5 `self_check_hint` 候选；形成于查看旧证据后，不占晋升分母 |
+| 高置信节奏结构合取（时值比提高到已有冻结值 1.30） | calibration 18/27、holdout 14/27，均 0 FP | 已查看 round4 4/6、0 FP；自然正确录音 0/285；专业长曲 13/2301 未裁决候选 | 冻结为 `issue_detected_candidate` 预闸；正式确诊仍为 2/12，必须由全新 fresh-blind 晋升 |
 | 通用波形 onset 峰计数 | 150 组参数均未过 P>=90%/R>=50%；开发最优 42.11%/53.33% | 合成 holdout 22.73%/33.33% | 止损，不再继续扫通用峰值参数 |
 
 复跑命令：
@@ -63,9 +64,9 @@ Round 5 intake 已接入总项目状态并做实时哈希绑定。当前 `ready=
 
 公开专业长曲压力给出了相反边界：Oliver Colbentson 两段 BWV1006 在正确展开反复记号后共有 2,301 个谱音，产生 936 个 assignment gap、595 个精炼提示，即 258.58 个提示/千音。由于没有逐音演奏错误人工 gold，这 595 个提示不能记作 FP；它们是实际可见的复核负担。故 `generalPurposeCandidateRetained=false`，该规则不得推广到任意专业长曲。它只保留为 Round 5 短篇学生混淆对的冻结候选，能否把正式确诊从 2/12 提高，仍只能由新的逐音人工真值 fresh-blind 决定。
 
-该候选已经接入 Round 5 targeted runner，而不是只留在回顾性脚本：gap 精炼参数固定为 synthetic calibration 选出的四组值，实际晋升只评 `merged_substitution`/`missing` 的 fresh-blind；新增的节奏结构合取也已作为同一执行器内的冻结子闸，只评 `extra`/`drag`，阈值固定为 relative-IOI `>0.15`、时值比 `>=1.20`、事件置信度 `>=0.75` 且 operation-path 同位置有候选。两者输出语义都固定为 `self_check_hint`，严格确诊口径不变。为避免只标少数混淆对却把所有未标位置误当真负例，合同新增每录音 `completeErrorInventory=true` 硬要求。当前 manifest/truth 尚缺，因此报告诚实停在 `runnerWired=true`、`evaluationPerformed=false`；数据到位后同一命令会按 precision≥0.90、recall≥0.50、strict FP=0 运行真闸。
+候选已经接入 Round 5 targeted runner，而不是只留在回顾性脚本：gap 精炼参数固定为 synthetic calibration 选出的四组值，实际晋升只评 `merged_substitution`/`missing` 的 fresh-blind；节奏结构合取只评 `extra`/`drag`，relative-IOI `>0.15`、事件置信度 `>=0.75` 且 operation-path 必须同位置有候选。其时值比 `>=1.20` 层只输出 `self_check_hint`；复用 operation-path 已冻结的 `1.30` 时值比形成独立 `issue_detected_candidate` 层。高置信层回顾性与原有 2 个严格确诊合并为 **6/12 @ 0/253**，再加 4 个 gap 自查为三层复核上限 **10/12 @ 0/253**；两者都是已查看数据上的上限，不改变正式 2/12。为避免只标少数混淆对却把所有未标位置误当真负例，合同要求每录音 `completeErrorInventory=true`。当前 manifest/truth 尚缺，因此报告停在 `runnerWired=true`、`evaluationPerformed=false`；数据到位后同一命令会按 precision≥0.90、recall≥0.50、strict FP=0 运行真闸。
 
-边界必须同时保留：这条精炼规则是在看过 Round 4 后形成，`strictConfirmedRecallUnchanged=true`，所以严格确诊仍是 `2/12`；当前仅 `candidateRetainedForFreshBlind=true`，`reviewAssistPromotionReady=false`、`automaticAccusationReady=false`。下一次 Round 5 fresh-blind 必须原样先测这条规则，不得先看新包再改成本或条件。可复跑：
+边界必须同时保留：gap、软节奏与高置信节奏合取都在看过当前证据后形成，`strictConfirmedRecallUnchanged=true`，所以严格确诊仍是 `2/12`；当前仅 `candidateRetainedForFreshBlind=true`，`reviewAssistPromotionReady=false`、`automaticAccusationEvidenceReady=false`、`automaticAccusationReady=false`。专业长曲的 13 个候选没有逐音人工真值，不能称 13 个 FP，但也不能授权通用自动指控。下一次 Round 5 fresh-blind 必须原样先测冻结规则，不得先看新包再改条件。可复跑：
 
 ```powershell
 npm run western:round5-temporal-operation-path

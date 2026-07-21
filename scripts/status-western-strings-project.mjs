@@ -1730,6 +1730,21 @@ export async function summarizeRound5TargetedIntake({
     : false;
   const frozenGapRefinement = modelReport?.frozenGapRefinement || null;
   const frozenRhythmRefinement = frozenGapRefinement?.rhythmStructuralRefinement || null;
+  const frozenRhythmStrict = frozenRhythmRefinement?.strictIssueCandidate || null;
+  const frozenRhythmStrictValid = Boolean(
+    frozenRhythmStrict?.contract
+      === "western-round5-frozen-rhythm-strict-issue-candidate-v1"
+      && frozenRhythmStrict?.runnerWired === true
+      && frozenRhythmStrict?.outputSemantic === "issue_detected_candidate"
+      && frozenRhythmStrict?.strictConfirmedRecallChanged === false
+      && frozenRhythmStrict?.automaticAccusationReady === false
+      && frozenRhythmStrict?.studentFacing === false
+      && (frozenRhythmStrict?.evaluationPerformed === true
+        ? frozenRhythmStrict?.promotionEvidenceEligible === true
+          && typeof frozenRhythmStrict?.automaticAccusationEvidenceReady === "boolean"
+        : frozenRhythmStrict?.promotionEvidenceEligible === false
+          && frozenRhythmStrict?.automaticAccusationEvidenceReady === false),
+  );
   const frozenRhythmRefinementValid = Boolean(
     frozenRhythmRefinement?.contract
       === "western-round5-frozen-rhythm-structural-refinement-v1"
@@ -1738,6 +1753,7 @@ export async function summarizeRound5TargetedIntake({
       && frozenRhythmRefinement?.strictConfirmedRecallChanged === false
       && frozenRhythmRefinement?.automaticAccusationReady === false
       && frozenRhythmRefinement?.studentFacing === false
+      && frozenRhythmStrictValid
       && (frozenRhythmRefinement?.evaluationPerformed === true
         ? frozenRhythmRefinement?.promotionEvidenceEligible === true
         : frozenRhythmRefinement?.promotionEvidenceEligible === false
@@ -1790,6 +1806,8 @@ export async function summarizeRound5TargetedIntake({
   const temporalCombined = temporalGapRefinement?.round4TwoLayerCombined || null;
   const temporalPublicStress = temporalGapRefinement?.publicProfessionalStress || null;
   const temporalRhythmRefinement = temporalEvidence?.rhythmStructuralRefinement || null;
+  const temporalRhythmStrict = temporalEvidence?.rhythmStrictIssueCandidate || null;
+  const temporalStrictLayers = temporalRhythmStrict?.round4RecallLayers || null;
   const temporalEvidenceValid = Boolean(
     temporalEvidence?.contract === "western-round5-temporal-operation-path-smoke-v1"
       && temporalEvidence?.scope === "architecture-smoke-preGateOnly"
@@ -1816,6 +1834,25 @@ export async function summarizeRound5TargetedIntake({
       && temporalRhythmRefinement?.naturalCleanStress?.hintRate <= 0.02
       && temporalRhythmRefinement?.automaticAccusationReady === false
       && temporalRhythmRefinement?.promotionEvidenceEligible === false
+      && temporalRhythmStrict?.contract
+        === "western-round5-rhythm-strict-issue-candidate-pre-gate-v1"
+      && temporalRhythmStrict?.candidateRetainedForFreshBlind === true
+      && temporalRhythmStrict?.outputSemantic === "issue_detected_candidate"
+      && temporalRhythmStrict?.syntheticHoldout?.truePositive === 14
+      && temporalRhythmStrict?.syntheticHoldout?.falsePositive === 0
+      && temporalRhythmStrict?.round4InspectedReal?.truePositive === 4
+      && temporalRhythmStrict?.round4InspectedReal?.falsePositive === 0
+      && temporalRhythmStrict?.naturalCleanStress?.falsePositive === 0
+      && temporalRhythmStrict?.publicProfessionalStress?.candidateCount === 13
+      && temporalRhythmStrict?.publicProfessionalStress?.falsePositiveCountAuthoritative === false
+      && temporalStrictLayers?.strictPlusRhythmCandidate?.truePositive === 6
+      && temporalStrictLayers?.strictPlusRhythmCandidate?.falsePositive === 0
+      && temporalStrictLayers?.strictPlusRhythmAndGapSelfCheck?.truePositive === 10
+      && temporalStrictLayers?.strictPlusRhythmAndGapSelfCheck?.falsePositive === 0
+      && temporalRhythmStrict?.strictConfirmedRecallChanged === false
+      && temporalRhythmStrict?.automaticAccusationEvidenceReady === false
+      && temporalRhythmStrict?.automaticAccusationReady === false
+      && temporalRhythmStrict?.promotionEvidenceEligible === false
       && temporalCombined?.strictConfirmed === 2
       && temporalCombined?.refinedSelfCheckHints === 4
       && temporalCombined?.falsePositive === 0
@@ -1887,6 +1924,9 @@ export async function summarizeRound5TargetedIntake({
         rhythmStructuralCandidateRetainedForFreshBlind:
           temporalRhythmRefinement?.candidateRetainedForFreshBlind === true,
         rhythmStructuralRefinement: temporalRhythmRefinement,
+        rhythmStrictIssueCandidateRetainedForFreshBlind:
+          temporalRhythmStrict?.candidateRetainedForFreshBlind === true,
+        rhythmStrictIssueCandidate: temporalRhythmStrict,
         generalPurposeCandidateRetained:
           temporalGapRefinement?.generalPurposeCandidateRetained === true,
         targetedFreshBlindRunner: {
@@ -4047,7 +4087,7 @@ export function summarizeNextActions(
     actions.push({
       priority: 1,
       track: "Ordinary diagnosis recall",
-      action: "Strict confirmed recall remains 2/12. The explicit temporal operation path has now been tested: raw use reaches 11/12 but causes 55/253 false positives and is rejected. Used only as an independent refiner for Policy C assignment-gap self-check hints, it retrospectively keeps all 4 useful hints and removes all 3 false hints, so the inspected Round-4 two-layer ceiling is 6/12 at 0/253 while strict-confirmed recall stays 2/12. A second frozen rhythm-structure conjunction (relative IOI, duration, confidence, and operation-path agreement) reaches 15/27 at 0 FP on synthetic holdout and 4/6 at 0 FP on inspected Round 4, with 5/285 natural-clean hints; it is also a self-check-only fresh-blind candidate, not promotion evidence. Both refiners are now wired into the Round-5 targeted runner, which requires a complete per-recording error inventory and evaluates the untouched fresh-blind split without retuning. Collect the Round-5 real confusion pairs and run the existing evaluator; do not resume single-threshold or fixed-RF tuning.",
+      action: "Strict confirmed recall remains 2/12. The explicit temporal operation path has now been tested: raw use reaches 11/12 but causes 55/253 false positives and is rejected. Used only as an independent refiner for Policy C assignment-gap self-check hints, it retrospectively keeps all 4 useful hints and removes all 3 false hints. The rhythm-structure conjunction now has two frozen tiers: duration ratio >=1.20 remains a soft self-check candidate, while the stricter existing threshold >=1.30 yields 18/27 at 0 FP on calibration, 14/27 at 0 FP on synthetic holdout, 4/6 at 0 FP on inspected Round 4, and 0/285 flags on natural-clean takes. Combined retrospectively with the existing 2 strict issues, this is a 6/12 strict-candidate ceiling at 0/253; adding the 4 gap self-checks gives a three-layer review ceiling of 10/12 at 0/253. None changes confirmed recall because the conjunction was formed after inspecting current evidence; 13 unadjudicated candidates on 2,301 public professional score positions also prevent general-purpose adoption. Both tiers are wired into the Round-5 targeted runner. Collect complete-inventory Round-5 real confusion pairs and run the untouched fresh-blind gate; do not retune on the new package.",
       artifact: ROUND5_TEMPORAL_OPERATION_PATH.replace(/\\/g, "/"),
       reason: normalizedReasonList([
         "policy-c-auto-accusation-closed",
@@ -4057,6 +4097,7 @@ export function summarizeNextActions(
           : ["policy-c-energy-robustness-not-ready"]),
         "gap-refinement-fresh-blind-not-run",
         "rhythm-structural-refinement-fresh-blind-not-run",
+        "rhythm-strict-issue-candidate-fresh-blind-not-run",
       ]),
     });
   }

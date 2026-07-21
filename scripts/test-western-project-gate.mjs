@@ -777,6 +777,34 @@ assert.equal(temporalPath?.rhythmStructuralRefinement?.round4InspectedReal?.fals
 assert.equal(temporalPath?.rhythmStructuralRefinement?.naturalCleanStress?.falsePositive, 5);
 assert.equal(temporalPath?.rhythmStructuralRefinement?.naturalCleanStress?.hintRate, 0.017544);
 assert.equal(temporalPath?.rhythmStructuralRefinement?.automaticAccusationReady, false);
+const rhythmStrict = temporalPath?.rhythmStrictIssueCandidate;
+assert.equal(temporalPath?.rhythmStrictIssueCandidateRetainedForFreshBlind, true);
+assert.equal(
+  rhythmStrict?.contract,
+  "western-round5-rhythm-strict-issue-candidate-pre-gate-v1",
+);
+assert.equal(rhythmStrict?.outputSemantic, "issue_detected_candidate");
+assert.equal(rhythmStrict?.syntheticHoldout?.truePositive, 14);
+assert.equal(rhythmStrict?.syntheticHoldout?.falsePositive, 0);
+assert.equal(rhythmStrict?.syntheticHoldout?.recall, 0.518519);
+assert.equal(rhythmStrict?.round4InspectedReal?.truePositive, 4);
+assert.equal(rhythmStrict?.round4InspectedReal?.falsePositive, 0);
+assert.equal(rhythmStrict?.naturalCleanStress?.falsePositive, 0);
+assert.equal(rhythmStrict?.publicProfessionalStress?.candidateCount, 13);
+assert.equal(rhythmStrict?.publicProfessionalStress?.falsePositiveCountAuthoritative, false);
+assert.equal(rhythmStrict?.round4RecallLayers?.strictPlusRhythmCandidate?.truePositive, 6);
+assert.equal(rhythmStrict?.round4RecallLayers?.strictPlusRhythmCandidate?.falsePositive, 0);
+assert.equal(
+  rhythmStrict?.round4RecallLayers?.strictPlusRhythmAndGapSelfCheck?.truePositive,
+  10,
+);
+assert.equal(
+  rhythmStrict?.round4RecallLayers?.strictPlusRhythmAndGapSelfCheck?.falsePositive,
+  0,
+);
+assert.equal(rhythmStrict?.strictConfirmedRecallChanged, false);
+assert.equal(rhythmStrict?.automaticAccusationEvidenceReady, false);
+assert.equal(rhythmStrict?.automaticAccusationReady, false);
 const targetedGapRunner = temporalPath?.targetedFreshBlindRunner;
 assert.equal(targetedGapRunner?.contract, "western-round5-frozen-gap-refinement-v1");
 assert.equal(targetedGapRunner?.bindingCurrent, true);
@@ -801,6 +829,18 @@ assert.equal(targetedRhythmRunner?.strictConfirmedRecallChanged, false);
 assert.equal(targetedRhythmRunner?.promotionEvidenceEligible, false);
 assert.equal(targetedRhythmRunner?.reviewAssistPromotionReady, false);
 assert.equal(targetedRhythmRunner?.automaticAccusationReady, false);
+const targetedRhythmStrict = targetedRhythmRunner?.strictIssueCandidate;
+assert.equal(
+  targetedRhythmStrict?.contract,
+  "western-round5-frozen-rhythm-strict-issue-candidate-v1",
+);
+assert.equal(targetedRhythmStrict?.runnerWired, true);
+assert.equal(targetedRhythmStrict?.evaluationPerformed, false);
+assert.equal(targetedRhythmStrict?.outputSemantic, "issue_detected_candidate");
+assert.equal(targetedRhythmStrict?.strictConfirmedRecallChanged, false);
+assert.equal(targetedRhythmStrict?.promotionEvidenceEligible, false);
+assert.equal(targetedRhythmStrict?.automaticAccusationEvidenceReady, false);
+assert.equal(targetedRhythmStrict?.automaticAccusationReady, false);
 assert.equal(temporalPath?.promotionEvidenceEligible, false);
 assert.equal(temporalPath?.studentFacing, false);
 assert.equal(temporalPath?.automaticAccusationReady, false);
