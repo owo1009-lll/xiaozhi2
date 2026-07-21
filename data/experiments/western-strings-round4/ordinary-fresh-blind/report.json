@@ -1,0 +1,294 @@
+{
+  "schemaVersion": 1,
+  "contract": "western-ordinary-dynamic-shadow-full-score-fresh-blind-v1",
+  "scope": "implementation-evidence-preGateOnly",
+  "studentFacing": false,
+  "automaticAdoptionAuthorized": false,
+  "authorizationReady": false,
+  "manifestPath": "data/private/western-strings-round4/manifest.csv",
+  "manifestSha256": "31209e297f819218168cb341c69f2bef0e05770d91f042b44a0f167759ddf526",
+  "machineAnalysisPath": "data/experiments/western-strings-round4/machine-analysis.json",
+  "machineAnalysisSha256": "b4817e2e08cfd92c75dae4f99d91c4dc08ddfeb60887c6136c1698a6fbf77cca",
+  "recordingCount": 6,
+  "tiers": {
+    "cleanFull": {
+      "recordingIds": [
+        "round4-r4-01",
+        "round4-r4-02"
+      ],
+      "coverageFloor": 0.2,
+      "rows": [
+        {
+          "recordingId": "round4-r4-01",
+          "scenario": "correct",
+          "pieceId": "r4-01-d-minor-steps",
+          "scoreId": "score-mrukrgtq-niw02x",
+          "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtw6-8gzbvn.json",
+          "candidateArtifactSha256": "13f25d57ab33a38ee1be0eb1c8aa866af3dfe0f7da13acc50abd826f1dd88adc",
+          "rowCount": 53,
+          "shadowSelectedCount": 48,
+          "shadowCoverage": 0.90566,
+          "markedZoneRowCount": 0,
+          "markedZoneAccusationCount": 0,
+          "m3plusDecisionCounts": {
+            "confirmed_center": 51,
+            "insufficient_evidence": 2
+          },
+          "m3plusZoneCounts": {
+            "stable_center": 53
+          }
+        },
+        {
+          "recordingId": "round4-r4-02",
+          "scenario": "correct",
+          "pieceId": "r4-02-g-siciliano",
+          "scoreId": "score-mrukrh5f-l6icr8",
+          "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwa-jleh9k.json",
+          "candidateArtifactSha256": "440514fcf070659351879f8cfb6cbf93bc6a55820068160e35d06ac5973c0780",
+          "rowCount": 59,
+          "shadowSelectedCount": 45,
+          "shadowCoverage": 0.762712,
+          "markedZoneRowCount": 0,
+          "markedZoneAccusationCount": 0,
+          "m3plusDecisionCounts": {
+            "confirmed_center": 51,
+            "insufficient_evidence": 8
+          },
+          "m3plusZoneCounts": {
+            "stable_center": 59
+          }
+        }
+      ]
+    },
+    "techniqueSafety": {
+      "recordingIds": [
+        "round4-r4-03",
+        "round4-r4-04"
+      ],
+      "totalMarkedZoneRows": 3,
+      "totalMarkedZoneAccusations": 0,
+      "rows": [
+        {
+          "recordingId": "round4-r4-03",
+          "scenario": "trill_vibrato",
+          "pieceId": "r4-03-a-minor-vibrato",
+          "scoreId": "score-mrukrhho-wzg9mg",
+          "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwc-immk43.json",
+          "candidateArtifactSha256": "a3b9c5c65e2da24a7e375bfd650b62113e76a0081fb8030a20c74b1dd90ceab7",
+          "rowCount": 24,
+          "shadowSelectedCount": 12,
+          "shadowCoverage": 0.5,
+          "markedZoneRowCount": 3,
+          "markedZoneAccusationCount": 0,
+          "m3plusDecisionCounts": {
+            "confirmed_center": 18,
+            "insufficient_evidence": 6
+          },
+          "m3plusZoneCounts": {
+            "stable_center": 21,
+            "score_marked_neutral": 3
+          }
+        },
+        {
+          "recordingId": "round4-r4-04",
+          "scenario": "slide",
+          "pieceId": "r4-04-d-slide",
+          "scoreId": "score-mrukrhs0-5ljoxc",
+          "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwf-7l1qro.json",
+          "candidateArtifactSha256": "acde5787ca8aea6f40797679adb19d41a33fbbad3fde8c19c96c447c8c083c54",
+          "rowCount": 44,
+          "shadowSelectedCount": 32,
+          "shadowCoverage": 0.727273,
+          "markedZoneRowCount": 0,
+          "markedZoneAccusationCount": 0,
+          "m3plusDecisionCounts": {
+            "confirmed_center": 40,
+            "insufficient_evidence": 4
+          },
+          "m3plusZoneCounts": {
+            "stable_center": 44
+          }
+        }
+      ]
+    },
+    "errorReferenceOnly": {
+      "recordingIds": [
+        "round4-r4-05",
+        "round4-r4-06"
+      ],
+      "groundTruthPrecision": false,
+      "note": "exact error positions were not recorded; these numbers are informational only and must never be counted toward a precision or zero-dangerous-leak claim",
+      "rows": [
+        {
+          "recordingId": "round4-r4-05",
+          "scenario": "wrong_pitch",
+          "pieceId": "r4-05-g-planted-errors",
+          "scoreId": "score-mrukri11-3irrzl",
+          "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwh-z0e60d.json",
+          "candidateArtifactSha256": "40bee518b3dc37e72b21cfba4bfcc3ebb524acc178b3fdd4af8deec34752259d",
+          "rowCount": 45,
+          "shadowSelectedCount": 31,
+          "shadowCoverage": 0.688889,
+          "markedZoneRowCount": 0,
+          "markedZoneAccusationCount": 0,
+          "m3plusDecisionCounts": {
+            "confirmed_center": 38,
+            "issue_detected": 2,
+            "insufficient_evidence": 5
+          },
+          "m3plusZoneCounts": {
+            "stable_center": 45
+          }
+        },
+        {
+          "recordingId": "round4-r4-06",
+          "scenario": "wrong_pitch",
+          "pieceId": "r4-06-c-planted-errors",
+          "scoreId": "score-mrukria4-u84gv1",
+          "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwj-8n41js.json",
+          "candidateArtifactSha256": "6e9e1d912db2f1efbad584b8405d42cb068f2c59d81e2c0d861f2a133b8dc686",
+          "rowCount": 40,
+          "shadowSelectedCount": 22,
+          "shadowCoverage": 0.55,
+          "markedZoneRowCount": 0,
+          "markedZoneAccusationCount": 0,
+          "m3plusDecisionCounts": {
+            "confirmed_center": 33,
+            "insufficient_evidence": 7
+          },
+          "m3plusZoneCounts": {
+            "stable_center": 40
+          }
+        }
+      ]
+    }
+  },
+  "recordings": [
+    {
+      "recordingId": "round4-r4-01",
+      "scenario": "correct",
+      "pieceId": "r4-01-d-minor-steps",
+      "scoreId": "score-mrukrgtq-niw02x",
+      "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtw6-8gzbvn.json",
+      "candidateArtifactSha256": "13f25d57ab33a38ee1be0eb1c8aa866af3dfe0f7da13acc50abd826f1dd88adc",
+      "rowCount": 53,
+      "shadowSelectedCount": 48,
+      "shadowCoverage": 0.90566,
+      "markedZoneRowCount": 0,
+      "markedZoneAccusationCount": 0,
+      "m3plusDecisionCounts": {
+        "confirmed_center": 51,
+        "insufficient_evidence": 2
+      },
+      "m3plusZoneCounts": {
+        "stable_center": 53
+      }
+    },
+    {
+      "recordingId": "round4-r4-02",
+      "scenario": "correct",
+      "pieceId": "r4-02-g-siciliano",
+      "scoreId": "score-mrukrh5f-l6icr8",
+      "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwa-jleh9k.json",
+      "candidateArtifactSha256": "440514fcf070659351879f8cfb6cbf93bc6a55820068160e35d06ac5973c0780",
+      "rowCount": 59,
+      "shadowSelectedCount": 45,
+      "shadowCoverage": 0.762712,
+      "markedZoneRowCount": 0,
+      "markedZoneAccusationCount": 0,
+      "m3plusDecisionCounts": {
+        "confirmed_center": 51,
+        "insufficient_evidence": 8
+      },
+      "m3plusZoneCounts": {
+        "stable_center": 59
+      }
+    },
+    {
+      "recordingId": "round4-r4-03",
+      "scenario": "trill_vibrato",
+      "pieceId": "r4-03-a-minor-vibrato",
+      "scoreId": "score-mrukrhho-wzg9mg",
+      "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwc-immk43.json",
+      "candidateArtifactSha256": "a3b9c5c65e2da24a7e375bfd650b62113e76a0081fb8030a20c74b1dd90ceab7",
+      "rowCount": 24,
+      "shadowSelectedCount": 12,
+      "shadowCoverage": 0.5,
+      "markedZoneRowCount": 3,
+      "markedZoneAccusationCount": 0,
+      "m3plusDecisionCounts": {
+        "confirmed_center": 18,
+        "insufficient_evidence": 6
+      },
+      "m3plusZoneCounts": {
+        "stable_center": 21,
+        "score_marked_neutral": 3
+      }
+    },
+    {
+      "recordingId": "round4-r4-04",
+      "scenario": "slide",
+      "pieceId": "r4-04-d-slide",
+      "scoreId": "score-mrukrhs0-5ljoxc",
+      "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwf-7l1qro.json",
+      "candidateArtifactSha256": "acde5787ca8aea6f40797679adb19d41a33fbbad3fde8c19c96c447c8c083c54",
+      "rowCount": 44,
+      "shadowSelectedCount": 32,
+      "shadowCoverage": 0.727273,
+      "markedZoneRowCount": 0,
+      "markedZoneAccusationCount": 0,
+      "m3plusDecisionCounts": {
+        "confirmed_center": 40,
+        "insufficient_evidence": 4
+      },
+      "m3plusZoneCounts": {
+        "stable_center": 44
+      }
+    },
+    {
+      "recordingId": "round4-r4-05",
+      "scenario": "wrong_pitch",
+      "pieceId": "r4-05-g-planted-errors",
+      "scoreId": "score-mrukri11-3irrzl",
+      "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwh-z0e60d.json",
+      "candidateArtifactSha256": "40bee518b3dc37e72b21cfba4bfcc3ebb524acc178b3fdd4af8deec34752259d",
+      "rowCount": 45,
+      "shadowSelectedCount": 31,
+      "shadowCoverage": 0.688889,
+      "markedZoneRowCount": 0,
+      "markedZoneAccusationCount": 0,
+      "m3plusDecisionCounts": {
+        "confirmed_center": 38,
+        "issue_detected": 2,
+        "insufficient_evidence": 5
+      },
+      "m3plusZoneCounts": {
+        "stable_center": 45
+      }
+    },
+    {
+      "recordingId": "round4-r4-06",
+      "scenario": "wrong_pitch",
+      "pieceId": "r4-06-c-planted-errors",
+      "scoreId": "score-mrukria4-u84gv1",
+      "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwj-8n41js.json",
+      "candidateArtifactSha256": "6e9e1d912db2f1efbad584b8405d42cb068f2c59d81e2c0d861f2a133b8dc686",
+      "rowCount": 40,
+      "shadowSelectedCount": 22,
+      "shadowCoverage": 0.55,
+      "markedZoneRowCount": 0,
+      "markedZoneAccusationCount": 0,
+      "m3plusDecisionCounts": {
+        "confirmed_center": 33,
+        "insufficient_evidence": 7
+      },
+      "m3plusZoneCounts": {
+        "stable_center": 40
+      }
+    }
+  ],
+  "evidenceReady": true,
+  "blockingReasons": [],
+  "generatedAt": "2026-07-21T11:37:31.735Z",
+  "evidenceDigestSha256": "08c4b6a3ae730fd855113680b79bb2ec0380c767501543ff728f975d68dd17d3"
+}

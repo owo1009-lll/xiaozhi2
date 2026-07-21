@@ -1,0 +1,145 @@
+{
+  "ok": true,
+  "generatedAt": "2026-07-21T11:35:13.359Z",
+  "ready": true,
+  "runtimePolicy": "review-only",
+  "manifest": "data/private/western-strings-round4/manifest.csv",
+  "batchRunId": "strings-batch-mrukrtwo-r7ymua",
+  "summary": {
+    "inputRowCount": 6,
+    "submissionCount": 6,
+    "offlineAnalysisProducedCount": 6,
+    "candidateRowCount": 265,
+    "autoDiagnosisIssued": false,
+    "studentFacing": false
+  },
+  "blockingReasons": [],
+  "items": [
+    {
+      "recordingId": "round4-r4-01",
+      "pieceId": "r4-01-d-minor-steps",
+      "scenario": "correct",
+      "submissionId": "strings-submit-mrukrtw6-8gzbvn",
+      "analysisStatus": "offline_feature_review_ready",
+      "offlineAnalysisProduced": true,
+      "candidateRowCount": 53,
+      "expectedPitchedNoteCount": 53,
+      "expectedMeasureCount": 16,
+      "candidateMeasureCount": 16,
+      "candidateUniqueNoteIdCount": 53,
+      "candidateStructureError": "",
+      "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtw6-8gzbvn.json",
+      "autoDiagnosisIssued": false,
+      "studentFacing": false,
+      "reasons": [
+        "ordinary-upload-dynamic-shadow-review-only"
+      ],
+      "error": ""
+    },
+    {
+      "recordingId": "round4-r4-02",
+      "pieceId": "r4-02-g-siciliano",
+      "scenario": "correct",
+      "submissionId": "strings-submit-mrukrtwa-jleh9k",
+      "analysisStatus": "offline_feature_review_ready",
+      "offlineAnalysisProduced": true,
+      "candidateRowCount": 59,
+      "expectedPitchedNoteCount": 59,
+      "expectedMeasureCount": 14,
+      "candidateMeasureCount": 14,
+      "candidateUniqueNoteIdCount": 59,
+      "candidateStructureError": "",
+      "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwa-jleh9k.json",
+      "autoDiagnosisIssued": false,
+      "studentFacing": false,
+      "reasons": [
+        "ordinary-upload-dynamic-shadow-review-only"
+      ],
+      "error": ""
+    },
+    {
+      "recordingId": "round4-r4-03",
+      "pieceId": "r4-03-a-minor-vibrato",
+      "scenario": "trill_vibrato",
+      "submissionId": "strings-submit-mrukrtwc-immk43",
+      "analysisStatus": "offline_feature_review_ready",
+      "offlineAnalysisProduced": true,
+      "candidateRowCount": 24,
+      "expectedPitchedNoteCount": 24,
+      "expectedMeasureCount": 14,
+      "candidateMeasureCount": 14,
+      "candidateUniqueNoteIdCount": 24,
+      "candidateStructureError": "",
+      "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwc-immk43.json",
+      "autoDiagnosisIssued": false,
+      "studentFacing": false,
+      "reasons": [
+        "ordinary-upload-dynamic-shadow-review-only"
+      ],
+      "error": ""
+    },
+    {
+      "recordingId": "round4-r4-04",
+      "pieceId": "r4-04-d-slide",
+      "scenario": "slide",
+      "submissionId": "strings-submit-mrukrtwf-7l1qro",
+      "analysisStatus": "offline_feature_review_ready",
+      "offlineAnalysisProduced": true,
+      "candidateRowCount": 44,
+      "expectedPitchedNoteCount": 44,
+      "expectedMeasureCount": 14,
+      "candidateMeasureCount": 14,
+      "candidateUniqueNoteIdCount": 44,
+      "candidateStructureError": "",
+      "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwf-7l1qro.json",
+      "autoDiagnosisIssued": false,
+      "studentFacing": false,
+      "reasons": [
+        "ordinary-upload-dynamic-shadow-review-only"
+      ],
+      "error": ""
+    },
+    {
+      "recordingId": "round4-r4-05",
+      "pieceId": "r4-05-g-planted-errors",
+      "scenario": "wrong_pitch",
+      "submissionId": "strings-submit-mrukrtwh-z0e60d",
+      "analysisStatus": "offline_feature_review_ready",
+      "offlineAnalysisProduced": true,
+      "candidateRowCount": 45,
+      "expectedPitchedNoteCount": 45,
+      "expectedMeasureCount": 14,
+      "candidateMeasureCount": 14,
+      "candidateUniqueNoteIdCount": 45,
+      "candidateStructureError": "",
+      "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwh-z0e60d.json",
+      "autoDiagnosisIssued": false,
+      "studentFacing": false,
+      "reasons": [
+        "ordinary-upload-dynamic-shadow-review-only"
+      ],
+      "error": ""
+    },
+    {
+      "recordingId": "round4-r4-06",
+      "pieceId": "r4-06-c-planted-errors",
+      "scenario": "wrong_pitch",
+      "submissionId": "strings-submit-mrukrtwj-8n41js",
+      "analysisStatus": "offline_feature_review_ready",
+      "offlineAnalysisProduced": true,
+      "candidateRowCount": 40,
+      "expectedPitchedNoteCount": 40,
+      "expectedMeasureCount": 16,
+      "candidateMeasureCount": 16,
+      "candidateUniqueNoteIdCount": 40,
+      "candidateStructureError": "",
+      "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwj-8n41js.json",
+      "autoDiagnosisIssued": false,
+      "studentFacing": false,
+      "reasons": [
+        "ordinary-upload-dynamic-shadow-review-only"
+      ],
+      "error": ""
+    }
+  ]
+}

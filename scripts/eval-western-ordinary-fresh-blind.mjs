@@ -373,14 +373,29 @@ function renderMarkdown(report) {
   return lines.join("\n");
 }
 
+function parseArgs(argv) {
+  const args = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    if (argv[index] === "--manifest") args.manifestPath = argv[++index];
+    else if (argv[index] === "--machine-analysis") args.machineAnalysisPath = argv[++index];
+    else if (argv[index] === "--out-dir") args.outDir = argv[++index];
+  }
+  return args;
+}
+
 async function main() {
-  const report = auditFreshBlindEvidence({});
-  const outDir = path.resolve(DEFAULT_OUT_DIR);
+  const args = parseArgs(process.argv.slice(2));
+  const auditOpts = {};
+  if (args.manifestPath) auditOpts.manifestPath = args.manifestPath;
+  if (args.machineAnalysisPath) auditOpts.machineAnalysisPath = args.machineAnalysisPath;
+  const outDirRel = args.outDir || DEFAULT_OUT_DIR;
+  const report = auditFreshBlindEvidence(auditOpts);
+  const outDir = path.resolve(outDirRel);
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, "report.json"), `${JSON.stringify(report, null, 2)}\n`, "utf8");
   fs.writeFileSync(path.join(outDir, "report.md"), renderMarkdown(report), "utf8");
   const liveAudit = report.evidenceReady
-    ? auditFreshBlindEvidenceLiveArtifacts({})
+    ? auditFreshBlindEvidenceLiveArtifacts({ reportPath: path.join(outDirRel, "report.json") })
     : { ready: false, blockingReasons: ["fresh-blind-evidence-not-ready"] };
   console.log(JSON.stringify({
     ok: report.evidenceReady && liveAudit.ready,
@@ -393,7 +408,7 @@ async function main() {
       totalMarkedZoneRows: report.tiers.techniqueSafety.totalMarkedZoneRows,
       totalMarkedZoneAccusations: report.tiers.techniqueSafety.totalMarkedZoneAccusations,
     },
-    out: rel(path.join(DEFAULT_OUT_DIR, "report.json")),
+    out: rel(path.join(outDirRel, "report.json")),
   }, null, 2));
   if (!(report.evidenceReady && liveAudit.ready)) process.exitCode = 1;
 }
