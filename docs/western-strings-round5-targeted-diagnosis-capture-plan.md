@@ -31,3 +31,5 @@
 ## 机器侧下一实现
 
 输入为连续 3–5 个谱音片段及对应音频，不再逐音独立分类。候选输出固定为 `match / insert / delete / substitute / timing-boundary-uncertain`，并把置信不足统一回退到 segment-level 自查提示。现有 round4 和注入集只用于开发诊断与回归，禁止计入新的 fresh-blind 晋升分母。
+
+机器入口已实现为 `npm run western:round5-segment-edit-path`。它只在 intake 的全部分母、隐私、split 与哈希检查通过后训练；calibration 用固定参数的四个 gate-specific segment classifier，fresh-blind 只评测且固定决策点为 0.5，不在盲测集调参。输入特征覆盖目标音前后各两音的 assignment gap、音高替代、relative-IOI、时值比以及局部未分配事件。当前私密输入未到位时应输出 `trainingPerformed=false`，不得生成模型或晋升任何权限。

@@ -49,3 +49,5 @@ Policy C 的 assignment gap 也补做了直接波形归因：
 因此当前不再追加单阈值或单一手工特征。下一轮数据必须直接覆盖真实混淆对，模型单位改为连续片段上的插入/删除/替代 edit-path。
 
 Round 5 intake 已接入总项目状态并做实时哈希绑定。当前 `ready=false`、`bindingCurrent=true`：合同本身与已生成报告一致，唯一输入 blocker 是私密 `manifest.csv` 和 `position-truth.json` 尚未到位。文件新增或改动后若未重跑 `npm run western:round5-targeted-intake`，总状态会以 stale reason 关闭，而不会继续沿用旧报告。
+
+片段模型入口也已落地：`western:round5-segment-edit-path` 只消费通过 intake 的 calibration/fresh-blind 分割，按 merged-substitution/missing/extra/drag 四个子闸分别训练固定随机森林，并以连续五音的局部 edit-path 证据评测。当前执行结果为 `intakeReady=false`、`trainingPerformed=false`、`reviewAssistPromotionReady=false`；这是缺真实输入的明确拒绝，不是模型失败数字。总状态还会复核模型报告引用的三份源哈希与模型工件哈希。
