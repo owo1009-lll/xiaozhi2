@@ -1728,6 +1728,19 @@ export async function summarizeRound5TargetedIntake({
           && String(modelReport?.modelArtifact?.sha256 || "").toLowerCase() === modelArtifact.sha256,
       )
     : false;
+  const frozenGapRefinement = modelReport?.frozenGapRefinement || null;
+  const frozenGapRefinementValid = Boolean(
+    frozenGapRefinement?.contract === "western-round5-frozen-gap-refinement-v1"
+      && frozenGapRefinement?.runnerWired === true
+      && frozenGapRefinement?.outputSemantic === "self_check_hint"
+      && frozenGapRefinement?.strictConfirmedRecallChanged === false
+      && frozenGapRefinement?.automaticAccusationReady === false
+      && frozenGapRefinement?.studentFacing === false
+      && (frozenGapRefinement?.evaluationPerformed === true
+        ? frozenGapRefinement?.promotionEvidenceEligible === true
+        : frozenGapRefinement?.promotionEvidenceEligible === false
+          && frozenGapRefinement?.reviewAssistPromotionReady === false),
+  );
   const modelBlockingReasons = normalizedReasonList([
     ...(modelReport?.blockingReasons || []),
     ...(!modelReport ? ["round5-segment-edit-path-report-missing"] : []),
@@ -1744,6 +1757,9 @@ export async function summarizeRound5TargetedIntake({
       : []),
     ...(modelReport?.trainingPerformed === true && !modelArtifactCurrent
       ? ["round5-segment-edit-path-model-artifact-stale"]
+      : []),
+    ...(modelReport && !frozenGapRefinementValid
+      ? ["round5-frozen-gap-refinement-runner-invalid"]
       : []),
   ]);
   const smokeEvidenceValid = Boolean(
@@ -1848,6 +1864,18 @@ export async function summarizeRound5TargetedIntake({
         publicProfessionalStress: temporalPublicStress,
         generalPurposeCandidateRetained:
           temporalGapRefinement?.generalPurposeCandidateRetained === true,
+        targetedFreshBlindRunner: {
+          source: String(modelReportPath).replace(/\\/g, "/"),
+          bindingCurrent: modelSourceBindingCurrent,
+          valid: frozenGapRefinementValid,
+          ...(frozenGapRefinement || {}),
+          reviewAssistPromotionReady: Boolean(
+            frozenGapRefinement?.reviewAssistPromotionReady === true
+              && frozenGapRefinement?.evaluationPerformed === true
+              && frozenGapRefinementValid
+              && modelSourceBindingCurrent
+          ),
+        },
         promotionEvidenceEligible: false,
         studentFacing: false,
         automaticAccusationReady: false,
@@ -3994,7 +4022,7 @@ export function summarizeNextActions(
     actions.push({
       priority: 1,
       track: "Ordinary diagnosis recall",
-      action: "Strict confirmed recall remains 2/12. The explicit temporal operation path has now been tested: raw use reaches 11/12 but causes 55/253 false positives and is rejected. Used only as an independent refiner for Policy C assignment-gap self-check hints, it retrospectively keeps all 4 useful hints and removes all 3 false hints, so the inspected Round-4 two-layer ceiling is 6/12 at 0/253 while strict-confirmed recall stays 2/12. Because that refinement rule was formulated after inspecting Round 4, it is not promotion evidence and is not wired to runtime. Freeze it unchanged, collect the Round-5 real confusion pairs, and make this the first candidate evaluated on the untouched fresh-blind split; do not resume single-threshold or fixed-RF tuning.",
+      action: "Strict confirmed recall remains 2/12. The explicit temporal operation path has now been tested: raw use reaches 11/12 but causes 55/253 false positives and is rejected. Used only as an independent refiner for Policy C assignment-gap self-check hints, it retrospectively keeps all 4 useful hints and removes all 3 false hints, so the inspected Round-4 two-layer ceiling is 6/12 at 0/253 while strict-confirmed recall stays 2/12. Because that refinement rule was formulated after inspecting Round 4, it is not promotion evidence or an automatic accusation. Its frozen parameters and rule are now wired into the Round-5 targeted runner, which requires a complete per-recording error inventory and evaluates the untouched fresh-blind split without retuning. Collect the Round-5 real confusion pairs and run the existing evaluator; do not resume single-threshold or fixed-RF tuning.",
       artifact: ROUND5_TEMPORAL_OPERATION_PATH.replace(/\\/g, "/"),
       reason: normalizedReasonList([
         "policy-c-auto-accusation-closed",

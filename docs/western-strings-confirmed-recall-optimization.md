@@ -62,6 +62,8 @@ Round 5 intake 已接入总项目状态并做实时哈希绑定。当前 `ready=
 
 公开专业长曲压力给出了相反边界：Oliver Colbentson 两段 BWV1006 在正确展开反复记号后共有 2,301 个谱音，产生 936 个 assignment gap、595 个精炼提示，即 258.58 个提示/千音。由于没有逐音演奏错误人工 gold，这 595 个提示不能记作 FP；它们是实际可见的复核负担。故 `generalPurposeCandidateRetained=false`，该规则不得推广到任意专业长曲。它只保留为 Round 5 短篇学生混淆对的冻结候选，能否把正式确诊从 2/12 提高，仍只能由新的逐音人工真值 fresh-blind 决定。
 
+该候选已经接入 Round 5 targeted runner，而不是只留在回顾性脚本：参数固定为 synthetic calibration 选出的四组值，实际晋升只评 `merged_substitution`/`missing` 的 fresh-blind；输出语义固定为 `self_check_hint`，严格确诊口径不变。为避免只标少数混淆对却把所有未标位置误当真负例，合同新增每录音 `completeErrorInventory=true` 硬要求。当前 manifest/truth 尚缺，因此报告诚实停在 `runnerWired=true`、`evaluationPerformed=false`；数据到位后同一命令会按 precision≥0.90、recall≥0.50、strict FP=0 运行真闸。
+
 边界必须同时保留：这条精炼规则是在看过 Round 4 后形成，`strictConfirmedRecallUnchanged=true`，所以严格确诊仍是 `2/12`；当前仅 `candidateRetainedForFreshBlind=true`，`reviewAssistPromotionReady=false`、`automaticAccusationReady=false`。下一次 Round 5 fresh-blind 必须原样先测这条规则，不得先看新包再改成本或条件。可复跑：
 
 ```powershell
