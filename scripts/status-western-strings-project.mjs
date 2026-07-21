@@ -1757,6 +1757,7 @@ export async function summarizeRound5TargetedIntake({
   );
   const temporalGapRefinement = temporalEvidence?.policyCGapRefinement || null;
   const temporalCombined = temporalGapRefinement?.round4TwoLayerCombined || null;
+  const temporalPublicStress = temporalGapRefinement?.publicProfessionalStress || null;
   const temporalEvidenceValid = Boolean(
     temporalEvidence?.contract === "western-round5-temporal-operation-path-smoke-v1"
       && temporalEvidence?.scope === "architecture-smoke-preGateOnly"
@@ -1768,6 +1769,15 @@ export async function summarizeRound5TargetedIntake({
       && temporalEvidence?.studentFacing === false
       && temporalGapRefinement?.candidateRetainedForFreshBlind === true
       && temporalGapRefinement?.naturalCleanStress?.refined?.falsePositive === 0
+      && temporalGapRefinement?.generalPurposeCandidateRetained === false
+      && temporalPublicStress?.evidenceRole
+        === "public-professional-unadjudicated-negative-burden-proxy"
+      && temporalPublicStress?.scorePositionCount === 2301
+      && temporalPublicStress?.refinedFlagCount === 595
+      && temporalPublicStress?.humanErrorGoldAvailable === false
+      && temporalPublicStress?.falsePositiveCountAuthoritative === false
+      && temporalPublicStress?.generalPurposeBurdenReady === false
+      && temporalPublicStress?.promotionEvidenceEligible === false
       && temporalCombined?.strictConfirmed === 2
       && temporalCombined?.refinedSelfCheckHints === 4
       && temporalCombined?.falsePositive === 0
@@ -1835,6 +1845,9 @@ export async function summarizeRound5TargetedIntake({
           temporalGapRefinement?.candidateRetainedForFreshBlind === true,
         round4TwoLayerCombined: temporalCombined,
         naturalCleanStress: temporalGapRefinement?.naturalCleanStress?.refined || null,
+        publicProfessionalStress: temporalPublicStress,
+        generalPurposeCandidateRetained:
+          temporalGapRefinement?.generalPurposeCandidateRetained === true,
         promotionEvidenceEligible: false,
         studentFacing: false,
         automaticAccusationReady: false,
