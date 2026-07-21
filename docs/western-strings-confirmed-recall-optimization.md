@@ -66,6 +66,8 @@ Round 5 intake 已接入总项目状态并做实时哈希绑定。当前 `ready=
 
 候选已经接入 Round 5 targeted runner，而不是只留在回顾性脚本：gap 精炼参数固定为 synthetic calibration 选出的四组值，实际晋升只评 `merged_substitution`/`missing` 的 fresh-blind；节奏结构合取只评 `extra`/`drag`，relative-IOI `>0.15`、事件置信度 `>=0.75` 且 operation-path 必须同位置有候选。其时值比 `>=1.20` 层只输出 `self_check_hint`；复用 operation-path 已冻结的 `1.30` 时值比形成独立 `issue_detected_candidate` 层。高置信层回顾性与原有 2 个严格确诊合并为 **6/12 @ 0/253**，再加 4 个 gap 自查为三层复核上限 **10/12 @ 0/253**；两者都是已查看数据上的上限，不改变正式 2/12。为避免只标少数混淆对却把所有未标位置误当真负例，合同要求每录音 `completeErrorInventory=true`。当前 manifest/truth 尚缺，因此报告停在 `runnerWired=true`、`evaluationPerformed=false`；数据到位后同一命令会按 precision≥0.90、recall≥0.50、strict FP=0 运行真闸。
 
+采集执行障碍已进一步收口：`docs/round5-targeted-diagnosis-capture-pack/index.html` 提供精确满足合同下限的 12-take 计划和可下载 manifest/truth 模板；每条预留 4 个正例与 8 个独立混淆位置，两个 split 的演奏上下文不重叠。模板默认不签署完整错误库存，intake 也拒绝重复位置凑分母，所以工具就绪不等于数据就绪。
+
 边界必须同时保留：gap、软节奏与高置信节奏合取都在看过当前证据后形成，`strictConfirmedRecallUnchanged=true`，所以严格确诊仍是 `2/12`；当前仅 `candidateRetainedForFreshBlind=true`，`reviewAssistPromotionReady=false`、`automaticAccusationEvidenceReady=false`、`automaticAccusationReady=false`。专业长曲的 13 个候选没有逐音人工真值，不能称 13 个 FP，但也不能授权通用自动指控。下一次 Round 5 fresh-blind 必须原样先测冻结规则，不得先看新包再改条件。可复跑：
 
 ```powershell

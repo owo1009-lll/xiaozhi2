@@ -752,6 +752,13 @@ assert.equal(
   6,
 );
 const temporalPath = round5TargetedIntake?.segmentEditPathCandidate?.temporalOperationPathDiagnostic;
+const ordinaryRecallAction = status.nextActions.find(
+  (action) => action.track === "Ordinary diagnosis recall",
+);
+assert(
+  ordinaryRecallAction?.action.includes("docs/round5-targeted-diagnosis-capture-pack/index.html"),
+  "the recall handoff must point to the executable complete-inventory capture pack",
+);
 assert.equal(temporalPath?.evidenceValid, true);
 assert.equal(temporalPath?.sourceBindingCurrent, true);
 assert.equal(temporalPath?.rawArchitectureCandidateRetained, false);
