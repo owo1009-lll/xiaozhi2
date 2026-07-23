@@ -61,6 +61,8 @@ Round 5 intake 已接入总项目状态并做实时哈希绑定。2026-07-23 当
 
 在不占用晋升分母的架构烟测中，r2-01 注入训练、r2-08 曲目留出，再投已查看 Round 4：结构特征基线为 `5/12` 命中、`6/253` 非故意位置误指控，P/R=`45.45%/41.67%`；加入固定 RMS/pYIN/onset 后降为 `1/12 @ 2/253`、P/R=`33.33%/8.33%`，且四个正确 gate 的 TP 合计为 0。两种均 `architectureCandidateRetained=false`，不接复核台；固定随机森林只保留为将来真实数据上的基线，下一模型族必须显式学习连续时序操作路径，而不是继续叠声学手工特征。
 
+Round 6 录音到位前又完成一次候选输入审计：旧全谱 runner 实际没有传入固定声学窗口，这与上述负向烟测一致，不能误修成“补上声学特征”。真正的泄漏风险是它仍继承了前后音程和片段边界等谱面上下文。现已重新冻结 `western-round6-full-score-candidate-v2`：随机森林剔除 7 个静态谱面特征和 11 个固定声学堆叠字段，强制保留 assignment-gap、relative-IOI、时值比及目标窗事件数等 8 个时序字段；一次性执行守卫会同时核对协议、模块常量和实际模型 `featureNames`，出现被禁字段或缺少时序字段即在已消费后 fail-closed。该修订只保证候选不能靠谱面位置取巧，不把历史数据重写成性能提升；有效 recall/precision 仍只能由未触碰 Round 6 决定。
+
 ## 显式 temporal operation-path 结果
 
 已实现并实测动态规划路径：对谱音与 Basic Pitch 事件显式允许 `match / insert / delete / merge / split`，512 组成本只在 r2-01 三个注入种子上选择，随后冻结投向 r2-08 曲目留出和已查看 Round 4。原始路径在 Round 4 能覆盖 `11/12`，但产生 `55/253` 非故意位置，precision 仅 `16.67%`；其中 extra 分支单独产生 53 个 FP。故原始架构明确 `architectureCandidateRetained=false`，不能以高召回掩盖误伤。

@@ -22,7 +22,7 @@ Round 5 的音频与 cal/fresh 映射无误，但标签位置混杂：
 - 自动指控数字仍用原门槛 `P>=0.90 / R>=0.50 / strict FP=0`，没有用 Round 5 结果降门槛；
 - `strict FP=0` 的分母不是 12 个预设混淆槽位：对每个 gate，fresh 中**每一个谱面位置**只要不是该 gate 的签署正例，就必须计为严格负例；普通未列位置、其他 gate 正例和其他 gate 对照均不得漏算；
 - fresh-blind 只允许一次，不得用 Round 4/5 音频替代。
-- 评测协议已在音频到位前冻结为 `config/western-strings-round6-evaluation-protocol.json`：逐 gate 固定随机森林现在使用完整谱面位置分母，并与 gap refinement/strict、rhythm structural/strict 一同冻结；固定参数、0.5 决策点和门槛均不得在 fresh 后修改。
+- 评测协议已在音频到位前重新冻结为 `config/western-strings-round6-evaluation-protocol.json`：逐 gate 随机森林 v2 使用完整谱面位置分母，只保留对齐/演奏证据；明确排除前后音程、片段边界等 7 个谱面上下文特征，以及在既有烟测中使真实域召回退化的固定 RMS/pYIN/onset 堆叠。协议同时强制保留 assignment-gap、relative-IOI、时值比和目标窗事件数等 8 个时序字段，并与 gap refinement/strict、rhythm structural/strict 一同冻结；固定参数、0.5 决策点和门槛均不得在 fresh 后修改。该变更用于消除泄漏和锁定证据通道，不构成召回提升声明。
 - `western:round6-frozen-eval` 在读取 fresh 前先写一次性 consumed ledger；运行崩溃也视为 fresh 已消费，后续新候选必须换全新未触碰采集包。候选返回后，runner 还会把两 split、四 gate 的全谱位置数、签署正例、混淆负例、其他 gate 事件、普通未列位置和总数据行数与 intake 逐项复算；缺字段或任一分母不一致都记为评测失败，不得形成晋升证据。
 
 ## 生成与录前验证
@@ -48,7 +48,7 @@ npm run western:project-status
 - `rhythmConfoundedSplits=[]`；
 - 预检 `audioRead=false`，不使用任何录音或表现标签。
 - 项目状态节点 `tracks.controlledCandidate.ordinaryDynamicShadow.round6CounterbalancedCapture` 从磁盘重算分母和材料，并把 position preflight、intake 分别绑定到当前 contract/manifest/truth 哈希；
-- 同一节点还现场重哈希评测协议绑定的执行守卫、全谱候选 runner、历史特征提取器、temporal-operation 规则、intake validator、音频特征分析器和 Round 6 合同；当前 `evaluationProtocol.runnerReady=true`、`freshBlindConsumed=false`、`evaluationPerformed=false`；
+- 同一节点还现场重哈希评测协议绑定的执行守卫、全谱候选 runner、历史特征提取器、temporal-operation 规则、intake validator、音频特征分析器和 Round 6 合同；v2 协议 SHA-256 为 `a2fc7cbd8779b2eeb8ad414521431707a07a231640043a47ce6b02f4fc4427e9`，当前 `evaluationProtocol.runnerReady=true`、`freshBlindConsumed=false`、`evaluationPerformed=false`；
 - 当前该节点为 `readyForRecording=true`、`intakeReady=false`。篡改 truth、manifest 或合同后，旧报告不会继续显示绿灯。
 
 私密材料位于 `data/private/western-strings-round6-counterbalanced/`。该目录不入 Git。
