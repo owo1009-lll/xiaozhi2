@@ -1,0 +1,1465 @@
+{
+  "schemaVersion": "western-p1-clean-domain-preregistration-v1",
+  "protocolDate": "2026-07-24",
+  "frozenBeforeEvaluation": true,
+  "freshBlindResultReadForThisProtocol": false,
+  "retuningAfterEvaluationAllowed": false,
+  "purpose": "Eliminate unsafe detector candidates on existing real clean performances before requesting any new recording.",
+  "authorization": {
+    "promotionEvidenceEligible": false,
+    "round4Round5ReuseAsAcceptance": false,
+    "studentFacing": false,
+    "automaticAccusationReady": false,
+    "automaticAdoptionReady": false,
+    "studentSwitchesMustRemainFalse": [
+      "ordinaryUploadAutoFeedbackReady",
+      "m3plusAutoFeedbackReady",
+      "m4OmrAutoScoreReady"
+    ]
+  },
+  "eliminationRules": {
+    "automatic_issue_candidate": {
+      "authoritativeLocalCleanFalsePositiveMax": 0,
+      "consumedRound5KnownNegativeFalsePositiveMax": 0,
+      "publicProfessionalBurdenPooledPer1000Max": 5.0,
+      "publicProfessionalBurdenAnyRecordingPer1000Max": 10.0,
+      "decision": "eliminate if any applicable maximum is exceeded"
+    },
+    "review_hint": {
+      "authoritativeLocalCleanHintRateMax": 0.02,
+      "authoritativeLocalCleanAnyRecordingHintRateMax": 0.05,
+      "consumedRound5KnownNegativeHintRateMax": 0.02,
+      "consumedRound5AnyRecordingHintRateMax": 0.05,
+      "publicProfessionalBurdenPooledPer1000Max": 20.0,
+      "publicProfessionalBurdenAnyRecordingPer1000Max": 50.0,
+      "decision": "eliminate if any applicable maximum is exceeded"
+    }
+  },
+  "candidates": [
+    {
+      "positionFeaturesAllowed": false,
+      "rawEnergyAllowed": false,
+      "studentFacing": false,
+      "automaticAdoptionReady": false,
+      "candidateId": "alignment-gap-refined-self-check-v1",
+      "family": "alignment-gap",
+      "outputSemantic": "review_hint",
+      "applicableDatasets": [
+        "authoritative-local-clean",
+        "consumed-round5-known-negatives",
+        "public-professional-burden"
+      ],
+      "rule": "assignment gap AND (same-position temporal path substitution OR temporal-path deletion inside an adjacent assignment-gap run)",
+      "thresholds": {
+        "temporalParamsByGate": {
+          "merged_substitution": {
+            "minConfidence": 0.45,
+            "pitchWeight": 0.5,
+            "deletePenalty": 0.8,
+            "insertPenalty": 1.1,
+            "mergePenalty": 0.2,
+            "durationWeight": 0.3,
+            "reattackRatio": 0.7,
+            "dragDurationRatio": 1.3,
+            "dragIoiRatio": 0.15
+          },
+          "missing": {
+            "minConfidence": 0.45,
+            "pitchWeight": 0.5,
+            "deletePenalty": 0.8,
+            "insertPenalty": 0.8,
+            "mergePenalty": 0.45,
+            "durationWeight": 0.15,
+            "reattackRatio": 0.7,
+            "dragDurationRatio": 1.3,
+            "dragIoiRatio": 0.15
+          },
+          "extra": {
+            "minConfidence": 0.55,
+            "pitchWeight": 0.5,
+            "deletePenalty": 0.8,
+            "insertPenalty": 1.1,
+            "mergePenalty": 0.2,
+            "durationWeight": 0.3,
+            "reattackRatio": 0.85,
+            "dragDurationRatio": 1.3,
+            "dragIoiRatio": 0.15
+          },
+          "drag": {
+            "minConfidence": 0.45,
+            "pitchWeight": 0.5,
+            "deletePenalty": 0.8,
+            "insertPenalty": 0.8,
+            "mergePenalty": 0.2,
+            "durationWeight": 0.15,
+            "reattackRatio": 0.7,
+            "dragDurationRatio": 1.3,
+            "dragIoiRatio": 0.15
+          }
+        }
+      }
+    },
+    {
+      "positionFeaturesAllowed": false,
+      "rawEnergyAllowed": false,
+      "studentFacing": false,
+      "automaticAdoptionReady": false,
+      "candidateId": "alignment-gap-strict-missing-v1",
+      "family": "alignment-gap",
+      "outputSemantic": "automatic_issue_candidate",
+      "applicableDatasets": [
+        "authoritative-local-clean",
+        "consumed-round5-known-negatives",
+        "public-professional-burden"
+      ],
+      "rule": "alignment-gap-refined-self-check-v1 restricted to missing-note scope and suppressed unless the whole-take alignment health guard passes",
+      "thresholds": {
+        "maxAssignmentGapCount": 5,
+        "maxAssignmentGapRate": 0.1,
+        "temporalParamsByGate": {
+          "merged_substitution": {
+            "minConfidence": 0.45,
+            "pitchWeight": 0.5,
+            "deletePenalty": 0.8,
+            "insertPenalty": 1.1,
+            "mergePenalty": 0.2,
+            "durationWeight": 0.3,
+            "reattackRatio": 0.7,
+            "dragDurationRatio": 1.3,
+            "dragIoiRatio": 0.15
+          },
+          "missing": {
+            "minConfidence": 0.45,
+            "pitchWeight": 0.5,
+            "deletePenalty": 0.8,
+            "insertPenalty": 0.8,
+            "mergePenalty": 0.45,
+            "durationWeight": 0.15,
+            "reattackRatio": 0.7,
+            "dragDurationRatio": 1.3,
+            "dragIoiRatio": 0.15
+          },
+          "extra": {
+            "minConfidence": 0.55,
+            "pitchWeight": 0.5,
+            "deletePenalty": 0.8,
+            "insertPenalty": 1.1,
+            "mergePenalty": 0.2,
+            "durationWeight": 0.3,
+            "reattackRatio": 0.85,
+            "dragDurationRatio": 1.3,
+            "dragIoiRatio": 0.15
+          },
+          "drag": {
+            "minConfidence": 0.45,
+            "pitchWeight": 0.5,
+            "deletePenalty": 0.8,
+            "insertPenalty": 0.8,
+            "mergePenalty": 0.2,
+            "durationWeight": 0.15,
+            "reattackRatio": 0.7,
+            "dragDurationRatio": 1.3,
+            "dragIoiRatio": 0.15
+          }
+        }
+      }
+    },
+    {
+      "positionFeaturesAllowed": false,
+      "rawEnergyAllowed": false,
+      "studentFacing": false,
+      "automaticAdoptionReady": false,
+      "candidateId": "relative-ioi-duration-review-v1",
+      "family": "relative-ioi-duration",
+      "outputSemantic": "review_hint",
+      "applicableDatasets": [
+        "authoritative-local-clean",
+        "consumed-round5-known-negatives",
+        "public-professional-burden"
+      ],
+      "rule": "temporal operation at same score position AND relative IOI deviation > 0.15 AND event duration ratio >= 1.20 AND event confidence >= 0.75",
+      "thresholds": {
+        "relativeIoiDeviationGreaterThan": 0.15,
+        "eventDurationRatioAtLeast": 1.2,
+        "eventConfidenceAtLeast": 0.75,
+        "temporalParamsByGate": {
+          "merged_substitution": {
+            "minConfidence": 0.45,
+            "pitchWeight": 0.5,
+            "deletePenalty": 0.8,
+            "insertPenalty": 1.1,
+            "mergePenalty": 0.2,
+            "durationWeight": 0.3,
+            "reattackRatio": 0.7,
+            "dragDurationRatio": 1.3,
+            "dragIoiRatio": 0.15
+          },
+          "missing": {
+            "minConfidence": 0.45,
+            "pitchWeight": 0.5,
+            "deletePenalty": 0.8,
+            "insertPenalty": 0.8,
+            "mergePenalty": 0.45,
+            "durationWeight": 0.15,
+            "reattackRatio": 0.7,
+            "dragDurationRatio": 1.3,
+            "dragIoiRatio": 0.15
+          },
+          "extra": {
+            "minConfidence": 0.55,
+            "pitchWeight": 0.5,
+            "deletePenalty": 0.8,
+            "insertPenalty": 1.1,
+            "mergePenalty": 0.2,
+            "durationWeight": 0.3,
+            "reattackRatio": 0.85,
+            "dragDurationRatio": 1.3,
+            "dragIoiRatio": 0.15
+          },
+          "drag": {
+            "minConfidence": 0.45,
+            "pitchWeight": 0.5,
+            "deletePenalty": 0.8,
+            "insertPenalty": 0.8,
+            "mergePenalty": 0.2,
+            "durationWeight": 0.15,
+            "reattackRatio": 0.7,
+            "dragDurationRatio": 1.3,
+            "dragIoiRatio": 0.15
+          }
+        }
+      }
+    },
+    {
+      "positionFeaturesAllowed": false,
+      "rawEnergyAllowed": false,
+      "studentFacing": false,
+      "automaticAdoptionReady": false,
+      "candidateId": "relative-ioi-duration-strict-v1",
+      "family": "relative-ioi-duration",
+      "outputSemantic": "automatic_issue_candidate",
+      "applicableDatasets": [
+        "authoritative-local-clean",
+        "consumed-round5-known-negatives",
+        "public-professional-burden"
+      ],
+      "rule": "temporal operation at same score position AND relative IOI deviation > 0.15 AND event duration ratio >= 1.30 AND event confidence >= 0.75",
+      "thresholds": {
+        "relativeIoiDeviationGreaterThan": 0.15,
+        "eventDurationRatioAtLeast": 1.3,
+        "eventConfidenceAtLeast": 0.75,
+        "temporalParamsByGate": {
+          "merged_substitution": {
+            "minConfidence": 0.45,
+            "pitchWeight": 0.5,
+            "deletePenalty": 0.8,
+            "insertPenalty": 1.1,
+            "mergePenalty": 0.2,
+            "durationWeight": 0.3,
+            "reattackRatio": 0.7,
+            "dragDurationRatio": 1.3,
+            "dragIoiRatio": 0.15
+          },
+          "missing": {
+            "minConfidence": 0.45,
+            "pitchWeight": 0.5,
+            "deletePenalty": 0.8,
+            "insertPenalty": 0.8,
+            "mergePenalty": 0.45,
+            "durationWeight": 0.15,
+            "reattackRatio": 0.7,
+            "dragDurationRatio": 1.3,
+            "dragIoiRatio": 0.15
+          },
+          "extra": {
+            "minConfidence": 0.55,
+            "pitchWeight": 0.5,
+            "deletePenalty": 0.8,
+            "insertPenalty": 1.1,
+            "mergePenalty": 0.2,
+            "durationWeight": 0.3,
+            "reattackRatio": 0.85,
+            "dragDurationRatio": 1.3,
+            "dragIoiRatio": 0.15
+          },
+          "drag": {
+            "minConfidence": 0.45,
+            "pitchWeight": 0.5,
+            "deletePenalty": 0.8,
+            "insertPenalty": 0.8,
+            "mergePenalty": 0.2,
+            "durationWeight": 0.15,
+            "reattackRatio": 0.7,
+            "dragDurationRatio": 1.3,
+            "dragIoiRatio": 0.15
+          }
+        }
+      }
+    },
+    {
+      "positionFeaturesAllowed": false,
+      "rawEnergyAllowed": false,
+      "studentFacing": false,
+      "automaticAdoptionReady": false,
+      "candidateId": "pitch-trajectory-center-strict-v1",
+      "family": "pitch-trajectory",
+      "outputSemantic": "automatic_issue_candidate",
+      "applicableDatasets": [
+        "pitch-artifact-local-clean"
+      ],
+      "rule": "current M3+ pYIN stable-center policy; emit only decision=issue_detected; protected notation, polyphony, missing windows, low support, and high dispersion remain neutral/insufficient rather than accusations",
+      "thresholds": {
+        "pitchToleranceCents": 50.0,
+        "maxSpreadCentsP95P05": 80.0,
+        "maxIqrCents": 80.0,
+        "minTotalFrameCount": 12,
+        "minVoicedFrameCount": 12,
+        "minVoicedFrameRatio": 0.7,
+        "glissandoTargetTailFraction": 0.35
+      }
+    },
+    {
+      "positionFeaturesAllowed": false,
+      "rawEnergyAllowed": false,
+      "studentFacing": false,
+      "automaticAdoptionReady": false,
+      "candidateId": "onset-density-extra-strict-v1",
+      "family": "onset-density",
+      "outputSemantic": "automatic_issue_candidate",
+      "applicableDatasets": [
+        "authoritative-local-clean",
+        "consumed-round5-known-negatives",
+        "public-professional-burden"
+      ],
+      "rule": "extra-gate temporal path exact-pitch match AND maximum normalized interior onset strength / whole-event maximum >= 0.85",
+      "thresholds": {
+        "interiorAttackRatioAtLeast": 0.85,
+        "interiorStartMargin": "max(0.12 seconds, 20% event duration)",
+        "interiorEndMargin": "max(0.06 seconds, 8% event duration)",
+        "temporalParams": {
+          "minConfidence": 0.55,
+          "pitchWeight": 0.5,
+          "deletePenalty": 0.8,
+          "insertPenalty": 1.1,
+          "mergePenalty": 0.2,
+          "durationWeight": 0.3,
+          "reattackRatio": 0.85,
+          "dragDurationRatio": 1.3,
+          "dragIoiRatio": 0.15
+        }
+      }
+    },
+    {
+      "positionFeaturesAllowed": false,
+      "rawEnergyAllowed": false,
+      "studentFacing": false,
+      "automaticAdoptionReady": false,
+      "candidateId": "temporal-operation-sequence-union-v1",
+      "family": "sequence-model",
+      "outputSemantic": "review_hint",
+      "applicableDatasets": [
+        "authoritative-local-clean",
+        "consumed-round5-known-negatives",
+        "public-professional-burden"
+      ],
+      "rule": "union of fixed-parameter dynamic-programming match/insert/delete/merge/split gate outputs; no fit or threshold selection in P1",
+      "thresholds": {
+        "temporalParamsByGate": {
+          "merged_substitution": {
+            "minConfidence": 0.45,
+            "pitchWeight": 0.5,
+            "deletePenalty": 0.8,
+            "insertPenalty": 1.1,
+            "mergePenalty": 0.2,
+            "durationWeight": 0.3,
+            "reattackRatio": 0.7,
+            "dragDurationRatio": 1.3,
+            "dragIoiRatio": 0.15
+          },
+          "missing": {
+            "minConfidence": 0.45,
+            "pitchWeight": 0.5,
+            "deletePenalty": 0.8,
+            "insertPenalty": 0.8,
+            "mergePenalty": 0.45,
+            "durationWeight": 0.15,
+            "reattackRatio": 0.7,
+            "dragDurationRatio": 1.3,
+            "dragIoiRatio": 0.15
+          },
+          "extra": {
+            "minConfidence": 0.55,
+            "pitchWeight": 0.5,
+            "deletePenalty": 0.8,
+            "insertPenalty": 1.1,
+            "mergePenalty": 0.2,
+            "durationWeight": 0.3,
+            "reattackRatio": 0.85,
+            "dragDurationRatio": 1.3,
+            "dragIoiRatio": 0.15
+          },
+          "drag": {
+            "minConfidence": 0.45,
+            "pitchWeight": 0.5,
+            "deletePenalty": 0.8,
+            "insertPenalty": 0.8,
+            "mergePenalty": 0.2,
+            "durationWeight": 0.15,
+            "reattackRatio": 0.7,
+            "dragDurationRatio": 1.3,
+            "dragIoiRatio": 0.15
+          }
+        }
+      }
+    }
+  ],
+  "excludedOrDeferred": [
+    {
+      "candidate": "raw-waveform-energy-absence",
+      "status": "stop-line",
+      "reason": "frozen real Round 5 recall 0/12; no further investment"
+    },
+    {
+      "candidate": "target-pitch-frame-ratio-absence",
+      "status": "rejected-before-P1",
+      "reason": "frozen real Round 5 5/12 with 49 false positives"
+    },
+    {
+      "candidate": "score-position-or-static-context-RF",
+      "status": "prohibited",
+      "reason": "Round 5 position confounding; position features are forbidden"
+    },
+    {
+      "candidate": "fixed-acoustic-feature-stack",
+      "status": "rejected-before-P1",
+      "reason": "existing fixed stack underperformed structural candidate"
+    },
+    {
+      "candidate": "performance-only-RF-v2",
+      "status": "deferred-not-executable-in-P1",
+      "reason": "requires a new counterbalanced calibration split; no valid fit is available without recording, so P1 cannot manufacture one"
+    },
+    {
+      "candidate": "M4-OMR",
+      "status": "stop-line",
+      "reason": "separate data/architecture blocker; outside audio P1"
+    }
+  ],
+  "datasets": {
+    "authoritative-local-clean": {
+      "evidenceRole": "authoritative-clean-negative",
+      "recordingCount": 17,
+      "recordings": [
+        {
+          "recordingId": "r2fb-01-20260718",
+          "sourceRound": "round2-fresh-blind",
+          "performerCohort": "unseen-performer",
+          "scenario": "correct",
+          "evidenceKind": "clean-full",
+          "audioPath": "data/private/western-strings-round2-fresh-blind/r2fb-01.m4a",
+          "scorePath": "data/private/western-strings-round2/r2-01.musicxml",
+          "authoritativeZeroErrorIntent": true,
+          "deviceId": null,
+          "roomId": null
+        },
+        {
+          "recordingId": "r2fb-05-20260718",
+          "sourceRound": "round2-fresh-blind",
+          "performerCohort": "unseen-performer",
+          "scenario": "slide",
+          "evidenceKind": "technique-full",
+          "audioPath": "data/private/western-strings-round2-fresh-blind/r2fb-05.m4a",
+          "scorePath": "data/private/western-strings-round2/r2-05.musicxml",
+          "authoritativeZeroErrorIntent": true,
+          "deviceId": null,
+          "roomId": null
+        },
+        {
+          "recordingId": "r2fb-06-20260718",
+          "sourceRound": "round2-fresh-blind",
+          "performerCohort": "unseen-performer",
+          "scenario": "trill_vibrato",
+          "evidenceKind": "technique-full",
+          "audioPath": "data/private/western-strings-round2-fresh-blind/r2fb-06.m4a",
+          "scorePath": "data/private/western-strings-round2/r2-06.musicxml",
+          "authoritativeZeroErrorIntent": true,
+          "deviceId": null,
+          "roomId": null
+        },
+        {
+          "recordingId": "r2fb-07-20260718",
+          "sourceRound": "round2-fresh-blind",
+          "performerCohort": "unseen-performer",
+          "scenario": "double_stop",
+          "evidenceKind": "technique-full",
+          "audioPath": "data/private/western-strings-round2-fresh-blind/r2fb-07.m4a",
+          "scorePath": "data/private/western-strings-round2/r2-07.musicxml",
+          "authoritativeZeroErrorIntent": true,
+          "deviceId": null,
+          "roomId": null
+        },
+        {
+          "recordingId": "r2fb-08-20260718",
+          "sourceRound": "round2-fresh-blind",
+          "performerCohort": "unseen-performer",
+          "scenario": "fresh_blind_correct",
+          "evidenceKind": "clean-full",
+          "audioPath": "data/private/western-strings-round2-fresh-blind/r2fb-08.m4a",
+          "scorePath": "data/private/western-strings-round2/r2-08.musicxml",
+          "authoritativeZeroErrorIntent": true,
+          "deviceId": null,
+          "roomId": null
+        },
+        {
+          "recordingId": "r3-01",
+          "sourceRound": "round3",
+          "performerCohort": "owner-reserve",
+          "scenario": "correct",
+          "pieceId": "r3-e-minor-etude",
+          "audioPath": "data/private/western-strings-round3/r3-01.m4a",
+          "scorePath": "data/private/western-strings-round3/r3-01.musicxml",
+          "authoritativeZeroErrorIntent": true,
+          "deviceId": null,
+          "roomId": null
+        },
+        {
+          "recordingId": "r3-02",
+          "sourceRound": "round3",
+          "performerCohort": "owner-reserve",
+          "scenario": "correct",
+          "pieceId": "r3-a-major-waltz",
+          "audioPath": "data/private/western-strings-round3/r3-02.m4a",
+          "scorePath": "data/private/western-strings-round3/r3-02.musicxml",
+          "authoritativeZeroErrorIntent": true,
+          "deviceId": null,
+          "roomId": null
+        },
+        {
+          "recordingId": "r3-03",
+          "sourceRound": "round3",
+          "performerCohort": "owner-reserve",
+          "scenario": "correct",
+          "pieceId": "r3-g-major-thirds",
+          "audioPath": "data/private/western-strings-round3/r3-03.m4a",
+          "scorePath": "data/private/western-strings-round3/r3-03.musicxml",
+          "authoritativeZeroErrorIntent": true,
+          "deviceId": null,
+          "roomId": null
+        },
+        {
+          "recordingId": "round2-r2-01-20260715",
+          "sourceRound": "round2",
+          "performerCohort": "owner-original",
+          "scenario": "correct",
+          "audioPath": "data/private/western-strings-round2/r2-01.m4a",
+          "scorePath": "data/private/western-strings-round2/r2-01.musicxml",
+          "authoritativeZeroErrorIntent": true,
+          "deviceId": null,
+          "roomId": null
+        },
+        {
+          "recordingId": "round2-r2-05-20260715",
+          "sourceRound": "round2",
+          "performerCohort": "owner-original",
+          "scenario": "slide",
+          "audioPath": "data/private/western-strings-round2/r2-05.m4a",
+          "scorePath": "data/private/western-strings-round2/r2-05.musicxml",
+          "authoritativeZeroErrorIntent": true,
+          "deviceId": null,
+          "roomId": null
+        },
+        {
+          "recordingId": "round2-r2-06-20260715",
+          "sourceRound": "round2",
+          "performerCohort": "owner-original",
+          "scenario": "trill_vibrato",
+          "audioPath": "data/private/western-strings-round2/r2-06.m4a",
+          "scorePath": "data/private/western-strings-round2/r2-06.musicxml",
+          "authoritativeZeroErrorIntent": true,
+          "deviceId": null,
+          "roomId": null
+        },
+        {
+          "recordingId": "round2-r2-07-20260715",
+          "sourceRound": "round2",
+          "performerCohort": "owner-original",
+          "scenario": "double_stop",
+          "audioPath": "data/private/western-strings-round2/r2-07.m4a",
+          "scorePath": "data/private/western-strings-round2/r2-07.musicxml",
+          "authoritativeZeroErrorIntent": true,
+          "deviceId": null,
+          "roomId": null
+        },
+        {
+          "recordingId": "round2-r2-08-20260715",
+          "sourceRound": "round2",
+          "performerCohort": "owner-original",
+          "scenario": "fresh_blind_correct",
+          "audioPath": "data/private/western-strings-round2/r2-08.m4a",
+          "scorePath": "data/private/western-strings-round2/r2-08.musicxml",
+          "authoritativeZeroErrorIntent": true,
+          "deviceId": null,
+          "roomId": null
+        },
+        {
+          "recordingId": "round4-r4-01",
+          "sourceRound": "round4",
+          "performerCohort": "round4-performer",
+          "scenario": "correct",
+          "audioPath": "data/private/western-strings-round4/r4-01.m4a",
+          "scorePath": "data/private/western-strings-round4/r4-01.musicxml",
+          "authoritativeZeroErrorIntent": true,
+          "deviceId": null,
+          "roomId": null
+        },
+        {
+          "recordingId": "round4-r4-02",
+          "sourceRound": "round4",
+          "performerCohort": "round4-performer",
+          "scenario": "correct",
+          "audioPath": "data/private/western-strings-round4/r4-02.m4a",
+          "scorePath": "data/private/western-strings-round4/r4-02.musicxml",
+          "authoritativeZeroErrorIntent": true,
+          "deviceId": null,
+          "roomId": null
+        },
+        {
+          "recordingId": "round4-r4-03",
+          "sourceRound": "round4",
+          "performerCohort": "round4-performer",
+          "scenario": "trill_vibrato",
+          "audioPath": "data/private/western-strings-round4/r4-03.m4a",
+          "scorePath": "data/private/western-strings-round4/r4-03.musicxml",
+          "authoritativeZeroErrorIntent": true,
+          "deviceId": null,
+          "roomId": null
+        },
+        {
+          "recordingId": "round4-r4-04",
+          "sourceRound": "round4",
+          "performerCohort": "round4-performer",
+          "scenario": "slide",
+          "audioPath": "data/private/western-strings-round4/r4-04.m4a",
+          "scorePath": "data/private/western-strings-round4/r4-04.musicxml",
+          "authoritativeZeroErrorIntent": true,
+          "deviceId": null,
+          "roomId": null
+        }
+      ],
+      "limitations": [
+        "round2-round4 manifests do not bind deviceId or roomId",
+        "these recordings are consumed historical evidence, never fresh acceptance"
+      ]
+    },
+    "consumed-round5-known-negatives": {
+      "evidenceRole": "consumed-complete-inventory-negative-diagnostic",
+      "recordingCount": 12,
+      "recordings": [
+        {
+          "recordingId": "r5-cal-01",
+          "split": "calibration",
+          "performerId": "performer-1",
+          "deviceId": "device-1",
+          "roomId": "room-1",
+          "audioPath": "data/private/western-strings-round5/r5-cal-01.m4a",
+          "scorePath": "data/private/western-strings-round5/r5-cal-01.musicxml",
+          "completeErrorInventoryRequired": true
+        },
+        {
+          "recordingId": "r5-cal-02",
+          "split": "calibration",
+          "performerId": "performer-2",
+          "deviceId": "device-1",
+          "roomId": "room-1",
+          "audioPath": "data/private/western-strings-round5/r5-cal-02.m4a",
+          "scorePath": "data/private/western-strings-round5/r5-cal-02.musicxml",
+          "completeErrorInventoryRequired": true
+        },
+        {
+          "recordingId": "r5-cal-03",
+          "split": "calibration",
+          "performerId": "performer-1",
+          "deviceId": "device-2",
+          "roomId": "room-1",
+          "audioPath": "data/private/western-strings-round5/r5-cal-03.m4a",
+          "scorePath": "data/private/western-strings-round5/r5-cal-03.musicxml",
+          "completeErrorInventoryRequired": true
+        },
+        {
+          "recordingId": "r5-cal-04",
+          "split": "calibration",
+          "performerId": "performer-2",
+          "deviceId": "device-2",
+          "roomId": "room-1",
+          "audioPath": "data/private/western-strings-round5/r5-cal-04.m4a",
+          "scorePath": "data/private/western-strings-round5/r5-cal-04.musicxml",
+          "completeErrorInventoryRequired": true
+        },
+        {
+          "recordingId": "r5-cal-05",
+          "split": "calibration",
+          "performerId": "performer-1",
+          "deviceId": "device-3",
+          "roomId": "room-1",
+          "audioPath": "data/private/western-strings-round5/r5-cal-05.m4a",
+          "scorePath": "data/private/western-strings-round5/r5-cal-05.musicxml",
+          "completeErrorInventoryRequired": true
+        },
+        {
+          "recordingId": "r5-cal-06",
+          "split": "calibration",
+          "performerId": "performer-2",
+          "deviceId": "device-3",
+          "roomId": "room-1",
+          "audioPath": "data/private/western-strings-round5/r5-cal-06.m4a",
+          "scorePath": "data/private/western-strings-round5/r5-cal-06.musicxml",
+          "completeErrorInventoryRequired": true
+        },
+        {
+          "recordingId": "r5-fresh-01",
+          "split": "fresh-blind",
+          "performerId": "performer-1",
+          "deviceId": "device-1",
+          "roomId": "room-2",
+          "audioPath": "data/private/western-strings-round5/r5-fresh-01.m4a",
+          "scorePath": "data/private/western-strings-round5/r5-fresh-01.musicxml",
+          "completeErrorInventoryRequired": true
+        },
+        {
+          "recordingId": "r5-fresh-02",
+          "split": "fresh-blind",
+          "performerId": "performer-2",
+          "deviceId": "device-1",
+          "roomId": "room-2",
+          "audioPath": "data/private/western-strings-round5/r5-fresh-02.m4a",
+          "scorePath": "data/private/western-strings-round5/r5-fresh-02.musicxml",
+          "completeErrorInventoryRequired": true
+        },
+        {
+          "recordingId": "r5-fresh-03",
+          "split": "fresh-blind",
+          "performerId": "performer-1",
+          "deviceId": "device-2",
+          "roomId": "room-2",
+          "audioPath": "data/private/western-strings-round5/r5-fresh-03.m4a",
+          "scorePath": "data/private/western-strings-round5/r5-fresh-03.musicxml",
+          "completeErrorInventoryRequired": true
+        },
+        {
+          "recordingId": "r5-fresh-04",
+          "split": "fresh-blind",
+          "performerId": "performer-2",
+          "deviceId": "device-2",
+          "roomId": "room-2",
+          "audioPath": "data/private/western-strings-round5/r5-fresh-04.m4a",
+          "scorePath": "data/private/western-strings-round5/r5-fresh-04.musicxml",
+          "completeErrorInventoryRequired": true
+        },
+        {
+          "recordingId": "r5-fresh-05",
+          "split": "fresh-blind",
+          "performerId": "performer-1",
+          "deviceId": "device-3",
+          "roomId": "room-2",
+          "audioPath": "data/private/western-strings-round5/r5-fresh-05.m4a",
+          "scorePath": "data/private/western-strings-round5/r5-fresh-05.musicxml",
+          "completeErrorInventoryRequired": true
+        },
+        {
+          "recordingId": "r5-fresh-06",
+          "split": "fresh-blind",
+          "performerId": "performer-2",
+          "deviceId": "device-3",
+          "roomId": "room-2",
+          "audioPath": "data/private/western-strings-round5/r5-fresh-06.m4a",
+          "scorePath": "data/private/western-strings-round5/r5-fresh-06.musicxml",
+          "completeErrorInventoryRequired": true
+        }
+      ],
+      "crossContextCoverage": {
+        "performerCount": 2,
+        "deviceCount": 3,
+        "roomCount": 2
+      },
+      "limitations": [
+        "Round 5 is consumed and cannot be reused as acceptance",
+        "only non-error positions count as authoritative negatives",
+        "room is perfectly collinear with calibration/fresh split"
+      ]
+    },
+    "public-professional-burden": {
+      "evidenceRole": "unadjudicated-real-professional-burden",
+      "recordingCount": 7,
+      "performerCount": 6,
+      "workCount": 6,
+      "sourceCount": 3,
+      "recordings": [
+        {
+          "recordingId": "emil-telmanyi_bwv1004_mov4",
+          "violinist": "Emil Telmányi",
+          "work": "BWV1004",
+          "movement": "Giga",
+          "source": "musopen",
+          "benchmarkSplit": "development-reference-performer",
+          "audioPath": "音频/Bach独奏小提琴数据集/audio-by-movement/emil-telmanyi_bwv1004_mov4.mp3",
+          "scorePath": "音频/Bach独奏小提琴数据集/bach-violin-dataset/scores/bwv1004/bwv1004_mov4_00.mxl",
+          "basicPitchCachePath": "data/experiments/western-strings-bach-violin-basic-pitch-cache/emil-telmanyi_bwv1004_mov4.basic-pitch.json",
+          "referenceNoteCount": 908,
+          "referenceDoubleStopNoteCount": 0,
+          "referenceDoubleStopRate": 0.0,
+          "humanErrorGoldAvailable": false
+        },
+        {
+          "recordingId": "emil-telmanyi_bwv1005_mov4",
+          "violinist": "Emil Telmányi",
+          "work": "BWV1005",
+          "movement": "Allegro assai",
+          "source": "musopen",
+          "benchmarkSplit": "development-reference-performer",
+          "audioPath": "音频/Bach独奏小提琴数据集/audio-by-movement/emil-telmanyi_bwv1005_mov4.mp3",
+          "scorePath": "音频/Bach独奏小提琴数据集/bach-violin-dataset/scores/bwv1005/bwv1005_mov4_00.mxl",
+          "basicPitchCachePath": "data/experiments/western-strings-bach-violin-basic-pitch-cache/emil-telmanyi_bwv1005_mov4.basic-pitch.json",
+          "referenceNoteCount": 1196,
+          "referenceDoubleStopNoteCount": 0,
+          "referenceDoubleStopRate": 0.0,
+          "humanErrorGoldAvailable": false
+        },
+        {
+          "recordingId": "john-garner_bwv1002_mov6",
+          "violinist": "John Garner",
+          "work": "BWV1002",
+          "movement": "Double",
+          "source": "musopen",
+          "benchmarkSplit": "holdout-unseen-performer",
+          "audioPath": "音频/Bach独奏小提琴数据集/audio-by-movement/john-garner_bwv1002_mov6.mp3",
+          "scorePath": "音频/Bach独奏小提琴数据集/bach-violin-dataset/scores/bwv1002/bwv1002_mov6.mxl",
+          "basicPitchCachePath": "data/experiments/western-strings-bach-violin-basic-pitch-cache/john-garner_bwv1002_mov6.basic-pitch.json",
+          "referenceNoteCount": 569,
+          "referenceDoubleStopNoteCount": 0,
+          "referenceDoubleStopRate": 0.0,
+          "humanErrorGoldAvailable": false
+        },
+        {
+          "recordingId": "karen-gomyo_bwv1006_mov7",
+          "violinist": "Karen Gomyo",
+          "work": "BWV1006",
+          "movement": "Gigue",
+          "source": "gardner-museum",
+          "benchmarkSplit": "holdout-unseen-performer",
+          "audioPath": "音频/Bach独奏小提琴数据集/audio-by-movement/karen-gomyo_bwv1006_mov7.mp3",
+          "scorePath": "音频/Bach独奏小提琴数据集/bach-violin-dataset/scores/bwv1006/bwv1006_mov7.mxl",
+          "basicPitchCachePath": "data/experiments/western-strings-bach-violin-basic-pitch-cache/karen-gomyo_bwv1006_mov7.basic-pitch.json",
+          "referenceNoteCount": 666,
+          "referenceDoubleStopNoteCount": 0,
+          "referenceDoubleStopRate": 0.0,
+          "humanErrorGoldAvailable": false
+        },
+        {
+          "recordingId": "ko-donghwi_bwv1001_mov4",
+          "violinist": "Ko Donghwi",
+          "work": "BWV1001",
+          "movement": "Presto",
+          "source": "youtube",
+          "benchmarkSplit": "holdout-unseen-performer",
+          "audioPath": "音频/Bach独奏小提琴数据集/audio-by-movement/ko-donghwi_bwv1001_mov4.mp3",
+          "scorePath": "音频/Bach独奏小提琴数据集/bach-violin-dataset/scores/bwv1001/bwv1001_mov4.mxl",
+          "basicPitchCachePath": "data/experiments/western-strings-bach-violin-basic-pitch-cache/ko-donghwi_bwv1001_mov4.basic-pitch.json",
+          "referenceNoteCount": 1624,
+          "referenceDoubleStopNoteCount": 34,
+          "referenceDoubleStopRate": 0.020936,
+          "humanErrorGoldAvailable": false
+        },
+        {
+          "recordingId": "minji-kim_bwv1003_mov4",
+          "violinist": "MinJi Kim",
+          "work": "BWV1003",
+          "movement": "Allegro",
+          "source": "youtube",
+          "benchmarkSplit": "holdout-unseen-performer",
+          "audioPath": "音频/Bach独奏小提琴数据集/audio-by-movement/minji-kim_bwv1003_mov4.mp3",
+          "scorePath": "音频/Bach独奏小提琴数据集/bach-violin-dataset/scores/bwv1003/bwv1003_mov4_00.mxl",
+          "basicPitchCachePath": "data/experiments/western-strings-bach-violin-basic-pitch-cache/minji-kim_bwv1003_mov4.basic-pitch.json",
+          "referenceNoteCount": 1021,
+          "referenceDoubleStopNoteCount": 2,
+          "referenceDoubleStopRate": 0.001959,
+          "humanErrorGoldAvailable": false
+        },
+        {
+          "recordingId": "oliver-colbentson_bwv1006_mov7",
+          "violinist": "Oliver Colbentson",
+          "work": "BWV1006",
+          "movement": "Gigue",
+          "source": "musopen",
+          "benchmarkSplit": "holdout-unseen-performer",
+          "audioPath": "音频/Bach独奏小提琴数据集/audio-by-movement/oliver-colbentson_bwv1006_mov7.mp3",
+          "scorePath": "音频/Bach独奏小提琴数据集/bach-violin-dataset/scores/bwv1006/bwv1006_mov7.mxl",
+          "basicPitchCachePath": "data/experiments/western-strings-bach-violin-basic-pitch-cache/oliver-colbentson_bwv1006_mov7.basic-pitch.json",
+          "referenceNoteCount": 666,
+          "referenceDoubleStopNoteCount": 0,
+          "referenceDoubleStopRate": 0.0,
+          "humanErrorGoldAvailable": false
+        }
+      ],
+      "limitations": [
+        "no note-level human error gold; emitted flags are burden, not false positives",
+        "estimated score/audio alignment and possible edition/performance deviations"
+      ]
+    },
+    "pitch-artifact-local-clean": {
+      "evidenceRole": "authoritative-clean-negative-current-pitch-runtime",
+      "recordingCount": 11,
+      "recordings": [
+        {
+          "recordingId": "r2fb-01-20260718",
+          "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrqj4pdf-u2krul/strings-submit-mrqj4pcy-ydbdaf.json"
+        },
+        {
+          "recordingId": "r2fb-05-20260718",
+          "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrqj4pdf-u2krul/strings-submit-mrqj4pd7-f0oaf7.json"
+        },
+        {
+          "recordingId": "r2fb-06-20260718",
+          "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrqj4pdf-u2krul/strings-submit-mrqj4pd9-pxnmgh.json"
+        },
+        {
+          "recordingId": "r2fb-07-20260718",
+          "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrqj4pdf-u2krul/strings-submit-mrqj4pda-shb453.json"
+        },
+        {
+          "recordingId": "r2fb-08-20260718",
+          "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrqj4pdf-u2krul/strings-submit-mrqj4pdc-1ghh7p.json"
+        },
+        {
+          "recordingId": "r3-02",
+          "candidateRowsPath": "data/experiments/western-strings-m3/ordinary-dynamic-shadow-r3-acceptance/runs/r3-02-warm.json"
+        },
+        {
+          "recordingId": "r3-03",
+          "candidateRowsPath": "data/experiments/western-strings-m3/ordinary-dynamic-shadow-r3-acceptance/runs/r3-03-warm.json"
+        },
+        {
+          "recordingId": "round4-r4-01",
+          "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtw6-8gzbvn.json"
+        },
+        {
+          "recordingId": "round4-r4-02",
+          "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwa-jleh9k.json"
+        },
+        {
+          "recordingId": "round4-r4-03",
+          "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwc-immk43.json"
+        },
+        {
+          "recordingId": "round4-r4-04",
+          "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwf-7l1qro.json"
+        }
+      ],
+      "limitations": [
+        "only recordings with already-frozen current M3+ candidate artifacts",
+        "not evaluated on public Bach because no equivalent frozen runtime artifact exists"
+      ]
+    }
+  },
+  "reportingContract": {
+    "requiredPerCandidate": [
+      "flagCount",
+      "positionCount",
+      "rate",
+      "flagsPer1000Positions",
+      "maximumPerRecordingRate",
+      "applicability",
+      "eliminated",
+      "eliminationReasons"
+    ],
+    "publicTerminology": "burden-not-false-positive",
+    "syntheticRecallMayRepresentRealRecall": false,
+    "noRetuneAfterResults": true
+  },
+  "sourceBindings": {
+    "fileCount": 96,
+    "aggregateSha256": "0194dc5f1a63138ee2643470ed2b5f44e58f92eb783f08af8d93e614c6717e8c",
+    "files": [
+      {
+        "path": "data/experiments/western-strings-bach-violin-basic-pitch-cache/emil-telmanyi_bwv1004_mov4.basic-pitch.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "c9fb3e58c91c8d760f3ed0893202dbf4ee919ce554b131c6bed53c3d42102e78"
+      },
+      {
+        "path": "data/experiments/western-strings-bach-violin-basic-pitch-cache/emil-telmanyi_bwv1005_mov4.basic-pitch.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "1aa976c9aa51c89ca3c947708b95e3fa3e3a9d8b203d8edbfc949b1e80459c06"
+      },
+      {
+        "path": "data/experiments/western-strings-bach-violin-basic-pitch-cache/john-garner_bwv1002_mov6.basic-pitch.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "34bf32bad0497bb1c33b14c2c600a1edcbc9684296256a2253be452546e8a3c5"
+      },
+      {
+        "path": "data/experiments/western-strings-bach-violin-basic-pitch-cache/karen-gomyo_bwv1006_mov7.basic-pitch.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "4074c6f3a87c1fb7f71e5b514d926c5eb62764d66703e92d1db2c15885b11dc1"
+      },
+      {
+        "path": "data/experiments/western-strings-bach-violin-basic-pitch-cache/ko-donghwi_bwv1001_mov4.basic-pitch.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "8153800143922e4b7a56e02daa28e57553f56fd3b0bd72dfc220c7ea685ae204"
+      },
+      {
+        "path": "data/experiments/western-strings-bach-violin-basic-pitch-cache/minji-kim_bwv1003_mov4.basic-pitch.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "e2c0e4aa4fa68edde7e0df7337a0623a7a6c1201003745375221c2d1ac3b95cb"
+      },
+      {
+        "path": "data/experiments/western-strings-bach-violin-basic-pitch-cache/oliver-colbentson_bwv1006_mov7.basic-pitch.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "ec9addc8b8a07f2fb177742ec907b73611cefd70cb80ddfe087ec7c4ec407622"
+      },
+      {
+        "path": "data/experiments/western-strings-bach-violin-dataset-audit.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "8d1ea66cf925a7f757ecb288219883fc83a71ea1a347a8d4a31a5427c2c1b327"
+      },
+      {
+        "path": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrqj4pdf-u2krul/strings-submit-mrqj4pcy-ydbdaf.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "0e9d128a799586b0b0bc27d84c3e11e69362d66c4321e60b488872f20656a8a6"
+      },
+      {
+        "path": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrqj4pdf-u2krul/strings-submit-mrqj4pd7-f0oaf7.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "3713e17786157b5fe678e0c692c895fe2e45dfa2ff5339aacfced44299f74656"
+      },
+      {
+        "path": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrqj4pdf-u2krul/strings-submit-mrqj4pd9-pxnmgh.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "8a9f9b382352c88e3e70d9fdbe1d7f8ab3031ddc9170b587d8f8dd65a174f07e"
+      },
+      {
+        "path": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrqj4pdf-u2krul/strings-submit-mrqj4pda-shb453.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "471cf8ac2f5f2ea4d9d8812352601cddb2b87c8d3cf3d726d96dad4896d2f2e2"
+      },
+      {
+        "path": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrqj4pdf-u2krul/strings-submit-mrqj4pdc-1ghh7p.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "8493676da668a994f47011591f5cfb07239821e3829c259696220c19d5a7e689"
+      },
+      {
+        "path": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtw6-8gzbvn.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "13f25d57ab33a38ee1be0eb1c8aa866af3dfe0f7da13acc50abd826f1dd88adc"
+      },
+      {
+        "path": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwa-jleh9k.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "440514fcf070659351879f8cfb6cbf93bc6a55820068160e35d06ac5973c0780"
+      },
+      {
+        "path": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwc-immk43.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "a3b9c5c65e2da24a7e375bfd650b62113e76a0081fb8030a20c74b1dd90ceab7"
+      },
+      {
+        "path": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwf-7l1qro.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "acde5787ca8aea6f40797679adb19d41a33fbbad3fde8c19c96c447c8c083c54"
+      },
+      {
+        "path": "data/experiments/western-strings-m3/ordinary-dynamic-shadow-r3-acceptance/report.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "f9d6e1ea4677b6d03a7c08fadf144cec4b488663dd701ce8ac397d9ec7d82c82"
+      },
+      {
+        "path": "data/experiments/western-strings-m3/ordinary-dynamic-shadow-r3-acceptance/runs/r3-02-warm.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "1d1ae9ea8fdeef3dd6f7966ee20276a36573bc796de2af894a5400575910565c"
+      },
+      {
+        "path": "data/experiments/western-strings-m3/ordinary-dynamic-shadow-r3-acceptance/runs/r3-03-warm.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "f1ea1485d1727949623f2cdd16dc37f8acb5c65e97b4dbf99511cd057c9eb548"
+      },
+      {
+        "path": "data/experiments/western-strings-m3/ordinary-fresh-blind/report.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "71ad5420fdd468ac739e89cb60e2718925c4e6ddfd3c06cd7010f75f557f6c57"
+      },
+      {
+        "path": "data/experiments/western-strings-round4/ordinary-fresh-blind/report.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "c5ae26ff4d051c03a3310b710bc6134b857c78ff1e481ad4ef60184a37cccb45"
+      },
+      {
+        "path": "data/private/western-strings-round2/manifest.csv",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "1f08eecfae9873fbba548932be816eb485cd8c355a182a910352a6351c10dd95"
+      },
+      {
+        "path": "data/private/western-strings-round2/r2-01.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "59b3f5a163fc2d37a7e5c6375143b830d7d33e5c81465273b1a6c03fcd788d6c"
+      },
+      {
+        "path": "data/private/western-strings-round2/r2-01.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "c8452070f5bc54c04cc86de128175a0acac5bfa176ccadb99fdf5f0c9a0edbf2"
+      },
+      {
+        "path": "data/private/western-strings-round2/r2-05.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "45cf8cc480a3c4d3ea00fe3cc48320a2c253517df62bd4b890a20b57a69d5cd7"
+      },
+      {
+        "path": "data/private/western-strings-round2/r2-05.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "0a40e0d1b7501f54339ba6f3c09034b3f9d520d126be5e2e1213a0a98decdd72"
+      },
+      {
+        "path": "data/private/western-strings-round2/r2-06.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "d40c624bb3dbfd38fc83224541d0fe3c7eb383dcefbc7ec07fb42681c514e768"
+      },
+      {
+        "path": "data/private/western-strings-round2/r2-06.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "fac16259a43b292f05c1fede742b713ff066df57e986f5075c5abc5689683b6c"
+      },
+      {
+        "path": "data/private/western-strings-round2/r2-07.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "ba4768f9596312667479be672c8750e1870cc86672dffc7904d2df8c4b850f97"
+      },
+      {
+        "path": "data/private/western-strings-round2/r2-07.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "2f94cb0bae84c12b0efce17faa1898fa6bddc73c1048c011413acbfdba6d26e5"
+      },
+      {
+        "path": "data/private/western-strings-round2/r2-08.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "ca8f0a16db7e36acd22e4c89b0494d9b9b62f45d0be35a0f7352ff28357f11ca"
+      },
+      {
+        "path": "data/private/western-strings-round2/r2-08.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "b12663085aa5f574996a639f561e43b47273abb86175b3742cc3465fd86132df"
+      },
+      {
+        "path": "data/private/western-strings-round2-fresh-blind/manifest.csv",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "ef621b8dc31641369e00adfd0ed86d971c0fd6072bb8aea70cd3a901608a26bd"
+      },
+      {
+        "path": "data/private/western-strings-round2-fresh-blind/r2fb-01.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "54a219e04461e11820f3e22cc3fe1e6a62d6ee41defebe0924008293caa409ae"
+      },
+      {
+        "path": "data/private/western-strings-round2-fresh-blind/r2fb-05.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "557aebdc71c560eaf694c13d9ce61da055c420641d9c751c27d5f58ce58d38bb"
+      },
+      {
+        "path": "data/private/western-strings-round2-fresh-blind/r2fb-06.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "4008349e46d8a8831f074fc7199f26fef469882b204c34a3fd117c957aff8bb9"
+      },
+      {
+        "path": "data/private/western-strings-round2-fresh-blind/r2fb-07.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "2227052200b90a15b7f0bd1a47d66c7ac0467bc87e0cb672ffd25dfdb9d5c8eb"
+      },
+      {
+        "path": "data/private/western-strings-round2-fresh-blind/r2fb-08.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "9b6136ee90a7db7bcf5ab0cdb055be484d7c01e07f80f26bab7795ce34d2d5cd"
+      },
+      {
+        "path": "data/private/western-strings-round3/r3-01.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "c714e81db43a303b0bec66d8ab6244cb2960995d2dd0a6bd90348e028a7bb99e"
+      },
+      {
+        "path": "data/private/western-strings-round3/r3-01.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "a7744530efefb818f3d4bff371894682f6777f658e293186ad08030ee443efd5"
+      },
+      {
+        "path": "data/private/western-strings-round3/r3-02.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "54960ce1b7b83ab1d1574dc81a437945334b4e00a6b7eb51212810e71f34a247"
+      },
+      {
+        "path": "data/private/western-strings-round3/r3-02.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "ef120608555956c229cd17218fd4f666abdb4c6f31a213665b51c97cf391ca95"
+      },
+      {
+        "path": "data/private/western-strings-round3/r3-03.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "979f2a5a227fe92bd856a92467bc2efc4eae4c057a5818d3dbe3c520504b475c"
+      },
+      {
+        "path": "data/private/western-strings-round3/r3-03.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "b619a229d729dcfe998f59581c34eec65ecd63c9a565f1a04b11d83418183493"
+      },
+      {
+        "path": "data/private/western-strings-round4/manifest.csv",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "31209e297f819218168cb341c69f2bef0e05770d91f042b44a0f167759ddf526"
+      },
+      {
+        "path": "data/private/western-strings-round4/r4-01.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "8c88d615635d7c090f97fe12bbac0a6697087337d8f0e0441c77521bcf27020e"
+      },
+      {
+        "path": "data/private/western-strings-round4/r4-01.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "9880e3aa642651ce6642157c931e12ed3bce6aa4d2a4c2b9c8434000b32c9f46"
+      },
+      {
+        "path": "data/private/western-strings-round4/r4-02.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "630a73712e93f6025bfb60ebd5d447eea4d237ee5c8ca04422326f94a882fd7d"
+      },
+      {
+        "path": "data/private/western-strings-round4/r4-02.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "bbe75bac272fc1d56da3e42414a33078261561ac12e3213c8f5d9c5335e0762b"
+      },
+      {
+        "path": "data/private/western-strings-round4/r4-03.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "a145536aa3ea30c830ff4047726afe1fcb4249925fc410d2d660491acb72adbd"
+      },
+      {
+        "path": "data/private/western-strings-round4/r4-03.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "772c56fa5856578128c6586d566b322a8fcaa9b56427a88fecad113236a0f103"
+      },
+      {
+        "path": "data/private/western-strings-round4/r4-04.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "fbd3eedae12bbdbe167eec60b9a8e4db6d640719e97a2a30b4e3a24f5344ea88"
+      },
+      {
+        "path": "data/private/western-strings-round4/r4-04.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "7116de541e33bf803e93b667f78730a358929538ee5d08abd1c0eaf2b96b7ec4"
+      },
+      {
+        "path": "data/private/western-strings-round5/manifest.csv",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "c6ed88403a7d8b8231a4b06009b0b2edb5fbdb9ad8a583d5e119afaa96c02cfb"
+      },
+      {
+        "path": "data/private/western-strings-round5/position-truth.json",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "74d5c522f7453b74ef4f9e9bfe67973530037fa02d90b36ae304b5ba33b065dd"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-01.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "13686f8b459ec15fc60e93aedecd44cd7c2ecfce0e7e8f9e0cd0c860bf913647"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-01.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "b42a26978e403779e29bd9159c14032392a18a162b0edd8884857d85e95c4afc"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-02.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "9b002cc35da30be6f9bb6fae3a0fb4561e8ba99805e9c162b5ecd47f9b890d37"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-02.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "241dc6a9ed7f0dfbce8393b1398755d368869387b21c610d75dc0b5de64dea7d"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-03.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "d2006c9b3e290fd112f0c573ebe42351f4804b98783507dfc2c13bc3fccf1907"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-03.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "64e73bd06cbb761a201dd93ad45b94d4bf3d88e236c574fa45d82f90d8f83925"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-04.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "bec3933b2ac76617767098b21202222221dbaa9416f2e1aa101475192d9f943f"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-04.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "bb38ed4e5498494f295d8ef2bc48998d1b00ae434fdbeedc37dbd76f3f812647"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-05.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "e36030eff68d46112f93eff2f91f6d5f3e4a065b28e6f5b4239c53052534a0da"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-05.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "63298505a54c546b0a01490d742085964d23032bc5fbf197dc3f09c56f619c0a"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-06.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "94b04d1e7a4190d556d7c89bcd256286765866ead36402bf7e6e441d745d5104"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-06.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "e3bfea6a86a2c7ddad8e3803d3f6dd05437a36eaf086fd895023f74206f4f1da"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-01.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "6c4dc63cd92377bff4eb5ff1bd8a1a771da2cd8c0acf11c045bf45f9daeb0c6e"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-01.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "677b955a95beee25f160bd4338f7ff8af4bf8c79d071f226242c6d6e4490fec1"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-02.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "9d0d87910d138c8f2aa2ee149b6765da18c9227238a51ef026e561436399598a"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-02.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "804a244e102b23a3b7f569fc4ec8c6926caac0ea606fcdd4d3c1fc2d84a2d3a6"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-03.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "753d9899170854bf7146197b50ef1868f704355ae1b32c4af14b818e3cd0d587"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-03.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "f7e2fa8d501e9652832f860d79088e2c5eccffa3303ff5eac0d65945c7c30f56"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-04.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "ccc03e241761697c4c787ec3374225ab322c8c0c76b56ba5e6101caf5d5239f9"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-04.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "18a3da68f95cd99db4c94c50c06e7dc50a62383975183422994ef205bf1dee32"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-05.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "9fc6051ddfc8d61e775ad5911b9b73d24f83d99e2fe177aae5dcc6ab22d21ad7"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-05.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "42c4ce95faece9a0f78df40e1fc427afb7ead79f33a421ac1044a9fc82f761c8"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-06.m4a",
+        "hashMode": "raw-sha256",
+        "sha256": "b8172db7135b4cc58393ca73ed2a498f6f9eefb6a8a270b8a8c2af08d3a034ec"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-06.musicxml",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "ead71987f2de087ab5e95bf72d3c08e574b4bb743240bb5805fbe1c5b339b0a4"
+      },
+      {
+        "path": "scripts/experiments/eval_western_round5_temporal_operation_path.py",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "2393f38be993427400e43a9f3355fcb244605d05ee4844cb7a626491581cc2c7"
+      },
+      {
+        "path": "scripts/experiments/preregister_western_p1_clean_domain_candidates.py",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "6dff578688d77db256a96630f16fc4f471aa2207aab001a03f4f89aee4d7a79e"
+      },
+      {
+        "path": "scripts/experiments/western_strings_m3plus_runtime_policy.py",
+        "hashMode": "lf-normalized-sha256",
+        "sha256": "226173fbde4fa73804d21daae7ea0179a3d97a5b547aebdfdebda52ac94e6eab"
+      },
+      {
+        "path": "音频/Bach独奏小提琴数据集/audio-by-movement/emil-telmanyi_bwv1004_mov4.mp3",
+        "hashMode": "raw-sha256",
+        "sha256": "7db40285c43c84c6dccc97ce8db88520153ae135a11ee9381480f7ebaff176d2"
+      },
+      {
+        "path": "音频/Bach独奏小提琴数据集/audio-by-movement/emil-telmanyi_bwv1005_mov4.mp3",
+        "hashMode": "raw-sha256",
+        "sha256": "cc018fc8968272b07a19519451b9f6cd917917a7c4ea78392076f815df129553"
+      },
+      {
+        "path": "音频/Bach独奏小提琴数据集/audio-by-movement/john-garner_bwv1002_mov6.mp3",
+        "hashMode": "raw-sha256",
+        "sha256": "1cb6043e045c03e9f71c914f22e97942c5f0809d69fdafb30983674e67ad8b69"
+      },
+      {
+        "path": "音频/Bach独奏小提琴数据集/audio-by-movement/karen-gomyo_bwv1006_mov7.mp3",
+        "hashMode": "raw-sha256",
+        "sha256": "7af9f15c11826dd610cf0f0239807497571f800394e73d1a562f6db5a4bc0686"
+      },
+      {
+        "path": "音频/Bach独奏小提琴数据集/audio-by-movement/ko-donghwi_bwv1001_mov4.mp3",
+        "hashMode": "raw-sha256",
+        "sha256": "a72dd601236dc4abe3b272572efe2bf9d1713aa15fe2e55c08f2007adb50fc2e"
+      },
+      {
+        "path": "音频/Bach独奏小提琴数据集/audio-by-movement/minji-kim_bwv1003_mov4.mp3",
+        "hashMode": "raw-sha256",
+        "sha256": "bf8f11326274562cd2cfda065d93f13e894d745251baeeefc21f4c82cf953d22"
+      },
+      {
+        "path": "音频/Bach独奏小提琴数据集/audio-by-movement/oliver-colbentson_bwv1006_mov7.mp3",
+        "hashMode": "raw-sha256",
+        "sha256": "de23360ea7e27204be02a5bf0e497662202538db6be93528141e3ea51643754d"
+      },
+      {
+        "path": "音频/Bach独奏小提琴数据集/bach-violin-dataset/scores/bwv1001/bwv1001_mov4.mxl",
+        "hashMode": "raw-sha256",
+        "sha256": "74e52afb0bdbfaecd817bcd1131da1da73535b0569d628e21c48d09ec1b20131"
+      },
+      {
+        "path": "音频/Bach独奏小提琴数据集/bach-violin-dataset/scores/bwv1002/bwv1002_mov6.mxl",
+        "hashMode": "raw-sha256",
+        "sha256": "c48267d5711dc25a7a6d8488d7a268cd93d3ae0c65d6f0649a1e202068fe472d"
+      },
+      {
+        "path": "音频/Bach独奏小提琴数据集/bach-violin-dataset/scores/bwv1003/bwv1003_mov4_00.mxl",
+        "hashMode": "raw-sha256",
+        "sha256": "e0a843b3d33c9433c92bca7b8760482f867248e237bc6bc9a0b52f4c9c594a01"
+      },
+      {
+        "path": "音频/Bach独奏小提琴数据集/bach-violin-dataset/scores/bwv1004/bwv1004_mov4_00.mxl",
+        "hashMode": "raw-sha256",
+        "sha256": "7198887022063a3acaeddb846c5c265ef742f96869dd5ff7b3cbffa9dccac967"
+      },
+      {
+        "path": "音频/Bach独奏小提琴数据集/bach-violin-dataset/scores/bwv1005/bwv1005_mov4_00.mxl",
+        "hashMode": "raw-sha256",
+        "sha256": "8d2cba5c586e390b5985afefcc36dec725765b95ec4a50010aece05827946bcb"
+      },
+      {
+        "path": "音频/Bach独奏小提琴数据集/bach-violin-dataset/scores/bwv1006/bwv1006_mov7.mxl",
+        "hashMode": "raw-sha256",
+        "sha256": "f51bcbd9f401e0b89b1c04abf1f32a447e77b4090630df24e0cbaa339106bfe5"
+      }
+    ]
+  },
+  "protocolSemanticSha256": "efe62f7b1dac036336647918f04c158be9f0d3113a6de8b637106cf42cef62f6"
+}
