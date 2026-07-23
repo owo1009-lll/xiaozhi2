@@ -29,6 +29,7 @@ npm run western:round6-counterbalanced-capture-pack
 npm run western:round6-position-balance
 npm run test:western-round6-counterbalanced-capture-pack
 npm run test:western-round6-project-status
+npm run test:western-round5-truth-signoff-pack
 npm run western:project-status
 ```
 
@@ -51,10 +52,10 @@ npm run western:project-status
 
 1. 按对应 PDF 和 `*-演奏说明.md` 从头到尾完整演奏；
 2. 不得只录某一个 rotation；同谱三条必须全部完成；
-3. 在 `position-truth.json` 逐事件填写 `asPerformed`；
-4. 把该条 `completeErrorInventory` 改为 true；
-5. manifest 的 `consent` 改为 `yes`、`licenseStatus` 改为 `local-only`；
-6. 音频按 manifest 的 `recordingId.m4a` 放入同一私密目录；
+3. 12 条音频全部按 manifest 命名放好后，运行 `npm run western:round6-truth-signoff-pack`，打开私密目录下的 `truth-signoff/index.html`；
+4. 页面不显示任何机器预测；逐条试听后填写全部 `asPerformed`，必要时追加计划外错误，并签署每条 `completeErrorInventory`。页面只有在全部检查通过后才允许下载 `position-truth.completed.json`；
+5. 复核下载内容及其 source manifest/truth SHA 后，用它更新私密 `position-truth.json`；
+6. manifest 的 `consent` 改为 `yes`、`licenseStatus` 改为 `local-only`；
 7. 运行 `npm run western:round6-targeted-intake`。
 
-当前 intake 只证明设计分母完整：12 条、144 事件、四类各 `12/24`，fresh 各 `6/12`。它保持 `ready=false`；项目状态现场重算的待补量为 12 条音频、12 条同意、12 条许可、144 个 `asPerformed` 和 12 个完整错误清单。这是正确的 fail-closed 状态。
+当前 intake 只证明设计分母完整：12 条、144 事件、四类各 `12/24`，fresh 各 `6/12`。它保持 `ready=false`；项目状态现场重算的待补量为 12 条音频、12 条同意、12 条许可、144 个 `asPerformed` 和 12 个完整错误清单。签署页命令当前也会因 12 条音频尚未到位而非零退出，不会生成可提前误签的页面。这是正确的 fail-closed 状态。
