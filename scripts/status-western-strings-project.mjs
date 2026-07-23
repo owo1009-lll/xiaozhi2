@@ -126,6 +126,12 @@ const ROUND5_TEMPORAL_OPERATION_PATH = path.join(
   "western-strings-round5-temporal-operation-path-20260722.json",
 );
 const ROUND5_TARGETED_CONTRACT_VERSION = "western-round5-targeted-diagnosis-intake-v1";
+const ROUND5_SEGMENT_GATES = Object.freeze([
+  "merged_substitution",
+  "missing",
+  "extra",
+  "drag",
+]);
 const ORDINARY_DYNAMIC_CONTRACT_VERSION = "western-ordinary-dynamic-shadow-candidate-v1";
 const ORDINARY_DYNAMIC_POLICY_VERSION = "western-ordinary-dynamic-shadow-policy-v1";
 const ORDINARY_DYNAMIC_GATE_VERSION = "western-ordinary-dynamic-shadow-gate-v1-review-only";
@@ -1787,8 +1793,51 @@ export async function summarizeRound5TargetedIntake({
         : frozenGapRefinement?.promotionEvidenceEligible === false
           && frozenGapRefinement?.reviewAssistPromotionReady === false),
   );
-  const modelBlockingReasons = normalizedReasonList([
-    ...(modelReport?.blockingReasons || []),
+  const targetedRunnerEvaluationPerformed = Boolean(
+    frozenGapRefinement?.evaluationPerformed === true
+      && frozenGapStrict?.evaluationPerformed === true
+      && frozenRhythmRefinement?.evaluationPerformed === true
+      && frozenRhythmStrict?.evaluationPerformed === true,
+  );
+  const targetedRunnerPromotionBlockingReasons = normalizedReasonList([
+    ...(frozenGapRefinement?.blockingReasons || []),
+    ...(frozenGapStrict?.blockingReasons || []),
+    ...(frozenRhythmRefinement?.blockingReasons || []),
+    ...(frozenRhythmStrict?.blockingReasons || []),
+  ]);
+  const computedPromotedGates = ROUND5_SEGMENT_GATES.filter(
+    (gate) => modelReport?.evaluation?.gates?.[gate]?.ready === true,
+  );
+  const computedFailedGates = ROUND5_SEGMENT_GATES.filter(
+    (gate) => !computedPromotedGates.includes(gate),
+  );
+  const declaredPromotedGates = Array.isArray(modelReport?.promotedGates)
+    ? modelReport.promotedGates
+    : [];
+  const declaredFailedGates = Array.isArray(modelReport?.failedGates)
+    ? modelReport.failedGates
+    : [];
+  const modelGateSummaryCurrent = modelReport?.trainingPerformed === true
+    ? Boolean(
+        modelReport?.promotionScope === "independent-per-gate"
+          && JSON.stringify(declaredPromotedGates) === JSON.stringify(computedPromotedGates)
+          && JSON.stringify(declaredFailedGates) === JSON.stringify(computedFailedGates)
+          && modelReport?.reviewAssistPromotionReady === (computedPromotedGates.length > 0)
+          && modelReport?.partialGatePromotionReady
+            === (computedPromotedGates.length > 0
+              && computedPromotedGates.length < ROUND5_SEGMENT_GATES.length)
+          && modelReport?.allGatePromotionReady
+            === (computedPromotedGates.length === ROUND5_SEGMENT_GATES.length),
+      )
+    : Boolean(
+        modelReport?.promotionScope === "independent-per-gate"
+          && declaredPromotedGates.length === 0
+          && JSON.stringify(declaredFailedGates) === JSON.stringify(ROUND5_SEGMENT_GATES)
+          && modelReport?.reviewAssistPromotionReady === false
+          && modelReport?.partialGatePromotionReady === false
+          && modelReport?.allGatePromotionReady === false,
+      );
+  const modelIntegrityBlockingReasons = normalizedReasonList([
     ...(!modelReport ? ["round5-segment-edit-path-report-missing"] : []),
     ...(modelReport && modelReport.contract !== "western-round5-segment-edit-path-candidate-v1"
       ? ["round5-segment-edit-path-contract-invalid"]
@@ -1804,9 +1853,16 @@ export async function summarizeRound5TargetedIntake({
     ...(modelReport?.trainingPerformed === true && !modelArtifactCurrent
       ? ["round5-segment-edit-path-model-artifact-stale"]
       : []),
+    ...(modelReport && !modelGateSummaryCurrent
+      ? ["round5-segment-edit-path-gate-summary-invalid"]
+      : []),
     ...(modelReport && !frozenGapRefinementValid
       ? ["round5-frozen-gap-refinement-runner-invalid"]
       : []),
+  ]);
+  const modelBlockingReasons = normalizedReasonList([
+    ...(modelReport?.blockingReasons || []),
+    ...modelIntegrityBlockingReasons,
   ]);
   const smokeEvidenceValid = Boolean(
     smokeEvidence?.contract === "western-round5-segment-edit-path-smoke-v1"
@@ -1924,8 +1980,14 @@ export async function summarizeRound5TargetedIntake({
         modelReport?.reviewAssistPromotionReady === true
           && modelSourceBindingCurrent
           && modelArtifactCurrent
-          && modelBlockingReasons.length === 0,
+          && modelGateSummaryCurrent
+          && modelIntegrityBlockingReasons.length === 0,
       ),
+      promotionScope: modelReport?.promotionScope || null,
+      promotedGates: declaredPromotedGates,
+      failedGates: declaredFailedGates,
+      partialGatePromotionReady: modelReport?.partialGatePromotionReady === true,
+      allGatePromotionReady: modelReport?.allGatePromotionReady === true,
       modelArtifactCurrent,
       evaluation: modelReport?.evaluation || null,
       smokeDiagnostic: {
@@ -1977,6 +2039,7 @@ export async function summarizeRound5TargetedIntake({
               && frozenGapRefinementValid
               && modelSourceBindingCurrent
           ),
+          promotionBlockingReasons: targetedRunnerPromotionBlockingReasons,
         },
         promotionEvidenceEligible: false,
         studentFacing: false,
@@ -1987,12 +2050,16 @@ export async function summarizeRound5TargetedIntake({
             ? ["temporal-operation-path-evidence-invalid"]
             : []),
           ...(temporalSourceAudit.blockingReasons || []),
-          ...(temporalGapRefinement?.promotionBlockingReasons || []),
+          ...(targetedRunnerEvaluationPerformed
+            ? targetedRunnerPromotionBlockingReasons
+            : temporalGapRefinement?.promotionBlockingReasons || []),
         ]),
       },
       studentFacing: false,
       automaticAccusationReady: false,
       productionAdoptionReady: false,
+      promotionBlockingReasons: modelReport?.blockingReasons || [],
+      integrityBlockingReasons: modelIntegrityBlockingReasons,
       blockingReasons: modelBlockingReasons,
     },
     blockingReasons,
@@ -4121,22 +4188,53 @@ export function summarizeNextActions(
       || shadow.rhythmChannelEvidence?.jointFloorReady !== true
     )
   ) {
+    const round5 = shadow.round5TargetedIntake || {};
+    const segment = round5.segmentEditPathCandidate || {};
+    const targetedRunner = segment.temporalOperationPathDiagnostic?.targetedFreshBlindRunner || {};
+    const round5Evaluated = Boolean(
+      round5.ready === true
+        && round5.bindingCurrent === true
+        && segment.trainingPerformed === true
+        && segment.bindingCurrent === true
+        && targetedRunner.evaluationPerformed === true,
+    );
+    const round5ReadyForEvaluation = Boolean(
+      round5.ready === true && round5.bindingCurrent === true && !round5Evaluated,
+    );
     actions.push({
       priority: 1,
       track: "Ordinary diagnosis recall",
-      action: "Strict confirmed recall remains 2/12. Raw temporal operation-path use reaches 11/12 but causes 55/253 false positives and is rejected. Three post-inspection candidates are now frozen for untouched Round 5 only. First, the gap self-check keeps 4 useful hints at 0/253. Second, a missing-targeted gap issue candidate adds a recording-level alignment-health guard (at most 5 gaps and 10% gap rate): calibration and synthetic holdout each detect 10/15 missing targets at 0 strict FP; inspected Round 4 detects all 3 missing targets plus 1 additional true wrong at 0/253. It suppresses all 595 raw professional-long-form gap hints by rejecting both globally unhealthy alignments as insufficient evidence, not as correct performances. Third, the strict rhythm conjunction detects 4/6 extra/drag at 0/253 and 0/285 natural-clean flags. Combined retrospectively with the existing 2 strict issues, the strict-candidate ceiling is now 10/12 at 0/253. Confirmed recall does not change because both strict candidates and the health guard were formed after current evidence was inspected. Use docs/round5-targeted-diagnosis-capture-pack/index.html to record the frozen 12-take complete-inventory matrix, then run the untouched fresh-blind gate; do not retune on the new package.",
-      artifact: ROUND5_TEMPORAL_OPERATION_PATH.replace(/\\/g, "/"),
-      reason: normalizedReasonList([
-        "policy-c-auto-accusation-closed",
-        ...(shadow.rhythmChannelEvidence?.blockingReasons || ["relative-ioi-diagnostic-not-ready"]),
-        ...(shadow.policyCReviewAssistEvidence.energyRobustnessReady === true
-          ? []
-          : ["policy-c-energy-robustness-not-ready"]),
-        "gap-refinement-fresh-blind-not-run",
-        "gap-strict-issue-candidate-fresh-blind-not-run",
-        "rhythm-structural-refinement-fresh-blind-not-run",
-        "rhythm-strict-issue-candidate-fresh-blind-not-run",
-      ]),
+      action: round5Evaluated
+        ? "The complete-inventory Round 5 frozen first run is complete and the fresh split is now consumed. The independent per-gate segment baseline promotes only `extra` to a teacher-review candidate (3/6 positives, 0/12 confusion false positives, precision 1.00, recall 0.50). `merged_substitution` is 1/6 with 1 false positive, `missing` is 0/6, and `drag` is 3/6 with 1 false positive, so those three gates fail. The pre-frozen gap paths also fail (strict missing 1/6 with 1 false positive); the strict rhythm conjunction reaches 4/12 at 0 false positives but recall 0.333 remains below the 0.50 floor. Freeze the passing extra result, diagnose and train the failed gates using calibration only, and require a newly registered untouched fresh split before any revised model is promoted. Strict confirmed recall remains 2/12 and all student automatic-accusation paths stay closed."
+        : round5ReadyForEvaluation
+          ? "Round 5 complete-inventory intake is ready and hash-current. Run `npm run western:round5-segment-edit-path` once with the frozen parameters; do not inspect or retune against the fresh split before that run. Strict confirmed recall remains 2/12 and all student automatic-accusation paths stay closed."
+          : "Strict confirmed recall remains 2/12. Raw temporal operation-path use reaches 11/12 but causes 55/253 false positives and is rejected. Three post-inspection candidates are frozen for untouched Round 5 only. Use docs/round5-targeted-diagnosis-capture-pack/index.html to complete the 12-take, complete-inventory matrix, then run the frozen fresh-blind gate without retuning.",
+      artifact: round5Evaluated || round5ReadyForEvaluation
+        ? segment.source
+        : ROUND5_TEMPORAL_OPERATION_PATH.replace(/\\/g, "/"),
+      reason: normalizedReasonList(
+        round5Evaluated
+          ? [
+              "policy-c-auto-accusation-closed",
+              ...(segment.failedGates || []).map(
+                (gate) => `round5-segment-model-gate-failed:${gate}`,
+              ),
+              ...(targetedRunner.promotionBlockingReasons
+                || targetedRunner.blockingReasons
+                || []),
+            ]
+          : round5ReadyForEvaluation
+            ? ["round5-frozen-first-run-not-performed"]
+            : [
+                "policy-c-auto-accusation-closed",
+                ...(shadow.rhythmChannelEvidence?.blockingReasons
+                  || ["relative-ioi-diagnostic-not-ready"]),
+                ...(shadow.policyCReviewAssistEvidence.energyRobustnessReady === true
+                  ? []
+                  : ["policy-c-energy-robustness-not-ready"]),
+                "round5-targeted-intake-not-ready",
+              ],
+      ),
     });
   }
   if (!m3plus.m3plusModeEvalReady) {

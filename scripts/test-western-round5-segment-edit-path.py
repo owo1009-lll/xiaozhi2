@@ -48,12 +48,28 @@ def main() -> int:
         "maxStrictFalseAccusations": 0,
     }
     evaluation, models = MODULE.train_and_evaluate(synthetic_dataset(), promotion)
+    assert evaluation["promotionScope"] == "independent-per-gate"
+    assert evaluation["promotedGates"] == list(MODULE.GATES)
+    assert evaluation["failedGates"] == []
+    assert evaluation["anyGateReady"] is True
     assert evaluation["allGatesReady"] is True, evaluation
     assert set(models) == set(MODULE.GATES)
     for gate in MODULE.GATES:
         assert evaluation["gates"][gate]["precision"] == 1.0
         assert evaluation["gates"][gate]["recall"] == 1.0
         assert evaluation["gates"][gate]["falsePositive"] == 0
+
+    partial_dataset = synthetic_dataset()
+    for row in partial_dataset:
+        if row["split"] == "fresh-blind" and row["gate"] != "extra":
+            row["features"]["operationEvidence"] = 0.0
+    partial, _ = MODULE.train_and_evaluate(partial_dataset, promotion)
+    assert partial["promotedGates"] == ["extra"]
+    assert partial["failedGates"] == [
+        "merged_substitution", "missing", "drag",
+    ]
+    assert partial["anyGateReady"] is True
+    assert partial["allGatesReady"] is False
 
     positions = [{"noteIndex": 3, "measure": 2, "beat": 1.0, "scoreMidi": 74}]
     assert MODULE.truth_note_index(positions, {
@@ -149,6 +165,12 @@ def main() -> int:
         result = MODULE.run(contract, manifest, truth, report, model)
         assert result["intakeReady"] is False
         assert result["trainingPerformed"] is False
+        assert result["evaluationPerformed"] is False
+        assert result["promotionScope"] == "independent-per-gate"
+        assert result["promotedGates"] == []
+        assert result["failedGates"] == list(MODULE.GATES)
+        assert result["partialGatePromotionReady"] is False
+        assert result["allGatePromotionReady"] is False
         assert result["reviewAssistPromotionReady"] is False
         assert result["automaticAccusationReady"] is False
         assert result["studentFacing"] is False

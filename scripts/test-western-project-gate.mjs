@@ -735,9 +735,55 @@ assert.equal(
 );
 assert.equal(round5TargetedIntake?.studentFacing, false);
 assert.equal(round5TargetedIntake?.automaticAuthorizationGranted, false);
+assert.equal(round5TargetedIntake?.ready, true);
+assert.equal(round5TargetedIntake?.bindingCurrent, true);
+assert.equal(round5TargetedIntake?.counts?.recordings, 12);
+assert.equal(round5TargetedIntake?.counts?.truthEvents, 144);
 assert.equal(round5TargetedIntake?.segmentEditPathCandidate?.studentFacing, false);
 assert.equal(round5TargetedIntake?.segmentEditPathCandidate?.automaticAccusationReady, false);
 assert.equal(round5TargetedIntake?.segmentEditPathCandidate?.productionAdoptionReady, false);
+assert.equal(round5TargetedIntake?.segmentEditPathCandidate?.trainingPerformed, true);
+assert.equal(
+  round5TargetedIntake?.segmentEditPathCandidate?.promotionScope,
+  "independent-per-gate",
+);
+assert.deepEqual(round5TargetedIntake?.segmentEditPathCandidate?.promotedGates, ["extra"]);
+assert.deepEqual(
+  round5TargetedIntake?.segmentEditPathCandidate?.failedGates,
+  ["merged_substitution", "missing", "drag"],
+);
+assert.equal(
+  round5TargetedIntake?.segmentEditPathCandidate?.reviewAssistPromotionReady,
+  true,
+);
+assert.equal(
+  round5TargetedIntake?.segmentEditPathCandidate?.partialGatePromotionReady,
+  true,
+);
+assert.equal(
+  round5TargetedIntake?.segmentEditPathCandidate?.allGatePromotionReady,
+  false,
+);
+assert.deepEqual(
+  round5TargetedIntake?.segmentEditPathCandidate?.integrityBlockingReasons,
+  [],
+);
+assert.deepEqual(
+  round5TargetedIntake?.segmentEditPathCandidate?.evaluation?.gates?.extra,
+  {
+    ready: true,
+    calibrationRows: 18,
+    freshBlindRows: 18,
+    decisionThreshold: 0.5,
+    truePositive: 3,
+    falsePositive: 0,
+    falseNegative: 3,
+    trueNegative: 12,
+    precision: 1,
+    recall: 0.5,
+    blockingReasons: [],
+  },
+);
 assert.equal(round5TargetedIntake?.segmentEditPathCandidate?.smokeDiagnostic?.evidenceValid, true);
 assert.equal(
   round5TargetedIntake?.segmentEditPathCandidate?.smokeDiagnostic?.architectureCandidateRetained,
@@ -756,8 +802,9 @@ const ordinaryRecallAction = status.nextActions.find(
   (action) => action.track === "Ordinary diagnosis recall",
 );
 assert(
-  ordinaryRecallAction?.action.includes("docs/round5-targeted-diagnosis-capture-pack/index.html"),
-  "the recall handoff must point to the executable complete-inventory capture pack",
+  ordinaryRecallAction?.action.includes("fresh split is now consumed")
+    && ordinaryRecallAction?.action.includes("promotes only `extra`"),
+  "the recall handoff must expose the completed Round-5 verdict and consumed split",
 );
 assert.equal(temporalPath?.evidenceValid, true);
 assert.equal(temporalPath?.sourceBindingCurrent, true);
@@ -834,49 +881,63 @@ assert.equal(targetedGapRunner?.contract, "western-round5-frozen-gap-refinement-
 assert.equal(targetedGapRunner?.bindingCurrent, true);
 assert.equal(targetedGapRunner?.valid, true);
 assert.equal(targetedGapRunner?.runnerWired, true);
-assert.equal(targetedGapRunner?.evaluationPerformed, false);
+assert.equal(targetedGapRunner?.evaluationPerformed, true);
 assert.equal(targetedGapRunner?.outputSemantic, "self_check_hint");
 assert.equal(targetedGapRunner?.strictConfirmedRecallChanged, false);
-assert.equal(targetedGapRunner?.promotionEvidenceEligible, false);
+assert.equal(targetedGapRunner?.promotionEvidenceEligible, true);
 assert.equal(targetedGapRunner?.reviewAssistPromotionReady, false);
 assert.equal(targetedGapRunner?.automaticAccusationReady, false);
+assert.equal(targetedGapRunner?.freshBlind?.truePositive, 1);
+assert.equal(targetedGapRunner?.freshBlind?.falsePositive, 1);
+assert.equal(targetedGapRunner?.freshBlind?.recall, 0.083333);
 const targetedGapStrict = targetedGapRunner?.strictIssueCandidate;
 assert.equal(
   targetedGapStrict?.contract,
   "western-round5-frozen-gap-strict-issue-candidate-v1",
 );
 assert.equal(targetedGapStrict?.runnerWired, true);
-assert.equal(targetedGapStrict?.evaluationPerformed, false);
+assert.equal(targetedGapStrict?.evaluationPerformed, true);
 assert.equal(targetedGapStrict?.outputSemantic, "issue_detected_candidate");
 assert.equal(targetedGapStrict?.strictConfirmedRecallChanged, false);
-assert.equal(targetedGapStrict?.promotionEvidenceEligible, false);
+assert.equal(targetedGapStrict?.promotionEvidenceEligible, true);
 assert.equal(targetedGapStrict?.automaticAccusationEvidenceReady, false);
 assert.equal(targetedGapStrict?.automaticAccusationReady, false);
-assert(targetedGapRunner?.blockingReasons?.includes("round5-targeted-intake-not-ready"));
+assert.equal(targetedGapStrict?.freshBlind?.truePositive, 1);
+assert.equal(targetedGapStrict?.freshBlind?.falsePositive, 1);
+assert.equal(targetedGapStrict?.freshBlind?.recall, 0.166667);
+assert(targetedGapRunner?.blockingReasons?.includes(
+  "round5-frozen-gap-refinement-gate-failed",
+));
 const targetedRhythmRunner = targetedGapRunner?.rhythmStructuralRefinement;
 assert.equal(
   targetedRhythmRunner?.contract,
   "western-round5-frozen-rhythm-structural-refinement-v1",
 );
 assert.equal(targetedRhythmRunner?.runnerWired, true);
-assert.equal(targetedRhythmRunner?.evaluationPerformed, false);
+assert.equal(targetedRhythmRunner?.evaluationPerformed, true);
 assert.equal(targetedRhythmRunner?.outputSemantic, "self_check_hint");
 assert.equal(targetedRhythmRunner?.strictConfirmedRecallChanged, false);
-assert.equal(targetedRhythmRunner?.promotionEvidenceEligible, false);
+assert.equal(targetedRhythmRunner?.promotionEvidenceEligible, true);
 assert.equal(targetedRhythmRunner?.reviewAssistPromotionReady, false);
 assert.equal(targetedRhythmRunner?.automaticAccusationReady, false);
+assert.equal(targetedRhythmRunner?.freshBlind?.truePositive, 4);
+assert.equal(targetedRhythmRunner?.freshBlind?.falsePositive, 0);
+assert.equal(targetedRhythmRunner?.freshBlind?.recall, 0.333333);
 const targetedRhythmStrict = targetedRhythmRunner?.strictIssueCandidate;
 assert.equal(
   targetedRhythmStrict?.contract,
   "western-round5-frozen-rhythm-strict-issue-candidate-v1",
 );
 assert.equal(targetedRhythmStrict?.runnerWired, true);
-assert.equal(targetedRhythmStrict?.evaluationPerformed, false);
+assert.equal(targetedRhythmStrict?.evaluationPerformed, true);
 assert.equal(targetedRhythmStrict?.outputSemantic, "issue_detected_candidate");
 assert.equal(targetedRhythmStrict?.strictConfirmedRecallChanged, false);
-assert.equal(targetedRhythmStrict?.promotionEvidenceEligible, false);
+assert.equal(targetedRhythmStrict?.promotionEvidenceEligible, true);
 assert.equal(targetedRhythmStrict?.automaticAccusationEvidenceReady, false);
 assert.equal(targetedRhythmStrict?.automaticAccusationReady, false);
+assert.equal(targetedRhythmStrict?.freshBlind?.truePositive, 4);
+assert.equal(targetedRhythmStrict?.freshBlind?.falsePositive, 0);
+assert.equal(targetedRhythmStrict?.freshBlind?.recall, 0.333333);
 assert.equal(temporalPath?.promotionEvidenceEligible, false);
 assert.equal(temporalPath?.studentFacing, false);
 assert.equal(temporalPath?.automaticAccusationReady, false);

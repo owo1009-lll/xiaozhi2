@@ -709,12 +709,20 @@ def train_and_evaluate(
             "blockingReasons": [] if ready else [f"round5-segment-model-gate-failed:{gate}"],
         }
         models[gate] = model
+    promoted_gates = [
+        gate for gate in GATES if results.get(gate, {}).get("ready") is True
+    ]
+    failed_gates = [gate for gate in GATES if gate not in promoted_gates]
     return {
         "featureNames": feature_names,
         "modelType": "fixed-random-forest-binary-per-gate",
         "modelParams": MODEL_PARAMS,
         "gates": results,
-        "allGatesReady": all(results.get(gate, {}).get("ready") is True for gate in GATES),
+        "promotionScope": "independent-per-gate",
+        "promotedGates": promoted_gates,
+        "failedGates": failed_gates,
+        "anyGateReady": bool(promoted_gates),
+        "allGatesReady": not failed_gates,
     }, models
 
 
@@ -735,6 +743,12 @@ def run(
         "sourceHashes": source_hashes,
         "intakeReady": intake_report.get("ready") is True,
         "trainingPerformed": False,
+        "evaluationPerformed": False,
+        "promotionScope": "independent-per-gate",
+        "promotedGates": [],
+        "failedGates": list(GATES),
+        "partialGatePromotionReady": False,
+        "allGatePromotionReady": False,
         "reviewAssistPromotionReady": False,
         "automaticAccusationReady": False,
         "studentFacing": False,
@@ -812,17 +826,25 @@ def run(
             "featureNames": evaluation["featureNames"],
             "models": models,
         }, model_path)
+        promoted_gates = evaluation["promotedGates"]
+        failed_gates = evaluation["failedGates"]
+        any_ready = evaluation["anyGateReady"]
         all_ready = evaluation["allGatesReady"]
         report = {
             **base,
             "trainingPerformed": True,
+            "evaluationPerformed": True,
             "datasetRows": len(dataset),
             "evaluation": evaluation,
             "modelArtifact": {
                 "path": str(model_path.resolve().relative_to(REPO.resolve())).replace("\\", "/"),
                 "sha256": sha256(model_path),
             },
-            "reviewAssistPromotionReady": all_ready,
+            "promotedGates": promoted_gates,
+            "failedGates": failed_gates,
+            "partialGatePromotionReady": any_ready and not all_ready,
+            "allGatePromotionReady": all_ready,
+            "reviewAssistPromotionReady": any_ready,
             "frozenGapRefinement": frozen_gap_refinement,
             "blockingReasons": [] if all_ready else sorted({
                 reason
