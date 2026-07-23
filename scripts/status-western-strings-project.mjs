@@ -1789,14 +1789,22 @@ export async function summarizeRound5TargetedIntake({
       && String(positionBalanceHashes.truthSha256 || "").toLowerCase() === truthSha256,
   );
   const positionBalanceValid = Boolean(
-    positionBalance?.contract === "western-round5-position-balance-preflight-v1"
+    positionBalance?.contract === "western-round5-position-balance-preflight-v2"
       && positionBalance?.evidenceRole === "pre-recording-position-balance-only"
       && positionBalanceBindingCurrent
       && positionBalance?.audioRead === false
       && positionBalance?.promotionEvidenceEligible === false
       && positionBalance?.automaticAccusationReady === false
-      && positionBalance?.studentFacing === false,
+      && positionBalance?.studentFacing === false
+      && positionBalance?.rhythmReviewHint?.thresholds?.minPrecision === 0.90
+      && positionBalance?.rhythmReviewHint?.thresholds?.minRecall === 0.20
+      && positionBalance?.rhythmReviewHint?.thresholds?.maxCleanHintRate === 0.02
+      && Array.isArray(positionBalance?.rhythmReviewHint?.confoundedSplits),
   );
+  const rhythmPositionConfoundedSplits = positionBalanceValid
+    ? (positionBalance?.rhythmReviewHint?.confoundedSplits || [])
+    : ["calibration", "fresh-blind"];
+  const rhythmPositionConfounded = rhythmPositionConfoundedSplits.length > 0;
   const positionBalanceBlockingReasons = normalizedReasonList([
     ...(!positionBalance ? ["round5-position-balance-report-missing"] : []),
     ...(positionBalance && !positionBalanceBindingCurrent
@@ -1872,11 +1880,44 @@ export async function summarizeRound5TargetedIntake({
       && frozenRhythmRefinement?.evaluationPerformed === true
       && frozenRhythmStrict?.evaluationPerformed === true,
   );
+  const effectiveFrozenRhythmStrict = frozenRhythmStrict
+    ? {
+        ...frozenRhythmStrict,
+        rawPromotionEvidenceEligible:
+          frozenRhythmStrict?.promotionEvidenceEligible === true,
+        promotionEvidenceEligible: Boolean(
+          frozenRhythmStrict?.promotionEvidenceEligible === true
+            && !rhythmPositionConfounded
+        ),
+        positionBalanceConfounded: rhythmPositionConfounded,
+      }
+    : null;
+  const effectiveFrozenRhythmRefinement = frozenRhythmRefinement
+    ? {
+        ...frozenRhythmRefinement,
+        rawPromotionEvidenceEligible:
+          frozenRhythmRefinement?.promotionEvidenceEligible === true,
+        promotionEvidenceEligible: Boolean(
+          frozenRhythmRefinement?.promotionEvidenceEligible === true
+            && !rhythmPositionConfounded
+        ),
+        reviewAssistPromotionReady: Boolean(
+          frozenRhythmRefinement?.reviewAssistPromotionReady === true
+            && !rhythmPositionConfounded
+        ),
+        positionBalanceConfounded: rhythmPositionConfounded,
+        positionBalanceConfoundedSplits: rhythmPositionConfoundedSplits,
+        strictIssueCandidate: effectiveFrozenRhythmStrict,
+      }
+    : null;
   const targetedRunnerPromotionBlockingReasons = normalizedReasonList([
     ...(frozenGapRefinement?.blockingReasons || []),
     ...(frozenGapStrict?.blockingReasons || []),
     ...(frozenRhythmRefinement?.blockingReasons || []),
     ...(frozenRhythmStrict?.blockingReasons || []),
+    ...rhythmPositionConfoundedSplits.map(
+      (split) => `round5-rhythm-position-score-context-confounded:${split}`,
+    ),
   ]);
   const computedPromotedGates = ROUND5_SEGMENT_GATES.filter(
     (gate) => modelReport?.evaluation?.gates?.[gate]?.ready === true,
@@ -2109,6 +2150,8 @@ export async function summarizeRound5TargetedIntake({
         readyForRecording: positionBalance?.readyForRecording === true,
         confoundedSplitGates: positionBalance?.confoundedSplitGates || [],
         freshBlindConfoundedGates: freshPositionConfoundedGates,
+        rhythmReviewHint: positionBalance?.rhythmReviewHint || null,
+        rhythmConfoundedSplits: rhythmPositionConfoundedSplits,
         requiredBalanceDimensions:
           positionBalance?.requiredBalanceDimensions || [],
         audioRead: false,
@@ -2160,11 +2203,13 @@ export async function summarizeRound5TargetedIntake({
           bindingCurrent: modelSourceBindingCurrent,
           valid: frozenGapRefinementValid,
           ...(frozenGapRefinement || {}),
+          rhythmStructuralRefinement: effectiveFrozenRhythmRefinement,
           reviewAssistPromotionReady: Boolean(
             frozenGapRefinement?.reviewAssistPromotionReady === true
               && frozenGapRefinement?.evaluationPerformed === true
               && frozenGapRefinementValid
               && modelSourceBindingCurrent
+              && !rhythmPositionConfounded
           ),
           promotionBlockingReasons: targetedRunnerPromotionBlockingReasons,
         },
@@ -2189,6 +2234,9 @@ export async function summarizeRound5TargetedIntake({
       promotionEvidenceBlockingReasons: normalizedReasonList([
         ...promotionBlockedGates.map(
           (gate) => `round5-fresh-position-score-context-confounded:${gate}`,
+        ),
+        ...rhythmPositionConfoundedSplits.map(
+          (split) => `round5-rhythm-position-score-context-confounded:${split}`,
         ),
         ...(!positionBalanceValid ? positionBalanceBlockingReasons : []),
       ]),
@@ -4339,7 +4387,7 @@ export function summarizeNextActions(
       priority: 1,
       track: "Ordinary diagnosis recall",
       action: round5Evaluated
-        ? "The complete-inventory Round 5 frozen first run is complete and the fresh split is now consumed. `extra` numerically reaches 3/6 positives at 0/12 confusion false positives (precision 1.00, recall 0.50), but it is not promotion-eligible: in that fresh split, score context alone separates all 6 extra positives from all 12 negatives, while the evaluated model includes those score-context features. `merged_substitution`, `missing`, and `drag` also fail their numeric gates. A calibration-only audit found the same position confounding for all three failed gates; once score-only context features are prohibited, no stable performance-evidence candidate meets the joint floor. Therefore no Round 5 gate is currently promoted. Do not retune on this package. Collect new calibration and fresh positions matched across positive/confusion rows on previous interval, next interval, and segment-edge status, run the position-balance preflight before recording, then select and evaluate a revised performance-only model. Strict confirmed recall remains 2/12 and all student automatic-accusation paths stay closed."
+        ? "The complete-inventory Round 5 frozen first run is complete and the fresh split is now consumed. `extra` numerically reaches 3/6 positives at 0/12 confusion false positives (precision 1.00, recall 0.50), but it is not promotion-eligible: in that fresh split, score context alone separates all 6 extra positives from all 12 negatives, while the evaluated model includes those score-context features. The rhythm self-check likewise has a raw 4/12 at 0/312 false positives, but static score context predicts all 12 extra/drag target positions at 0/324 false positives under leave-one-recording-out in both splits; its apparent precision therefore cannot establish performance generalization. `merged_substitution`, `missing`, and `drag` also fail their numeric gates. A calibration-only audit found position confounding for all three failed gates; once score-only context features are prohibited, no stable performance-evidence candidate meets the joint floor. Therefore no Round 5 gate or rhythm hint is currently promoted. Do not retune on this package. Counterbalance target roles across previous/next interval, written duration, beat strength, normalized position, and segment-edge status in both new calibration and fresh plans; require the position-balance preflight to pass before recording, then select and evaluate a performance-only model. Strict confirmed recall remains 2/12 and all student automatic-accusation paths stay closed."
         : round5ReadyForEvaluation
           ? "Round 5 complete-inventory intake is ready and hash-current. Run `npm run western:round5-segment-edit-path` once with the frozen parameters; do not inspect or retune against the fresh split before that run. Strict confirmed recall remains 2/12 and all student automatic-accusation paths stay closed."
           : "Strict confirmed recall remains 2/12. Raw temporal operation-path use reaches 11/12 but causes 55/253 false positives and is rejected. Three post-inspection candidates are frozen for untouched Round 5 only. Use docs/round5-targeted-diagnosis-capture-pack/index.html to complete the 12-take, complete-inventory matrix, then run the frozen fresh-blind gate without retuning.",

@@ -812,9 +812,41 @@ assert.deepEqual(positionBalanceAudit?.freshBlindConfoundedGates, [
   "merged_substitution",
   "extra",
 ]);
+assert.deepEqual(positionBalanceAudit?.rhythmConfoundedSplits, [
+  "calibration",
+  "fresh-blind",
+]);
+assert.equal(
+  positionBalanceAudit?.rhythmReviewHint?.bySplit?.calibration
+    ?.scoreContextOnlyRule?.scoreContextRandomForest?.reviewFloorMetrics
+    ?.truePositive,
+  12,
+);
+assert.equal(
+  positionBalanceAudit?.rhythmReviewHint?.bySplit?.calibration
+    ?.scoreContextOnlyRule?.scoreContextRandomForest?.reviewFloorMetrics
+    ?.falsePositive,
+  0,
+);
+assert.equal(
+  positionBalanceAudit?.rhythmReviewHint?.bySplit?.["fresh-blind"]
+    ?.scoreContextOnlyRule?.scoreContextRandomForest?.reviewFloorMetrics
+    ?.truePositive,
+  12,
+);
+assert.equal(
+  positionBalanceAudit?.rhythmReviewHint?.bySplit?.["fresh-blind"]
+    ?.scoreContextOnlyRule?.scoreContextRandomForest?.reviewFloorMetrics
+    ?.falsePositive,
+  0,
+);
 assert(
   round5TargetedIntake?.segmentEditPathCandidate?.promotionEvidenceBlockingReasons
     ?.includes("round5-fresh-position-score-context-confounded:extra"),
+);
+assert(
+  round5TargetedIntake?.segmentEditPathCandidate?.promotionEvidenceBlockingReasons
+    ?.includes("round5-rhythm-position-score-context-confounded:fresh-blind"),
 );
 assert.deepEqual(
   round5TargetedIntake?.segmentEditPathCandidate?.evaluation?.gates?.extra,
@@ -966,7 +998,13 @@ assert.equal(targetedRhythmRunner?.runnerWired, true);
 assert.equal(targetedRhythmRunner?.evaluationPerformed, true);
 assert.equal(targetedRhythmRunner?.outputSemantic, "self_check_hint");
 assert.equal(targetedRhythmRunner?.strictConfirmedRecallChanged, false);
-assert.equal(targetedRhythmRunner?.promotionEvidenceEligible, true);
+assert.equal(targetedRhythmRunner?.rawPromotionEvidenceEligible, true);
+assert.equal(targetedRhythmRunner?.promotionEvidenceEligible, false);
+assert.equal(targetedRhythmRunner?.positionBalanceConfounded, true);
+assert.deepEqual(targetedRhythmRunner?.positionBalanceConfoundedSplits, [
+  "calibration",
+  "fresh-blind",
+]);
 assert.equal(targetedRhythmRunner?.reviewAssistPromotionReady, false);
 assert.equal(targetedRhythmRunner?.automaticAccusationReady, false);
 assert.equal(targetedRhythmRunner?.freshBlind?.truePositive, 4);
@@ -981,7 +1019,9 @@ assert.equal(targetedRhythmStrict?.runnerWired, true);
 assert.equal(targetedRhythmStrict?.evaluationPerformed, true);
 assert.equal(targetedRhythmStrict?.outputSemantic, "issue_detected_candidate");
 assert.equal(targetedRhythmStrict?.strictConfirmedRecallChanged, false);
-assert.equal(targetedRhythmStrict?.promotionEvidenceEligible, true);
+assert.equal(targetedRhythmStrict?.rawPromotionEvidenceEligible, true);
+assert.equal(targetedRhythmStrict?.promotionEvidenceEligible, false);
+assert.equal(targetedRhythmStrict?.positionBalanceConfounded, true);
 assert.equal(targetedRhythmStrict?.automaticAccusationEvidenceReady, false);
 assert.equal(targetedRhythmStrict?.automaticAccusationReady, false);
 assert.equal(targetedRhythmStrict?.freshBlind?.truePositive, 4);
