@@ -53,7 +53,7 @@ Policy C 的 assignment gap 也补做了直接波形归因：
 
 Round 5 intake 已接入总项目状态并做实时哈希绑定。2026-07-23 当前 `ready=true`、`bindingCurrent=true`：12 条录音、144 个完整签署事件、2 人/3 设备/2 房间及四类分母均通过。另以 `npm run western:round5-audio-score-identity` 做了不读取真值标签和 gate 结果的音频—乐谱身份审计；12/12 均匹配当前同名冻结谱，全局一对一分配也是 12/12 原位，因此 cal/fresh 没有反置。
 
-片段模型入口也已落地：`western:round5-segment-edit-path` 只消费通过 intake 的 calibration/fresh-blind 分割，按 merged-substitution/missing/extra/drag 四个子闸分别训练固定随机森林，并以连续五音的局部 edit-path 证据评测。2026-07-23 冻结首跑已完成；按“每个子闸独立过门”的合同，只有 `extra` 达到 `3/6 @ 0/12 confusion FP`、P/R=`100%/50%`，可冻结为教师复核候选证据。`merged_substitution` 为 `1/6 @ 1 FP`、`missing` 为 `0/6 @ 0 FP`、`drag` 为 `3/6 @ 1 FP`，三者失败。聚合字段现明确为 `promotionScope=independent-per-gate`、`promotedGates=["extra"]`；学生端、自动指控与生产采纳仍全部为 false。总状态会复核三份源哈希、模型工件哈希及 per-gate 汇总是否能由逐闸结果重算。
+片段模型入口也已落地：`western:round5-segment-edit-path` 只消费通过 intake 的 calibration/fresh-blind 分割，按 merged-substitution/missing/extra/drag 四个子闸分别训练固定随机森林，并以连续五音的局部 edit-path 证据评测。2026-07-23 首跑的原始数字只有 `extra` 达到 `3/6 @ 0/12 confusion FP`、P/R=`100%/50%`；但后续谱面位置平衡审计证明 fresh-extra 的 6 正/12 负可由前一音程单特征完全分开，而模型含该静态特征，所以这个数值通过不具晋升效力。状态现区分 `numericallyPromotedGates=["extra"]` 与有效 `promotedGates=[]`；`reviewAssistPromotionReady=false`，学生端、自动指控与生产采纳仍全部为 false。
 
 在不占用晋升分母的架构烟测中，r2-01 注入训练、r2-08 曲目留出，再投已查看 Round 4：结构特征基线为 `5/12` 命中、`6/253` 非故意位置误指控，P/R=`45.45%/41.67%`；加入固定 RMS/pYIN/onset 后降为 `1/12 @ 2/253`、P/R=`33.33%/8.33%`，且四个正确 gate 的 TP 合计为 0。两种均 `architectureCandidateRetained=false`，不接复核台；固定随机森林只保留为将来真实数据上的基线，下一模型族必须显式学习连续时序操作路径，而不是继续叠声学手工特征。
 
@@ -67,9 +67,9 @@ Round 5 intake 已接入总项目状态并做实时哈希绑定。2026-07-23 当
 
 候选已经接入 Round 5 targeted runner，而不是只留在回顾性脚本：gap 的 `self_check_hint` 仍保留，同时新增 missing-targeted 严格层；只有整条 assignment gap `<=5` 且 gap rate `<=10%` 才可输出 `issue_detected_candidate`，否则回退证据不足。节奏结构合取只评 `extra`/`drag`，relative-IOI `>0.15`、事件置信度 `>=0.75` 且 operation-path 必须同位置有候选；时值比 `>=1.20` 为软层，复用已有冻结值 `>=1.30` 为严格层。Round 5 首跑已经否定这些回顾性上限的晋升资格：gap 自查为 `1/12 @ 1 FP`，missing 严格层为 `1/6 @ 1 FP`；节奏 soft/strict 均为 `4/12 @ 0 FP`、recall=`33.33%`。它们均未过 precision≥0.90、target recall≥0.50、strict FP=0，正式严格确诊继续为 **2/12**。
 
-本轮采集、签署、身份核对和冻结首跑均已完成，当前 12 条 fresh 证据视为已消费。下一步不是在这 6 条 fresh 上调阈值重考，而是只用 calibration 诊断 `merged_substitution`、`missing`、`drag` 的失败模式；任何改过的模型都必须登记并采集新的 untouched fresh 包。`extra` 的通过结果冻结保留，不因其他三闸失败被聚合抹掉，也不得外推为四类合格。
+本轮采集、签署、身份核对和首跑均已完成，当前 12 条证据视为已消费。calibration-only 留一录音审计进一步发现 merged、missing、drag 的标签都被纯谱面音程上下文完美分开；排除前后音程和片段边界等静态特征后，没有稳定候选过门。因此下一步不能在旧 calibration 上继续调模，必须同时重做位置配平的 calibration 和 untouched fresh。
 
-边界必须同时保留：gap 健康守卫、软节奏与高置信节奏合取都未通过 Round 5，`strictConfirmedRecallUnchanged=true`，所以严格确诊仍是 `2/12`；片段模型只有 `extra` 的教师复核候选证据过门，`automaticAccusationEvidenceReady=false`、`automaticAccusationReady=false`。健康守卫把长曲降级为证据不足，不等于证明长曲正确；节奏严格层的 13 个专业长曲候选也没有逐音人工真值。可复跑：
+边界必须同时保留：gap 健康守卫、软节奏与高置信节奏合取都未通过 Round 5，片段模型的 extra 也因 fresh 位置混杂不能晋升；`strictConfirmedRecallUnchanged=true`，所以严格确诊仍是 `2/12`，`reviewAssistPromotionReady=false`、`automaticAccusationEvidenceReady=false`、`automaticAccusationReady=false`。健康守卫把长曲降级为证据不足，不等于证明长曲正确；节奏严格层的 13 个专业长曲候选也没有逐音人工真值。可复跑：
 
 ```powershell
 npm run western:round5-temporal-operation-path

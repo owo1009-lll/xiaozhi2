@@ -44,9 +44,17 @@
 |---|---:|---:|---|
 | merged substitution | 1 / 1 / 5 | 50% / 16.67% | 失败 |
 | missing | 0 / 0 / 6 | 0% / 0% | 失败 |
-| extra | 3 / 0 / 3 | 100% / 50% | 教师复核候选证据通过 |
+| extra | 3 / 0 / 3 | 100% / 50% | 数值过线，但证据有效性失败 |
 | drag | 3 / 1 / 3 | 75% / 50% | 失败 |
 
-因此 `promotionScope=independent-per-gate`、`promotedGates=["extra"]`、`failedGates=["merged_substitution","missing","drag"]`。这不打开学生端或自动指控；`extra` 也不能替另外三类背书。当前 fresh split 已消费，后续只能在 calibration 上分析失败模式，任何改模必须在新登记的 untouched fresh 包上重新验收。
+录音后谱面位置审计发现 calibration 的 merged/missing/drag 和 fresh 的 merged/extra 标签可被纯谱面前后音程完全分开；extra 模型又包含这些静态特征。因此当前只记录 `numericallyPromotedGates=["extra"]`，有效 `promotedGates=[]`、`reviewAssistPromotionReady=false`。当前 calibration 与 fresh 都已消费且位置混杂，不能继续用于选模或晋升。
+
+下一包必须先填完计划位置、但在录音前运行：
+
+```powershell
+npm run western:round5-position-balance -- --manifest <new-manifest.csv> --truth <new-position-truth.json> --require-ready
+```
+
+该预检不读取音频，只检查每个 split、每个 gate 的正例/混淆负例是否会被 `scorePreviousInterval / scoreNextInterval / segmentEdgeStatus` 单独分开；任何一项可分即非零退出，先换位置再录。模型候选也禁止使用这些静态谱面上下文特征。只有位置预检通过、calibration performance-only 留一录音过门后，才允许生成新的 untouched fresh 包。
 
 为排除采集目录误标，`npm run western:round5-audio-score-identity` 只用音频提取的音高事件与 12 份冻结 MusicXML 做全交叉匹配，不读取 `position-truth.json` 或 gate 结果。当前 12/12 均匹配同名谱，全局一对一分配也是原位，结论为 `current-mapping-confirmed`，cal/fresh 没有反置。
