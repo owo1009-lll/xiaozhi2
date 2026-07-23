@@ -1,0 +1,357 @@
+{
+  "schemaVersion": 1,
+  "contract": "western-p2-public-error-recall-audit-v1",
+  "evidenceDate": "2026-07-24",
+  "evidenceRole": "public-real-domain-error-recall-derivability-audit",
+  "sourceBindings": [
+    {
+      "path": "data/experiments/western-strings-m1/western-strings-dataset-index.csv",
+      "sha256": "b91f7a01df306b23edc7f3da214d68cae58c2e47ced837e972a068bee05714cb"
+    },
+    {
+      "path": "data/experiments/western-strings-musicnet-accompanied-violin/report.json",
+      "sha256": "b63e822f41fc3c0c9a6cb51db8818eccf1b5eb8c49d34677f9145ae0fc7a1390"
+    },
+    {
+      "path": "scripts/experiments/eval_western_musicnet_accompanied_violin.py",
+      "sha256": "25db074d7a3453e887a5c8e50a4a253a389aa96a678fa8ffe53963f0df407b58"
+    },
+    {
+      "path": "data/experiments/western-strings-musicnet-accompanied-violin/raw/2330.csv",
+      "sha256": "cb2ca0e5ee3378c20e46e6de4e55b59cc6527821d57de105e9559d3a6f84cf07"
+    },
+    {
+      "path": "data/experiments/western-strings-musicnet-accompanied-violin/raw/2334.csv",
+      "sha256": "89af2a59173bbabbf907577c6d8d613ba63368999aa0555245b6833bd1dcac57"
+    },
+    {
+      "path": "data/experiments/western-strings-m0/m0a-bach10/m0a-bach10-summary.json",
+      "sha256": "fdf5c19245c614c11f929c0e460e19470a7e8e0616a65964690ff8536940f9b4"
+    },
+    {
+      "path": "data/experiments/western-strings-m0/m0a-bach10/m0a-bach10-per-note.csv",
+      "sha256": "653872496969fd3b52244e30aa1c8c3325360139efca74f41e0f58ba55638a49"
+    },
+    {
+      "path": "data/experiments/western-strings-m0/m0a-bach10/m0a-bach10-sanity.csv",
+      "sha256": "b9a54a84a7907b93037c11acb49cfe3980e6b579a26300c5263dba0f46883b0f"
+    },
+    {
+      "path": "scripts/experiments/eval_western_strings_m0_bach10.py",
+      "sha256": "261cebdfb3f99b1ce8948fdcfa56c8787a9dd4b4e9267dd12211bc56584bbfc1"
+    },
+    {
+      "path": "data/experiments/western-strings-m0/m0b-urmp/m0b-urmp-summary.json",
+      "sha256": "beb8ed2a015c7c9c029ba42787a05c2c6c7790780de2f6ec891d08a27caffdfd"
+    },
+    {
+      "path": "data/experiments/western-strings-m0/m0b-urmp/m0b-urmp-per-note.csv",
+      "sha256": "79914ed13b019e62d35f49f1ab5388ab2f78dc2fe3cf9289659b26a0394e0c58"
+    },
+    {
+      "path": "data/experiments/western-strings-m0/m0b-urmp/m0b-urmp-sanity.csv",
+      "sha256": "d1af56981d96d76480b6cc600c94ddb01b0f44151f41d49c6ec95c66759b040c"
+    },
+    {
+      "path": "scripts/experiments/eval_western_strings_m0_urmp.py",
+      "sha256": "27c016a6e1422c9fd451279b71371a8ba205f79d5be33cda969845f1f559f288"
+    },
+    {
+      "path": "data/experiments/western-strings-m0/m0c-musicnet/m0c-musicnet-summary.json",
+      "sha256": "a2d39b21bb7e4744076b937b92c5ce869ff55472a5cae872bc0e55ef571eddeb"
+    },
+    {
+      "path": "data/experiments/western-strings-m0/m0c-musicnet/m0c-musicnet-per-note.csv",
+      "sha256": "99b4ba518f49b9d0c39252c6d44cfbaa5fb57adb181c8273b852bb872948b73f"
+    },
+    {
+      "path": "data/experiments/western-strings-m0/m0c-musicnet/m0c-musicnet-sanity.csv",
+      "sha256": "e43bffc0e05dd20483fc45637dabc69633231614b4bc78a9510b38a661efca31"
+    },
+    {
+      "path": "scripts/experiments/eval_western_strings_m0_musicnet.py",
+      "sha256": "30f5b0246a11bcba324f603b79b8334c6e191f014f4c8186320a1bdcc1ffd93e"
+    }
+  ],
+  "intendedUse": "Determine whether already-aligned public real recordings contain independent positive truth for wrong, missing, extra, or drag recall.",
+  "datasets": [
+    {
+      "datasetId": "bach10",
+      "artifactDatasetName": "Bach10_v1.1",
+      "grain": "one aligned reference note, repeated once per evaluation method",
+      "artifactRows": 2125,
+      "uniqueAlignedReferenceNotes": 425,
+      "methodsPerReferenceNote": 5,
+      "itemSummary": {
+        "pieces": 10,
+        "instruments": [
+          "violin/soprano source_id=1"
+        ],
+        "doubleStopNotes": 0,
+        "legatoKnownNotes": 0
+      },
+      "columns": [
+        "absError",
+        "doubleStop",
+        "goldTime",
+        "legato",
+        "method",
+        "midi",
+        "noteIndex",
+        "piece",
+        "predTime",
+        "scoreTime"
+      ],
+      "adjudicatedErrorLabelColumns": [],
+      "scoreAndAudioOnsetPairAvailable": true,
+      "timingResidualComputable": true,
+      "timingResidualEligibleAsErrorGold": false,
+      "timingResidualExclusionReasons": [
+        "Score time and performance time differ under expressive tempo and rubato.",
+        "No external correctness rubric or human error adjudication is attached.",
+        "Thresholding the evaluated timing feature to create truth would be circular."
+      ],
+      "pairingAudit": {
+        "samePartRepeatedPerformancePairs": 0,
+        "reason": "10 首不同众赞歌各只有一条 source_id=1 小提琴/高音声部；其他 source ID 是同次合奏中的不同声部。"
+      },
+      "scoreLabelIdentityAudit": "The source schema carries one shared MIDI pitch beside score and audio onset times; it does not carry intended-versus-performed pitch.",
+      "adjudicatedRealErrorPositives": 0,
+      "realErrorRecallDerivable": false,
+      "eligibleUses": [
+        "real-performance alignment evaluation",
+        "recognition stress testing",
+        "clean-like burden diagnostics with an explicit non-gold caveat"
+      ],
+      "ineligibleUses": [
+        "wrong/missing/extra/drag error recall",
+        "student-facing detector promotion"
+      ]
+    },
+    {
+      "datasetId": "urmp",
+      "artifactDatasetName": "URMP Eredis02/HuggingFace smoke subset",
+      "grain": "one aligned reference note, repeated once per evaluation method",
+      "artifactRows": 730,
+      "uniqueAlignedReferenceNotes": 146,
+      "methodsPerReferenceNote": 5,
+      "itemSummary": {
+        "pieces": 1,
+        "tracks": [
+          "vn",
+          "vc"
+        ],
+        "instruments": [
+          "violin",
+          "cello"
+        ]
+      },
+      "columns": [
+        "absError",
+        "doubleStop",
+        "goldTime",
+        "legato",
+        "method",
+        "midi",
+        "noteIndex",
+        "piece",
+        "predTime",
+        "scoreTime"
+      ],
+      "adjudicatedErrorLabelColumns": [],
+      "scoreAndAudioOnsetPairAvailable": true,
+      "timingResidualComputable": true,
+      "timingResidualEligibleAsErrorGold": false,
+      "timingResidualExclusionReasons": [
+        "Score time and performance time differ under expressive tempo and rubato.",
+        "No external correctness rubric or human error adjudication is attached.",
+        "Thresholding the evaluated timing feature to create truth would be circular."
+      ],
+      "pairingAudit": {
+        "samePartRepeatedPerformancePairs": 0,
+        "reason": "小提琴和大提琴文件是同一 Jupiter 合奏的不同声部，不是同一声部的正确/错误两次演奏。"
+      },
+      "scoreLabelIdentityAudit": "The evaluator hard-fails on MIDI/gold count or pitch mismatch; remaining score-versus-audio differences are onset/duration alignment.",
+      "adjudicatedRealErrorPositives": 0,
+      "realErrorRecallDerivable": false,
+      "eligibleUses": [
+        "real-performance alignment evaluation",
+        "recognition stress testing",
+        "clean-like burden diagnostics with an explicit non-gold caveat"
+      ],
+      "ineligibleUses": [
+        "wrong/missing/extra/drag error recall",
+        "student-facing detector promotion"
+      ]
+    },
+    {
+      "datasetId": "musicnet-solo",
+      "artifactDatasetName": "MusicNet DreamyWanderer/HuggingFace two-sample string smoke",
+      "grain": "one aligned reference note, repeated once per evaluation method",
+      "artifactRows": 7585,
+      "uniqueAlignedReferenceNotes": 1517,
+      "methodsPerReferenceNote": 5,
+      "itemSummary": {
+        "samples": [
+          "2191",
+          "2298"
+        ],
+        "ensembles": [
+          "Solo Violin",
+          "Solo Cello"
+        ],
+        "instruments": [
+          "violin",
+          "cello"
+        ],
+        "doubleStopNotes": 28
+      },
+      "columns": [
+        "absError",
+        "doubleStop",
+        "goldTime",
+        "legato",
+        "method",
+        "midi",
+        "noteIndex",
+        "piece",
+        "predTime",
+        "scoreTime"
+      ],
+      "adjudicatedErrorLabelColumns": [],
+      "scoreAndAudioOnsetPairAvailable": true,
+      "timingResidualComputable": true,
+      "timingResidualEligibleAsErrorGold": false,
+      "timingResidualExclusionReasons": [
+        "Score time and performance time differ under expressive tempo and rubato.",
+        "No external correctness rubric or human error adjudication is attached.",
+        "Thresholding the evaluated timing feature to create truth would be circular."
+      ],
+      "pairingAudit": {
+        "samePartRepeatedPerformancePairs": 0,
+        "reason": "样本 2191 与 2298 是不同 Bach 作品、不同乐器，不是同一声部的成对演奏。"
+      },
+      "scoreLabelIdentityAudit": "The evaluator hard-fails on MIDI/label count or pitch mismatch; the authors' estimated residual label noise has no adjudicated positions.",
+      "adjudicatedRealErrorPositives": 0,
+      "realErrorRecallDerivable": false,
+      "eligibleUses": [
+        "real-performance alignment evaluation",
+        "recognition stress testing",
+        "clean-like burden diagnostics with an explicit non-gold caveat"
+      ],
+      "ineligibleUses": [
+        "wrong/missing/extra/drag error recall",
+        "student-facing detector promotion"
+      ]
+    },
+    {
+      "datasetId": "musicnet-accompanied-violin",
+      "grain": "one instrument-labelled violin note in a violin+piano mix",
+      "samples": [
+        {
+          "id": "2330",
+          "split": "development",
+          "work": "Violin Sonata No. 1 in D major, I",
+          "performerSource": "Timothy Jones",
+          "violinReferenceNotes": 1660
+        },
+        {
+          "id": "2334",
+          "split": "holdout-unseen-performer",
+          "work": "Violin Sonata No. 8 in G major, I",
+          "performerSource": "Edward Auer",
+          "violinReferenceNotes": 1578
+        }
+      ],
+      "uniqueInstrumentLabelledReferenceNotes": 3238,
+      "labelColumns": [
+        "end_beat",
+        "end_time",
+        "instrument",
+        "note",
+        "note_value",
+        "start_beat",
+        "start_time"
+      ],
+      "adjudicatedErrorLabelColumns": [],
+      "pairingAudit": {
+        "samePartRepeatedPerformancePairs": 0,
+        "reason": "开发集 2330 与留出集 2334 使用不同奏鸣曲和不同演奏者；它们是识别评测分割，不是同一声部的正确/错误演奏对。"
+      },
+      "timingResidualComputable": false,
+      "adjudicatedRealErrorPositives": 0,
+      "realErrorRecallDerivable": false,
+      "eligibleUses": [
+        "full-mix target-instrument recognition/isolation evaluation",
+        "accompaniment-domain precision and coverage stress testing"
+      ],
+      "ineligibleUses": [
+        "wrong/missing/extra/drag error recall",
+        "student-facing detector promotion"
+      ],
+      "recognitionGateReady": false,
+      "studentReleaseEligible": false,
+      "labelNoiseCaveat": "The estimated roughly 4% residual MusicNet label error has no known per-position adjudication and cannot be counted as detector positives."
+    }
+  ],
+  "profile": {
+    "m0AlignedReferenceNotes": 2088,
+    "accompaniedInstrumentLabelledReferenceNotes": 3238,
+    "totalReferenceNoteEventsInspected": 5326,
+    "samePartRepeatedPerformancePairs": 0,
+    "adjudicatedRealErrorPositiveCount": 0
+  },
+  "reproducibility": {
+    "indexedDatasetRows": 14,
+    "locallyPresentByIndex": {
+      "audioExists": 0,
+      "scoreExists": 0,
+      "goldExists": 0
+    },
+    "rawM0ReplayableWithoutRedownload": false,
+    "impact": "The tracked summaries, per-note tables, evaluator contracts, and hashes are sufficient for this label-semantics audit, but the M0 metrics cannot currently be rerun locally without redownloading raw data.",
+    "severity": "medium"
+  },
+  "decision": {
+    "realErrorRecallMetricDerivable": false,
+    "weakRealRecallEvidenceAvailable": false,
+    "reason": "All public truth is alignment or instrument-labelled note truth. There are zero adjudicated error positives and zero repeated same-part correct/error performance pairs.",
+    "timingResidualPolicy": "Do not label large score-to-performance onset residuals as drag errors: expressive timing is unadjudicated and a residual threshold would manufacture circular truth.",
+    "syntheticRecallPolicy": "Synthetic injection remains precision-side support only and must not be reported as real-domain recall.",
+    "p2ReducesPositiveErrorRecordingNeed": false,
+    "promotionAuthorized": false
+  },
+  "stopLines": {
+    "m4OmrFurtherInvestment": false,
+    "waveformEnergyMissingNoteFurtherInvestment": false
+  },
+  "releaseSafety": {
+    "round4AndRound5AcceptanceReuse": false,
+    "postBlindRetuning": false,
+    "studentSwitchesRemainFalse": true,
+    "failClosed": true
+  },
+  "findings": [
+    {
+      "severity": "critical",
+      "confidence": "high",
+      "finding": "No public dataset supplies real error-positive truth.",
+      "evidence": "0 adjudicated positives and 0 same-part repeated-performance pairs across four audited dataset paths.",
+      "impact": "Recall for student errors cannot be computed or weakly inferred."
+    },
+    {
+      "severity": "high",
+      "confidence": "high",
+      "finding": "Timing residuals are not error labels.",
+      "evidence": "2088 score/audio onset pairs exist, but score pitch and annotation pitch are identical by schema or evaluator assertion.",
+      "impact": "Treating residual thresholds as drag truth would evaluate a detector against labels generated from its own feature."
+    },
+    {
+      "severity": "medium",
+      "confidence": "high",
+      "finding": "The M0 raw fixtures are absent locally.",
+      "evidence": "The dataset index reports 0/14 audio, 0/14 score, and 0/14 gold files present.",
+      "impact": "The semantic audit is source-bound, but numerical M0 regeneration requires a public-data redownload."
+    }
+  ]
+}
