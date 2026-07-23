@@ -775,6 +775,7 @@ assert.equal(
 assert.equal(round6CounterbalancedCapture?.contractValid, true);
 assert.equal(round6CounterbalancedCapture?.bindings?.positionBalance, true);
 assert.equal(round6CounterbalancedCapture?.bindings?.intake, true);
+assert.equal(round6CounterbalancedCapture?.bindings?.evaluationProtocol, true);
 assert.equal(round6CounterbalancedCapture?.designCountsReady, true);
 assert.equal(round6CounterbalancedCapture?.materialsReady, true);
 assert.equal(round6CounterbalancedCapture?.readyForRecording, true);
@@ -799,6 +800,36 @@ assert.deepEqual(
   [],
 );
 assert.equal(round6CounterbalancedCapture?.positionBalance?.audioRead, false);
+assert.equal(
+  round6CounterbalancedCapture?.evaluationProtocol?.contract,
+  "western-round6-frozen-evaluation-protocol-v1",
+);
+assert.equal(round6CounterbalancedCapture?.evaluationProtocol?.valid, true);
+assert.equal(
+  round6CounterbalancedCapture?.evaluationProtocol?.sourceBindingsCurrent,
+  true,
+);
+assert.equal(round6CounterbalancedCapture?.evaluationProtocol?.runnerReady, true);
+assert.equal(
+  round6CounterbalancedCapture?.evaluationProtocol?.reportBindingCurrent,
+  true,
+);
+assert.equal(
+  round6CounterbalancedCapture?.evaluationProtocol?.evaluationPerformed,
+  false,
+);
+assert.equal(
+  round6CounterbalancedCapture?.evaluationProtocol?.freshBlindConsumed,
+  false,
+);
+assert.equal(
+  round6CounterbalancedCapture?.evaluationProtocol?.freshBlindRunLimit,
+  1,
+);
+assert.equal(
+  round6CounterbalancedCapture?.evaluationProtocol?.freshUsedForSelection,
+  false,
+);
 assert.equal(round6CounterbalancedCapture?.studentFacing, false);
 assert.equal(round6CounterbalancedCapture?.automaticAccusationReady, false);
 assert.equal(round5TargetedIntake?.segmentEditPathCandidate?.studentFacing, false);
@@ -948,6 +979,7 @@ assert(
     && ordinaryRecallAction?.action.includes("Round 6 counterbalanced")
     && ordinaryRecallAction?.action.includes("western:round6-truth-signoff-pack")
     && ordinaryRecallAction?.action.includes("western:round6-targeted-intake")
+    && ordinaryRecallAction?.action.includes("western:round6-frozen-eval")
     && ordinaryRecallAction?.action.includes("2/12"),
   "the recall handoff must expose the consumed Round-5 verdict and ready-to-record Round-6 plan",
 );

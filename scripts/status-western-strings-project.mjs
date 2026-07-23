@@ -171,6 +171,16 @@ const ROUND6_COUNTERBALANCED_INTAKE = path.join(
   "experiments",
   "western-strings-round6-counterbalanced-intake.json",
 );
+const ROUND6_EVALUATION_PROTOCOL = path.join(
+  "config",
+  "western-strings-round6-evaluation-protocol.json",
+);
+const ROUND6_EVALUATION_REPORT = path.join(
+  "data",
+  "experiments",
+  "western-strings-round6-frozen-evaluation",
+  "report.json",
+);
 const ROUND5_SEGMENT_EDIT_PATH_SMOKE = path.join(
   "docs",
   "evidence",
@@ -185,6 +195,7 @@ const ROUND5_TARGETED_CONTRACT_VERSION = "western-round5-targeted-diagnosis-inta
 const ROUND5_REVIEW_ASSIST_CALIBRATION_CONTRACT =
   "western-round5-review-assist-calibration-pack-v1";
 const ROUND6_COUNTERBALANCED_CONTRACT_VERSION = "western-round6-counterbalanced-diagnosis-v1";
+const ROUND6_EVALUATION_PROTOCOL_VERSION = "western-round6-frozen-evaluation-protocol-v1";
 const ROUND5_SEGMENT_GATES = Object.freeze([
   "merged_substitution",
   "missing",
@@ -1719,7 +1730,10 @@ export async function summarizeRound6CounterbalancedCapture({
   truthPath = ROUND6_COUNTERBALANCED_TRUTH,
   positionBalancePath = ROUND6_COUNTERBALANCED_POSITION_BALANCE,
   intakePath = ROUND6_COUNTERBALANCED_INTAKE,
+  evaluationProtocolPath = ROUND6_EVALUATION_PROTOCOL,
+  evaluationReportPath = ROUND6_EVALUATION_REPORT,
   materialsRoot = path.dirname(manifestPath),
+  workspaceRoot = process.cwd(),
 } = {}) {
   const [
     contract,
@@ -1727,6 +1741,8 @@ export async function summarizeRound6CounterbalancedCapture({
     truth,
     positionBalance,
     intake,
+    evaluationProtocol,
+    evaluationReport,
     contractSha256,
     manifestSha256,
     truthSha256,
@@ -1736,6 +1752,8 @@ export async function summarizeRound6CounterbalancedCapture({
     readJson(truthPath),
     readJson(positionBalancePath),
     readJson(intakePath),
+    readJson(evaluationProtocolPath),
+    readJson(evaluationReportPath),
     sha256FileOrEmpty(contractPath),
     sha256FileOrEmpty(manifestPath),
     sha256FileOrEmpty(truthPath),
@@ -1787,6 +1805,137 @@ export async function summarizeRound6CounterbalancedCapture({
       && contract?.automaticAuthorizationGranted === false
       && contract?.promotion?.studentFacing === false
       && contract?.promotion?.automaticAuthorizationGranted === false,
+  );
+  const hashBoundText = async (filePath, mode) => {
+    try {
+      const bytes = await fs.readFile(path.resolve(workspaceRoot, filePath));
+      const input = mode === "lf-normalized-sha256"
+        ? bytes.toString("utf8").replace(/\r\n?/g, "\n")
+        : mode === "raw-sha256"
+          ? bytes
+          : null;
+      return input === null
+        ? ""
+        : crypto.createHash("sha256").update(input).digest("hex");
+    } catch {
+      return "";
+    }
+  };
+  const evaluationProtocolSha256 = await hashBoundText(
+    evaluationProtocolPath,
+    "lf-normalized-sha256",
+  );
+  const evaluationBindings = Array.isArray(evaluationProtocol?.sourceBindings)
+    ? evaluationProtocol.sourceBindings : [];
+  const observedEvaluationBindings = await Promise.all(
+    evaluationBindings.map(async (binding) => ({
+      role: String(binding?.role || ""),
+      path: String(binding?.path || "").replace(/\\/g, "/"),
+      hashMode: String(binding?.hashMode || ""),
+      expectedSha256: String(binding?.sha256 || "").toLowerCase(),
+      observedSha256: await hashBoundText(binding?.path, binding?.hashMode),
+    })),
+  );
+  const requiredEvaluationRoles = [
+    "execution-guard",
+    "candidate-runner",
+    "temporal-operation-policy",
+    "intake-validator",
+    "audio-feature-analyzer",
+    "round6-contract",
+  ];
+  const observedEvaluationRoles = observedEvaluationBindings.map((row) => row.role);
+  const evaluationSourcesCurrent = Boolean(
+    observedEvaluationBindings.length === requiredEvaluationRoles.length
+      && new Set(observedEvaluationRoles).size === observedEvaluationRoles.length
+      && sameStringSet(observedEvaluationRoles, requiredEvaluationRoles)
+      && observedEvaluationBindings.every((row) => (
+        /^[a-f0-9]{64}$/.test(row.expectedSha256)
+          && row.observedSha256 === row.expectedSha256
+      )),
+  );
+  const evaluation = evaluationProtocol?.evaluation || {};
+  const evaluationCandidate = evaluationProtocol?.candidate || {};
+  const evaluationProtocolValid = Boolean(
+    evaluationProtocol?.contractVersion === ROUND6_EVALUATION_PROTOCOL_VERSION
+      && evaluationProtocol?.status === "pre-registered-before-audio"
+      && evaluation?.calibrationSplit === "calibration"
+      && evaluation?.freshBlindSplit === "fresh-blind"
+      && evaluation?.freshBlindRunLimit === 1
+      && evaluation?.freshUsedForSelection === false
+      && evaluation?.decisionThreshold === 0.5
+      && sameStringSet(evaluation?.gates, ROUND5_SEGMENT_GATES)
+      && evaluation?.promotionThresholds?.minPrecision === 0.9
+      && evaluation?.promotionThresholds?.minRecall === 0.5
+      && evaluation?.promotionThresholds?.maxStrictFalseAccusations === 0
+      && evaluation?.promotionScope === "independent-per-gate"
+      && evaluation?.completeInventoryRequired === true
+      && evaluation?.scorePositionCounterbalanceRequired === true
+      && evaluationCandidate?.sourceContract
+        === "western-round5-segment-edit-path-candidate-v1"
+      && evaluationCandidate?.modelFamily === "fixed-random-forest-binary-per-gate"
+      && JSON.stringify(evaluationCandidate?.modelParams) === JSON.stringify({
+        n_estimators: 256,
+        max_depth: 4,
+        min_samples_leaf: 2,
+        class_weight: "balanced_subsample",
+        random_state: 20260722,
+        n_jobs: 1,
+      })
+      && JSON.stringify(evaluationCandidate?.frozenRuleContracts) === JSON.stringify({
+        gapRefinement: "western-round5-frozen-gap-refinement-v1",
+        gapStrict: "western-round5-frozen-gap-strict-issue-candidate-v1",
+        rhythmRefinement: "western-round5-frozen-rhythm-structural-refinement-v1",
+        rhythmStrict: "western-round5-frozen-rhythm-strict-issue-candidate-v1",
+      })
+      && JSON.stringify(evaluationCandidate?.allowedCandidateFamilies) === JSON.stringify([
+        "fixed-random-forest-binary-per-gate",
+        "frozen-gap-refinement-self-check",
+        "frozen-gap-strict-missing",
+        "frozen-rhythm-structural-self-check",
+        "frozen-rhythm-strict-extra-drag",
+      ])
+      && evaluationCandidate?.postFreshRetuningAllowed === false
+      && evaluationProtocol?.interpretation?.failedOrCrashedFreshRunMayNotBeRepeated === true
+      && evaluationProtocol?.interpretation?.newCandidateAfterFreshRequiresNewUntouchedPackage
+        === true
+      && evaluationProtocol?.interpretation?.numericPassIsEvidenceNotReleaseAuthorization
+        === true
+      && evaluationProtocol?.interpretation?.partialGatePassDoesNotAuthorizeOtherGates
+        === true
+      && evaluationProtocol?.studentFacing === false
+      && evaluationProtocol?.automaticAuthorizationGranted === false
+      && evaluationSourcesCurrent,
+  );
+  const evaluationRunnerReady = evaluationProtocolValid && Boolean(evaluationProtocolSha256);
+  const consumedLedgerPath = String(
+    evaluationProtocol?.paths?.consumedLedger || "",
+  );
+  const consumedLedger = consumedLedgerPath
+    ? await readJson(path.resolve(workspaceRoot, consumedLedgerPath))
+    : null;
+  const consumedLedgerExists = consumedLedgerPath
+    ? await exists(path.resolve(workspaceRoot, consumedLedgerPath))
+    : false;
+  const freshBlindConsumed = Boolean(
+    consumedLedgerExists
+      || consumedLedger?.freshBlindConsumed === true
+      || evaluationReport?.freshBlindConsumed === true,
+  );
+  const evaluationReportBindingCurrent = Boolean(
+    evaluationReport
+      && evaluationProtocolSha256
+      && evaluationReport?.protocol === ROUND6_EVALUATION_PROTOCOL_VERSION
+      && evaluationReport?.protocolSha256 === evaluationProtocolSha256
+      && evaluationReport?.sourceHashes?.contractSha256 === contractSha256
+      && evaluationReport?.sourceHashes?.manifestSha256 === manifestSha256
+      && evaluationReport?.sourceHashes?.truthSha256 === truthSha256,
+  );
+  const evaluationPerformed = Boolean(
+    freshBlindConsumed
+      && evaluationReportBindingCurrent
+      && evaluationReport?.evaluationPerformed === true
+      && evaluationReport?.promotionEvidenceEligible === true,
   );
   const truthRecordings = truth?.recordings && typeof truth.recordings === "object"
     ? Object.entries(truth.recordings)
@@ -1944,6 +2093,7 @@ export async function summarizeRound6CounterbalancedCapture({
       && designCountsReady
       && materialsReady
       && positionValid
+      && evaluationRunnerReady
   );
   const intakeReady = Boolean(
     readyForRecording
@@ -1962,6 +2112,10 @@ export async function summarizeRound6CounterbalancedCapture({
     ...(!recordingIdsMatch ? ["round6-counterbalanced-recording-identity-mismatch"] : []),
     ...(!designCountsReady ? ["round6-counterbalanced-design-counts-not-ready"] : []),
     ...(!materialsReady ? ["round6-counterbalanced-materials-not-ready"] : []),
+    ...(!evaluationProtocol ? ["round6-evaluation-protocol-missing"] : []),
+    ...(evaluationProtocol && !evaluationProtocolValid
+      ? ["round6-evaluation-protocol-not-current"]
+      : []),
     ...(!positionBalance ? ["round6-counterbalanced-position-report-missing"] : []),
     ...(positionBalance && !positionBindingCurrent
       ? ["round6-counterbalanced-position-binding-stale"]
@@ -1995,6 +2149,15 @@ export async function summarizeRound6CounterbalancedCapture({
         ]
       : []),
   ]);
+  const evaluationBlockingReasons = normalizedReasonList([
+    ...(!evaluationRunnerReady ? ["round6-evaluation-runner-not-ready"] : []),
+    ...(intakeReady && !freshBlindConsumed
+      ? ["round6-fresh-blind-evaluation-pending"]
+      : []),
+    ...(freshBlindConsumed && !evaluationPerformed
+      ? ["round6-fresh-blind-consumed-without-current-completed-report"]
+      : []),
+  ]);
   return {
     contract: ROUND6_COUNTERBALANCED_CONTRACT_VERSION,
     source: String(intakePath).replace(/\\/g, "/"),
@@ -2003,12 +2166,15 @@ export async function summarizeRound6CounterbalancedCapture({
       manifest: String(manifestPath).replace(/\\/g, "/"),
       truth: String(truthPath).replace(/\\/g, "/"),
       positionBalance: String(positionBalancePath).replace(/\\/g, "/"),
+      evaluationProtocol: String(evaluationProtocolPath).replace(/\\/g, "/"),
+      evaluationReport: String(evaluationReportPath).replace(/\\/g, "/"),
     },
     contractValid,
-    bindingCurrent: positionBindingCurrent && intakeBindingCurrent,
+    bindingCurrent: positionBindingCurrent && intakeBindingCurrent && evaluationRunnerReady,
     bindings: {
       positionBalance: positionBindingCurrent,
       intake: intakeBindingCurrent,
+      evaluationProtocol: evaluationRunnerReady,
     },
     designCountsReady,
     materialsReady,
@@ -2048,6 +2214,22 @@ export async function summarizeRound6CounterbalancedCapture({
       studentFacing: false,
       automaticAccusationReady: false,
     },
+    evaluationProtocol: {
+      contract: ROUND6_EVALUATION_PROTOCOL_VERSION,
+      protocolSha256: evaluationProtocolSha256,
+      valid: evaluationProtocolValid,
+      sourceBindingsCurrent: evaluationSourcesCurrent,
+      runnerReady: evaluationRunnerReady,
+      reportBindingCurrent: evaluationReportBindingCurrent,
+      evaluationPerformed,
+      freshBlindConsumed,
+      freshBlindRunLimit: Number(evaluation?.freshBlindRunLimit || 0),
+      freshUsedForSelection: evaluation?.freshUsedForSelection === true,
+      promotionEvidenceEligible: evaluationPerformed,
+      studentFacing: false,
+      automaticAccusationReady: false,
+      blockingReasons: evaluationBlockingReasons,
+    },
     remainingExternalInput: {
       audioFiles: Math.max(0, manifestRows.length - audioFileCount),
       consentRows: Math.max(0, manifestRows.length - consentCount),
@@ -2061,6 +2243,7 @@ export async function summarizeRound6CounterbalancedCapture({
     promotionEvidenceEligible: false,
     designBlockingReasons,
     recordingBlockingReasons,
+    evaluationBlockingReasons,
   };
 }
 
@@ -4985,7 +5168,7 @@ export function summarizeNextActions(
       track: "Ordinary diagnosis recall",
       action: round5Evaluated
         ? round6ReadyForRecording
-          ? "Round 5 is consumed and cannot support promotion because its apparent gate and rhythm gains are score-position confounded. The Round 6 counterbalanced contract, 12-take manifest, 144-event truth, capture materials, and v2 position preflight are now hash-current and ready for recording. Record exactly the 12 specified takes without changing the positive/negative role rotations. After all audio files are present, run `npm run western:round6-truth-signoff-pack`; its no-machine-prediction page binds the contract, manifest, truth, and every audio SHA, and requires all 144 `asPerformed` fields, 12 complete error inventories, and 12 actual recording-metadata confirmations before download. Dry-run the downloaded JSON with `npm run western:round6-truth-signoff-apply -- --completed <path>`; only after `readyToApply=true`, repeat with `--apply`, then rerun `npm run western:round6-position-balance` and `npm run western:round6-targeted-intake` because both source hashes changed. Strict confirmed recall remains 2/12 and every student automatic-accusation path stays closed until a new untouched fresh evaluation passes the frozen 90% precision / 50% recall / 0 strict-FP gate."
+          ? "Round 5 is consumed and cannot support promotion because its apparent gate and rhythm gains are score-position confounded. The Round 6 counterbalanced contract, 12-take manifest, 144-event truth, capture materials, v2 position preflight, and once-only evaluation protocol are now hash-current and ready for recording. Record exactly the 12 specified takes without changing the positive/negative role rotations. After all audio files are present, run `npm run western:round6-truth-signoff-pack`; its no-machine-prediction page binds the contract, manifest, truth, and every audio SHA, and requires all 144 `asPerformed` fields, 12 complete error inventories, and 12 actual recording-metadata confirmations before download. Dry-run the downloaded JSON with `npm run western:round6-truth-signoff-apply -- --completed <path>`; only after `readyToApply=true`, repeat with `--apply`, then rerun `npm run western:round6-position-balance` and `npm run western:round6-targeted-intake` because both source hashes changed. Only after intake is ready, run `npm run western:round6-frozen-eval` exactly once; it writes the consumed ledger before reading fresh and does not grant student authorization even if a numeric gate passes. Strict confirmed recall remains 2/12 and every student automatic-accusation path stays closed until a new untouched fresh evaluation passes the frozen 90% precision / 50% recall / 0 strict-FP gate."
           : "The complete-inventory Round 5 frozen first run is complete and the fresh split is now consumed. `extra` numerically reaches 3/6 positives at 0/12 confusion false positives (precision 1.00, recall 0.50), but it is not promotion-eligible: in that fresh split, score context alone separates all 6 extra positives from all 12 negatives, while the evaluated model includes those score-context features. The rhythm self-check likewise has a raw 4/12 at 0/312 false positives, but static score context predicts all 12 extra/drag target positions at 0/324 false positives under leave-one-recording-out in both splits; its apparent precision therefore cannot establish performance generalization. `merged_substitution`, `missing`, and `drag` also fail their numeric gates. A calibration-only audit found position confounding for all three failed gates; once score-only context features are prohibited, no stable performance-evidence candidate meets the joint floor. Therefore no Round 5 gate or rhythm hint is currently promoted. Do not retune on this package. Counterbalance target roles across previous/next interval, written duration, beat strength, normalized position, and segment-edge status in both new calibration and fresh plans; require the position-balance preflight to pass before recording, then select and evaluate a performance-only model. Strict confirmed recall remains 2/12 and all student automatic-accusation paths stay closed."
         : round5ReadyForEvaluation
           ? "Round 5 complete-inventory intake is ready and hash-current. Run `npm run western:round5-segment-edit-path` once with the frozen parameters; do not inspect or retune against the fresh split before that run. Strict confirmed recall remains 2/12 and all student automatic-accusation paths stay closed."

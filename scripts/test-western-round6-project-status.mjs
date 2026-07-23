@@ -23,6 +23,8 @@ try {
   const truthPath = path.join(root, "position-truth.json");
   const positionBalancePath = path.join(root, "position-report.json");
   const intakePath = path.join(root, "intake.json");
+  const evaluationProtocolPath = path.join(root, "evaluation-protocol.json");
+  const evaluationReportPath = path.join(root, "evaluation-report.json");
   const contract = {
     contractVersion: "western-round6-counterbalanced-diagnosis-v1",
     status: "pre-recording-design-only",
@@ -177,6 +179,85 @@ try {
     hashes,
     blockingReasons: ["recording-input-pending"],
   }));
+  const evaluationSources = {
+    "execution-guard": "evaluation/guard.py",
+    "candidate-runner": "evaluation/candidate.py",
+    "temporal-operation-policy": "evaluation/temporal.py",
+    "intake-validator": "evaluation/intake.py",
+    "audio-feature-analyzer": "evaluation/audio.py",
+    "round6-contract": "contract.json",
+  };
+  await fs.mkdir(path.join(root, "evaluation"), { recursive: true });
+  for (const [role, relative] of Object.entries(evaluationSources)) {
+    if (role !== "round6-contract") {
+      await fs.writeFile(path.join(root, relative), `${role}\n`);
+    }
+  }
+  await fs.writeFile(evaluationProtocolPath, jsonBytes({
+    contractVersion: "western-round6-frozen-evaluation-protocol-v1",
+    status: "pre-registered-before-audio",
+    paths: {
+      consumedLedger: "evaluation/fresh-consumed.json",
+    },
+    sourceBindings: await Promise.all(
+      Object.entries(evaluationSources).map(async ([role, relative]) => ({
+        role,
+        path: relative,
+        hashMode: "lf-normalized-sha256",
+        sha256: sha256(await fs.readFile(path.join(root, relative))),
+      })),
+    ),
+    evaluation: {
+      calibrationSplit: "calibration",
+      freshBlindSplit: "fresh-blind",
+      freshBlindRunLimit: 1,
+      freshUsedForSelection: false,
+      decisionThreshold: 0.5,
+      gates: GATES,
+      promotionThresholds: {
+        minPrecision: 0.9,
+        minRecall: 0.5,
+        maxStrictFalseAccusations: 0,
+      },
+      promotionScope: "independent-per-gate",
+      completeInventoryRequired: true,
+      scorePositionCounterbalanceRequired: true,
+    },
+    candidate: {
+      sourceContract: "western-round5-segment-edit-path-candidate-v1",
+      modelFamily: "fixed-random-forest-binary-per-gate",
+      modelParams: {
+        n_estimators: 256,
+        max_depth: 4,
+        min_samples_leaf: 2,
+        class_weight: "balanced_subsample",
+        random_state: 20260722,
+        n_jobs: 1,
+      },
+      frozenRuleContracts: {
+        gapRefinement: "western-round5-frozen-gap-refinement-v1",
+        gapStrict: "western-round5-frozen-gap-strict-issue-candidate-v1",
+        rhythmRefinement: "western-round5-frozen-rhythm-structural-refinement-v1",
+        rhythmStrict: "western-round5-frozen-rhythm-strict-issue-candidate-v1",
+      },
+      allowedCandidateFamilies: [
+        "fixed-random-forest-binary-per-gate",
+        "frozen-gap-refinement-self-check",
+        "frozen-gap-strict-missing",
+        "frozen-rhythm-structural-self-check",
+        "frozen-rhythm-strict-extra-drag",
+      ],
+      postFreshRetuningAllowed: false,
+    },
+    interpretation: {
+      numericPassIsEvidenceNotReleaseAuthorization: true,
+      partialGatePassDoesNotAuthorizeOtherGates: true,
+      failedOrCrashedFreshRunMayNotBeRepeated: true,
+      newCandidateAfterFreshRequiresNewUntouchedPackage: true,
+    },
+    studentFacing: false,
+    automaticAuthorizationGranted: false,
+  }));
 
   const ready = await summarizeRound6CounterbalancedCapture({
     contractPath,
@@ -184,13 +265,20 @@ try {
     truthPath,
     positionBalancePath,
     intakePath,
+    evaluationProtocolPath,
+    evaluationReportPath,
     materialsRoot: root,
+    workspaceRoot: root,
   });
   assert.equal(ready.contractValid, true);
   assert.equal(ready.bindingCurrent, true);
   assert.equal(ready.designCountsReady, true);
   assert.equal(ready.materialsReady, true);
   assert.equal(ready.readyForRecording, true);
+  assert.equal(ready.bindings.evaluationProtocol, true);
+  assert.equal(ready.evaluationProtocol.runnerReady, true);
+  assert.equal(ready.evaluationProtocol.freshBlindConsumed, false);
+  assert.equal(ready.evaluationProtocol.evaluationPerformed, false);
   assert.equal(ready.intakeReady, false);
   assert.equal(ready.recordingComplete, false);
   assert.equal(ready.counts.recordings, 12);
@@ -206,6 +294,47 @@ try {
   assert.equal(ready.studentFacing, false);
   assert.equal(ready.automaticAccusationReady, false);
 
+  await fs.writeFile(path.join(root, "evaluation", "fresh-consumed.json"), "not-json\n");
+  const consumedWithoutReport = await summarizeRound6CounterbalancedCapture({
+    contractPath,
+    manifestPath,
+    truthPath,
+    positionBalancePath,
+    intakePath,
+    evaluationProtocolPath,
+    evaluationReportPath,
+    materialsRoot: root,
+    workspaceRoot: root,
+  });
+  assert.equal(consumedWithoutReport.evaluationProtocol.freshBlindConsumed, true);
+  assert.equal(consumedWithoutReport.evaluationProtocol.evaluationPerformed, false);
+  assert(consumedWithoutReport.evaluationBlockingReasons.includes(
+    "round6-fresh-blind-consumed-without-current-completed-report",
+  ));
+  await fs.rm(path.join(root, "evaluation", "fresh-consumed.json"));
+
+  await fs.writeFile(path.join(root, "evaluation", "temporal.py"), "changed\n");
+  const protocolStale = await summarizeRound6CounterbalancedCapture({
+    contractPath,
+    manifestPath,
+    truthPath,
+    positionBalancePath,
+    intakePath,
+    evaluationProtocolPath,
+    evaluationReportPath,
+    materialsRoot: root,
+    workspaceRoot: root,
+  });
+  assert.equal(protocolStale.bindings.evaluationProtocol, false);
+  assert.equal(protocolStale.readyForRecording, false);
+  assert(protocolStale.designBlockingReasons.includes(
+    "round6-evaluation-protocol-not-current",
+  ));
+  await fs.writeFile(
+    path.join(root, "evaluation", "temporal.py"),
+    "temporal-operation-policy\n",
+  );
+
   await fs.writeFile(truthPath, Buffer.concat([truthBytes, Buffer.from("\n")]));
   const stale = await summarizeRound6CounterbalancedCapture({
     contractPath,
@@ -213,7 +342,10 @@ try {
     truthPath,
     positionBalancePath,
     intakePath,
+    evaluationProtocolPath,
+    evaluationReportPath,
     materialsRoot: root,
+    workspaceRoot: root,
   });
   assert.equal(stale.bindings.positionBalance, false);
   assert.equal(stale.bindings.intake, false);
