@@ -1,0 +1,66 @@
+{
+  "contractVersion": "western-round6-counterbalanced-diagnosis-v1",
+  "status": "pre-recording-design-only",
+  "allowedGates": [
+    "merged_substitution",
+    "missing",
+    "extra",
+    "drag"
+  ],
+  "allowedSplits": [
+    "calibration",
+    "fresh-blind"
+  ],
+  "allowedLabels": [
+    "positive",
+    "confusion_negative"
+  ],
+  "minimums": {
+    "performers": 6,
+    "devices": 3,
+    "rooms": 4,
+    "positivePerGate": 12,
+    "freshBlindPositivePerGate": 6,
+    "confusionNegativePerGate": 24,
+    "freshBlindConfusionNegativePerGate": 12
+  },
+  "promotionThresholds": {
+    "minPrecision": 0.9,
+    "minRecall": 0.5,
+    "maxStrictFalseAccusations": 0
+  },
+  "privacy": {
+    "requiredConsent": "yes",
+    "requiredLicenseStatus": "local-only",
+    "requiredPathPrefix": "data/private/western-strings-round6-counterbalanced/"
+  },
+  "truth": {
+    "requiredCompleteErrorInventory": true,
+    "completeErrorInventoryField": "completeErrorInventory"
+  },
+  "promotion": {
+    "minPrecision": 0.9,
+    "minRecall": 0.5,
+    "maxStrictFalseAccusations": 0,
+    "studentFacing": false,
+    "automaticAuthorizationGranted": false
+  },
+  "positionDesign": {
+    "recordingsPerScore": 3,
+    "roleRotation": [
+      "positive",
+      "confusion_negative_a",
+      "confusion_negative_b"
+    ],
+    "requiredPreflightContract": "western-round5-position-balance-preflight-v2",
+    "requiredPreflightReady": true
+  },
+  "splitDiscipline": {
+    "calibrationAndFreshScoresDisjoint": true,
+    "calibrationAndFreshPerformersDisjoint": true,
+    "freshBlindMayBeRunOnce": true,
+    "consumedRound4OrRound5AudioAllowed": false
+  },
+  "studentFacing": false,
+  "automaticAuthorizationGranted": false
+}
