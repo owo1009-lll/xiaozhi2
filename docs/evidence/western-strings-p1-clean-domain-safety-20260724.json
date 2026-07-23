@@ -1,0 +1,2492 @@
+{
+  "schemaVersion": "western-p1-clean-domain-safety-evaluation-v1",
+  "preregistration": {
+    "path": "docs/evidence/western-strings-p1-clean-domain-preregistration-20260724.json",
+    "artifactSha256": "f3bfe14b2f5f7a75e70efa4df5a9ceb8f1d96453269aae96d0fa4faa22a69fd8",
+    "protocolSemanticSha256": "efe62f7b1dac036336647918f04c158be9f0d3113a6de8b637106cf42cef62f6",
+    "sourceBindingsAggregateSha256": "0194dc5f1a63138ee2643470ed2b5f44e58f92eb783f08af8d93e614c6717e8c",
+    "gitCommitShaBeforeEvaluation": "8de5b9e23972c2a2256ace9c5c13640080cb5749",
+    "executionRunnerCommitSha": "0b4d9ccc515b199f7ad4b10f3a7f48483fce74c2",
+    "frozenBeforeEvaluation": true
+  },
+  "executionDiscipline": {
+    "candidateCount": 7,
+    "candidateRetuned": false,
+    "thresholdChanged": false,
+    "inputSelectionChanged": false,
+    "blindResultUsedForSelection": false,
+    "round4Round5ReusedAsAcceptance": false,
+    "syntheticRecallReportedAsReal": false,
+    "priorFailedAttempt": {
+      "runnerCommitSha": "8de5b9e23972c2a2256ace9c5c13640080cb5749",
+      "outcome": "no-report-deterministic-input-parser-crash",
+      "reason": "r2-07 polyphonic MusicXML failed the inherited injection-index isomorphism assertion",
+      "candidateCountsPrintedOrRead": false,
+      "thresholdChangedAfterAttempt": false,
+      "inputSelectionChangedAfterAttempt": false,
+      "correction": "support the already-frozen polyphonic input with the same lowest-written-pitch projection used by the public-score path"
+    }
+  },
+  "candidateResults": [
+    {
+      "candidateId": "alignment-gap-refined-self-check-v1",
+      "family": "alignment-gap",
+      "outputSemantic": "review_hint",
+      "applicableDatasets": [
+        "authoritative-local-clean",
+        "consumed-round5-known-negatives",
+        "public-professional-burden"
+      ],
+      "domains": {
+        "authoritative-local-clean": {
+          "evidenceRole": "authoritative-clean-negative",
+          "recordingCount": 17,
+          "flagCount": 5,
+          "positionCount": 743,
+          "rate": 0.006729475,
+          "flagsPer1000Positions": 6.729475,
+          "maximumPerRecordingRate": 0.044776119,
+          "falsePositiveCountAuthoritative": true,
+          "recordings": [
+            {
+              "recordingId": "r2fb-01-20260718",
+              "flagCount": 3,
+              "countedNegativeOrBurdenFlags": 3,
+              "positionCount": 67,
+              "countedPositionCount": 67,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.044776119
+            },
+            {
+              "recordingId": "r2fb-05-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 25,
+              "countedPositionCount": 25,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r2fb-06-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 23,
+              "countedPositionCount": 23,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r2fb-07-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 26,
+              "countedPositionCount": 26,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r2fb-08-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 63,
+              "countedPositionCount": 63,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r3-01",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 59,
+              "countedPositionCount": 59,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r3-02",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 45,
+              "countedPositionCount": 45,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r3-03",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 51,
+              "countedPositionCount": 51,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round2-r2-01-20260715",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 67,
+              "countedPositionCount": 67,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round2-r2-05-20260715",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 25,
+              "countedPositionCount": 25,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round2-r2-06-20260715",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 23,
+              "countedPositionCount": 23,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round2-r2-07-20260715",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 1,
+              "positionCount": 26,
+              "countedPositionCount": 26,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.038461538
+            },
+            {
+              "recordingId": "round2-r2-08-20260715",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 63,
+              "countedPositionCount": 63,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round4-r4-01",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 53,
+              "countedPositionCount": 53,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round4-r4-02",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 59,
+              "countedPositionCount": 59,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round4-r4-03",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 24,
+              "countedPositionCount": 24,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round4-r4-04",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 1,
+              "positionCount": 44,
+              "countedPositionCount": 44,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.022727273
+            }
+          ]
+        },
+        "consumed-round5-known-negatives": {
+          "evidenceRole": "consumed-complete-inventory-negative-diagnostic",
+          "recordingCount": 12,
+          "flagCount": 3,
+          "positionCount": 624,
+          "rate": 0.004807692,
+          "flagsPer1000Positions": 4.807692,
+          "maximumPerRecordingRate": 0.019230769,
+          "falsePositiveCountAuthoritative": true,
+          "recordings": [
+            {
+              "recordingId": "r5-cal-01",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-cal-02",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-cal-03",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 1,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.019230769
+            },
+            {
+              "recordingId": "r5-cal-04",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-cal-05",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-cal-06",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 1,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.019230769
+            },
+            {
+              "recordingId": "r5-fresh-01",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-fresh-02",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-fresh-03",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-fresh-04",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-fresh-05",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 1,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.019230769
+            },
+            {
+              "recordingId": "r5-fresh-06",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            }
+          ]
+        },
+        "public-professional-burden": {
+          "evidenceRole": "unadjudicated-real-professional-burden",
+          "recordingCount": 7,
+          "flagCount": 1008,
+          "positionCount": 6652,
+          "rate": 0.151533373,
+          "flagsPer1000Positions": 151.533373,
+          "maximumPerRecordingRate": 0.225752508,
+          "falsePositiveCountAuthoritative": false,
+          "recordings": [
+            {
+              "recordingId": "emil-telmanyi_bwv1004_mov4",
+              "flagCount": 123,
+              "countedNegativeOrBurdenFlags": 123,
+              "positionCount": 910,
+              "countedPositionCount": 910,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.135164835
+            },
+            {
+              "recordingId": "emil-telmanyi_bwv1005_mov4",
+              "flagCount": 270,
+              "countedNegativeOrBurdenFlags": 270,
+              "positionCount": 1196,
+              "countedPositionCount": 1196,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.225752508
+            },
+            {
+              "recordingId": "john-garner_bwv1002_mov6",
+              "flagCount": 19,
+              "countedNegativeOrBurdenFlags": 19,
+              "positionCount": 569,
+              "countedPositionCount": 569,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.033391916
+            },
+            {
+              "recordingId": "karen-gomyo_bwv1006_mov7",
+              "flagCount": 71,
+              "countedNegativeOrBurdenFlags": 71,
+              "positionCount": 666,
+              "countedPositionCount": 666,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.106606607
+            },
+            {
+              "recordingId": "ko-donghwi_bwv1001_mov4",
+              "flagCount": 366,
+              "countedNegativeOrBurdenFlags": 366,
+              "positionCount": 1624,
+              "countedPositionCount": 1624,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.225369458
+            },
+            {
+              "recordingId": "minji-kim_bwv1003_mov4",
+              "flagCount": 89,
+              "countedNegativeOrBurdenFlags": 89,
+              "positionCount": 1021,
+              "countedPositionCount": 1021,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.087169442
+            },
+            {
+              "recordingId": "oliver-colbentson_bwv1006_mov7",
+              "flagCount": 70,
+              "countedNegativeOrBurdenFlags": 70,
+              "positionCount": 666,
+              "countedPositionCount": 666,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.105105105
+            }
+          ]
+        }
+      },
+      "eliminated": true,
+      "eliminationReasons": [
+        "public-professional-pooled-burden",
+        "public-professional-recording-burden"
+      ],
+      "retainedForRecallAuditOnly": false,
+      "promotionReady": false,
+      "studentFacing": false,
+      "automaticAdoptionReady": false
+    },
+    {
+      "candidateId": "alignment-gap-strict-missing-v1",
+      "family": "alignment-gap",
+      "outputSemantic": "automatic_issue_candidate",
+      "applicableDatasets": [
+        "authoritative-local-clean",
+        "consumed-round5-known-negatives",
+        "public-professional-burden"
+      ],
+      "domains": {
+        "authoritative-local-clean": {
+          "evidenceRole": "authoritative-clean-negative",
+          "recordingCount": 17,
+          "flagCount": 1,
+          "positionCount": 743,
+          "rate": 0.001345895,
+          "flagsPer1000Positions": 1.345895,
+          "maximumPerRecordingRate": 0.022727273,
+          "falsePositiveCountAuthoritative": true,
+          "recordings": [
+            {
+              "recordingId": "r2fb-01-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 67,
+              "countedPositionCount": 67,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r2fb-05-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 25,
+              "countedPositionCount": 25,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r2fb-06-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 23,
+              "countedPositionCount": 23,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r2fb-07-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 26,
+              "countedPositionCount": 26,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r2fb-08-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 63,
+              "countedPositionCount": 63,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r3-01",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 59,
+              "countedPositionCount": 59,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r3-02",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 45,
+              "countedPositionCount": 45,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r3-03",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 51,
+              "countedPositionCount": 51,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round2-r2-01-20260715",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 67,
+              "countedPositionCount": 67,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round2-r2-05-20260715",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 25,
+              "countedPositionCount": 25,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round2-r2-06-20260715",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 23,
+              "countedPositionCount": 23,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round2-r2-07-20260715",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 26,
+              "countedPositionCount": 26,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round2-r2-08-20260715",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 63,
+              "countedPositionCount": 63,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round4-r4-01",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 53,
+              "countedPositionCount": 53,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round4-r4-02",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 59,
+              "countedPositionCount": 59,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round4-r4-03",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 24,
+              "countedPositionCount": 24,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round4-r4-04",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 1,
+              "positionCount": 44,
+              "countedPositionCount": 44,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.022727273
+            }
+          ]
+        },
+        "consumed-round5-known-negatives": {
+          "evidenceRole": "consumed-complete-inventory-negative-diagnostic",
+          "recordingCount": 12,
+          "flagCount": 2,
+          "positionCount": 624,
+          "rate": 0.003205128,
+          "flagsPer1000Positions": 3.205128,
+          "maximumPerRecordingRate": 0.019230769,
+          "falsePositiveCountAuthoritative": true,
+          "recordings": [
+            {
+              "recordingId": "r5-cal-01",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-cal-02",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-cal-03",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-cal-04",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-cal-05",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-cal-06",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 1,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.019230769
+            },
+            {
+              "recordingId": "r5-fresh-01",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-fresh-02",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-fresh-03",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-fresh-04",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-fresh-05",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 1,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.019230769
+            },
+            {
+              "recordingId": "r5-fresh-06",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            }
+          ]
+        },
+        "public-professional-burden": {
+          "evidenceRole": "unadjudicated-real-professional-burden",
+          "recordingCount": 7,
+          "flagCount": 0,
+          "positionCount": 6652,
+          "rate": 0.0,
+          "flagsPer1000Positions": 0.0,
+          "maximumPerRecordingRate": 0.0,
+          "falsePositiveCountAuthoritative": false,
+          "recordings": [
+            {
+              "recordingId": "emil-telmanyi_bwv1004_mov4",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 910,
+              "countedPositionCount": 910,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "emil-telmanyi_bwv1005_mov4",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 1196,
+              "countedPositionCount": 1196,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "john-garner_bwv1002_mov6",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 569,
+              "countedPositionCount": 569,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "karen-gomyo_bwv1006_mov7",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 666,
+              "countedPositionCount": 666,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "ko-donghwi_bwv1001_mov4",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 1624,
+              "countedPositionCount": 1624,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "minji-kim_bwv1003_mov4",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 1021,
+              "countedPositionCount": 1021,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "oliver-colbentson_bwv1006_mov7",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 666,
+              "countedPositionCount": 666,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            }
+          ]
+        }
+      },
+      "eliminated": true,
+      "eliminationReasons": [
+        "authoritative-local-clean-false-positive",
+        "consumed-round5-known-negative-false-positive"
+      ],
+      "retainedForRecallAuditOnly": false,
+      "promotionReady": false,
+      "studentFacing": false,
+      "automaticAdoptionReady": false
+    },
+    {
+      "candidateId": "relative-ioi-duration-review-v1",
+      "family": "relative-ioi-duration",
+      "outputSemantic": "review_hint",
+      "applicableDatasets": [
+        "authoritative-local-clean",
+        "consumed-round5-known-negatives",
+        "public-professional-burden"
+      ],
+      "domains": {
+        "authoritative-local-clean": {
+          "evidenceRole": "authoritative-clean-negative",
+          "recordingCount": 17,
+          "flagCount": 7,
+          "positionCount": 743,
+          "rate": 0.009421265,
+          "flagsPer1000Positions": 9.421265,
+          "maximumPerRecordingRate": 0.088888889,
+          "falsePositiveCountAuthoritative": true,
+          "recordings": [
+            {
+              "recordingId": "r2fb-01-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 67,
+              "countedPositionCount": 67,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r2fb-05-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 25,
+              "countedPositionCount": 25,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r2fb-06-20260718",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 1,
+              "positionCount": 23,
+              "countedPositionCount": 23,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.043478261
+            },
+            {
+              "recordingId": "r2fb-07-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 26,
+              "countedPositionCount": 26,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r2fb-08-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 63,
+              "countedPositionCount": 63,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r3-01",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 1,
+              "positionCount": 59,
+              "countedPositionCount": 59,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.016949153
+            },
+            {
+              "recordingId": "r3-02",
+              "flagCount": 4,
+              "countedNegativeOrBurdenFlags": 4,
+              "positionCount": 45,
+              "countedPositionCount": 45,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.088888889
+            },
+            {
+              "recordingId": "r3-03",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 51,
+              "countedPositionCount": 51,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round2-r2-01-20260715",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 67,
+              "countedPositionCount": 67,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round2-r2-05-20260715",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 25,
+              "countedPositionCount": 25,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round2-r2-06-20260715",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 23,
+              "countedPositionCount": 23,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round2-r2-07-20260715",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 1,
+              "positionCount": 26,
+              "countedPositionCount": 26,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.038461538
+            },
+            {
+              "recordingId": "round2-r2-08-20260715",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 63,
+              "countedPositionCount": 63,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round4-r4-01",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 53,
+              "countedPositionCount": 53,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round4-r4-02",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 59,
+              "countedPositionCount": 59,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round4-r4-03",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 24,
+              "countedPositionCount": 24,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round4-r4-04",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 44,
+              "countedPositionCount": 44,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            }
+          ]
+        },
+        "consumed-round5-known-negatives": {
+          "evidenceRole": "consumed-complete-inventory-negative-diagnostic",
+          "recordingCount": 12,
+          "flagCount": 0,
+          "positionCount": 624,
+          "rate": 0.0,
+          "flagsPer1000Positions": 0.0,
+          "maximumPerRecordingRate": 0.0,
+          "falsePositiveCountAuthoritative": true,
+          "recordings": [
+            {
+              "recordingId": "r5-cal-01",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-cal-02",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-cal-03",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-cal-04",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-cal-05",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-cal-06",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-fresh-01",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-fresh-02",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-fresh-03",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-fresh-04",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-fresh-05",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-fresh-06",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.0
+            }
+          ]
+        },
+        "public-professional-burden": {
+          "evidenceRole": "unadjudicated-real-professional-burden",
+          "recordingCount": 7,
+          "flagCount": 37,
+          "positionCount": 6652,
+          "rate": 0.005562237,
+          "flagsPer1000Positions": 5.562237,
+          "maximumPerRecordingRate": 0.012302285,
+          "falsePositiveCountAuthoritative": false,
+          "recordings": [
+            {
+              "recordingId": "emil-telmanyi_bwv1004_mov4",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 1,
+              "positionCount": 910,
+              "countedPositionCount": 910,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.001098901
+            },
+            {
+              "recordingId": "emil-telmanyi_bwv1005_mov4",
+              "flagCount": 11,
+              "countedNegativeOrBurdenFlags": 11,
+              "positionCount": 1196,
+              "countedPositionCount": 1196,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.009197324
+            },
+            {
+              "recordingId": "john-garner_bwv1002_mov6",
+              "flagCount": 7,
+              "countedNegativeOrBurdenFlags": 7,
+              "positionCount": 569,
+              "countedPositionCount": 569,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.012302285
+            },
+            {
+              "recordingId": "karen-gomyo_bwv1006_mov7",
+              "flagCount": 3,
+              "countedNegativeOrBurdenFlags": 3,
+              "positionCount": 666,
+              "countedPositionCount": 666,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.004504505
+            },
+            {
+              "recordingId": "ko-donghwi_bwv1001_mov4",
+              "flagCount": 4,
+              "countedNegativeOrBurdenFlags": 4,
+              "positionCount": 1624,
+              "countedPositionCount": 1624,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.002463054
+            },
+            {
+              "recordingId": "minji-kim_bwv1003_mov4",
+              "flagCount": 6,
+              "countedNegativeOrBurdenFlags": 6,
+              "positionCount": 1021,
+              "countedPositionCount": 1021,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.005876592
+            },
+            {
+              "recordingId": "oliver-colbentson_bwv1006_mov7",
+              "flagCount": 5,
+              "countedNegativeOrBurdenFlags": 5,
+              "positionCount": 666,
+              "countedPositionCount": 666,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.007507508
+            }
+          ]
+        }
+      },
+      "eliminated": true,
+      "eliminationReasons": [
+        "authoritative-local-clean-recording-hint-rate"
+      ],
+      "retainedForRecallAuditOnly": false,
+      "promotionReady": false,
+      "studentFacing": false,
+      "automaticAdoptionReady": false
+    },
+    {
+      "candidateId": "relative-ioi-duration-strict-v1",
+      "family": "relative-ioi-duration",
+      "outputSemantic": "automatic_issue_candidate",
+      "applicableDatasets": [
+        "authoritative-local-clean",
+        "consumed-round5-known-negatives",
+        "public-professional-burden"
+      ],
+      "domains": {
+        "authoritative-local-clean": {
+          "evidenceRole": "authoritative-clean-negative",
+          "recordingCount": 17,
+          "flagCount": 2,
+          "positionCount": 743,
+          "rate": 0.00269179,
+          "flagsPer1000Positions": 2.69179,
+          "maximumPerRecordingRate": 0.043478261,
+          "falsePositiveCountAuthoritative": true,
+          "recordings": [
+            {
+              "recordingId": "r2fb-01-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 67,
+              "countedPositionCount": 67,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r2fb-05-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 25,
+              "countedPositionCount": 25,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r2fb-06-20260718",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 1,
+              "positionCount": 23,
+              "countedPositionCount": 23,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.043478261
+            },
+            {
+              "recordingId": "r2fb-07-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 26,
+              "countedPositionCount": 26,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r2fb-08-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 63,
+              "countedPositionCount": 63,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r3-01",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 59,
+              "countedPositionCount": 59,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r3-02",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 45,
+              "countedPositionCount": 45,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r3-03",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 51,
+              "countedPositionCount": 51,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round2-r2-01-20260715",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 67,
+              "countedPositionCount": 67,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round2-r2-05-20260715",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 25,
+              "countedPositionCount": 25,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round2-r2-06-20260715",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 23,
+              "countedPositionCount": 23,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round2-r2-07-20260715",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 1,
+              "positionCount": 26,
+              "countedPositionCount": 26,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.038461538
+            },
+            {
+              "recordingId": "round2-r2-08-20260715",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 63,
+              "countedPositionCount": 63,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round4-r4-01",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 53,
+              "countedPositionCount": 53,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round4-r4-02",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 59,
+              "countedPositionCount": 59,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round4-r4-03",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 24,
+              "countedPositionCount": 24,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "round4-r4-04",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 44,
+              "countedPositionCount": 44,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            }
+          ]
+        },
+        "consumed-round5-known-negatives": {
+          "evidenceRole": "consumed-complete-inventory-negative-diagnostic",
+          "recordingCount": 12,
+          "flagCount": 0,
+          "positionCount": 624,
+          "rate": 0.0,
+          "flagsPer1000Positions": 0.0,
+          "maximumPerRecordingRate": 0.0,
+          "falsePositiveCountAuthoritative": true,
+          "recordings": [
+            {
+              "recordingId": "r5-cal-01",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-cal-02",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-cal-03",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-cal-04",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-cal-05",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-cal-06",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-fresh-01",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-fresh-02",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-fresh-03",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-fresh-04",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-fresh-05",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r5-fresh-06",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.0
+            }
+          ]
+        },
+        "public-professional-burden": {
+          "evidenceRole": "unadjudicated-real-professional-burden",
+          "recordingCount": 7,
+          "flagCount": 37,
+          "positionCount": 6652,
+          "rate": 0.005562237,
+          "flagsPer1000Positions": 5.562237,
+          "maximumPerRecordingRate": 0.012302285,
+          "falsePositiveCountAuthoritative": false,
+          "recordings": [
+            {
+              "recordingId": "emil-telmanyi_bwv1004_mov4",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 1,
+              "positionCount": 910,
+              "countedPositionCount": 910,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.001098901
+            },
+            {
+              "recordingId": "emil-telmanyi_bwv1005_mov4",
+              "flagCount": 11,
+              "countedNegativeOrBurdenFlags": 11,
+              "positionCount": 1196,
+              "countedPositionCount": 1196,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.009197324
+            },
+            {
+              "recordingId": "john-garner_bwv1002_mov6",
+              "flagCount": 7,
+              "countedNegativeOrBurdenFlags": 7,
+              "positionCount": 569,
+              "countedPositionCount": 569,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.012302285
+            },
+            {
+              "recordingId": "karen-gomyo_bwv1006_mov7",
+              "flagCount": 3,
+              "countedNegativeOrBurdenFlags": 3,
+              "positionCount": 666,
+              "countedPositionCount": 666,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.004504505
+            },
+            {
+              "recordingId": "ko-donghwi_bwv1001_mov4",
+              "flagCount": 4,
+              "countedNegativeOrBurdenFlags": 4,
+              "positionCount": 1624,
+              "countedPositionCount": 1624,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.002463054
+            },
+            {
+              "recordingId": "minji-kim_bwv1003_mov4",
+              "flagCount": 6,
+              "countedNegativeOrBurdenFlags": 6,
+              "positionCount": 1021,
+              "countedPositionCount": 1021,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.005876592
+            },
+            {
+              "recordingId": "oliver-colbentson_bwv1006_mov7",
+              "flagCount": 5,
+              "countedNegativeOrBurdenFlags": 5,
+              "positionCount": 666,
+              "countedPositionCount": 666,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.007507508
+            }
+          ]
+        }
+      },
+      "eliminated": true,
+      "eliminationReasons": [
+        "authoritative-local-clean-false-positive",
+        "public-professional-pooled-burden",
+        "public-professional-recording-burden"
+      ],
+      "retainedForRecallAuditOnly": false,
+      "promotionReady": false,
+      "studentFacing": false,
+      "automaticAdoptionReady": false
+    },
+    {
+      "candidateId": "pitch-trajectory-center-strict-v1",
+      "family": "pitch-trajectory",
+      "outputSemantic": "automatic_issue_candidate",
+      "applicableDatasets": [
+        "pitch-artifact-local-clean"
+      ],
+      "domains": {
+        "pitch-artifact-local-clean": {
+          "evidenceRole": "authoritative-clean-negative-current-pitch-runtime",
+          "recordingCount": 11,
+          "flagCount": 10,
+          "positionCount": 506,
+          "rate": 0.019762846,
+          "flagsPer1000Positions": 19.762846,
+          "maximumPerRecordingRate": 0.134328358,
+          "falsePositiveCountAuthoritative": true,
+          "recordings": [
+            {
+              "recordingId": "r2fb-01-20260718",
+              "flagCount": 9,
+              "countedNegativeOrBurdenFlags": 9,
+              "positionCount": 67,
+              "countedPositionCount": 67,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.134328358,
+              "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrqj4pdf-u2krul/strings-submit-mrqj4pcy-ydbdaf.json"
+            },
+            {
+              "recordingId": "r2fb-05-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 25,
+              "countedPositionCount": 25,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0,
+              "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrqj4pdf-u2krul/strings-submit-mrqj4pd7-f0oaf7.json"
+            },
+            {
+              "recordingId": "r2fb-06-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 23,
+              "countedPositionCount": 23,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0,
+              "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrqj4pdf-u2krul/strings-submit-mrqj4pd9-pxnmgh.json"
+            },
+            {
+              "recordingId": "r2fb-07-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 52,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0,
+              "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrqj4pdf-u2krul/strings-submit-mrqj4pda-shb453.json"
+            },
+            {
+              "recordingId": "r2fb-08-20260718",
+              "flagCount": 1,
+              "countedNegativeOrBurdenFlags": 1,
+              "positionCount": 63,
+              "countedPositionCount": 63,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.015873016,
+              "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrqj4pdf-u2krul/strings-submit-mrqj4pdc-1ghh7p.json"
+            },
+            {
+              "recordingId": "r3-02",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 45,
+              "countedPositionCount": 45,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0,
+              "candidateRowsPath": "data/experiments/western-strings-m3/ordinary-dynamic-shadow-r3-acceptance/runs/r3-02-warm.json"
+            },
+            {
+              "recordingId": "r3-03",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 51,
+              "countedPositionCount": 51,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0,
+              "candidateRowsPath": "data/experiments/western-strings-m3/ordinary-dynamic-shadow-r3-acceptance/runs/r3-03-warm.json"
+            },
+            {
+              "recordingId": "round4-r4-01",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 53,
+              "countedPositionCount": 53,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0,
+              "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtw6-8gzbvn.json"
+            },
+            {
+              "recordingId": "round4-r4-02",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 59,
+              "countedPositionCount": 59,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0,
+              "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwa-jleh9k.json"
+            },
+            {
+              "recordingId": "round4-r4-03",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 24,
+              "countedPositionCount": 24,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0,
+              "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwc-immk43.json"
+            },
+            {
+              "recordingId": "round4-r4-04",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 44,
+              "countedPositionCount": 44,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0,
+              "candidateRowsPath": "data/experiments/western-strings-m3/offline-feature-candidates/strings-batch-mrukrtwo-r7ymua/strings-submit-mrukrtwf-7l1qro.json"
+            }
+          ]
+        }
+      },
+      "eliminated": true,
+      "eliminationReasons": [
+        "authoritative-local-clean-false-positive"
+      ],
+      "retainedForRecallAuditOnly": false,
+      "promotionReady": false,
+      "studentFacing": false,
+      "automaticAdoptionReady": false
+    },
+    {
+      "candidateId": "onset-density-extra-strict-v1",
+      "family": "onset-density",
+      "outputSemantic": "automatic_issue_candidate",
+      "applicableDatasets": [
+        "authoritative-local-clean",
+        "consumed-round5-known-negatives",
+        "public-professional-burden"
+      ],
+      "domains": {
+        "authoritative-local-clean": {
+          "evidenceRole": "authoritative-clean-negative",
+          "recordingCount": 17,
+          "flagCount": 232,
+          "positionCount": 743,
+          "rate": 0.312247645,
+          "flagsPer1000Positions": 312.247645,
+          "maximumPerRecordingRate": 0.549019608,
+          "falsePositiveCountAuthoritative": true,
+          "recordings": [
+            {
+              "recordingId": "r2fb-01-20260718",
+              "flagCount": 16,
+              "countedNegativeOrBurdenFlags": 16,
+              "positionCount": 67,
+              "countedPositionCount": 67,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.23880597
+            },
+            {
+              "recordingId": "r2fb-05-20260718",
+              "flagCount": 11,
+              "countedNegativeOrBurdenFlags": 11,
+              "positionCount": 25,
+              "countedPositionCount": 25,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.44
+            },
+            {
+              "recordingId": "r2fb-06-20260718",
+              "flagCount": 7,
+              "countedNegativeOrBurdenFlags": 7,
+              "positionCount": 23,
+              "countedPositionCount": 23,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.304347826
+            },
+            {
+              "recordingId": "r2fb-07-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 26,
+              "countedPositionCount": 26,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r2fb-08-20260718",
+              "flagCount": 27,
+              "countedNegativeOrBurdenFlags": 27,
+              "positionCount": 63,
+              "countedPositionCount": 63,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.428571429
+            },
+            {
+              "recordingId": "r3-01",
+              "flagCount": 31,
+              "countedNegativeOrBurdenFlags": 31,
+              "positionCount": 59,
+              "countedPositionCount": 59,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.525423729
+            },
+            {
+              "recordingId": "r3-02",
+              "flagCount": 19,
+              "countedNegativeOrBurdenFlags": 19,
+              "positionCount": 45,
+              "countedPositionCount": 45,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.422222222
+            },
+            {
+              "recordingId": "r3-03",
+              "flagCount": 28,
+              "countedNegativeOrBurdenFlags": 28,
+              "positionCount": 51,
+              "countedPositionCount": 51,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.549019608
+            },
+            {
+              "recordingId": "round2-r2-01-20260715",
+              "flagCount": 22,
+              "countedNegativeOrBurdenFlags": 22,
+              "positionCount": 67,
+              "countedPositionCount": 67,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.328358209
+            },
+            {
+              "recordingId": "round2-r2-05-20260715",
+              "flagCount": 8,
+              "countedNegativeOrBurdenFlags": 8,
+              "positionCount": 25,
+              "countedPositionCount": 25,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.32
+            },
+            {
+              "recordingId": "round2-r2-06-20260715",
+              "flagCount": 4,
+              "countedNegativeOrBurdenFlags": 4,
+              "positionCount": 23,
+              "countedPositionCount": 23,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.173913043
+            },
+            {
+              "recordingId": "round2-r2-07-20260715",
+              "flagCount": 2,
+              "countedNegativeOrBurdenFlags": 2,
+              "positionCount": 26,
+              "countedPositionCount": 26,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.076923077
+            },
+            {
+              "recordingId": "round2-r2-08-20260715",
+              "flagCount": 26,
+              "countedNegativeOrBurdenFlags": 26,
+              "positionCount": 63,
+              "countedPositionCount": 63,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.412698413
+            },
+            {
+              "recordingId": "round4-r4-01",
+              "flagCount": 6,
+              "countedNegativeOrBurdenFlags": 6,
+              "positionCount": 53,
+              "countedPositionCount": 53,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.113207547
+            },
+            {
+              "recordingId": "round4-r4-02",
+              "flagCount": 14,
+              "countedNegativeOrBurdenFlags": 14,
+              "positionCount": 59,
+              "countedPositionCount": 59,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.237288136
+            },
+            {
+              "recordingId": "round4-r4-03",
+              "flagCount": 5,
+              "countedNegativeOrBurdenFlags": 5,
+              "positionCount": 24,
+              "countedPositionCount": 24,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.208333333
+            },
+            {
+              "recordingId": "round4-r4-04",
+              "flagCount": 6,
+              "countedNegativeOrBurdenFlags": 6,
+              "positionCount": 44,
+              "countedPositionCount": 44,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.136363636
+            }
+          ]
+        },
+        "consumed-round5-known-negatives": {
+          "evidenceRole": "consumed-complete-inventory-negative-diagnostic",
+          "recordingCount": 12,
+          "flagCount": 64,
+          "positionCount": 624,
+          "rate": 0.102564103,
+          "flagsPer1000Positions": 102.564103,
+          "maximumPerRecordingRate": 0.211538462,
+          "falsePositiveCountAuthoritative": true,
+          "recordings": [
+            {
+              "recordingId": "r5-cal-01",
+              "flagCount": 4,
+              "countedNegativeOrBurdenFlags": 4,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.076923077
+            },
+            {
+              "recordingId": "r5-cal-02",
+              "flagCount": 5,
+              "countedNegativeOrBurdenFlags": 5,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.096153846
+            },
+            {
+              "recordingId": "r5-cal-03",
+              "flagCount": 10,
+              "countedNegativeOrBurdenFlags": 8,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 2,
+              "rate": 0.153846154
+            },
+            {
+              "recordingId": "r5-cal-04",
+              "flagCount": 6,
+              "countedNegativeOrBurdenFlags": 6,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.115384615
+            },
+            {
+              "recordingId": "r5-cal-05",
+              "flagCount": 3,
+              "countedNegativeOrBurdenFlags": 3,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.057692308
+            },
+            {
+              "recordingId": "r5-cal-06",
+              "flagCount": 4,
+              "countedNegativeOrBurdenFlags": 3,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.057692308
+            },
+            {
+              "recordingId": "r5-fresh-01",
+              "flagCount": 5,
+              "countedNegativeOrBurdenFlags": 5,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.096153846
+            },
+            {
+              "recordingId": "r5-fresh-02",
+              "flagCount": 6,
+              "countedNegativeOrBurdenFlags": 5,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.096153846
+            },
+            {
+              "recordingId": "r5-fresh-03",
+              "flagCount": 6,
+              "countedNegativeOrBurdenFlags": 5,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.096153846
+            },
+            {
+              "recordingId": "r5-fresh-04",
+              "flagCount": 11,
+              "countedNegativeOrBurdenFlags": 11,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.211538462
+            },
+            {
+              "recordingId": "r5-fresh-05",
+              "flagCount": 4,
+              "countedNegativeOrBurdenFlags": 4,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.076923077
+            },
+            {
+              "recordingId": "r5-fresh-06",
+              "flagCount": 5,
+              "countedNegativeOrBurdenFlags": 5,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.096153846
+            }
+          ]
+        },
+        "public-professional-burden": {
+          "evidenceRole": "unadjudicated-real-professional-burden",
+          "recordingCount": 7,
+          "flagCount": 124,
+          "positionCount": 6652,
+          "rate": 0.01864101,
+          "flagsPer1000Positions": 18.64101,
+          "maximumPerRecordingRate": 0.107205624,
+          "falsePositiveCountAuthoritative": false,
+          "recordings": [
+            {
+              "recordingId": "emil-telmanyi_bwv1004_mov4",
+              "flagCount": 3,
+              "countedNegativeOrBurdenFlags": 3,
+              "positionCount": 910,
+              "countedPositionCount": 910,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.003296703
+            },
+            {
+              "recordingId": "emil-telmanyi_bwv1005_mov4",
+              "flagCount": 2,
+              "countedNegativeOrBurdenFlags": 2,
+              "positionCount": 1196,
+              "countedPositionCount": 1196,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.001672241
+            },
+            {
+              "recordingId": "john-garner_bwv1002_mov6",
+              "flagCount": 61,
+              "countedNegativeOrBurdenFlags": 61,
+              "positionCount": 569,
+              "countedPositionCount": 569,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.107205624
+            },
+            {
+              "recordingId": "karen-gomyo_bwv1006_mov7",
+              "flagCount": 2,
+              "countedNegativeOrBurdenFlags": 2,
+              "positionCount": 666,
+              "countedPositionCount": 666,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.003003003
+            },
+            {
+              "recordingId": "ko-donghwi_bwv1001_mov4",
+              "flagCount": 2,
+              "countedNegativeOrBurdenFlags": 2,
+              "positionCount": 1624,
+              "countedPositionCount": 1624,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.001231527
+            },
+            {
+              "recordingId": "minji-kim_bwv1003_mov4",
+              "flagCount": 51,
+              "countedNegativeOrBurdenFlags": 51,
+              "positionCount": 1021,
+              "countedPositionCount": 1021,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.049951028
+            },
+            {
+              "recordingId": "oliver-colbentson_bwv1006_mov7",
+              "flagCount": 3,
+              "countedNegativeOrBurdenFlags": 3,
+              "positionCount": 666,
+              "countedPositionCount": 666,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.004504505
+            }
+          ]
+        }
+      },
+      "eliminated": true,
+      "eliminationReasons": [
+        "authoritative-local-clean-false-positive",
+        "consumed-round5-known-negative-false-positive",
+        "public-professional-pooled-burden",
+        "public-professional-recording-burden"
+      ],
+      "retainedForRecallAuditOnly": false,
+      "promotionReady": false,
+      "studentFacing": false,
+      "automaticAdoptionReady": false
+    },
+    {
+      "candidateId": "temporal-operation-sequence-union-v1",
+      "family": "sequence-model",
+      "outputSemantic": "review_hint",
+      "applicableDatasets": [
+        "authoritative-local-clean",
+        "consumed-round5-known-negatives",
+        "public-professional-burden"
+      ],
+      "domains": {
+        "authoritative-local-clean": {
+          "evidenceRole": "authoritative-clean-negative",
+          "recordingCount": 17,
+          "flagCount": 289,
+          "positionCount": 743,
+          "rate": 0.388963661,
+          "flagsPer1000Positions": 388.963661,
+          "maximumPerRecordingRate": 0.695652174,
+          "falsePositiveCountAuthoritative": true,
+          "recordings": [
+            {
+              "recordingId": "r2fb-01-20260718",
+              "flagCount": 32,
+              "countedNegativeOrBurdenFlags": 32,
+              "positionCount": 67,
+              "countedPositionCount": 67,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.47761194
+            },
+            {
+              "recordingId": "r2fb-05-20260718",
+              "flagCount": 13,
+              "countedNegativeOrBurdenFlags": 13,
+              "positionCount": 25,
+              "countedPositionCount": 25,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.52
+            },
+            {
+              "recordingId": "r2fb-06-20260718",
+              "flagCount": 11,
+              "countedNegativeOrBurdenFlags": 11,
+              "positionCount": 23,
+              "countedPositionCount": 23,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.47826087
+            },
+            {
+              "recordingId": "r2fb-07-20260718",
+              "flagCount": 0,
+              "countedNegativeOrBurdenFlags": 0,
+              "positionCount": 26,
+              "countedPositionCount": 26,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.0
+            },
+            {
+              "recordingId": "r2fb-08-20260718",
+              "flagCount": 31,
+              "countedNegativeOrBurdenFlags": 31,
+              "positionCount": 63,
+              "countedPositionCount": 63,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.492063492
+            },
+            {
+              "recordingId": "r3-01",
+              "flagCount": 31,
+              "countedNegativeOrBurdenFlags": 31,
+              "positionCount": 59,
+              "countedPositionCount": 59,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.525423729
+            },
+            {
+              "recordingId": "r3-02",
+              "flagCount": 19,
+              "countedNegativeOrBurdenFlags": 19,
+              "positionCount": 45,
+              "countedPositionCount": 45,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.422222222
+            },
+            {
+              "recordingId": "r3-03",
+              "flagCount": 29,
+              "countedNegativeOrBurdenFlags": 29,
+              "positionCount": 51,
+              "countedPositionCount": 51,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.568627451
+            },
+            {
+              "recordingId": "round2-r2-01-20260715",
+              "flagCount": 22,
+              "countedNegativeOrBurdenFlags": 22,
+              "positionCount": 67,
+              "countedPositionCount": 67,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.328358209
+            },
+            {
+              "recordingId": "round2-r2-05-20260715",
+              "flagCount": 10,
+              "countedNegativeOrBurdenFlags": 10,
+              "positionCount": 25,
+              "countedPositionCount": 25,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.4
+            },
+            {
+              "recordingId": "round2-r2-06-20260715",
+              "flagCount": 16,
+              "countedNegativeOrBurdenFlags": 16,
+              "positionCount": 23,
+              "countedPositionCount": 23,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.695652174
+            },
+            {
+              "recordingId": "round2-r2-07-20260715",
+              "flagCount": 4,
+              "countedNegativeOrBurdenFlags": 4,
+              "positionCount": 26,
+              "countedPositionCount": 26,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.153846154
+            },
+            {
+              "recordingId": "round2-r2-08-20260715",
+              "flagCount": 26,
+              "countedNegativeOrBurdenFlags": 26,
+              "positionCount": 63,
+              "countedPositionCount": 63,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.412698413
+            },
+            {
+              "recordingId": "round4-r4-01",
+              "flagCount": 6,
+              "countedNegativeOrBurdenFlags": 6,
+              "positionCount": 53,
+              "countedPositionCount": 53,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.113207547
+            },
+            {
+              "recordingId": "round4-r4-02",
+              "flagCount": 15,
+              "countedNegativeOrBurdenFlags": 15,
+              "positionCount": 59,
+              "countedPositionCount": 59,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.254237288
+            },
+            {
+              "recordingId": "round4-r4-03",
+              "flagCount": 12,
+              "countedNegativeOrBurdenFlags": 12,
+              "positionCount": 24,
+              "countedPositionCount": 24,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.5
+            },
+            {
+              "recordingId": "round4-r4-04",
+              "flagCount": 12,
+              "countedNegativeOrBurdenFlags": 12,
+              "positionCount": 44,
+              "countedPositionCount": 44,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.272727273
+            }
+          ]
+        },
+        "consumed-round5-known-negatives": {
+          "evidenceRole": "consumed-complete-inventory-negative-diagnostic",
+          "recordingCount": 12,
+          "flagCount": 116,
+          "positionCount": 624,
+          "rate": 0.185897436,
+          "flagsPer1000Positions": 185.897436,
+          "maximumPerRecordingRate": 0.307692308,
+          "falsePositiveCountAuthoritative": true,
+          "recordings": [
+            {
+              "recordingId": "r5-cal-01",
+              "flagCount": 12,
+              "countedNegativeOrBurdenFlags": 9,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 3,
+              "rate": 0.173076923
+            },
+            {
+              "recordingId": "r5-cal-02",
+              "flagCount": 9,
+              "countedNegativeOrBurdenFlags": 7,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 2,
+              "rate": 0.134615385
+            },
+            {
+              "recordingId": "r5-cal-03",
+              "flagCount": 16,
+              "countedNegativeOrBurdenFlags": 12,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 4,
+              "rate": 0.230769231
+            },
+            {
+              "recordingId": "r5-cal-04",
+              "flagCount": 10,
+              "countedNegativeOrBurdenFlags": 9,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 1,
+              "rate": 0.173076923
+            },
+            {
+              "recordingId": "r5-cal-05",
+              "flagCount": 9,
+              "countedNegativeOrBurdenFlags": 5,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 4,
+              "rate": 0.096153846
+            },
+            {
+              "recordingId": "r5-cal-06",
+              "flagCount": 9,
+              "countedNegativeOrBurdenFlags": 7,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 2,
+              "rate": 0.134615385
+            },
+            {
+              "recordingId": "r5-fresh-01",
+              "flagCount": 13,
+              "countedNegativeOrBurdenFlags": 11,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 2,
+              "rate": 0.211538462
+            },
+            {
+              "recordingId": "r5-fresh-02",
+              "flagCount": 11,
+              "countedNegativeOrBurdenFlags": 9,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 2,
+              "rate": 0.173076923
+            },
+            {
+              "recordingId": "r5-fresh-03",
+              "flagCount": 14,
+              "countedNegativeOrBurdenFlags": 10,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 4,
+              "rate": 0.192307692
+            },
+            {
+              "recordingId": "r5-fresh-04",
+              "flagCount": 18,
+              "countedNegativeOrBurdenFlags": 16,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 2,
+              "rate": 0.307692308
+            },
+            {
+              "recordingId": "r5-fresh-05",
+              "flagCount": 12,
+              "countedNegativeOrBurdenFlags": 10,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 2,
+              "rate": 0.192307692
+            },
+            {
+              "recordingId": "r5-fresh-06",
+              "flagCount": 15,
+              "countedNegativeOrBurdenFlags": 11,
+              "positionCount": 56,
+              "countedPositionCount": 52,
+              "excludedKnownPositiveFlagCount": 4,
+              "rate": 0.211538462
+            }
+          ]
+        },
+        "public-professional-burden": {
+          "evidenceRole": "unadjudicated-real-professional-burden",
+          "recordingCount": 7,
+          "flagCount": 3371,
+          "positionCount": 6652,
+          "rate": 0.506764883,
+          "flagsPer1000Positions": 506.764883,
+          "maximumPerRecordingRate": 0.673913043,
+          "falsePositiveCountAuthoritative": false,
+          "recordings": [
+            {
+              "recordingId": "emil-telmanyi_bwv1004_mov4",
+              "flagCount": 455,
+              "countedNegativeOrBurdenFlags": 455,
+              "positionCount": 910,
+              "countedPositionCount": 910,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.5
+            },
+            {
+              "recordingId": "emil-telmanyi_bwv1005_mov4",
+              "flagCount": 806,
+              "countedNegativeOrBurdenFlags": 806,
+              "positionCount": 1196,
+              "countedPositionCount": 1196,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.673913043
+            },
+            {
+              "recordingId": "john-garner_bwv1002_mov6",
+              "flagCount": 197,
+              "countedNegativeOrBurdenFlags": 197,
+              "positionCount": 569,
+              "countedPositionCount": 569,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.346221441
+            },
+            {
+              "recordingId": "karen-gomyo_bwv1006_mov7",
+              "flagCount": 292,
+              "countedNegativeOrBurdenFlags": 292,
+              "positionCount": 666,
+              "countedPositionCount": 666,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.438438438
+            },
+            {
+              "recordingId": "ko-donghwi_bwv1001_mov4",
+              "flagCount": 916,
+              "countedNegativeOrBurdenFlags": 916,
+              "positionCount": 1624,
+              "countedPositionCount": 1624,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.564039409
+            },
+            {
+              "recordingId": "minji-kim_bwv1003_mov4",
+              "flagCount": 429,
+              "countedNegativeOrBurdenFlags": 429,
+              "positionCount": 1021,
+              "countedPositionCount": 1021,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.420176298
+            },
+            {
+              "recordingId": "oliver-colbentson_bwv1006_mov7",
+              "flagCount": 276,
+              "countedNegativeOrBurdenFlags": 276,
+              "positionCount": 666,
+              "countedPositionCount": 666,
+              "excludedKnownPositiveFlagCount": 0,
+              "rate": 0.414414414
+            }
+          ]
+        }
+      },
+      "eliminated": true,
+      "eliminationReasons": [
+        "authoritative-local-clean-pooled-hint-rate",
+        "authoritative-local-clean-recording-hint-rate",
+        "consumed-round5-pooled-hint-rate",
+        "consumed-round5-recording-hint-rate",
+        "public-professional-pooled-burden",
+        "public-professional-recording-burden"
+      ],
+      "retainedForRecallAuditOnly": false,
+      "promotionReady": false,
+      "studentFacing": false,
+      "automaticAdoptionReady": false
+    }
+  ],
+  "conclusions": {
+    "eliminatedCandidateIds": [
+      "alignment-gap-refined-self-check-v1",
+      "alignment-gap-strict-missing-v1",
+      "relative-ioi-duration-review-v1",
+      "relative-ioi-duration-strict-v1",
+      "pitch-trajectory-center-strict-v1",
+      "onset-density-extra-strict-v1",
+      "temporal-operation-sequence-union-v1"
+    ],
+    "retainedCandidateIds": [],
+    "retainedCandidatesMayProceedToRecallAuditOnly": true,
+    "retainedCandidatesPromotionReady": false,
+    "studentFacing": false,
+    "automaticAccusationReady": false,
+    "automaticAdoptionReady": false,
+    "publicFlagsAreBurdenNotAuthoritativeFalsePositives": true
+  },
+  "stopLines": {
+    "m4Omr": "no-further-investment",
+    "waveformEnergyMissingNote": "no-further-investment"
+  },
+  "studentSwitches": {
+    "ordinaryUploadAutoFeedbackReady": false,
+    "m3plusAutoFeedbackReady": false,
+    "m4OmrAutoScoreReady": false
+  },
+  "evidenceSemanticSha256": "238f7765ed9b99e44e244df211f9096f8bd1cd3b786a94da8a39839c59c2fadf"
+}
