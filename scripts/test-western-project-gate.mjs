@@ -880,6 +880,10 @@ assert.equal(round6CounterbalancedCapture?.counts?.audioFiles, 0);
     signedEvents: 72,
     completeInventories: 6,
   });
+  assert.deepEqual(round6Schedule?.stopLines, {
+    m4Omr: "no-further-investment",
+    waveformEnergyMissingNote: "no-further-investment",
+  });
   assert.deepEqual(round6Schedule?.blockingReasons, []);
 assert.deepEqual(
   round6CounterbalancedCapture?.positionBalance?.confoundedSplitGates,
@@ -1093,6 +1097,11 @@ assert.equal(
 assert.deepEqual(ordinaryRecallAction?.reason, [
   "policy-c-auto-accusation-closed",
 ]);
+assert.equal(
+  status.nextActions.some((action) => String(action.track || "").startsWith("M4 OMR")),
+  false,
+  "the frozen M4 stop-line must not emit another investment action",
+);
 const reviewAssistCalibrationAction = status.nextActions.find(
   (action) => action.track === "Ordinary review-assist calibration",
 );

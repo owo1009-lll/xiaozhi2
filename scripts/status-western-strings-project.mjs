@@ -2914,6 +2914,13 @@ export async function summarizeRound6CounterbalancedCapture({
       stageAExternalInput,
       stageBExternalInput,
       currentStageExternalInput,
+      stopLines: stagedProtocolValid
+        ? {
+          m4Omr: stagedProtocol.stopLines.m4Omr,
+          waveformEnergyMissingNote:
+            stagedProtocol.stopLines.waveformEnergyMissingNote,
+        }
+        : {},
       blockingReasons: schedulingBlockingReasons,
     },
     counts: {
@@ -6076,7 +6083,13 @@ export function summarizeNextActions(
       reason: m3plus.blockingReasons,
     });
   }
-  if (!m4Omr.m4OmrIndependentBenchmarkReady) {
+  const recordingStopLines = (
+    shadow.round6CounterbalancedCapture?.recordingSchedule?.stopLines || {}
+  );
+  const m4FurtherInvestmentStopped = (
+    recordingStopLines.m4Omr === "no-further-investment"
+  );
+  if (!m4FurtherInvestmentStopped && !m4Omr.m4OmrIndependentBenchmarkReady) {
     actions.push({
       priority: 3,
       track: "M4 OMR independent benchmark",
@@ -6084,7 +6097,11 @@ export function summarizeNextActions(
       artifact: m4Omr.artifacts?.independentBenchmarkJson || M4_INDEPENDENT_BENCHMARK_AUDIT.replace(/\\/g, "/"),
       reason: m4Omr.blockingReasons,
     });
-  } else if (!m4Omr.m4OmrDraftQualityReady && m4Omr.humanTask !== "none") {
+  } else if (
+    !m4FurtherInvestmentStopped
+    && !m4Omr.m4OmrDraftQualityReady
+    && m4Omr.humanTask !== "none"
+  ) {
     actions.push({
       priority: 3,
       track: "M4 OMR benchmark",
@@ -6094,7 +6111,7 @@ export function summarizeNextActions(
       teacherReviewNeeded: m4Omr.teacherReviewNeeded,
       reason: m4Omr.blockingReasons,
     });
-  } else if (!m4Omr.m4OmrAutomaticAdoptionReady) {
+  } else if (!m4FurtherInvestmentStopped && !m4Omr.m4OmrAutomaticAdoptionReady) {
     const realPhotoRows = Number(m4Omr.independentBenchmark?.independentRealPhotoRows || 0);
     actions.push({
       priority: 3,
@@ -6128,7 +6145,8 @@ export function summarizeNextActions(
   }
   // Once BOTH monitored-pilot audits pass, the release chain (release review ->
   // controlled pilot decision -> owner approval) becomes the top action even
-  // while research-only tracks (e.g. M4 automatic adoption) stay blocked.
+  // while closed research tracks remain project blockers without generating
+  // further-investment actions.
   const m3plusPilotAudit = m3plus.monitoredPilotAudit || {};
   const m3plusPilotEvidencePassed = m3plusPilotAudit.readyForMonitoredPilot === true
     && m3plusPilotAudit.teacherReviewNeeded !== true
