@@ -3,7 +3,10 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { writeRound5TruthSignoffPack } from "./generate-western-round5-truth-signoff-pack.mjs";
+import {
+  writeRound5TruthSignoffPack,
+  writeTruthSignoffPack,
+} from "./generate-western-round5-truth-signoff-pack.mjs";
 
 const root = await fs.mkdtemp(path.join(os.tmpdir(), "round5-truth-signoff-"));
 
@@ -15,7 +18,7 @@ try {
     "r5-test,piece,performer,device,room,fresh-blind,private/take.wav,private/score.musicxml,yes,local-only",
     "",
   ].join("\n"));
-  await fs.writeFile(path.join(root, "private", "truth.json"), `${JSON.stringify({
+  const truth = {
     contractVersion: "western-round5-targeted-diagnosis-intake-v1",
     recordings: {
       "r5-test": {
@@ -32,7 +35,18 @@ try {
         }],
       },
     },
-  })}\n`);
+  };
+  await fs.writeFile(
+    path.join(root, "private", "truth.json"),
+    `${JSON.stringify(truth)}\n`,
+  );
+  await fs.writeFile(
+    path.join(root, "private", "truth-round6.json"),
+    `${JSON.stringify({
+      ...truth,
+      contractVersion: "western-round6-counterbalanced-diagnosis-v1",
+    })}\n`,
+  );
 
   const result = await writeRound5TruthSignoffPack({
     repoRoot: root,
@@ -57,15 +71,32 @@ try {
   assert(browserScript);
   new Function(browserScript); // eslint-disable-line no-new-func
 
-  await fs.rm(path.join(root, "private", "take.wav"));
-  const missing = await writeRound5TruthSignoffPack({
+  const round6 = await writeTruthSignoffPack({
     repoRoot: root,
     manifestPath: "private/manifest.csv",
-    truthPath: "private/truth.json",
+    truthPath: "private/truth-round6.json",
+    outDir: "private/signoff-round6",
+    roundNumber: 6,
+  });
+  assert.equal(round6.readyForSignoff, true);
+  const round6Html = await fs.readFile(
+    path.join(root, "private", "signoff-round6", "index.html"),
+    "utf8",
+  );
+  assert(round6Html.includes("Round 6 逐条试听与真值签署"));
+  assert(round6Html.includes("western-round6-truth-signoff:"));
+  assert(round6Html.includes("本页不展示任何机器预测"));
+
+  await fs.rm(path.join(root, "private", "take.wav"));
+  const missing = await writeTruthSignoffPack({
+    repoRoot: root,
+    manifestPath: "private/manifest.csv",
+    truthPath: "private/truth-round6.json",
     outDir: "private/missing",
+    roundNumber: 6,
   });
   assert.equal(missing.ok, false);
-  assert(missing.blockingReasons.includes("round5-signoff-audio-missing:r5-test"));
+  assert(missing.blockingReasons.includes("round6-signoff-audio-missing:r5-test"));
 
   console.log(JSON.stringify({
     ok: true,
@@ -74,6 +105,7 @@ try {
       "no-machine-predictions",
       "complete-inventory-required-before-download",
       "unplanned-error-entry-available",
+      "round6-reuse-keeps-no-prediction-boundary",
       "missing-audio-fail-closed",
     ],
   }));

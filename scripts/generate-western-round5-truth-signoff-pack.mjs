@@ -51,7 +51,14 @@ async function readSource(repoRoot, relativePath) {
   return { absolute, bytes, sha256: sha256(bytes) };
 }
 
-function renderHtml({ truth, recordings, manifestSha256, truthSha256 }) {
+function renderHtml({
+  truth,
+  recordings,
+  manifestSha256,
+  truthSha256,
+  roundNumber = 5,
+}) {
+  const roundLabel = `Round ${roundNumber}`;
   const payload = JSON.stringify({ truth, recordings, manifestSha256, truthSha256 })
     .replace(/</g, "\\u003c");
   return `<!doctype html>
@@ -59,7 +66,7 @@ function renderHtml({ truth, recordings, manifestSha256, truthSha256 }) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Round 5 逐条试听与真值签署</title>
+  <title>${roundLabel} 逐条试听与真值签署</title>
   <style>
     body{margin:0;background:#f3f5f8;color:#172033;font-family:"Microsoft YaHei",sans-serif}
     main{max-width:1120px;margin:auto;padding:20px}.sticky{position:sticky;top:0;z-index:3;background:#f3f5f8;border-bottom:1px solid #cbd5e1;padding:12px 0}
@@ -73,7 +80,7 @@ function renderHtml({ truth, recordings, manifestSha256, truthSha256 }) {
 </head>
 <body><main>
   <section class="sticky">
-    <h1>Round 5 逐条试听与真值签署</h1>
+    <h1>${roundLabel} 逐条试听与真值签署</h1>
     <p class="danger" id="no-machine-predictions">本页不展示任何机器预测。请只根据录音实际内容复核，避免污染 fresh-blind。</p>
     <button id="download">全部完成后下载 position-truth.completed.json</button>
     <span id="summary"></span>
@@ -84,7 +91,7 @@ function renderHtml({ truth, recordings, manifestSha256, truthSha256 }) {
 const PACK=${payload};
 const GATES=["merged_substitution","missing","extra","drag"];
 const LABELS=["positive","confusion_negative"];
-const KEY="western-round5-truth-signoff:"+PACK.truthSha256;
+const KEY="western-round${roundNumber}-truth-signoff:"+PACK.truthSha256;
 const saved=JSON.parse(localStorage.getItem(KEY)||"{}");
 const state={
   values:saved.values||{},
@@ -203,12 +210,16 @@ render();
 </script></body></html>`;
 }
 
-export async function writeRound5TruthSignoffPack({
+export async function writeTruthSignoffPack({
   repoRoot = process.cwd(),
   manifestPath = DEFAULT_MANIFEST,
   truthPath = DEFAULT_TRUTH,
   outDir = DEFAULT_OUT,
+  roundNumber = 5,
 } = {}) {
+  if (![5, 6].includes(Number(roundNumber))) {
+    throw new Error(`unsupported round number: ${roundNumber}`);
+  }
   const root = path.resolve(repoRoot);
   const [manifestSource, truthSource] = await Promise.all([
     readSource(root, manifestPath),
@@ -219,9 +230,15 @@ export async function writeRound5TruthSignoffPack({
   const output = path.resolve(root, outDir);
   const blockers = [];
   const recordings = [];
+  const expectedContract = Number(roundNumber) === 6
+    ? "western-round6-counterbalanced-diagnosis-v1"
+    : "western-round5-targeted-diagnosis-intake-v1";
+  if (truth.contractVersion !== expectedContract) {
+    blockers.push(`round${roundNumber}-signoff-truth-contract-invalid`);
+  }
   for (const row of manifest) {
     if (!truth.recordings?.[row.recordingId]) {
-      blockers.push(`round5-signoff-truth-recording-missing:${row.recordingId}`);
+      blockers.push(`round${roundNumber}-signoff-truth-recording-missing:${row.recordingId}`);
       continue;
     }
     const audioPath = path.resolve(root, row.audioPath);
@@ -233,12 +250,16 @@ export async function writeRound5TruthSignoffPack({
         audioRelativePath: posixPath(path.relative(output, audioPath)),
       });
     } catch (error) {
-      blockers.push(`round5-signoff-audio-${error?.code === "ENOENT" ? "missing" : "unreadable"}:${row.recordingId}`);
+      blockers.push(
+        `round${roundNumber}-signoff-audio-${
+          error?.code === "ENOENT" ? "missing" : "unreadable"
+        }:${row.recordingId}`,
+      );
     }
   }
   for (const recordingId of Object.keys(truth.recordings || {})) {
     if (!manifest.some((row) => row.recordingId === recordingId)) {
-      blockers.push(`round5-signoff-manifest-recording-missing:${recordingId}`);
+      blockers.push(`round${roundNumber}-signoff-manifest-recording-missing:${recordingId}`);
     }
   }
   if (blockers.length) {
@@ -250,6 +271,7 @@ export async function writeRound5TruthSignoffPack({
     recordings,
     manifestSha256: manifestSource.sha256,
     truthSha256: truthSource.sha256,
+    roundNumber: Number(roundNumber),
   });
   const pagePath = path.join(output, "index.html");
   await fs.writeFile(pagePath, html, "utf8");
@@ -270,8 +292,23 @@ export async function writeRound5TruthSignoffPack({
   };
 }
 
+export const writeRound5TruthSignoffPack = writeTruthSignoffPack;
+
+function parseArgs(argv) {
+  const args = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--manifest") args.manifestPath = argv[++index];
+    else if (arg === "--truth") args.truthPath = argv[++index];
+    else if (arg === "--out") args.outDir = argv[++index];
+    else if (arg === "--round") args.roundNumber = Number(argv[++index]);
+    else throw new Error(`unknown argument: ${arg}`);
+  }
+  return args;
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
-  writeRound5TruthSignoffPack()
+  writeTruthSignoffPack(parseArgs(process.argv.slice(2)))
     .then((result) => {
       console.log(JSON.stringify(result, null, 2));
       if (!result.ok) process.exitCode = 1;

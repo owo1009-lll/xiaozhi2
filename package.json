@@ -284,6 +284,7 @@
     "test:western-review-assist-project-status": "node scripts\\test-western-review-assist-project-status.mjs",
     "western:round5-truth-signoff-pack": "node scripts\\generate-western-round5-truth-signoff-pack.mjs",
     "test:western-round5-truth-signoff-pack": "node scripts\\test-western-round5-truth-signoff-pack.mjs",
+    "western:round6-truth-signoff-pack": "node scripts\\generate-western-round5-truth-signoff-pack.mjs --round 6 --manifest data\\private\\western-strings-round6-counterbalanced\\manifest.csv --truth data\\private\\western-strings-round6-counterbalanced\\position-truth.json --out data\\private\\western-strings-round6-counterbalanced\\truth-signoff",
     "western:round5-audio-score-identity": "py -3.11 scripts\\audit-western-round5-audio-score-identity.py",
     "test:western-round5-audio-score-identity": "py -3.11 scripts\\test-western-round5-audio-score-identity.py",
     "western:round5-calibration-failure-audit": "py -3.11 scripts\\experiments\\audit_western_round5_calibration_failure_modes.py",

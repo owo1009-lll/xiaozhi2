@@ -946,6 +946,7 @@ const ordinaryRecallAction = status.nextActions.find(
 assert(
   ordinaryRecallAction?.action.includes("Round 5 is consumed")
     && ordinaryRecallAction?.action.includes("Round 6 counterbalanced")
+    && ordinaryRecallAction?.action.includes("western:round6-truth-signoff-pack")
     && ordinaryRecallAction?.action.includes("western:round6-targeted-intake")
     && ordinaryRecallAction?.action.includes("2/12"),
   "the recall handoff must expose the consumed Round-5 verdict and ready-to-record Round-6 plan",
