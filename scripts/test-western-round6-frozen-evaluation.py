@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shutil
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
@@ -134,6 +135,34 @@ def main() -> int:
             intake=SimpleNamespace(REPO=root),
         )
         calls = {"evaluation": 0}
+        intake_counts = {
+            "positiveByGate": {
+                gate: 2 for gate in MODULE.EXPECTED_GATES
+            },
+            "confusionNegativeByGate": {
+                gate: 4 for gate in MODULE.EXPECTED_GATES
+            },
+            "freshBlindPositiveByGate": {
+                gate: 1 for gate in MODULE.EXPECTED_GATES
+            },
+            "freshBlindConfusionNegativeByGate": {
+                gate: 2 for gate in MODULE.EXPECTED_GATES
+            },
+        }
+        valid_denominators = {
+            split: {
+                gate: {
+                    "allScorePositions": 20,
+                    "positivePositions": 1,
+                    "strictNegativePositions": 19,
+                    "ordinaryUnlistedPositions": 8,
+                    "targetConfusionNegativePositions": 2,
+                    "otherGateOrControlPositions": 9,
+                }
+                for gate in MODULE.EXPECTED_GATES
+            }
+            for split in ("calibration", "fresh-blind")
+        }
 
         def pending_intake(*_args):
             return {
@@ -146,6 +175,7 @@ def main() -> int:
             return {
                 "ready": True,
                 "hashes": {"truthSha256": "ready"},
+                "counts": intake_counts,
                 "blockingReasons": [],
             }
 
@@ -154,7 +184,14 @@ def main() -> int:
             report.write_text("{}\n", encoding="utf-8")
             model.write_bytes(b"model")
             return {
+                "contract": candidate.CONTRACT,
+                "modelFamily": candidate.MODEL_FAMILY,
+                "strictFalseAccusationDenominator": (
+                    candidate.STRICT_FALSE_ACCUSATION_DENOMINATOR
+                ),
                 "evaluationPerformed": True,
+                "datasetRows": 160,
+                "denominators": valid_denominators,
                 "promotedGates": [],
                 "automaticAccusationReady": False,
                 "studentFacing": False,
@@ -189,6 +226,42 @@ def main() -> int:
         ]
         assert calls["evaluation"] == 0
         stale_source.write_text(original_source, encoding="utf-8")
+
+        with tempfile.TemporaryDirectory() as bad_temp:
+            bad_root = Path(bad_temp)
+            shutil.copytree(root, bad_root, dirs_exist_ok=True)
+
+            def malformed_evaluate(_contract, _manifest, _truth, report, model):
+                report.write_text("{}\n", encoding="utf-8")
+                model.write_bytes(b"model")
+                return {
+                    "contract": candidate.CONTRACT,
+                    "modelFamily": candidate.MODEL_FAMILY,
+                    "strictFalseAccusationDenominator": (
+                        candidate.STRICT_FALSE_ACCUSATION_DENOMINATOR
+                    ),
+                    "evaluationPerformed": True,
+                }
+
+            malformed = MODULE.run(
+                repo_root=bad_root,
+                protocol_path=bad_root / "config/protocol.json",
+                module=candidate,
+                intake_validator=ready_intake,
+                evaluator=malformed_evaluate,
+            )
+            assert malformed["evaluationPerformed"] is False
+            assert malformed["promotionEvidenceEligible"] is False
+            assert malformed["freshBlindConsumed"] is True
+            assert "round6-candidate-evidence-denominators-missing" in malformed[
+                "blockingReasons"
+            ]
+            malformed_ledger = json.loads(
+                (bad_root / protocol["paths"]["consumedLedger"]).read_text(
+                    encoding="utf-8"
+                )
+            )
+            assert malformed_ledger["status"] == "evaluation-failed"
 
         completed = MODULE.run(
             repo_root=root,

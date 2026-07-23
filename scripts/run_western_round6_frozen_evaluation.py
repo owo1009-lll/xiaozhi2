@@ -24,6 +24,12 @@ REPORT_CONTRACT = "western-round6-frozen-evaluation-v1"
 EXPECTED_GATES = ("merged_substitution", "missing", "extra", "drag")
 
 
+class CandidateEvidenceError(RuntimeError):
+    def __init__(self, blocking_reasons: list[str]):
+        self.blocking_reasons = sorted(set(blocking_reasons))
+        super().__init__("round6-candidate-evidence-invalid")
+
+
 def read_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -238,6 +244,151 @@ def candidate_semantics_blockers(module: ModuleType, protocol: dict[str, Any]) -
     return blockers
 
 
+def candidate_evidence_blockers(
+    evidence: dict[str, Any],
+    protocol: dict[str, Any],
+    intake_report: dict[str, Any],
+) -> list[str]:
+    blockers = []
+    candidate = protocol.get("candidate") or {}
+    if evidence.get("contract") != candidate.get("sourceContract"):
+        blockers.append("round6-candidate-evidence-contract-mismatch")
+    if evidence.get("modelFamily") != candidate.get("modelFamily"):
+        blockers.append("round6-candidate-evidence-model-family-mismatch")
+    if (
+        evidence.get("strictFalseAccusationDenominator")
+        != candidate.get("strictFalseAccusationDenominator")
+    ):
+        blockers.append("round6-candidate-evidence-denominator-contract-mismatch")
+
+    counts = intake_report.get("counts")
+    denominators = evidence.get("denominators")
+    if not isinstance(counts, dict):
+        blockers.append("round6-candidate-evidence-intake-counts-missing")
+        return blockers
+    if not isinstance(denominators, dict):
+        blockers.append("round6-candidate-evidence-denominators-missing")
+        return blockers
+
+    count_fields = (
+        "positiveByGate",
+        "confusionNegativeByGate",
+        "freshBlindPositiveByGate",
+        "freshBlindConfusionNegativeByGate",
+    )
+    observed_counts: dict[str, dict[str, int]] = {}
+    for field in count_fields:
+        values = counts.get(field)
+        if not isinstance(values, dict):
+            blockers.append(f"round6-candidate-evidence-intake-counts-invalid:{field}")
+            continue
+        observed_counts[field] = {}
+        for gate in EXPECTED_GATES:
+            value = values.get(gate)
+            if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                blockers.append(
+                    f"round6-candidate-evidence-intake-count-invalid:{field}:{gate}"
+                )
+            else:
+                observed_counts[field][gate] = value
+    if blockers:
+        return blockers
+
+    split_counts = {
+        "calibration": {
+            "positive": {
+                gate: (
+                    observed_counts["positiveByGate"][gate]
+                    - observed_counts["freshBlindPositiveByGate"][gate]
+                )
+                for gate in EXPECTED_GATES
+            },
+            "confusion": {
+                gate: (
+                    observed_counts["confusionNegativeByGate"][gate]
+                    - observed_counts["freshBlindConfusionNegativeByGate"][gate]
+                )
+                for gate in EXPECTED_GATES
+            },
+        },
+        "fresh-blind": {
+            "positive": observed_counts["freshBlindPositiveByGate"],
+            "confusion": observed_counts["freshBlindConfusionNegativeByGate"],
+        },
+    }
+    dataset_rows = 0
+    denominator_fields = (
+        "allScorePositions",
+        "positivePositions",
+        "strictNegativePositions",
+        "ordinaryUnlistedPositions",
+        "targetConfusionNegativePositions",
+        "otherGateOrControlPositions",
+    )
+    for split, expected in split_counts.items():
+        split_denominators = denominators.get(split)
+        if not isinstance(split_denominators, dict):
+            blockers.append(f"round6-candidate-evidence-denominator-split-missing:{split}")
+            continue
+        all_score_position_counts = set()
+        total_signed_positions = sum(expected["positive"].values()) + sum(
+            expected["confusion"].values()
+        )
+        for gate in EXPECTED_GATES:
+            row = split_denominators.get(gate)
+            if not isinstance(row, dict):
+                blockers.append(
+                    f"round6-candidate-evidence-denominator-gate-missing:{split}:{gate}"
+                )
+                continue
+            if any(
+                not isinstance(row.get(field), int)
+                or isinstance(row.get(field), bool)
+                or row[field] < 0
+                for field in denominator_fields
+            ):
+                blockers.append(
+                    f"round6-candidate-evidence-denominator-field-invalid:{split}:{gate}"
+                )
+                continue
+            all_positions = row["allScorePositions"]
+            all_score_position_counts.add(all_positions)
+            dataset_rows += all_positions
+            expected_positive = expected["positive"][gate]
+            expected_confusion = expected["confusion"][gate]
+            expected_other = (
+                total_signed_positions - expected_positive - expected_confusion
+            )
+            expected_ordinary = all_positions - total_signed_positions
+            if row["positivePositions"] != expected_positive:
+                blockers.append(
+                    f"round6-candidate-evidence-positive-count-mismatch:{split}:{gate}"
+                )
+            if row["targetConfusionNegativePositions"] != expected_confusion:
+                blockers.append(
+                    f"round6-candidate-evidence-confusion-count-mismatch:{split}:{gate}"
+                )
+            if row["otherGateOrControlPositions"] != expected_other:
+                blockers.append(
+                    f"round6-candidate-evidence-other-gate-count-mismatch:{split}:{gate}"
+                )
+            if expected_ordinary < 0 or row["ordinaryUnlistedPositions"] != expected_ordinary:
+                blockers.append(
+                    f"round6-candidate-evidence-ordinary-count-mismatch:{split}:{gate}"
+                )
+            if row["strictNegativePositions"] != all_positions - expected_positive:
+                blockers.append(
+                    f"round6-candidate-evidence-strict-negative-count-mismatch:{split}:{gate}"
+                )
+        if len(all_score_position_counts) != 1:
+            blockers.append(
+                f"round6-candidate-evidence-all-score-count-inconsistent:{split}"
+            )
+    if evidence.get("datasetRows") != dataset_rows:
+        blockers.append("round6-candidate-evidence-dataset-row-count-mismatch")
+    return sorted(set(blockers))
+
+
 def run(
     *,
     repo_root: Path = REPO,
@@ -345,6 +496,9 @@ def run(
         )
         if inner.get("evaluationPerformed") is not True:
             raise RuntimeError("round6-candidate-returned-without-evaluation")
+        evidence_blockers = candidate_evidence_blockers(inner, protocol, intake_report)
+        if evidence_blockers:
+            raise CandidateEvidenceError(evidence_blockers)
         result = {
             **base,
             "ok": True,
@@ -365,13 +519,18 @@ def run(
         write_json(ledger_path, completed_ledger)
         return result
     except Exception as error:  # fresh has already been consumed; never retry automatically
+        evidence_blockers = (
+            error.blocking_reasons
+            if isinstance(error, CandidateEvidenceError)
+            else [f"round6-evaluation-error:{type(error).__name__}"]
+        )
         result = {
             **base,
             "intakeReady": True,
             "freshBlindConsumed": True,
             "blockingReasons": [
                 "round6-fresh-blind-evaluation-failed-after-consumption",
-                f"round6-evaluation-error:{type(error).__name__}",
+                *evidence_blockers,
             ],
         }
         write_json(report_path, result)

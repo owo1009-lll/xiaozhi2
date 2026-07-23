@@ -14,7 +14,7 @@
       "role": "execution-guard",
       "path": "scripts/run_western_round6_frozen_evaluation.py",
       "hashMode": "lf-normalized-sha256",
-      "sha256": "d210d506845177487664d88e4ec5f34d8406f91cee9651e5615a2da871e98f24"
+      "sha256": "579f523b8aa07a840fe75c04ae8cea1b7676730d1ba1e7ba710ea6bee296c9cc"
     },
     {
       "role": "candidate-runner",
