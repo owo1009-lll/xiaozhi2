@@ -1,0 +1,378 @@
+{
+  "schemaVersion": 1,
+  "contract": "western-round5-evidence-accounting-v1",
+  "evidenceDate": "2026-07-24",
+  "evidenceRole": "consumed-round5-reaccounting-only",
+  "round5Consumed": true,
+  "freshBlindRetuned": false,
+  "modelRetrained": false,
+  "thresholdChanged": false,
+  "studentFacing": false,
+  "automaticAccusationReady": false,
+  "sourceBindings": [
+    {
+      "path": "data/experiments/western-strings-round5-segment-edit-path/report.json",
+      "sha256": "b69a717b75f73cc0c73f341afcb5f14dc6738f2370c7d5a55907517a8f2afb1f"
+    },
+    {
+      "path": "data/experiments/western-strings-round5-position-balance/report.json",
+      "sha256": "bff5e7ac3e28e5b8c8485f8285bf9cabb941689773b1cba6541675c951b1bee5"
+    },
+    {
+      "path": "data/experiments/western-strings-round5-calibration-failure-audit/report.json",
+      "sha256": "d99eadf6cd7f97f73b00e504fcd96f391932c82f7c08b7f7e3131b4e6c84ef73"
+    },
+    {
+      "path": "docs/evidence/western-strings-round5-policy-c-waveform-robustness-20260724.json",
+      "sha256": "92016cacefe8ebc71017f335577c21a1c7b8adb9d770d01a4c7fb7a2d71b833e"
+    },
+    {
+      "path": "scripts/experiments/eval_western_round5_temporal_operation_path.py",
+      "sha256": "2393f38be993427400e43a9f3355fcb244605d05ee4844cb7a626491581cc2c7"
+    }
+  ],
+  "positionLeakAudit": {
+    "segmentModelPositionFeatures": [
+      "n_0OutOfRange",
+      "n_m1OutOfRange",
+      "n_m2OutOfRange",
+      "n_p1OutOfRange",
+      "n_p2OutOfRange",
+      "scoreNextInterval",
+      "scorePreviousInterval"
+    ],
+    "confoundedSplitGates": [
+      "calibration:merged_substitution",
+      "calibration:missing",
+      "calibration:drag",
+      "fresh-blind:merged_substitution",
+      "fresh-blind:extra"
+    ],
+    "calibrationPositionConfoundedGates": [
+      "merged_substitution",
+      "missing",
+      "drag"
+    ],
+    "rhythmTargetPositionConfoundedSplits": [
+      "calibration",
+      "fresh-blind"
+    ]
+  },
+  "accounting": [
+    {
+      "candidateId": "segment-rf-merged_substitution",
+      "family": "fixed-random-forest-with-score-context",
+      "gate": "merged_substitution",
+      "observedFreshBlind": {
+        "truePositive": 1,
+        "falsePositive": 1,
+        "falseNegative": 5,
+        "trueNegative": 11,
+        "precision": 0.5,
+        "recall": 0.166667
+      },
+      "readsPositionFeatures": true,
+      "positionConfoundedSplits": [
+        "calibration",
+        "fresh-blind"
+      ],
+      "accountingClass": "invalidated-by-position-confounding",
+      "validClaim": "Package-specific predictions are reproducible, but neither precision nor recall establishes performance generalization.",
+      "invalidClaim": "Do not promote or compare this raw number as a detector result."
+    },
+    {
+      "candidateId": "segment-rf-missing",
+      "family": "fixed-random-forest-with-score-context",
+      "gate": "missing",
+      "observedFreshBlind": {
+        "truePositive": 0,
+        "falsePositive": 0,
+        "falseNegative": 6,
+        "trueNegative": 12,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "readsPositionFeatures": true,
+      "positionConfoundedSplits": [
+        "calibration"
+      ],
+      "accountingClass": "invalidated-by-position-confounding",
+      "validClaim": "Package-specific predictions are reproducible, but neither precision nor recall establishes performance generalization.",
+      "invalidClaim": "Do not promote or compare this raw number as a detector result."
+    },
+    {
+      "candidateId": "segment-rf-extra",
+      "family": "fixed-random-forest-with-score-context",
+      "gate": "extra",
+      "observedFreshBlind": {
+        "truePositive": 3,
+        "falsePositive": 0,
+        "falseNegative": 3,
+        "trueNegative": 12,
+        "precision": 1.0,
+        "recall": 0.5
+      },
+      "readsPositionFeatures": true,
+      "positionConfoundedSplits": [
+        "fresh-blind"
+      ],
+      "accountingClass": "invalidated-by-position-confounding",
+      "validClaim": "Package-specific predictions are reproducible, but neither precision nor recall establishes performance generalization.",
+      "invalidClaim": "Do not promote or compare this raw number as a detector result."
+    },
+    {
+      "candidateId": "segment-rf-drag",
+      "family": "fixed-random-forest-with-score-context",
+      "gate": "drag",
+      "observedFreshBlind": {
+        "truePositive": 3,
+        "falsePositive": 1,
+        "falseNegative": 3,
+        "trueNegative": 11,
+        "precision": 0.75,
+        "recall": 0.5
+      },
+      "readsPositionFeatures": true,
+      "positionConfoundedSplits": [
+        "calibration"
+      ],
+      "accountingClass": "invalidated-by-position-confounding",
+      "validClaim": "Package-specific predictions are reproducible, but neither precision nor recall establishes performance generalization.",
+      "invalidClaim": "Do not promote or compare this raw number as a detector result."
+    },
+    {
+      "candidateId": "gap-refinement-self-check",
+      "family": "frozen-alignment-gap-rule",
+      "gates": [
+        "merged_substitution",
+        "missing"
+      ],
+      "observedFreshBlind": {
+        "truePositive": 1,
+        "falsePositive": 1,
+        "falseNegative": 11,
+        "trueNegative": 311,
+        "precision": 0.5,
+        "recall": 0.083333
+      },
+      "byGateRecall": {
+        "merged_substitution": {
+          "positive": 6,
+          "detected": 0,
+          "recall": 0.0
+        },
+        "missing": {
+          "positive": 6,
+          "detected": 1,
+          "recall": 0.166667
+        }
+      },
+      "readsPositionFeatures": false,
+      "positionBalanced": false,
+      "accountingClass": "genuine-detection-failure-on-fixed-position-sample",
+      "validClaim": "The frozen rule truly detected only 1/12 targets and produced one full-score false positive; position leakage cannot explain away the 11 misses.",
+      "scopeCaveat": "Target placement is not counterbalanced, so the exact rate is not a generalization estimate."
+    },
+    {
+      "candidateId": "gap-strict-missing",
+      "family": "frozen-alignment-gap-rule-with-health-guard",
+      "gates": [
+        "missing"
+      ],
+      "observedFreshBlind": {
+        "truePositive": 1,
+        "falsePositive": 1,
+        "falseNegative": 5,
+        "trueNegative": 311,
+        "precision": 0.5,
+        "recall": 0.166667
+      },
+      "readsPositionFeatures": false,
+      "positionBalanced": false,
+      "accountingClass": "genuine-detection-failure-on-fixed-position-sample",
+      "validClaim": "The frozen strict rule truly detected 1/6 missing targets and produced one full-score false positive; its 16.67% recall is not a score-position model artifact.",
+      "scopeCaveat": "Target placement is not counterbalanced, so the exact rate is not a generalization estimate."
+    },
+    {
+      "candidateId": "rhythm-structural-self-check",
+      "family": "frozen-relative-ioi-duration-operation-rule",
+      "gates": [
+        "extra",
+        "drag"
+      ],
+      "observedFreshBlind": {
+        "truePositive": 4,
+        "falsePositive": 0,
+        "falseNegative": 8,
+        "trueNegative": 312,
+        "precision": 1.0,
+        "recall": 0.333333
+      },
+      "byGateRecall": {
+        "extra": {
+          "positive": 6,
+          "detected": 2,
+          "recall": 0.333333
+        },
+        "drag": {
+          "positive": 6,
+          "detected": 2,
+          "recall": 0.333333
+        }
+      },
+      "readsPositionFeatures": false,
+      "positionBalanced": false,
+      "positionConfoundedSplits": [
+        "calibration",
+        "fresh-blind"
+      ],
+      "accountingClass": "real-sensitivity-observation-safety-not-generalizable",
+      "validClaim": "The frozen performance rule really found 4/12 targets and missed 8/12.",
+      "invalidClaim": "Its 0/312 package false-positive count cannot establish clean-domain safety, because the extra/drag target positions are score-context identifiable."
+    },
+    {
+      "candidateId": "rhythm-strict-extra-drag",
+      "family": "frozen-high-confidence-relative-ioi-duration-operation-rule",
+      "gates": [
+        "extra",
+        "drag"
+      ],
+      "observedFreshBlind": {
+        "truePositive": 4,
+        "falsePositive": 0,
+        "falseNegative": 8,
+        "trueNegative": 312,
+        "precision": 1.0,
+        "recall": 0.333333
+      },
+      "readsPositionFeatures": false,
+      "positionBalanced": false,
+      "positionConfoundedSplits": [
+        "calibration",
+        "fresh-blind"
+      ],
+      "accountingClass": "real-sensitivity-observation-safety-not-generalizable",
+      "validClaim": "The frozen strict performance rule really found 4/12 targets and missed 8/12.",
+      "invalidClaim": "Its 0/312 package false-positive count cannot establish clean-domain safety, because the extra/drag target positions are score-context identifiable."
+    },
+    {
+      "candidateId": "performance-only-calibration-merged_substitution",
+      "family": "score-context-excluded-random-forest-loro",
+      "gate": "merged_substitution",
+      "observedCalibrationLoro": {
+        "truePositive": 3,
+        "falsePositive": 1,
+        "falseNegative": 3,
+        "trueNegative": 11,
+        "precision": 0.75,
+        "recall": 0.5,
+        "passesCandidateFloor": false
+      },
+      "freshBlindRowsUsed": 0,
+      "readsPositionFeatures": false,
+      "accountingClass": "position-controlled-calibration-diagnostic-failed",
+      "validClaim": "After excluding score-only features, the fixed RF still fails the 90/50/0 joint floor on calibration leave-one-recording-out.",
+      "promotionEligible": false
+    },
+    {
+      "candidateId": "performance-only-calibration-missing",
+      "family": "score-context-excluded-random-forest-loro",
+      "gate": "missing",
+      "observedCalibrationLoro": {
+        "truePositive": 3,
+        "falsePositive": 1,
+        "falseNegative": 3,
+        "trueNegative": 11,
+        "precision": 0.75,
+        "recall": 0.5,
+        "passesCandidateFloor": false
+      },
+      "freshBlindRowsUsed": 0,
+      "readsPositionFeatures": false,
+      "accountingClass": "position-controlled-calibration-diagnostic-failed",
+      "validClaim": "After excluding score-only features, the fixed RF still fails the 90/50/0 joint floor on calibration leave-one-recording-out.",
+      "promotionEligible": false
+    },
+    {
+      "candidateId": "performance-only-calibration-drag",
+      "family": "score-context-excluded-random-forest-loro",
+      "gate": "drag",
+      "observedCalibrationLoro": {
+        "truePositive": 4,
+        "falsePositive": 1,
+        "falseNegative": 2,
+        "trueNegative": 11,
+        "precision": 0.8,
+        "recall": 0.666667,
+        "passesCandidateFloor": false
+      },
+      "freshBlindRowsUsed": 0,
+      "readsPositionFeatures": false,
+      "accountingClass": "position-controlled-calibration-diagnostic-failed",
+      "validClaim": "After excluding score-only features, the fixed RF still fails the 90/50/0 joint floor on calibration leave-one-recording-out.",
+      "promotionEligible": false
+    },
+    {
+      "candidateId": "waveform-energy-absence",
+      "family": "frozen-relative-energy-threshold",
+      "observedAllRound5": {
+        "truePositive": 0,
+        "falsePositive": 0,
+        "falseNegative": 12,
+        "trueNegative": 660,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "readsPositionFeatures": false,
+      "accountingClass": "genuine-cross-domain-detection-failure",
+      "validClaim": "The frozen synthetic threshold emitted no flag on any of 12 real targets. Its 0% real-domain recall is a genuine transfer failure.",
+      "decision": "stop-no-further-investment"
+    },
+    {
+      "candidateId": "waveform-target-pitch-absence",
+      "family": "frozen-target-pitch-frame-threshold",
+      "observedAllRound5": {
+        "truePositive": 5,
+        "falsePositive": 49,
+        "falseNegative": 7,
+        "trueNegative": 611,
+        "precision": 0.092593,
+        "recall": 0.416667
+      },
+      "readsPositionFeatures": false,
+      "accountingClass": "genuine-cross-domain-precision-and-recall-failure",
+      "validClaim": "The frozen synthetic threshold found 5/12 targets but flagged 49/660 ordinary positions; the 9.26% precision failure is not caused by score-position leakage.",
+      "decision": "reject"
+    }
+  ],
+  "conclusions": {
+    "invalidatedByPositionConfounding": [
+      "segment-rf-merged_substitution",
+      "segment-rf-missing",
+      "segment-rf-extra",
+      "segment-rf-drag"
+    ],
+    "genuineDetectionFailures": [
+      "gap-refinement-self-check",
+      "gap-strict-missing",
+      "waveform-energy-absence",
+      "waveform-target-pitch-absence"
+    ],
+    "retainedOnlyAsSensitivityObservation": [
+      "rhythm-structural-self-check",
+      "rhythm-strict-extra-drag"
+    ],
+    "positionControlledCandidatePassed": false,
+    "strictConfirmedRecall": "2/12",
+    "round5CanAuthorizePromotion": false
+  },
+  "blockingReasons": [
+    "round5-consumed-no-retest",
+    "round5-segment-rf-position-confounded",
+    "round5-performance-only-calibration-candidates-failed",
+    "round5-gap-frozen-rules-low-recall-and-nonzero-fp",
+    "round5-rhythm-safety-not-position-balanced",
+    "round5-waveform-energy-real-domain-transfer-failed",
+    "round5-waveform-target-pitch-joint-floor-failed"
+  ]
+}
