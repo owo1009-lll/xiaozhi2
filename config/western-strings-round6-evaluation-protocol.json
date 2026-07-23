@@ -1,0 +1,105 @@
+{
+  "contractVersion": "western-round6-frozen-evaluation-protocol-v1",
+  "status": "pre-registered-before-audio",
+  "paths": {
+    "contract": "config/western-strings-round6-counterbalanced-contract.json",
+    "manifest": "data/private/western-strings-round6-counterbalanced/manifest.csv",
+    "truth": "data/private/western-strings-round6-counterbalanced/position-truth.json",
+    "report": "data/experiments/western-strings-round6-frozen-evaluation/report.json",
+    "model": "data/experiments/western-strings-round6-frozen-evaluation/model.joblib",
+    "consumedLedger": "data/experiments/western-strings-round6-frozen-evaluation/fresh-blind-consumed.json"
+  },
+  "sourceBindings": [
+    {
+      "role": "execution-guard",
+      "path": "scripts/run_western_round6_frozen_evaluation.py",
+      "hashMode": "lf-normalized-sha256",
+      "sha256": "6ab8449b22d157448776f09453818cd52f2dab288af3523f7ff6c58ef5c92b1f"
+    },
+    {
+      "role": "candidate-runner",
+      "path": "scripts/experiments/train_western_round5_segment_edit_path.py",
+      "hashMode": "lf-normalized-sha256",
+      "sha256": "145f7d744b65557e7d304926833e385ecc4bf867ad8e3cbc035a7903bc481f92"
+    },
+    {
+      "role": "temporal-operation-policy",
+      "path": "scripts/experiments/eval_western_round5_temporal_operation_path.py",
+      "hashMode": "lf-normalized-sha256",
+      "sha256": "2393f38be993427400e43a9f3355fcb244605d05ee4844cb7a626491581cc2c7"
+    },
+    {
+      "role": "intake-validator",
+      "path": "scripts/status_western_round5_targeted_intake.py",
+      "hashMode": "lf-normalized-sha256",
+      "sha256": "094b7465401869d84a09d5a1a3c9ed511d176f075b637f4443e69248af505420"
+    },
+    {
+      "role": "audio-feature-analyzer",
+      "path": "scripts/experiments/eval_western_strings_duration_extra_quantization.py",
+      "hashMode": "lf-normalized-sha256",
+      "sha256": "cda4296094be1adfd3ad079bbbe52dc54f2965c7e580f7eb0c18ae18ca440598"
+    },
+    {
+      "role": "round6-contract",
+      "path": "config/western-strings-round6-counterbalanced-contract.json",
+      "hashMode": "lf-normalized-sha256",
+      "sha256": "5f5aa8b5846b364068baa0d1a604c3e85e69b126cd659200e9bb5d2f06bb537f"
+    }
+  ],
+  "evaluation": {
+    "calibrationSplit": "calibration",
+    "freshBlindSplit": "fresh-blind",
+    "freshBlindRunLimit": 1,
+    "freshUsedForSelection": false,
+    "decisionThreshold": 0.5,
+    "gates": [
+      "merged_substitution",
+      "missing",
+      "extra",
+      "drag"
+    ],
+    "promotionThresholds": {
+      "minPrecision": 0.9,
+      "minRecall": 0.5,
+      "maxStrictFalseAccusations": 0
+    },
+    "promotionScope": "independent-per-gate",
+    "completeInventoryRequired": true,
+    "scorePositionCounterbalanceRequired": true
+  },
+  "candidate": {
+    "sourceContract": "western-round5-segment-edit-path-candidate-v1",
+    "modelFamily": "fixed-random-forest-binary-per-gate",
+    "modelParams": {
+      "n_estimators": 256,
+      "max_depth": 4,
+      "min_samples_leaf": 2,
+      "class_weight": "balanced_subsample",
+      "random_state": 20260722,
+      "n_jobs": 1
+    },
+    "frozenRuleContracts": {
+      "gapRefinement": "western-round5-frozen-gap-refinement-v1",
+      "gapStrict": "western-round5-frozen-gap-strict-issue-candidate-v1",
+      "rhythmRefinement": "western-round5-frozen-rhythm-structural-refinement-v1",
+      "rhythmStrict": "western-round5-frozen-rhythm-strict-issue-candidate-v1"
+    },
+    "allowedCandidateFamilies": [
+      "fixed-random-forest-binary-per-gate",
+      "frozen-gap-refinement-self-check",
+      "frozen-gap-strict-missing",
+      "frozen-rhythm-structural-self-check",
+      "frozen-rhythm-strict-extra-drag"
+    ],
+    "postFreshRetuningAllowed": false
+  },
+  "interpretation": {
+    "numericPassIsEvidenceNotReleaseAuthorization": true,
+    "partialGatePassDoesNotAuthorizeOtherGates": true,
+    "failedOrCrashedFreshRunMayNotBeRepeated": true,
+    "newCandidateAfterFreshRequiresNewUntouchedPackage": true
+  },
+  "studentFacing": false,
+  "automaticAuthorizationGranted": false
+}
