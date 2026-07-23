@@ -739,6 +739,41 @@ assert.equal(round5TargetedIntake?.ready, true);
 assert.equal(round5TargetedIntake?.bindingCurrent, true);
 assert.equal(round5TargetedIntake?.counts?.recordings, 12);
 assert.equal(round5TargetedIntake?.counts?.truthEvents, 144);
+const round6CounterbalancedCapture =
+  controlled.ordinaryDynamicShadow?.round6CounterbalancedCapture;
+assert.equal(
+  round6CounterbalancedCapture?.contract,
+  "western-round6-counterbalanced-diagnosis-v1",
+);
+assert.equal(round6CounterbalancedCapture?.contractValid, true);
+assert.equal(round6CounterbalancedCapture?.bindings?.positionBalance, true);
+assert.equal(round6CounterbalancedCapture?.bindings?.intake, true);
+assert.equal(round6CounterbalancedCapture?.designCountsReady, true);
+assert.equal(round6CounterbalancedCapture?.materialsReady, true);
+assert.equal(round6CounterbalancedCapture?.readyForRecording, true);
+assert.equal(round6CounterbalancedCapture?.intakeReady, false);
+assert.equal(round6CounterbalancedCapture?.recordingComplete, false);
+assert.equal(round6CounterbalancedCapture?.counts?.recordings, 12);
+assert.equal(round6CounterbalancedCapture?.counts?.truthEvents, 144);
+assert.equal(round6CounterbalancedCapture?.counts?.audioFiles, 0);
+assert.deepEqual(round6CounterbalancedCapture?.remainingExternalInput, {
+  audioFiles: 12,
+  consentRows: 12,
+  licenseRows: 12,
+  signedEvents: 144,
+  completeInventories: 12,
+});
+assert.deepEqual(
+  round6CounterbalancedCapture?.positionBalance?.confoundedSplitGates,
+  [],
+);
+assert.deepEqual(
+  round6CounterbalancedCapture?.positionBalance?.rhythmConfoundedSplits,
+  [],
+);
+assert.equal(round6CounterbalancedCapture?.positionBalance?.audioRead, false);
+assert.equal(round6CounterbalancedCapture?.studentFacing, false);
+assert.equal(round6CounterbalancedCapture?.automaticAccusationReady, false);
 assert.equal(round5TargetedIntake?.segmentEditPathCandidate?.studentFacing, false);
 assert.equal(round5TargetedIntake?.segmentEditPathCandidate?.automaticAccusationReady, false);
 assert.equal(round5TargetedIntake?.segmentEditPathCandidate?.productionAdoptionReady, false);
@@ -882,10 +917,18 @@ const ordinaryRecallAction = status.nextActions.find(
   (action) => action.track === "Ordinary diagnosis recall",
 );
 assert(
-  ordinaryRecallAction?.action.includes("fresh split is now consumed")
-    && ordinaryRecallAction?.action.includes("not promotion-eligible")
-    && ordinaryRecallAction?.action.includes("score context alone separates"),
-  "the recall handoff must expose the completed Round-5 verdict and consumed split",
+  ordinaryRecallAction?.action.includes("Round 5 is consumed")
+    && ordinaryRecallAction?.action.includes("Round 6 counterbalanced")
+    && ordinaryRecallAction?.action.includes("western:round6-targeted-intake")
+    && ordinaryRecallAction?.action.includes("2/12"),
+  "the recall handoff must expose the consumed Round-5 verdict and ready-to-record Round-6 plan",
+);
+assert.equal(
+  ordinaryRecallAction?.artifact,
+  "docs/western-strings-round6-counterbalanced-capture-plan.md",
+);
+assert(
+  ordinaryRecallAction?.reason.includes("round6-counterbalanced-audio-pending:12"),
 );
 assert.equal(temporalPath?.evidenceValid, true);
 assert.equal(temporalPath?.sourceBindingCurrent, true);

@@ -127,6 +127,33 @@ const ROUND5_POSITION_BALANCE_REPORT = path.join(
   "western-strings-round5-position-balance",
   "report.json",
 );
+const ROUND6_COUNTERBALANCED_CONTRACT = path.join(
+  "config",
+  "western-strings-round6-counterbalanced-contract.json",
+);
+const ROUND6_COUNTERBALANCED_MANIFEST = path.join(
+  "data",
+  "private",
+  "western-strings-round6-counterbalanced",
+  "manifest.csv",
+);
+const ROUND6_COUNTERBALANCED_TRUTH = path.join(
+  "data",
+  "private",
+  "western-strings-round6-counterbalanced",
+  "position-truth.json",
+);
+const ROUND6_COUNTERBALANCED_POSITION_BALANCE = path.join(
+  "data",
+  "experiments",
+  "western-strings-round6-counterbalanced-position-balance",
+  "report.json",
+);
+const ROUND6_COUNTERBALANCED_INTAKE = path.join(
+  "data",
+  "experiments",
+  "western-strings-round6-counterbalanced-intake.json",
+);
 const ROUND5_SEGMENT_EDIT_PATH_SMOKE = path.join(
   "docs",
   "evidence",
@@ -138,6 +165,7 @@ const ROUND5_TEMPORAL_OPERATION_PATH = path.join(
   "western-strings-round5-temporal-operation-path-20260722.json",
 );
 const ROUND5_TARGETED_CONTRACT_VERSION = "western-round5-targeted-diagnosis-intake-v1";
+const ROUND6_COUNTERBALANCED_CONTRACT_VERSION = "western-round6-counterbalanced-diagnosis-v1";
 const ROUND5_SEGMENT_GATES = Object.freeze([
   "merged_substitution",
   "missing",
@@ -1664,6 +1692,357 @@ async function auditFlatEvidenceSourceBinding(evidence) {
     blockingReasons.push("flat-evidence-source-aggregate-mismatch");
   }
   return { ready: blockingReasons.length === 0, fileCount: rows.length, aggregateSha256, blockingReasons };
+}
+
+export async function summarizeRound6CounterbalancedCapture({
+  contractPath = ROUND6_COUNTERBALANCED_CONTRACT,
+  manifestPath = ROUND6_COUNTERBALANCED_MANIFEST,
+  truthPath = ROUND6_COUNTERBALANCED_TRUTH,
+  positionBalancePath = ROUND6_COUNTERBALANCED_POSITION_BALANCE,
+  intakePath = ROUND6_COUNTERBALANCED_INTAKE,
+  materialsRoot = path.dirname(manifestPath),
+} = {}) {
+  const [
+    contract,
+    manifestRows,
+    truth,
+    positionBalance,
+    intake,
+    contractSha256,
+    manifestSha256,
+    truthSha256,
+  ] = await Promise.all([
+    readJson(contractPath),
+    readCsv(manifestPath),
+    readJson(truthPath),
+    readJson(positionBalancePath),
+    readJson(intakePath),
+    sha256FileOrEmpty(contractPath),
+    sha256FileOrEmpty(manifestPath),
+    sha256FileOrEmpty(truthPath),
+  ]);
+  const frozenMinimums = {
+    performers: 6,
+    devices: 3,
+    rooms: 4,
+    positivePerGate: 12,
+    freshBlindPositivePerGate: 6,
+    confusionNegativePerGate: 24,
+    freshBlindConfusionNegativePerGate: 12,
+  };
+  const sameStringSet = (left, right) => (
+    JSON.stringify([...(left || [])].sort()) === JSON.stringify([...(right || [])].sort())
+  );
+  const frozenMinimumsCurrent = Object.entries(frozenMinimums).every(
+    ([key, value]) => Number(contract?.minimums?.[key]) === value,
+  );
+  const contractValid = Boolean(
+    contract?.contractVersion === ROUND6_COUNTERBALANCED_CONTRACT_VERSION
+      && contract?.status === "pre-recording-design-only"
+      && sameStringSet(contract?.allowedGates, ROUND5_SEGMENT_GATES)
+      && sameStringSet(contract?.allowedSplits, ["calibration", "fresh-blind"])
+      && sameStringSet(contract?.allowedLabels, ["positive", "confusion_negative"])
+      && frozenMinimumsCurrent
+      && contract?.promotionThresholds?.minPrecision === 0.9
+      && contract?.promotionThresholds?.minRecall === 0.5
+      && contract?.promotionThresholds?.maxStrictFalseAccusations === 0
+      && contract?.promotion?.minPrecision === 0.9
+      && contract?.promotion?.minRecall === 0.5
+      && contract?.promotion?.maxStrictFalseAccusations === 0
+      && contract?.positionDesign?.recordingsPerScore === 3
+      && sameStringSet(
+        contract?.positionDesign?.roleRotation,
+        ["positive", "confusion_negative_a", "confusion_negative_b"],
+      )
+      && contract?.positionDesign?.requiredPreflightContract
+        === "western-round5-position-balance-preflight-v2"
+      && contract?.positionDesign?.requiredPreflightReady === true
+      && contract?.splitDiscipline?.calibrationAndFreshScoresDisjoint === true
+      && contract?.splitDiscipline?.calibrationAndFreshPerformersDisjoint === true
+      && contract?.splitDiscipline?.freshBlindMayBeRunOnce === true
+      && contract?.splitDiscipline?.consumedRound4OrRound5AudioAllowed === false
+      && contract?.privacy?.requiredConsent === "yes"
+      && contract?.privacy?.requiredLicenseStatus === "local-only"
+      && contract?.truth?.requiredCompleteErrorInventory === true
+      && contract?.studentFacing === false
+      && contract?.automaticAuthorizationGranted === false
+      && contract?.promotion?.studentFacing === false
+      && contract?.promotion?.automaticAuthorizationGranted === false,
+  );
+  const truthRecordings = truth?.recordings && typeof truth.recordings === "object"
+    ? Object.entries(truth.recordings)
+    : [];
+  const manifestByRecording = new Map(
+    manifestRows.map((row) => [String(row.recordingId || ""), row]),
+  );
+  const manifestIds = manifestRows.map((row) => String(row.recordingId || ""));
+  const truthIds = truthRecordings.map(([recordingId]) => recordingId);
+  const recordingIdsMatch = manifestIds.length > 0
+    && new Set(manifestIds).size === manifestIds.length
+    && sameStringSet(manifestIds, truthIds);
+  const countsForGates = () => Object.fromEntries(
+    ROUND5_SEGMENT_GATES.map((gate) => [gate, 0]),
+  );
+  const positiveByGate = countsForGates();
+  const confusionNegativeByGate = countsForGates();
+  const freshBlindPositiveByGate = countsForGates();
+  const freshBlindConfusionNegativeByGate = countsForGates();
+  let truthEventCount = 0;
+  let signedEventCount = 0;
+  let completeInventoryCount = 0;
+  let eventSchemaValid = truth?.contractVersion === ROUND6_COUNTERBALANCED_CONTRACT_VERSION;
+  for (const [recordingId, recording] of truthRecordings) {
+    const row = manifestByRecording.get(recordingId);
+    const split = String(row?.split || "");
+    const events = Array.isArray(recording?.events) ? recording.events : [];
+    if (recording?.completeErrorInventory === true) completeInventoryCount += 1;
+    for (const event of events) {
+      truthEventCount += 1;
+      if (String(event?.asPerformed || "").trim()) signedEventCount += 1;
+      const gate = String(event?.gate || "");
+      const label = String(event?.label || "");
+      if (!ROUND5_SEGMENT_GATES.includes(gate)
+          || !["positive", "confusion_negative"].includes(label)
+          || !["calibration", "fresh-blind"].includes(split)) {
+        eventSchemaValid = false;
+        continue;
+      }
+      if (label === "positive") {
+        positiveByGate[gate] += 1;
+        if (split === "fresh-blind") freshBlindPositiveByGate[gate] += 1;
+      } else {
+        confusionNegativeByGate[gate] += 1;
+        if (split === "fresh-blind") freshBlindConfusionNegativeByGate[gate] += 1;
+      }
+    }
+  }
+  const uniqueCount = (field) => new Set(
+    manifestRows.map((row) => String(row[field] || "")).filter(Boolean),
+  ).size;
+  const calibrationRows = manifestRows.filter((row) => row.split === "calibration");
+  const freshRows = manifestRows.filter((row) => row.split === "fresh-blind");
+  const valuesDisjoint = (leftRows, rightRows, field) => {
+    const left = new Set(leftRows.map((row) => String(row[field] || "")).filter(Boolean));
+    return rightRows.every((row) => !left.has(String(row[field] || "")));
+  };
+  const recordingsPerPiece = {};
+  for (const row of manifestRows) {
+    const pieceId = String(row.pieceId || "");
+    recordingsPerPiece[pieceId] = (recordingsPerPiece[pieceId] || 0) + 1;
+  }
+  const gateCountsReady = ROUND5_SEGMENT_GATES.every((gate) => (
+    positiveByGate[gate] >= frozenMinimums.positivePerGate
+      && freshBlindPositiveByGate[gate] >= frozenMinimums.freshBlindPositivePerGate
+      && confusionNegativeByGate[gate] >= frozenMinimums.confusionNegativePerGate
+      && freshBlindConfusionNegativeByGate[gate]
+        >= frozenMinimums.freshBlindConfusionNegativePerGate
+  ));
+  const designCountsReady = Boolean(
+    recordingIdsMatch
+      && eventSchemaValid
+      && uniqueCount("performerId") >= frozenMinimums.performers
+      && uniqueCount("deviceId") >= frozenMinimums.devices
+      && uniqueCount("roomId") >= frozenMinimums.rooms
+      && calibrationRows.length > 0
+      && freshRows.length > 0
+      && valuesDisjoint(calibrationRows, freshRows, "pieceId")
+      && valuesDisjoint(calibrationRows, freshRows, "performerId")
+      && Object.keys(recordingsPerPiece).every(Boolean)
+      && Object.values(recordingsPerPiece).every(
+        (count) => count === contract?.positionDesign?.recordingsPerScore,
+      )
+      && gateCountsReady
+  );
+  const present = async (filePath) => Boolean(
+    String(filePath || "").trim() && await exists(filePath),
+  );
+  const materialRows = await Promise.all(manifestRows.map(async (row) => ({
+    recordingId: row.recordingId,
+    score: await present(row.scorePath),
+    pdf: await present(path.join(materialsRoot, `${row.recordingId}.pdf`)),
+    instructions: await present(
+      path.join(materialsRoot, `${row.recordingId}-演奏说明.md`),
+    ),
+    audio: await present(row.audioPath),
+    consent: String(row.consent || "").trim().toLowerCase()
+      === String(contract?.privacy?.requiredConsent || "").toLowerCase(),
+    license: String(row.licenseStatus || "").trim().toLowerCase()
+      === String(contract?.privacy?.requiredLicenseStatus || "").toLowerCase(),
+  })));
+  const countMaterial = (field) => materialRows.filter((row) => row[field] === true).length;
+  const scoreFileCount = countMaterial("score");
+  const pdfCount = countMaterial("pdf");
+  const instructionCount = countMaterial("instructions");
+  const audioFileCount = countMaterial("audio");
+  const consentCount = countMaterial("consent");
+  const licenseCount = countMaterial("license");
+  const materialsReady = manifestRows.length > 0
+    && scoreFileCount === manifestRows.length
+    && pdfCount === manifestRows.length
+    && instructionCount === manifestRows.length;
+  const positionHashes = positionBalance?.sourceHashes || {};
+  const positionBindingCurrent = Boolean(
+    positionBalance
+      && manifestSha256
+      && truthSha256
+      && String(positionHashes.manifestSha256 || "").toLowerCase() === manifestSha256
+      && String(positionHashes.truthSha256 || "").toLowerCase() === truthSha256,
+  );
+  const positionValid = Boolean(
+    positionBalance?.contract === "western-round5-position-balance-preflight-v2"
+      && positionBalance?.evidenceRole === "pre-recording-position-balance-only"
+      && positionBindingCurrent
+      && positionBalance?.readyForRecording === true
+      && positionBalance?.audioRead === false
+      && positionBalance?.promotionEvidenceEligible === false
+      && positionBalance?.automaticAccusationReady === false
+      && positionBalance?.studentFacing === false
+      && Array.isArray(positionBalance?.confoundedSplitGates)
+      && positionBalance.confoundedSplitGates.length === 0
+      && Array.isArray(positionBalance?.rhythmReviewHint?.confoundedSplits)
+      && positionBalance.rhythmReviewHint.confoundedSplits.length === 0
+      && Array.isArray(positionBalance?.blockingReasons)
+      && positionBalance.blockingReasons.length === 0,
+  );
+  const intakeHashes = intake?.hashes || {};
+  const intakeBindingCurrent = Boolean(
+    intake
+      && contractSha256
+      && manifestSha256
+      && truthSha256
+      && String(intakeHashes.contractSha256 || "").toLowerCase() === contractSha256
+      && String(intakeHashes.manifestSha256 || "").toLowerCase() === manifestSha256
+      && String(intakeHashes.truthSha256 || "").toLowerCase() === truthSha256,
+  );
+  const recordingComplete = manifestRows.length > 0
+    && audioFileCount === manifestRows.length
+    && consentCount === manifestRows.length
+    && licenseCount === manifestRows.length
+    && signedEventCount === truthEventCount
+    && completeInventoryCount === truthRecordings.length;
+  const readyForRecording = Boolean(
+    contractValid
+      && designCountsReady
+      && materialsReady
+      && positionValid
+  );
+  const intakeReady = Boolean(
+    readyForRecording
+      && recordingComplete
+      && intakeBindingCurrent
+      && intake?.contractVersion === ROUND6_COUNTERBALANCED_CONTRACT_VERSION
+      && intake?.ready === true
+      && intake?.studentFacing === false
+      && intake?.automaticAuthorizationGranted === false
+      && Array.isArray(intake?.blockingReasons)
+      && intake.blockingReasons.length === 0
+  );
+  const designBlockingReasons = normalizedReasonList([
+    ...(!contract ? ["round6-counterbalanced-contract-missing"] : []),
+    ...(contract && !contractValid ? ["round6-counterbalanced-contract-invalid"] : []),
+    ...(!recordingIdsMatch ? ["round6-counterbalanced-recording-identity-mismatch"] : []),
+    ...(!designCountsReady ? ["round6-counterbalanced-design-counts-not-ready"] : []),
+    ...(!materialsReady ? ["round6-counterbalanced-materials-not-ready"] : []),
+    ...(!positionBalance ? ["round6-counterbalanced-position-report-missing"] : []),
+    ...(positionBalance && !positionBindingCurrent
+      ? ["round6-counterbalanced-position-binding-stale"]
+      : []),
+    ...(positionBalance && !positionValid
+      ? ["round6-counterbalanced-position-preflight-not-ready"]
+      : []),
+  ]);
+  const recordingBlockingReasons = normalizedReasonList([
+    ...(!intake ? ["round6-counterbalanced-intake-report-missing"] : []),
+    ...(intake && !intakeBindingCurrent
+      ? ["round6-counterbalanced-intake-binding-stale"]
+      : []),
+    ...(audioFileCount < manifestRows.length
+      ? [`round6-counterbalanced-audio-pending:${manifestRows.length - audioFileCount}`]
+      : []),
+    ...(consentCount < manifestRows.length
+      ? [`round6-counterbalanced-consent-pending:${manifestRows.length - consentCount}`]
+      : []),
+    ...(licenseCount < manifestRows.length
+      ? [`round6-counterbalanced-license-pending:${manifestRows.length - licenseCount}`]
+      : []),
+    ...(signedEventCount < truthEventCount
+      ? [`round6-counterbalanced-as-performed-pending:${truthEventCount - signedEventCount}`]
+      : []),
+    ...(completeInventoryCount < truthRecordings.length
+      ? [
+          `round6-counterbalanced-complete-inventory-pending:${
+            truthRecordings.length - completeInventoryCount
+          }`,
+        ]
+      : []),
+  ]);
+  return {
+    contract: ROUND6_COUNTERBALANCED_CONTRACT_VERSION,
+    source: String(intakePath).replace(/\\/g, "/"),
+    paths: {
+      contract: String(contractPath).replace(/\\/g, "/"),
+      manifest: String(manifestPath).replace(/\\/g, "/"),
+      truth: String(truthPath).replace(/\\/g, "/"),
+      positionBalance: String(positionBalancePath).replace(/\\/g, "/"),
+    },
+    contractValid,
+    bindingCurrent: positionBindingCurrent && intakeBindingCurrent,
+    bindings: {
+      positionBalance: positionBindingCurrent,
+      intake: intakeBindingCurrent,
+    },
+    designCountsReady,
+    materialsReady,
+    readyForRecording,
+    intakeReady,
+    recordingComplete,
+    counts: {
+      recordings: manifestRows.length,
+      truthRecordings: truthRecordings.length,
+      truthEvents: truthEventCount,
+      performers: uniqueCount("performerId"),
+      devices: uniqueCount("deviceId"),
+      rooms: uniqueCount("roomId"),
+      scoreFiles: scoreFileCount,
+      pdfs: pdfCount,
+      instructions: instructionCount,
+      audioFiles: audioFileCount,
+      consentRows: consentCount,
+      licenseRows: licenseCount,
+      signedEvents: signedEventCount,
+      completeInventories: completeInventoryCount,
+      positiveByGate,
+      confusionNegativeByGate,
+      freshBlindPositiveByGate,
+      freshBlindConfusionNegativeByGate,
+    },
+    minimums: frozenMinimums,
+    positionBalance: {
+      contract: "western-round5-position-balance-preflight-v2",
+      bindingCurrent: positionBindingCurrent,
+      valid: positionValid,
+      readyForRecording: positionBalance?.readyForRecording === true,
+      confoundedSplitGates: positionBalance?.confoundedSplitGates || [],
+      rhythmConfoundedSplits: positionBalance?.rhythmReviewHint?.confoundedSplits || [],
+      audioRead: positionBalance?.audioRead === true,
+      promotionEvidenceEligible: false,
+      studentFacing: false,
+      automaticAccusationReady: false,
+    },
+    remainingExternalInput: {
+      audioFiles: Math.max(0, manifestRows.length - audioFileCount),
+      consentRows: Math.max(0, manifestRows.length - consentCount),
+      licenseRows: Math.max(0, manifestRows.length - licenseCount),
+      signedEvents: Math.max(0, truthEventCount - signedEventCount),
+      completeInventories: Math.max(0, truthRecordings.length - completeInventoryCount),
+    },
+    studentFacing: false,
+    automaticAuthorizationGranted: false,
+    automaticAccusationReady: false,
+    promotionEvidenceEligible: false,
+    designBlockingReasons,
+    recordingBlockingReasons,
+  };
 }
 
 export async function summarizeRound5TargetedIntake({
@@ -3367,11 +3746,18 @@ async function auditOrdinaryReviewAssistRuntime() {
 
 async function buildOrdinaryDynamicShadowStatus() {
   const runtime = evaluateOrdinaryAudioRuntime();
-  const [acceptance, acceptanceArtifact, reviewAssistRuntime, round5TargetedIntake] = await Promise.all([
+  const [
+    acceptance,
+    acceptanceArtifact,
+    reviewAssistRuntime,
+    round5TargetedIntake,
+    round6CounterbalancedCapture,
+  ] = await Promise.all([
     readJson(ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE),
     hashWorkspaceArtifact(ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE),
     auditOrdinaryReviewAssistRuntime(),
     summarizeRound5TargetedIntake(),
+    summarizeRound6CounterbalancedCapture(),
   ]);
   const acceptanceValidation = validateOrdinaryDynamicShadowAcceptance(acceptance);
   // The schema-valid report only stays green while the live-artifact verifier
@@ -3471,6 +3857,7 @@ async function buildOrdinaryDynamicShadowStatus() {
     },
     policyCReviewAssistRuntime: reviewAssistRuntime,
     round5TargetedIntake,
+    round6CounterbalancedCapture,
     rhythmChannelEvidence: {
       contract: RHYTHM_CHANNEL_DIAGNOSTIC_CONTRACT,
       source: ROUND4_POLICY_C_REPORT.replace(/\\/g, "/"),
@@ -4370,6 +4757,7 @@ export function summarizeNextActions(
     )
   ) {
     const round5 = shadow.round5TargetedIntake || {};
+    const round6 = shadow.round6CounterbalancedCapture || {};
     const segment = round5.segmentEditPathCandidate || {};
     const calibrationAudit = segment.calibrationFailureAudit || {};
     const targetedRunner = segment.temporalOperationPathDiagnostic?.targetedFreshBlindRunner || {};
@@ -4383,24 +4771,39 @@ export function summarizeNextActions(
     const round5ReadyForEvaluation = Boolean(
       round5.ready === true && round5.bindingCurrent === true && !round5Evaluated,
     );
+    const round6ReadyForRecording = Boolean(
+      round6.readyForRecording === true
+        && round6.intakeReady !== true
+        && round6.bindings?.positionBalance === true
+        && round6.bindings?.intake === true,
+    );
     actions.push({
       priority: 1,
       track: "Ordinary diagnosis recall",
       action: round5Evaluated
-        ? "The complete-inventory Round 5 frozen first run is complete and the fresh split is now consumed. `extra` numerically reaches 3/6 positives at 0/12 confusion false positives (precision 1.00, recall 0.50), but it is not promotion-eligible: in that fresh split, score context alone separates all 6 extra positives from all 12 negatives, while the evaluated model includes those score-context features. The rhythm self-check likewise has a raw 4/12 at 0/312 false positives, but static score context predicts all 12 extra/drag target positions at 0/324 false positives under leave-one-recording-out in both splits; its apparent precision therefore cannot establish performance generalization. `merged_substitution`, `missing`, and `drag` also fail their numeric gates. A calibration-only audit found position confounding for all three failed gates; once score-only context features are prohibited, no stable performance-evidence candidate meets the joint floor. Therefore no Round 5 gate or rhythm hint is currently promoted. Do not retune on this package. Counterbalance target roles across previous/next interval, written duration, beat strength, normalized position, and segment-edge status in both new calibration and fresh plans; require the position-balance preflight to pass before recording, then select and evaluate a performance-only model. Strict confirmed recall remains 2/12 and all student automatic-accusation paths stay closed."
+        ? round6ReadyForRecording
+          ? "Round 5 is consumed and cannot support promotion because its apparent gate and rhythm gains are score-position confounded. The Round 6 counterbalanced contract, 12-take manifest, 144-event truth, capture materials, and v2 position preflight are now hash-current and ready for recording. Record exactly the 12 specified takes without changing the positive/negative role rotations. Then mark consent and local-only licensing, sign every `asPerformed` field plus each complete error inventory, and run `npm run western:round6-targeted-intake`. Strict confirmed recall remains 2/12 and every student automatic-accusation path stays closed until a new untouched fresh evaluation passes the frozen 90% precision / 50% recall / 0 strict-FP gate."
+          : "The complete-inventory Round 5 frozen first run is complete and the fresh split is now consumed. `extra` numerically reaches 3/6 positives at 0/12 confusion false positives (precision 1.00, recall 0.50), but it is not promotion-eligible: in that fresh split, score context alone separates all 6 extra positives from all 12 negatives, while the evaluated model includes those score-context features. The rhythm self-check likewise has a raw 4/12 at 0/312 false positives, but static score context predicts all 12 extra/drag target positions at 0/324 false positives under leave-one-recording-out in both splits; its apparent precision therefore cannot establish performance generalization. `merged_substitution`, `missing`, and `drag` also fail their numeric gates. A calibration-only audit found position confounding for all three failed gates; once score-only context features are prohibited, no stable performance-evidence candidate meets the joint floor. Therefore no Round 5 gate or rhythm hint is currently promoted. Do not retune on this package. Counterbalance target roles across previous/next interval, written duration, beat strength, normalized position, and segment-edge status in both new calibration and fresh plans; require the position-balance preflight to pass before recording, then select and evaluate a performance-only model. Strict confirmed recall remains 2/12 and all student automatic-accusation paths stay closed."
         : round5ReadyForEvaluation
           ? "Round 5 complete-inventory intake is ready and hash-current. Run `npm run western:round5-segment-edit-path` once with the frozen parameters; do not inspect or retune against the fresh split before that run. Strict confirmed recall remains 2/12 and all student automatic-accusation paths stay closed."
           : "Strict confirmed recall remains 2/12. Raw temporal operation-path use reaches 11/12 but causes 55/253 false positives and is rejected. Three post-inspection candidates are frozen for untouched Round 5 only. Use docs/round5-targeted-diagnosis-capture-pack/index.html to complete the 12-take, complete-inventory matrix, then run the frozen fresh-blind gate without retuning.",
       artifact: round5Evaluated
-        ? segment.positionBalanceAudit?.source
-          || calibrationAudit.source
-          || segment.source
+        ? round6ReadyForRecording
+          ? "docs/western-strings-round6-counterbalanced-capture-plan.md"
+          : segment.positionBalanceAudit?.source
+            || calibrationAudit.source
+            || segment.source
         : round5ReadyForEvaluation
           ? segment.source
         : ROUND5_TEMPORAL_OPERATION_PATH.replace(/\\/g, "/"),
       reason: normalizedReasonList(
         round5Evaluated
-          ? [
+          ? round6ReadyForRecording
+            ? [
+                "policy-c-auto-accusation-closed",
+                ...(round6.recordingBlockingReasons || []),
+              ]
+            : [
               "policy-c-auto-accusation-closed",
               ...(segment.failedGates || []).map(
                 (gate) => `round5-segment-model-gate-failed:${gate}`,
