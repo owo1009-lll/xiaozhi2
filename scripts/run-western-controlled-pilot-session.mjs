@@ -69,6 +69,34 @@ function runNpmScript(script) {
   };
 }
 
+function refreshPostExecutionEvidence() {
+  const releaseReview = runNpmScript("western:release-review");
+  if (!releaseReview.ok) {
+    return {
+      ok: false,
+      releaseReview,
+      decision: { ok: false, skipped: true },
+      startPreflight: { ok: false, skipped: true },
+    };
+  }
+  const decision = runNpmScript("western:controlled-pilot-decision");
+  if (!decision.ok) {
+    return {
+      ok: false,
+      releaseReview,
+      decision,
+      startPreflight: { ok: false, skipped: true },
+    };
+  }
+  const startPreflight = runNpmScript("western:controlled-pilot-start-preflight");
+  return {
+    ok: startPreflight.ok === true,
+    releaseReview,
+    decision,
+    startPreflight,
+  };
+}
+
 async function readJsonOrNull(filePath) {
   try {
     return JSON.parse(await fs.readFile(filePath, "utf8"));
@@ -136,6 +164,7 @@ function renderMarkdown(report) {
     `- ordinaryExecutionPassed: ${report.executors.ordinary.executionPassed}`,
     `- m3plusExecutionPassed: ${report.executors.m3plus.executionPassed}`,
     `- pilotRunAccepted: ${report.pilotRunAccepted}`,
+    `- postExecutionEvidenceRefreshReady: ${report.postExecutionEvidenceRefresh?.ok === true}`,
     `- approvedBy: ${report.approvedBy || ""}`,
     `- requestedRecordingIds: ${report.requestedRecordingIds.join(", ") || "any eligible recording"}`,
     `- historicalRecordingIdsExcluded: ${report.historyExcludedRecordingIds.join(", ") || "none"}`,
@@ -229,6 +258,8 @@ export async function runControlledPilotSession(args = {}, dependencies = {}) {
   const runM3PlusPitchSafetyPilotSession = dependencies.runM3PlusPitchSafetyPilotSession || null;
   const buildStatus = dependencies.buildStatus || buildProjectStatus;
   const refreshReleaseReview = dependencies.refreshReleaseReview || (() => runNpmScript("western:release-review"));
+  const refreshPostExecution = dependencies.refreshPostExecutionEvidence
+    || refreshPostExecutionEvidence;
   const loadHistory = dependencies.loadHistoricalRecordingIds || loadHistoricalRecordingIds;
   const requestedRecordingIds = [...new Set(
     (Array.isArray(args.includeRecordingIds) ? args.includeRecordingIds : [])
@@ -251,6 +282,7 @@ export async function runControlledPilotSession(args = {}, dependencies = {}) {
   let precision = null;
   let m3plusResult = null;
   let runtimeStatusAfter = null;
+  let postExecutionEvidenceRefresh = { ok: true, skipped: true };
   let caughtError = "";
   const historyExcludedRecordingIds = await loadHistory(args.outRoot || DEFAULT_OUT_ROOT);
   const effectiveExcludedRecordingIds = [...new Set([
@@ -342,6 +374,20 @@ export async function runControlledPilotSession(args = {}, dependencies = {}) {
   } finally {
     if (oldEnable === undefined) delete process.env[ENABLE_ENV];
     else process.env[ENABLE_ENV] = oldEnable;
+    if (executionPerformed) {
+      try {
+        postExecutionEvidenceRefresh = await refreshPostExecution();
+        if (postExecutionEvidenceRefresh?.ok !== true) {
+          blockingReasons.push("pilot-run-post-execution-evidence-refresh-failed");
+        }
+      } catch (error) {
+        postExecutionEvidenceRefresh = {
+          ok: false,
+          error: String(error?.message || error),
+        };
+        blockingReasons.push("pilot-run-post-execution-evidence-refresh-failed");
+      }
+    }
     runtimeStatusAfter = await buildStatus();
   }
 
@@ -465,6 +511,7 @@ export async function runControlledPilotSession(args = {}, dependencies = {}) {
     effectiveExcludedRecordingIds,
     selectedSubmissions,
     refreshedReleaseReview: refresh,
+    postExecutionEvidenceRefresh,
     preflight: {
       okToStartControlledPilot: preflight.okToStartControlledPilot === true,
       blockingReasons: preflight.blockingReasons || [],
@@ -511,6 +558,7 @@ async function main() {
     executionRequested: report.executionRequested,
     executionPerformed: report.executionPerformed,
     pilotRunAccepted: report.pilotRunAccepted,
+    postExecutionEvidenceRefreshReady: report.postExecutionEvidenceRefresh?.ok === true,
     defaultRuntimeFailClosedAfter: report.defaultRuntimeFailClosedAfter,
     blockingReasons: report.blockingReasons,
     monitoring: report.monitoring,

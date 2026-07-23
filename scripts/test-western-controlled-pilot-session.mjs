@@ -114,9 +114,14 @@ const oldEnable = process.env[ENABLE_ENV];
 try {
   let calls = 0;
   let m3plusCalls = 0;
+  let postExecutionRefreshCalls = 0;
   const common = {
     outRoot: tempRoot,
     refreshReleaseReview: async () => ({ ok: true }),
+    refreshPostExecutionEvidence: async () => {
+      postExecutionRefreshCalls += 1;
+      return { ok: true };
+    },
     buildStatus: async () => statusFailClosed(),
     loadHistoricalRecordingIds: async () => [],
     runM3PlusPitchSafetyPilotSession: async () => {
@@ -158,6 +163,7 @@ try {
   assert.equal(dryRun.sessionStatus, "ready_not_executed");
   assert.equal(dryRun.executionPerformed, false);
   assert.equal(calls, 0, "dry-run must not execute the pilot batch");
+  assert.equal(postExecutionRefreshCalls, 0, "dry-run must not refresh post-execution evidence");
 
   const noApproval = await runControlledPilotSession({ execute: true, sessionId: "no-approval", outRoot: tempRoot }, {
     ...common,
@@ -287,7 +293,27 @@ try {
   assert.equal(safe.monitoring.reviewRequiredCandidateCount, 5);
   assert.equal(safe.defaultRuntimeFailClosedAfter, true);
   assert.equal(safe.processEnvironmentRestored, true);
+  assert.equal(safe.postExecutionEvidenceRefresh.ok, true);
+  assert.equal(postExecutionRefreshCalls, 1);
   assert.equal(process.env[ENABLE_ENV], undefined);
+
+  const staleAfterExecution = await runControlledPilotSession({
+    execute: true,
+    sessionId: "post-execution-refresh-failed",
+    outRoot: tempRoot,
+  }, {
+    ...common,
+    buildPreflight: async () => approvedPreflight(),
+    runPrecisionSession: async () => precisionResult(),
+    refreshPostExecutionEvidence: async () => ({ ok: false }),
+  });
+  assert.equal(staleAfterExecution.sessionStatus, "aborted");
+  assert.equal(staleAfterExecution.pilotRunAccepted, false);
+  assert(
+    staleAfterExecution.blockingReasons.includes(
+      "pilot-run-post-execution-evidence-refresh-failed",
+    ),
+  );
 
   const invalidM3Results = [
     ["wrong-contract", { contract: ORDINARY_EXECUTOR_CONTRACT }],
@@ -470,6 +496,9 @@ try {
 
   const safeJson = JSON.parse(await fs.readFile(path.join(tempRoot, "safe", "session.json"), "utf8"));
   assert.equal(safeJson.sessionStatus, "completed_safe");
+  assert.equal(safeJson.postExecutionEvidenceRefresh.ok, true);
+  const safeMarkdown = await fs.readFile(path.join(tempRoot, "safe", "session.md"), "utf8");
+  assert(safeMarkdown.includes("- postExecutionEvidenceRefreshReady: true"));
 } finally {
   if (oldEnable === undefined) delete process.env[ENABLE_ENV];
   else process.env[ENABLE_ENV] = oldEnable;
@@ -488,6 +517,7 @@ console.log(JSON.stringify({
     "executor-contracts-must-be-exact-and-distinct",
     "parent-enabled-env-blocks",
     "safe-session-runs-and-passes-both-executors",
+    "post-execution-evidence-refresh-is-required",
     "invalid-m3plus-result-contracts-abort",
     "invalid-ordinary-result-aborts",
     "raw-model-auto-pass-is-suppressed-unless-self-checked",
