@@ -51,9 +51,9 @@ Policy C 的 assignment gap 也补做了直接波形归因：
 
 因此当前不再追加单阈值或单一手工特征。下一轮数据必须直接覆盖真实混淆对，模型单位改为连续片段上的插入/删除/替代 edit-path。
 
-Round 5 intake 已接入总项目状态并做实时哈希绑定。当前 `ready=false`、`bindingCurrent=true`：合同本身与已生成报告一致，唯一输入 blocker 是私密 `manifest.csv` 和 `position-truth.json` 尚未到位。文件新增或改动后若未重跑 `npm run western:round5-targeted-intake`，总状态会以 stale reason 关闭，而不会继续沿用旧报告。
+Round 5 intake 已接入总项目状态并做实时哈希绑定。2026-07-23 当前 `ready=true`、`bindingCurrent=true`：12 条录音、144 个完整签署事件、2 人/3 设备/2 房间及四类分母均通过。另以 `npm run western:round5-audio-score-identity` 做了不读取真值标签和 gate 结果的音频—乐谱身份审计；12/12 均匹配当前同名冻结谱，全局一对一分配也是 12/12 原位，因此 cal/fresh 没有反置。
 
-片段模型入口也已落地：`western:round5-segment-edit-path` 只消费通过 intake 的 calibration/fresh-blind 分割，按 merged-substitution/missing/extra/drag 四个子闸分别训练固定随机森林，并以连续五音的局部 edit-path 证据评测。当前执行结果为 `intakeReady=false`、`trainingPerformed=false`、`reviewAssistPromotionReady=false`；这是缺真实输入的明确拒绝，不是模型失败数字。总状态还会复核模型报告引用的三份源哈希与模型工件哈希。
+片段模型入口也已落地：`western:round5-segment-edit-path` 只消费通过 intake 的 calibration/fresh-blind 分割，按 merged-substitution/missing/extra/drag 四个子闸分别训练固定随机森林，并以连续五音的局部 edit-path 证据评测。2026-07-23 冻结首跑已完成；按“每个子闸独立过门”的合同，只有 `extra` 达到 `3/6 @ 0/12 confusion FP`、P/R=`100%/50%`，可冻结为教师复核候选证据。`merged_substitution` 为 `1/6 @ 1 FP`、`missing` 为 `0/6 @ 0 FP`、`drag` 为 `3/6 @ 1 FP`，三者失败。聚合字段现明确为 `promotionScope=independent-per-gate`、`promotedGates=["extra"]`；学生端、自动指控与生产采纳仍全部为 false。总状态会复核三份源哈希、模型工件哈希及 per-gate 汇总是否能由逐闸结果重算。
 
 在不占用晋升分母的架构烟测中，r2-01 注入训练、r2-08 曲目留出，再投已查看 Round 4：结构特征基线为 `5/12` 命中、`6/253` 非故意位置误指控，P/R=`45.45%/41.67%`；加入固定 RMS/pYIN/onset 后降为 `1/12 @ 2/253`、P/R=`33.33%/8.33%`，且四个正确 gate 的 TP 合计为 0。两种均 `architectureCandidateRetained=false`，不接复核台；固定随机森林只保留为将来真实数据上的基线，下一模型族必须显式学习连续时序操作路径，而不是继续叠声学手工特征。
 
@@ -65,11 +65,11 @@ Round 5 intake 已接入总项目状态并做实时哈希绑定。当前 `ready=
 
 公开专业长曲压力给出了相反边界：Oliver Colbentson 两段 BWV1006 在正确展开反复记号后共有 2,301 个谱音，产生 936 个 assignment gap、595 个精炼提示，即 258.58 个提示/千音。由于没有逐音演奏错误人工 gold，这 595 个提示不能记作 FP；它们是实际可见的复核负担。故 `generalPurposeCandidateRetained=false`，该规则不得推广到任意专业长曲。它只保留为 Round 5 短篇学生混淆对的冻结候选，能否把正式确诊从 2/12 提高，仍只能由新的逐音人工真值 fresh-blind 决定。
 
-候选已经接入 Round 5 targeted runner，而不是只留在回顾性脚本：gap 的 `self_check_hint` 仍保留，同时新增 missing-targeted 严格层；只有整条 assignment gap `<=5` 且 gap rate `<=10%` 才可输出 `issue_detected_candidate`，否则回退证据不足。节奏结构合取只评 `extra`/`drag`，relative-IOI `>0.15`、事件置信度 `>=0.75` 且 operation-path 必须同位置有候选；时值比 `>=1.20` 为软层，复用已有冻结值 `>=1.30` 为严格层。两个严格候选与原有 2 个确诊的回顾性合并上限为 **10/12 @ 0/253**，但规则均形成于查看当前证据之后，不改变正式 2/12。合同要求每录音 `completeErrorInventory=true`；当前 manifest/truth 尚缺，因此报告停在 `runnerWired=true`、`evaluationPerformed=false`，数据到位后同一命令按 precision≥0.90、target recall≥0.50、strict FP=0 运行真闸。
+候选已经接入 Round 5 targeted runner，而不是只留在回顾性脚本：gap 的 `self_check_hint` 仍保留，同时新增 missing-targeted 严格层；只有整条 assignment gap `<=5` 且 gap rate `<=10%` 才可输出 `issue_detected_candidate`，否则回退证据不足。节奏结构合取只评 `extra`/`drag`，relative-IOI `>0.15`、事件置信度 `>=0.75` 且 operation-path 必须同位置有候选；时值比 `>=1.20` 为软层，复用已有冻结值 `>=1.30` 为严格层。Round 5 首跑已经否定这些回顾性上限的晋升资格：gap 自查为 `1/12 @ 1 FP`，missing 严格层为 `1/6 @ 1 FP`；节奏 soft/strict 均为 `4/12 @ 0 FP`、recall=`33.33%`。它们均未过 precision≥0.90、target recall≥0.50、strict FP=0，正式严格确诊继续为 **2/12**。
 
-采集执行障碍已进一步收口：`docs/round5-targeted-diagnosis-capture-pack/index.html` 提供精确满足合同下限的 12-take 计划和可下载 manifest/truth 模板；每条预留 4 个正例与 8 个独立混淆位置，两个 split 的演奏上下文不重叠。模板默认不签署完整错误库存，intake 也拒绝重复位置凑分母，所以工具就绪不等于数据就绪。
+本轮采集、签署、身份核对和冻结首跑均已完成，当前 12 条 fresh 证据视为已消费。下一步不是在这 6 条 fresh 上调阈值重考，而是只用 calibration 诊断 `merged_substitution`、`missing`、`drag` 的失败模式；任何改过的模型都必须登记并采集新的 untouched fresh 包。`extra` 的通过结果冻结保留，不因其他三闸失败被聚合抹掉，也不得外推为四类合格。
 
-边界必须同时保留：gap 健康守卫、软节奏与高置信节奏合取都在看过当前证据后形成，`strictConfirmedRecallUnchanged=true`，所以严格确诊仍是 `2/12`；当前仅 `candidateRetainedForFreshBlind=true`，`reviewAssistPromotionReady=false`、`automaticAccusationEvidenceReady=false`、`automaticAccusationReady=false`。健康守卫把长曲降级为证据不足，不等于证明长曲正确；节奏严格层的 13 个专业长曲候选也没有逐音人工真值。下一次 Round 5 fresh-blind 必须原样先测冻结规则，不得先看新包再改条件。可复跑：
+边界必须同时保留：gap 健康守卫、软节奏与高置信节奏合取都未通过 Round 5，`strictConfirmedRecallUnchanged=true`，所以严格确诊仍是 `2/12`；片段模型只有 `extra` 的教师复核候选证据过门，`automaticAccusationEvidenceReady=false`、`automaticAccusationReady=false`。健康守卫把长曲降级为证据不足，不等于证明长曲正确；节奏严格层的 13 个专业长曲候选也没有逐音人工真值。可复跑：
 
 ```powershell
 npm run western:round5-temporal-operation-path

@@ -28,7 +28,7 @@
 - `docs/round5-targeted-diagnosis-capture-pack/manifest.template.csv` → `data/private/western-strings-round5/manifest.csv`
 - `docs/round5-targeted-diagnosis-capture-pack/truth.template.json` → `data/private/western-strings-round5/position-truth.json`
 
-随后运行 `npm run western:round5-targeted-intake`。当前无私密输入时应明确返回 `round5-manifest-missing` 与 `round5-position-truth-missing`；文件到位后它会检查分母、文件存在性、隐私路径、consent/license、曲目与演奏者-设备-房间 split 泄漏、逐事件字段以及 contract/manifest/truth SHA-256。`npm run western:project-status` 会把该结果显示在 `tracks.controlledCandidate.ordinaryDynamicShadow.round5TargetedIntake`，并在合同、清单或真值后续变化但报告未重跑时标记对应 `*-binding-stale`。只有 `ready=true` 且 `bindingCurrent=true` 才允许训练或 fresh-blind 评测，且该状态仍不授予学生端权限。
+随后运行 `npm run western:round5-targeted-intake`。缺私密输入时应明确返回 `round5-manifest-missing` 与 `round5-position-truth-missing`；文件到位后它会检查分母、文件存在性、隐私路径、consent/license、曲目与演奏者-设备-房间 split 泄漏、逐事件字段以及 contract/manifest/truth SHA-256。`npm run western:project-status` 会把结果显示在 `tracks.controlledCandidate.ordinaryDynamicShadow.round5TargetedIntake`，并在合同、清单或真值后续变化但报告未重跑时标记对应 `*-binding-stale`。2026-07-23 当前实际 intake 为 `ready=true`、`bindingCurrent=true`：12 条录音与 144 个完整事件全部通过；该状态仍不授予学生端权限。
 
 模板默认把全部 `completeErrorInventory` 保持为 `false`，位置字段为空，因此不能误过 intake。逐条人工复核后才允许签署为 `true`。intake 还会拒绝非法 measure/beat/MIDI，以及同一录音内重复使用同一个 `measure/beat/scoreMidi` 位置来凑多个分母。
 
@@ -36,4 +36,17 @@
 
 输入为连续 3–5 个谱音片段及对应音频，不再逐音独立分类。候选输出固定为 `match / insert / delete / substitute / timing-boundary-uncertain`，并把置信不足统一回退到 segment-level 自查提示。现有 round4 和注入集只用于开发诊断与回归，禁止计入新的 fresh-blind 晋升分母。
 
-机器基线入口已实现为 `npm run western:round5-segment-edit-path`。它只在 intake 的全部分母、隐私、split 与哈希检查通过后训练；calibration 用固定参数的四个 gate-specific segment classifier，fresh-blind 只评测且固定决策点为 0.5，不在盲测集调参。输入特征覆盖目标音前后各两音的 assignment gap、音高替代、relative-IOI、时值比以及局部未分配事件。该固定随机森林现只保留为基线：两曲目注入→Round 4 烟测没有通过，不能预设为最终架构。真实 calibration 到位后应与显式 temporal operation-path 模型比较，模型选择仍不得查看 fresh-blind。当前私密输入未到位时应输出 `trainingPerformed=false`，不得生成模型或晋升任何权限。
+机器基线入口已实现为 `npm run western:round5-segment-edit-path`。它只在 intake 的全部分母、隐私、split 与哈希检查通过后训练；calibration 用固定参数的四个 gate-specific segment classifier，fresh-blind 只评测且固定决策点为 0.5，不在盲测集调参。输入特征覆盖目标音前后各两音的 assignment gap、音高替代、relative-IOI、时值比以及局部未分配事件。
+
+2026-07-23 首跑结果按第 3 条“每个子闸独立验收”判定：
+
+| 子闸 | fresh-blind TP/FP/FN | Precision / Recall | 判定 |
+|---|---:|---:|---|
+| merged substitution | 1 / 1 / 5 | 50% / 16.67% | 失败 |
+| missing | 0 / 0 / 6 | 0% / 0% | 失败 |
+| extra | 3 / 0 / 3 | 100% / 50% | 教师复核候选证据通过 |
+| drag | 3 / 1 / 3 | 75% / 50% | 失败 |
+
+因此 `promotionScope=independent-per-gate`、`promotedGates=["extra"]`、`failedGates=["merged_substitution","missing","drag"]`。这不打开学生端或自动指控；`extra` 也不能替另外三类背书。当前 fresh split 已消费，后续只能在 calibration 上分析失败模式，任何改模必须在新登记的 untouched fresh 包上重新验收。
+
+为排除采集目录误标，`npm run western:round5-audio-score-identity` 只用音频提取的音高事件与 12 份冻结 MusicXML 做全交叉匹配，不读取 `position-truth.json` 或 gate 结果。当前 12/12 均匹配同名谱，全局一对一分配也是原位，结论为 `current-mapping-confirmed`，cal/fresh 没有反置。
