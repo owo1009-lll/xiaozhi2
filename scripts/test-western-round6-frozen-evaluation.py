@@ -82,8 +82,43 @@ def main() -> int:
                 "scorePositionCounterbalanceRequired": True,
             },
             "candidate": {
-                "sourceContract": "western-round6-full-score-candidate-v1",
-                "modelFamily": "full-score-fixed-random-forest-binary-per-gate",
+                "sourceContract": "western-round6-full-score-candidate-v2",
+                "modelFamily": (
+                    "full-score-performance-only-random-forest-binary-per-gate"
+                ),
+                "featurePolicy": "alignment-performance-only-no-fixed-acoustic-v1",
+                "excludedScoreContextFeatures": [
+                    "n_0OutOfRange",
+                    "n_m1OutOfRange",
+                    "n_m2OutOfRange",
+                    "n_p1OutOfRange",
+                    "n_p2OutOfRange",
+                    "scoreNextInterval",
+                    "scorePreviousInterval",
+                ],
+                "excludedFixedAcousticFeatures": [
+                    "acousticAvailable",
+                    "targetInteriorAttackRatio",
+                    "targetMeanVoicedProbability",
+                    "targetNearPitchOccupancy",
+                    "targetOnsetMax",
+                    "targetOnsetMean",
+                    "targetOnsetPeakCount",
+                    "targetPeakDb",
+                    "targetPitchOccupancy",
+                    "targetRmsDb",
+                    "targetVoicedFrameRatio",
+                ],
+                "requiredTemporalFeatures": [
+                    "n_0AssignmentGap",
+                    "n_0DurationMissing",
+                    "n_0DurationRatio",
+                    "n_0IoiDeviation",
+                    "n_0IoiMissing",
+                    "segmentMaxIoiDeviation",
+                    "segmentMeanIoiDeviation",
+                    "targetWindowEventCount",
+                ],
                 "strictFalseAccusationDenominator": (
                     "every fresh score position not signed positive for the evaluated gate"
                 ),
@@ -95,7 +130,7 @@ def main() -> int:
                     "rhythmStrict": "rhythm-strict",
                 },
                 "allowedCandidateFamilies": [
-                    "full-score-fixed-random-forest-binary-per-gate",
+                    "full-score-performance-only-random-forest-binary-per-gate",
                     "frozen-gap-refinement-self-check",
                     "frozen-gap-strict-missing",
                     "frozen-rhythm-structural-self-check",
@@ -121,8 +156,20 @@ def main() -> int:
         (root / "data/private/truth.json").write_text("{}\n", encoding="utf-8")
 
         candidate = SimpleNamespace(
-            CONTRACT="western-round6-full-score-candidate-v1",
-            MODEL_FAMILY="full-score-fixed-random-forest-binary-per-gate",
+            CONTRACT="western-round6-full-score-candidate-v2",
+            MODEL_FAMILY=(
+                "full-score-performance-only-random-forest-binary-per-gate"
+            ),
+            FEATURE_POLICY="alignment-performance-only-no-fixed-acoustic-v1",
+            EXCLUDED_SCORE_CONTEXT_FEATURES=tuple(
+                protocol["candidate"]["excludedScoreContextFeatures"]
+            ),
+            EXCLUDED_FIXED_ACOUSTIC_FEATURES=tuple(
+                protocol["candidate"]["excludedFixedAcousticFeatures"]
+            ),
+            REQUIRED_TEMPORAL_FEATURES=tuple(
+                protocol["candidate"]["requiredTemporalFeatures"]
+            ),
             STRICT_FALSE_ACCUSATION_DENOMINATOR=(
                 "every fresh score position not signed positive for the evaluated gate"
             ),
@@ -186,12 +233,28 @@ def main() -> int:
             return {
                 "contract": candidate.CONTRACT,
                 "modelFamily": candidate.MODEL_FAMILY,
+                "featurePolicy": candidate.FEATURE_POLICY,
+                "excludedScoreContextFeatures": list(
+                    candidate.EXCLUDED_SCORE_CONTEXT_FEATURES
+                ),
+                "excludedFixedAcousticFeatures": list(
+                    candidate.EXCLUDED_FIXED_ACOUSTIC_FEATURES
+                ),
+                "requiredTemporalFeatures": list(
+                    candidate.REQUIRED_TEMPORAL_FEATURES
+                ),
                 "strictFalseAccusationDenominator": (
                     candidate.STRICT_FALSE_ACCUSATION_DENOMINATOR
                 ),
                 "evaluationPerformed": True,
                 "datasetRows": 160,
                 "denominators": valid_denominators,
+                "evaluation": {
+                    "featureNames": [
+                        *candidate.REQUIRED_TEMPORAL_FEATURES,
+                        "operationEvidence",
+                    ],
+                },
                 "promotedGates": [],
                 "automaticAccusationReady": False,
                 "studentFacing": False,
@@ -237,6 +300,16 @@ def main() -> int:
                 return {
                     "contract": candidate.CONTRACT,
                     "modelFamily": candidate.MODEL_FAMILY,
+                    "featurePolicy": candidate.FEATURE_POLICY,
+                    "excludedScoreContextFeatures": list(
+                        candidate.EXCLUDED_SCORE_CONTEXT_FEATURES
+                    ),
+                    "excludedFixedAcousticFeatures": list(
+                        candidate.EXCLUDED_FIXED_ACOUSTIC_FEATURES
+                    ),
+                    "requiredTemporalFeatures": list(
+                        candidate.REQUIRED_TEMPORAL_FEATURES
+                    ),
                     "strictFalseAccusationDenominator": (
                         candidate.STRICT_FALSE_ACCUSATION_DENOMINATOR
                     ),

@@ -14,13 +14,13 @@
       "role": "execution-guard",
       "path": "scripts/run_western_round6_frozen_evaluation.py",
       "hashMode": "lf-normalized-sha256",
-      "sha256": "579f523b8aa07a840fe75c04ae8cea1b7676730d1ba1e7ba710ea6bee296c9cc"
+      "sha256": "5a1795b2bb125069c8beb92c7a5a12f179ebdef7315270c2d703c25b9aa72732"
     },
     {
       "role": "candidate-runner",
       "path": "scripts/experiments/train_western_round6_full_score_candidate.py",
       "hashMode": "lf-normalized-sha256",
-      "sha256": "334ede61ecdcdd83b53c43b9f4d2aaac92606379bcbefa533f28664897525aa8"
+      "sha256": "a25ff9d2a9ff79cb086a1273c3c1a380be0c324010df560cb996e0bda1272e03"
     },
     {
       "role": "feature-extractor",
@@ -75,8 +75,41 @@
     "scorePositionCounterbalanceRequired": true
   },
   "candidate": {
-    "sourceContract": "western-round6-full-score-candidate-v1",
-    "modelFamily": "full-score-fixed-random-forest-binary-per-gate",
+    "sourceContract": "western-round6-full-score-candidate-v2",
+    "modelFamily": "full-score-performance-only-random-forest-binary-per-gate",
+    "featurePolicy": "alignment-performance-only-no-fixed-acoustic-v1",
+    "excludedScoreContextFeatures": [
+      "n_0OutOfRange",
+      "n_m1OutOfRange",
+      "n_m2OutOfRange",
+      "n_p1OutOfRange",
+      "n_p2OutOfRange",
+      "scoreNextInterval",
+      "scorePreviousInterval"
+    ],
+    "excludedFixedAcousticFeatures": [
+      "acousticAvailable",
+      "targetInteriorAttackRatio",
+      "targetMeanVoicedProbability",
+      "targetNearPitchOccupancy",
+      "targetOnsetMax",
+      "targetOnsetMean",
+      "targetOnsetPeakCount",
+      "targetPeakDb",
+      "targetPitchOccupancy",
+      "targetRmsDb",
+      "targetVoicedFrameRatio"
+    ],
+    "requiredTemporalFeatures": [
+      "n_0AssignmentGap",
+      "n_0DurationMissing",
+      "n_0DurationRatio",
+      "n_0IoiDeviation",
+      "n_0IoiMissing",
+      "segmentMaxIoiDeviation",
+      "segmentMeanIoiDeviation",
+      "targetWindowEventCount"
+    ],
     "strictFalseAccusationDenominator": "every fresh score position not signed positive for the evaluated gate",
     "modelParams": {
       "n_estimators": 256,
@@ -93,7 +126,7 @@
       "rhythmStrict": "western-round5-frozen-rhythm-strict-issue-candidate-v1"
     },
     "allowedCandidateFamilies": [
-      "full-score-fixed-random-forest-binary-per-gate",
+      "full-score-performance-only-random-forest-binary-per-gate",
       "frozen-gap-refinement-self-check",
       "frozen-gap-strict-missing",
       "frozen-rhythm-structural-self-check",

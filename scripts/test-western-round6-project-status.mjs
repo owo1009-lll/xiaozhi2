@@ -225,8 +225,41 @@ try {
       scorePositionCounterbalanceRequired: true,
     },
     candidate: {
-      sourceContract: "western-round6-full-score-candidate-v1",
-      modelFamily: "full-score-fixed-random-forest-binary-per-gate",
+      sourceContract: "western-round6-full-score-candidate-v2",
+      modelFamily: "full-score-performance-only-random-forest-binary-per-gate",
+      featurePolicy: "alignment-performance-only-no-fixed-acoustic-v1",
+      excludedScoreContextFeatures: [
+        "n_0OutOfRange",
+        "n_m1OutOfRange",
+        "n_m2OutOfRange",
+        "n_p1OutOfRange",
+        "n_p2OutOfRange",
+        "scoreNextInterval",
+        "scorePreviousInterval",
+      ],
+      excludedFixedAcousticFeatures: [
+        "acousticAvailable",
+        "targetInteriorAttackRatio",
+        "targetMeanVoicedProbability",
+        "targetNearPitchOccupancy",
+        "targetOnsetMax",
+        "targetOnsetMean",
+        "targetOnsetPeakCount",
+        "targetPeakDb",
+        "targetPitchOccupancy",
+        "targetRmsDb",
+        "targetVoicedFrameRatio",
+      ],
+      requiredTemporalFeatures: [
+        "n_0AssignmentGap",
+        "n_0DurationMissing",
+        "n_0DurationRatio",
+        "n_0IoiDeviation",
+        "n_0IoiMissing",
+        "segmentMaxIoiDeviation",
+        "segmentMeanIoiDeviation",
+        "targetWindowEventCount",
+      ],
       strictFalseAccusationDenominator:
         "every fresh score position not signed positive for the evaluated gate",
       modelParams: {
@@ -244,7 +277,7 @@ try {
         rhythmStrict: "western-round5-frozen-rhythm-strict-issue-candidate-v1",
       },
       allowedCandidateFamilies: [
-        "full-score-fixed-random-forest-binary-per-gate",
+        "full-score-performance-only-random-forest-binary-per-gate",
         "frozen-gap-refinement-self-check",
         "frozen-gap-strict-missing",
         "frozen-rhythm-structural-self-check",
@@ -282,7 +315,24 @@ try {
   assert.equal(ready.evaluationProtocol.runnerReady, true);
   assert.equal(
     ready.evaluationProtocol.candidateModelFamily,
-    "full-score-fixed-random-forest-binary-per-gate",
+    "full-score-performance-only-random-forest-binary-per-gate",
+  );
+  assert.equal(
+    ready.evaluationProtocol.candidateFeaturePolicy,
+    "alignment-performance-only-no-fixed-acoustic-v1",
+  );
+  assert.deepEqual(
+    ready.evaluationProtocol.requiredTemporalFeatures,
+    [
+      "n_0AssignmentGap",
+      "n_0DurationMissing",
+      "n_0DurationRatio",
+      "n_0IoiDeviation",
+      "n_0IoiMissing",
+      "segmentMaxIoiDeviation",
+      "segmentMeanIoiDeviation",
+      "targetWindowEventCount",
+    ],
   );
   assert.equal(
     ready.evaluationProtocol.strictFalseAccusationDenominator,

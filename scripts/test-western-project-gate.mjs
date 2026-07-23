@@ -872,7 +872,11 @@ assert.equal(
 );
 assert.equal(
   round6CounterbalancedCapture?.evaluationProtocol?.candidateModelFamily,
-  "full-score-fixed-random-forest-binary-per-gate",
+  "full-score-performance-only-random-forest-binary-per-gate",
+);
+assert.equal(
+  round6CounterbalancedCapture?.evaluationProtocol?.candidateFeaturePolicy,
+  "alignment-performance-only-no-fixed-acoustic-v1",
 );
 assert.equal(
   round6CounterbalancedCapture?.evaluationProtocol?.strictFalseAccusationDenominator,

@@ -20,6 +20,27 @@ SPEC.loader.exec_module(MODULE)
 
 
 def main() -> int:
+    raw_features = {
+        name: float(index)
+        for index, name in enumerate(
+            [
+                *MODULE.EXCLUDED_SCORE_CONTEXT_FEATURES,
+                *MODULE.EXCLUDED_FIXED_ACOUSTIC_FEATURES,
+                *MODULE.REQUIRED_TEMPORAL_FEATURES,
+                "n_0Confidence",
+            ]
+        )
+    }
+    filtered = MODULE.candidate_features(raw_features)
+    assert not (
+        set(filtered) & set(MODULE.EXCLUDED_SCORE_CONTEXT_FEATURES)
+    )
+    assert not (
+        set(filtered) & set(MODULE.EXCLUDED_FIXED_ACOUSTIC_FEATURES)
+    )
+    assert set(MODULE.REQUIRED_TEMPORAL_FEATURES) <= set(filtered)
+    assert filtered["n_0Confidence"] == raw_features["n_0Confidence"]
+
     positions = [
         {"noteIndex": index, "measure": index + 1, "beat": 1.0, "scoreMidi": 60 + index}
         for index in range(5)

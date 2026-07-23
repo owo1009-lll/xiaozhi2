@@ -27,8 +27,41 @@ import train_western_round5_segment_edit_path as base  # noqa: E402
 from eval_western_strings_duration_extra_quantization import analyze_take  # noqa: E402
 
 
-CONTRACT = "western-round6-full-score-candidate-v1"
-MODEL_FAMILY = "full-score-fixed-random-forest-binary-per-gate"
+CONTRACT = "western-round6-full-score-candidate-v2"
+MODEL_FAMILY = "full-score-performance-only-random-forest-binary-per-gate"
+FEATURE_POLICY = "alignment-performance-only-no-fixed-acoustic-v1"
+EXCLUDED_SCORE_CONTEXT_FEATURES = (
+    "n_0OutOfRange",
+    "n_m1OutOfRange",
+    "n_m2OutOfRange",
+    "n_p1OutOfRange",
+    "n_p2OutOfRange",
+    "scoreNextInterval",
+    "scorePreviousInterval",
+)
+EXCLUDED_FIXED_ACOUSTIC_FEATURES = (
+    "acousticAvailable",
+    "targetInteriorAttackRatio",
+    "targetMeanVoicedProbability",
+    "targetNearPitchOccupancy",
+    "targetOnsetMax",
+    "targetOnsetMean",
+    "targetOnsetPeakCount",
+    "targetPeakDb",
+    "targetPitchOccupancy",
+    "targetRmsDb",
+    "targetVoicedFrameRatio",
+)
+REQUIRED_TEMPORAL_FEATURES = (
+    "n_0AssignmentGap",
+    "n_0DurationMissing",
+    "n_0DurationRatio",
+    "n_0IoiDeviation",
+    "n_0IoiMissing",
+    "segmentMaxIoiDeviation",
+    "segmentMeanIoiDeviation",
+    "targetWindowEventCount",
+)
 STRICT_FALSE_ACCUSATION_DENOMINATOR = (
     "every fresh score position not signed positive for the evaluated gate"
 )
@@ -46,6 +79,28 @@ def read_json(path: Path) -> Any:
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def candidate_features(raw_features: dict[str, float]) -> dict[str, float]:
+    excluded = {
+        *EXCLUDED_SCORE_CONTEXT_FEATURES,
+        *EXCLUDED_FIXED_ACOUSTIC_FEATURES,
+    }
+    filtered = {
+        name: value
+        for name, value in raw_features.items()
+        if name not in excluded
+    }
+    missing = [
+        name for name in REQUIRED_TEMPORAL_FEATURES
+        if name not in filtered
+    ]
+    if missing:
+        raise ValueError(
+            "round6-required-temporal-feature-missing:"
+            + ",".join(missing)
+        )
+    return filtered
 
 
 def expand_full_score_rows(
@@ -114,9 +169,11 @@ def build_dataset(manifest_path: Path, truth_path: Path) -> list[dict[str, Any]]
         if len(positions) != len(take["notes"]):
             raise ValueError(f"round6-score-position-count-mismatch:{recording_id}")
         features_by_note = {
-            int(position["noteIndex"]): base.extract_segment_features(
-                take,
-                int(position["noteIndex"]),
+            int(position["noteIndex"]): candidate_features(
+                base.extract_segment_features(
+                    take,
+                    int(position["noteIndex"]),
+                )
             )
             for position in positions
         }
@@ -168,6 +225,10 @@ def run(
         "schemaVersion": 1,
         "contract": CONTRACT,
         "modelFamily": MODEL_FAMILY,
+        "featurePolicy": FEATURE_POLICY,
+        "excludedScoreContextFeatures": list(EXCLUDED_SCORE_CONTEXT_FEATURES),
+        "excludedFixedAcousticFeatures": list(EXCLUDED_FIXED_ACOUSTIC_FEATURES),
+        "requiredTemporalFeatures": list(REQUIRED_TEMPORAL_FEATURES),
         "intakeContractVersion": intake_report.get("contractVersion"),
         "sourceHashes": intake_report.get("hashes", {}),
         "intakeReady": intake_report.get("ready") is True,

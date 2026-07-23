@@ -1995,9 +1995,46 @@ export async function summarizeRound6CounterbalancedCapture({
       && evaluation?.completeInventoryRequired === true
       && evaluation?.scorePositionCounterbalanceRequired === true
       && evaluationCandidate?.sourceContract
-        === "western-round6-full-score-candidate-v1"
+        === "western-round6-full-score-candidate-v2"
       && evaluationCandidate?.modelFamily
-        === "full-score-fixed-random-forest-binary-per-gate"
+        === "full-score-performance-only-random-forest-binary-per-gate"
+      && evaluationCandidate?.featurePolicy
+        === "alignment-performance-only-no-fixed-acoustic-v1"
+      && JSON.stringify(evaluationCandidate?.excludedScoreContextFeatures)
+        === JSON.stringify([
+          "n_0OutOfRange",
+          "n_m1OutOfRange",
+          "n_m2OutOfRange",
+          "n_p1OutOfRange",
+          "n_p2OutOfRange",
+          "scoreNextInterval",
+          "scorePreviousInterval",
+        ])
+      && JSON.stringify(evaluationCandidate?.excludedFixedAcousticFeatures)
+        === JSON.stringify([
+          "acousticAvailable",
+          "targetInteriorAttackRatio",
+          "targetMeanVoicedProbability",
+          "targetNearPitchOccupancy",
+          "targetOnsetMax",
+          "targetOnsetMean",
+          "targetOnsetPeakCount",
+          "targetPeakDb",
+          "targetPitchOccupancy",
+          "targetRmsDb",
+          "targetVoicedFrameRatio",
+        ])
+      && JSON.stringify(evaluationCandidate?.requiredTemporalFeatures)
+        === JSON.stringify([
+          "n_0AssignmentGap",
+          "n_0DurationMissing",
+          "n_0DurationRatio",
+          "n_0IoiDeviation",
+          "n_0IoiMissing",
+          "segmentMaxIoiDeviation",
+          "segmentMeanIoiDeviation",
+          "targetWindowEventCount",
+        ])
       && evaluationCandidate?.strictFalseAccusationDenominator
         === "every fresh score position not signed positive for the evaluated gate"
       && JSON.stringify(evaluationCandidate?.modelParams) === JSON.stringify({
@@ -2015,7 +2052,7 @@ export async function summarizeRound6CounterbalancedCapture({
         rhythmStrict: "western-round5-frozen-rhythm-strict-issue-candidate-v1",
       })
       && JSON.stringify(evaluationCandidate?.allowedCandidateFamilies) === JSON.stringify([
-        "full-score-fixed-random-forest-binary-per-gate",
+        "full-score-performance-only-random-forest-binary-per-gate",
         "frozen-gap-refinement-self-check",
         "frozen-gap-strict-missing",
         "frozen-rhythm-structural-self-check",
@@ -2352,6 +2389,13 @@ export async function summarizeRound6CounterbalancedCapture({
       freshBlindRunLimit: Number(evaluation?.freshBlindRunLimit || 0),
       freshUsedForSelection: evaluation?.freshUsedForSelection === true,
       candidateModelFamily: String(evaluationCandidate?.modelFamily || ""),
+      candidateFeaturePolicy: String(evaluationCandidate?.featurePolicy || ""),
+      excludedScoreContextFeatures:
+        evaluationCandidate?.excludedScoreContextFeatures || [],
+      excludedFixedAcousticFeatures:
+        evaluationCandidate?.excludedFixedAcousticFeatures || [],
+      requiredTemporalFeatures:
+        evaluationCandidate?.requiredTemporalFeatures || [],
       strictFalseAccusationDenominator: String(
         evaluationCandidate?.strictFalseAccusationDenominator || "",
       ),

@@ -159,10 +159,51 @@ def validate_protocol(repo: Path, protocol_path: Path) -> dict[str, Any]:
     if protocol.get("automaticAuthorizationGranted") is not False:
         blockers.append("round6-evaluation-authorization-boundary-invalid")
     candidate = protocol.get("candidate") or {}
-    if candidate.get("modelFamily") != "full-score-fixed-random-forest-binary-per-gate":
+    if candidate.get("modelFamily") != (
+        "full-score-performance-only-random-forest-binary-per-gate"
+    ):
         blockers.append("round6-evaluation-model-family-invalid")
+    if candidate.get("featurePolicy") != (
+        "alignment-performance-only-no-fixed-acoustic-v1"
+    ):
+        blockers.append("round6-evaluation-feature-policy-invalid")
+    if candidate.get("excludedScoreContextFeatures") != [
+        "n_0OutOfRange",
+        "n_m1OutOfRange",
+        "n_m2OutOfRange",
+        "n_p1OutOfRange",
+        "n_p2OutOfRange",
+        "scoreNextInterval",
+        "scorePreviousInterval",
+    ]:
+        blockers.append("round6-evaluation-score-context-exclusions-invalid")
+    if candidate.get("excludedFixedAcousticFeatures") != [
+        "acousticAvailable",
+        "targetInteriorAttackRatio",
+        "targetMeanVoicedProbability",
+        "targetNearPitchOccupancy",
+        "targetOnsetMax",
+        "targetOnsetMean",
+        "targetOnsetPeakCount",
+        "targetPeakDb",
+        "targetPitchOccupancy",
+        "targetRmsDb",
+        "targetVoicedFrameRatio",
+    ]:
+        blockers.append("round6-evaluation-acoustic-exclusions-invalid")
+    if candidate.get("requiredTemporalFeatures") != [
+        "n_0AssignmentGap",
+        "n_0DurationMissing",
+        "n_0DurationRatio",
+        "n_0IoiDeviation",
+        "n_0IoiMissing",
+        "segmentMaxIoiDeviation",
+        "segmentMeanIoiDeviation",
+        "targetWindowEventCount",
+    ]:
+        blockers.append("round6-evaluation-temporal-feature-requirements-invalid")
     if candidate.get("allowedCandidateFamilies") != [
-        "full-score-fixed-random-forest-binary-per-gate",
+        "full-score-performance-only-random-forest-binary-per-gate",
         "frozen-gap-refinement-self-check",
         "frozen-gap-strict-missing",
         "frozen-rhythm-structural-self-check",
@@ -223,6 +264,20 @@ def candidate_semantics_blockers(module: ModuleType, protocol: dict[str, Any]) -
         blockers.append("round6-evaluation-candidate-contract-mismatch")
     if str(getattr(module, "MODEL_FAMILY", "")) != candidate.get("modelFamily"):
         blockers.append("round6-evaluation-model-family-mismatch")
+    if str(getattr(module, "FEATURE_POLICY", "")) != candidate.get("featurePolicy"):
+        blockers.append("round6-evaluation-feature-policy-mismatch")
+    if list(getattr(module, "EXCLUDED_SCORE_CONTEXT_FEATURES", ())) != (
+        candidate.get("excludedScoreContextFeatures")
+    ):
+        blockers.append("round6-evaluation-score-context-exclusions-mismatch")
+    if list(getattr(module, "EXCLUDED_FIXED_ACOUSTIC_FEATURES", ())) != (
+        candidate.get("excludedFixedAcousticFeatures")
+    ):
+        blockers.append("round6-evaluation-acoustic-exclusions-mismatch")
+    if list(getattr(module, "REQUIRED_TEMPORAL_FEATURES", ())) != (
+        candidate.get("requiredTemporalFeatures")
+    ):
+        blockers.append("round6-evaluation-temporal-feature-requirements-mismatch")
     if (
         str(getattr(module, "STRICT_FALSE_ACCUSATION_DENOMINATOR", ""))
         != candidate.get("strictFalseAccusationDenominator")
@@ -255,11 +310,55 @@ def candidate_evidence_blockers(
         blockers.append("round6-candidate-evidence-contract-mismatch")
     if evidence.get("modelFamily") != candidate.get("modelFamily"):
         blockers.append("round6-candidate-evidence-model-family-mismatch")
+    if evidence.get("featurePolicy") != candidate.get("featurePolicy"):
+        blockers.append("round6-candidate-evidence-feature-policy-mismatch")
+    if evidence.get("excludedScoreContextFeatures") != (
+        candidate.get("excludedScoreContextFeatures")
+    ):
+        blockers.append("round6-candidate-evidence-score-context-exclusions-mismatch")
+    if evidence.get("excludedFixedAcousticFeatures") != (
+        candidate.get("excludedFixedAcousticFeatures")
+    ):
+        blockers.append("round6-candidate-evidence-acoustic-exclusions-mismatch")
+    if evidence.get("requiredTemporalFeatures") != (
+        candidate.get("requiredTemporalFeatures")
+    ):
+        blockers.append("round6-candidate-evidence-temporal-features-mismatch")
     if (
         evidence.get("strictFalseAccusationDenominator")
         != candidate.get("strictFalseAccusationDenominator")
     ):
         blockers.append("round6-candidate-evidence-denominator-contract-mismatch")
+    evaluation = evidence.get("evaluation")
+    feature_names = (
+        evaluation.get("featureNames")
+        if isinstance(evaluation, dict)
+        else None
+    )
+    if not isinstance(feature_names, list) or not all(
+        isinstance(name, str) for name in feature_names
+    ):
+        blockers.append("round6-candidate-evidence-feature-names-missing")
+    else:
+        excluded = {
+            *candidate.get("excludedScoreContextFeatures", []),
+            *candidate.get("excludedFixedAcousticFeatures", []),
+        }
+        leaked = sorted(set(feature_names) & excluded)
+        if leaked:
+            blockers.append(
+                "round6-candidate-evidence-excluded-feature-present:"
+                + ",".join(leaked)
+            )
+        missing_temporal = sorted(
+            set(candidate.get("requiredTemporalFeatures", []))
+            - set(feature_names)
+        )
+        if missing_temporal:
+            blockers.append(
+                "round6-candidate-evidence-temporal-feature-missing:"
+                + ",".join(missing_temporal)
+            )
 
     counts = intake_report.get("counts")
     denominators = evidence.get("denominators")
