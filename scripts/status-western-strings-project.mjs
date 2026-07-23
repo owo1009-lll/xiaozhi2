@@ -109,6 +109,11 @@ const ROUND5_TARGETED_REPORT = path.join(
   "experiments",
   "western-strings-round5-targeted-intake.json",
 );
+const ROUND5_POLICY_C_WAVEFORM_ROBUSTNESS = path.join(
+  "docs",
+  "evidence",
+  "western-strings-round5-policy-c-waveform-robustness-20260724.json",
+);
 const ROUND5_SEGMENT_EDIT_PATH_REPORT = path.join(
   "data",
   "experiments",
@@ -1722,6 +1727,123 @@ async function auditFlatEvidenceSourceBinding(evidence) {
     blockingReasons.push("flat-evidence-source-aggregate-mismatch");
   }
   return { ready: blockingReasons.length === 0, fileCount: rows.length, aggregateSha256, blockingReasons };
+}
+
+async function summarizeRound5PolicyCWaveformRobustness({
+  reportPath = ROUND5_POLICY_C_WAVEFORM_ROBUSTNESS,
+} = {}) {
+  const evidence = await readJson(reportPath);
+  const sourceAudit = evidence
+    ? await auditFlatEvidenceSourceBinding(evidence)
+    : {
+        ready: false,
+        fileCount: 0,
+        aggregateSha256: "",
+        blockingReasons: ["round5-policy-c-waveform-evidence-missing"],
+      };
+  const independence = evidence?.independenceAudit || {};
+  const sample = evidence?.sample || {};
+  const energy = evidence?.energyAbsence || {};
+  const targetPitch = evidence?.targetPitchAbsence || {};
+  const boundaryValid = Boolean(
+    evidence?.scope === "consumed-multi-device-room-diagnostic-only"
+      && evidence?.evidenceRole === "diagnostic-only"
+      && evidence?.studentFacing === false
+      && evidence?.automaticAccusationReady === false
+      && evidence?.reviewAssistPromotionReady === false
+      && evidence?.promotionEvidenceEligible === false
+      && evidence?.freshBlindPromotionEligible === false
+      && evidence?.round5Consumed === true
+      && evidence?.thresholdRetunedOnRound5 === false
+      && energy?.energyRobustnessReady === false
+      && targetPitch?.targetPitchRobustnessReady === false
+  );
+  const independenceLimitationsCurrent = Boolean(
+    independence?.thresholdSelectionUsesRound5 === false
+      && independence?.round5LabelsPreviouslyInspected === true
+      && independence?.round5AudioPreviouslyEvaluated === true
+      && independence?.samePerformersAcrossSplits === true
+      && independence?.sameDevicesAcrossSplits === true
+      && independence?.roomPerfectlyConfoundedWithSplit === true
+      && independence?.positionTargetsScoreContextConfounded === true
+  );
+  const denominatorCurrent = Boolean(
+    Number(sample?.recordings) === 12
+      && Number(sample?.scorePositions) === 672
+      && Number(sample?.missingPositives) === 12
+      && Number(sample?.missingConfusionNegatives) === 24
+      && Number(sample?.performers) === 2
+      && Number(sample?.devices) === 3
+      && Number(sample?.rooms) === 2
+  );
+  const thresholdsCurrent = Boolean(
+    Number(energy?.frozenThreshold?.threshold) === -134.825302
+      && energy?.frozenThreshold?.selectionDomain
+        === "r2-01 waveform-injection-v2 (3 seeds)"
+      && Number(targetPitch?.frozenThreshold?.threshold) === 0
+      && targetPitch?.frozenThreshold?.selectionDomain
+        === "r2-01 waveform-injection-v2 (3 seeds)"
+  );
+  const requiredEvidenceReasons = [
+    "round5-consumed-diagnostic-not-promotion-evidence",
+    "round5-position-targets-score-context-confounded",
+    "round5-room-perfectly-confounded-with-split",
+    "independent-cross-performer-device-fresh-evidence-missing",
+  ];
+  const evidenceReasons = Array.isArray(evidence?.blockingReasons)
+    ? evidence.blockingReasons
+    : [];
+  const limitationsExplicit = requiredEvidenceReasons.every(
+    (reason) => evidenceReasons.includes(reason),
+  );
+  const blockingReasons = normalizedReasonList([
+    ...(!evidence ? ["round5-policy-c-waveform-evidence-missing"] : []),
+    ...(evidence && evidence.contract
+      !== "western-round5-policy-c-waveform-robustness-diagnostic-v1"
+      ? ["round5-policy-c-waveform-contract-invalid"]
+      : []),
+    ...(!boundaryValid ? ["round5-policy-c-waveform-safety-boundary-invalid"] : []),
+    ...(!independenceLimitationsCurrent
+      ? ["round5-policy-c-waveform-independence-audit-invalid"]
+      : []),
+    ...(!denominatorCurrent ? ["round5-policy-c-waveform-denominator-invalid"] : []),
+    ...(!thresholdsCurrent ? ["round5-policy-c-waveform-threshold-binding-invalid"] : []),
+    ...(!limitationsExplicit
+      ? ["round5-policy-c-waveform-limitations-not-explicit"]
+      : []),
+    ...(sourceAudit.blockingReasons || []),
+  ]);
+  return {
+    contract: evidence?.contract || null,
+    source: reportPath.replace(/\\/g, "/"),
+    scope: evidence?.scope || null,
+    auditReady: blockingReasons.length === 0,
+    sourceCurrent: sourceAudit.ready === true,
+    sourceFileCount: sourceAudit.fileCount,
+    sourceAggregateSha256: sourceAudit.aggregateSha256 || null,
+    safetyBoundaryValid: boundaryValid,
+    independenceLimitationsCurrent,
+    denominatorCurrent,
+    thresholdsCurrent,
+    sample: evidence?.sample || null,
+    thresholdRetunedOnRound5: evidence?.thresholdRetunedOnRound5 === true,
+    promotionEvidenceEligible: evidence?.promotionEvidenceEligible === true,
+    freshBlindPromotionEligible: evidence?.freshBlindPromotionEligible === true,
+    energyRobustnessReady: false,
+    targetPitchRobustnessReady: false,
+    energyAbsence: {
+      threshold: energy?.frozenThreshold?.threshold ?? null,
+      pooled: energy?.round5Diagnostic?.pooled || null,
+      split: energy?.round5Diagnostic?.split || null,
+    },
+    targetPitchAbsence: {
+      threshold: targetPitch?.frozenThreshold?.threshold ?? null,
+      pooled: targetPitch?.round5Diagnostic?.pooled || null,
+      split: targetPitch?.round5Diagnostic?.split || null,
+    },
+    evidenceBlockingReasons: normalizedReasonList(evidenceReasons),
+    blockingReasons,
+  };
 }
 
 export async function summarizeRound6CounterbalancedCapture({
@@ -4142,6 +4264,7 @@ async function buildOrdinaryDynamicShadowStatus() {
     acceptanceArtifact,
     reviewAssistRuntime,
     reviewAssistCalibrationPack,
+    round5PolicyCWaveformRobustness,
     round5TargetedIntake,
     round6CounterbalancedCapture,
   ] = await Promise.all([
@@ -4149,6 +4272,7 @@ async function buildOrdinaryDynamicShadowStatus() {
     hashWorkspaceArtifact(ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE),
     auditOrdinaryReviewAssistRuntime(),
     auditRound5ReviewAssistCalibrationPack(),
+    summarizeRound5PolicyCWaveformRobustness(),
     summarizeRound5TargetedIntake(),
     summarizeRound6CounterbalancedCapture(),
   ]);
@@ -4233,6 +4357,7 @@ async function buildOrdinaryDynamicShadowStatus() {
       nonPlanted: policyC?.nonPlanted || null,
       combinedPrecisionProxy: policyC?.combinedPrecisionProxy ?? null,
       energyRobustnessReady: policyC?.energyEvidence?.energyRobustnessReady === true,
+      waveformRobustnessDiagnostic: round5PolicyCWaveformRobustness,
       outputSemantics: policyC?.outputSemantics || null,
       blockingReasons: normalizedReasonList([
         ...(policyCLiveAudit.blockingReasons || []),

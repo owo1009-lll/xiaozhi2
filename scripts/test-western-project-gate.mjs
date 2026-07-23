@@ -712,6 +712,46 @@ assert.equal(policyC?.nonPlanted?.selfCheckHints, 3);
 assert.equal(policyC?.nonPlanted?.total, 253);
 assert.equal(policyC?.energyRobustnessReady, false, "assignment-gap evidence is not waveform-energy robustness evidence");
 assert.deepEqual(policyC?.blockingReasons, []);
+const waveformRobustness = policyC?.waveformRobustnessDiagnostic;
+assert.equal(
+  waveformRobustness?.contract,
+  "western-round5-policy-c-waveform-robustness-diagnostic-v1",
+);
+assert.equal(
+  waveformRobustness?.auditReady,
+  true,
+  "the consumed Round-5 waveform diagnostic must remain hash-current and fail closed",
+);
+assert.equal(waveformRobustness?.sourceCurrent, true);
+assert.equal(waveformRobustness?.sourceFileCount, 36);
+assert.equal(waveformRobustness?.safetyBoundaryValid, true);
+assert.equal(waveformRobustness?.independenceLimitationsCurrent, true);
+assert.equal(waveformRobustness?.denominatorCurrent, true);
+assert.equal(waveformRobustness?.thresholdsCurrent, true);
+assert.equal(waveformRobustness?.thresholdRetunedOnRound5, false);
+assert.equal(waveformRobustness?.promotionEvidenceEligible, false);
+assert.equal(waveformRobustness?.freshBlindPromotionEligible, false);
+assert.equal(waveformRobustness?.energyRobustnessReady, false);
+assert.equal(waveformRobustness?.targetPitchRobustnessReady, false);
+assert.equal(waveformRobustness?.sample?.recordings, 12);
+assert.equal(waveformRobustness?.sample?.scorePositions, 672);
+assert.equal(waveformRobustness?.sample?.missingPositives, 12);
+assert.equal(waveformRobustness?.sample?.missingConfusionNegatives, 24);
+assert.equal(waveformRobustness?.energyAbsence?.pooled?.truePositive, 0);
+assert.equal(waveformRobustness?.energyAbsence?.pooled?.falsePositive, 0);
+assert.equal(waveformRobustness?.targetPitchAbsence?.pooled?.truePositive, 5);
+assert.equal(waveformRobustness?.targetPitchAbsence?.pooled?.falsePositive, 49);
+assert.deepEqual(waveformRobustness?.blockingReasons, []);
+assert(
+  waveformRobustness?.evidenceBlockingReasons?.includes(
+    "round5-consumed-diagnostic-not-promotion-evidence",
+  ),
+);
+assert(
+  waveformRobustness?.evidenceBlockingReasons?.includes(
+    "round5-room-perfectly-confounded-with-split",
+  ),
+);
 const policyCRuntime = controlled.ordinaryDynamicShadow?.policyCReviewAssistRuntime;
 assert.equal(policyCRuntime?.contract, "western-round4-policy-c-review-assist-v1");
 assert.equal(policyCRuntime?.ready, true, "Policy C must be present in the latest physical teacher-review batch");

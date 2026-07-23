@@ -12,11 +12,15 @@ Policy C 采用两层输出，不能把两层合并成“自动判错”：
 2. `self_check_hint`：未确诊，且
    `m3plusTimingAssignmentAvailable !== true`；它只表示 Basic Pitch/DTW 没有给该谱面音分配到事件，只能提示自查，不能指控演奏错误。
 
-这不是 `voicedFrameRatio < 0.2` 的波形能量规则。本轮没有直接测量或冻结波形能量阈值，报告必须保持：
+这不是 `voicedFrameRatio < 0.2` 的波形能量规则。权威 Round 4 Policy C
+报告没有直接测量或冻结波形能量阈值，报告必须保持：
 
 - `waveformEnergyMeasured: false`
 - `energyRobustnessReady: false`
 - `autoAccusationReady: false`
+
+2026-07-24 新增的 Round 5 波形审计是独立的、已消费数据上的诊断证据，
+不会回写上述 Policy C 契约或改变这三个字段。
 
 ## round4 冻结结果
 
@@ -65,6 +69,6 @@ Policy C 采用两层输出，不能把两层合并成“自动判错”：
 - 节奏通道：字段并非空置，round4 有 246/265 行 relative-IOI 证据；冻结单阈值 0.15 虽抓到 5/6 个 drag/extra，却产生 37 个误报。后续多信号结构合取在旧证据上的回顾性上限较高，但 2026-07-23 原样投向 complete-inventory Round 5 后，soft 与 strict 层均只有 `4/12 @ 0 FP`、P/R=`100%/33.33%`，extra、drag 各 `2/6`，低于 50% recall 地板。v2 位置审计还证明固定 extra+drag 槽可由纯谱面上下文在 calibration/fresh 两侧各自 `12/12 @ 0/324 FP` 识别，所以原始零误报不能单独证明演奏 precision 泛化。该候选不晋升，下一包必须反向轮换目标角色并在录音前通过全谱位置预检；正式确诊仍为 2/12。
 - gap 严格候选：原始 gap 精炼在公开专业长曲有 595 个提示，因此只保留为自查；recording-level 对齐健康守卫（gap `<=5` 且 rate `<=10%`）在旧证据上的回顾数字不能替代新验收。Round 5 gap 自查实际为 `1/12 @ 1 FP`，missing-targeted 严格层为 `1/6 @ 1 FP`，同时违反 precision、recall 与 `FP=0`，故失败，正式确诊仍为 2/12。
 - 片段模型：同一 Round 5 首跑中，固定 gate-specific baseline 的 extra 数值达到 `3/6 @ 0/12 confusion FP`、P/R=`100%/50%`，其余三类失败；但录音后证据审计发现 fresh-extra 的标签可被纯谱面前一音程完全分开，而模型使用了该静态特征，因此 extra 只保留“数值过线”记录，不构成教师复核晋升证据。calibration 的 merged/missing/drag 也存在同类位置混杂，排除静态谱面特征后无稳定候选。有效 `promotedGates=[]`，旧包禁止调参重考；下一轮必须先做位置配平预检，再重采 calibration 与 untouched fresh。学生自动指控仍关闭。
-- 能量/目标音高归因：现已对 authoritative assignment gaps 重建邻接时间窗。直接 RMS 在合成开发/holdout 可达 P=100%、R=73.33%/60.00%，但阈值约为 `-134.83dB`，本质只学到了注入器制造的数字静音；round4 真实漏音召回为 0/3。pYIN 目标音高占用率在合成 P=100%、R=73.33%/80.00%，到 round4 则为 P/R=42.86%/100%，因为 3 个真实漏音和其余 4 个 assignment gaps 的目标音高占用率都为 0。两条都证明合成到真实域失效，不能进入复核提示或指控。下一轮必须在手机麦、不同房间/演奏者的全新录音中同时收漏音正例与滑音、错音、邻音延长、普通对齐缺口混淆负例，再建立独立 fresh-blind 闸。
+- 能量/目标音高归因：现已对 authoritative assignment gaps 重建邻接时间窗。直接 RMS 在合成开发/holdout 可达 P=100%、R=73.33%/60.00%，但阈值约为 `-134.83dB`，本质只学到了注入器制造的数字静音；round4 真实漏音召回为 0/3。pYIN 目标音高占用率在合成 P=100%、R=73.33%/80.00%，到 round4 则为 P/R=42.86%/100%，因为 3 个真实漏音和其余 4 个 assignment gaps 的目标音高占用率都为 0。2026-07-24 又把同一冻结阈值、不经 Round 5 调参地投向 12 条真实录音和完整 672 位置分母：RMS 为 `0/12 @ 0/660 FP`；目标音高缺失为 `5/12 @ 49/660 FP`，P/R=`9.26%/41.67%`，fresh 房间只有 `1/6 @ 23 FP`。两条都再次证明合成到真实域失效，不能进入复核提示或指控。Round 5 已消费、目标位置有谱面上下文混杂，且 room-1/room-2 与 calibration/fresh 完全共线，因此该结果只是固定阈值的跨房间诊断，不是独立跨设备/演奏者晋升证据。继续调这两个单阈值已经止损；下一次可晋升尝试必须使用反向轮换位置的全新包，并把能量/音高占用只作为结构或学习候选的输入之一，在 untouched fresh 上重新过 `90%/50%/0` 真闸。
 - 学生端：三个 `WESTERN_STUDENT_RUNTIME_GATE` 开关继续为 `false`；本证据不授予自动反馈权限。
 - 样本边界：12/253 足够冻结本轮复核辅助候选，不足以证明跨设备自动指控可靠。
