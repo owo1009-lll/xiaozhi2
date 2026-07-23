@@ -23,7 +23,7 @@ Round 5 的音频与 cal/fresh 映射无误，但标签位置混杂：
 - `strict FP=0` 的分母不是 12 个预设混淆槽位：对每个 gate，fresh 中**每一个谱面位置**只要不是该 gate 的签署正例，就必须计为严格负例；普通未列位置、其他 gate 正例和其他 gate 对照均不得漏算；
 - fresh-blind 只允许一次，不得用 Round 4/5 音频替代。
 - 评测协议已在音频到位前冻结为 `config/western-strings-round6-evaluation-protocol.json`：逐 gate 固定随机森林现在使用完整谱面位置分母，并与 gap refinement/strict、rhythm structural/strict 一同冻结；固定参数、0.5 决策点和门槛均不得在 fresh 后修改。
-- `western:round6-frozen-eval` 在读取 fresh 前先写一次性 consumed ledger；运行崩溃也视为 fresh 已消费，后续新候选必须换全新未触碰采集包。
+- `western:round6-frozen-eval` 在读取 fresh 前先写一次性 consumed ledger；运行崩溃也视为 fresh 已消费，后续新候选必须换全新未触碰采集包。候选返回后，runner 还会把两 split、四 gate 的全谱位置数、签署正例、混淆负例、其他 gate 事件、普通未列位置和总数据行数与 intake 逐项复算；缺字段或任一分母不一致都记为评测失败，不得形成晋升证据。
 
 ## 生成与录前验证
 
