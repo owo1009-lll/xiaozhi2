@@ -95,6 +95,7 @@ def source_audit(repo: Path, protocol: dict[str, Any]) -> tuple[list[dict[str, A
     required = {
         "execution-guard",
         "candidate-runner",
+        "feature-extractor",
         "temporal-operation-policy",
         "intake-validator",
         "audio-feature-analyzer",
@@ -152,10 +153,10 @@ def validate_protocol(repo: Path, protocol_path: Path) -> dict[str, Any]:
     if protocol.get("automaticAuthorizationGranted") is not False:
         blockers.append("round6-evaluation-authorization-boundary-invalid")
     candidate = protocol.get("candidate") or {}
-    if candidate.get("modelFamily") != "fixed-random-forest-binary-per-gate":
+    if candidate.get("modelFamily") != "full-score-fixed-random-forest-binary-per-gate":
         blockers.append("round6-evaluation-model-family-invalid")
     if candidate.get("allowedCandidateFamilies") != [
-        "fixed-random-forest-binary-per-gate",
+        "full-score-fixed-random-forest-binary-per-gate",
         "frozen-gap-refinement-self-check",
         "frozen-gap-strict-missing",
         "frozen-rhythm-structural-self-check",
@@ -164,6 +165,10 @@ def validate_protocol(repo: Path, protocol_path: Path) -> dict[str, Any]:
         blockers.append("round6-evaluation-candidate-families-invalid")
     if candidate.get("postFreshRetuningAllowed") is not False:
         blockers.append("round6-evaluation-retuning-boundary-invalid")
+    if candidate.get("strictFalseAccusationDenominator") != (
+        "every fresh score position not signed positive for the evaluated gate"
+    ):
+        blockers.append("round6-evaluation-false-accusation-denominator-invalid")
     interpretation = protocol.get("interpretation") or {}
     for field in (
         "numericPassIsEvidenceNotReleaseAuthorization",
@@ -210,6 +215,13 @@ def candidate_semantics_blockers(module: ModuleType, protocol: dict[str, Any]) -
     blockers = []
     if str(getattr(module, "CONTRACT", "")) != candidate.get("sourceContract"):
         blockers.append("round6-evaluation-candidate-contract-mismatch")
+    if str(getattr(module, "MODEL_FAMILY", "")) != candidate.get("modelFamily"):
+        blockers.append("round6-evaluation-model-family-mismatch")
+    if (
+        str(getattr(module, "STRICT_FALSE_ACCUSATION_DENOMINATOR", ""))
+        != candidate.get("strictFalseAccusationDenominator")
+    ):
+        blockers.append("round6-evaluation-false-accusation-denominator-mismatch")
     if tuple(getattr(module, "GATES", ())) != EXPECTED_GATES:
         blockers.append("round6-evaluation-candidate-gates-mismatch")
     if dict(getattr(module, "MODEL_PARAMS", {})) != candidate.get("modelParams"):

@@ -830,6 +830,14 @@ assert.equal(
   round6CounterbalancedCapture?.evaluationProtocol?.freshUsedForSelection,
   false,
 );
+assert.equal(
+  round6CounterbalancedCapture?.evaluationProtocol?.candidateModelFamily,
+  "full-score-fixed-random-forest-binary-per-gate",
+);
+assert.equal(
+  round6CounterbalancedCapture?.evaluationProtocol?.strictFalseAccusationDenominator,
+  "every fresh score position not signed positive for the evaluated gate",
+);
 assert.equal(round6CounterbalancedCapture?.studentFacing, false);
 assert.equal(round6CounterbalancedCapture?.automaticAccusationReady, false);
 assert.equal(round5TargetedIntake?.segmentEditPathCandidate?.studentFacing, false);

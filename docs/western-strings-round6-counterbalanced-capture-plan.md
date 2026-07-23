@@ -20,8 +20,9 @@ Round 5 的音频与 cal/fresh 映射无误，但标签位置混杂：
 - 每类 gate 共 12 正例、24 混淆负例；fresh 为 6 正例、12 混淆负例；
 - 每个 gate 的每个目标位置在同谱三次录音中恰好出现 1 次正例和 2 次负例；
 - 自动指控数字仍用原门槛 `P>=0.90 / R>=0.50 / strict FP=0`，没有用 Round 5 结果降门槛；
+- `strict FP=0` 的分母不是 12 个预设混淆槽位：对每个 gate，fresh 中**每一个谱面位置**只要不是该 gate 的签署正例，就必须计为严格负例；普通未列位置、其他 gate 正例和其他 gate 对照均不得漏算；
 - fresh-blind 只允许一次，不得用 Round 4/5 音频替代。
-- 评测协议已在音频到位前冻结为 `config/western-strings-round6-evaluation-protocol.json`：只允许既有的逐 gate 固定随机森林、gap refinement/strict 和 rhythm structural/strict 五个候选族；固定参数、0.5 决策点和门槛均不得在 fresh 后修改。
+- 评测协议已在音频到位前冻结为 `config/western-strings-round6-evaluation-protocol.json`：逐 gate 固定随机森林现在使用完整谱面位置分母，并与 gap refinement/strict、rhythm structural/strict 一同冻结；固定参数、0.5 决策点和门槛均不得在 fresh 后修改。
 - `western:round6-frozen-eval` 在读取 fresh 前先写一次性 consumed ledger；运行崩溃也视为 fresh 已消费，后续新候选必须换全新未触碰采集包。
 
 ## 生成与录前验证
@@ -34,6 +35,7 @@ npm run test:western-round6-project-status
 npm run test:western-round5-truth-signoff-pack
 npm run test:western-round6-truth-signoff-apply
 npm run test:western-round6-frozen-eval
+npm run test:western-round6-full-score-candidate
 npm run western:project-status
 ```
 
@@ -46,7 +48,7 @@ npm run western:project-status
 - `rhythmConfoundedSplits=[]`；
 - 预检 `audioRead=false`，不使用任何录音或表现标签。
 - 项目状态节点 `tracks.controlledCandidate.ordinaryDynamicShadow.round6CounterbalancedCapture` 从磁盘重算分母和材料，并把 position preflight、intake 分别绑定到当前 contract/manifest/truth 哈希；
-- 同一节点还现场重哈希评测协议绑定的执行守卫、候选 runner、temporal-operation 规则、intake validator、音频特征分析器和 Round 6 合同；当前 `evaluationProtocol.runnerReady=true`、`freshBlindConsumed=false`、`evaluationPerformed=false`；
+- 同一节点还现场重哈希评测协议绑定的执行守卫、全谱候选 runner、历史特征提取器、temporal-operation 规则、intake validator、音频特征分析器和 Round 6 合同；当前 `evaluationProtocol.runnerReady=true`、`freshBlindConsumed=false`、`evaluationPerformed=false`；
 - 当前该节点为 `readyForRecording=true`、`intakeReady=false`。篡改 truth、manifest 或合同后，旧报告不会继续显示绿灯。
 
 私密材料位于 `data/private/western-strings-round6-counterbalanced/`。该目录不入 Git。
@@ -80,6 +82,6 @@ npm run western:project-status
    npm run western:round6-frozen-eval
    ```
 
-   runner 只用 calibration 训练/检查候选，fresh 不参与选型；fresh 开始读取前即写 consumed ledger。任何数值过门只形成晋升证据，不等于发布授权，`automaticAccusationReady` 和学生端开关仍保持 false，必须另走显式发布决定。
+   runner 只用 calibration 训练/检查候选，fresh 不参与选型；fresh 开始读取前即写 consumed ledger。评测器会把 fresh 的全部谱面位置逐 gate 展开，除该 gate 签署正例外全部计入严格假阳分母，不能只在预设混淆槽位上报 `0 FP`。任何数值过门只形成晋升证据，不等于发布授权，`automaticAccusationReady` 和学生端开关仍保持 false，必须另走显式发布决定。
 
 当前 intake 只证明设计分母完整：12 条、144 事件、四类各 `12/24`，fresh 各 `6/12`。它保持 `ready=false`；项目状态现场重算的待补量为 12 条音频、12 条同意、12 条许可、144 个 `asPerformed` 和 12 个完整错误清单。签署页和 frozen eval 当前都会因输入未到位而非零退出；后者保持 `freshBlindConsumed=false`，不会提前读取或消耗 fresh。这是正确的 fail-closed 状态。

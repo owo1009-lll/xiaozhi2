@@ -14,10 +14,16 @@
       "role": "execution-guard",
       "path": "scripts/run_western_round6_frozen_evaluation.py",
       "hashMode": "lf-normalized-sha256",
-      "sha256": "6ab8449b22d157448776f09453818cd52f2dab288af3523f7ff6c58ef5c92b1f"
+      "sha256": "d210d506845177487664d88e4ec5f34d8406f91cee9651e5615a2da871e98f24"
     },
     {
       "role": "candidate-runner",
+      "path": "scripts/experiments/train_western_round6_full_score_candidate.py",
+      "hashMode": "lf-normalized-sha256",
+      "sha256": "334ede61ecdcdd83b53c43b9f4d2aaac92606379bcbefa533f28664897525aa8"
+    },
+    {
+      "role": "feature-extractor",
       "path": "scripts/experiments/train_western_round5_segment_edit_path.py",
       "hashMode": "lf-normalized-sha256",
       "sha256": "145f7d744b65557e7d304926833e385ecc4bf867ad8e3cbc035a7903bc481f92"
@@ -69,8 +75,9 @@
     "scorePositionCounterbalanceRequired": true
   },
   "candidate": {
-    "sourceContract": "western-round5-segment-edit-path-candidate-v1",
-    "modelFamily": "fixed-random-forest-binary-per-gate",
+    "sourceContract": "western-round6-full-score-candidate-v1",
+    "modelFamily": "full-score-fixed-random-forest-binary-per-gate",
+    "strictFalseAccusationDenominator": "every fresh score position not signed positive for the evaluated gate",
     "modelParams": {
       "n_estimators": 256,
       "max_depth": 4,
@@ -86,7 +93,7 @@
       "rhythmStrict": "western-round5-frozen-rhythm-strict-issue-candidate-v1"
     },
     "allowedCandidateFamilies": [
-      "fixed-random-forest-binary-per-gate",
+      "full-score-fixed-random-forest-binary-per-gate",
       "frozen-gap-refinement-self-check",
       "frozen-gap-strict-missing",
       "frozen-rhythm-structural-self-check",

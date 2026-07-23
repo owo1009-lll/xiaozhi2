@@ -24,6 +24,7 @@ def main() -> int:
         roles = {
             "execution-guard": "scripts/guard.py",
             "candidate-runner": "scripts/candidate.py",
+            "feature-extractor": "scripts/feature_extractor.py",
             "temporal-operation-policy": "scripts/temporal.py",
             "intake-validator": "scripts/intake.py",
             "audio-feature-analyzer": "scripts/audio.py",
@@ -80,8 +81,11 @@ def main() -> int:
                 "scorePositionCounterbalanceRequired": True,
             },
             "candidate": {
-                "sourceContract": "western-round5-segment-edit-path-candidate-v1",
-                "modelFamily": "fixed-random-forest-binary-per-gate",
+                "sourceContract": "western-round6-full-score-candidate-v1",
+                "modelFamily": "full-score-fixed-random-forest-binary-per-gate",
+                "strictFalseAccusationDenominator": (
+                    "every fresh score position not signed positive for the evaluated gate"
+                ),
                 "modelParams": model_params,
                 "frozenRuleContracts": {
                     "gapRefinement": "gap-refinement",
@@ -90,7 +94,7 @@ def main() -> int:
                     "rhythmStrict": "rhythm-strict",
                 },
                 "allowedCandidateFamilies": [
-                    "fixed-random-forest-binary-per-gate",
+                    "full-score-fixed-random-forest-binary-per-gate",
                     "frozen-gap-refinement-self-check",
                     "frozen-gap-strict-missing",
                     "frozen-rhythm-structural-self-check",
@@ -116,7 +120,11 @@ def main() -> int:
         (root / "data/private/truth.json").write_text("{}\n", encoding="utf-8")
 
         candidate = SimpleNamespace(
-            CONTRACT="western-round5-segment-edit-path-candidate-v1",
+            CONTRACT="western-round6-full-score-candidate-v1",
+            MODEL_FAMILY="full-score-fixed-random-forest-binary-per-gate",
+            STRICT_FALSE_ACCUSATION_DENOMINATOR=(
+                "every fresh score position not signed positive for the evaluated gate"
+            ),
             GATES=MODULE.EXPECTED_GATES,
             MODEL_PARAMS=model_params,
             FROZEN_GAP_REFINEMENT_CONTRACT="gap-refinement",
@@ -166,6 +174,7 @@ def main() -> int:
         assert not (root / protocol["paths"]["consumedLedger"]).exists()
 
         stale_source = root / roles["temporal-operation-policy"]
+        original_source = stale_source.read_text(encoding="utf-8")
         stale_source.write_text("changed\n", encoding="utf-8")
         stale = MODULE.run(
             repo_root=root,
@@ -179,7 +188,7 @@ def main() -> int:
             "blockingReasons"
         ]
         assert calls["evaluation"] == 0
-        stale_source.write_text("source-2\n", encoding="utf-8")
+        stale_source.write_text(original_source, encoding="utf-8")
 
         completed = MODULE.run(
             repo_root=root,

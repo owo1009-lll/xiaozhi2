@@ -182,6 +182,7 @@ try {
   const evaluationSources = {
     "execution-guard": "evaluation/guard.py",
     "candidate-runner": "evaluation/candidate.py",
+    "feature-extractor": "evaluation/feature-extractor.py",
     "temporal-operation-policy": "evaluation/temporal.py",
     "intake-validator": "evaluation/intake.py",
     "audio-feature-analyzer": "evaluation/audio.py",
@@ -224,8 +225,10 @@ try {
       scorePositionCounterbalanceRequired: true,
     },
     candidate: {
-      sourceContract: "western-round5-segment-edit-path-candidate-v1",
-      modelFamily: "fixed-random-forest-binary-per-gate",
+      sourceContract: "western-round6-full-score-candidate-v1",
+      modelFamily: "full-score-fixed-random-forest-binary-per-gate",
+      strictFalseAccusationDenominator:
+        "every fresh score position not signed positive for the evaluated gate",
       modelParams: {
         n_estimators: 256,
         max_depth: 4,
@@ -241,7 +244,7 @@ try {
         rhythmStrict: "western-round5-frozen-rhythm-strict-issue-candidate-v1",
       },
       allowedCandidateFamilies: [
-        "fixed-random-forest-binary-per-gate",
+        "full-score-fixed-random-forest-binary-per-gate",
         "frozen-gap-refinement-self-check",
         "frozen-gap-strict-missing",
         "frozen-rhythm-structural-self-check",
@@ -277,6 +280,14 @@ try {
   assert.equal(ready.readyForRecording, true);
   assert.equal(ready.bindings.evaluationProtocol, true);
   assert.equal(ready.evaluationProtocol.runnerReady, true);
+  assert.equal(
+    ready.evaluationProtocol.candidateModelFamily,
+    "full-score-fixed-random-forest-binary-per-gate",
+  );
+  assert.equal(
+    ready.evaluationProtocol.strictFalseAccusationDenominator,
+    "every fresh score position not signed positive for the evaluated gate",
+  );
   assert.equal(ready.evaluationProtocol.freshBlindConsumed, false);
   assert.equal(ready.evaluationProtocol.evaluationPerformed, false);
   assert.equal(ready.intakeReady, false);
