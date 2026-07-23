@@ -340,16 +340,36 @@ def extract_segment_features(
     return features
 
 
+def select_recording_specs(
+    manifest_path: Path,
+    truth_path: Path,
+    allowed_splits: set[str] | None = None,
+) -> list[tuple[str, dict[str, str], dict[str, Any]]]:
+    with manifest_path.open(encoding="utf-8-sig", newline="") as handle:
+        manifest = list(csv.DictReader(handle))
+    truth = read_json(truth_path)["recordings"]
+    selected = []
+    for metadata in manifest:
+        if allowed_splits is not None and metadata["split"] not in allowed_splits:
+            continue
+        recording_id = metadata["recordingId"]
+        if recording_id not in truth:
+            raise ValueError(f"round5-truth-recording-missing:{recording_id}")
+        selected.append((recording_id, metadata, truth[recording_id]))
+    return selected
+
+
 def build_dataset(
     manifest_path: Path,
     truth_path: Path,
+    allowed_splits: set[str] | None = None,
 ) -> list[dict[str, Any]]:
-    with manifest_path.open(encoding="utf-8-sig", newline="") as handle:
-        manifest = {row["recordingId"]: row for row in csv.DictReader(handle)}
-    truth = read_json(truth_path)["recordings"]
     dataset = []
-    for recording_id, truth_recording in truth.items():
-        metadata = manifest[recording_id]
+    for recording_id, metadata, truth_recording in select_recording_specs(
+        manifest_path,
+        truth_path,
+        allowed_splits,
+    ):
         score_path = REPO / metadata["scorePath"]
         audio_path = REPO / metadata["audioPath"]
         take = analyze_take(score_path, audio_path)
@@ -367,6 +387,9 @@ def build_dataset(
                 "split": metadata["split"],
                 "gate": event["gate"],
                 "label": event["label"],
+                "eventId": event.get("eventId"),
+                "asPerformed": event.get("asPerformed"),
+                "confusionKind": event.get("confusionKind"),
                 "noteIndex": note_index,
                 "features": extract_segment_features(take, note_index),
             })

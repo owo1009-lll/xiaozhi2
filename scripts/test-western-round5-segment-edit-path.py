@@ -154,6 +154,30 @@ def main() -> int:
 
     with tempfile.TemporaryDirectory() as temp:
         root = Path(temp)
+        manifest = root / "manifest.csv"
+        truth = root / "truth.json"
+        manifest.write_text(
+            "recordingId,split\nr5-cal-test,calibration\nr5-fresh-test,fresh-blind\n",
+            encoding="utf-8",
+        )
+        truth.write_text(json.dumps({
+            "recordings": {
+                "r5-cal-test": {"events": [{"gate": "missing"}]},
+                # Deliberately not a usable recording payload: calibration-only
+                # selection must not inspect fresh event fields.
+                "r5-fresh-test": {"poison": True},
+            },
+        }), encoding="utf-8")
+        selected = MODULE.select_recording_specs(
+            manifest,
+            truth,
+            {"calibration"},
+        )
+        assert [item[0] for item in selected] == ["r5-cal-test"]
+        assert selected[0][2]["events"][0]["gate"] == "missing"
+
+    with tempfile.TemporaryDirectory() as temp:
+        root = Path(temp)
         contract = root / "contract.json"
         manifest = root / "manifest.csv"
         truth = root / "truth.json"
