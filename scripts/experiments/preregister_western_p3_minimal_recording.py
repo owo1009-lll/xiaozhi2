@@ -32,7 +32,13 @@ ROUND6_MANIFEST = ROUND6_ROOT / "manifest.csv"
 ROUND6_TRUTH = ROUND6_ROOT / "position-truth.json"
 TRUTH_SIGNOFF_GENERATOR = REPO / "scripts/generate-western-round5-truth-signoff-pack.mjs"
 TRUTH_SIGNOFF_APPLIER = REPO / "scripts/apply-western-truth-signoff.mjs"
+STAGED_SIGNOFF_SUPPORT = (
+    REPO / "scripts/western-round6-staged-signoff-support.mjs"
+)
 STAGE_A_SAFETY_RUNNER = REPO / "scripts/run_western_round6_stage_a_safety.py"
+FROZEN_EVALUATION_RUNNER = (
+    REPO / "scripts/run_western_round6_frozen_evaluation.py"
+)
 ROUND6_CANDIDATE_RUNNER = (
     REPO / "scripts/experiments/train_western_round6_full_score_candidate.py"
 )
@@ -329,6 +335,32 @@ def build_report() -> dict[str, Any]:
                 candidate["strictFalseAccusationDenominator"]
             ),
             "postFreshRetuningAllowed": candidate["postFreshRetuningAllowed"],
+            "trainingDuringFreshAllowed": False,
+            "frozenStageAModelReuseRequired": True,
+            "operations": {
+                "truthSignoffPackCommand": (
+                    "npm run western:round6-stage-b-truth-signoff-pack"
+                ),
+                "truthSignoffApplyCommand": (
+                    "npm run western:round6-stage-b-truth-signoff-apply -- "
+                    "--completed <path> --apply"
+                ),
+                "signoffLineagePath": (
+                    "data/experiments/"
+                    "western-strings-round6-stage-b-signoff/ledger.json"
+                ),
+                "frozenModelPath": (
+                    "data/experiments/"
+                    "western-strings-round6-stage-a-safety/model.joblib"
+                ),
+                "evaluationCommand": "npm run western:round6-frozen-eval",
+                "evaluationRunnerPath": report_path(
+                    FROZEN_EVALUATION_RUNNER
+                ),
+                "freshAudioMayBeReadOnce": True,
+                "calibrationMayBeResigned": False,
+                "candidateMayBeRefit": False,
+            },
             "numericPassIsReleaseAuthorization": False,
         },
         "discipline": {
@@ -336,6 +368,7 @@ def build_report() -> dict[str, Any]:
             "freshReadDuringStageA": False,
             "retuneAfterCleanSafety": False,
             "retuneAfterFresh": False,
+            "round6UnscopedTruthSignoffAllowed": False,
             "studentSwitchesRemainFalse": True,
             "failClosed": True,
         },
@@ -360,6 +393,7 @@ def build_report() -> dict[str, Any]:
         TRUTH_SIGNOFF_GENERATOR,
         TRUTH_SIGNOFF_APPLIER,
         STAGE_A_SAFETY_RUNNER,
+        STAGED_SIGNOFF_SUPPORT,
         ROUND6_CANDIDATE_RUNNER,
         PACKAGE_JSON,
     )
@@ -381,6 +415,7 @@ def markdown(report: dict[str, Any]) -> str:
     limits = stage_a["cleanSafetyLimits"]
     model = stage_a["candidate"]
     operations = stage_a["operations"]
+    stage_b_operations = stage_b["operations"]
     lines = [
         "# P3 最小录音分阶段协议",
         "",
@@ -441,10 +476,22 @@ def markdown(report: dict[str, Any]) -> str:
         "每个 gate 的门槛仍为 P≥90%、R≥50%、strict FP=0，"
         "任一数值通过也不自动取得学生端发布授权。",
         "",
+        "Stage B 固定执行链：",
+        "",
+        f"1. `{stage_b_operations['truthSignoffPackCommand']}` 先验证 Stage A "
+        "通过报告、consumed ledger 和冻结模型 SHA，再只读取 6 条 fresh。",
+        f"2. 下载签署 JSON 后先 dry-run "
+        f"`{stage_b_operations['truthSignoffApplyCommand'].replace(' --apply', '')}`，"
+        "确认 calibration 投影完全不变后再加 `--apply`。",
+        f"3. 只执行一次 `{stage_b_operations['evaluationCommand']}`；"
+        "执行器只能加载 Stage A 模型，`trainingPerformed` 必须为 false，"
+        "`frozenModelLoaded` 必须为 true。",
+        "",
         "## 不变的红线",
         "",
         "- Round 4/5 不复用作验收。",
         "- Stage A 不读取 fresh；Stage B 看过结果后不回调、不重测。",
+        "- Round 6 不允许无作用域一次性签满 12 条，也不允许重新签署 calibration。",
         "- 合成召回不代表真实召回。",
         "- M4 OMR 与能量验漏音继续收线。",
         "- 学生三个开关保持 false，系统 fail-closed。",

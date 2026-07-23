@@ -668,7 +668,10 @@ def build_artifact() -> dict[str, Any]:
                         "2. 按冻结 RF 参数和 `0.5` 决策点训练，先跑既有 P1 clean 安全闸。\n"
                         "3. 任一安全上限超限就收线，省掉 6 条 fresh；strict 保持 `2/12`。\n"
                         "4. 只有 Stage A 全通过，才冻结模型并补 6 条 fresh，一次性按 "
-                        "`P≥90% / R≥50% / strict FP=0` 评测。\n\n"
+                        "`P≥90% / R≥50% / strict FP=0` 评测。Round 6 无作用域的 "
+                        "12 条签署入口已关闭；Stage B 只签 fresh 六条，并且只能复用 "
+                        "Stage A 模型，证据必须满足 `trainingPerformed=false`、"
+                        "`frozenModelLoaded=true`。\n\n"
                         f"分阶段协议语义 SHA-256：`{p3_sha}`。"
                     ),
                     "sourceId": "p3-protocol",
@@ -702,6 +705,8 @@ def build_artifact() -> dict[str, Any]:
                         "不是对总体泛化置信度的充分样本声明。\n"
                         "- Round 4/5 已消费，不复用为验收；Stage A 不读取 fresh，"
                         "Stage B 看过结果后不回调、不重测。\n"
+                        "- Stage B 签署链必须保持 calibration 投影不变；fresh 评测不得"
+                        "重新拟合候选或生成替代模型。\n"
                         "- M4 OMR 与波形能量验漏音维持收线；合成召回不代表真实召回。\n"
                         "- 三个学生开关继续为 false，系统保持 fail-closed。"
                     ),

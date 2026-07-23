@@ -248,6 +248,7 @@ const P3_MINIMAL_RECORDING_REQUIRED_SOURCE_PATHS = Object.freeze([
   "scripts/generate-western-round5-truth-signoff-pack.mjs",
   "scripts/apply-western-truth-signoff.mjs",
   "scripts/run_western_round6_stage_a_safety.py",
+  "scripts/western-round6-staged-signoff-support.mjs",
   "scripts/experiments/train_western_round6_full_score_candidate.py",
   "package.json",
 ]);
@@ -5945,7 +5946,12 @@ export function summarizeNextActions(
             (round6Schedule.stageBFreshRecordingIds || []).join(", ")
           }。`
           + "模型、特征、0.5 决策点和 90% precision / 50% recall / 0 strict-FP "
-          + "门槛不得再改；fresh 只能读取一次，数值通过也不自动授权学生端。"
+          + "门槛不得再改。录音后先运行 "
+          + "`npm run western:round6-stage-b-truth-signoff-pack`，下载完成 JSON，"
+          + "再用 `npm run western:round6-stage-b-truth-signoff-apply -- "
+          + "--completed <path>` dry-run，确认 calibration 投影不变后加 `--apply`；"
+          + "最后只运行一次 `npm run western:round6-frozen-eval`。该评测只能加载 "
+          + "Stage A 模型且不得重新训练；数值通过也不自动授权学生端。"
         )
         : round6Schedule.stageARecordingComplete === true
           && round6Schedule.stageASafetyAttemptFailedClosed !== true

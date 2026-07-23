@@ -59,7 +59,7 @@ Round 5 intake 已接入总项目状态并做实时哈希绑定。2026-07-23 当
 
 该下一轮现已落成 `western-round6-counterbalanced-diagnosis-v1` 候选包。每份谱录三次，同一位置在三次中恰好轮换为 1 次正例和 2 次混淆负例；calibration 与 fresh 各使用两份独立新谱及不重叠演奏者占位。12 槽、144 事件和四类分母已生成，v2 录前预检为全绿；这只说明**最大条件总包**的设计和材料可用，不是现在一次录满 12 条的授权，也不构成新的模型证据或召回提升。
 
-P0–P2 零录音工作随后已全部榨完：7 个可直接运行候选全部因真实干净域过度标注被淘汰；Bach10、URMP、MusicNet 共 5,326 个公开参考音符中没有独立裁定错误正例，也没有同声部正确/错误演奏对。唯一剩余的预注册候选 `performance-only-RF-v2` 必须用真实反平衡 calibration 拟合。因此 P3 语义 SHA-256=`d08bff4b76a114feaf93f4d2d00fb2e37df54660d67b0edc7d6fc1f313777a3f` 已把录制拆为两段：现在只授权 6 条 calibration；先按冻结参数训练并在既有真实 clean 域过安全闸，任一超限即收线并省掉 fresh；只有全部通过才条件追加 6 条 untouched fresh。`readyForRecording=true` 只表示技术包就绪，当前调度权威字段是 `recordingSchedule.stageARecordingAuthorizedNow=true`、`stageBFreshRecordingAuthorizedNow=false`。
+P0–P2 零录音工作随后已全部榨完：7 个可直接运行候选全部因真实干净域过度标注被淘汰；Bach10、URMP、MusicNet 共 5,326 个公开参考音符中没有独立裁定错误正例，也没有同声部正确/错误演奏对。唯一剩余的预注册候选 `performance-only-RF-v2` 必须用真实反平衡 calibration 拟合。因此 P3 语义 SHA-256=`fe5302fe816d7a436a72e8e40fe8194c28ae05bb694924a7c29102c7f2a07ccb` 已把录制拆为两段：现在只授权 6 条 calibration；先按冻结参数训练并在既有真实 clean 域过安全闸，任一超限即收线并省掉 fresh；只有全部通过才条件追加 6 条 untouched fresh。`readyForRecording=true` 只表示技术包就绪，当前调度权威字段是 `recordingSchedule.stageARecordingAuthorizedNow=true`、`stageBFreshRecordingAuthorizedNow=false`。Round 6 无作用域的一次性 12 条签署已关闭；条件 Stage B 必须先验证 Stage A 报告、consumed ledger 和模型 SHA，再只签署 fresh 六条。最终 runner 在消费 fresh 后只加载 Stage A 冻结模型，禁止重新拟合，并以 `trainingPerformed=false / frozenModelLoaded=true` 作为证据有效性硬条件。
 
 在不占用晋升分母的架构烟测中，r2-01 注入训练、r2-08 曲目留出，再投已查看 Round 4：结构特征基线为 `5/12` 命中、`6/253` 非故意位置误指控，P/R=`45.45%/41.67%`；加入固定 RMS/pYIN/onset 后降为 `1/12 @ 2/253`、P/R=`33.33%/8.33%`，且四个正确 gate 的 TP 合计为 0。两种均 `architectureCandidateRetained=false`，不接复核台；固定随机森林只保留为将来真实数据上的基线，下一模型族必须显式学习连续时序操作路径，而不是继续叠声学手工特征。
 

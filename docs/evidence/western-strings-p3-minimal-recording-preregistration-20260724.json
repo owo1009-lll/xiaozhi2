@@ -231,6 +231,19 @@
     "scorePositionCounterbalanceRequired": true,
     "strictFalseAccusationDenominator": "every fresh score position not signed positive for the evaluated gate",
     "postFreshRetuningAllowed": false,
+    "trainingDuringFreshAllowed": false,
+    "frozenStageAModelReuseRequired": true,
+    "operations": {
+      "truthSignoffPackCommand": "npm run western:round6-stage-b-truth-signoff-pack",
+      "truthSignoffApplyCommand": "npm run western:round6-stage-b-truth-signoff-apply -- --completed <path> --apply",
+      "signoffLineagePath": "data/experiments/western-strings-round6-stage-b-signoff/ledger.json",
+      "frozenModelPath": "data/experiments/western-strings-round6-stage-a-safety/model.joblib",
+      "evaluationCommand": "npm run western:round6-frozen-eval",
+      "evaluationRunnerPath": "scripts/run_western_round6_frozen_evaluation.py",
+      "freshAudioMayBeReadOnce": true,
+      "calibrationMayBeResigned": false,
+      "candidateMayBeRefit": false
+    },
     "numericPassIsReleaseAuthorization": false
   },
   "discipline": {
@@ -238,6 +251,7 @@
     "freshReadDuringStageA": false,
     "retuneAfterCleanSafety": false,
     "retuneAfterFresh": false,
+    "round6UnscopedTruthSignoffAllowed": false,
     "studentSwitchesRemainFalse": true,
     "failClosed": true
   },
@@ -265,7 +279,7 @@
     },
     {
       "path": "config/western-strings-round6-evaluation-protocol.json",
-      "sha256": "7546020e1e0f326910b160c7bca0f12602c40bce9477efd764c4f23e2f4e3d75"
+      "sha256": "7cd9befaab8461f9f6f3553d716f12068a7af59ace0b1ebcd2bdc5e2ed2094cf"
     },
     {
       "path": "config/western-strings-round6-counterbalanced-contract.json",
@@ -281,24 +295,28 @@
     },
     {
       "path": "scripts/generate-western-round5-truth-signoff-pack.mjs",
-      "sha256": "53111e01a95176854068ebc5107a3d9b861789ff8d0d407ca2c31c17804821b4"
+      "sha256": "24e5e87de5049b9b5ad6dea77a23f5c18d3db967e8667b6dadf997c05e8e6233"
     },
     {
       "path": "scripts/apply-western-truth-signoff.mjs",
-      "sha256": "5477ba04303070d225233fe6d285d45e567415f0e1d561398b2f2b739291ef1f"
+      "sha256": "37d184392819460b8f51a750ca23a589e46ee98820a5d044c33ea728b0839374"
     },
     {
       "path": "scripts/run_western_round6_stage_a_safety.py",
       "sha256": "8995827575b86302a38d9b474a69c8cc87da5b24962d59a4f049256712dada22"
     },
     {
+      "path": "scripts/western-round6-staged-signoff-support.mjs",
+      "sha256": "a31f44e7f12a360ffbe55fbccddb3b97bc7b71ecde1a163e45fe778cd2141da2"
+    },
+    {
       "path": "scripts/experiments/train_western_round6_full_score_candidate.py",
-      "sha256": "06457633b3970a31bfbd5503bd1460b5df60c2d6046a92606f3083d7f53c34ef"
+      "sha256": "a54b3edbe2d8543c18b8489ec3c3c2ca9b2ccd0e145ce7ca420b485c2eae086f"
     },
     {
       "path": "package.json",
-      "sha256": "1e55409da0d0d766b050c157da2dce9879f503d51fda824dd83c321bf0110bdf"
+      "sha256": "ebebef0a6881aef3c8a70e39e9462cee5867e869bec77d86dae0471099d89fd6"
     }
   ],
-  "protocolSemanticSha256": "d08bff4b76a114feaf93f4d2d00fb2e37df54660d67b0edc7d6fc1f313777a3f"
+  "protocolSemanticSha256": "fe5302fe816d7a436a72e8e40fe8194c28ae05bb694924a7c29102c7f2a07ccb"
 }

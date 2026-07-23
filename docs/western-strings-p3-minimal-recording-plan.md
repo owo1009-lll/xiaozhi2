@@ -6,7 +6,7 @@
 - 条件追加：`6` 条。
 - 最坏总量：`12` 条。
 - Stage A 失败可避免：`6` 条 fresh。
-- 协议语义 SHA-256：`d08bff4b76a114feaf93f4d2d00fb2e37df54660d67b0edc7d6fc1f313777a3f`。
+- 协议语义 SHA-256：`fe5302fe816d7a436a72e8e40fe8194c28ae05bb694924a7c29102c7f2a07ccb`。
 
 ## 为什么必须先录 6 条
 
@@ -47,10 +47,17 @@ Stage A 固定执行链：
 
 模型、特征、决策点和门槛全部保持冻结；fresh 只读一次。每个 gate 的门槛仍为 P≥90%、R≥50%、strict FP=0，任一数值通过也不自动取得学生端发布授权。
 
+Stage B 固定执行链：
+
+1. `npm run western:round6-stage-b-truth-signoff-pack` 先验证 Stage A 通过报告、consumed ledger 和冻结模型 SHA，再只读取 6 条 fresh。
+2. 下载签署 JSON 后先 dry-run `npm run western:round6-stage-b-truth-signoff-apply -- --completed <path>`，确认 calibration 投影完全不变后再加 `--apply`。
+3. 只执行一次 `npm run western:round6-frozen-eval`；执行器只能加载 Stage A 模型，`trainingPerformed` 必须为 false，`frozenModelLoaded` 必须为 true。
+
 ## 不变的红线
 
 - Round 4/5 不复用作验收。
 - Stage A 不读取 fresh；Stage B 看过结果后不回调、不重测。
+- Round 6 不允许无作用域一次性签满 12 条，也不允许重新签署 calibration。
 - 合成召回不代表真实召回。
 - M4 OMR 与能量验漏音继续收线。
 - 学生三个开关保持 false，系统 fail-closed。

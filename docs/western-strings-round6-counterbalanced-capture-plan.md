@@ -5,7 +5,7 @@
 ## 当前调度冻结
 
 - 权威分阶段协议：`docs/evidence/western-strings-p3-minimal-recording-preregistration-20260724.json`
-- 协议语义 SHA-256：`d08bff4b76a114feaf93f4d2d00fb2e37df54660d67b0edc7d6fc1f313777a3f`
+- 协议语义 SHA-256：`fe5302fe816d7a436a72e8e40fe8194c28ae05bb694924a7c29102c7f2a07ccb`
 - 现在录：`r6-cal-a-01/02/03`、`r6-cal-b-01/02/03`，共 6 条；
 - 现在不要录：全部 `r6-fresh-*`；Stage A 执行时这些音频必须不存在；
 - `readyForRecording=true` 仅表示 12 槽技术包与材料可用，调度权威是 `recordingSchedule`；
@@ -34,7 +34,7 @@ Round 5 的音频与 cal/fresh 映射无误，但标签位置混杂：
 - `strict FP=0` 的分母不是 12 个预设混淆槽位：对每个 gate，fresh 中**每一个谱面位置**只要不是该 gate 的签署正例，就必须计为严格负例；普通未列位置、其他 gate 正例和其他 gate 对照均不得漏算；
 - fresh-blind 只允许一次，不得用 Round 4/5 音频替代。
 - 评测协议已在音频到位前重新冻结为 `config/western-strings-round6-evaluation-protocol.json`：逐 gate 随机森林 v2 使用完整谱面位置分母，只保留对齐/演奏证据；明确排除前后音程、片段边界等 7 个谱面上下文特征，以及在既有烟测中使真实域召回退化的固定 RMS/pYIN/onset 堆叠。协议同时强制保留 assignment-gap、relative-IOI、时值比和目标窗事件数等 8 个时序字段，并与 gap refinement/strict、rhythm structural/strict 一同冻结；固定参数、0.5 决策点和门槛均不得在 fresh 后修改。该变更用于消除泄漏和锁定证据通道，不构成召回提升声明。
-- `western:round6-frozen-eval` 在读取 fresh 前先写一次性 consumed ledger；运行崩溃也视为 fresh 已消费，后续新候选必须换全新未触碰采集包。候选返回后，runner 还会把两 split、四 gate 的全谱位置数、签署正例、混淆负例、其他 gate 事件、普通未列位置和总数据行数与 intake 逐项复算；缺字段或任一分母不一致都记为评测失败，不得形成晋升证据。
+- `western:round6-frozen-eval` 先验证 Stage B fresh-only 签署 lineage、Stage A 安全报告/consumed ledger/模型 SHA 和 calibration 不变证明，再写一次性 fresh consumed ledger；随后才读取并核验 fresh 音频 SHA。运行崩溃也视为 fresh 已消费，后续新候选必须换全新未触碰采集包。候选只能加载 Stage A 模型，证据必须满足 `trainingPerformed=false`、`frozenModelLoaded=true`；runner 还会把两 split、四 gate 的全谱位置数和严格分母与 intake 逐项复算，缺字段或任一不一致都不得形成晋升证据。
 
 ## 生成与录前验证
 
@@ -47,7 +47,9 @@ npm run test:western-round5-truth-signoff-pack
 npm run test:western-round6-truth-signoff-apply
 npm run test:western-round6-stage-a-signoff
 npm run test:western-round6-stage-a-safety
+npm run test:western-round6-stage-b-signoff
 npm run test:western-round6-frozen-eval
+npm run test:western-round6-frozen-model-reuse
 npm run test:western-round6-full-score-candidate
 npm run western:project-status
 ```
@@ -61,8 +63,8 @@ npm run western:project-status
 - `rhythmConfoundedSplits=[]`；
 - 预检 `audioRead=false`，不使用任何录音或表现标签。
 - 项目状态节点 `tracks.controlledCandidate.ordinaryDynamicShadow.round6CounterbalancedCapture` 从磁盘重算分母和材料，并把 position preflight、intake 分别绑定到当前 contract/manifest/truth 哈希；
-- 同一节点还现场重哈希评测协议绑定的执行守卫、全谱候选 runner、历史特征提取器、temporal-operation 规则、intake validator、音频特征分析器和 Round 6 合同；v2 协议 SHA-256 为 `7546020e1e0f326910b160c7bca0f12602c40bce9477efd764c4f23e2f4e3d75`，当前 `evaluationProtocol.runnerReady=true`、`freshBlindConsumed=false`、`evaluationPerformed=false`；
-- 当前该节点为 `readyForRecording=true`、`intakeReady=false`，同时 `recordingSchedule.valid=true`、当前精确外部输入为 6 条 calibration 音频、6 条同意、6 条许可、72 个 `asPerformed` 和 6 个完整错误清单。篡改 truth、manifest、合同、分阶段协议或其 12 个来源后，旧绿灯不会继续有效。
+- 同一节点还现场重哈希评测协议绑定的执行守卫、全谱候选 runner、历史特征提取器、temporal-operation 规则、intake validator、音频特征分析器和 Round 6 合同；v2 协议 SHA-256 为 `7cd9befaab8461f9f6f3553d716f12068a7af59ace0b1ebcd2bdc5e2ed2094cf`，当前静态协议层 `evaluationProtocol.runnerReady=true`、`freshBlindConsumed=false`、`evaluationPerformed=false`；实际 Stage B 预检仍为 `stageBAuthorizationReady=false`，因为 Stage A 录音、通过报告、consumed ledger 和冻结模型尚未产生；
+- 当前该节点为 `readyForRecording=true`、`intakeReady=false`，同时 `recordingSchedule.valid=true`、当前精确外部输入为 6 条 calibration 音频、6 条同意、6 条许可、72 个 `asPerformed` 和 6 个完整错误清单。篡改 truth、manifest、合同、分阶段协议或其 13 个来源后，旧绿灯不会继续有效。
 
 私密材料位于 `data/private/western-strings-round6-counterbalanced/`。该目录不入 Git。
 
@@ -109,6 +111,15 @@ npm run western:project-status
 
 ## Stage B：仅在安全闸通过后
 
-只有 `western:project-status` 明确给出 `recordingSchedule.stageBFreshRecordingAuthorizedNow=true` 时，才录 `r6-fresh-a-01/02/03` 与 `r6-fresh-b-01/02/03`。冻结模型、特征、0.5 决策点和安全门槛不得再改；fresh 只允许读取一次。完整包随后仍按全谱严格分母执行 `P>=0.90 / R>=0.50 / strict FP=0`，任何数值通过只形成性能证据，不等于发布授权，`automaticAccusationReady` 与学生端三个开关继续保持 false。
+只有 `western:project-status` 明确给出 `recordingSchedule.stageBFreshRecordingAuthorizedNow=true` 时，才录 `r6-fresh-a-01/02/03` 与 `r6-fresh-b-01/02/03`。冻结模型、特征、0.5 决策点和安全门槛不得再改。六条 fresh 到位后固定执行：
+
+```powershell
+npm run western:round6-stage-b-truth-signoff-pack
+npm run western:round6-stage-b-truth-signoff-apply -- --completed "下载文件的绝对路径"
+npm run western:round6-stage-b-truth-signoff-apply -- --completed "下载文件的绝对路径" --apply
+npm run western:round6-frozen-eval
+```
+
+Stage B 包在读取 fresh 前验证 Stage A 授权链，只包含 fresh 六条；apply 证明 calibration 行和真值投影完全不变并写一次性 lineage。评测在读取 fresh 前写 consumed ledger，只加载 Stage A 的 `model.joblib`，不得 `.fit()` 或生成新模型。完整 fresh 仍按全谱严格分母执行 `P>=0.90 / R>=0.50 / strict FP=0`；任何数值通过只形成性能证据，不等于发布授权，`automaticAccusationReady` 与学生端三个开关继续保持 false。
 
 当前状态是正确的 fail-closed：Stage A 待补 6 条音频、6 条同意、6 条许可、72 个 `asPerformed` 和 6 个完整错误清单；Stage B fresh 未授权且未消费。

@@ -88,7 +88,7 @@
             "docs/evidence/western-strings-p3-minimal-recording-preregistration-20260724.json"
           ],
           "metric_definitions": [
-            "文件 SHA-256=91c4b1ca630758c52ba2cc383d9c4f44febff027fa397265b8202b40cc974d35"
+            "文件 SHA-256=fe0c7fdc590ea9a5e7369279b19c62b3c175ff5e79c5dffddb5401c0aa04c74b"
           ]
         }
       },
@@ -240,7 +240,7 @@
       {
         "id": "p3-heading",
         "type": "markdown",
-        "body": "## 现在只录 6 条，而不是一次录 12 条\n\nP1 还留下一个不能零录音执行的预注册候选：`performance-only-RF-v2` 需要反平衡 calibration 才能拟合。现有 Round 6 设计可无损拆为 calibration 6 条和 fresh 6 条；两边各有两份新谱×三次角色轮换，每 gate 都是 `6 positive + 12 confusion-negative`，曲目和演奏者跨 split 不重叠。\n\n1. 现在只录并完整签署 6 条 calibration。\n2. 按冻结 RF 参数和 `0.5` 决策点训练，先跑既有 P1 clean 安全闸。\n3. 任一安全上限超限就收线，省掉 6 条 fresh；strict 保持 `2/12`。\n4. 只有 Stage A 全通过，才冻结模型并补 6 条 fresh，一次性按 `P≥90% / R≥50% / strict FP=0` 评测。\n\n分阶段协议语义 SHA-256：`d08bff4b76a114feaf93f4d2d00fb2e37df54660d67b0edc7d6fc1f313777a3f`。",
+        "body": "## 现在只录 6 条，而不是一次录 12 条\n\nP1 还留下一个不能零录音执行的预注册候选：`performance-only-RF-v2` 需要反平衡 calibration 才能拟合。现有 Round 6 设计可无损拆为 calibration 6 条和 fresh 6 条；两边各有两份新谱×三次角色轮换，每 gate 都是 `6 positive + 12 confusion-negative`，曲目和演奏者跨 split 不重叠。\n\n1. 现在只录并完整签署 6 条 calibration。\n2. 按冻结 RF 参数和 `0.5` 决策点训练，先跑既有 P1 clean 安全闸。\n3. 任一安全上限超限就收线，省掉 6 条 fresh；strict 保持 `2/12`。\n4. 只有 Stage A 全通过，才冻结模型并补 6 条 fresh，一次性按 `P≥90% / R≥50% / strict FP=0` 评测。Round 6 无作用域的 12 条签署入口已关闭；Stage B 只签 fresh 六条，并且只能复用 Stage A 模型，证据必须满足 `trainingPerformed=false`、`frozenModelLoaded=true`。\n\n分阶段协议语义 SHA-256：`fe5302fe816d7a436a72e8e40fe8194c28ae05bb694924a7c29102c7f2a07ccb`。",
         "sourceId": "p3-protocol"
       },
       {
@@ -256,7 +256,7 @@
       {
         "id": "caveats",
         "type": "markdown",
-        "body": "## 约束与假设\n\n- 公开专业演奏没有逐音 clean 裁定，因此其 flags 称为负担，不是权威假阳；淘汰依据仍是预注册负担上限。\n- 当前 6 条是现有两谱×三角色反平衡设计下的最小 calibration，不是对总体泛化置信度的充分样本声明。\n- Round 4/5 已消费，不复用为验收；Stage A 不读取 fresh，Stage B 看过结果后不回调、不重测。\n- M4 OMR 与波形能量验漏音维持收线；合成召回不代表真实召回。\n- 三个学生开关继续为 false，系统保持 fail-closed。"
+        "body": "## 约束与假设\n\n- 公开专业演奏没有逐音 clean 裁定，因此其 flags 称为负担，不是权威假阳；淘汰依据仍是预注册负担上限。\n- 当前 6 条是现有两谱×三角色反平衡设计下的最小 calibration，不是对总体泛化置信度的充分样本声明。\n- Round 4/5 已消费，不复用为验收；Stage A 不读取 fresh，Stage B 看过结果后不回调、不重测。\n- Stage B 签署链必须保持 calibration 投影不变；fresh 评测不得重新拟合候选或生成替代模型。\n- M4 OMR 与波形能量验漏音维持收线；合成召回不代表真实召回。\n- 三个学生开关继续为 false，系统保持 fail-closed。"
       }
     ],
     "charts": [
@@ -923,7 +923,7 @@
           "docs/evidence/western-strings-p3-minimal-recording-preregistration-20260724.json"
         ],
         "metric_definitions": [
-          "文件 SHA-256=91c4b1ca630758c52ba2cc383d9c4f44febff027fa397265b8202b40cc974d35"
+          "文件 SHA-256=fe0c7fdc590ea9a5e7369279b19c62b3c175ff5e79c5dffddb5401c0aa04c74b"
         ]
       }
     },

@@ -846,7 +846,7 @@ assert.equal(round6CounterbalancedCapture?.counts?.audioFiles, 0);
   assert.equal(round6Schedule?.sourceBindingsCurrent, true);
   assert.equal(
     round6Schedule?.protocolSemanticSha256,
-    "d08bff4b76a114feaf93f4d2d00fb2e37df54660d67b0edc7d6fc1f313777a3f",
+    "fe5302fe816d7a436a72e8e40fe8194c28ae05bb694924a7c29102c7f2a07ccb",
   );
   assert.equal(
     round6Schedule?.observedProtocolSemanticSha256,

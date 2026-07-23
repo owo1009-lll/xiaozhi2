@@ -81,7 +81,20 @@ def main() -> int:
         "maxStrictFalseAccusations": 0,
     }
     assert report["stageB"]["postFreshRetuningAllowed"] is False
+    assert report["stageB"]["trainingDuringFreshAllowed"] is False
+    assert report["stageB"]["frozenStageAModelReuseRequired"] is True
+    stage_b_operations = report["stageB"]["operations"]
+    assert stage_b_operations["truthSignoffPackCommand"] == (
+        "npm run western:round6-stage-b-truth-signoff-pack"
+    )
+    assert stage_b_operations["truthSignoffApplyCommand"] == (
+        "npm run western:round6-stage-b-truth-signoff-apply -- "
+        "--completed <path> --apply"
+    )
+    assert stage_b_operations["candidateMayBeRefit"] is False
+    assert stage_b_operations["calibrationMayBeResigned"] is False
     assert report["discipline"]["freshReadDuringStageA"] is False
+    assert report["discipline"]["round6UnscopedTruthSignoffAllowed"] is False
     assert report["discipline"]["studentSwitchesRemainFalse"] is True
     assert report["supersession"][
         "currentAuthorizedRecordingScope"
@@ -98,6 +111,7 @@ def main() -> int:
         "scripts/generate-western-round5-truth-signoff-pack.mjs",
         "scripts/apply-western-truth-signoff.mjs",
         "scripts/run_western_round6_stage_a_safety.py",
+        "scripts/western-round6-staged-signoff-support.mjs",
         "scripts/experiments/train_western_round6_full_score_candidate.py",
         "package.json",
     }
