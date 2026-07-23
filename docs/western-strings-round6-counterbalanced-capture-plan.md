@@ -30,6 +30,7 @@ npm run western:round6-position-balance
 npm run test:western-round6-counterbalanced-capture-pack
 npm run test:western-round6-project-status
 npm run test:western-round5-truth-signoff-pack
+npm run test:western-round6-truth-signoff-apply
 npm run western:project-status
 ```
 
@@ -53,9 +54,21 @@ npm run western:project-status
 1. 按对应 PDF 和 `*-演奏说明.md` 从头到尾完整演奏；
 2. 不得只录某一个 rotation；同谱三条必须全部完成；
 3. 12 条音频全部按 manifest 命名放好后，运行 `npm run western:round6-truth-signoff-pack`，打开私密目录下的 `truth-signoff/index.html`；
-4. 页面不显示任何机器预测；逐条试听后填写全部 `asPerformed`，必要时追加计划外错误，并签署每条 `completeErrorInventory`。页面只有在全部检查通过后才允许下载 `position-truth.completed.json`；
-5. 复核下载内容及其 source manifest/truth SHA 后，用它更新私密 `position-truth.json`；
-6. manifest 的 `consent` 改为 `yes`、`licenseStatus` 改为 `local-only`；
-7. 运行 `npm run western:round6-targeted-intake`。
+4. 页面不显示任何机器预测；逐条试听后填写全部 `asPerformed`，必要时追加计划外错误，并签署每条 `completeErrorInventory`。同时核对每条实际演奏者匿名 ID、设备、房间、同意和仅本地许可；全部检查通过后下载 `western-round6-truth-signoff.completed.json`；
+5. 先只读预检，不写任何源文件：
+
+   ```powershell
+   npm run western:round6-truth-signoff-apply -- --completed "下载文件的绝对路径"
+   ```
+
+   预检会重新核对合同、manifest、原始 truth、12 条音频 SHA、录音 ID 集、逐事件位置、6/3/4 覆盖和 cal/fresh 演奏者隔离。只有输出 `readyToApply=true` 才继续；
+6. 显式应用并自动留下按旧哈希命名的两份 `.bak`：
+
+   ```powershell
+   npm run western:round6-truth-signoff-apply -- --completed "下载文件的绝对路径" --apply
+   ```
+
+   此命令只更新私密 `position-truth.json` 的人工真值，以及 manifest 的演奏者、设备、房间、同意和许可五类字段；其余列保持原样；
+7. 因 manifest/truth 哈希已改变，依次重跑 `npm run western:round6-position-balance` 和 `npm run western:round6-targeted-intake`，不得沿用签署前报告。
 
 当前 intake 只证明设计分母完整：12 条、144 事件、四类各 `12/24`，fresh 各 `6/12`。它保持 `ready=false`；项目状态现场重算的待补量为 12 条音频、12 条同意、12 条许可、144 个 `asPerformed` 和 12 个完整错误清单。签署页命令当前也会因 12 条音频尚未到位而非零退出，不会生成可提前误签的页面。这是正确的 fail-closed 状态。
