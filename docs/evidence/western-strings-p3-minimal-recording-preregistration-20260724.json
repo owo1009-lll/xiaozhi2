@@ -1,0 +1,269 @@
+{
+  "schemaVersion": 1,
+  "contract": "western-p3-staged-minimal-recording-protocol-v1",
+  "decisionDate": "2026-07-24",
+  "trigger": {
+    "p1RunnableCandidatesEliminated": 7,
+    "p1RunnableCandidatesRetained": 0,
+    "p2AdjudicatedRealErrorPositives": 0,
+    "remainingCandidate": "performance-only-RF-v2",
+    "remainingCandidateRequiresNewCounterbalancedCalibration": true
+  },
+  "recordingDecision": {
+    "minimumUnavoidableNewRecordingsNow": 6,
+    "conditionalAdditionalFreshRecordings": 6,
+    "maximumTotalIfStageAPasses": 12,
+    "recordAllTwelveNow": false,
+    "recordingReductionIfStageAFails": 6,
+    "whyNotZero": "The only unevaluated pre-registered audio candidate cannot be fitted without counterbalanced real calibration errors.",
+    "whyNotTwelveNow": "A calibration-fitted candidate can first be eliminated on the already-frozen real clean domains without exposing or recording the fresh split."
+  },
+  "stageA": {
+    "name": "counterbalanced-calibration-plus-existing-clean-safety",
+    "recordingIds": [
+      "r6-cal-a-01",
+      "r6-cal-a-02",
+      "r6-cal-a-03",
+      "r6-cal-b-01",
+      "r6-cal-b-02",
+      "r6-cal-b-03"
+    ],
+    "recordingCount": 6,
+    "profile": {
+      "recordingIds": [
+        "r6-cal-a-01",
+        "r6-cal-a-02",
+        "r6-cal-a-03",
+        "r6-cal-b-01",
+        "r6-cal-b-02",
+        "r6-cal-b-03"
+      ],
+      "recordingCount": 6,
+      "pieceIds": [
+        "r6-cal-a-etude",
+        "r6-cal-b-etude"
+      ],
+      "performerIds": [
+        "cal-performer-1",
+        "cal-performer-2",
+        "cal-performer-3"
+      ],
+      "deviceIds": [
+        "device-1",
+        "device-2",
+        "device-3"
+      ],
+      "roomIds": [
+        "cal-room-1",
+        "cal-room-2"
+      ],
+      "recordingsPerPiece": {
+        "r6-cal-a-etude": 3,
+        "r6-cal-b-etude": 3
+      },
+      "eventCount": 72,
+      "byGate": {
+        "merged_substitution": {
+          "positive": 6,
+          "confusionNegative": 12
+        },
+        "missing": {
+          "positive": 6,
+          "confusionNegative": 12
+        },
+        "extra": {
+          "positive": 6,
+          "confusionNegative": 12
+        },
+        "drag": {
+          "positive": 6,
+          "confusionNegative": 12
+        }
+      }
+    },
+    "candidate": {
+      "sourceContract": "western-round6-full-score-candidate-v2",
+      "modelFamily": "full-score-performance-only-random-forest-binary-per-gate",
+      "featurePolicy": "alignment-performance-only-no-fixed-acoustic-v1",
+      "excludedScoreContextFeatures": [
+        "n_0OutOfRange",
+        "n_m1OutOfRange",
+        "n_m2OutOfRange",
+        "n_p1OutOfRange",
+        "n_p2OutOfRange",
+        "scoreNextInterval",
+        "scorePreviousInterval"
+      ],
+      "excludedFixedAcousticFeatures": [
+        "acousticAvailable",
+        "targetInteriorAttackRatio",
+        "targetMeanVoicedProbability",
+        "targetNearPitchOccupancy",
+        "targetOnsetMax",
+        "targetOnsetMean",
+        "targetOnsetPeakCount",
+        "targetPeakDb",
+        "targetPitchOccupancy",
+        "targetRmsDb",
+        "targetVoicedFrameRatio"
+      ],
+      "requiredTemporalFeatures": [
+        "n_0AssignmentGap",
+        "n_0DurationMissing",
+        "n_0DurationRatio",
+        "n_0IoiDeviation",
+        "n_0IoiMissing",
+        "segmentMaxIoiDeviation",
+        "segmentMeanIoiDeviation",
+        "targetWindowEventCount"
+      ],
+      "modelParams": {
+        "n_estimators": 256,
+        "max_depth": 4,
+        "min_samples_leaf": 2,
+        "class_weight": "balanced_subsample",
+        "random_state": 20260722,
+        "n_jobs": 1
+      },
+      "decisionThreshold": 0.5
+    },
+    "cleanSafetyInputsRemainFrozen": true,
+    "cleanSafetyLimits": {
+      "authoritativeLocalCleanFalsePositiveMax": 0,
+      "consumedRound5KnownNegativeFalsePositiveMax": 0,
+      "publicProfessionalBurdenPooledPer1000Max": 5.0,
+      "publicProfessionalBurdenAnyRecordingPer1000Max": 10.0,
+      "decision": "eliminate if any applicable maximum is exceeded"
+    },
+    "round5Role": "known-negative consumed diagnostic only; never acceptance",
+    "syntheticRecallMayRepresentRealRecall": false,
+    "passAction": "Freeze the fitted model and complete Stage B without changing features, model parameters, decision threshold, or safety limits.",
+    "failAction": "Stop with strict confirmed recall 2/12; do not record the six fresh takes for this candidate."
+  },
+  "stageB": {
+    "name": "conditional-untouched-fresh-evaluation",
+    "authorizedOnlyAfterStageAPass": true,
+    "recordingIds": [
+      "r6-fresh-a-01",
+      "r6-fresh-a-02",
+      "r6-fresh-a-03",
+      "r6-fresh-b-01",
+      "r6-fresh-b-02",
+      "r6-fresh-b-03"
+    ],
+    "recordingCount": 6,
+    "profile": {
+      "recordingIds": [
+        "r6-fresh-a-01",
+        "r6-fresh-a-02",
+        "r6-fresh-a-03",
+        "r6-fresh-b-01",
+        "r6-fresh-b-02",
+        "r6-fresh-b-03"
+      ],
+      "recordingCount": 6,
+      "pieceIds": [
+        "r6-fresh-a-etude",
+        "r6-fresh-b-etude"
+      ],
+      "performerIds": [
+        "fresh-performer-1",
+        "fresh-performer-2",
+        "fresh-performer-3"
+      ],
+      "deviceIds": [
+        "device-1",
+        "device-2",
+        "device-3"
+      ],
+      "roomIds": [
+        "fresh-room-1",
+        "fresh-room-2"
+      ],
+      "recordingsPerPiece": {
+        "r6-fresh-a-etude": 3,
+        "r6-fresh-b-etude": 3
+      },
+      "eventCount": 72,
+      "byGate": {
+        "merged_substitution": {
+          "positive": 6,
+          "confusionNegative": 12
+        },
+        "missing": {
+          "positive": 6,
+          "confusionNegative": 12
+        },
+        "extra": {
+          "positive": 6,
+          "confusionNegative": 12
+        },
+        "drag": {
+          "positive": 6,
+          "confusionNegative": 12
+        }
+      }
+    },
+    "freshBlindRunLimit": 1,
+    "freshUsedForSelection": false,
+    "promotionThresholds": {
+      "minPrecision": 0.9,
+      "minRecall": 0.5,
+      "maxStrictFalseAccusations": 0
+    },
+    "promotionScope": "independent-per-gate",
+    "completeInventoryRequired": true,
+    "scorePositionCounterbalanceRequired": true,
+    "strictFalseAccusationDenominator": "every fresh score position not signed positive for the evaluated gate",
+    "postFreshRetuningAllowed": false,
+    "numericPassIsReleaseAuthorization": false
+  },
+  "discipline": {
+    "round4Round5ReusedAsAcceptance": false,
+    "freshReadDuringStageA": false,
+    "retuneAfterCleanSafety": false,
+    "retuneAfterFresh": false,
+    "studentSwitchesRemainFalse": true,
+    "failClosed": true
+  },
+  "stopLines": {
+    "m4Omr": "no-further-investment",
+    "waveformEnergyMissingNote": "no-further-investment"
+  },
+  "supersession": {
+    "priorAllAtOnceRound6Scheduling": "deferred",
+    "technicalTwelveTakePackRemainsValid": true,
+    "currentAuthorizedRecordingScope": "stage-a-calibration-six-only"
+  },
+  "sourceBindings": [
+    {
+      "path": "docs/evidence/western-strings-p1-clean-domain-preregistration-20260724.json",
+      "sha256": "f3bfe14b2f5f7a75e70efa4df5a9ceb8f1d96453269aae96d0fa4faa22a69fd8"
+    },
+    {
+      "path": "docs/evidence/western-strings-p1-clean-domain-safety-20260724.json",
+      "sha256": "9a4325c6d8a024fbfc91924e2455bb0c4e95ac7da199794504f9c80b67375031"
+    },
+    {
+      "path": "docs/evidence/western-strings-p2-public-error-recall-audit-20260724.json",
+      "sha256": "96a4b255483328684e14ec53673a10fcd9129b4e639d7c6640fa5afc72fe1e0b"
+    },
+    {
+      "path": "config/western-strings-round6-evaluation-protocol.json",
+      "sha256": "a2fc7cbd8779b2eeb8ad414521431707a07a231640043a47ce6b02f4fc4427e9"
+    },
+    {
+      "path": "config/western-strings-round6-counterbalanced-contract.json",
+      "sha256": "5f5aa8b5846b364068baa0d1a604c3e85e69b126cd659200e9bb5d2f06bb537f"
+    },
+    {
+      "path": "data/private/western-strings-round6-counterbalanced/manifest.csv",
+      "sha256": "b860e722d10a9e0653aed34be9487998c6a61b4f297e95a7f5cd131b3f420950"
+    },
+    {
+      "path": "data/private/western-strings-round6-counterbalanced/position-truth.json",
+      "sha256": "953d01d5f9b4465213a30992d72784aedda7ad99d361d4c06e508a1fec6c2ce9"
+    }
+  ],
+  "protocolSemanticSha256": "e249bfdc21d9e722d83a0788647fed1eefc14b45064460be0a88a2afe159195f"
+}
