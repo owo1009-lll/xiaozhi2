@@ -727,6 +727,33 @@ assert.equal(
   policyCRuntime?.confirmedIssueCandidateCount + policyCRuntime?.selfCheckHintCount,
 );
 assert.deepEqual(policyCRuntime?.blockingReasons, []);
+const reviewAssistCalibrationPack =
+  controlled.ordinaryDynamicShadow?.policyCReviewAssistCalibrationPack;
+assert.equal(
+  reviewAssistCalibrationPack?.contract,
+  "western-round5-review-assist-calibration-pack-v1",
+);
+assert.equal(reviewAssistCalibrationPack?.sourceCurrent, true);
+assert.equal(reviewAssistCalibrationPack?.safetyBoundaryValid, true);
+assert.equal(reviewAssistCalibrationPack?.candidateAvailable, true);
+assert.equal(reviewAssistCalibrationPack?.readyForReview, true);
+assert.equal(reviewAssistCalibrationPack?.completedReviewPresent, false);
+assert.equal(reviewAssistCalibrationPack?.readyForStaging, false);
+assert.equal(reviewAssistCalibrationPack?.counts?.candidates, 9);
+assert.equal(reviewAssistCalibrationPack?.counts?.playableCandidates, 9);
+assert.equal(reviewAssistCalibrationPack?.counts?.recordings, 4);
+assert.equal(reviewAssistCalibrationPack?.counts?.confirmedIssues, 2);
+assert.equal(reviewAssistCalibrationPack?.counts?.selfCheckHints, 7);
+assert.equal(reviewAssistCalibrationPack?.calibrationOnly, true);
+assert.equal(reviewAssistCalibrationPack?.freshBlindEligible, false);
+assert.equal(reviewAssistCalibrationPack?.studentFacing, false);
+assert.equal(reviewAssistCalibrationPack?.automaticAccusationReady, false);
+assert.equal(reviewAssistCalibrationPack?.strictConfirmedRecallChanged, false);
+assert.deepEqual(reviewAssistCalibrationPack?.blockingReasons, []);
+assert.deepEqual(
+  reviewAssistCalibrationPack?.reviewCompletionBlockingReasons,
+  ["round5-review-assist-human-review-pending"],
+);
 const round5TargetedIntake = controlled.ordinaryDynamicShadow?.round5TargetedIntake;
 assert.equal(
   round5TargetedIntake?.contract,
@@ -929,6 +956,19 @@ assert.equal(
 );
 assert(
   ordinaryRecallAction?.reason.includes("round6-counterbalanced-audio-pending:12"),
+);
+const reviewAssistCalibrationAction = status.nextActions.find(
+  (action) => action.track === "Ordinary review-assist calibration",
+);
+assert(
+  reviewAssistCalibrationAction?.action.includes("all 9 candidates")
+    && reviewAssistCalibrationAction?.action.includes("fresh-blind denominators")
+    && reviewAssistCalibrationAction?.action.includes("2/12"),
+  "the review-assist handoff must expose the live candidate pack without implying promotion",
+);
+assert.equal(
+  reviewAssistCalibrationAction?.artifact,
+  reviewAssistCalibrationPack?.reviewPage,
 );
 assert.equal(temporalPath?.evidenceValid, true);
 assert.equal(temporalPath?.sourceBindingCurrent, true);

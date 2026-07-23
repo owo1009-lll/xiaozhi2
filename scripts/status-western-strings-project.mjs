@@ -127,6 +127,23 @@ const ROUND5_POSITION_BALANCE_REPORT = path.join(
   "western-strings-round5-position-balance",
   "report.json",
 );
+const ROUND5_REVIEW_ASSIST_CALIBRATION_PACK = path.join(
+  "data",
+  "experiments",
+  "western-strings-round5-review-assist-calibration-pack",
+);
+const ROUND5_REVIEW_ASSIST_CALIBRATION_LEDGER = path.join(
+  ROUND5_REVIEW_ASSIST_CALIBRATION_PACK,
+  "ledger.json",
+);
+const ROUND5_REVIEW_ASSIST_CALIBRATION_PAGE = path.join(
+  ROUND5_REVIEW_ASSIST_CALIBRATION_PACK,
+  "index.html",
+);
+const ROUND5_REVIEW_ASSIST_CALIBRATION_COMPLETED = path.join(
+  ROUND5_REVIEW_ASSIST_CALIBRATION_PACK,
+  "round5-review-assist-calibration.completed.json",
+);
 const ROUND6_COUNTERBALANCED_CONTRACT = path.join(
   "config",
   "western-strings-round6-counterbalanced-contract.json",
@@ -165,6 +182,8 @@ const ROUND5_TEMPORAL_OPERATION_PATH = path.join(
   "western-strings-round5-temporal-operation-path-20260722.json",
 );
 const ROUND5_TARGETED_CONTRACT_VERSION = "western-round5-targeted-diagnosis-intake-v1";
+const ROUND5_REVIEW_ASSIST_CALIBRATION_CONTRACT =
+  "western-round5-review-assist-calibration-pack-v1";
 const ROUND6_COUNTERBALANCED_CONTRACT_VERSION = "western-round6-counterbalanced-diagnosis-v1";
 const ROUND5_SEGMENT_GATES = Object.freeze([
   "merged_substitution",
@@ -3744,18 +3763,201 @@ async function auditOrdinaryReviewAssistRuntime() {
   };
 }
 
+export async function auditRound5ReviewAssistCalibrationPack({
+  ledgerPath = ROUND5_REVIEW_ASSIST_CALIBRATION_LEDGER,
+  reviewPagePath = ROUND5_REVIEW_ASSIST_CALIBRATION_PAGE,
+  completedPath = ROUND5_REVIEW_ASSIST_CALIBRATION_COMPLETED,
+} = {}) {
+  const [ledgerRead, pageRead, completedRead] = await Promise.all([
+    readWorkspaceArtifact(ledgerPath),
+    readWorkspaceArtifact(reviewPagePath),
+    readWorkspaceArtifact(completedPath),
+  ]);
+  const blockingReasons = [];
+  let ledger = null;
+  if (ledgerRead.status === "ok") {
+    try {
+      ledger = JSON.parse(ledgerRead.bytes.toString("utf8"));
+    } catch {
+      blockingReasons.push("round5-review-assist-ledger-invalid-json");
+    }
+  } else {
+    blockingReasons.push(`round5-review-assist-ledger-${ledgerRead.status}`);
+  }
+  const rows = Array.isArray(ledger?.rows) ? ledger.rows : [];
+  const safetyBoundaryValid = Boolean(
+    ledger?.schemaVersion === 1
+      && ledger?.contract === ROUND5_REVIEW_ASSIST_CALIBRATION_CONTRACT
+      && ledger?.scope === "teacher-reviewed-calibration-draft-only"
+      && ledger?.calibrationOnly === true
+      && ledger?.freshBlindEligible === false
+      && rows.length > 0
+      && rows.every((row) => (
+        row?.calibrationOnly === true
+          && row?.freshBlindEligible === false
+          && ["confirmed_issue", "self_check_hint"].includes(row?.sourceSemantic)
+      )),
+  );
+  if (ledger && !safetyBoundaryValid) {
+    blockingReasons.push("round5-review-assist-safety-boundary-invalid");
+  }
+  if (ledger?.sourceSummary?.candidateCount !== rows.length) {
+    blockingReasons.push("round5-review-assist-candidate-count-mismatch");
+  }
+  if (ledger?.sourceSummary?.sourceWarningCount !== 0
+      || (ledger?.sourceWarnings || []).length !== 0) {
+    blockingReasons.push("round5-review-assist-source-warnings-present");
+  }
+  const identityKeys = rows.map((row) => String(row?.identityKey || ""));
+  if (identityKeys.some((key) => !key)
+      || new Set(identityKeys).size !== identityKeys.length) {
+    blockingReasons.push("round5-review-assist-identity-keys-invalid");
+  }
+  const frozenSource = ledger?.frozenSource || {};
+  const frozenRead = frozenSource.path
+    ? await readWorkspaceArtifact(frozenSource.path)
+    : { status: "path-invalid", sha256: "" };
+  const frozenSourceCurrent = Boolean(
+    frozenRead.status === "ok"
+      && String(frozenSource.sha256 || "").toLowerCase() === frozenRead.sha256
+      && frozenSource.policyCReviewAssistGateReady === true,
+  );
+  if (ledger && !frozenSourceCurrent) {
+    blockingReasons.push("round5-review-assist-frozen-source-stale");
+  }
+  const packRoot = path.dirname(String(ledgerPath));
+  const safePackRelativePath = (value) => {
+    const relative = String(value || "").trim();
+    if (!relative || path.isAbsolute(relative)) return "";
+    const resolved = path.normalize(path.join(packRoot, relative));
+    const relation = path.relative(path.normalize(packRoot), resolved);
+    return relation && !relation.startsWith(`..${path.sep}`) && relation !== ".."
+      ? resolved
+      : "";
+  };
+  const rowAudits = await Promise.all(rows.map(async (row, index) => {
+    const localAudioPath = safePackRelativePath(row?.localAudioPath);
+    const [candidate, audio, score, localAudio] = await Promise.all([
+      readWorkspaceArtifact(row?.candidateRowsPath),
+      readWorkspaceArtifact(row?.audioSourcePath),
+      readWorkspaceArtifact(row?.scoreSourcePath),
+      readWorkspaceArtifact(localAudioPath),
+    ]);
+    const candidateCurrent = candidate.status === "ok"
+      && candidate.sha256 === String(row?.candidateRowsSha256 || "").toLowerCase();
+    const audioCurrent = audio.status === "ok"
+      && audio.sha256 === String(row?.audioSourceSha256 || "").toLowerCase()
+      && audio.sha256 === String(row?.audioHash || "").toLowerCase();
+    const scoreCurrent = score.status === "ok"
+      && score.sha256 === String(row?.scoreSourceSha256 || "").toLowerCase();
+    const localAudioCurrent = localAudio.status === "ok"
+      && localAudio.sha256 === String(row?.audioSourceSha256 || "").toLowerCase();
+    return {
+      index,
+      candidateCurrent,
+      audioCurrent,
+      scoreCurrent,
+      localAudioCurrent,
+      current: candidateCurrent && audioCurrent && scoreCurrent && localAudioCurrent,
+    };
+  }));
+  for (const audit of rowAudits) {
+    if (!audit.current) {
+      blockingReasons.push(`round5-review-assist-row-source-stale:${audit.index}`);
+    }
+  }
+  const pageCurrent = Boolean(
+    pageRead.status === "ok"
+      && ledgerRead.status === "ok"
+      && pageRead.bytes.toString("utf8").includes(ledgerRead.sha256)
+      && pageRead.bytes.toString("utf8").includes("Round 5 calibration 复核包")
+      && pageRead.bytes.toString("utf8").includes("下载已完成 JSON"),
+  );
+  if (ledger && !pageCurrent) {
+    blockingReasons.push("round5-review-assist-page-ledger-binding-stale");
+  }
+  let completed = null;
+  let completedReviewValid = false;
+  const reviewCompletionBlockingReasons = [];
+  if (completedRead.status === "ok") {
+    try {
+      completed = JSON.parse(completedRead.bytes.toString("utf8"));
+      completedReviewValid = Boolean(
+        completed?.contract === ROUND5_REVIEW_ASSIST_CALIBRATION_CONTRACT
+          && completed?.ledgerSha256 === ledgerRead.sha256
+          && completed?.calibrationOnly === true
+          && completed?.freshBlindEligible === false
+          && Array.isArray(completed?.reviews)
+          && completed.reviews.length === rows.length
+      );
+      if (!completedReviewValid) {
+        reviewCompletionBlockingReasons.push("round5-review-assist-completed-review-invalid");
+      }
+    } catch {
+      reviewCompletionBlockingReasons.push("round5-review-assist-completed-review-invalid-json");
+    }
+  } else {
+    reviewCompletionBlockingReasons.push("round5-review-assist-human-review-pending");
+  }
+  const sourceCurrent = blockingReasons.length === 0;
+  const playableCandidateCount = rowAudits.filter(
+    (audit) => audit.audioCurrent && audit.localAudioCurrent,
+  ).length;
+  const semanticCounts = rows.reduce((counts, row) => {
+    const semantic = String(row?.sourceSemantic || "");
+    counts[semantic] = (counts[semantic] || 0) + 1;
+    return counts;
+  }, {});
+  return {
+    contract: ROUND5_REVIEW_ASSIST_CALIBRATION_CONTRACT,
+    source: String(ledgerPath).replace(/\\/g, "/"),
+    reviewPage: String(reviewPagePath).replace(/\\/g, "/"),
+    completedReview: String(completedPath).replace(/\\/g, "/"),
+    ledgerSha256: ledgerRead.sha256,
+    sourceCurrent,
+    safetyBoundaryValid,
+    candidateAvailable: sourceCurrent && rows.length > 0,
+    readyForReview: sourceCurrent
+      && rows.length > 0
+      && playableCandidateCount === rows.length,
+    completedReviewPresent: completedRead.status === "ok",
+    completedReviewValid,
+    readyForStaging: sourceCurrent && completedReviewValid,
+    counts: {
+      candidates: rows.length,
+      playableCandidates: playableCandidateCount,
+      recordings: new Set(rows.map((row) => row?.recordingId).filter(Boolean)).size,
+      confirmedIssues: semanticCounts.confirmed_issue || 0,
+      selfCheckHints: semanticCounts.self_check_hint || 0,
+      sourceRejectedArtifacts: Array.isArray(ledger?.rejectedArtifacts)
+        ? ledger.rejectedArtifacts.length
+        : 0,
+    },
+    calibrationOnly: true,
+    freshBlindEligible: false,
+    studentFacing: false,
+    automaticAccusationReady: false,
+    strictConfirmedRecallChanged: false,
+    blockingReasons: normalizedReasonList(blockingReasons),
+    reviewCompletionBlockingReasons:
+      normalizedReasonList(reviewCompletionBlockingReasons),
+  };
+}
+
 async function buildOrdinaryDynamicShadowStatus() {
   const runtime = evaluateOrdinaryAudioRuntime();
   const [
     acceptance,
     acceptanceArtifact,
     reviewAssistRuntime,
+    reviewAssistCalibrationPack,
     round5TargetedIntake,
     round6CounterbalancedCapture,
   ] = await Promise.all([
     readJson(ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE),
     hashWorkspaceArtifact(ORDINARY_DYNAMIC_SHADOW_ACCEPTANCE),
     auditOrdinaryReviewAssistRuntime(),
+    auditRound5ReviewAssistCalibrationPack(),
     summarizeRound5TargetedIntake(),
     summarizeRound6CounterbalancedCapture(),
   ]);
@@ -3856,6 +4058,7 @@ async function buildOrdinaryDynamicShadowStatus() {
       ]),
     },
     policyCReviewAssistRuntime: reviewAssistRuntime,
+    policyCReviewAssistCalibrationPack: reviewAssistCalibrationPack,
     round5TargetedIntake,
     round6CounterbalancedCapture,
     rhythmChannelEvidence: {
@@ -4830,6 +5033,25 @@ export function summarizeNextActions(
                 "round5-targeted-intake-not-ready",
               ],
       ),
+    });
+  }
+  const reviewAssistPack = shadow.policyCReviewAssistCalibrationPack || {};
+  if (reviewAssistPack.readyForReview === true
+      && reviewAssistPack.completedReviewPresent !== true) {
+    actions.push({
+      priority: 2,
+      track: "Ordinary review-assist calibration",
+      action: "Open the live-bound local review page and independently listen to all 9 candidates (2 confirmed-issue candidates and 7 self-check hints across 4 recordings). Complete the recording metadata and candidate labels, then download `round5-review-assist-calibration.completed.json`. This is calibration-only teacher evidence: it cannot enter fresh-blind denominators, cannot change strict confirmed recall 2/12, and cannot authorize a student accusation. After review, stage it with `npm run western:round5-review-assist-calibration-stage -- --completed <downloaded-json>`.",
+      artifact: reviewAssistPack.reviewPage,
+      reason: reviewAssistPack.reviewCompletionBlockingReasons,
+    });
+  } else if (reviewAssistPack.readyForStaging === true) {
+    actions.push({
+      priority: 2,
+      track: "Ordinary review-assist calibration",
+      action: `Stage the completed calibration-only review with \`npm run western:round5-review-assist-calibration-stage -- --completed ${reviewAssistPack.completedReview}\`. The staging verifier will recheck the ledger, audio, score, and candidate hashes before writing a private draft; it cannot update fresh-blind evidence or student authorization.`,
+      artifact: reviewAssistPack.completedReview,
+      reason: ["round5-review-assist-calibration-draft-not-staged"],
     });
   }
   if (!m3plus.m3plusModeEvalReady) {

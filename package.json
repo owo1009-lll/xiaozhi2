@@ -281,6 +281,7 @@
     "western:round5-review-assist-calibration-pack": "node scripts\\export-western-round5-review-assist-calibration.mjs",
     "western:round5-review-assist-calibration-stage": "node scripts\\stage-western-round5-review-assist-calibration.mjs",
     "test:western-round5-review-assist-calibration": "node scripts\\test-western-round5-review-assist-calibration.mjs",
+    "test:western-review-assist-project-status": "node scripts\\test-western-review-assist-project-status.mjs",
     "western:round5-truth-signoff-pack": "node scripts\\generate-western-round5-truth-signoff-pack.mjs",
     "test:western-round5-truth-signoff-pack": "node scripts\\test-western-round5-truth-signoff-pack.mjs",
     "western:round5-audio-score-identity": "py -3.11 scripts\\audit-western-round5-audio-score-identity.py",
