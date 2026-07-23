@@ -747,17 +747,29 @@ assert.equal(
   round5TargetedIntake?.segmentEditPathCandidate?.promotionScope,
   "independent-per-gate",
 );
-assert.deepEqual(round5TargetedIntake?.segmentEditPathCandidate?.promotedGates, ["extra"]);
+assert.deepEqual(round5TargetedIntake?.segmentEditPathCandidate?.promotedGates, []);
+assert.deepEqual(
+  round5TargetedIntake?.segmentEditPathCandidate?.numericallyPromotedGates,
+  ["extra"],
+);
+assert.deepEqual(
+  round5TargetedIntake?.segmentEditPathCandidate?.promotionBlockedGates,
+  ["extra"],
+);
 assert.deepEqual(
   round5TargetedIntake?.segmentEditPathCandidate?.failedGates,
   ["merged_substitution", "missing", "drag"],
 );
 assert.equal(
   round5TargetedIntake?.segmentEditPathCandidate?.reviewAssistPromotionReady,
-  true,
+  false,
 );
 assert.equal(
   round5TargetedIntake?.segmentEditPathCandidate?.partialGatePromotionReady,
+  false,
+);
+assert.equal(
+  round5TargetedIntake?.segmentEditPathCandidate?.partialGateNumericFloorReady,
   true,
 );
 assert.equal(
@@ -767,6 +779,42 @@ assert.equal(
 assert.deepEqual(
   round5TargetedIntake?.segmentEditPathCandidate?.integrityBlockingReasons,
   [],
+);
+const calibrationFailureAudit =
+  round5TargetedIntake?.segmentEditPathCandidate?.calibrationFailureAudit;
+assert.equal(calibrationFailureAudit?.valid, true);
+assert.equal(calibrationFailureAudit?.bindingCurrent, true);
+assert.equal(calibrationFailureAudit?.splitDiscipline?.freshBlindRowsUsed, 0);
+assert.equal(calibrationFailureAudit?.splitDiscipline?.freshBlindLabelsAccessed, false);
+assert.deepEqual(
+  calibrationFailureAudit?.positionConfoundingDetectedGates,
+  ["merged_substitution", "missing", "drag"],
+);
+assert.deepEqual(
+  calibrationFailureAudit?.additionalCalibrationRequiredGates,
+  ["merged_substitution", "missing", "drag"],
+);
+assert.deepEqual(calibrationFailureAudit?.retainedCandidateGates, []);
+assert.equal(calibrationFailureAudit?.newUntouchedFreshBlindRequired, true);
+assert.equal(calibrationFailureAudit?.promotionEvidenceEligible, false);
+assert.equal(calibrationFailureAudit?.automaticAccusationReady, false);
+assert.deepEqual(calibrationFailureAudit?.blockingReasons, []);
+const positionBalanceAudit =
+  round5TargetedIntake?.segmentEditPathCandidate?.positionBalanceAudit;
+assert.equal(positionBalanceAudit?.valid, true);
+assert.equal(positionBalanceAudit?.bindingCurrent, true);
+assert.equal(positionBalanceAudit?.readyForRecording, false);
+assert.equal(positionBalanceAudit?.audioRead, false);
+assert(positionBalanceAudit?.confoundedSplitGates?.includes(
+  "fresh-blind:extra",
+));
+assert.deepEqual(positionBalanceAudit?.freshBlindConfoundedGates, [
+  "merged_substitution",
+  "extra",
+]);
+assert(
+  round5TargetedIntake?.segmentEditPathCandidate?.promotionEvidenceBlockingReasons
+    ?.includes("round5-fresh-position-score-context-confounded:extra"),
 );
 assert.deepEqual(
   round5TargetedIntake?.segmentEditPathCandidate?.evaluation?.gates?.extra,
@@ -803,7 +851,8 @@ const ordinaryRecallAction = status.nextActions.find(
 );
 assert(
   ordinaryRecallAction?.action.includes("fresh split is now consumed")
-    && ordinaryRecallAction?.action.includes("promotes only `extra`"),
+    && ordinaryRecallAction?.action.includes("not promotion-eligible")
+    && ordinaryRecallAction?.action.includes("score context alone separates"),
   "the recall handoff must expose the completed Round-5 verdict and consumed split",
 );
 assert.equal(temporalPath?.evidenceValid, true);

@@ -115,6 +115,18 @@ const ROUND5_SEGMENT_EDIT_PATH_REPORT = path.join(
   "western-strings-round5-segment-edit-path",
   "report.json",
 );
+const ROUND5_CALIBRATION_FAILURE_AUDIT_REPORT = path.join(
+  "data",
+  "experiments",
+  "western-strings-round5-calibration-failure-audit",
+  "report.json",
+);
+const ROUND5_POSITION_BALANCE_REPORT = path.join(
+  "data",
+  "experiments",
+  "western-strings-round5-position-balance",
+  "report.json",
+);
 const ROUND5_SEGMENT_EDIT_PATH_SMOKE = path.join(
   "docs",
   "evidence",
@@ -1660,14 +1672,19 @@ export async function summarizeRound5TargetedIntake({
   truthPath = ROUND5_TARGETED_TRUTH,
   reportPath = ROUND5_TARGETED_REPORT,
   modelReportPath = ROUND5_SEGMENT_EDIT_PATH_REPORT,
+  calibrationFailureAuditPath = ROUND5_CALIBRATION_FAILURE_AUDIT_REPORT,
+  positionBalancePath = ROUND5_POSITION_BALANCE_REPORT,
 } = {}) {
   const [
-    contract, report, modelReport, smokeEvidence, temporalEvidence,
+    contract, report, modelReport, calibrationFailureAudit, positionBalance,
+    smokeEvidence, temporalEvidence,
     contractSha256, manifestSha256, truthSha256,
   ] = await Promise.all([
     readJson(contractPath),
     readJson(reportPath),
     readJson(modelReportPath),
+    readJson(calibrationFailureAuditPath),
+    readJson(positionBalancePath),
     readJson(ROUND5_SEGMENT_EDIT_PATH_SMOKE),
     readJson(ROUND5_TEMPORAL_OPERATION_PATH),
     sha256FileOrEmpty(contractPath),
@@ -1734,6 +1751,62 @@ export async function summarizeRound5TargetedIntake({
           && String(modelReport?.modelArtifact?.sha256 || "").toLowerCase() === modelArtifact.sha256,
       )
     : false;
+  const calibrationAuditHashes = calibrationFailureAudit?.sourceHashes || {};
+  const calibrationAuditBindingCurrent = Boolean(
+    calibrationFailureAudit
+      && String(calibrationAuditHashes.manifestSha256 || "").toLowerCase() === manifestSha256
+      && String(calibrationAuditHashes.truthSha256 || "").toLowerCase() === truthSha256,
+  );
+  const calibrationFailureAuditValid = Boolean(
+    calibrationFailureAudit?.contract === "western-round5-calibration-failure-audit-v1"
+      && calibrationFailureAudit?.evidenceRole
+        === "calibration-only-candidate-selection-not-promotion"
+      && calibrationAuditBindingCurrent
+      && JSON.stringify(calibrationFailureAudit?.splitDiscipline?.allowedSplits)
+        === JSON.stringify(["calibration"])
+      && calibrationFailureAudit?.splitDiscipline?.freshBlindRowsUsed === 0
+      && calibrationFailureAudit?.splitDiscipline?.freshBlindLabelsAccessed === false
+      && calibrationFailureAudit?.splitDiscipline?.promotionEvidenceEligible === false
+      && calibrationFailureAudit?.automaticAccusationReady === false
+      && calibrationFailureAudit?.studentFacing === false
+      && calibrationFailureAudit?.productionAdoptionReady === false,
+  );
+  const calibrationFailureAuditBlockingReasons = normalizedReasonList([
+    ...(!calibrationFailureAudit
+      ? ["round5-calibration-failure-audit-missing"]
+      : []),
+    ...(calibrationFailureAudit && !calibrationAuditBindingCurrent
+      ? ["round5-calibration-failure-audit-binding-stale"]
+      : []),
+    ...(calibrationFailureAudit && !calibrationFailureAuditValid
+      ? ["round5-calibration-failure-audit-invalid"]
+      : []),
+  ]);
+  const positionBalanceHashes = positionBalance?.sourceHashes || {};
+  const positionBalanceBindingCurrent = Boolean(
+    positionBalance
+      && String(positionBalanceHashes.manifestSha256 || "").toLowerCase() === manifestSha256
+      && String(positionBalanceHashes.truthSha256 || "").toLowerCase() === truthSha256,
+  );
+  const positionBalanceValid = Boolean(
+    positionBalance?.contract === "western-round5-position-balance-preflight-v1"
+      && positionBalance?.evidenceRole === "pre-recording-position-balance-only"
+      && positionBalanceBindingCurrent
+      && positionBalance?.audioRead === false
+      && positionBalance?.promotionEvidenceEligible === false
+      && positionBalance?.automaticAccusationReady === false
+      && positionBalance?.studentFacing === false,
+  );
+  const positionBalanceBlockingReasons = normalizedReasonList([
+    ...(!positionBalance ? ["round5-position-balance-report-missing"] : []),
+    ...(positionBalance && !positionBalanceBindingCurrent
+      ? ["round5-position-balance-binding-stale"]
+      : []),
+    ...(positionBalance && !positionBalanceValid
+      ? ["round5-position-balance-report-invalid"]
+      : []),
+    ...(positionBalance?.blockingReasons || []),
+  ]);
   const frozenGapRefinement = modelReport?.frozenGapRefinement || null;
   const frozenGapStrict = frozenGapRefinement?.strictIssueCandidate || null;
   const frozenGapStrictValid = Boolean(
@@ -1817,6 +1890,17 @@ export async function summarizeRound5TargetedIntake({
   const declaredFailedGates = Array.isArray(modelReport?.failedGates)
     ? modelReport.failedGates
     : [];
+  const freshPositionConfoundedGates = positionBalanceValid
+    ? (positionBalance?.confoundedSplitGates || [])
+      .filter((item) => String(item).startsWith("fresh-blind:"))
+      .map((item) => String(item).slice("fresh-blind:".length))
+    : [...ROUND5_SEGMENT_GATES];
+  const promotionEligibleGates = declaredPromotedGates.filter(
+    (gate) => !freshPositionConfoundedGates.includes(gate),
+  );
+  const promotionBlockedGates = declaredPromotedGates.filter(
+    (gate) => freshPositionConfoundedGates.includes(gate),
+  );
   const modelGateSummaryCurrent = modelReport?.trainingPerformed === true
     ? Boolean(
         modelReport?.promotionScope === "independent-per-gate"
@@ -1981,15 +2065,58 @@ export async function summarizeRound5TargetedIntake({
           && modelSourceBindingCurrent
           && modelArtifactCurrent
           && modelGateSummaryCurrent
-          && modelIntegrityBlockingReasons.length === 0,
+          && modelIntegrityBlockingReasons.length === 0
+          && positionBalanceValid
+          && promotionEligibleGates.length > 0
       ),
       promotionScope: modelReport?.promotionScope || null,
-      promotedGates: declaredPromotedGates,
+      numericallyPromotedGates: declaredPromotedGates,
+      promotedGates: promotionEligibleGates,
+      promotionBlockedGates,
       failedGates: declaredFailedGates,
-      partialGatePromotionReady: modelReport?.partialGatePromotionReady === true,
-      allGatePromotionReady: modelReport?.allGatePromotionReady === true,
+      partialGateNumericFloorReady: modelReport?.partialGatePromotionReady === true,
+      partialGatePromotionReady: promotionEligibleGates.length > 0
+        && promotionEligibleGates.length < ROUND5_SEGMENT_GATES.length,
+      allGateNumericFloorReady: modelReport?.allGatePromotionReady === true,
+      allGatePromotionReady:
+        promotionEligibleGates.length === ROUND5_SEGMENT_GATES.length,
       modelArtifactCurrent,
       evaluation: modelReport?.evaluation || null,
+      calibrationFailureAudit: {
+        source: String(calibrationFailureAuditPath).replace(/\\/g, "/"),
+        valid: calibrationFailureAuditValid,
+        bindingCurrent: calibrationAuditBindingCurrent,
+        splitDiscipline: calibrationFailureAudit?.splitDiscipline || null,
+        retainedCandidateGates: calibrationFailureAudit?.retainedCandidateGates || [],
+        positionConfoundingDetectedGates:
+          calibrationFailureAudit?.positionConfoundingDetectedGates || [],
+        additionalCalibrationRequiredGates:
+          calibrationFailureAudit?.additionalCalibrationRequiredGates || [],
+        gates: calibrationFailureAudit?.gates || null,
+        nextCalibrationRequirements:
+          calibrationFailureAudit?.nextCalibrationRequirements || null,
+        newUntouchedFreshBlindRequired:
+          calibrationFailureAudit?.newUntouchedFreshBlindRequired === true,
+        promotionEvidenceEligible: false,
+        studentFacing: false,
+        automaticAccusationReady: false,
+        blockingReasons: calibrationFailureAuditBlockingReasons,
+      },
+      positionBalanceAudit: {
+        source: String(positionBalancePath).replace(/\\/g, "/"),
+        valid: positionBalanceValid,
+        bindingCurrent: positionBalanceBindingCurrent,
+        readyForRecording: positionBalance?.readyForRecording === true,
+        confoundedSplitGates: positionBalance?.confoundedSplitGates || [],
+        freshBlindConfoundedGates: freshPositionConfoundedGates,
+        requiredBalanceDimensions:
+          positionBalance?.requiredBalanceDimensions || [],
+        audioRead: false,
+        promotionEvidenceEligible: false,
+        studentFacing: false,
+        automaticAccusationReady: false,
+        blockingReasons: positionBalanceBlockingReasons,
+      },
       smokeDiagnostic: {
         source: ROUND5_SEGMENT_EDIT_PATH_SMOKE.replace(/\\/g, "/"),
         evidenceValid: smokeEvidenceValid,
@@ -2059,6 +2186,12 @@ export async function summarizeRound5TargetedIntake({
       automaticAccusationReady: false,
       productionAdoptionReady: false,
       promotionBlockingReasons: modelReport?.blockingReasons || [],
+      promotionEvidenceBlockingReasons: normalizedReasonList([
+        ...promotionBlockedGates.map(
+          (gate) => `round5-fresh-position-score-context-confounded:${gate}`,
+        ),
+        ...(!positionBalanceValid ? positionBalanceBlockingReasons : []),
+      ]),
       integrityBlockingReasons: modelIntegrityBlockingReasons,
       blockingReasons: modelBlockingReasons,
     },
@@ -4190,6 +4323,7 @@ export function summarizeNextActions(
   ) {
     const round5 = shadow.round5TargetedIntake || {};
     const segment = round5.segmentEditPathCandidate || {};
+    const calibrationAudit = segment.calibrationFailureAudit || {};
     const targetedRunner = segment.temporalOperationPathDiagnostic?.targetedFreshBlindRunner || {};
     const round5Evaluated = Boolean(
       round5.ready === true
@@ -4205,12 +4339,16 @@ export function summarizeNextActions(
       priority: 1,
       track: "Ordinary diagnosis recall",
       action: round5Evaluated
-        ? "The complete-inventory Round 5 frozen first run is complete and the fresh split is now consumed. The independent per-gate segment baseline promotes only `extra` to a teacher-review candidate (3/6 positives, 0/12 confusion false positives, precision 1.00, recall 0.50). `merged_substitution` is 1/6 with 1 false positive, `missing` is 0/6, and `drag` is 3/6 with 1 false positive, so those three gates fail. The pre-frozen gap paths also fail (strict missing 1/6 with 1 false positive); the strict rhythm conjunction reaches 4/12 at 0 false positives but recall 0.333 remains below the 0.50 floor. Freeze the passing extra result, diagnose and train the failed gates using calibration only, and require a newly registered untouched fresh split before any revised model is promoted. Strict confirmed recall remains 2/12 and all student automatic-accusation paths stay closed."
+        ? "The complete-inventory Round 5 frozen first run is complete and the fresh split is now consumed. `extra` numerically reaches 3/6 positives at 0/12 confusion false positives (precision 1.00, recall 0.50), but it is not promotion-eligible: in that fresh split, score context alone separates all 6 extra positives from all 12 negatives, while the evaluated model includes those score-context features. `merged_substitution`, `missing`, and `drag` also fail their numeric gates. A calibration-only audit found the same position confounding for all three failed gates; once score-only context features are prohibited, no stable performance-evidence candidate meets the joint floor. Therefore no Round 5 gate is currently promoted. Do not retune on this package. Collect new calibration and fresh positions matched across positive/confusion rows on previous interval, next interval, and segment-edge status, run the position-balance preflight before recording, then select and evaluate a revised performance-only model. Strict confirmed recall remains 2/12 and all student automatic-accusation paths stay closed."
         : round5ReadyForEvaluation
           ? "Round 5 complete-inventory intake is ready and hash-current. Run `npm run western:round5-segment-edit-path` once with the frozen parameters; do not inspect or retune against the fresh split before that run. Strict confirmed recall remains 2/12 and all student automatic-accusation paths stay closed."
           : "Strict confirmed recall remains 2/12. Raw temporal operation-path use reaches 11/12 but causes 55/253 false positives and is rejected. Three post-inspection candidates are frozen for untouched Round 5 only. Use docs/round5-targeted-diagnosis-capture-pack/index.html to complete the 12-take, complete-inventory matrix, then run the frozen fresh-blind gate without retuning.",
-      artifact: round5Evaluated || round5ReadyForEvaluation
-        ? segment.source
+      artifact: round5Evaluated
+        ? segment.positionBalanceAudit?.source
+          || calibrationAudit.source
+          || segment.source
+        : round5ReadyForEvaluation
+          ? segment.source
         : ROUND5_TEMPORAL_OPERATION_PATH.replace(/\\/g, "/"),
       reason: normalizedReasonList(
         round5Evaluated
@@ -4222,6 +4360,12 @@ export function summarizeNextActions(
               ...(targetedRunner.promotionBlockingReasons
                 || targetedRunner.blockingReasons
                 || []),
+              ...(calibrationAudit.positionConfoundingDetectedGates || []).map(
+                (gate) => `round5-calibration-score-context-confounded:${gate}`,
+              ),
+              ...(calibrationAudit.blockingReasons || []),
+              ...(segment.promotionEvidenceBlockingReasons || []),
+              ...(segment.positionBalanceAudit?.blockingReasons || []),
             ]
           : round5ReadyForEvaluation
             ? ["round5-frozen-first-run-not-performed"]
