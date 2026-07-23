@@ -1,6 +1,17 @@
 # Round 6 反向配平自动诊断采集计划
 
-状态：**录前设计通过，录音未到位，不能评测或晋升。**
+状态：**12 槽技术设计通过；当前只授权 Stage A 的 6 条 calibration，fresh 6 条未授权。**
+
+## 当前调度冻结
+
+- 权威分阶段协议：`docs/evidence/western-strings-p3-minimal-recording-preregistration-20260724.json`
+- 协议语义 SHA-256：`d08bff4b76a114feaf93f4d2d00fb2e37df54660d67b0edc7d6fc1f313777a3f`
+- 现在录：`r6-cal-a-01/02/03`、`r6-cal-b-01/02/03`，共 6 条；
+- 现在不要录：全部 `r6-fresh-*`；Stage A 执行时这些音频必须不存在；
+- `readyForRecording=true` 仅表示 12 槽技术包与材料可用，调度权威是 `recordingSchedule`；
+- 当前现场状态：`stageARecordingAuthorizedNow=true`、`stageBFreshRecordingAuthorizedNow=false`、`recordAllTwelveNow=false`；
+- Stage A 失败、崩溃或来源失配即收线，省掉 fresh 6 条，strict 保持 `2/12`；
+- 只有 Stage A 使用冻结参数训练出的候选通过既有真实干净域安全闸，才允许补 6 条 untouched fresh。
 
 ## 为什么不用固定目标槽
 
@@ -15,7 +26,7 @@ Round 5 的音频与 cal/fresh 映射无误，但标签位置混杂：
 
 - 合同：`config/western-strings-round6-counterbalanced-contract.json`
 - 4 份全新谱：calibration 2 份、fresh-blind 2 份；
-- 每份谱 3 次录音，共 12 条；
+- 每份谱 3 次录音，最大条件总包共 12 条；当前 Stage A 只执行其中 calibration 两谱×三次，共 6 条；
 - calibration/fresh 演奏者占位符完全分离，共 6 人、3 设备、4 房间；
 - 每类 gate 共 12 正例、24 混淆负例；fresh 为 6 正例、12 混淆负例；
 - 每个 gate 的每个目标位置在同谱三次录音中恰好出现 1 次正例和 2 次负例；
@@ -34,6 +45,8 @@ npm run test:western-round6-counterbalanced-capture-pack
 npm run test:western-round6-project-status
 npm run test:western-round5-truth-signoff-pack
 npm run test:western-round6-truth-signoff-apply
+npm run test:western-round6-stage-a-signoff
+npm run test:western-round6-stage-a-safety
 npm run test:western-round6-frozen-eval
 npm run test:western-round6-full-score-candidate
 npm run western:project-status
@@ -48,40 +61,54 @@ npm run western:project-status
 - `rhythmConfoundedSplits=[]`；
 - 预检 `audioRead=false`，不使用任何录音或表现标签。
 - 项目状态节点 `tracks.controlledCandidate.ordinaryDynamicShadow.round6CounterbalancedCapture` 从磁盘重算分母和材料，并把 position preflight、intake 分别绑定到当前 contract/manifest/truth 哈希；
-- 同一节点还现场重哈希评测协议绑定的执行守卫、全谱候选 runner、历史特征提取器、temporal-operation 规则、intake validator、音频特征分析器和 Round 6 合同；v2 协议 SHA-256 为 `a2fc7cbd8779b2eeb8ad414521431707a07a231640043a47ce6b02f4fc4427e9`，当前 `evaluationProtocol.runnerReady=true`、`freshBlindConsumed=false`、`evaluationPerformed=false`；
-- 当前该节点为 `readyForRecording=true`、`intakeReady=false`。篡改 truth、manifest 或合同后，旧报告不会继续显示绿灯。
+- 同一节点还现场重哈希评测协议绑定的执行守卫、全谱候选 runner、历史特征提取器、temporal-operation 规则、intake validator、音频特征分析器和 Round 6 合同；v2 协议 SHA-256 为 `7546020e1e0f326910b160c7bca0f12602c40bce9477efd764c4f23e2f4e3d75`，当前 `evaluationProtocol.runnerReady=true`、`freshBlindConsumed=false`、`evaluationPerformed=false`；
+- 当前该节点为 `readyForRecording=true`、`intakeReady=false`，同时 `recordingSchedule.valid=true`、当前精确外部输入为 6 条 calibration 音频、6 条同意、6 条许可、72 个 `asPerformed` 和 6 个完整错误清单。篡改 truth、manifest、合同、分阶段协议或其 12 个来源后，旧绿灯不会继续有效。
 
 私密材料位于 `data/private/western-strings-round6-counterbalanced/`。该目录不入 Git。
 
-## 录音后的签署
+## Stage A：当前六条录音与签署
 
-每条录音必须：
-
-1. 按对应 PDF 和 `*-演奏说明.md` 从头到尾完整演奏；
-2. 不得只录某一个 rotation；同谱三条必须全部完成；
-3. 12 条音频全部按 manifest 命名放好后，运行 `npm run western:round6-truth-signoff-pack`，打开私密目录下的 `truth-signoff/index.html`；
-4. 页面不显示任何机器预测；逐条试听后填写全部 `asPerformed`，必要时追加计划外错误，并签署每条 `completeErrorInventory`。同时核对每条实际演奏者匿名 ID、设备、房间、同意和仅本地许可；全部检查通过后下载 `western-round6-truth-signoff.completed.json`；
-5. 先只读预检，不写任何源文件：
+1. 只按对应 PDF 和 `*-演奏说明.md` 完整录制六条 `r6-cal-*`；同谱三条 rotation 必须全部完成，任何 `r6-fresh-*` 音频都不要放入目录。
+2. 运行：
 
    ```powershell
-   npm run western:round6-truth-signoff-apply -- --completed "下载文件的绝对路径"
+   npm run western:round6-stage-a-truth-signoff-pack
    ```
 
-   预检会重新核对合同、manifest、原始 truth、12 条音频 SHA、录音 ID 集、逐事件位置、6/3/4 覆盖和 cal/fresh 演奏者隔离。只有输出 `readyToApply=true` 才继续；
-6. 显式应用并自动留下按旧哈希命名的两份 `.bak`：
+   打开私密目录下的 `stage-a-truth-signoff/index.html`。页面无机器预测，只包含六条 calibration，并绑定六条音频 SHA。
+3. 逐条试听并完成 72 个 `asPerformed`、6 个 `completeErrorInventory`，必要时补计划外错误；同时核对每条实际演奏者匿名 ID、设备、房间、同意和仅本地许可，然后下载完成 JSON。
+4. 先 dry-run，不写源文件：
 
    ```powershell
-   npm run western:round6-truth-signoff-apply -- --completed "下载文件的绝对路径" --apply
+   npm run western:round6-stage-a-truth-signoff-apply -- --completed "下载文件的绝对路径"
    ```
 
-   此命令只更新私密 `position-truth.json` 的人工真值，以及 manifest 的演奏者、设备、房间、同意和许可五类字段；其余列保持原样；
-7. 因 manifest/truth 哈希已改变，依次重跑 `npm run western:round6-position-balance` 和 `npm run western:round6-targeted-intake`，不得沿用签署前报告。
-8. 只有 intake 输出 `ready=true` 后，运行一次且仅一次：
+   只有输出 `readyToApply=true` 才继续。预检会核对分阶段协议语义 SHA、原始合同/manifest/truth、六条音频 SHA、六条 calibration ID、72 个事件以及至少 3 演奏者/3 设备/2 房间；fresh 六行和 truth 必须保持未签署、未暴露。
+5. 显式应用：
 
    ```powershell
-   npm run western:round6-frozen-eval
+   npm run western:round6-stage-a-truth-signoff-apply -- --completed "下载文件的绝对路径" --apply
    ```
 
-   runner 只用 calibration 训练/检查候选，fresh 不参与选型；fresh 开始读取前即写 consumed ledger。评测器会把 fresh 的全部谱面位置逐 gate 展开，除该 gate 签署正例外全部计入严格假阳分母，不能只在预设混淆槽位上报 `0 FP`。任何数值过门只形成晋升证据，不等于发布授权，`automaticAccusationReady` 和学生端开关仍保持 false，必须另走显式发布决定。
+   工具只更新六条 calibration，保留 fresh 六行和 72 个未签署事件，并留下旧哈希备份及 `western-round6-stage-a-signoff-lineage-v1` ledger。
+6. 重跑位置平衡并做只读安全预检：
 
-当前 intake 只证明设计分母完整：12 条、144 事件、四类各 `12/24`，fresh 各 `6/12`。它保持 `ready=false`；项目状态现场重算的待补量为 12 条音频、12 条同意、12 条许可、144 个 `asPerformed` 和 12 个完整错误清单。签署页和 frozen eval 当前都会因输入未到位而非零退出；后者保持 `freshBlindConsumed=false`，不会提前读取或消耗 fresh。这是正确的 fail-closed 状态。
+   ```powershell
+   npm run western:round6-position-balance
+   npm run western:round6-stage-a-safety-preflight
+   ```
+
+   预检要求 fresh 音频不存在，六条 calibration 的音频/签署/授权/来源全部 current，并再次确认位置混淆为空。
+7. 预检通过后只执行一次：
+
+   ```powershell
+   npm run western:round6-stage-a-safety-eval
+   ```
+
+   它只用 calibration 拟合冻结的逐 gate RF，并在读取既有 clean 安全结果前写 consumed ledger。随后检查：本地权威 clean `FP=0`、Round 5 已消费普通位置 `FP=0`、公开专业合并负担 `≤5/1000`、任一公开录音 `≤10/1000`。任一超限、崩溃或绑定失配均 fail-closed，不得重跑，也不得录 fresh。
+
+## Stage B：仅在安全闸通过后
+
+只有 `western:project-status` 明确给出 `recordingSchedule.stageBFreshRecordingAuthorizedNow=true` 时，才录 `r6-fresh-a-01/02/03` 与 `r6-fresh-b-01/02/03`。冻结模型、特征、0.5 决策点和安全门槛不得再改；fresh 只允许读取一次。完整包随后仍按全谱严格分母执行 `P>=0.90 / R>=0.50 / strict FP=0`，任何数值通过只形成性能证据，不等于发布授权，`automaticAccusationReady` 与学生端三个开关继续保持 false。
+
+当前状态是正确的 fail-closed：Stage A 待补 6 条音频、6 条同意、6 条许可、72 个 `asPerformed` 和 6 个完整错误清单；Stage B fresh 未授权且未消费。

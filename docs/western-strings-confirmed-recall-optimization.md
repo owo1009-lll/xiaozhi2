@@ -57,7 +57,9 @@ Round 5 intake 已接入总项目状态并做实时哈希绑定。2026-07-23 当
 
 同一审计的 v2 又把节奏目标与每条录音的全部谱音负例比较。虽然冻结 soft/strict 节奏合取原始结果为 `4/12 @ 0/312 FP`，静态谱面上下文随机森林却能在 calibration 和 fresh 各自的留一录音中达到 `12/12 @ 0/324 FP`。这说明固定 extra/drag 槽位本身可被书面时值、拍位、相邻音程和归一化位置识别；原始数字可保留为诊断，却不能证明演奏识别 precision 泛化。下一轮必须让相同谱面结构在不同录音中轮换为 extra、drag 和正常角色，且在录音前通过全谱位置预检。
 
-该下一轮现已落成 `western-round6-counterbalanced-diagnosis-v1` 候选包。每份谱录三次，同一位置在三次中恰好轮换为 1 次正例和 2 次混淆负例；calibration 与 fresh 各使用两份独立新谱及不重叠演奏者占位。12 条、144 事件和四类分母已生成，v2 录前预检为全绿；但音频与逐事件人工签署尚未到位，所以这里只消除了数据设计 blocker，不构成新的模型证据或召回提升。
+该下一轮现已落成 `western-round6-counterbalanced-diagnosis-v1` 候选包。每份谱录三次，同一位置在三次中恰好轮换为 1 次正例和 2 次混淆负例；calibration 与 fresh 各使用两份独立新谱及不重叠演奏者占位。12 槽、144 事件和四类分母已生成，v2 录前预检为全绿；这只说明**最大条件总包**的设计和材料可用，不是现在一次录满 12 条的授权，也不构成新的模型证据或召回提升。
+
+P0–P2 零录音工作随后已全部榨完：7 个可直接运行候选全部因真实干净域过度标注被淘汰；Bach10、URMP、MusicNet 共 5,326 个公开参考音符中没有独立裁定错误正例，也没有同声部正确/错误演奏对。唯一剩余的预注册候选 `performance-only-RF-v2` 必须用真实反平衡 calibration 拟合。因此 P3 语义 SHA-256=`d08bff4b76a114feaf93f4d2d00fb2e37df54660d67b0edc7d6fc1f313777a3f` 已把录制拆为两段：现在只授权 6 条 calibration；先按冻结参数训练并在既有真实 clean 域过安全闸，任一超限即收线并省掉 fresh；只有全部通过才条件追加 6 条 untouched fresh。`readyForRecording=true` 只表示技术包就绪，当前调度权威字段是 `recordingSchedule.stageARecordingAuthorizedNow=true`、`stageBFreshRecordingAuthorizedNow=false`。
 
 在不占用晋升分母的架构烟测中，r2-01 注入训练、r2-08 曲目留出，再投已查看 Round 4：结构特征基线为 `5/12` 命中、`6/253` 非故意位置误指控，P/R=`45.45%/41.67%`；加入固定 RMS/pYIN/onset 后降为 `1/12 @ 2/253`、P/R=`33.33%/8.33%`，且四个正确 gate 的 TP 合计为 0。两种均 `architectureCandidateRetained=false`，不接复核台；固定随机森林只保留为将来真实数据上的基线，下一模型族必须显式学习连续时序操作路径，而不是继续叠声学手工特征。
 
@@ -73,7 +75,7 @@ Round 6 录音到位前又完成一次候选输入审计：旧全谱 runner 实�
 
 候选已经接入 Round 5 targeted runner，而不是只留在回顾性脚本：gap 的 `self_check_hint` 仍保留，同时新增 missing-targeted 严格层；只有整条 assignment gap `<=5` 且 gap rate `<=10%` 才可输出 `issue_detected_candidate`，否则回退证据不足。节奏结构合取只评 `extra`/`drag`，relative-IOI `>0.15`、事件置信度 `>=0.75` 且 operation-path 必须同位置有候选；时值比 `>=1.20` 为软层，复用已有冻结值 `>=1.30` 为严格层。Round 5 首跑已经否定这些回顾性上限的晋升资格：gap 自查为 `1/12 @ 1 FP`，missing 严格层为 `1/6 @ 1 FP`；节奏 soft/strict 均为 `4/12 @ 0 FP`、recall=`33.33%`，且固定节奏目标位置可被纯谱面上下文完全识别。它们既未过原冻结 recall 地板，也没有有效的位置配平证据；正式严格确诊继续为 **2/12**。
 
-本轮采集、签署、身份核对和首跑均已完成，当前 12 条证据视为已消费。calibration-only 留一录音审计进一步发现 merged、missing、drag 的标签都被纯谱面音程上下文完美分开；排除前后音程和片段边界等静态特征后，没有稳定候选过门。因此下一步不能在旧 calibration 上继续调模，必须同时重做位置配平的 calibration 和 untouched fresh。
+本轮采集、签署、身份核对和首跑均已完成，当前 12 条证据视为已消费。calibration-only 留一录音审计进一步发现 merged、missing、drag 的标签都被纯谱面音程上下文完美分开；排除前后音程和片段边界等静态特征后，没有稳定候选过门。因此不能在旧 calibration 上继续调模；新技术设计必须同时保证 calibration 与 untouched fresh 都反平衡，但录制顺序按 P3 分阶段执行，先 6 条 calibration，安全闸通过后才录 fresh 6 条。
 
 边界必须同时保留：gap 健康守卫、软节奏与高置信节奏合取都未通过 Round 5，片段模型的 extra 也因 fresh 位置混杂不能晋升；`strictConfirmedRecallUnchanged=true`，所以严格确诊仍是 `2/12`，`reviewAssistPromotionReady=false`、`automaticAccusationEvidenceReady=false`、`automaticAccusationReady=false`。健康守卫把长曲降级为证据不足，不等于证明长曲正确；节奏严格层的 13 个专业长曲候选也没有逐音人工真值。可复跑：
 
