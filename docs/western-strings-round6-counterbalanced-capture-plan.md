@@ -28,6 +28,8 @@ Round 5 的音频与 cal/fresh 映射无误，但标签位置混杂：
 npm run western:round6-counterbalanced-capture-pack
 npm run western:round6-position-balance
 npm run test:western-round6-counterbalanced-capture-pack
+npm run test:western-round6-project-status
+npm run western:project-status
 ```
 
 当前结果：
@@ -38,6 +40,8 @@ npm run test:western-round6-counterbalanced-capture-pack
 - `confoundedSplitGates=[]`；
 - `rhythmConfoundedSplits=[]`；
 - 预检 `audioRead=false`，不使用任何录音或表现标签。
+- 项目状态节点 `tracks.controlledCandidate.ordinaryDynamicShadow.round6CounterbalancedCapture` 从磁盘重算分母和材料，并把 position preflight、intake 分别绑定到当前 contract/manifest/truth 哈希；
+- 当前该节点为 `readyForRecording=true`、`intakeReady=false`。篡改 truth、manifest 或合同后，旧报告不会继续显示绿灯。
 
 私密材料位于 `data/private/western-strings-round6-counterbalanced/`。该目录不入 Git。
 
@@ -53,4 +57,4 @@ npm run test:western-round6-counterbalanced-capture-pack
 6. 音频按 manifest 的 `recordingId.m4a` 放入同一私密目录；
 7. 运行 `npm run western:round6-targeted-intake`。
 
-当前 intake 只证明设计分母完整：12 条、144 事件、四类各 `12/24`，fresh 各 `6/12`。它保持 `ready=false`，因为音频、同意/许可和人工签署尚未到位。这是正确的 fail-closed 状态。
+当前 intake 只证明设计分母完整：12 条、144 事件、四类各 `12/24`，fresh 各 `6/12`。它保持 `ready=false`；项目状态现场重算的待补量为 12 条音频、12 条同意、12 条许可、144 个 `asPerformed` 和 12 个完整错误清单。这是正确的 fail-closed 状态。
