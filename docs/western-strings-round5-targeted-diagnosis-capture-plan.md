@@ -55,6 +55,6 @@
 npm run western:round5-position-balance -- --manifest <new-manifest.csv> --truth <new-position-truth.json> --require-ready
 ```
 
-该预检不读取音频，只检查每个 split、每个 gate 的正例/混淆负例是否会被 `scorePreviousInterval / scoreNextInterval / segmentEdgeStatus` 单独分开；任何一项可分即非零退出，先换位置再录。模型候选也禁止使用这些静态谱面上下文特征。只有位置预检通过、calibration performance-only 留一录音过门后，才允许生成新的 untouched fresh 包。
+该预检不读取音频。v2 除逐 gate 正例/混淆负例外，还把 extra+drag 节奏正例与每条录音的全部其余谱音比较；检查维度包括相邻音程、书面时值及相邻时值比、拍位/拍强、重复音、归一化位置和段落边界，并同时运行留一录音单特征规则与静态随机森林。任何纯谱面模型达到预注册复核地板即非零退出，必须先让同一结构跨录音轮换为正例与正常角色再录。演奏识别模型也禁止把这些静态上下文当作独立阳性证据。只有位置预检通过、calibration performance-only 留一录音过门后，才允许生成新的 untouched fresh 包。
 
 为排除采集目录误标，`npm run western:round5-audio-score-identity` 只用音频提取的音高事件与 12 份冻结 MusicXML 做全交叉匹配，不读取 `position-truth.json` 或 gate 结果。当前 12/12 均匹配同名谱，全局一对一分配也是原位，结论为 `current-mapping-confirmed`，cal/fresh 没有反置。

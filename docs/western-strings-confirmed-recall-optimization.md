@@ -55,6 +55,10 @@ Round 5 intake 已接入总项目状态并做实时哈希绑定。2026-07-23 当
 
 片段模型入口也已落地：`western:round5-segment-edit-path` 只消费通过 intake 的 calibration/fresh-blind 分割，按 merged-substitution/missing/extra/drag 四个子闸分别训练固定随机森林，并以连续五音的局部 edit-path 证据评测。2026-07-23 首跑的原始数字只有 `extra` 达到 `3/6 @ 0/12 confusion FP`、P/R=`100%/50%`；但后续谱面位置平衡审计证明 fresh-extra 的 6 正/12 负可由前一音程单特征完全分开，而模型含该静态特征，所以这个数值通过不具晋升效力。状态现区分 `numericallyPromotedGates=["extra"]` 与有效 `promotedGates=[]`；`reviewAssistPromotionReady=false`，学生端、自动指控与生产采纳仍全部为 false。
 
+同一审计的 v2 又把节奏目标与每条录音的全部谱音负例比较。虽然冻结 soft/strict 节奏合取原始结果为 `4/12 @ 0/312 FP`，静态谱面上下文随机森林却能在 calibration 和 fresh 各自的留一录音中达到 `12/12 @ 0/324 FP`。这说明固定 extra/drag 槽位本身可被书面时值、拍位、相邻音程和归一化位置识别；原始数字可保留为诊断，却不能证明演奏识别 precision 泛化。下一轮必须让相同谱面结构在不同录音中轮换为 extra、drag 和正常角色，且在录音前通过全谱位置预检。
+
+该下一轮现已落成 `western-round6-counterbalanced-diagnosis-v1` 候选包。每份谱录三次，同一位置在三次中恰好轮换为 1 次正例和 2 次混淆负例；calibration 与 fresh 各使用两份独立新谱及不重叠演奏者占位。12 条、144 事件和四类分母已生成，v2 录前预检为全绿；但音频与逐事件人工签署尚未到位，所以这里只消除了数据设计 blocker，不构成新的模型证据或召回提升。
+
 在不占用晋升分母的架构烟测中，r2-01 注入训练、r2-08 曲目留出，再投已查看 Round 4：结构特征基线为 `5/12` 命中、`6/253` 非故意位置误指控，P/R=`45.45%/41.67%`；加入固定 RMS/pYIN/onset 后降为 `1/12 @ 2/253`、P/R=`33.33%/8.33%`，且四个正确 gate 的 TP 合计为 0。两种均 `architectureCandidateRetained=false`，不接复核台；固定随机森林只保留为将来真实数据上的基线，下一模型族必须显式学习连续时序操作路径，而不是继续叠声学手工特征。
 
 ## 显式 temporal operation-path 结果
@@ -65,7 +69,7 @@ Round 5 intake 已接入总项目状态并做实时哈希绑定。2026-07-23 当
 
 公开专业长曲压力给出了相反边界：Oliver Colbentson 两段 BWV1006 在正确展开反复记号后共有 2,301 个谱音，产生 936 个 assignment gap、595 个精炼提示，即 258.58 个提示/千音。由于没有逐音演奏错误人工 gold，这 595 个提示不能记作 FP；它们是实际可见的复核负担。故 `generalPurposeCandidateRetained=false`，该规则不得推广到任意专业长曲。它只保留为 Round 5 短篇学生混淆对的冻结候选，能否把正式确诊从 2/12 提高，仍只能由新的逐音人工真值 fresh-blind 决定。
 
-候选已经接入 Round 5 targeted runner，而不是只留在回顾性脚本：gap 的 `self_check_hint` 仍保留，同时新增 missing-targeted 严格层；只有整条 assignment gap `<=5` 且 gap rate `<=10%` 才可输出 `issue_detected_candidate`，否则回退证据不足。节奏结构合取只评 `extra`/`drag`，relative-IOI `>0.15`、事件置信度 `>=0.75` 且 operation-path 必须同位置有候选；时值比 `>=1.20` 为软层，复用已有冻结值 `>=1.30` 为严格层。Round 5 首跑已经否定这些回顾性上限的晋升资格：gap 自查为 `1/12 @ 1 FP`，missing 严格层为 `1/6 @ 1 FP`；节奏 soft/strict 均为 `4/12 @ 0 FP`、recall=`33.33%`。它们均未过 precision≥0.90、target recall≥0.50、strict FP=0，正式严格确诊继续为 **2/12**。
+候选已经接入 Round 5 targeted runner，而不是只留在回顾性脚本：gap 的 `self_check_hint` 仍保留，同时新增 missing-targeted 严格层；只有整条 assignment gap `<=5` 且 gap rate `<=10%` 才可输出 `issue_detected_candidate`，否则回退证据不足。节奏结构合取只评 `extra`/`drag`，relative-IOI `>0.15`、事件置信度 `>=0.75` 且 operation-path 必须同位置有候选；时值比 `>=1.20` 为软层，复用已有冻结值 `>=1.30` 为严格层。Round 5 首跑已经否定这些回顾性上限的晋升资格：gap 自查为 `1/12 @ 1 FP`，missing 严格层为 `1/6 @ 1 FP`；节奏 soft/strict 均为 `4/12 @ 0 FP`、recall=`33.33%`，且固定节奏目标位置可被纯谱面上下文完全识别。它们既未过原冻结 recall 地板，也没有有效的位置配平证据；正式严格确诊继续为 **2/12**。
 
 本轮采集、签署、身份核对和首跑均已完成，当前 12 条证据视为已消费。calibration-only 留一录音审计进一步发现 merged、missing、drag 的标签都被纯谱面音程上下文完美分开；排除前后音程和片段边界等静态特征后，没有稳定候选过门。因此下一步不能在旧 calibration 上继续调模，必须同时重做位置配平的 calibration 和 untouched fresh。
 
