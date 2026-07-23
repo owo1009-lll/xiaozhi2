@@ -814,23 +814,73 @@ assert.equal(
 );
 assert.equal(round6CounterbalancedCapture?.contractValid, true);
 assert.equal(round6CounterbalancedCapture?.bindings?.positionBalance, true);
-assert.equal(round6CounterbalancedCapture?.bindings?.intake, true);
-assert.equal(round6CounterbalancedCapture?.bindings?.evaluationProtocol, true);
+  assert.equal(round6CounterbalancedCapture?.bindings?.intake, true);
+  assert.equal(round6CounterbalancedCapture?.bindings?.evaluationProtocol, true);
+  assert.equal(round6CounterbalancedCapture?.bindings?.stagedProtocol, true);
 assert.equal(round6CounterbalancedCapture?.designCountsReady, true);
 assert.equal(round6CounterbalancedCapture?.materialsReady, true);
-assert.equal(round6CounterbalancedCapture?.readyForRecording, true);
+  assert.equal(round6CounterbalancedCapture?.readyForRecording, true);
+  assert.equal(
+    round6CounterbalancedCapture?.readyForRecordingMeaning,
+    "technical-twelve-take-pack-ready-not-all-at-once-scheduling-authority",
+  );
 assert.equal(round6CounterbalancedCapture?.intakeReady, false);
 assert.equal(round6CounterbalancedCapture?.recordingComplete, false);
 assert.equal(round6CounterbalancedCapture?.counts?.recordings, 12);
 assert.equal(round6CounterbalancedCapture?.counts?.truthEvents, 144);
 assert.equal(round6CounterbalancedCapture?.counts?.audioFiles, 0);
-assert.deepEqual(round6CounterbalancedCapture?.remainingExternalInput, {
+  assert.deepEqual(round6CounterbalancedCapture?.remainingExternalInput, {
   audioFiles: 12,
   consentRows: 12,
   licenseRows: 12,
   signedEvents: 144,
-  completeInventories: 12,
-});
+    completeInventories: 12,
+  });
+  const round6Schedule = round6CounterbalancedCapture?.recordingSchedule;
+  assert.equal(
+    round6Schedule?.contract,
+    "western-p3-staged-minimal-recording-protocol-v1",
+  );
+  assert.equal(round6Schedule?.valid, true);
+  assert.equal(round6Schedule?.semanticHashCurrent, true);
+  assert.equal(round6Schedule?.sourceBindingsCurrent, true);
+  assert.equal(
+    round6Schedule?.protocolSemanticSha256,
+    "d08bff4b76a114feaf93f4d2d00fb2e37df54660d67b0edc7d6fc1f313777a3f",
+  );
+  assert.equal(
+    round6Schedule?.observedProtocolSemanticSha256,
+    round6Schedule?.protocolSemanticSha256,
+  );
+  assert.equal(
+    round6Schedule?.currentAuthorizedRecordingScope,
+    "stage-a-calibration-six-only",
+  );
+  assert.equal(round6Schedule?.minimumUnavoidableRecordingsNow, 6);
+  assert.equal(round6Schedule?.conditionalAdditionalFreshRecordings, 6);
+  assert.equal(round6Schedule?.maximumConditionalTotal, 12);
+  assert.equal(round6Schedule?.recordAllTwelveNow, false);
+  assert.equal(round6Schedule?.allTwelveRecordingAuthorizedNow, false);
+  assert.equal(round6Schedule?.stageARecordingAuthorizedNow, true);
+  assert.deepEqual(round6Schedule?.stageARecordingIds, [
+    "r6-cal-a-01",
+    "r6-cal-a-02",
+    "r6-cal-a-03",
+    "r6-cal-b-01",
+    "r6-cal-b-02",
+    "r6-cal-b-03",
+  ]);
+  assert.equal(round6Schedule?.stageARecordingComplete, false);
+  assert.equal(round6Schedule?.stageASafetyEvaluationPassed, false);
+  assert.equal(round6Schedule?.stageBFreshRecordingAuthorizedNow, false);
+  assert.deepEqual(round6Schedule?.currentStageExternalInput, {
+    audioFiles: 6,
+    consentRows: 6,
+    licenseRows: 6,
+    signedEvents: 72,
+    completeInventories: 6,
+  });
+  assert.deepEqual(round6Schedule?.blockingReasons, []);
 assert.deepEqual(
   round6CounterbalancedCapture?.positionBalance?.confoundedSplitGates,
   [],
@@ -1027,21 +1077,22 @@ const ordinaryRecallAction = status.nextActions.find(
   (action) => action.track === "Ordinary diagnosis recall",
 );
 assert(
-  ordinaryRecallAction?.action.includes("Round 5 is consumed")
-    && ordinaryRecallAction?.action.includes("Round 6 counterbalanced")
-    && ordinaryRecallAction?.action.includes("western:round6-truth-signoff-pack")
-    && ordinaryRecallAction?.action.includes("western:round6-targeted-intake")
-    && ordinaryRecallAction?.action.includes("western:round6-frozen-eval")
+  ordinaryRecallAction?.action.includes("P0–P2 已全部榨完")
+    && ordinaryRecallAction?.action.includes("Stage A 的 6 条 calibration")
+    && ordinaryRecallAction?.action.includes("不要录 6 条 fresh")
+    && ordinaryRecallAction?.action.includes("western:round6-stage-a-truth-signoff-pack")
+    && ordinaryRecallAction?.action.includes("western:round6-stage-a-safety-preflight")
+    && ordinaryRecallAction?.action.includes("western:round6-stage-a-safety-eval")
     && ordinaryRecallAction?.action.includes("2/12"),
-  "the recall handoff must expose the consumed Round-5 verdict and ready-to-record Round-6 plan",
+  "the recall handoff must expose the exhausted zero-recording work and six-take Stage-A plan",
 );
 assert.equal(
   ordinaryRecallAction?.artifact,
-  "docs/western-strings-round6-counterbalanced-capture-plan.md",
+  "docs/western-strings-p3-minimal-recording-plan.md",
 );
-assert(
-  ordinaryRecallAction?.reason.includes("round6-counterbalanced-audio-pending:12"),
-);
+assert.deepEqual(ordinaryRecallAction?.reason, [
+  "policy-c-auto-accusation-closed",
+]);
 const reviewAssistCalibrationAction = status.nextActions.find(
   (action) => action.track === "Ordinary review-assist calibration",
 );

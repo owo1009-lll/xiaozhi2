@@ -60,6 +60,7 @@ function renderHtml({
   manifestSha256,
   truthSha256,
   roundNumber = 5,
+  scope = null,
 }) {
   const roundLabel = `Round ${roundNumber}`;
   const payload = JSON.stringify({
@@ -69,6 +70,7 @@ function renderHtml({
     manifestSha256,
     truthSha256,
     roundNumber,
+    scope,
   })
     .replace(/</g, "\\u003c");
   return `<!doctype html>
@@ -247,6 +249,7 @@ function validateAndBuild(){
   const output={
     contractVersion:"${COMPLETED_CONTRACT}",
     roundNumber:PACK.roundNumber,
+    ...(PACK.scope?{scope:PACK.scope}:{}),
     sourceContractSha256:PACK.contractSha256,
     sourceManifestSha256:PACK.manifestSha256,
     sourceTruthSha256:PACK.truthSha256,
@@ -282,6 +285,7 @@ export async function writeTruthSignoffPack({
   truthPath = DEFAULT_TRUTH,
   outDir = DEFAULT_OUT,
   roundNumber = 5,
+  split,
 } = {}) {
   if (![5, 6].includes(Number(roundNumber))) {
     throw new Error(`unsupported round number: ${roundNumber}`);
@@ -301,6 +305,12 @@ export async function writeTruthSignoffPack({
   const output = path.resolve(root, outDir);
   const blockers = [];
   const recordings = [];
+  const selectedSplit = split ? String(split).trim() : "";
+  if (selectedSplit && (
+    Number(roundNumber) !== 6 || selectedSplit !== "calibration"
+  )) {
+    throw new Error(`unsupported truth-signoff split: ${selectedSplit}`);
+  }
   const expectedContract = Number(roundNumber) === 6
     ? "western-round6-counterbalanced-diagnosis-v1"
     : "western-round5-targeted-diagnosis-intake-v1";
@@ -313,8 +323,25 @@ export async function writeTruthSignoffPack({
   for (const row of manifest) {
     if (!truth.recordings?.[row.recordingId]) {
       blockers.push(`round${roundNumber}-signoff-truth-recording-missing:${row.recordingId}`);
-      continue;
     }
+  }
+  for (const recordingId of Object.keys(truth.recordings || {})) {
+    if (!manifest.some((row) => row.recordingId === recordingId)) {
+      blockers.push(`round${roundNumber}-signoff-manifest-recording-missing:${recordingId}`);
+    }
+  }
+  const selectedManifest = selectedSplit
+    ? manifest.filter((row) => row.split === selectedSplit)
+    : manifest;
+  if (selectedSplit && selectedManifest.length !== 6) {
+    blockers.push(
+      `round${roundNumber}-signoff-scope-recording-count-invalid:${
+        selectedManifest.length
+      }/6`,
+    );
+  }
+  for (const row of selectedManifest) {
+    if (!truth.recordings?.[row.recordingId]) continue;
     const audioPath = path.resolve(root, row.audioPath);
     try {
       const audioBytes = await fs.readFile(audioPath);
@@ -331,22 +358,32 @@ export async function writeTruthSignoffPack({
       );
     }
   }
-  for (const recordingId of Object.keys(truth.recordings || {})) {
-    if (!manifest.some((row) => row.recordingId === recordingId)) {
-      blockers.push(`round${roundNumber}-signoff-manifest-recording-missing:${recordingId}`);
-    }
-  }
   if (blockers.length) {
     return { ok: false, readyForSignoff: false, blockingReasons: blockers };
   }
+  const selectedRecordingIds = recordings.map((row) => row.recordingId);
+  const scopedTruth = selectedSplit
+    ? {
+      ...truth,
+      recordings: Object.fromEntries(
+        selectedRecordingIds.map(
+          (recordingId) => [recordingId, truth.recordings[recordingId]],
+        ),
+      ),
+    }
+    : truth;
+  const scope = selectedSplit
+    ? { split: selectedSplit, recordingIds: selectedRecordingIds }
+    : null;
   await fs.mkdir(output, { recursive: true });
   const html = renderHtml({
-    truth,
+    truth: scopedTruth,
     recordings,
     contractSha256: contractSource.sha256,
     manifestSha256: manifestSource.sha256,
     truthSha256: truthSource.sha256,
     roundNumber: Number(roundNumber),
+    scope,
   });
   const pagePath = path.join(output, "index.html");
   await fs.writeFile(pagePath, html, "utf8");
@@ -363,6 +400,7 @@ export async function writeTruthSignoffPack({
       0,
     ),
     audioHashesBound: recordings.length,
+    scope,
     machinePredictionsIncluded: false,
     blockingReasons: [],
   };
@@ -379,6 +417,7 @@ function parseArgs(argv) {
     else if (arg === "--truth") args.truthPath = argv[++index];
     else if (arg === "--out") args.outDir = argv[++index];
     else if (arg === "--round") args.roundNumber = Number(argv[++index]);
+    else if (arg === "--split") args.split = argv[++index];
     else throw new Error(`unknown argument: ${arg}`);
   }
   return args;

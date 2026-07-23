@@ -186,6 +186,34 @@ const ROUND6_EVALUATION_REPORT = path.join(
   "western-strings-round6-frozen-evaluation",
   "report.json",
 );
+const P3_MINIMAL_RECORDING_PROTOCOL = path.join(
+  "docs",
+  "evidence",
+  "western-strings-p3-minimal-recording-preregistration-20260724.json",
+);
+const ROUND6_STAGE_A_SIGNOFF_LINEAGE = path.join(
+  "data",
+  "experiments",
+  "western-strings-round6-stage-a-signoff",
+  "ledger.json",
+);
+const ROUND6_STAGE_A_SAFETY_ROOT = path.join(
+  "data",
+  "experiments",
+  "western-strings-round6-stage-a-safety",
+);
+const ROUND6_STAGE_A_SAFETY_REPORT = path.join(
+  ROUND6_STAGE_A_SAFETY_ROOT,
+  "report.json",
+);
+const ROUND6_STAGE_A_SAFETY_MODEL = path.join(
+  ROUND6_STAGE_A_SAFETY_ROOT,
+  "model.joblib",
+);
+const ROUND6_STAGE_A_SAFETY_CONSUMED = path.join(
+  ROUND6_STAGE_A_SAFETY_ROOT,
+  "consumed-ledger.json",
+);
 const ROUND5_SEGMENT_EDIT_PATH_SMOKE = path.join(
   "docs",
   "evidence",
@@ -201,6 +229,28 @@ const ROUND5_REVIEW_ASSIST_CALIBRATION_CONTRACT =
   "western-round5-review-assist-calibration-pack-v1";
 const ROUND6_COUNTERBALANCED_CONTRACT_VERSION = "western-round6-counterbalanced-diagnosis-v1";
 const ROUND6_EVALUATION_PROTOCOL_VERSION = "western-round6-frozen-evaluation-protocol-v1";
+const P3_MINIMAL_RECORDING_PROTOCOL_VERSION =
+  "western-p3-staged-minimal-recording-protocol-v1";
+const ROUND6_STAGE_A_SIGNOFF_LINEAGE_VERSION =
+  "western-round6-stage-a-signoff-lineage-v1";
+const ROUND6_STAGE_A_SAFETY_VERSION =
+  "western-round6-stage-a-clean-safety-v1";
+const ROUND6_STAGE_A_SAFETY_CONSUMED_VERSION =
+  "western-round6-stage-a-clean-safety-consumed-v1";
+const P3_MINIMAL_RECORDING_REQUIRED_SOURCE_PATHS = Object.freeze([
+  "docs/evidence/western-strings-p1-clean-domain-preregistration-20260724.json",
+  "docs/evidence/western-strings-p1-clean-domain-safety-20260724.json",
+  "docs/evidence/western-strings-p2-public-error-recall-audit-20260724.json",
+  "config/western-strings-round6-evaluation-protocol.json",
+  "config/western-strings-round6-counterbalanced-contract.json",
+  "data/private/western-strings-round6-counterbalanced/manifest.csv",
+  "data/private/western-strings-round6-counterbalanced/position-truth.json",
+  "scripts/generate-western-round5-truth-signoff-pack.mjs",
+  "scripts/apply-western-truth-signoff.mjs",
+  "scripts/run_western_round6_stage_a_safety.py",
+  "scripts/experiments/train_western_round6_full_score_candidate.py",
+  "package.json",
+]);
 const ROUND5_SEGMENT_GATES = Object.freeze([
   "merged_substitution",
   "missing",
@@ -1854,6 +1904,11 @@ export async function summarizeRound6CounterbalancedCapture({
   intakePath = ROUND6_COUNTERBALANCED_INTAKE,
   evaluationProtocolPath = ROUND6_EVALUATION_PROTOCOL,
   evaluationReportPath = ROUND6_EVALUATION_REPORT,
+  stagedProtocolPath = P3_MINIMAL_RECORDING_PROTOCOL,
+  stageASignoffLineagePath = ROUND6_STAGE_A_SIGNOFF_LINEAGE,
+  stageASafetyReportPath = ROUND6_STAGE_A_SAFETY_REPORT,
+  stageASafetyModelPath = ROUND6_STAGE_A_SAFETY_MODEL,
+  stageASafetyConsumedPath = ROUND6_STAGE_A_SAFETY_CONSUMED,
   materialsRoot = path.dirname(manifestPath),
   workspaceRoot = process.cwd(),
 } = {}) {
@@ -1865,9 +1920,18 @@ export async function summarizeRound6CounterbalancedCapture({
     intake,
     evaluationProtocol,
     evaluationReport,
+    stagedProtocol,
+    stageASignoffLineage,
+    stageASafetyReport,
+    stageASafetyConsumed,
     contractSha256,
     manifestSha256,
     truthSha256,
+    stagedProtocolSha256,
+    stageASignoffLineageSha256,
+    stageASafetyReportSha256,
+    stageASafetyModelSha256,
+    stageASafetyConsumedSha256,
   ] = await Promise.all([
     readJson(contractPath),
     readCsv(manifestPath),
@@ -1876,9 +1940,18 @@ export async function summarizeRound6CounterbalancedCapture({
     readJson(intakePath),
     readJson(evaluationProtocolPath),
     readJson(evaluationReportPath),
+    readJson(path.resolve(workspaceRoot, stagedProtocolPath)),
+    readJson(path.resolve(workspaceRoot, stageASignoffLineagePath)),
+    readJson(path.resolve(workspaceRoot, stageASafetyReportPath)),
+    readJson(path.resolve(workspaceRoot, stageASafetyConsumedPath)),
     sha256FileOrEmpty(contractPath),
     sha256FileOrEmpty(manifestPath),
     sha256FileOrEmpty(truthPath),
+    sha256FileOrEmpty(path.resolve(workspaceRoot, stagedProtocolPath)),
+    sha256FileOrEmpty(path.resolve(workspaceRoot, stageASignoffLineagePath)),
+    sha256FileOrEmpty(path.resolve(workspaceRoot, stageASafetyReportPath)),
+    sha256FileOrEmpty(path.resolve(workspaceRoot, stageASafetyModelPath)),
+    sha256FileOrEmpty(path.resolve(workspaceRoot, stageASafetyConsumedPath)),
   ]);
   const frozenMinimums = {
     performers: 6,
@@ -1943,6 +2016,91 @@ export async function summarizeRound6CounterbalancedCapture({
       return "";
     }
   };
+  const stagedProtocolBindings = Array.isArray(stagedProtocol?.sourceBindings)
+    ? stagedProtocol.sourceBindings : [];
+  const observedStagedProtocolBindings = await Promise.all(
+    stagedProtocolBindings.map(async (binding) => ({
+      path: String(binding?.path || "").replace(/\\/g, "/"),
+      expectedSha256: String(binding?.sha256 || "").toLowerCase(),
+      observedSha256: await sha256FileOrEmpty(
+        path.resolve(workspaceRoot, String(binding?.path || "")),
+      ),
+    })),
+  );
+  const stagedProtocolSemanticCore = stagedProtocol
+    ? Object.fromEntries(
+      Object.entries(stagedProtocol).filter(
+        ([key]) => ![
+          "schemaVersion",
+          "sourceBindings",
+          "protocolSemanticSha256",
+        ].includes(key),
+      ),
+    )
+    : null;
+  const observedStagedProtocolSemanticSha256 = stagedProtocolSemanticCore
+    ? crypto.createHash("sha256")
+      .update(canonicalJson(stagedProtocolSemanticCore), "utf8")
+      .digest("hex")
+    : "";
+  const stagedProtocolSemanticHashCurrent = Boolean(
+    stagedProtocol
+      && /^[a-f0-9]{64}$/.test(
+        String(stagedProtocol?.protocolSemanticSha256 || ""),
+      )
+      && observedStagedProtocolSemanticSha256
+        === String(stagedProtocol.protocolSemanticSha256),
+  );
+  const stagedBindingByPath = new Map(
+    observedStagedProtocolBindings.map((row) => [row.path, row]),
+  );
+  const mutableStagedPaths = new Set([
+    String(path.relative(
+      path.resolve(workspaceRoot),
+      path.resolve(workspaceRoot, manifestPath),
+    )).replace(/\\/g, "/"),
+    String(path.relative(
+      path.resolve(workspaceRoot),
+      path.resolve(workspaceRoot, truthPath),
+    )).replace(/\\/g, "/"),
+  ]);
+  const lineageMutableKey = (sourcePath) => (
+    sourcePath.endsWith("/manifest.csv") || sourcePath === "manifest.csv"
+      ? "manifestSha256"
+      : "truthSha256"
+  );
+  const stageASignoffLineageBaseCurrent = Boolean(
+    stageASignoffLineage?.contract === ROUND6_STAGE_A_SIGNOFF_LINEAGE_VERSION
+      && stageASignoffLineage?.stagedProtocol?.protocolSemanticSha256
+        === stagedProtocol?.protocolSemanticSha256
+      && stageASignoffLineage?.studentFacing === false
+      && stageASignoffLineage?.automaticAuthorizationGranted === false
+  );
+  const stagedProtocolBindingPathSetCurrent = sameStringSet(
+    observedStagedProtocolBindings.map((row) => row.path),
+    P3_MINIMAL_RECORDING_REQUIRED_SOURCE_PATHS,
+  );
+  const stagedProtocolSourceBindingsCurrent = Boolean(
+    stagedProtocolBindingPathSetCurrent
+      && observedStagedProtocolBindings.every((row) => {
+        if (
+          !row.path
+          || !/^[a-f0-9]{64}$/.test(row.expectedSha256)
+          || !/^[a-f0-9]{64}$/.test(row.observedSha256)
+        ) {
+          return false;
+        }
+        if (row.observedSha256 === row.expectedSha256) return true;
+        if (!mutableStagedPaths.has(row.path) || !stageASignoffLineageBaseCurrent) {
+          return false;
+        }
+        const key = lineageMutableKey(row.path);
+        return (
+          stageASignoffLineage?.sourceHashes?.[key] === row.expectedSha256
+            && stageASignoffLineage?.appliedHashes?.[key] === row.observedSha256
+        );
+      }),
+  );
   const evaluationProtocolSha256 = await hashBoundText(
     evaluationProtocolPath,
     "lf-normalized-sha256",
@@ -2156,6 +2314,131 @@ export async function summarizeRound6CounterbalancedCapture({
     const left = new Set(leftRows.map((row) => String(row[field] || "")).filter(Boolean));
     return rightRows.every((row) => !left.has(String(row[field] || "")));
   };
+  const stagedDecision = stagedProtocol?.recordingDecision || {};
+  const stagedStageA = stagedProtocol?.stageA || {};
+  const stagedStageB = stagedProtocol?.stageB || {};
+  const stagedStageAIds = Array.isArray(stagedStageA?.recordingIds)
+    ? stagedStageA.recordingIds.map(String) : [];
+  const stagedStageBIds = Array.isArray(stagedStageB?.recordingIds)
+    ? stagedStageB.recordingIds.map(String) : [];
+  const calibrationIds = calibrationRows.map(
+    (row) => String(row.recordingId || ""),
+  );
+  const freshIds = freshRows.map((row) => String(row.recordingId || ""));
+  const stagedProtocolValid = Boolean(
+    stagedProtocol?.contract === P3_MINIMAL_RECORDING_PROTOCOL_VERSION
+      && stagedProtocolSemanticHashCurrent
+      && stagedProtocolSourceBindingsCurrent
+      && Number(stagedDecision.minimumUnavoidableNewRecordingsNow) === 6
+      && Number(stagedDecision.conditionalAdditionalFreshRecordings) === 6
+      && Number(stagedDecision.maximumTotalIfStageAPasses) === 12
+      && stagedDecision.recordAllTwelveNow === false
+      && Number(stagedStageA.recordingCount) === 6
+      && Number(stagedStageB.recordingCount) === 6
+      && sameStringSet(stagedStageAIds, calibrationIds)
+      && sameStringSet(stagedStageBIds, freshIds)
+      && stagedStageB.authorizedOnlyAfterStageAPass === true
+      && stagedStageA.cleanSafetyInputsRemainFrozen === true
+      && stagedStageA.cleanSafetyLimits
+        ?.authoritativeLocalCleanFalsePositiveMax === 0
+      && stagedStageA.cleanSafetyLimits
+        ?.consumedRound5KnownNegativeFalsePositiveMax === 0
+      && stagedStageA.cleanSafetyLimits
+        ?.publicProfessionalBurdenPooledPer1000Max === 5
+      && stagedStageA.cleanSafetyLimits
+        ?.publicProfessionalBurdenAnyRecordingPer1000Max === 10
+      && stagedStageA.candidate?.modelFamily === evaluationCandidate?.modelFamily
+      && stagedStageA.candidate?.featurePolicy
+        === evaluationCandidate?.featurePolicy
+      && stagedStageA.candidate?.decisionThreshold === evaluation?.decisionThreshold
+      && JSON.stringify(stagedStageA.candidate?.modelParams)
+        === JSON.stringify(evaluationCandidate?.modelParams)
+      && stagedProtocol?.discipline?.round4Round5ReusedAsAcceptance === false
+      && stagedProtocol?.discipline?.freshReadDuringStageA === false
+      && stagedProtocol?.discipline?.retuneAfterCleanSafety === false
+      && stagedProtocol?.discipline?.retuneAfterFresh === false
+      && stagedProtocol?.discipline?.studentSwitchesRemainFalse === true
+      && stagedProtocol?.discipline?.failClosed === true
+      && stagedProtocol?.stopLines?.m4Omr === "no-further-investment"
+      && stagedProtocol?.stopLines?.waveformEnergyMissingNote
+        === "no-further-investment"
+      && stagedProtocol?.supersession?.priorAllAtOnceRound6Scheduling
+        === "deferred"
+      && stagedProtocol?.supersession?.technicalTwelveTakePackRemainsValid
+        === true
+      && stagedProtocol?.supersession?.currentAuthorizedRecordingScope
+        === "stage-a-calibration-six-only"
+      && stagedStageA.operations?.truthSignoffPackCommand
+        === "npm run western:round6-stage-a-truth-signoff-pack"
+      && stagedStageA.operations?.truthSignoffApplyCommand
+        === (
+          "npm run western:round6-stage-a-truth-signoff-apply -- "
+          + "--completed <path> --apply"
+        )
+      && stagedStageA.operations?.positionBalanceCommand
+        === "npm run western:round6-position-balance"
+      && stagedStageA.operations?.safetyPreflightCommand
+        === "npm run western:round6-stage-a-safety-preflight"
+      && stagedStageA.operations?.safetyEvaluationCommand
+        === "npm run western:round6-stage-a-safety-eval"
+      && stagedStageA.operations?.safetyEvaluatorContract
+        === ROUND6_STAGE_A_SAFETY_VERSION
+      && stagedStageA.operations?.signoffLineagePath
+        === String(ROUND6_STAGE_A_SIGNOFF_LINEAGE).replace(/\\/g, "/")
+      && stagedStageA.operations?.safetyConsumedLedgerPath
+        === String(ROUND6_STAGE_A_SAFETY_CONSUMED).replace(/\\/g, "/")
+      && stagedStageA.operations?.safetyReportPath
+        === String(ROUND6_STAGE_A_SAFETY_REPORT).replace(/\\/g, "/")
+      && stagedStageA.operations?.modelPath
+        === String(ROUND6_STAGE_A_SAFETY_MODEL).replace(/\\/g, "/")
+      && stagedStageA.operations?.freshAudioMustBeAbsent === true
+      && stagedStageA.operations?.cleanSafetyMayBeConsumedOnce === true
+  );
+  const stagedManifestBinding = stagedBindingByPath.get(
+    [...mutableStagedPaths].find(
+      (sourcePath) => lineageMutableKey(sourcePath) === "manifestSha256",
+    ),
+  );
+  const stagedTruthBinding = stagedBindingByPath.get(
+    [...mutableStagedPaths].find(
+      (sourcePath) => lineageMutableKey(sourcePath) === "truthSha256",
+    ),
+  );
+  const stageALineageAudioHashes = (
+    stageASignoffLineage?.audioSha256ByRecording || {}
+  );
+  const stageASignoffLineageCurrent = Boolean(
+    stageASignoffLineageBaseCurrent
+      && stageASignoffLineage?.scope?.split === "calibration"
+      && sameStringSet(
+        stageASignoffLineage?.scope?.recordingIds,
+        stagedStageAIds,
+      )
+      && stageASignoffLineage?.stagedProtocol?.path
+        === String(stagedProtocolPath).replace(/\\/g, "/")
+      && stageASignoffLineage?.stagedProtocol?.sha256
+        === stagedProtocolSha256
+      && stageASignoffLineage?.sourceHashes?.contractSha256
+        === contractSha256
+      && stageASignoffLineage?.sourceHashes?.manifestSha256
+        === stagedManifestBinding?.expectedSha256
+      && stageASignoffLineage?.sourceHashes?.truthSha256
+        === stagedTruthBinding?.expectedSha256
+      && stageASignoffLineage?.appliedHashes?.manifestSha256
+        === manifestSha256
+      && stageASignoffLineage?.appliedHashes?.truthSha256
+        === truthSha256
+      && /^[a-f0-9]{64}$/.test(
+        String(stageASignoffLineage?.sourceHashes?.completedSha256 || ""),
+      )
+      && sameStringSet(
+        Object.keys(stageALineageAudioHashes),
+        stagedStageAIds,
+      )
+      && Object.values(stageALineageAudioHashes).every(
+        (value) => /^[a-f0-9]{64}$/.test(String(value || "")),
+      )
+  );
   const recordingsPerPiece = {};
   for (const row of manifestRows) {
     const pieceId = String(row.pieceId || "");
@@ -2189,6 +2472,7 @@ export async function summarizeRound6CounterbalancedCapture({
   );
   const materialRows = await Promise.all(manifestRows.map(async (row) => ({
     recordingId: row.recordingId,
+    audioPath: row.audioPath,
     score: await present(row.scorePath),
     pdf: await present(path.join(materialsRoot, `${row.recordingId}.pdf`)),
     instructions: await present(
@@ -2211,6 +2495,93 @@ export async function summarizeRound6CounterbalancedCapture({
     && scoreFileCount === manifestRows.length
     && pdfCount === manifestRows.length
     && instructionCount === manifestRows.length;
+  const stageAIdSet = new Set(stagedStageAIds);
+  const stageAMaterialRows = materialRows.filter(
+    (row) => stageAIdSet.has(String(row.recordingId || "")),
+  );
+  const countStageAMaterial = (field) => (
+    stageAMaterialRows.filter((row) => row[field] === true).length
+  );
+  const stageATruthRecordings = truthRecordings.filter(
+    ([recordingId]) => stageAIdSet.has(recordingId),
+  );
+  const stageATruthEventCount = stageATruthRecordings.reduce(
+    (sum, [, recording]) => sum + (
+      Array.isArray(recording?.events) ? recording.events.length : 0
+    ),
+    0,
+  );
+  const stageASignedEventCount = stageATruthRecordings.reduce(
+    (sum, [, recording]) => sum + (
+      Array.isArray(recording?.events)
+        ? recording.events.filter(
+          (event) => String(event?.asPerformed || "").trim(),
+        ).length
+        : 0
+    ),
+    0,
+  );
+  const stageACompleteInventoryCount = stageATruthRecordings.filter(
+    ([, recording]) => recording?.completeErrorInventory === true,
+  ).length;
+  const stageAAudioFileCount = countStageAMaterial("audio");
+  const stageAConsentCount = countStageAMaterial("consent");
+  const stageALicenseCount = countStageAMaterial("license");
+  const stageAAudioBindingsCurrent = Boolean(
+    stageASignoffLineageCurrent
+      && (
+        await Promise.all(stageAMaterialRows.map(async (row) => (
+          row.audio === true
+            && await sha256FileOrEmpty(row.audioPath)
+              === stageALineageAudioHashes[row.recordingId]
+        )))
+      ).every(Boolean)
+  );
+  const stageARecordingComplete = Boolean(
+    stagedProtocolValid
+      && stageASignoffLineageCurrent
+      && stageAAudioBindingsCurrent
+      && stageAMaterialRows.length === 6
+      && stageATruthRecordings.length === 6
+      && stageATruthEventCount === 72
+      && stageAAudioFileCount === 6
+      && stageAConsentCount === 6
+      && stageALicenseCount === 6
+      && stageASignedEventCount === stageATruthEventCount
+      && stageACompleteInventoryCount === stageATruthRecordings.length
+  );
+  const stageBIdSet = new Set(stagedStageBIds);
+  const stageBMaterialRows = materialRows.filter(
+    (row) => stageBIdSet.has(String(row.recordingId || "")),
+  );
+  const countStageBMaterial = (field) => (
+    stageBMaterialRows.filter((row) => row[field] === true).length
+  );
+  const stageBTruthRecordings = truthRecordings.filter(
+    ([recordingId]) => stageBIdSet.has(recordingId),
+  );
+  const stageBTruthEventCount = stageBTruthRecordings.reduce(
+    (sum, [, recording]) => sum + (
+      Array.isArray(recording?.events) ? recording.events.length : 0
+    ),
+    0,
+  );
+  const stageBSignedEventCount = stageBTruthRecordings.reduce(
+    (sum, [, recording]) => sum + (
+      Array.isArray(recording?.events)
+        ? recording.events.filter(
+          (event) => String(event?.asPerformed || "").trim(),
+        ).length
+        : 0
+    ),
+    0,
+  );
+  const stageBCompleteInventoryCount = stageBTruthRecordings.filter(
+    ([, recording]) => recording?.completeErrorInventory === true,
+  ).length;
+  const stageBAudioFileCount = countStageBMaterial("audio");
+  const stageBConsentCount = countStageBMaterial("consent");
+  const stageBLicenseCount = countStageBMaterial("license");
   const positionHashes = positionBalance?.sourceHashes || {};
   const positionBindingCurrent = Boolean(
     positionBalance
@@ -2269,6 +2640,130 @@ export async function summarizeRound6CounterbalancedCapture({
       && Array.isArray(intake?.blockingReasons)
       && intake.blockingReasons.length === 0
   );
+  const positionBalanceSha256 = await sha256FileOrEmpty(positionBalancePath);
+  const expectedStageASafetySourceHashes = {
+    protocolSha256: stagedProtocolSha256,
+    protocolSemanticSha256: String(
+      stagedProtocol?.protocolSemanticSha256 || "",
+    ),
+    contractSha256,
+    manifestSha256,
+    truthSha256,
+    positionBalanceSha256,
+    signoffLineageSha256: stageASignoffLineageSha256,
+  };
+  const stageASafetySourceHashesCurrent = (sourceHashes) => (
+    sourceHashes
+      && Object.entries(expectedStageASafetySourceHashes).every(
+        ([key, expected]) => (
+          /^[a-f0-9]{64}$/.test(String(expected || ""))
+            && sourceHashes[key] === expected
+        ),
+      )
+  );
+  const expectedStageASafetyModelPath = String(path.relative(
+    path.resolve(workspaceRoot),
+    path.resolve(workspaceRoot, stageASafetyModelPath),
+  )).replace(/\\/g, "/");
+  const stageASafetyConsumedCurrent = Boolean(
+    stageASafetyConsumedSha256
+      && stageASafetyConsumed?.contract
+        === ROUND6_STAGE_A_SAFETY_CONSUMED_VERSION
+      && stageASafetyConsumed?.p3ProtocolSemanticSha256
+        === stagedProtocol?.protocolSemanticSha256
+      && stageASafetySourceHashesCurrent(stageASafetyConsumed?.sourceHashes)
+      && stageASafetyConsumed?.modelSha256 === stageASafetyModelSha256
+      && stageASafetyConsumed?.cleanSafetyConsumed === true
+      && stageASafetyConsumed?.freshAudioRead === false
+      && stageASafetyConsumed?.studentFacing === false
+      && stageASafetyConsumed?.automaticAuthorizationGranted === false
+  );
+  const stageASafetyAttemptCurrent = Boolean(
+    stageASafetyReportSha256
+      && stageASafetyReport?.contract === ROUND6_STAGE_A_SAFETY_VERSION
+      && stageASafetyReport?.p3ProtocolSemanticSha256
+        === stagedProtocol?.protocolSemanticSha256
+      && stageASafetySourceHashesCurrent(stageASafetyReport?.sourceHashes)
+      && stageASafetyConsumedCurrent
+      && stageASafetyReport?.executionRequested === true
+      && stageASafetyReport?.trainingPerformed === true
+      && stageASafetyReport?.modelArtifact?.path
+        === expectedStageASafetyModelPath
+      && stageASafetyReport?.modelArtifact?.sha256
+        === stageASafetyModelSha256
+      && stageASafetyReport?.freshAudioRead === false
+      && stageASafetyReport?.strictConfirmedRecall === "2/12"
+      && stageASafetyReport?.studentFacing === false
+      && stageASafetyReport?.automaticAuthorizationGranted === false
+  );
+  const stageASafetyEvaluationPerformed = Boolean(
+    stageASafetyAttemptCurrent
+      && stageASafetyReport?.cleanSafetyEvaluationPerformed === true
+  );
+  const stageASafetyEvaluationPassed = Boolean(
+    stageASafetyEvaluationPerformed
+      && stageASafetyReport?.stageAPassed === true
+      && stageASafetyReport?.stageBFreshRecordingAuthorized === true
+      && Array.isArray(stageASafetyReport?.safetyLimitViolations)
+      && stageASafetyReport.safetyLimitViolations.length === 0
+      && Array.isArray(stageASafetyReport?.blockingReasons)
+      && stageASafetyReport.blockingReasons.length === 0
+      && canonicalJson(stageASafetyReport?.cleanSafetyLimits)
+        === canonicalJson(stagedStageA.cleanSafetyLimits)
+  );
+  const stageASafetyAttemptFailedClosed = Boolean(
+    stageASafetyConsumedSha256 && !stageASafetyEvaluationPassed
+  );
+  const stageARecordingAuthorizedNow = Boolean(
+    stagedProtocolValid
+      && readyForRecording
+      && !stageARecordingComplete
+      && !stageASafetyConsumedSha256
+      && !freshBlindConsumed
+  );
+  const stageBFreshRecordingAuthorizedNow = Boolean(
+    stagedProtocolValid
+      && stageARecordingComplete
+      && stageASafetyEvaluationPassed
+      && !freshBlindConsumed
+  );
+  const emptyExternalInput = {
+    audioFiles: 0,
+    consentRows: 0,
+    licenseRows: 0,
+    signedEvents: 0,
+    completeInventories: 0,
+  };
+  const stageAExternalInput = {
+    audioFiles: Math.max(0, 6 - stageAAudioFileCount),
+    consentRows: Math.max(0, 6 - stageAConsentCount),
+    licenseRows: Math.max(0, 6 - stageALicenseCount),
+    signedEvents: Math.max(0, stageATruthEventCount - stageASignedEventCount),
+    completeInventories: Math.max(
+      0,
+      stageATruthRecordings.length - stageACompleteInventoryCount,
+    ),
+  };
+  const stageBExternalInput = {
+    audioFiles: Math.max(0, 6 - stageBAudioFileCount),
+    consentRows: Math.max(0, 6 - stageBConsentCount),
+    licenseRows: Math.max(0, 6 - stageBLicenseCount),
+    signedEvents: Math.max(0, stageBTruthEventCount - stageBSignedEventCount),
+    completeInventories: Math.max(
+      0,
+      stageBTruthRecordings.length - stageBCompleteInventoryCount,
+    ),
+  };
+  const currentStageExternalInput = stageBFreshRecordingAuthorizedNow
+    ? stageBExternalInput
+    : stageARecordingAuthorizedNow
+      ? stageAExternalInput
+      : emptyExternalInput;
+  const currentAuthorizedRecordingScope = stageBFreshRecordingAuthorizedNow
+    ? "stage-b-fresh-six-only"
+    : stageARecordingAuthorizedNow
+      ? "stage-a-calibration-six-only"
+      : "none";
   const designBlockingReasons = normalizedReasonList([
     ...(!contract ? ["round6-counterbalanced-contract-missing"] : []),
     ...(contract && !contractValid ? ["round6-counterbalanced-contract-invalid"] : []),
@@ -2321,6 +2816,35 @@ export async function summarizeRound6CounterbalancedCapture({
       ? ["round6-fresh-blind-consumed-without-current-completed-report"]
       : []),
   ]);
+  const schedulingBlockingReasons = normalizedReasonList([
+    ...(!stagedProtocol ? ["p3-staged-recording-protocol-missing"] : []),
+    ...(stagedProtocol && !stagedProtocolSemanticHashCurrent
+      ? ["p3-staged-recording-protocol-semantic-hash-stale"]
+      : []),
+    ...(stagedProtocol && !stagedProtocolSourceBindingsCurrent
+      ? ["p3-staged-recording-protocol-source-binding-stale"]
+      : []),
+    ...(stagedProtocol && !stagedProtocolValid
+      ? ["p3-staged-recording-protocol-invalid"]
+      : []),
+    ...(!readyForRecording
+      ? ["round6-technical-capture-pack-not-ready"]
+      : []),
+    ...(stageARecordingComplete
+      && !stageASafetyConsumedSha256
+      && !stageASafetyEvaluationPassed
+      ? ["round6-stage-a-clean-safety-evaluation-pending"]
+      : []),
+    ...(stageASafetyConsumedSha256 && !stageASafetyConsumedCurrent
+      ? ["round6-stage-a-clean-safety-consumed-ledger-stale"]
+      : []),
+    ...(stageASafetyConsumedCurrent && !stageASafetyAttemptCurrent
+      ? ["round6-stage-a-clean-safety-report-stale-or-crashed"]
+      : []),
+    ...(stageASafetyAttemptCurrent && !stageASafetyEvaluationPassed
+      ? ["round6-stage-a-clean-safety-failed-stop"]
+      : []),
+  ]);
   return {
     contract: ROUND6_COUNTERBALANCED_CONTRACT_VERSION,
     source: String(intakePath).replace(/\\/g, "/"),
@@ -2331,6 +2855,15 @@ export async function summarizeRound6CounterbalancedCapture({
       positionBalance: String(positionBalancePath).replace(/\\/g, "/"),
       evaluationProtocol: String(evaluationProtocolPath).replace(/\\/g, "/"),
       evaluationReport: String(evaluationReportPath).replace(/\\/g, "/"),
+      stagedProtocol: String(stagedProtocolPath).replace(/\\/g, "/"),
+      stageASignoffLineage:
+        String(stageASignoffLineagePath).replace(/\\/g, "/"),
+      stageASafetyReport:
+        String(stageASafetyReportPath).replace(/\\/g, "/"),
+      stageASafetyModel:
+        String(stageASafetyModelPath).replace(/\\/g, "/"),
+      stageASafetyConsumed:
+        String(stageASafetyConsumedPath).replace(/\\/g, "/"),
     },
     contractValid,
     bindingCurrent: positionBindingCurrent && intakeBindingCurrent && evaluationRunnerReady,
@@ -2338,12 +2871,51 @@ export async function summarizeRound6CounterbalancedCapture({
       positionBalance: positionBindingCurrent,
       intake: intakeBindingCurrent,
       evaluationProtocol: evaluationRunnerReady,
+      stagedProtocol: stagedProtocolValid,
+      stageASignoffLineage: stageASignoffLineageCurrent,
+      stageASafetyConsumed: stageASafetyConsumedCurrent,
+      stageASafetyReport: stageASafetyAttemptCurrent,
     },
     designCountsReady,
     materialsReady,
     readyForRecording,
+    readyForRecordingMeaning:
+      "technical-twelve-take-pack-ready-not-all-at-once-scheduling-authority",
     intakeReady,
     recordingComplete,
+    recordingSchedule: {
+      contract: P3_MINIMAL_RECORDING_PROTOCOL_VERSION,
+      source: String(stagedProtocolPath).replace(/\\/g, "/"),
+      valid: stagedProtocolValid,
+      semanticHashCurrent: stagedProtocolSemanticHashCurrent,
+      sourceBindingsCurrent: stagedProtocolSourceBindingsCurrent,
+      protocolSemanticSha256: String(
+        stagedProtocol?.protocolSemanticSha256 || "",
+      ),
+      observedProtocolSemanticSha256: observedStagedProtocolSemanticSha256,
+      currentAuthorizedRecordingScope,
+      minimumUnavoidableRecordingsNow: 6,
+      conditionalAdditionalFreshRecordings: 6,
+      maximumConditionalTotal: 12,
+      recordAllTwelveNow: false,
+      allTwelveRecordingAuthorizedNow: false,
+      stageARecordingAuthorizedNow,
+      stageARecordingIds: stagedStageAIds,
+      stageARecordingComplete,
+      stageASignoffLineageCurrent,
+      stageAAudioBindingsCurrent,
+      stageASafetyConsumedCurrent,
+      stageASafetyAttemptCurrent,
+      stageASafetyEvaluationPerformed,
+      stageASafetyEvaluationPassed,
+      stageASafetyAttemptFailedClosed,
+      stageBFreshRecordingAuthorizedNow,
+      stageBFreshRecordingIds: stagedStageBIds,
+      stageAExternalInput,
+      stageBExternalInput,
+      currentStageExternalInput,
+      blockingReasons: schedulingBlockingReasons,
+    },
     counts: {
       recordings: manifestRows.length,
       truthRecordings: truthRecordings.length,
@@ -2404,6 +2976,8 @@ export async function summarizeRound6CounterbalancedCapture({
       automaticAccusationReady: false,
       blockingReasons: evaluationBlockingReasons,
     },
+    remainingExternalInputScope:
+      "maximum-conditional-twelve-take-pack-not-current-scheduling-authority",
     remainingExternalInput: {
       audioFiles: Math.max(0, manifestRows.length - audioFileCount),
       consentRows: Math.max(0, manifestRows.length - consentCount),
@@ -2418,6 +2992,7 @@ export async function summarizeRound6CounterbalancedCapture({
     designBlockingReasons,
     recordingBlockingReasons,
     evaluationBlockingReasons,
+    schedulingBlockingReasons,
   };
 }
 
@@ -5334,25 +5909,69 @@ export function summarizeNextActions(
     const round5ReadyForEvaluation = Boolean(
       round5.ready === true && round5.bindingCurrent === true && !round5Evaluated,
     );
-    const round6ReadyForRecording = Boolean(
+    const round6Schedule = round6.recordingSchedule || {};
+    const round6StagedWorkflowCurrent = Boolean(
       round6.readyForRecording === true
-        && round6.intakeReady !== true
-        && round6.bindings?.positionBalance === true
-        && round6.bindings?.intake === true,
+        && round6Schedule.valid === true
+        && round6Schedule.semanticHashCurrent === true
+        && round6Schedule.sourceBindingsCurrent === true,
     );
+    const round6StagedAction = round6Schedule.stageARecordingAuthorizedNow === true
+      ? (
+        "P0–P2 已全部榨完：7 个冻结可运行候选均在真实干净域安全闸被淘汰，"
+        + "公开 Bach10/URMP/MusicNet 也没有可裁定的真实错误正例。"
+        + "当前唯一授权范围是 Stage A 的 6 条 calibration："
+        + `${(round6Schedule.stageARecordingIds || []).join(", ")}。`
+        + "不要录 6 条 fresh，也不要改角色轮换。音频到位后运行 "
+        + "`npm run western:round6-stage-a-truth-signoff-pack`；下载完成 JSON，先用 "
+        + "`npm run western:round6-stage-a-truth-signoff-apply -- --completed <path>` "
+        + "dry-run，只有 `readyToApply=true` 才加 `--apply`。随后依次运行 "
+        + "`npm run western:round6-position-balance`、"
+        + "`npm run western:round6-stage-a-safety-preflight`，最后只运行一次 "
+        + "`npm run western:round6-stage-a-safety-eval`。Stage A 任一真实干净域安全上限"
+        + "超限即收线并省掉 fresh 6 条；strict 保持 2/12，学生自动指控保持关闭。"
+      )
+      : round6Schedule.stageBFreshRecordingAuthorizedNow === true
+        ? (
+          "Stage A 的 6 条 calibration 已通过冻结的真实干净域安全闸；现在才授权 "
+          + `Stage B 的 6 条 untouched fresh：${
+            (round6Schedule.stageBFreshRecordingIds || []).join(", ")
+          }。`
+          + "模型、特征、0.5 决策点和 90% precision / 50% recall / 0 strict-FP "
+          + "门槛不得再改；fresh 只能读取一次，数值通过也不自动授权学生端。"
+        )
+        : round6Schedule.stageARecordingComplete === true
+          && round6Schedule.stageASafetyAttemptFailedClosed !== true
+          ? (
+            "Stage A 的 6 条 calibration 已完成录音与人工签署；当前不再需要录音。"
+            + "依次运行 `npm run western:round6-position-balance`、"
+            + "`npm run western:round6-stage-a-safety-preflight`，确认预检通过后只运行一次 "
+            + "`npm run western:round6-stage-a-safety-eval`。安全闸通过才允许补 6 条 "
+            + "fresh；失败或崩溃均收线且不得重跑。"
+          )
+          : round6Schedule.stageASafetyAttemptFailedClosed === true
+            ? (
+              "Stage A 干净域安全闸已失败、崩溃或证据失配，候选按预注册纪律收线。"
+              + "不要录 Stage B fresh；strict confirmed recall 保持 2/12，"
+              + "教师复核辅助可继续，学生三开关保持 false。"
+            )
+            : (
+              "Round 6 分阶段协议当前 fail-closed；先修复项目状态列出的协议、来源绑定或"
+              + "技术包问题。未恢复为 current 前不得录 calibration 或 fresh。"
+            );
     actions.push({
       priority: 1,
       track: "Ordinary diagnosis recall",
       action: round5Evaluated
-        ? round6ReadyForRecording
-          ? "Round 5 is consumed and cannot support promotion because its apparent gate and rhythm gains are score-position confounded. The Round 6 counterbalanced contract, 12-take manifest, 144-event truth, capture materials, v2 position preflight, and once-only evaluation protocol are now hash-current and ready for recording. Record exactly the 12 specified takes without changing the positive/negative role rotations. After all audio files are present, run `npm run western:round6-truth-signoff-pack`; its no-machine-prediction page binds the contract, manifest, truth, and every audio SHA, and requires all 144 `asPerformed` fields, 12 complete error inventories, and 12 actual recording-metadata confirmations before download. Dry-run the downloaded JSON with `npm run western:round6-truth-signoff-apply -- --completed <path>`; only after `readyToApply=true`, repeat with `--apply`, then rerun `npm run western:round6-position-balance` and `npm run western:round6-targeted-intake` because both source hashes changed. Only after intake is ready, run `npm run western:round6-frozen-eval` exactly once; it writes the consumed ledger before reading fresh and does not grant student authorization even if a numeric gate passes. Strict confirmed recall remains 2/12 and every student automatic-accusation path stays closed until a new untouched fresh evaluation passes the frozen 90% precision / 50% recall / 0 strict-FP gate."
+        ? round6StagedWorkflowCurrent
+          ? round6StagedAction
           : "The complete-inventory Round 5 frozen first run is complete and the fresh split is now consumed. `extra` numerically reaches 3/6 positives at 0/12 confusion false positives (precision 1.00, recall 0.50), but it is not promotion-eligible: in that fresh split, score context alone separates all 6 extra positives from all 12 negatives, while the evaluated model includes those score-context features. The rhythm self-check likewise has a raw 4/12 at 0/312 false positives, but static score context predicts all 12 extra/drag target positions at 0/324 false positives under leave-one-recording-out in both splits; its apparent precision therefore cannot establish performance generalization. `merged_substitution`, `missing`, and `drag` also fail their numeric gates. A calibration-only audit found position confounding for all three failed gates; once score-only context features are prohibited, no stable performance-evidence candidate meets the joint floor. Therefore no Round 5 gate or rhythm hint is currently promoted. Do not retune on this package. Counterbalance target roles across previous/next interval, written duration, beat strength, normalized position, and segment-edge status in both new calibration and fresh plans; require the position-balance preflight to pass before recording, then select and evaluate a performance-only model. Strict confirmed recall remains 2/12 and all student automatic-accusation paths stay closed."
         : round5ReadyForEvaluation
           ? "Round 5 complete-inventory intake is ready and hash-current. Run `npm run western:round5-segment-edit-path` once with the frozen parameters; do not inspect or retune against the fresh split before that run. Strict confirmed recall remains 2/12 and all student automatic-accusation paths stay closed."
           : "Strict confirmed recall remains 2/12. Raw temporal operation-path use reaches 11/12 but causes 55/253 false positives and is rejected. Three post-inspection candidates are frozen for untouched Round 5 only. Use docs/round5-targeted-diagnosis-capture-pack/index.html to complete the 12-take, complete-inventory matrix, then run the frozen fresh-blind gate without retuning.",
       artifact: round5Evaluated
-        ? round6ReadyForRecording
-          ? "docs/western-strings-round6-counterbalanced-capture-plan.md"
+        ? round6StagedWorkflowCurrent
+          ? "docs/western-strings-p3-minimal-recording-plan.md"
           : segment.positionBalanceAudit?.source
             || calibrationAudit.source
             || segment.source
@@ -5361,10 +5980,10 @@ export function summarizeNextActions(
         : ROUND5_TEMPORAL_OPERATION_PATH.replace(/\\/g, "/"),
       reason: normalizedReasonList(
         round5Evaluated
-          ? round6ReadyForRecording
+          ? round6StagedWorkflowCurrent
             ? [
                 "policy-c-auto-accusation-closed",
-                ...(round6.recordingBlockingReasons || []),
+                ...(round6Schedule.blockingReasons || []),
               ]
             : [
               "policy-c-auto-accusation-closed",

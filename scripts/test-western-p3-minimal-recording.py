@@ -59,6 +59,22 @@ def main() -> int:
         "random_state": 20260722,
         "n_jobs": 1,
     }
+    operations = report["stageA"]["operations"]
+    assert operations["truthSignoffPackCommand"] == (
+        "npm run western:round6-stage-a-truth-signoff-pack"
+    )
+    assert operations["truthSignoffApplyCommand"] == (
+        "npm run western:round6-stage-a-truth-signoff-apply -- "
+        "--completed <path> --apply"
+    )
+    assert operations["safetyPreflightCommand"] == (
+        "npm run western:round6-stage-a-safety-preflight"
+    )
+    assert operations["safetyEvaluationCommand"] == (
+        "npm run western:round6-stage-a-safety-eval"
+    )
+    assert operations["freshAudioMustBeAbsent"] is True
+    assert operations["cleanSafetyMayBeConsumedOnce"] is True
     assert report["stageB"]["promotionThresholds"] == {
         "minPrecision": 0.9,
         "minRecall": 0.5,
@@ -70,6 +86,21 @@ def main() -> int:
     assert report["supersession"][
         "currentAuthorizedRecordingScope"
     ] == "stage-a-calibration-six-only"
+    source_paths = {binding["path"] for binding in report["sourceBindings"]}
+    assert source_paths == {
+        "docs/evidence/western-strings-p1-clean-domain-preregistration-20260724.json",
+        "docs/evidence/western-strings-p1-clean-domain-safety-20260724.json",
+        "docs/evidence/western-strings-p2-public-error-recall-audit-20260724.json",
+        "config/western-strings-round6-evaluation-protocol.json",
+        "config/western-strings-round6-counterbalanced-contract.json",
+        "data/private/western-strings-round6-counterbalanced/manifest.csv",
+        "data/private/western-strings-round6-counterbalanced/position-truth.json",
+        "scripts/generate-western-round5-truth-signoff-pack.mjs",
+        "scripts/apply-western-truth-signoff.mjs",
+        "scripts/run_western_round6_stage_a_safety.py",
+        "scripts/experiments/train_western_round6_full_score_candidate.py",
+        "package.json",
+    }
     print("western P3 minimum-recording preregistration tests passed")
     return 0
 

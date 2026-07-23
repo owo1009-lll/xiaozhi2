@@ -30,6 +30,13 @@ ROUND6_CONTRACT = (
 ROUND6_ROOT = REPO / "data/private/western-strings-round6-counterbalanced"
 ROUND6_MANIFEST = ROUND6_ROOT / "manifest.csv"
 ROUND6_TRUTH = ROUND6_ROOT / "position-truth.json"
+TRUTH_SIGNOFF_GENERATOR = REPO / "scripts/generate-western-round5-truth-signoff-pack.mjs"
+TRUTH_SIGNOFF_APPLIER = REPO / "scripts/apply-western-truth-signoff.mjs"
+STAGE_A_SAFETY_RUNNER = REPO / "scripts/run_western_round6_stage_a_safety.py"
+ROUND6_CANDIDATE_RUNNER = (
+    REPO / "scripts/experiments/train_western_round6_full_score_candidate.py"
+)
+PACKAGE_JSON = REPO / "package.json"
 OUT_JSON = (
     REPO
     / "docs/evidence/western-strings-p3-minimal-recording-preregistration-20260724.json"
@@ -188,7 +195,14 @@ def build_report() -> dict[str, Any]:
     if set(calibration["performerIds"]) & set(fresh["performerIds"]):
         raise RuntimeError("p3-round6-performer-split-overlap")
 
-    clean_limits = p1_prereg["eliminationRules"]["automatic_issue_candidate"]
+    clean_limits = {
+        key: int(value)
+        if isinstance(value, float) and value.is_integer()
+        else value
+        for key, value in p1_prereg[
+            "eliminationRules"
+        ]["automatic_issue_candidate"].items()
+    }
     frozen_evaluation = evaluation["evaluation"]
     candidate = evaluation["candidate"]
     protocol_core = {
@@ -246,6 +260,46 @@ def build_report() -> dict[str, Any]:
                 "known-negative consumed diagnostic only; never acceptance"
             ),
             "syntheticRecallMayRepresentRealRecall": False,
+            "operations": {
+                "truthSignoffPackCommand": (
+                    "npm run western:round6-stage-a-truth-signoff-pack"
+                ),
+                "truthSignoffApplyCommand": (
+                    "npm run western:round6-stage-a-truth-signoff-apply -- "
+                    "--completed <path> --apply"
+                ),
+                "positionBalanceCommand": (
+                    "npm run western:round6-position-balance"
+                ),
+                "safetyPreflightCommand": (
+                    "npm run western:round6-stage-a-safety-preflight"
+                ),
+                "safetyEvaluationCommand": (
+                    "npm run western:round6-stage-a-safety-eval"
+                ),
+                "safetyEvaluatorContract": (
+                    "western-round6-stage-a-clean-safety-v1"
+                ),
+                "safetyEvaluatorPath": report_path(STAGE_A_SAFETY_RUNNER),
+                "signoffLineagePath": (
+                    "data/experiments/"
+                    "western-strings-round6-stage-a-signoff/ledger.json"
+                ),
+                "safetyConsumedLedgerPath": (
+                    "data/experiments/"
+                    "western-strings-round6-stage-a-safety/consumed-ledger.json"
+                ),
+                "safetyReportPath": (
+                    "data/experiments/"
+                    "western-strings-round6-stage-a-safety/report.json"
+                ),
+                "modelPath": (
+                    "data/experiments/"
+                    "western-strings-round6-stage-a-safety/model.joblib"
+                ),
+                "freshAudioMustBeAbsent": True,
+                "cleanSafetyMayBeConsumedOnce": True,
+            },
             "passAction": (
                 "Freeze the fitted model and complete Stage B without changing "
                 "features, model parameters, decision threshold, or safety limits."
@@ -303,6 +357,11 @@ def build_report() -> dict[str, Any]:
         ROUND6_CONTRACT,
         ROUND6_MANIFEST,
         ROUND6_TRUTH,
+        TRUTH_SIGNOFF_GENERATOR,
+        TRUTH_SIGNOFF_APPLIER,
+        STAGE_A_SAFETY_RUNNER,
+        ROUND6_CANDIDATE_RUNNER,
+        PACKAGE_JSON,
     )
     return {
         "schemaVersion": 1,
@@ -321,6 +380,7 @@ def markdown(report: dict[str, Any]) -> str:
     stage_b = report["stageB"]
     limits = stage_a["cleanSafetyLimits"]
     model = stage_a["candidate"]
+    operations = stage_a["operations"]
     lines = [
         "# P3 最小录音分阶段协议",
         "",
@@ -362,6 +422,16 @@ def markdown(report: dict[str, Any]) -> str:
         f"任一录音 `≤{limits['publicProfessionalBurdenAnyRecordingPer1000Max']}/1000`。",
         "",
         "任一超限立即淘汰并收线，不录 fresh。",
+        "",
+        "Stage A 固定执行链：",
+        "",
+        f"1. `{operations['truthSignoffPackCommand']}` 只读取 6 条 calibration；fresh 音频必须不存在。",
+        f"2. 下载签署 JSON 后先 dry-run `{operations['truthSignoffApplyCommand'].replace(' --apply', '')}`，"
+        "确认 `readyToApply=true` 后再加 `--apply`。",
+        f"3. 依次运行 `{operations['positionBalanceCommand']}` 和 "
+        f"`{operations['safetyPreflightCommand']}`。",
+        f"4. 只执行一次 `{operations['safetyEvaluationCommand']}`；"
+        "consumed ledger 在读取 clean 安全结果前写入，崩溃也不得重跑。",
         "",
         "## Stage B：仅在 Stage A 通过后补 fresh 6 条",
         "",

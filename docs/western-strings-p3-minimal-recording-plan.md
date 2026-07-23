@@ -6,7 +6,7 @@
 - 条件追加：`6` 条。
 - 最坏总量：`12` 条。
 - Stage A 失败可避免：`6` 条 fresh。
-- 协议语义 SHA-256：`e249bfdc21d9e722d83a0788647fed1eefc14b45064460be0a88a2afe159195f`。
+- 协议语义 SHA-256：`d08bff4b76a114feaf93f4d2d00fb2e37df54660d67b0edc7d6fc1f313777a3f`。
 
 ## 为什么必须先录 6 条
 
@@ -30,9 +30,16 @@ P1 的 7 个可直接运行候选全部因真实干净域过度标注而淘汰�
 
 - 本地权威 clean：FP `≤0`。
 - Round 5 已消费普通位置：FP `≤0`，只作诊断。
-- 公开专业演奏：合并负担 `≤5.0/1000`，任一录音 `≤10.0/1000`。
+- 公开专业演奏：合并负担 `≤5/1000`，任一录音 `≤10/1000`。
 
 任一超限立即淘汰并收线，不录 fresh。
+
+Stage A 固定执行链：
+
+1. `npm run western:round6-stage-a-truth-signoff-pack` 只读取 6 条 calibration；fresh 音频必须不存在。
+2. 下载签署 JSON 后先 dry-run `npm run western:round6-stage-a-truth-signoff-apply -- --completed <path>`，确认 `readyToApply=true` 后再加 `--apply`。
+3. 依次运行 `npm run western:round6-position-balance` 和 `npm run western:round6-stage-a-safety-preflight`。
+4. 只执行一次 `npm run western:round6-stage-a-safety-eval`；consumed ledger 在读取 clean 安全结果前写入，崩溃也不得重跑。
 
 ## Stage B：仅在 Stage A 通过后补 fresh 6 条
 

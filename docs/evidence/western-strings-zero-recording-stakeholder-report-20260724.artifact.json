@@ -88,7 +88,7 @@
             "docs/evidence/western-strings-p3-minimal-recording-preregistration-20260724.json"
           ],
           "metric_definitions": [
-            "文件 SHA-256=576b1f262deb28adb1ddcf4ddbdb414f08c8238c92da5c5b280654877a0f7cb7"
+            "文件 SHA-256=91c4b1ca630758c52ba2cc383d9c4f44febff027fa397265b8202b40cc974d35"
           ]
         }
       },
@@ -240,7 +240,7 @@
       {
         "id": "p3-heading",
         "type": "markdown",
-        "body": "## 现在只录 6 条，而不是一次录 12 条\n\nP1 还留下一个不能零录音执行的预注册候选：`performance-only-RF-v2` 需要反平衡 calibration 才能拟合。现有 Round 6 设计可无损拆为 calibration 6 条和 fresh 6 条；两边各有两份新谱×三次角色轮换，每 gate 都是 `6 positive + 12 confusion-negative`，曲目和演奏者跨 split 不重叠。\n\n1. 现在只录并完整签署 6 条 calibration。\n2. 按冻结 RF 参数和 `0.5` 决策点训练，先跑既有 P1 clean 安全闸。\n3. 任一安全上限超限就收线，省掉 6 条 fresh；strict 保持 `2/12`。\n4. 只有 Stage A 全通过，才冻结模型并补 6 条 fresh，一次性按 `P≥90% / R≥50% / strict FP=0` 评测。\n\n分阶段协议语义 SHA-256：`e249bfdc21d9e722d83a0788647fed1eefc14b45064460be0a88a2afe159195f`。",
+        "body": "## 现在只录 6 条，而不是一次录 12 条\n\nP1 还留下一个不能零录音执行的预注册候选：`performance-only-RF-v2` 需要反平衡 calibration 才能拟合。现有 Round 6 设计可无损拆为 calibration 6 条和 fresh 6 条；两边各有两份新谱×三次角色轮换，每 gate 都是 `6 positive + 12 confusion-negative`，曲目和演奏者跨 split 不重叠。\n\n1. 现在只录并完整签署 6 条 calibration。\n2. 按冻结 RF 参数和 `0.5` 决策点训练，先跑既有 P1 clean 安全闸。\n3. 任一安全上限超限就收线，省掉 6 条 fresh；strict 保持 `2/12`。\n4. 只有 Stage A 全通过，才冻结模型并补 6 条 fresh，一次性按 `P≥90% / R≥50% / strict FP=0` 评测。\n\n分阶段协议语义 SHA-256：`d08bff4b76a114feaf93f4d2d00fb2e37df54660d67b0edc7d6fc1f313777a3f`。",
         "sourceId": "p3-protocol"
       },
       {
@@ -923,7 +923,7 @@
           "docs/evidence/western-strings-p3-minimal-recording-preregistration-20260724.json"
         ],
         "metric_definitions": [
-          "文件 SHA-256=576b1f262deb28adb1ddcf4ddbdb414f08c8238c92da5c5b280654877a0f7cb7"
+          "文件 SHA-256=91c4b1ca630758c52ba2cc383d9c4f44febff027fa397265b8202b40cc974d35"
         ]
       }
     },

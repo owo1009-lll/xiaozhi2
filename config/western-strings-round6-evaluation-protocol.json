@@ -20,7 +20,7 @@
       "role": "candidate-runner",
       "path": "scripts/experiments/train_western_round6_full_score_candidate.py",
       "hashMode": "lf-normalized-sha256",
-      "sha256": "a25ff9d2a9ff79cb086a1273c3c1a380be0c324010df560cb996e0bda1272e03"
+      "sha256": "06457633b3970a31bfbd5503bd1460b5df60c2d6046a92606f3083d7f53c34ef"
     },
     {
       "role": "feature-extractor",

@@ -155,12 +155,18 @@ def expand_full_score_rows(
     return rows
 
 
-def build_dataset(manifest_path: Path, truth_path: Path) -> list[dict[str, Any]]:
+def build_dataset(
+    manifest_path: Path,
+    truth_path: Path,
+    include_splits: set[str] | None = None,
+) -> list[dict[str, Any]]:
     with manifest_path.open(encoding="utf-8-sig", newline="") as handle:
         manifest = list(csv.DictReader(handle))
     truth = read_json(truth_path)["recordings"]
     dataset = []
     for metadata in manifest:
+        if include_splits is not None and metadata["split"] not in include_splits:
+            continue
         recording_id = metadata["recordingId"]
         score_path = REPO / metadata["scorePath"]
         audio_path = REPO / metadata["audioPath"]
