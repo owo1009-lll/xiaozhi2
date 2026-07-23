@@ -1,0 +1,1062 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "surface": "report",
+    "title": "少录音优先决策",
+    "description": "P0-P3 零录音优先审计、候选安全淘汰和最小分阶段录音决策。",
+    "generatedAt": "2026-07-24T00:00:00+08:00",
+    "sources": [
+      {
+        "id": "p0-accounting",
+        "label": "Round 5 证据重记账",
+        "path": "docs/evidence/western-strings-round5-evidence-accounting-20260724.json",
+        "query": {
+          "description": "读取已提交、SHA 绑定的项目证据 JSON。",
+          "engine": "python-local",
+          "language": "python",
+          "sql": "import json\nfrom pathlib import Path\ndata = json.loads(Path('docs/evidence/western-strings-round5-evidence-accounting-20260724.json').read_text(encoding='utf-8'))",
+          "tables_used": [
+            "docs/evidence/western-strings-round5-evidence-accounting-20260724.json"
+          ],
+          "metric_definitions": [
+            "文件 SHA-256=a6330f10f498f295e1fedd99bb761563b5ab7a60267e83e1e342fb72316b929a"
+          ]
+        }
+      },
+      {
+        "id": "p1-prereg",
+        "label": "P1 候选预注册与冻结门槛",
+        "path": "docs/evidence/western-strings-p1-clean-domain-preregistration-20260724.json",
+        "query": {
+          "description": "读取已提交、SHA 绑定的项目证据 JSON。",
+          "engine": "python-local",
+          "language": "python",
+          "sql": "import json\nfrom pathlib import Path\ndata = json.loads(Path('docs/evidence/western-strings-p1-clean-domain-preregistration-20260724.json').read_text(encoding='utf-8'))",
+          "tables_used": [
+            "docs/evidence/western-strings-p1-clean-domain-preregistration-20260724.json"
+          ],
+          "metric_definitions": [
+            "文件 SHA-256=f3bfe14b2f5f7a75e70efa4df5a9ceb8f1d96453269aae96d0fa4faa22a69fd8"
+          ]
+        }
+      },
+      {
+        "id": "p1-results",
+        "label": "P1 真实干净域安全筛选",
+        "path": "docs/evidence/western-strings-p1-clean-domain-safety-20260724.json",
+        "query": {
+          "description": "读取已提交、SHA 绑定的项目证据 JSON。",
+          "engine": "python-local",
+          "language": "python",
+          "sql": "import json\nfrom pathlib import Path\ndata = json.loads(Path('docs/evidence/western-strings-p1-clean-domain-safety-20260724.json').read_text(encoding='utf-8'))",
+          "tables_used": [
+            "docs/evidence/western-strings-p1-clean-domain-safety-20260724.json"
+          ],
+          "metric_definitions": [
+            "文件 SHA-256=9a4325c6d8a024fbfc91924e2455bb0c4e95ac7da199794504f9c80b67375031"
+          ]
+        }
+      },
+      {
+        "id": "p2-audit",
+        "label": "P2 公开数据召回可派生性审计",
+        "path": "docs/evidence/western-strings-p2-public-error-recall-audit-20260724.json",
+        "query": {
+          "description": "读取已提交、SHA 绑定的项目证据 JSON。",
+          "engine": "python-local",
+          "language": "python",
+          "sql": "import json\nfrom pathlib import Path\ndata = json.loads(Path('docs/evidence/western-strings-p2-public-error-recall-audit-20260724.json').read_text(encoding='utf-8'))",
+          "tables_used": [
+            "docs/evidence/western-strings-p2-public-error-recall-audit-20260724.json"
+          ],
+          "metric_definitions": [
+            "文件 SHA-256=96a4b255483328684e14ec53673a10fcd9129b4e639d7c6640fa5afc72fe1e0b"
+          ]
+        }
+      },
+      {
+        "id": "p3-protocol",
+        "label": "P3 最小录音分阶段协议",
+        "path": "docs/evidence/western-strings-p3-minimal-recording-preregistration-20260724.json",
+        "query": {
+          "description": "读取已提交、SHA 绑定的项目证据 JSON。",
+          "engine": "python-local",
+          "language": "python",
+          "sql": "import json\nfrom pathlib import Path\ndata = json.loads(Path('docs/evidence/western-strings-p3-minimal-recording-preregistration-20260724.json').read_text(encoding='utf-8'))",
+          "tables_used": [
+            "docs/evidence/western-strings-p3-minimal-recording-preregistration-20260724.json"
+          ],
+          "metric_definitions": [
+            "文件 SHA-256=576b1f262deb28adb1ddcf4ddbdb414f08c8238c92da5c5b280654877a0f7cb7"
+          ]
+        }
+      },
+      {
+        "id": "stakeholder-report-candidate_outcomes",
+        "label": "P1 候选阈值与安全淘汰汇总",
+        "path": "scripts/experiments/build_western_zero_recording_stakeholder_report.py",
+        "query": {
+          "description": "从 P0-P3 已审阅 JSON 确定性生成内存 SQLite 表，再执行本查询产生最终报告快照；不重新训练、不改阈值。",
+          "engine": "sqlite-in-memory",
+          "language": "sql",
+          "sql": "SELECT * FROM \"candidate_outcomes\" ORDER BY \"order\" ASC",
+          "tables_used": [
+            "candidate_outcomes"
+          ],
+          "filters": [
+            "仅使用 2026-07-24 已冻结证据",
+            "Round 4/5 不作验收",
+            "不把合成召回当真实召回"
+          ],
+          "metric_definitions": [
+            "违反安全上限数=候选 eliminationReasons 的预注册上限条目数。",
+            "公开专业 flags 是负担而非权威假阳。"
+          ]
+        }
+      },
+      {
+        "id": "stakeholder-report-round5_accounting",
+        "label": "Round 5 证据分类汇总",
+        "path": "scripts/experiments/build_western_zero_recording_stakeholder_report.py",
+        "query": {
+          "description": "从 P0-P3 已审阅 JSON 确定性生成内存 SQLite 表，再执行本查询产生最终报告快照；不重新训练、不改阈值。",
+          "engine": "sqlite-in-memory",
+          "language": "sql",
+          "sql": "SELECT * FROM \"round5_accounting\" ORDER BY \"order\" ASC",
+          "tables_used": [
+            "round5_accounting"
+          ],
+          "filters": [
+            "仅使用 2026-07-24 已冻结证据",
+            "Round 4/5 不作验收",
+            "不把合成召回当真实召回"
+          ],
+          "metric_definitions": [
+            "观测值按位置混淆、真实失败或灵敏度观察重新分类。"
+          ]
+        }
+      },
+      {
+        "id": "stakeholder-report-public_recall",
+        "label": "P2 公开数据召回可派生性汇总",
+        "path": "scripts/experiments/build_western_zero_recording_stakeholder_report.py",
+        "query": {
+          "description": "从 P0-P3 已审阅 JSON 确定性生成内存 SQLite 表，再执行本查询产生最终报告快照；不重新训练、不改阈值。",
+          "engine": "sqlite-in-memory",
+          "language": "sql",
+          "sql": "SELECT * FROM \"public_recall\" ORDER BY \"referenceNotes\" DESC, \"order\" ASC",
+          "tables_used": [
+            "public_recall"
+          ],
+          "filters": [
+            "仅使用 2026-07-24 已冻结证据",
+            "Round 4/5 不作验收",
+            "不把合成召回当真实召回"
+          ],
+          "metric_definitions": [
+            "错误正例必须有独立人工裁定；对齐残差不计错误正例。"
+          ]
+        }
+      },
+      {
+        "id": "stakeholder-report-recording_stages",
+        "label": "P3 最小分阶段录音汇总",
+        "path": "scripts/experiments/build_western_zero_recording_stakeholder_report.py",
+        "query": {
+          "description": "从 P0-P3 已审阅 JSON 确定性生成内存 SQLite 表，再执行本查询产生最终报告快照；不重新训练、不改阈值。",
+          "engine": "sqlite-in-memory",
+          "language": "sql",
+          "sql": "SELECT * FROM \"recording_stages\" ORDER BY \"order\" ASC",
+          "tables_used": [
+            "recording_stages"
+          ],
+          "filters": [
+            "仅使用 2026-07-24 已冻结证据",
+            "Round 4/5 不作验收",
+            "不把合成召回当真实召回"
+          ],
+          "metric_definitions": [
+            "当前最小录音量=Stage A calibration 录音数。",
+            "Stage B 仅在 Stage A 全部安全上限通过后计入条件追加量。"
+          ]
+        }
+      }
+    ],
+    "blocks": [
+      {
+        "id": "title",
+        "type": "markdown",
+        "body": "# 少录音优先决策"
+      },
+      {
+        "id": "executive-summary",
+        "type": "markdown",
+        "body": "## Executive Summary\n\n- **Round 5 的原始片段 RF 数字因位置混淆作废，但 gap 与波形路线的低召回是真失败。** 严格确诊保持 `2/12`。\n- **P1 冻结的 7 个可直接运行候选全部在真实干净域安全闸淘汰，0 个进入召回审计。** 没有在看结果后放宽任何门槛。\n- **P2 检查 5,326 个公开参考音符事件，错误正例与同声部演奏对均为 0。** 公开数据不能提供真实错误召回或弱旁证。\n- **当前非录不可的是 6 条 calibration，不是一次录满 12。** 只有冻结的 performance-only RF 先通过既有 clean 安全闸，才条件追加 6 条 untouched fresh。"
+      },
+      {
+        "id": "p1-finding",
+        "type": "markdown",
+        "body": "## 七个可直接运行候选全部在安全闸前淘汰\n\nP1 的分母是本地权威 clean `743` 个位置、Round 5 已消费普通位置 `624` 个、公开专业 Bach `6,652` 个；音高轨迹另按 `506` 个可判位置。自动指控候选要求本地和 Round 5 `0 FP`、公开合并负担不超过 `5/1000` 且任一录音不超过 `10/1000`。复核提示允许本地/Round 5 合并 `2%`、单条 `5%`，公开合并 `20/1000`、单条 `50/1000`。图中条数是违反了几项预注册安全上限，不把不同分母的误报率强行放在同一轴。"
+      },
+      {
+        "id": "candidate-breach-chart-block",
+        "type": "chart",
+        "chartId": "candidate-breach-chart"
+      },
+      {
+        "id": "candidate-threshold-heading",
+        "type": "markdown",
+        "body": "## 冻结候选与精确门槛\n\n以下逐项保留每个候选的固定触发阈值。DP 数字按 `M/N/E/D=错音/漏音/多音/拖拍` 顺序列出；完整 JSON 阈值仍保留在图表数据详情与 P1 预注册源中。\n\n- **Gap 复核**（复核提示）：conf[M/N/E/D]=0.45/0.45/0.55/0.45; pitch[M/N/E/D]=0.5/0.5/0.5/0.5; del[M/N/E/D]=0.8/0.8/0.8/0.8; ins[M/N/E/D]=1.1/0.8/1.1/0.8; merge[M/N/E/D]=0.2/0.45/0.2/0.2; dur[M/N/E/D]=0.3/0.15/0.3/0.15; reattack[M/N/E/D]=0.7/0.7/0.85/0.7; dragDur[M/N/E/D]=1.3/1.3/1.3/1.3; dragIOI[M/N/E/D]=0.15/0.15/0.15/0.15; rule=gap AND same-position substitution/deletion-in-gap-run\n- **Gap 严格漏音**（自动指控）：conf[M/N/E/D]=0.45/0.45/0.55/0.45; pitch[M/N/E/D]=0.5/0.5/0.5/0.5; del[M/N/E/D]=0.8/0.8/0.8/0.8; ins[M/N/E/D]=1.1/0.8/1.1/0.8; merge[M/N/E/D]=0.2/0.45/0.2/0.2; dur[M/N/E/D]=0.3/0.15/0.3/0.15; reattack[M/N/E/D]=0.7/0.7/0.85/0.7; dragDur[M/N/E/D]=1.3/1.3/1.3/1.3; dragIOI[M/N/E/D]=0.15/0.15/0.15/0.15; missing only; maxGapCount=5; maxGapRate=0.1\n- **IOI/时值复核**（复核提示）：conf[M/N/E/D]=0.45/0.45/0.55/0.45; pitch[M/N/E/D]=0.5/0.5/0.5/0.5; del[M/N/E/D]=0.8/0.8/0.8/0.8; ins[M/N/E/D]=1.1/0.8/1.1/0.8; merge[M/N/E/D]=0.2/0.45/0.2/0.2; dur[M/N/E/D]=0.3/0.15/0.3/0.15; reattack[M/N/E/D]=0.7/0.7/0.85/0.7; dragDur[M/N/E/D]=1.3/1.3/1.3/1.3; dragIOI[M/N/E/D]=0.15/0.15/0.15/0.15; relIOI>0.15; duration≥1.2; confidence≥0.75\n- **IOI/时值严格**（自动指控）：conf[M/N/E/D]=0.45/0.45/0.55/0.45; pitch[M/N/E/D]=0.5/0.5/0.5/0.5; del[M/N/E/D]=0.8/0.8/0.8/0.8; ins[M/N/E/D]=1.1/0.8/1.1/0.8; merge[M/N/E/D]=0.2/0.45/0.2/0.2; dur[M/N/E/D]=0.3/0.15/0.3/0.15; reattack[M/N/E/D]=0.7/0.7/0.85/0.7; dragDur[M/N/E/D]=1.3/1.3/1.3/1.3; dragIOI[M/N/E/D]=0.15/0.15/0.15/0.15; relIOI>0.15; duration≥1.3; confidence≥0.75\n- **音高轨迹严格**（自动指控）：pitchTolerance=50.0c; spreadP95-P05≤80.0c; IQR≤80.0c; frames≥12; voicedFrames≥12; voicedRatio≥0.7; glissTail=0.35\n- **起音密度严格**（自动指控）：extra DP: conf=0.55, pitch=0.5, del=0.8, ins=1.1, merge=0.2, dur=0.3, reattack=0.85, dragDur=1.3, dragIOI=0.15; interiorAttack≥0.85; startMargin=max(0.12 seconds, 20% event duration); endMargin=max(0.06 seconds, 8% event duration)\n- **时序操作并集**（复核提示）：conf[M/N/E/D]=0.45/0.45/0.55/0.45; pitch[M/N/E/D]=0.5/0.5/0.5/0.5; del[M/N/E/D]=0.8/0.8/0.8/0.8; ins[M/N/E/D]=1.1/0.8/1.1/0.8; merge[M/N/E/D]=0.2/0.45/0.2/0.2; dur[M/N/E/D]=0.3/0.15/0.3/0.15; reattack[M/N/E/D]=0.7/0.7/0.85/0.7; dragDur[M/N/E/D]=1.3/1.3/1.3/1.3; dragIOI[M/N/E/D]=0.15/0.15/0.15/0.15; union=match/insert/delete/merge/split\n\n### 冻结后的真实干净域结果\n\n- **Gap 复核**：本地 `5/743=6.73/1000；单条最高 4.48%`；Round 5 `3/624=4.81/1000；单条最高 1.92%`；公开专业 `1008/6652=151.53/1000；单条最高 22.58%`；淘汰原因：public-professional-pooled-burden；public-professional-recording-burden。\n- **Gap 严格漏音**：本地 `1/743=1.35/1000；单条最高 2.27%`；Round 5 `2/624=3.21/1000；单条最高 1.92%`；公开专业 `0/6652=0.00/1000；单条最高 0.00%`；淘汰原因：authoritative-local-clean-false-positive；consumed-round5-known-negative-false-positive。\n- **IOI/时值复核**：本地 `7/743=9.42/1000；单条最高 8.89%`；Round 5 `0/624=0.00/1000；单条最高 0.00%`；公开专业 `37/6652=5.56/1000；单条最高 1.23%`；淘汰原因：authoritative-local-clean-recording-hint-rate。\n- **IOI/时值严格**：本地 `2/743=2.69/1000；单条最高 4.35%`；Round 5 `0/624=0.00/1000；单条最高 0.00%`；公开专业 `37/6652=5.56/1000；单条最高 1.23%`；淘汰原因：authoritative-local-clean-false-positive；public-professional-pooled-burden；public-professional-recording-burden。\n- **音高轨迹严格**：本地 `不适用`；Round 5 `不适用`；公开专业 `不适用`；淘汰原因：authoritative-local-clean-false-positive。\n- **起音密度严格**：本地 `232/743=312.25/1000；单条最高 54.90%`；Round 5 `64/624=102.56/1000；单条最高 21.15%`；公开专业 `124/6652=18.64/1000；单条最高 10.72%`；淘汰原因：authoritative-local-clean-false-positive；consumed-round5-known-negative-false-positive；public-professional-pooled-burden；public-professional-recording-burden。\n- **时序操作并集**：本地 `289/743=388.96/1000；单条最高 69.57%`；Round 5 `116/624=185.90/1000；单条最高 30.77%`；公开专业 `3371/6652=506.76/1000；单条最高 67.39%`；淘汰原因：authoritative-local-clean-pooled-hint-rate；authoritative-local-clean-recording-hint-rate；consumed-round5-pooled-hint-rate；consumed-round5-recording-hint-rate；public-professional-pooled-burden；public-professional-recording-burden。\n\n后附表只保留角色、违反上限数与最终决策；逐域精确负担仍在上方和底层数据中。",
+        "sourceId": "p1-prereg"
+      },
+      {
+        "id": "candidate-table-block",
+        "type": "table",
+        "tableId": "candidate-table"
+      },
+      {
+        "id": "p0-heading",
+        "type": "markdown",
+        "body": "## Round 5：位置混淆不能掩盖真实失败\n\n四个含谱面上下文的片段 RF gate 失去泛化资格；这不等于所有路线都只是混淆。gap 规则不读取位置，其 `1/12` 与漏音 `1/6` 是真实漏检；波形能量 `0/12` 以及目标音高缺失 `5/12 @ 49/660 FP` 同样是真跨域失败。节奏 `4/12` 只保留灵敏度观察，包内 `0 FP` 不可外推安全。",
+        "sourceId": "p0-accounting"
+      },
+      {
+        "id": "p0-table-block",
+        "type": "table",
+        "tableId": "p0-table"
+      },
+      {
+        "id": "p2-heading",
+        "type": "markdown",
+        "body": "## 公开对齐数据没有错误正例\n\nBach10、URMP 与 MusicNet 的真实演奏标签是对齐或乐器音符真值，不是错音、漏音、多音或拖拍的人工裁定。把 score/audio 起音残差阈值化成 drag，再用同一残差评测，会制造循环真值。因此 P2 不减少真实错误 calibration 的需要。",
+        "sourceId": "p2-audit"
+      },
+      {
+        "id": "p2-table-block",
+        "type": "table",
+        "tableId": "p2-table"
+      },
+      {
+        "id": "p3-heading",
+        "type": "markdown",
+        "body": "## 现在只录 6 条，而不是一次录 12 条\n\nP1 还留下一个不能零录音执行的预注册候选：`performance-only-RF-v2` 需要反平衡 calibration 才能拟合。现有 Round 6 设计可无损拆为 calibration 6 条和 fresh 6 条；两边各有两份新谱×三次角色轮换，每 gate 都是 `6 positive + 12 confusion-negative`，曲目和演奏者跨 split 不重叠。\n\n1. 现在只录并完整签署 6 条 calibration。\n2. 按冻结 RF 参数和 `0.5` 决策点训练，先跑既有 P1 clean 安全闸。\n3. 任一安全上限超限就收线，省掉 6 条 fresh；strict 保持 `2/12`。\n4. 只有 Stage A 全通过，才冻结模型并补 6 条 fresh，一次性按 `P≥90% / R≥50% / strict FP=0` 评测。\n\n分阶段协议语义 SHA-256：`e249bfdc21d9e722d83a0788647fed1eefc14b45064460be0a88a2afe159195f`。",
+        "sourceId": "p3-protocol"
+      },
+      {
+        "id": "p3-table-block",
+        "type": "table",
+        "tableId": "p3-table"
+      },
+      {
+        "id": "further-questions",
+        "type": "markdown",
+        "body": "## 进一步问题\n\n- Stage A 的冻结 RF 能否在本地 clean、Round 5 普通位置和公开专业演奏同时守住自动指控安全上限？这是决定是否补 fresh 的唯一问题。\n- 若 Stage A 失败，下一步不是放宽阈值或换位置特征，而是把自动确诊路线按 strict `2/12` 收线，仅保留人工复核辅助。\n- 若 Stage A 通过，Stage B 的 6 条 fresh 仍只产生性能证据，不会自动打开学生端授权。"
+      },
+      {
+        "id": "caveats",
+        "type": "markdown",
+        "body": "## 约束与假设\n\n- 公开专业演奏没有逐音 clean 裁定，因此其 flags 称为负担，不是权威假阳；淘汰依据仍是预注册负担上限。\n- 当前 6 条是现有两谱×三角色反平衡设计下的最小 calibration，不是对总体泛化置信度的充分样本声明。\n- Round 4/5 已消费，不复用为验收；Stage A 不读取 fresh，Stage B 看过结果后不回调、不重测。\n- M4 OMR 与波形能量验漏音维持收线；合成召回不代表真实召回。\n- 三个学生开关继续为 false，系统保持 fail-closed。"
+      }
+    ],
+    "charts": [
+      {
+        "id": "candidate-breach-chart",
+        "title": "冻结候选违反的安全上限数量",
+        "description": "7/7 至少违反一项预注册安全上限，0 个进入召回审计。",
+        "dataset": "candidate_outcomes",
+        "type": "bar",
+        "encodings": {
+          "x": {
+            "field": "candidateLabel",
+            "type": "nominal",
+            "label": "候选"
+          },
+          "y": {
+            "field": "safetyLimitsBreached",
+            "type": "quantitative",
+            "label": "违反上限数"
+          }
+        },
+        "options": {
+          "orientation": "vertical",
+          "grouping": "single",
+          "legend": {
+            "show": false
+          },
+          "valueLabels": {
+            "show": true
+          },
+          "palette": {
+            "kind": "single",
+            "root": "orange"
+          }
+        },
+        "source": {
+          "id": "stakeholder-report-candidate_outcomes",
+          "label": "P1 候选阈值与安全淘汰汇总",
+          "path": "scripts/experiments/build_western_zero_recording_stakeholder_report.py",
+          "query": {
+            "description": "从 P0-P3 已审阅 JSON 确定性生成内存 SQLite 表，再执行本查询产生最终报告快照；不重新训练、不改阈值。",
+            "engine": "sqlite-in-memory",
+            "language": "sql",
+            "sql": "SELECT * FROM \"candidate_outcomes\" ORDER BY \"order\" ASC",
+            "tables_used": [
+              "candidate_outcomes"
+            ],
+            "filters": [
+              "仅使用 2026-07-24 已冻结证据",
+              "Round 4/5 不作验收",
+              "不把合成召回当真实召回"
+            ],
+            "metric_definitions": [
+              "违反安全上限数=候选 eliminationReasons 的预注册上限条目数。",
+              "公开专业 flags 是负担而非权威假阳。"
+            ]
+          }
+        }
+      }
+    ],
+    "tables": [
+      {
+        "id": "candidate-table",
+        "title": "候选安全淘汰决策",
+        "description": "7 个候选；本地/Round 5 为权威普通位置，公开域为专业演奏负担。",
+        "dataset": "candidate_outcomes",
+        "columns": [
+          {
+            "field": "candidateLabel",
+            "label": "候选",
+            "type": "text"
+          },
+          {
+            "field": "role",
+            "label": "语义",
+            "type": "text"
+          },
+          {
+            "field": "safetyLimitsBreached",
+            "label": "违反上限数",
+            "type": "number"
+          },
+          {
+            "field": "retained",
+            "label": "保留",
+            "type": "text"
+          }
+        ],
+        "defaultSort": {
+          "field": "candidateLabel",
+          "direction": "asc"
+        },
+        "source": {
+          "id": "stakeholder-report-candidate_outcomes",
+          "label": "P1 候选阈值与安全淘汰汇总",
+          "path": "scripts/experiments/build_western_zero_recording_stakeholder_report.py",
+          "query": {
+            "description": "从 P0-P3 已审阅 JSON 确定性生成内存 SQLite 表，再执行本查询产生最终报告快照；不重新训练、不改阈值。",
+            "engine": "sqlite-in-memory",
+            "language": "sql",
+            "sql": "SELECT * FROM \"candidate_outcomes\" ORDER BY \"order\" ASC",
+            "tables_used": [
+              "candidate_outcomes"
+            ],
+            "filters": [
+              "仅使用 2026-07-24 已冻结证据",
+              "Round 4/5 不作验收",
+              "不把合成召回当真实召回"
+            ],
+            "metric_definitions": [
+              "违反安全上限数=候选 eliminationReasons 的预注册上限条目数。",
+              "公开专业 flags 是负担而非权威假阳。"
+            ]
+          }
+        }
+      },
+      {
+        "id": "p0-table",
+        "title": "Round 5 证据分类",
+        "description": "只重新记账，不调参、不重训、不复考。",
+        "dataset": "round5_accounting",
+        "columns": [
+          {
+            "field": "evidence",
+            "label": "证据",
+            "type": "text"
+          },
+          {
+            "field": "observed",
+            "label": "观测",
+            "type": "text"
+          },
+          {
+            "field": "classification",
+            "label": "分类",
+            "type": "text"
+          },
+          {
+            "field": "claim",
+            "label": "允许结论",
+            "type": "text"
+          }
+        ],
+        "defaultSort": {
+          "field": "evidence",
+          "direction": "asc"
+        },
+        "source": {
+          "id": "stakeholder-report-round5_accounting",
+          "label": "Round 5 证据分类汇总",
+          "path": "scripts/experiments/build_western_zero_recording_stakeholder_report.py",
+          "query": {
+            "description": "从 P0-P3 已审阅 JSON 确定性生成内存 SQLite 表，再执行本查询产生最终报告快照；不重新训练、不改阈值。",
+            "engine": "sqlite-in-memory",
+            "language": "sql",
+            "sql": "SELECT * FROM \"round5_accounting\" ORDER BY \"order\" ASC",
+            "tables_used": [
+              "round5_accounting"
+            ],
+            "filters": [
+              "仅使用 2026-07-24 已冻结证据",
+              "Round 4/5 不作验收",
+              "不把合成召回当真实召回"
+            ],
+            "metric_definitions": [
+              "观测值按位置混淆、真实失败或灵敏度观察重新分类。"
+            ]
+          }
+        }
+      },
+      {
+        "id": "p2-table",
+        "title": "公开数据错误召回可派生性",
+        "description": "参考音符事件不等于经裁定错误正例。",
+        "dataset": "public_recall",
+        "columns": [
+          {
+            "field": "dataset",
+            "label": "数据集",
+            "type": "text"
+          },
+          {
+            "field": "referenceNotes",
+            "label": "参考音符",
+            "type": "number"
+          },
+          {
+            "field": "samePartPairs",
+            "label": "同声部演奏对",
+            "type": "number"
+          },
+          {
+            "field": "adjudicatedErrorPositives",
+            "label": "错误正例",
+            "type": "number"
+          },
+          {
+            "field": "recallDerivable",
+            "label": "可派生召回",
+            "type": "text"
+          }
+        ],
+        "defaultSort": {
+          "field": "referenceNotes",
+          "direction": "desc"
+        },
+        "source": {
+          "id": "stakeholder-report-public_recall",
+          "label": "P2 公开数据召回可派生性汇总",
+          "path": "scripts/experiments/build_western_zero_recording_stakeholder_report.py",
+          "query": {
+            "description": "从 P0-P3 已审阅 JSON 确定性生成内存 SQLite 表，再执行本查询产生最终报告快照；不重新训练、不改阈值。",
+            "engine": "sqlite-in-memory",
+            "language": "sql",
+            "sql": "SELECT * FROM \"public_recall\" ORDER BY \"referenceNotes\" DESC, \"order\" ASC",
+            "tables_used": [
+              "public_recall"
+            ],
+            "filters": [
+              "仅使用 2026-07-24 已冻结证据",
+              "Round 4/5 不作验收",
+              "不把合成召回当真实召回"
+            ],
+            "metric_definitions": [
+              "错误正例必须有独立人工裁定；对齐残差不计错误正例。"
+            ]
+          }
+        }
+      },
+      {
+        "id": "p3-table",
+        "title": "最小分阶段录音量",
+        "description": "Stage B 仅在 Stage A 守住全部安全上限后授权。",
+        "dataset": "recording_stages",
+        "columns": [
+          {
+            "field": "stage",
+            "label": "阶段",
+            "type": "text"
+          },
+          {
+            "field": "recordings",
+            "label": "录音数",
+            "type": "number"
+          },
+          {
+            "field": "condition",
+            "label": "触发条件",
+            "type": "text"
+          },
+          {
+            "field": "outcome",
+            "label": "淘汰/通过动作",
+            "type": "text"
+          }
+        ],
+        "defaultSort": {
+          "field": "stage",
+          "direction": "asc"
+        },
+        "source": {
+          "id": "stakeholder-report-recording_stages",
+          "label": "P3 最小分阶段录音汇总",
+          "path": "scripts/experiments/build_western_zero_recording_stakeholder_report.py",
+          "query": {
+            "description": "从 P0-P3 已审阅 JSON 确定性生成内存 SQLite 表，再执行本查询产生最终报告快照；不重新训练、不改阈值。",
+            "engine": "sqlite-in-memory",
+            "language": "sql",
+            "sql": "SELECT * FROM \"recording_stages\" ORDER BY \"order\" ASC",
+            "tables_used": [
+              "recording_stages"
+            ],
+            "filters": [
+              "仅使用 2026-07-24 已冻结证据",
+              "Round 4/5 不作验收",
+              "不把合成召回当真实召回"
+            ],
+            "metric_definitions": [
+              "当前最小录音量=Stage A calibration 录音数。",
+              "Stage B 仅在 Stage A 全部安全上限通过后计入条件追加量。"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "status": "ready",
+    "generatedAt": "2026-07-24T00:00:00+08:00",
+    "datasets": {
+      "candidate_outcomes": [
+        {
+          "order": 1,
+          "candidateId": "alignment-gap-refined-self-check-v1",
+          "candidateLabel": "Gap 复核",
+          "family": "alignment-gap",
+          "role": "复核提示",
+          "thresholdSummary": "conf[M/N/E/D]=0.45/0.45/0.55/0.45; pitch[M/N/E/D]=0.5/0.5/0.5/0.5; del[M/N/E/D]=0.8/0.8/0.8/0.8; ins[M/N/E/D]=1.1/0.8/1.1/0.8; merge[M/N/E/D]=0.2/0.45/0.2/0.2; dur[M/N/E/D]=0.3/0.15/0.3/0.15; reattack[M/N/E/D]=0.7/0.7/0.85/0.7; dragDur[M/N/E/D]=1.3/1.3/1.3/1.3; dragIOI[M/N/E/D]=0.15/0.15/0.15/0.15; rule=gap AND same-position substitution/deletion-in-gap-run",
+          "thresholdsJson": "{\"temporalParamsByGate\":{\"drag\":{\"deletePenalty\":0.8,\"dragDurationRatio\":1.3,\"dragIoiRatio\":0.15,\"durationWeight\":0.15,\"insertPenalty\":0.8,\"mergePenalty\":0.2,\"minConfidence\":0.45,\"pitchWeight\":0.5,\"reattackRatio\":0.7},\"extra\":{\"deletePenalty\":0.8,\"dragDurationRatio\":1.3,\"dragIoiRatio\":0.15,\"durationWeight\":0.3,\"insertPenalty\":1.1,\"mergePenalty\":0.2,\"minConfidence\":0.55,\"pitchWeight\":0.5,\"reattackRatio\":0.85},\"merged_substitution\":{\"deletePenalty\":0.8,\"dragDurationRatio\":1.3,\"dragIoiRatio\":0.15,\"durationWeight\":0.3,\"insertPenalty\":1.1,\"mergePenalty\":0.2,\"minConfidence\":0.45,\"pitchWeight\":0.5,\"reattackRatio\":0.7},\"missing\":{\"deletePenalty\":0.8,\"dragDurationRatio\":1.3,\"dragIoiRatio\":0.15,\"durationWeight\":0.15,\"insertPenalty\":0.8,\"mergePenalty\":0.45,\"minConfidence\":0.45,\"pitchWeight\":0.5,\"reattackRatio\":0.7}}}",
+          "safetyLimitsBreached": 2,
+          "eliminationReasons": "public-professional-pooled-burden；public-professional-recording-burden",
+          "retained": "否",
+          "localFlags": 5,
+          "localPositions": 743,
+          "localPer1000": 6.729475,
+          "localMaxRate": 0.044776119,
+          "round5Flags": 3,
+          "round5Positions": 624,
+          "round5Per1000": 4.807692,
+          "round5MaxRate": 0.019230769,
+          "publicFlags": 1008,
+          "publicPositions": 6652,
+          "publicPer1000": 151.533373,
+          "publicMaxRate": 0.225752508,
+          "localEvidence": "5/743=6.73/1000；单条最高 4.48%",
+          "round5Evidence": "3/624=4.81/1000；单条最高 1.92%",
+          "publicEvidence": "1008/6652=151.53/1000；单条最高 22.58%"
+        },
+        {
+          "order": 2,
+          "candidateId": "alignment-gap-strict-missing-v1",
+          "candidateLabel": "Gap 严格漏音",
+          "family": "alignment-gap",
+          "role": "自动指控",
+          "thresholdSummary": "conf[M/N/E/D]=0.45/0.45/0.55/0.45; pitch[M/N/E/D]=0.5/0.5/0.5/0.5; del[M/N/E/D]=0.8/0.8/0.8/0.8; ins[M/N/E/D]=1.1/0.8/1.1/0.8; merge[M/N/E/D]=0.2/0.45/0.2/0.2; dur[M/N/E/D]=0.3/0.15/0.3/0.15; reattack[M/N/E/D]=0.7/0.7/0.85/0.7; dragDur[M/N/E/D]=1.3/1.3/1.3/1.3; dragIOI[M/N/E/D]=0.15/0.15/0.15/0.15; missing only; maxGapCount=5; maxGapRate=0.1",
+          "thresholdsJson": "{\"maxAssignmentGapCount\":5,\"maxAssignmentGapRate\":0.1,\"temporalParamsByGate\":{\"drag\":{\"deletePenalty\":0.8,\"dragDurationRatio\":1.3,\"dragIoiRatio\":0.15,\"durationWeight\":0.15,\"insertPenalty\":0.8,\"mergePenalty\":0.2,\"minConfidence\":0.45,\"pitchWeight\":0.5,\"reattackRatio\":0.7},\"extra\":{\"deletePenalty\":0.8,\"dragDurationRatio\":1.3,\"dragIoiRatio\":0.15,\"durationWeight\":0.3,\"insertPenalty\":1.1,\"mergePenalty\":0.2,\"minConfidence\":0.55,\"pitchWeight\":0.5,\"reattackRatio\":0.85},\"merged_substitution\":{\"deletePenalty\":0.8,\"dragDurationRatio\":1.3,\"dragIoiRatio\":0.15,\"durationWeight\":0.3,\"insertPenalty\":1.1,\"mergePenalty\":0.2,\"minConfidence\":0.45,\"pitchWeight\":0.5,\"reattackRatio\":0.7},\"missing\":{\"deletePenalty\":0.8,\"dragDurationRatio\":1.3,\"dragIoiRatio\":0.15,\"durationWeight\":0.15,\"insertPenalty\":0.8,\"mergePenalty\":0.45,\"minConfidence\":0.45,\"pitchWeight\":0.5,\"reattackRatio\":0.7}}}",
+          "safetyLimitsBreached": 2,
+          "eliminationReasons": "authoritative-local-clean-false-positive；consumed-round5-known-negative-false-positive",
+          "retained": "否",
+          "localFlags": 1,
+          "localPositions": 743,
+          "localPer1000": 1.345895,
+          "localMaxRate": 0.022727273,
+          "round5Flags": 2,
+          "round5Positions": 624,
+          "round5Per1000": 3.205128,
+          "round5MaxRate": 0.019230769,
+          "publicFlags": 0,
+          "publicPositions": 6652,
+          "publicPer1000": 0.0,
+          "publicMaxRate": 0.0,
+          "localEvidence": "1/743=1.35/1000；单条最高 2.27%",
+          "round5Evidence": "2/624=3.21/1000；单条最高 1.92%",
+          "publicEvidence": "0/6652=0.00/1000；单条最高 0.00%"
+        },
+        {
+          "order": 3,
+          "candidateId": "relative-ioi-duration-review-v1",
+          "candidateLabel": "IOI/时值复核",
+          "family": "relative-ioi-duration",
+          "role": "复核提示",
+          "thresholdSummary": "conf[M/N/E/D]=0.45/0.45/0.55/0.45; pitch[M/N/E/D]=0.5/0.5/0.5/0.5; del[M/N/E/D]=0.8/0.8/0.8/0.8; ins[M/N/E/D]=1.1/0.8/1.1/0.8; merge[M/N/E/D]=0.2/0.45/0.2/0.2; dur[M/N/E/D]=0.3/0.15/0.3/0.15; reattack[M/N/E/D]=0.7/0.7/0.85/0.7; dragDur[M/N/E/D]=1.3/1.3/1.3/1.3; dragIOI[M/N/E/D]=0.15/0.15/0.15/0.15; relIOI>0.15; duration≥1.2; confidence≥0.75",
+          "thresholdsJson": "{\"eventConfidenceAtLeast\":0.75,\"eventDurationRatioAtLeast\":1.2,\"relativeIoiDeviationGreaterThan\":0.15,\"temporalParamsByGate\":{\"drag\":{\"deletePenalty\":0.8,\"dragDurationRatio\":1.3,\"dragIoiRatio\":0.15,\"durationWeight\":0.15,\"insertPenalty\":0.8,\"mergePenalty\":0.2,\"minConfidence\":0.45,\"pitchWeight\":0.5,\"reattackRatio\":0.7},\"extra\":{\"deletePenalty\":0.8,\"dragDurationRatio\":1.3,\"dragIoiRatio\":0.15,\"durationWeight\":0.3,\"insertPenalty\":1.1,\"mergePenalty\":0.2,\"minConfidence\":0.55,\"pitchWeight\":0.5,\"reattackRatio\":0.85},\"merged_substitution\":{\"deletePenalty\":0.8,\"dragDurationRatio\":1.3,\"dragIoiRatio\":0.15,\"durationWeight\":0.3,\"insertPenalty\":1.1,\"mergePenalty\":0.2,\"minConfidence\":0.45,\"pitchWeight\":0.5,\"reattackRatio\":0.7},\"missing\":{\"deletePenalty\":0.8,\"dragDurationRatio\":1.3,\"dragIoiRatio\":0.15,\"durationWeight\":0.15,\"insertPenalty\":0.8,\"mergePenalty\":0.45,\"minConfidence\":0.45,\"pitchWeight\":0.5,\"reattackRatio\":0.7}}}",
+          "safetyLimitsBreached": 1,
+          "eliminationReasons": "authoritative-local-clean-recording-hint-rate",
+          "retained": "否",
+          "localFlags": 7,
+          "localPositions": 743,
+          "localPer1000": 9.421265,
+          "localMaxRate": 0.088888889,
+          "round5Flags": 0,
+          "round5Positions": 624,
+          "round5Per1000": 0.0,
+          "round5MaxRate": 0.0,
+          "publicFlags": 37,
+          "publicPositions": 6652,
+          "publicPer1000": 5.562237,
+          "publicMaxRate": 0.012302285,
+          "localEvidence": "7/743=9.42/1000；单条最高 8.89%",
+          "round5Evidence": "0/624=0.00/1000；单条最高 0.00%",
+          "publicEvidence": "37/6652=5.56/1000；单条最高 1.23%"
+        },
+        {
+          "order": 4,
+          "candidateId": "relative-ioi-duration-strict-v1",
+          "candidateLabel": "IOI/时值严格",
+          "family": "relative-ioi-duration",
+          "role": "自动指控",
+          "thresholdSummary": "conf[M/N/E/D]=0.45/0.45/0.55/0.45; pitch[M/N/E/D]=0.5/0.5/0.5/0.5; del[M/N/E/D]=0.8/0.8/0.8/0.8; ins[M/N/E/D]=1.1/0.8/1.1/0.8; merge[M/N/E/D]=0.2/0.45/0.2/0.2; dur[M/N/E/D]=0.3/0.15/0.3/0.15; reattack[M/N/E/D]=0.7/0.7/0.85/0.7; dragDur[M/N/E/D]=1.3/1.3/1.3/1.3; dragIOI[M/N/E/D]=0.15/0.15/0.15/0.15; relIOI>0.15; duration≥1.3; confidence≥0.75",
+          "thresholdsJson": "{\"eventConfidenceAtLeast\":0.75,\"eventDurationRatioAtLeast\":1.3,\"relativeIoiDeviationGreaterThan\":0.15,\"temporalParamsByGate\":{\"drag\":{\"deletePenalty\":0.8,\"dragDurationRatio\":1.3,\"dragIoiRatio\":0.15,\"durationWeight\":0.15,\"insertPenalty\":0.8,\"mergePenalty\":0.2,\"minConfidence\":0.45,\"pitchWeight\":0.5,\"reattackRatio\":0.7},\"extra\":{\"deletePenalty\":0.8,\"dragDurationRatio\":1.3,\"dragIoiRatio\":0.15,\"durationWeight\":0.3,\"insertPenalty\":1.1,\"mergePenalty\":0.2,\"minConfidence\":0.55,\"pitchWeight\":0.5,\"reattackRatio\":0.85},\"merged_substitution\":{\"deletePenalty\":0.8,\"dragDurationRatio\":1.3,\"dragIoiRatio\":0.15,\"durationWeight\":0.3,\"insertPenalty\":1.1,\"mergePenalty\":0.2,\"minConfidence\":0.45,\"pitchWeight\":0.5,\"reattackRatio\":0.7},\"missing\":{\"deletePenalty\":0.8,\"dragDurationRatio\":1.3,\"dragIoiRatio\":0.15,\"durationWeight\":0.15,\"insertPenalty\":0.8,\"mergePenalty\":0.45,\"minConfidence\":0.45,\"pitchWeight\":0.5,\"reattackRatio\":0.7}}}",
+          "safetyLimitsBreached": 3,
+          "eliminationReasons": "authoritative-local-clean-false-positive；public-professional-pooled-burden；public-professional-recording-burden",
+          "retained": "否",
+          "localFlags": 2,
+          "localPositions": 743,
+          "localPer1000": 2.69179,
+          "localMaxRate": 0.043478261,
+          "round5Flags": 0,
+          "round5Positions": 624,
+          "round5Per1000": 0.0,
+          "round5MaxRate": 0.0,
+          "publicFlags": 37,
+          "publicPositions": 6652,
+          "publicPer1000": 5.562237,
+          "publicMaxRate": 0.012302285,
+          "localEvidence": "2/743=2.69/1000；单条最高 4.35%",
+          "round5Evidence": "0/624=0.00/1000；单条最高 0.00%",
+          "publicEvidence": "37/6652=5.56/1000；单条最高 1.23%"
+        },
+        {
+          "order": 5,
+          "candidateId": "pitch-trajectory-center-strict-v1",
+          "candidateLabel": "音高轨迹严格",
+          "family": "pitch-trajectory",
+          "role": "自动指控",
+          "thresholdSummary": "pitchTolerance=50.0c; spreadP95-P05≤80.0c; IQR≤80.0c; frames≥12; voicedFrames≥12; voicedRatio≥0.7; glissTail=0.35",
+          "thresholdsJson": "{\"glissandoTargetTailFraction\":0.35,\"maxIqrCents\":80.0,\"maxSpreadCentsP95P05\":80.0,\"minTotalFrameCount\":12,\"minVoicedFrameCount\":12,\"minVoicedFrameRatio\":0.7,\"pitchToleranceCents\":50.0}",
+          "safetyLimitsBreached": 1,
+          "eliminationReasons": "authoritative-local-clean-false-positive",
+          "retained": "否",
+          "localFlags": null,
+          "localPositions": null,
+          "localPer1000": null,
+          "localMaxRate": null,
+          "round5Flags": null,
+          "round5Positions": null,
+          "round5Per1000": null,
+          "round5MaxRate": null,
+          "publicFlags": null,
+          "publicPositions": null,
+          "publicPer1000": null,
+          "publicMaxRate": null,
+          "localEvidence": "不适用",
+          "round5Evidence": "不适用",
+          "publicEvidence": "不适用"
+        },
+        {
+          "order": 6,
+          "candidateId": "onset-density-extra-strict-v1",
+          "candidateLabel": "起音密度严格",
+          "family": "onset-density",
+          "role": "自动指控",
+          "thresholdSummary": "extra DP: conf=0.55, pitch=0.5, del=0.8, ins=1.1, merge=0.2, dur=0.3, reattack=0.85, dragDur=1.3, dragIOI=0.15; interiorAttack≥0.85; startMargin=max(0.12 seconds, 20% event duration); endMargin=max(0.06 seconds, 8% event duration)",
+          "thresholdsJson": "{\"interiorAttackRatioAtLeast\":0.85,\"interiorEndMargin\":\"max(0.06 seconds, 8% event duration)\",\"interiorStartMargin\":\"max(0.12 seconds, 20% event duration)\",\"temporalParams\":{\"deletePenalty\":0.8,\"dragDurationRatio\":1.3,\"dragIoiRatio\":0.15,\"durationWeight\":0.3,\"insertPenalty\":1.1,\"mergePenalty\":0.2,\"minConfidence\":0.55,\"pitchWeight\":0.5,\"reattackRatio\":0.85}}",
+          "safetyLimitsBreached": 4,
+          "eliminationReasons": "authoritative-local-clean-false-positive；consumed-round5-known-negative-false-positive；public-professional-pooled-burden；public-professional-recording-burden",
+          "retained": "否",
+          "localFlags": 232,
+          "localPositions": 743,
+          "localPer1000": 312.247645,
+          "localMaxRate": 0.549019608,
+          "round5Flags": 64,
+          "round5Positions": 624,
+          "round5Per1000": 102.564103,
+          "round5MaxRate": 0.211538462,
+          "publicFlags": 124,
+          "publicPositions": 6652,
+          "publicPer1000": 18.64101,
+          "publicMaxRate": 0.107205624,
+          "localEvidence": "232/743=312.25/1000；单条最高 54.90%",
+          "round5Evidence": "64/624=102.56/1000；单条最高 21.15%",
+          "publicEvidence": "124/6652=18.64/1000；单条最高 10.72%"
+        },
+        {
+          "order": 7,
+          "candidateId": "temporal-operation-sequence-union-v1",
+          "candidateLabel": "时序操作并集",
+          "family": "sequence-model",
+          "role": "复核提示",
+          "thresholdSummary": "conf[M/N/E/D]=0.45/0.45/0.55/0.45; pitch[M/N/E/D]=0.5/0.5/0.5/0.5; del[M/N/E/D]=0.8/0.8/0.8/0.8; ins[M/N/E/D]=1.1/0.8/1.1/0.8; merge[M/N/E/D]=0.2/0.45/0.2/0.2; dur[M/N/E/D]=0.3/0.15/0.3/0.15; reattack[M/N/E/D]=0.7/0.7/0.85/0.7; dragDur[M/N/E/D]=1.3/1.3/1.3/1.3; dragIOI[M/N/E/D]=0.15/0.15/0.15/0.15; union=match/insert/delete/merge/split",
+          "thresholdsJson": "{\"temporalParamsByGate\":{\"drag\":{\"deletePenalty\":0.8,\"dragDurationRatio\":1.3,\"dragIoiRatio\":0.15,\"durationWeight\":0.15,\"insertPenalty\":0.8,\"mergePenalty\":0.2,\"minConfidence\":0.45,\"pitchWeight\":0.5,\"reattackRatio\":0.7},\"extra\":{\"deletePenalty\":0.8,\"dragDurationRatio\":1.3,\"dragIoiRatio\":0.15,\"durationWeight\":0.3,\"insertPenalty\":1.1,\"mergePenalty\":0.2,\"minConfidence\":0.55,\"pitchWeight\":0.5,\"reattackRatio\":0.85},\"merged_substitution\":{\"deletePenalty\":0.8,\"dragDurationRatio\":1.3,\"dragIoiRatio\":0.15,\"durationWeight\":0.3,\"insertPenalty\":1.1,\"mergePenalty\":0.2,\"minConfidence\":0.45,\"pitchWeight\":0.5,\"reattackRatio\":0.7},\"missing\":{\"deletePenalty\":0.8,\"dragDurationRatio\":1.3,\"dragIoiRatio\":0.15,\"durationWeight\":0.15,\"insertPenalty\":0.8,\"mergePenalty\":0.45,\"minConfidence\":0.45,\"pitchWeight\":0.5,\"reattackRatio\":0.7}}}",
+          "safetyLimitsBreached": 6,
+          "eliminationReasons": "authoritative-local-clean-pooled-hint-rate；authoritative-local-clean-recording-hint-rate；consumed-round5-pooled-hint-rate；consumed-round5-recording-hint-rate；public-professional-pooled-burden；public-professional-recording-burden",
+          "retained": "否",
+          "localFlags": 289,
+          "localPositions": 743,
+          "localPer1000": 388.963661,
+          "localMaxRate": 0.695652174,
+          "round5Flags": 116,
+          "round5Positions": 624,
+          "round5Per1000": 185.897436,
+          "round5MaxRate": 0.307692308,
+          "publicFlags": 3371,
+          "publicPositions": 6652,
+          "publicPer1000": 506.764883,
+          "publicMaxRate": 0.673913043,
+          "localEvidence": "289/743=388.96/1000；单条最高 69.57%",
+          "round5Evidence": "116/624=185.90/1000；单条最高 30.77%",
+          "publicEvidence": "3371/6652=506.76/1000；单条最高 67.39%"
+        }
+      ],
+      "round5_accounting": [
+        {
+          "order": 1,
+          "evidence": "4 个片段 RF gate",
+          "observed": "原始数字可复现",
+          "classification": "位置混淆作废",
+          "claim": "不能把原始 P/R 当作检测器泛化能力。"
+        },
+        {
+          "order": 2,
+          "evidence": "Gap 自查",
+          "observed": "1/12 @ 1 FP",
+          "classification": "真实检测失败",
+          "claim": "规则不读位置；11 个漏检不能由位置混淆洗掉。"
+        },
+        {
+          "order": 3,
+          "evidence": "Gap 严格漏音",
+          "observed": "1/6 @ 1 FP",
+          "classification": "真实检测失败",
+          "claim": "规则不读位置；召回 16.67% 是固定样本上的真实漏检。"
+        },
+        {
+          "order": 4,
+          "evidence": "节奏 soft/strict",
+          "observed": "4/12 @ 包内 0 FP",
+          "classification": "只保留灵敏度观察",
+          "claim": "4 个命中有效；0 FP 因目标位置可由谱面识别，不能证明安全。"
+        },
+        {
+          "order": 5,
+          "evidence": "波形能量验漏音",
+          "observed": "0/12 @ 0/660 FP",
+          "classification": "真实跨域失败",
+          "claim": "冻结合成阈值在真实域召回为 0，维持收线。"
+        },
+        {
+          "order": 6,
+          "evidence": "目标音高缺失",
+          "observed": "5/12 @ 49/660 FP",
+          "classification": "真实精度与召回失败",
+          "claim": "P=9.26%、R=41.67%，不是位置模型造成。"
+        }
+      ],
+      "public_recall": [
+        {
+          "order": 4,
+          "dataset": "musicnet-accompanied-violin",
+          "referenceNotes": 3238,
+          "samePartPairs": 0,
+          "adjudicatedErrorPositives": 0,
+          "recallDerivable": "否",
+          "reason": "开发集 2330 与留出集 2334 使用不同奏鸣曲和不同演奏者；它们是识别评测分割，不是同一声部的正确/错误演奏对。"
+        },
+        {
+          "order": 3,
+          "dataset": "musicnet-solo",
+          "referenceNotes": 1517,
+          "samePartPairs": 0,
+          "adjudicatedErrorPositives": 0,
+          "recallDerivable": "否",
+          "reason": "样本 2191 与 2298 是不同 Bach 作品、不同乐器，不是同一声部的成对演奏。"
+        },
+        {
+          "order": 1,
+          "dataset": "bach10",
+          "referenceNotes": 425,
+          "samePartPairs": 0,
+          "adjudicatedErrorPositives": 0,
+          "recallDerivable": "否",
+          "reason": "10 首不同众赞歌各只有一条 source_id=1 小提琴/高音声部；其他 source ID 是同次合奏中的不同声部。"
+        },
+        {
+          "order": 2,
+          "dataset": "urmp",
+          "referenceNotes": 146,
+          "samePartPairs": 0,
+          "adjudicatedErrorPositives": 0,
+          "recallDerivable": "否",
+          "reason": "小提琴和大提琴文件是同一 Jupiter 合奏的不同声部，不是同一声部的正确/错误两次演奏。"
+        }
+      ],
+      "recording_stages": [
+        {
+          "order": 1,
+          "stage": "Stage A：现在录",
+          "recordings": 6,
+          "purpose": "反平衡 calibration + 既有 clean 安全淘汰",
+          "condition": "现在必要",
+          "outcome": "任一安全上限超限即收线，不录 fresh"
+        },
+        {
+          "order": 2,
+          "stage": "Stage B：条件追加",
+          "recordings": 6,
+          "purpose": "冻结模型的一次性 untouched fresh 召回/精度评测",
+          "condition": "仅 Stage A 全部通过",
+          "outcome": "P≥90%、R≥50%、strict FP=0；通过也不自动发布"
+        }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "id": "p0-accounting",
+      "label": "Round 5 证据重记账",
+      "path": "docs/evidence/western-strings-round5-evidence-accounting-20260724.json",
+      "query": {
+        "description": "读取已提交、SHA 绑定的项目证据 JSON。",
+        "engine": "python-local",
+        "language": "python",
+        "sql": "import json\nfrom pathlib import Path\ndata = json.loads(Path('docs/evidence/western-strings-round5-evidence-accounting-20260724.json').read_text(encoding='utf-8'))",
+        "tables_used": [
+          "docs/evidence/western-strings-round5-evidence-accounting-20260724.json"
+        ],
+        "metric_definitions": [
+          "文件 SHA-256=a6330f10f498f295e1fedd99bb761563b5ab7a60267e83e1e342fb72316b929a"
+        ]
+      }
+    },
+    {
+      "id": "p1-prereg",
+      "label": "P1 候选预注册与冻结门槛",
+      "path": "docs/evidence/western-strings-p1-clean-domain-preregistration-20260724.json",
+      "query": {
+        "description": "读取已提交、SHA 绑定的项目证据 JSON。",
+        "engine": "python-local",
+        "language": "python",
+        "sql": "import json\nfrom pathlib import Path\ndata = json.loads(Path('docs/evidence/western-strings-p1-clean-domain-preregistration-20260724.json').read_text(encoding='utf-8'))",
+        "tables_used": [
+          "docs/evidence/western-strings-p1-clean-domain-preregistration-20260724.json"
+        ],
+        "metric_definitions": [
+          "文件 SHA-256=f3bfe14b2f5f7a75e70efa4df5a9ceb8f1d96453269aae96d0fa4faa22a69fd8"
+        ]
+      }
+    },
+    {
+      "id": "p1-results",
+      "label": "P1 真实干净域安全筛选",
+      "path": "docs/evidence/western-strings-p1-clean-domain-safety-20260724.json",
+      "query": {
+        "description": "读取已提交、SHA 绑定的项目证据 JSON。",
+        "engine": "python-local",
+        "language": "python",
+        "sql": "import json\nfrom pathlib import Path\ndata = json.loads(Path('docs/evidence/western-strings-p1-clean-domain-safety-20260724.json').read_text(encoding='utf-8'))",
+        "tables_used": [
+          "docs/evidence/western-strings-p1-clean-domain-safety-20260724.json"
+        ],
+        "metric_definitions": [
+          "文件 SHA-256=9a4325c6d8a024fbfc91924e2455bb0c4e95ac7da199794504f9c80b67375031"
+        ]
+      }
+    },
+    {
+      "id": "p2-audit",
+      "label": "P2 公开数据召回可派生性审计",
+      "path": "docs/evidence/western-strings-p2-public-error-recall-audit-20260724.json",
+      "query": {
+        "description": "读取已提交、SHA 绑定的项目证据 JSON。",
+        "engine": "python-local",
+        "language": "python",
+        "sql": "import json\nfrom pathlib import Path\ndata = json.loads(Path('docs/evidence/western-strings-p2-public-error-recall-audit-20260724.json').read_text(encoding='utf-8'))",
+        "tables_used": [
+          "docs/evidence/western-strings-p2-public-error-recall-audit-20260724.json"
+        ],
+        "metric_definitions": [
+          "文件 SHA-256=96a4b255483328684e14ec53673a10fcd9129b4e639d7c6640fa5afc72fe1e0b"
+        ]
+      }
+    },
+    {
+      "id": "p3-protocol",
+      "label": "P3 最小录音分阶段协议",
+      "path": "docs/evidence/western-strings-p3-minimal-recording-preregistration-20260724.json",
+      "query": {
+        "description": "读取已提交、SHA 绑定的项目证据 JSON。",
+        "engine": "python-local",
+        "language": "python",
+        "sql": "import json\nfrom pathlib import Path\ndata = json.loads(Path('docs/evidence/western-strings-p3-minimal-recording-preregistration-20260724.json').read_text(encoding='utf-8'))",
+        "tables_used": [
+          "docs/evidence/western-strings-p3-minimal-recording-preregistration-20260724.json"
+        ],
+        "metric_definitions": [
+          "文件 SHA-256=576b1f262deb28adb1ddcf4ddbdb414f08c8238c92da5c5b280654877a0f7cb7"
+        ]
+      }
+    },
+    {
+      "id": "stakeholder-report-candidate_outcomes",
+      "label": "P1 候选阈值与安全淘汰汇总",
+      "path": "scripts/experiments/build_western_zero_recording_stakeholder_report.py",
+      "query": {
+        "description": "从 P0-P3 已审阅 JSON 确定性生成内存 SQLite 表，再执行本查询产生最终报告快照；不重新训练、不改阈值。",
+        "engine": "sqlite-in-memory",
+        "language": "sql",
+        "sql": "SELECT * FROM \"candidate_outcomes\" ORDER BY \"order\" ASC",
+        "tables_used": [
+          "candidate_outcomes"
+        ],
+        "filters": [
+          "仅使用 2026-07-24 已冻结证据",
+          "Round 4/5 不作验收",
+          "不把合成召回当真实召回"
+        ],
+        "metric_definitions": [
+          "违反安全上限数=候选 eliminationReasons 的预注册上限条目数。",
+          "公开专业 flags 是负担而非权威假阳。"
+        ]
+      }
+    },
+    {
+      "id": "stakeholder-report-round5_accounting",
+      "label": "Round 5 证据分类汇总",
+      "path": "scripts/experiments/build_western_zero_recording_stakeholder_report.py",
+      "query": {
+        "description": "从 P0-P3 已审阅 JSON 确定性生成内存 SQLite 表，再执行本查询产生最终报告快照；不重新训练、不改阈值。",
+        "engine": "sqlite-in-memory",
+        "language": "sql",
+        "sql": "SELECT * FROM \"round5_accounting\" ORDER BY \"order\" ASC",
+        "tables_used": [
+          "round5_accounting"
+        ],
+        "filters": [
+          "仅使用 2026-07-24 已冻结证据",
+          "Round 4/5 不作验收",
+          "不把合成召回当真实召回"
+        ],
+        "metric_definitions": [
+          "观测值按位置混淆、真实失败或灵敏度观察重新分类。"
+        ]
+      }
+    },
+    {
+      "id": "stakeholder-report-public_recall",
+      "label": "P2 公开数据召回可派生性汇总",
+      "path": "scripts/experiments/build_western_zero_recording_stakeholder_report.py",
+      "query": {
+        "description": "从 P0-P3 已审阅 JSON 确定性生成内存 SQLite 表，再执行本查询产生最终报告快照；不重新训练、不改阈值。",
+        "engine": "sqlite-in-memory",
+        "language": "sql",
+        "sql": "SELECT * FROM \"public_recall\" ORDER BY \"referenceNotes\" DESC, \"order\" ASC",
+        "tables_used": [
+          "public_recall"
+        ],
+        "filters": [
+          "仅使用 2026-07-24 已冻结证据",
+          "Round 4/5 不作验收",
+          "不把合成召回当真实召回"
+        ],
+        "metric_definitions": [
+          "错误正例必须有独立人工裁定；对齐残差不计错误正例。"
+        ]
+      }
+    },
+    {
+      "id": "stakeholder-report-recording_stages",
+      "label": "P3 最小分阶段录音汇总",
+      "path": "scripts/experiments/build_western_zero_recording_stakeholder_report.py",
+      "query": {
+        "description": "从 P0-P3 已审阅 JSON 确定性生成内存 SQLite 表，再执行本查询产生最终报告快照；不重新训练、不改阈值。",
+        "engine": "sqlite-in-memory",
+        "language": "sql",
+        "sql": "SELECT * FROM \"recording_stages\" ORDER BY \"order\" ASC",
+        "tables_used": [
+          "recording_stages"
+        ],
+        "filters": [
+          "仅使用 2026-07-24 已冻结证据",
+          "Round 4/5 不作验收",
+          "不把合成召回当真实召回"
+        ],
+        "metric_definitions": [
+          "当前最小录音量=Stage A calibration 录音数。",
+          "Stage B 仅在 Stage A 全部安全上限通过后计入条件追加量。"
+        ]
+      }
+    }
+  ],
+  "package_info": {
+    "audience": "product stakeholders",
+    "audienceSpecification": "executive-report.md",
+    "deliveryMode": "mcp-app",
+    "requiredStructureMap": {
+      "title": "title",
+      "executiveSummary": "executive-summary",
+      "keyFindingsWithVisualEvidence": [
+        "p1-finding",
+        "candidate-breach-chart-block",
+        "candidate-threshold-heading",
+        "candidate-table-block",
+        "p0-heading",
+        "p0-table-block",
+        "p2-heading",
+        "p2-table-block"
+      ],
+      "recommendedNextSteps": [
+        "p3-heading",
+        "p3-table-block"
+      ],
+      "furtherQuestions": "further-questions",
+      "caveatsAndAssumptions": "caveats"
+    },
+    "chartMap": [
+      {
+        "section": "七个可直接运行候选全部在安全闸前淘汰",
+        "question": "每个候选违反了多少项预注册安全上限？",
+        "family": "comparison",
+        "type": "bar",
+        "x": "candidateLabel",
+        "y": "safetyLimitsBreached",
+        "takeaway": "7/7 至少违反一项，0 个可进入召回审计。",
+        "palettePolicy": "single-root preferred; orange; direct values"
+      }
+    ],
+    "visualOmissionNotes": [
+      "P0、P2 与 P3 需要精确语义或条件查阅，使用表格比图形更诚实。",
+      "不同候选/域的分母和安全语义不同，未把原始负担率画在同一轴。"
+    ]
+  }
+}
