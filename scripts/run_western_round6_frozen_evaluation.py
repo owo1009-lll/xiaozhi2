@@ -8,6 +8,7 @@ the fresh-blind split into a reusable tuning set.
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import importlib.util
 import json
@@ -22,6 +23,12 @@ DEFAULT_PROTOCOL = REPO / "config/western-strings-round6-evaluation-protocol.jso
 PROTOCOL_CONTRACT = "western-round6-frozen-evaluation-protocol-v1"
 REPORT_CONTRACT = "western-round6-frozen-evaluation-v1"
 EXPECTED_GATES = ("merged_substitution", "missing", "extra", "drag")
+P3_CONTRACT = "western-p3-staged-minimal-recording-protocol-v1"
+STAGE_A_LINEAGE_CONTRACT = "western-round6-stage-a-signoff-lineage-v1"
+STAGE_A_SAFETY_CONTRACT = "western-round6-stage-a-clean-safety-v1"
+STAGE_A_CONSUMED_CONTRACT = "western-round6-stage-a-clean-safety-consumed-v1"
+STAGE_B_AUTHORIZATION_CONTRACT = "western-round6-stage-b-authorization-v1"
+STAGE_B_LINEAGE_CONTRACT = "western-round6-stage-b-signoff-lineage-v1"
 
 
 class CandidateEvidenceError(RuntimeError):
@@ -66,6 +73,217 @@ def write_json(path: Path, value: Any, *, exclusive: bool = False) -> None:
 def summarize_blockers(reasons: list[Any]) -> list[str]:
     counts = Counter(str(reason).split(":", 1)[0] for reason in reasons)
     return [f"{reason}:{count}" for reason, count in sorted(counts.items())]
+
+
+def semantic_sha(value: Any) -> str:
+    payload = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def validate_stage_b_authorization(
+    repo: Path,
+    protocol: dict[str, Any],
+) -> dict[str, Any]:
+    paths = protocol.get("paths") or {}
+    blockers: list[str] = []
+    required = {
+        "stagedProtocol",
+        "stageASignoffLineage",
+        "stageASafetyReport",
+        "stageASafetyConsumed",
+        "stageBSignoffLineage",
+        "model",
+        "manifest",
+        "truth",
+    }
+    resolved: dict[str, Path] = {}
+    for key in sorted(required):
+        try:
+            resolved[key] = resolve_inside(repo, paths.get(key, ""))
+        except (TypeError, ValueError):
+            blockers.append(f"round6-stage-b-authorization-path-invalid:{key}")
+    if blockers:
+        return {"ready": False, "blockingReasons": blockers}
+    try:
+        staged = read_json(resolved["stagedProtocol"])
+        stage_a_lineage = read_json(resolved["stageASignoffLineage"])
+        safety_report = read_json(resolved["stageASafetyReport"])
+        safety_consumed = read_json(resolved["stageASafetyConsumed"])
+        stage_b_lineage = read_json(resolved["stageBSignoffLineage"])
+    except (OSError, json.JSONDecodeError):
+        return {
+            "ready": False,
+            "blockingReasons": ["round6-stage-b-authorization-source-unreadable"],
+        }
+    try:
+        hashes = {
+            "protocolSha256": sha256_path(resolved["stagedProtocol"]),
+            "stageALineageSha256": sha256_path(resolved["stageASignoffLineage"]),
+            "safetyReportSha256": sha256_path(resolved["stageASafetyReport"]),
+            "safetyConsumedSha256": sha256_path(resolved["stageASafetyConsumed"]),
+            "safetyModelSha256": sha256_path(resolved["model"]),
+            "stageBLineageSha256": sha256_path(resolved["stageBSignoffLineage"]),
+            "manifestSha256": sha256_path(resolved["manifest"]),
+            "truthSha256": sha256_path(resolved["truth"]),
+        }
+    except OSError:
+        return {
+            "ready": False,
+            "blockingReasons": ["round6-stage-b-authorization-artifact-missing"],
+        }
+    staged_core = {
+        key: value
+        for key, value in staged.items()
+        if key not in {
+            "schemaVersion",
+            "sourceBindings",
+            "protocolSemanticSha256",
+        }
+    }
+    staged_semantic = str(staged.get("protocolSemanticSha256") or "")
+    if (
+        staged.get("contract") != P3_CONTRACT
+        or not staged_semantic
+        or semantic_sha(staged_core) != staged_semantic
+    ):
+        blockers.append("round6-stage-b-staged-protocol-invalid")
+    stage_a_ids = sorted(
+        str(value) for value in staged.get("stageA", {}).get("recordingIds", [])
+    )
+    stage_b_ids = sorted(
+        str(value) for value in staged.get("stageB", {}).get("recordingIds", [])
+    )
+    if len(stage_a_ids) != 6 or len(stage_b_ids) != 6:
+        blockers.append("round6-stage-b-recording-scope-invalid")
+    if (
+        stage_a_lineage.get("contract") != STAGE_A_LINEAGE_CONTRACT
+        or stage_a_lineage.get("scope", {}).get("split") != "calibration"
+        or sorted(stage_a_lineage.get("scope", {}).get("recordingIds", []))
+        != stage_a_ids
+    ):
+        blockers.append("round6-stage-b-stage-a-lineage-invalid")
+    if (
+        safety_report.get("contract") != STAGE_A_SAFETY_CONTRACT
+        or safety_report.get("p3ProtocolSemanticSha256") != staged_semantic
+        or safety_report.get("stageAPassed") is not True
+        or safety_report.get("stageBFreshRecordingAuthorized") is not True
+        or safety_report.get("trainingPerformed") is not True
+        or safety_report.get("cleanSafetyEvaluationPerformed") is not True
+        or safety_report.get("freshAudioRead") is not False
+        or safety_report.get("studentFacing") is not False
+        or safety_report.get("automaticAuthorizationGranted") is not False
+        or safety_report.get("blockingReasons") != []
+    ):
+        blockers.append("round6-stage-b-stage-a-safety-report-invalid")
+    if (
+        safety_consumed.get("contract") != STAGE_A_CONSUMED_CONTRACT
+        or safety_consumed.get("p3ProtocolSemanticSha256") != staged_semantic
+        or safety_consumed.get("cleanSafetyConsumed") is not True
+        or safety_consumed.get("freshAudioRead") is not False
+        or safety_consumed.get("studentFacing") is not False
+        or safety_consumed.get("automaticAuthorizationGranted") is not False
+    ):
+        blockers.append("round6-stage-b-stage-a-consumed-invalid")
+    if (
+        safety_report.get("modelArtifact", {}).get("sha256")
+        != hashes["safetyModelSha256"]
+        or safety_consumed.get("modelSha256") != hashes["safetyModelSha256"]
+    ):
+        blockers.append("round6-stage-b-stage-a-model-binding-invalid")
+    authorization = stage_b_lineage.get("stageAAuthorization") or {}
+    expected_authorization_hashes = {
+        key: hashes[key]
+        for key in (
+            "protocolSha256",
+            "stageALineageSha256",
+            "safetyReportSha256",
+            "safetyConsumedSha256",
+            "safetyModelSha256",
+        )
+    }
+    if (
+        stage_b_lineage.get("contract") != STAGE_B_LINEAGE_CONTRACT
+        or stage_b_lineage.get("scope", {}).get("split") != "fresh-blind"
+        or sorted(stage_b_lineage.get("scope", {}).get("recordingIds", []))
+        != stage_b_ids
+        or authorization.get("contract") != STAGE_B_AUTHORIZATION_CONTRACT
+        or authorization.get("p3ProtocolSemanticSha256") != staged_semantic
+        or authorization.get("stageAPassed") is not True
+        or authorization.get("stageBFreshRecordingAuthorized") is not True
+        or authorization.get("authorizationHashes")
+        != expected_authorization_hashes
+        or stage_b_lineage.get("appliedHashes", {}).get("manifestSha256")
+        != hashes["manifestSha256"]
+        or stage_b_lineage.get("appliedHashes", {}).get("truthSha256")
+        != hashes["truthSha256"]
+        or stage_b_lineage.get("studentFacing") is not False
+        or stage_b_lineage.get("automaticAuthorizationGranted") is not False
+    ):
+        blockers.append("round6-stage-b-signoff-lineage-invalid")
+    preservation = stage_b_lineage.get("calibrationPreservation") or {}
+    if (
+        preservation.get("unchanged") is not True
+        or preservation.get("manifestProjectionBeforeSha256")
+        != preservation.get("manifestProjectionAfterSha256")
+        or preservation.get("truthProjectionBeforeSha256")
+        != preservation.get("truthProjectionAfterSha256")
+    ):
+        blockers.append("round6-stage-b-calibration-preservation-invalid")
+    audio_hashes = stage_b_lineage.get("audioSha256ByRecording")
+    if (
+        not isinstance(audio_hashes, dict)
+        or sorted(audio_hashes) != stage_b_ids
+        or any(
+            not isinstance(value, str) or len(value) != 64
+            for value in audio_hashes.values()
+        )
+    ):
+        blockers.append("round6-stage-b-audio-bindings-invalid")
+    return {
+        "ready": not blockers,
+        "stagedProtocolSemanticSha256": staged_semantic,
+        "stageBRecordingIds": stage_b_ids,
+        "freshAudioSha256ByRecording": audio_hashes or {},
+        "artifactHashes": hashes,
+        "blockingReasons": sorted(set(blockers)),
+    }
+
+
+def verify_fresh_audio_hashes(
+    repo: Path,
+    manifest_path: Path,
+    authorization: dict[str, Any],
+) -> list[str]:
+    with manifest_path.open(encoding="utf-8-sig", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    by_id = {
+        str(row.get("recordingId") or ""): row
+        for row in rows
+        if str(row.get("split") or "") == "fresh-blind"
+    }
+    expected_ids = authorization["stageBRecordingIds"]
+    blockers = []
+    if sorted(by_id) != expected_ids:
+        blockers.append("round6-stage-b-fresh-manifest-scope-mismatch")
+        return blockers
+    for recording_id in expected_ids:
+        try:
+            audio_path = resolve_inside(repo, str(by_id[recording_id]["audioPath"]))
+            observed = sha256_path(audio_path)
+        except (OSError, TypeError, ValueError):
+            blockers.append(f"round6-stage-b-fresh-audio-unreadable:{recording_id}")
+            continue
+        if (
+            observed
+            != authorization["freshAudioSha256ByRecording"].get(recording_id)
+        ):
+            blockers.append(f"round6-stage-b-fresh-audio-sha-mismatch:{recording_id}")
+    return blockers
 
 
 def source_audit(repo: Path, protocol: dict[str, Any]) -> tuple[list[dict[str, Any]], list[str]]:
@@ -229,7 +447,19 @@ def validate_protocol(repo: Path, protocol_path: Path) -> dict[str, Any]:
     if not isinstance(paths, dict):
         blockers.append("round6-evaluation-paths-missing")
     else:
-        for key in ("contract", "manifest", "truth", "report", "model", "consumedLedger"):
+        for key in (
+            "contract",
+            "manifest",
+            "truth",
+            "report",
+            "model",
+            "consumedLedger",
+            "stagedProtocol",
+            "stageASignoffLineage",
+            "stageASafetyReport",
+            "stageASafetyConsumed",
+            "stageBSignoffLineage",
+        ):
             value = paths.get(key)
             if not isinstance(value, str) or not value.strip() or Path(value).is_absolute():
                 blockers.append(f"round6-evaluation-path-invalid:{key}")
@@ -303,6 +533,7 @@ def candidate_evidence_blockers(
     evidence: dict[str, Any],
     protocol: dict[str, Any],
     intake_report: dict[str, Any],
+    frozen_model_sha256: str,
 ) -> list[str]:
     blockers = []
     candidate = protocol.get("candidate") or {}
@@ -329,6 +560,15 @@ def candidate_evidence_blockers(
         != candidate.get("strictFalseAccusationDenominator")
     ):
         blockers.append("round6-candidate-evidence-denominator-contract-mismatch")
+    if evidence.get("trainingPerformed") is not False:
+        blockers.append("round6-candidate-evidence-retrained-on-fresh")
+    if evidence.get("frozenModelLoaded") is not True:
+        blockers.append("round6-candidate-evidence-frozen-model-not-loaded")
+    if (
+        evidence.get("modelArtifact", {}).get("sha256")
+        != frozen_model_sha256
+    ):
+        blockers.append("round6-candidate-evidence-frozen-model-sha-mismatch")
     evaluation = evidence.get("evaluation")
     feature_names = (
         evaluation.get("featureNames")
@@ -494,7 +734,7 @@ def run(
     protocol_path: Path = DEFAULT_PROTOCOL,
     module: ModuleType | None = None,
     intake_validator: Callable[[Path, Path, Path], dict[str, Any]] | None = None,
-    evaluator: Callable[[Path, Path, Path, Path, Path], dict[str, Any]] | None = None,
+    evaluator: Callable[..., dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     repo = repo_root.resolve()
     protocol_file = protocol_path if protocol_path.is_absolute() else repo / protocol_path
@@ -520,6 +760,7 @@ def run(
         "protocolSha256": audit["protocolSha256"],
         "sourceBindings": audit["sources"],
         "runnerReady": audit["ready"],
+        "stageBAuthorizationReady": False,
         "intakeReady": False,
         "evaluationPerformed": False,
         "freshBlindConsumed": False,
@@ -539,9 +780,46 @@ def run(
         write_json(report_path, result)
         return result
 
+    if ledger_path.exists():
+        try:
+            ledger = read_json(ledger_path)
+        except (OSError, json.JSONDecodeError):
+            ledger = {}
+        result = {
+            **base,
+            "freshBlindConsumed": True,
+            "consumedLedgerStatus": str(ledger.get("status") or "unreadable"),
+            "blockingReasons": ["round6-fresh-blind-already-consumed"],
+        }
+        write_json(report_path, result)
+        return result
+
     contract_path = resolve_inside(repo, paths["contract"])
     manifest_path = resolve_inside(repo, paths["manifest"])
     truth_path = resolve_inside(repo, paths["truth"])
+    base["sourceHashes"] = {
+        "contractSha256": sha256_path(contract_path),
+        "manifestSha256": sha256_path(manifest_path),
+        "truthSha256": sha256_path(truth_path),
+    }
+    authorization = validate_stage_b_authorization(repo, protocol)
+    if not authorization["ready"]:
+        result = {
+            **base,
+            "runnerReady": False,
+            "stageBAuthorizationReady": False,
+            "blockingReasons": authorization["blockingReasons"],
+        }
+        write_json(report_path, result)
+        return result
+    base["stageBAuthorizationReady"] = True
+    base["stageBAuthorization"] = {
+        "stagedProtocolSemanticSha256":
+            authorization["stagedProtocolSemanticSha256"],
+        "stageBRecordingIds": authorization["stageBRecordingIds"],
+        "artifactHashes": authorization["artifactHashes"],
+    }
+
     validate_intake = intake_validator or candidate_module.intake.validate
     candidate_module.intake.REPO = repo
     intake_report = validate_intake(contract_path, manifest_path, truth_path)
@@ -560,42 +838,53 @@ def run(
         write_json(report_path, result)
         return result
 
-    if ledger_path.exists():
-        try:
-            ledger = read_json(ledger_path)
-        except (OSError, json.JSONDecodeError):
-            ledger = {}
-        result = {
-            **base,
-            "intakeReady": True,
-            "freshBlindConsumed": True,
-            "consumedLedgerStatus": str(ledger.get("status") or "unreadable"),
-            "blockingReasons": ["round6-fresh-blind-already-consumed"],
-        }
-        write_json(report_path, result)
-        return result
-
     started_ledger = {
         "contract": "western-round6-fresh-blind-consumed-ledger-v1",
         "protocolSha256": audit["protocolSha256"],
         "freshBlindConsumed": True,
         "status": "evaluation-started",
         "sourceHashes": intake_report.get("hashes", {}),
+        "stageBAuthorization": base["stageBAuthorization"],
+        "frozenModelSha256":
+            authorization["artifactHashes"]["safetyModelSha256"],
     }
     write_json(ledger_path, started_ledger, exclusive=True)
     evaluate = evaluator or candidate_module.run
     scratch_report = report_path.with_suffix(".inner.tmp.json")
     try:
-        inner = evaluate(
-            contract_path,
+        fresh_audio_blockers = verify_fresh_audio_hashes(
+            repo,
             manifest_path,
-            truth_path,
-            scratch_report,
-            model_path,
+            authorization,
         )
+        if fresh_audio_blockers:
+            raise CandidateEvidenceError(fresh_audio_blockers)
+        if evaluator is None:
+            inner = evaluate(
+                contract_path,
+                manifest_path,
+                truth_path,
+                scratch_report,
+                model_path,
+                frozen_model_path=model_path,
+            )
+        else:
+            inner = evaluate(
+                contract_path,
+                manifest_path,
+                truth_path,
+                scratch_report,
+                model_path,
+                model_path,
+            )
         if inner.get("evaluationPerformed") is not True:
             raise RuntimeError("round6-candidate-returned-without-evaluation")
-        evidence_blockers = candidate_evidence_blockers(inner, protocol, intake_report)
+        evidence_blockers = candidate_evidence_blockers(
+            inner,
+            protocol,
+            intake_report,
+            authorization["artifactHashes"]["safetyModelSha256"],
+        )
         if evidence_blockers:
             raise CandidateEvidenceError(evidence_blockers)
         result = {

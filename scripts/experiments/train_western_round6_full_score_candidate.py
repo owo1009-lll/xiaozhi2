@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 import joblib
+import numpy as np
 
 
 REPO = Path(__file__).resolve().parents[2]
@@ -67,6 +68,7 @@ STRICT_FALSE_ACCUSATION_DENOMINATOR = (
 )
 GATES = base.GATES
 MODEL_PARAMS = base.MODEL_PARAMS
+STAGE_A_MODEL_CONTRACT = "western-round6-stage-a-clean-safety-v1"
 FROZEN_GAP_REFINEMENT_CONTRACT = base.FROZEN_GAP_REFINEMENT_CONTRACT
 FROZEN_GAP_STRICT_CONTRACT = base.FROZEN_GAP_STRICT_CONTRACT
 FROZEN_RHYTHM_REFINEMENT_CONTRACT = base.FROZEN_RHYTHM_REFINEMENT_CONTRACT
@@ -217,12 +219,131 @@ def denominator_summary(dataset: list[dict[str, Any]]) -> dict[str, Any]:
     return summary
 
 
+def load_frozen_stage_a_model(model_path: Path) -> dict[str, Any]:
+    payload = joblib.load(model_path)
+    if not isinstance(payload, dict):
+        raise ValueError("round6-stage-a-model-payload-invalid")
+    if payload.get("contract") != STAGE_A_MODEL_CONTRACT:
+        raise ValueError("round6-stage-a-model-contract-invalid")
+    if payload.get("candidateContract") != CONTRACT:
+        raise ValueError("round6-stage-a-model-candidate-contract-invalid")
+    if payload.get("modelParams") != MODEL_PARAMS:
+        raise ValueError("round6-stage-a-model-params-invalid")
+    feature_names = payload.get("featureNames")
+    if (
+        not isinstance(feature_names, list)
+        or not feature_names
+        or not all(isinstance(name, str) and name for name in feature_names)
+        or len(set(feature_names)) != len(feature_names)
+    ):
+        raise ValueError("round6-stage-a-model-feature-names-invalid")
+    missing = [
+        name for name in REQUIRED_TEMPORAL_FEATURES
+        if name not in feature_names
+    ]
+    if missing:
+        raise ValueError(
+            "round6-stage-a-model-required-temporal-feature-missing:"
+            + ",".join(missing)
+        )
+    models = payload.get("models")
+    if not isinstance(models, dict) or set(models) != set(GATES):
+        raise ValueError("round6-stage-a-model-gates-invalid")
+    for gate in GATES:
+        model = models[gate]
+        classes = list(getattr(model, "classes_", []))
+        if 1 not in classes:
+            raise ValueError(f"round6-stage-a-model-positive-class-missing:{gate}")
+        if int(getattr(model, "n_features_in_", -1)) != len(feature_names):
+            raise ValueError(f"round6-stage-a-model-feature-count-invalid:{gate}")
+    return payload
+
+
+def evaluate_with_frozen_models(
+    dataset: list[dict[str, Any]],
+    promotion: dict[str, Any],
+    frozen: dict[str, Any],
+) -> dict[str, Any]:
+    feature_names = frozen["featureNames"]
+    models = frozen["models"]
+    results = {}
+    for gate in GATES:
+        calibration = [
+            row for row in dataset
+            if row["gate"] == gate and row["split"] == "calibration"
+        ]
+        fresh = [
+            row for row in dataset
+            if row["gate"] == gate and row["split"] == "fresh-blind"
+        ]
+        y_fresh = np.asarray([
+            int(row["label"] == "positive")
+            for row in fresh
+        ])
+        if not fresh or set(y_fresh.tolist()) != {0, 1}:
+            results[gate] = {
+                "ready": False,
+                "calibrationRows": len(calibration),
+                "freshBlindRows": len(fresh),
+                "blockingReasons": [
+                    f"round6-frozen-model-fresh-class-support-missing:{gate}"
+                ],
+            }
+            continue
+        matrix = np.asarray([
+            [
+                float(row["features"].get(name, 0.0))
+                for name in feature_names
+            ]
+            for row in fresh
+        ])
+        model = models[gate]
+        positive_column = list(model.classes_).index(1)
+        predicted = (
+            model.predict_proba(matrix)[:, positive_column] >= 0.5
+        ).astype(int)
+        metrics = base.binary_metrics(y_fresh, predicted)
+        ready = (
+            metrics["precision"] >= float(promotion["minPrecision"])
+            and metrics["recall"] >= float(promotion["minRecall"])
+            and metrics["falsePositive"]
+            <= int(promotion["maxStrictFalseAccusations"])
+        )
+        results[gate] = {
+            "ready": ready,
+            "calibrationRows": len(calibration),
+            "freshBlindRows": len(fresh),
+            "decisionThreshold": 0.5,
+            **metrics,
+            "blockingReasons": [] if ready else [
+                f"round6-frozen-model-gate-failed:{gate}"
+            ],
+        }
+    promoted_gates = [
+        gate for gate in GATES
+        if results.get(gate, {}).get("ready") is True
+    ]
+    failed_gates = [gate for gate in GATES if gate not in promoted_gates]
+    return {
+        "featureNames": feature_names,
+        "modelType": MODEL_FAMILY,
+        "modelParams": MODEL_PARAMS,
+        "gates": results,
+        "promotionScope": "independent-per-gate",
+        "promotedGates": promoted_gates,
+        "failedGates": failed_gates,
+        "anyGateReady": bool(promoted_gates),
+        "allGatesReady": not failed_gates,
+    }
+
+
 def run(
     contract_path: Path,
     manifest_path: Path,
     truth_path: Path,
     report_path: Path,
     model_path: Path,
+    frozen_model_path: Path | None = None,
 ) -> dict[str, Any]:
     intake.REPO = REPO
     base.REPO = REPO
@@ -239,6 +360,7 @@ def run(
         "sourceHashes": intake_report.get("hashes", {}),
         "intakeReady": intake_report.get("ready") is True,
         "trainingPerformed": False,
+        "frozenModelLoaded": False,
         "evaluationPerformed": False,
         "strictFalseAccusationDenominator": (
             STRICT_FALSE_ACCUSATION_DENOMINATOR
@@ -258,29 +380,49 @@ def run(
     else:
         contract = read_json(contract_path)
         dataset = build_dataset(manifest_path, truth_path)
-        evaluation, models = base.train_and_evaluate(dataset, contract["promotion"])
+        if frozen_model_path is not None:
+            frozen = load_frozen_stage_a_model(frozen_model_path)
+            evaluation = evaluate_with_frozen_models(
+                dataset,
+                contract["promotion"],
+                frozen,
+            )
+            resolved_model_path = frozen_model_path
+            training_performed = False
+            frozen_model_loaded = True
+        else:
+            evaluation, models = base.train_and_evaluate(
+                dataset,
+                contract["promotion"],
+            )
+            model_path.parent.mkdir(parents=True, exist_ok=True)
+            joblib.dump({
+                "contract": CONTRACT,
+                "featureNames": evaluation["featureNames"],
+                "models": models,
+            }, model_path)
+            resolved_model_path = model_path
+            training_performed = True
+            frozen_model_loaded = False
         evaluation["modelType"] = MODEL_FAMILY
         frozen_rules = base.evaluate_frozen_gap_refinement(
             manifest_path,
             truth_path,
             contract["promotion"],
         )
-        model_path.parent.mkdir(parents=True, exist_ok=True)
-        joblib.dump({
-            "contract": CONTRACT,
-            "featureNames": evaluation["featureNames"],
-            "models": models,
-        }, model_path)
         report.update({
-            "trainingPerformed": True,
+            "trainingPerformed": training_performed,
+            "frozenModelLoaded": frozen_model_loaded,
             "evaluationPerformed": True,
             "datasetRows": len(dataset),
             "denominators": denominator_summary(dataset),
             "evaluation": evaluation,
             "frozenRules": frozen_rules,
             "modelArtifact": {
-                "path": str(model_path.resolve().relative_to(REPO.resolve())).replace("\\", "/"),
-                "sha256": sha256(model_path),
+                "path": str(
+                    resolved_model_path.resolve().relative_to(REPO.resolve())
+                ).replace("\\", "/"),
+                "sha256": sha256(resolved_model_path),
             },
             "promotedGates": evaluation["promotedGates"],
             "failedGates": evaluation["failedGates"],

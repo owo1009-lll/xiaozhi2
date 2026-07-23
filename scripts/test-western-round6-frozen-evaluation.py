@@ -50,8 +50,21 @@ def main() -> int:
                 "manifest": "data/private/manifest.csv",
                 "truth": "data/private/truth.json",
                 "report": "data/experiments/report.json",
-                "model": "data/experiments/model.joblib",
+                "model": "data/experiments/stage-a-model.joblib",
                 "consumedLedger": "data/experiments/consumed.json",
+                "stagedProtocol": "data/experiments/p3.json",
+                "stageASignoffLineage": (
+                    "data/experiments/stage-a-lineage.json"
+                ),
+                "stageASafetyReport": (
+                    "data/experiments/stage-a-safety-report.json"
+                ),
+                "stageASafetyConsumed": (
+                    "data/experiments/stage-a-safety-consumed.json"
+                ),
+                "stageBSignoffLineage": (
+                    "data/experiments/stage-b-lineage.json"
+                ),
             },
             "sourceBindings": [
                 {
@@ -152,8 +165,141 @@ def main() -> int:
             json.dumps(protocol, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
-        (root / "data/private/manifest.csv").write_text("recordingId\n", encoding="utf-8")
-        (root / "data/private/truth.json").write_text("{}\n", encoding="utf-8")
+        stage_a_ids = [f"r6-cal-{index + 1}" for index in range(6)]
+        stage_b_ids = [f"r6-fresh-{index + 1}" for index in range(6)]
+        manifest_path = root / protocol["paths"]["manifest"]
+        manifest_path.write_text(
+            "recordingId,split,audioPath\n"
+            + "".join(
+                f"{recording_id},calibration,data/private/{recording_id}.wav\n"
+                for recording_id in stage_a_ids
+            )
+            + "".join(
+                f"{recording_id},fresh-blind,data/private/{recording_id}.wav\n"
+                for recording_id in stage_b_ids
+            ),
+            encoding="utf-8",
+        )
+        (root / protocol["paths"]["truth"]).write_text("{}\n", encoding="utf-8")
+        fresh_audio_hashes = {}
+        for recording_id in stage_b_ids:
+            audio_path = root / f"data/private/{recording_id}.wav"
+            audio_path.write_bytes(f"audio-{recording_id}".encode())
+            fresh_audio_hashes[recording_id] = MODULE.sha256_path(audio_path)
+
+        staged_core = {
+            "contract": MODULE.P3_CONTRACT,
+            "stageA": {"recordingIds": stage_a_ids},
+            "stageB": {"recordingIds": stage_b_ids},
+        }
+        staged = {
+            "schemaVersion": 1,
+            **staged_core,
+            "sourceBindings": [],
+            "protocolSemanticSha256": MODULE.semantic_sha(staged_core),
+        }
+        staged_path = root / protocol["paths"]["stagedProtocol"]
+        staged_path.write_text(
+            json.dumps(staged, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        stage_a_lineage_path = (
+            root / protocol["paths"]["stageASignoffLineage"]
+        )
+        stage_a_lineage = {
+            "contract": MODULE.STAGE_A_LINEAGE_CONTRACT,
+            "scope": {
+                "split": "calibration",
+                "recordingIds": stage_a_ids,
+            },
+        }
+        stage_a_lineage_path.write_text(
+            json.dumps(stage_a_lineage, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        model_path = root / protocol["paths"]["model"]
+        model_path.write_bytes(b"frozen-stage-a-model")
+        authorization_hashes = {
+            "protocolSha256": MODULE.sha256_path(staged_path),
+            "stageALineageSha256": MODULE.sha256_path(stage_a_lineage_path),
+            "safetyModelSha256": MODULE.sha256_path(model_path),
+        }
+        safety_consumed_path = (
+            root / protocol["paths"]["stageASafetyConsumed"]
+        )
+        safety_consumed = {
+            "contract": MODULE.STAGE_A_CONSUMED_CONTRACT,
+            "p3ProtocolSemanticSha256": staged["protocolSemanticSha256"],
+            "modelSha256": authorization_hashes["safetyModelSha256"],
+            "cleanSafetyConsumed": True,
+            "freshAudioRead": False,
+            "studentFacing": False,
+            "automaticAuthorizationGranted": False,
+        }
+        safety_consumed_path.write_text(
+            json.dumps(safety_consumed, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        safety_report_path = root / protocol["paths"]["stageASafetyReport"]
+        safety_report = {
+            "contract": MODULE.STAGE_A_SAFETY_CONTRACT,
+            "p3ProtocolSemanticSha256": staged["protocolSemanticSha256"],
+            "stageAPassed": True,
+            "stageBFreshRecordingAuthorized": True,
+            "trainingPerformed": True,
+            "cleanSafetyEvaluationPerformed": True,
+            "freshAudioRead": False,
+            "studentFacing": False,
+            "automaticAuthorizationGranted": False,
+            "blockingReasons": [],
+            "modelArtifact": {
+                "sha256": authorization_hashes["safetyModelSha256"],
+            },
+        }
+        safety_report_path.write_text(
+            json.dumps(safety_report, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        authorization_hashes.update({
+            "safetyReportSha256": MODULE.sha256_path(safety_report_path),
+            "safetyConsumedSha256": MODULE.sha256_path(safety_consumed_path),
+        })
+        stage_b_lineage = {
+            "contract": MODULE.STAGE_B_LINEAGE_CONTRACT,
+            "scope": {
+                "split": "fresh-blind",
+                "recordingIds": stage_b_ids,
+            },
+            "stageAAuthorization": {
+                "contract": MODULE.STAGE_B_AUTHORIZATION_CONTRACT,
+                "p3ProtocolSemanticSha256": staged[
+                    "protocolSemanticSha256"
+                ],
+                "stageAPassed": True,
+                "stageBFreshRecordingAuthorized": True,
+                "authorizationHashes": authorization_hashes,
+            },
+            "audioSha256ByRecording": fresh_audio_hashes,
+            "appliedHashes": {
+                "manifestSha256": MODULE.sha256_path(manifest_path),
+                "truthSha256": MODULE.sha256_path(
+                    root / protocol["paths"]["truth"]
+                ),
+            },
+            "calibrationPreservation": {
+                "unchanged": True,
+                "manifestProjectionBeforeSha256": "a" * 64,
+                "manifestProjectionAfterSha256": "a" * 64,
+                "truthProjectionBeforeSha256": "b" * 64,
+                "truthProjectionAfterSha256": "b" * 64,
+            },
+            "studentFacing": False,
+            "automaticAuthorizationGranted": False,
+        }
+        (root / protocol["paths"]["stageBSignoffLineage"]).write_text(
+            json.dumps(stage_b_lineage, indent=2) + "\n",
+            encoding="utf-8",
+        )
 
         candidate = SimpleNamespace(
             CONTRACT="western-round6-full-score-candidate-v2",
@@ -226,10 +372,17 @@ def main() -> int:
                 "blockingReasons": [],
             }
 
-        def evaluate(_contract, _manifest, _truth, report, model):
+        def evaluate(
+            _contract,
+            _manifest,
+            _truth,
+            report,
+            model,
+            frozen_model,
+        ):
             calls["evaluation"] += 1
             report.write_text("{}\n", encoding="utf-8")
-            model.write_bytes(b"model")
+            assert model == frozen_model
             return {
                 "contract": candidate.CONTRACT,
                 "modelFamily": candidate.MODEL_FAMILY,
@@ -246,6 +399,8 @@ def main() -> int:
                 "strictFalseAccusationDenominator": (
                     candidate.STRICT_FALSE_ACCUSATION_DENOMINATOR
                 ),
+                "trainingPerformed": False,
+                "frozenModelLoaded": True,
                 "evaluationPerformed": True,
                 "datasetRows": 160,
                 "denominators": valid_denominators,
@@ -256,6 +411,9 @@ def main() -> int:
                     ],
                 },
                 "promotedGates": [],
+                "modelArtifact": {
+                    "sha256": MODULE.sha256_path(frozen_model),
+                },
                 "automaticAccusationReady": False,
                 "studentFacing": False,
             }
@@ -294,9 +452,16 @@ def main() -> int:
             bad_root = Path(bad_temp)
             shutil.copytree(root, bad_root, dirs_exist_ok=True)
 
-            def malformed_evaluate(_contract, _manifest, _truth, report, model):
+            def malformed_evaluate(
+                _contract,
+                _manifest,
+                _truth,
+                report,
+                model,
+                frozen_model,
+            ):
                 report.write_text("{}\n", encoding="utf-8")
-                model.write_bytes(b"model")
+                assert model == frozen_model
                 return {
                     "contract": candidate.CONTRACT,
                     "modelFamily": candidate.MODEL_FAMILY,
@@ -313,6 +478,11 @@ def main() -> int:
                     "strictFalseAccusationDenominator": (
                         candidate.STRICT_FALSE_ACCUSATION_DENOMINATOR
                     ),
+                    "trainingPerformed": False,
+                    "frozenModelLoaded": True,
+                    "modelArtifact": {
+                        "sha256": MODULE.sha256_path(frozen_model),
+                    },
                     "evaluationPerformed": True,
                 }
 

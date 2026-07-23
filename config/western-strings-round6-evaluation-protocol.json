@@ -6,21 +6,26 @@
     "manifest": "data/private/western-strings-round6-counterbalanced/manifest.csv",
     "truth": "data/private/western-strings-round6-counterbalanced/position-truth.json",
     "report": "data/experiments/western-strings-round6-frozen-evaluation/report.json",
-    "model": "data/experiments/western-strings-round6-frozen-evaluation/model.joblib",
-    "consumedLedger": "data/experiments/western-strings-round6-frozen-evaluation/fresh-blind-consumed.json"
+    "model": "data/experiments/western-strings-round6-stage-a-safety/model.joblib",
+    "consumedLedger": "data/experiments/western-strings-round6-frozen-evaluation/fresh-blind-consumed.json",
+    "stagedProtocol": "docs/evidence/western-strings-p3-minimal-recording-preregistration-20260724.json",
+    "stageASignoffLineage": "data/experiments/western-strings-round6-stage-a-signoff/ledger.json",
+    "stageASafetyReport": "data/experiments/western-strings-round6-stage-a-safety/report.json",
+    "stageASafetyConsumed": "data/experiments/western-strings-round6-stage-a-safety/consumed-ledger.json",
+    "stageBSignoffLineage": "data/experiments/western-strings-round6-stage-b-signoff/ledger.json"
   },
   "sourceBindings": [
     {
       "role": "execution-guard",
       "path": "scripts/run_western_round6_frozen_evaluation.py",
       "hashMode": "lf-normalized-sha256",
-      "sha256": "5a1795b2bb125069c8beb92c7a5a12f179ebdef7315270c2d703c25b9aa72732"
+      "sha256": "a3b9180647234c0442b44c80c1f7bc05bcfef9ae59e176f9a4174ee5cc6424ef"
     },
     {
       "role": "candidate-runner",
       "path": "scripts/experiments/train_western_round6_full_score_candidate.py",
       "hashMode": "lf-normalized-sha256",
-      "sha256": "06457633b3970a31bfbd5503bd1460b5df60c2d6046a92606f3083d7f53c34ef"
+      "sha256": "a54b3edbe2d8543c18b8489ec3c3c2ca9b2ccd0e145ce7ca420b485c2eae086f"
     },
     {
       "role": "feature-extractor",
