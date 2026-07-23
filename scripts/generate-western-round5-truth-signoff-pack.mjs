@@ -4,9 +4,11 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const DEFAULT_ROOT = path.join("data", "private", "western-strings-round5");
+const DEFAULT_CONTRACT = path.join("config", "western-strings-round5-targeted-contract.json");
 const DEFAULT_MANIFEST = path.join(DEFAULT_ROOT, "manifest.csv");
 const DEFAULT_TRUTH = path.join(DEFAULT_ROOT, "position-truth.json");
 const DEFAULT_OUT = path.join(DEFAULT_ROOT, "truth-signoff");
+const COMPLETED_CONTRACT = "western-truth-signoff-completed-v1";
 
 const sha256 = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
 const posixPath = (value) => value.replace(/\\/g, "/");
@@ -54,12 +56,20 @@ async function readSource(repoRoot, relativePath) {
 function renderHtml({
   truth,
   recordings,
+  contractSha256,
   manifestSha256,
   truthSha256,
   roundNumber = 5,
 }) {
   const roundLabel = `Round ${roundNumber}`;
-  const payload = JSON.stringify({ truth, recordings, manifestSha256, truthSha256 })
+  const payload = JSON.stringify({
+    truth,
+    recordings,
+    contractSha256,
+    manifestSha256,
+    truthSha256,
+    roundNumber,
+  })
     .replace(/</g, "\\u003c");
   return `<!doctype html>
 <html lang="zh-CN">
@@ -82,7 +92,7 @@ function renderHtml({
   <section class="sticky">
     <h1>${roundLabel} 逐条试听与真值签署</h1>
     <p class="danger" id="no-machine-predictions">本页不展示任何机器预测。请只根据录音实际内容复核，避免污染 fresh-blind。</p>
-    <button id="download">全部完成后下载 position-truth.completed.json</button>
+    <button id="download">全部完成后下载签署包 JSON</button>
     <span id="summary"></span>
   </section>
   <section id="recordings"></section>
@@ -96,7 +106,19 @@ const saved=JSON.parse(localStorage.getItem(KEY)||"{}");
 const state={
   values:saved.values||{},
   inventories:saved.inventories||{},
-  extras:saved.extras||{}
+  extras:saved.extras||{},
+  metadata:Object.fromEntries(PACK.recordings.map((recording)=>[
+    recording.recordingId,
+    {
+      performerId:recording.performerId,
+      deviceId:recording.deviceId,
+      roomId:recording.roomId,
+      consent:recording.consent,
+      licenseStatus:recording.licenseStatus,
+      ...(saved.metadata?.[recording.recordingId]||{})
+    }
+  ])),
+  metadataConfirmed:saved.metadataConfirmed||{}
 };
 const esc=(value)=>String(value??"").replace(/[&<>"']/g,(char)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
 const eventKey=(recordingId,eventId)=>recordingId+"::"+eventId;
@@ -130,6 +152,16 @@ function bindInputs(){
     state.inventories[element.dataset.inventory]=element.checked;
     persist();
   }));
+  document.querySelectorAll("[data-metadata-recording]").forEach((element)=>element.addEventListener("change",()=>{
+    const recordingId=element.dataset.metadataRecording;
+    state.metadata[recordingId]=state.metadata[recordingId]||{};
+    state.metadata[recordingId][element.dataset.metadataField]=element.value;
+    persist();
+  }));
+  document.querySelectorAll("[data-metadata-confirmed]").forEach((element)=>element.addEventListener("change",()=>{
+    state.metadataConfirmed[element.dataset.metadataConfirmed]=element.checked;
+    persist();
+  }));
   document.querySelectorAll("[data-add]").forEach((element)=>element.addEventListener("click",()=>{
     const recordingId=element.dataset.add;
     const extras=state.extras[recordingId]||[];
@@ -148,9 +180,18 @@ function render(){
   root.innerHTML=PACK.recordings.map((recording)=>{
     const spec=PACK.truth.recordings[recording.recordingId];
     const extras=state.extras[recording.recordingId]||[];
+    const metadata=state.metadata[recording.recordingId]||{};
     return '<article class="card"><h2>'+esc(recording.recordingId)+' · '+esc(recording.split)+'</h2>'
-      +'<div class="meta"><span>'+esc(recording.performerId)+'</span><span>'+esc(recording.deviceId)+'</span><span>'+esc(recording.roomId)+'</span><span>音频 SHA '+esc(recording.audioSha256.slice(0,12))+'…</span></div>'
+      +'<div class="meta"><span>音频 SHA '+esc(recording.audioSha256.slice(0,12))+'…</span></div>'
       +'<audio controls preload="metadata" src="'+esc(recording.audioRelativePath)+'"></audio>'
+      +'<div class="grid">'
+      +'<input data-metadata-recording="'+esc(recording.recordingId)+'" data-metadata-field="performerId" value="'+esc(metadata.performerId)+'" placeholder="实际演奏者匿名 ID">'
+      +'<input data-metadata-recording="'+esc(recording.recordingId)+'" data-metadata-field="deviceId" value="'+esc(metadata.deviceId)+'" placeholder="实际设备 ID">'
+      +'<input data-metadata-recording="'+esc(recording.recordingId)+'" data-metadata-field="roomId" value="'+esc(metadata.roomId)+'" placeholder="实际房间 ID">'
+      +'<select data-metadata-recording="'+esc(recording.recordingId)+'" data-metadata-field="consent"><option value="pending" '+(metadata.consent!=="yes"?'selected':'')+'>同意待确认</option><option value="yes" '+(metadata.consent==="yes"?'selected':'')+'>已取得同意</option></select>'
+      +'<select data-metadata-recording="'+esc(recording.recordingId)+'" data-metadata-field="licenseStatus"><option value="local-private-pending" '+(metadata.licenseStatus!=="local-only"?'selected':'')+'>许可待确认</option><option value="local-only" '+(metadata.licenseStatus==="local-only"?'selected':'')+'>仅本地使用</option></select>'
+      +'</div>'
+      +'<p><label><input type="checkbox" data-metadata-confirmed="'+esc(recording.recordingId)+'" '+(state.metadataConfirmed[recording.recordingId]?'checked':'')+'> 我已核对本条实际演奏者、设备、房间、同意和许可</label></p>'
       +'<p><label><input type="checkbox" data-inventory="'+esc(recording.recordingId)+'" '+(state.inventories[recording.recordingId]?'checked':'')+'> 我已完整试听整条录音，并已追加所有计划外错误</label></p>'
       +(spec.events||[]).map(event=>eventFields(recording.recordingId,event)).join('')
       +extras.map(event=>eventFields(recording.recordingId,event,true)).join('')
@@ -170,14 +211,20 @@ function materializeEvent(recordingId,event){
 }
 function validateAndBuild(){
   const problems=[];
-  const output=structuredClone(PACK.truth);
-  output.sourceTruthSha256=PACK.truthSha256;
-  output.sourceManifestSha256=PACK.manifestSha256;
+  const truth=structuredClone(PACK.truth);
+  const recordingMetadata={};
   for(const recording of PACK.recordings){
     const id=recording.recordingId;
     const base=PACK.truth.recordings[id];
+    const metadata=state.metadata[id]||{};
     const events=[...(base.events||[]),...(state.extras[id]||[])].map(event=>materializeEvent(id,event));
     if(!state.inventories[id]) problems.push(id+"：尚未签署完整错误清单");
+    if(!state.metadataConfirmed[id]) problems.push(id+"：尚未签署录音元数据");
+    for(const field of ["performerId","deviceId","roomId"]){
+      if(!String(metadata[field]||"").trim()) problems.push(id+"："+field+" 未填写");
+    }
+    if(metadata.consent!=="yes") problems.push(id+"：尚未确认录音同意");
+    if(metadata.licenseStatus!=="local-only") problems.push(id+"：尚未确认仅本地许可");
     const positions=new Set();
     for(const event of events){
       if(!GATES.includes(event.gate)||!LABELS.includes(event.label)) problems.push(id+"/"+event.eventId+"：gate 或实际标签无效");
@@ -188,22 +235,40 @@ function validateAndBuild(){
       if(positions.has(position)) problems.push(id+"/"+event.eventId+"：与同录音另一事件位置重复");
       positions.add(position);
     }
-    output.recordings[id]={completeErrorInventory:true,events};
+    truth.recordings[id]={completeErrorInventory:true,events};
+    recordingMetadata[id]={
+      performerId:String(metadata.performerId||"").trim(),
+      deviceId:String(metadata.deviceId||"").trim(),
+      roomId:String(metadata.roomId||"").trim(),
+      consent:String(metadata.consent||"").trim(),
+      licenseStatus:String(metadata.licenseStatus||"").trim()
+    };
   }
+  const output={
+    contractVersion:"${COMPLETED_CONTRACT}",
+    roundNumber:PACK.roundNumber,
+    sourceContractSha256:PACK.contractSha256,
+    sourceManifestSha256:PACK.manifestSha256,
+    sourceTruthSha256:PACK.truthSha256,
+    audioSha256ByRecording:Object.fromEntries(PACK.recordings.map(row=>[row.recordingId,row.audioSha256])),
+    recordingMetadata,
+    truth
+  };
   return {problems,output};
 }
 function summary(){
   const recordings=PACK.recordings.length;
   const inventoryDone=PACK.recordings.filter(row=>state.inventories[row.recordingId]).length;
+  const metadataDone=PACK.recordings.filter(row=>state.metadataConfirmed[row.recordingId]).length;
   const allEvents=PACK.recordings.flatMap(row=>[...(PACK.truth.recordings[row.recordingId].events||[]),...(state.extras[row.recordingId]||[])].map(event=>[row.recordingId,event]));
   const filled=allEvents.filter(([id,event])=>String(valueFor(id,event).asPerformed||"").trim()).length;
-  document.getElementById("summary").textContent=" 已签完整录音 "+inventoryDone+"/"+recordings+"；已填事件 "+filled+"/"+allEvents.length;
+  document.getElementById("summary").textContent=" 元数据 "+metadataDone+"/"+recordings+"；完整录音 "+inventoryDone+"/"+recordings+"；事件 "+filled+"/"+allEvents.length;
 }
 document.getElementById("download").addEventListener("click",()=>{
   const {problems,output}=validateAndBuild();
   if(problems.length){alert("还不能下载：\\n"+problems.slice(0,20).join("\\n")+(problems.length>20?"\\n…共 "+problems.length+" 项":""));return;}
   const blob=new Blob([JSON.stringify(output,null,2)+"\\n"],{type:"application/json"});
-  const link=document.createElement("a");link.href=URL.createObjectURL(blob);link.download="position-truth.completed.json";link.click();
+  const link=document.createElement("a");link.href=URL.createObjectURL(blob);link.download="western-round"+PACK.roundNumber+"-truth-signoff.completed.json";link.click();
   setTimeout(()=>URL.revokeObjectURL(link.href),1000);
 });
 render();
@@ -212,6 +277,7 @@ render();
 
 export async function writeTruthSignoffPack({
   repoRoot = process.cwd(),
+  contractPath,
   manifestPath = DEFAULT_MANIFEST,
   truthPath = DEFAULT_TRUTH,
   outDir = DEFAULT_OUT,
@@ -221,10 +287,15 @@ export async function writeTruthSignoffPack({
     throw new Error(`unsupported round number: ${roundNumber}`);
   }
   const root = path.resolve(repoRoot);
-  const [manifestSource, truthSource] = await Promise.all([
+  const selectedContractPath = contractPath || (Number(roundNumber) === 6
+    ? path.join("config", "western-strings-round6-counterbalanced-contract.json")
+    : DEFAULT_CONTRACT);
+  const [contractSource, manifestSource, truthSource] = await Promise.all([
+    readSource(root, selectedContractPath),
     readSource(root, manifestPath),
     readSource(root, truthPath),
   ]);
+  const contract = JSON.parse(contractSource.bytes.toString("utf8"));
   const manifest = parseCsv(manifestSource.bytes.toString("utf8"));
   const truth = JSON.parse(truthSource.bytes.toString("utf8"));
   const output = path.resolve(root, outDir);
@@ -233,6 +304,9 @@ export async function writeTruthSignoffPack({
   const expectedContract = Number(roundNumber) === 6
     ? "western-round6-counterbalanced-diagnosis-v1"
     : "western-round5-targeted-diagnosis-intake-v1";
+  if (contract.contractVersion !== expectedContract) {
+    blockers.push(`round${roundNumber}-signoff-contract-invalid`);
+  }
   if (truth.contractVersion !== expectedContract) {
     blockers.push(`round${roundNumber}-signoff-truth-contract-invalid`);
   }
@@ -269,6 +343,7 @@ export async function writeTruthSignoffPack({
   const html = renderHtml({
     truth,
     recordings,
+    contractSha256: contractSource.sha256,
     manifestSha256: manifestSource.sha256,
     truthSha256: truthSource.sha256,
     roundNumber: Number(roundNumber),
@@ -279,6 +354,7 @@ export async function writeTruthSignoffPack({
     ok: true,
     readyForSignoff: true,
     page: posixPath(path.relative(root, pagePath)),
+    contractSha256: contractSource.sha256,
     manifestSha256: manifestSource.sha256,
     truthSha256: truthSource.sha256,
     recordingCount: recordings.length,
@@ -298,7 +374,8 @@ function parseArgs(argv) {
   const args = {};
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === "--manifest") args.manifestPath = argv[++index];
+    if (arg === "--contract") args.contractPath = argv[++index];
+    else if (arg === "--manifest") args.manifestPath = argv[++index];
     else if (arg === "--truth") args.truthPath = argv[++index];
     else if (arg === "--out") args.outDir = argv[++index];
     else if (arg === "--round") args.roundNumber = Number(argv[++index]);

@@ -12,6 +12,15 @@ const root = await fs.mkdtemp(path.join(os.tmpdir(), "round5-truth-signoff-"));
 
 try {
   await fs.mkdir(path.join(root, "private"), { recursive: true });
+  await fs.mkdir(path.join(root, "config"), { recursive: true });
+  await fs.writeFile(
+    path.join(root, "config", "western-strings-round5-targeted-contract.json"),
+    `${JSON.stringify({ contractVersion: "western-round5-targeted-diagnosis-intake-v1" })}\n`,
+  );
+  await fs.writeFile(
+    path.join(root, "config", "western-strings-round6-counterbalanced-contract.json"),
+    `${JSON.stringify({ contractVersion: "western-round6-counterbalanced-diagnosis-v1" })}\n`,
+  );
   await fs.writeFile(path.join(root, "private", "take.wav"), Buffer.from("audio"));
   await fs.writeFile(path.join(root, "private", "manifest.csv"), [
     "\uFEFFrecordingId,pieceId,performerId,deviceId,roomId,split,audioPath,scorePath,consent,licenseStatus",
@@ -63,8 +72,11 @@ try {
   const html = await fs.readFile(path.join(root, "private", "signoff", "index.html"), "utf8");
   assert(html.includes("本页不展示任何机器预测"));
   assert(html.includes("../take.wav"));
-  assert(html.includes("position-truth.completed.json"));
-  assert(html.includes("output.recordings[id]={completeErrorInventory:true,events}"));
+  assert(html.includes("western-round\"+PACK.roundNumber+\"-truth-signoff.completed.json"));
+  assert(html.includes("sourceContractSha256:PACK.contractSha256"));
+  assert(html.includes("audioSha256ByRecording"));
+  assert(html.includes("data-metadata-confirmed"));
+  assert(html.includes("truth.recordings[id]={completeErrorInventory:true,events}"));
   assert(html.includes("追加计划外错误"));
   assert(html.includes("混淆负例必须填写 confusionKind"));
   const browserScript = html.match(/<script>([\s\S]*)<\/script>/)?.[1];
