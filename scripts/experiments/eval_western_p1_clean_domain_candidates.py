@@ -27,6 +27,8 @@ EXPERIMENTS = REPO / "scripts/experiments"
 sys.path.insert(0, str(EXPERIMENTS))
 
 import eval_western_round5_temporal_operation_path as temporal  # noqa: E402
+from eval_western_strings_injected_errors_dynamic_gate import CACHE as LOCAL_CACHE  # noqa: E402
+from eval_western_strings_m0_bach10 import basic_pitch_events  # noqa: E402
 
 
 PREREG_SCRIPT = EXPERIMENTS / "preregister_western_p1_clean_domain_candidates.py"
@@ -88,7 +90,7 @@ def load_preregistration_module():
     return module
 
 
-def validate_preregistration() -> tuple[dict[str, Any], str]:
+def validate_preregistration() -> tuple[dict[str, Any], str, str]:
     module = load_preregistration_module()
     stored = read_json(PREREG_JSON)
     rebuilt = module.build_protocol()
@@ -113,8 +115,15 @@ def validate_preregistration() -> tuple[dict[str, Any], str]:
         elif thresholds.get("temporalParams") != temporal_params["extra"]:
             raise RuntimeError(f"p1-extra-temporal-params-drift:{candidate_id}")
 
-    head = subprocess.run(
+    execution_head = subprocess.run(
         ["git", "rev-parse", "HEAD"],
+        cwd=REPO,
+        check=True,
+        text=True,
+        capture_output=True,
+    ).stdout.strip()
+    freeze_commit = subprocess.run(
+        ["git", "log", "-n", "1", "--format=%H", "--", relative(PREREG_JSON)],
         cwd=REPO,
         check=True,
         text=True,
@@ -134,7 +143,9 @@ def validate_preregistration() -> tuple[dict[str, Any], str]:
     )
     if clean.returncode != 0:
         raise RuntimeError("p1-freeze-files-modified-after-commit")
-    return stored, head
+    if not freeze_commit:
+        raise RuntimeError("p1-preregistration-freeze-commit-missing")
+    return stored, freeze_commit, execution_head
 
 
 def empty_truth() -> dict[str, set[int]]:
@@ -144,12 +155,56 @@ def empty_truth() -> dict[str, set[int]]:
 def prepare_local(row: dict[str, Any]) -> dict[str, Any]:
     score = REPO / row["scorePath"]
     audio = REPO / row["audioPath"]
-    item = temporal.prepare_take(
-        row["recordingId"],
-        row.get("pieceId", row["recordingId"]),
-        score,
-        audio,
-    )
+    parsed = converter.parse(str(score))
+    polyphonic = any(len(note.pitches) > 1 for note in parsed.flatten().notes)
+    if polyphonic:
+        notes = []
+        durations = []
+        for note in parsed.flatten().notes:
+            midis = sorted(int(pitch.midi) for pitch in note.pitches)
+            notes.append(
+                {
+                    "midi": midis[0],
+                    "midis": midis,
+                    "scoreUnit": float(note.offset),
+                    "scoreOnsetUnit": float(note.offset),
+                }
+            )
+            durations.append(max(0.125, float(note.quarterLength)))
+        events = temporal.filter_events(
+            basic_pitch_events(audio, LOCAL_CACHE),
+            temporal.EVENT_FILTER["minConfidence"],
+            temporal.EVENT_FILTER["minDurationSeconds"],
+        )
+        take_rows = temporal.build_rows(notes, events)
+        for take_row in take_rows:
+            take_row["selected"] = temporal.shadow_selected(take_row)
+        assignments = temporal.assign_basic_pitch_events(notes, events)
+        matched = {assignment["eventIndex"] for assignment in assignments if assignment}
+        item = {
+            "recordingId": row["recordingId"],
+            "pieceId": row.get("pieceId", row["recordingId"]),
+            "scorePath": score,
+            "audioPath": audio,
+            "take": {
+                "notes": notes,
+                "rows": take_rows,
+                "events": events,
+                "unassigned": [
+                    event for index, event in enumerate(events) if index not in matched
+                ],
+            },
+            "durations": durations,
+            "onset": temporal.onset_context(audio),
+            "polyphonicDeterministicProjection": "lowest-written-pitch-per-onset",
+        }
+    else:
+        item = temporal.prepare_take(
+            row["recordingId"],
+            row.get("pieceId", row["recordingId"]),
+            score,
+            audio,
+        )
     item["truth"] = empty_truth()
     item["metadata"] = row
     return item
@@ -510,7 +565,11 @@ def elimination_decision(
     return bool(reasons), reasons
 
 
-def build_report(protocol: dict[str, Any], preregistration_commit: str) -> dict[str, Any]:
+def build_report(
+    protocol: dict[str, Any],
+    preregistration_commit: str,
+    execution_commit: str,
+) -> dict[str, Any]:
     datasets = protocol["datasets"]
     local_results = evaluate_temporal_dataset(
         dataset_id="authoritative-local-clean",
@@ -578,6 +637,7 @@ def build_report(protocol: dict[str, Any], preregistration_commit: str) -> dict[
                 "aggregateSha256"
             ],
             "gitCommitShaBeforeEvaluation": preregistration_commit,
+            "executionRunnerCommitSha": execution_commit,
             "frozenBeforeEvaluation": True,
         },
         "executionDiscipline": {
@@ -588,6 +648,15 @@ def build_report(protocol: dict[str, Any], preregistration_commit: str) -> dict[
             "blindResultUsedForSelection": False,
             "round4Round5ReusedAsAcceptance": False,
             "syntheticRecallReportedAsReal": False,
+            "priorFailedAttempt": {
+                "runnerCommitSha": preregistration_commit,
+                "outcome": "no-report-deterministic-input-parser-crash",
+                "reason": "r2-07 polyphonic MusicXML failed the inherited injection-index isomorphism assertion",
+                "candidateCountsPrintedOrRead": False,
+                "thresholdChangedAfterAttempt": False,
+                "inputSelectionChangedAfterAttempt": False,
+                "correction": "support the already-frozen polyphonic input with the same lowest-written-pitch projection used by the public-score path",
+            },
         },
         "candidateResults": candidate_results,
         "conclusions": {
@@ -685,8 +754,8 @@ def main() -> int:
     parser.add_argument("--evidence-md", type=Path, default=EVIDENCE_MD)
     args = parser.parse_args()
 
-    protocol, preregistration_commit = validate_preregistration()
-    report = build_report(protocol, preregistration_commit)
+    protocol, preregistration_commit, execution_commit = validate_preregistration()
+    report = build_report(protocol, preregistration_commit, execution_commit)
     for path in (args.out, args.evidence_json):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
