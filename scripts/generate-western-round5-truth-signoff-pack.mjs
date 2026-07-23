@@ -3,6 +3,11 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import {
+  DEFAULT_STAGED_PATHS,
+  validateStageAAuthorization,
+} from "./western-round6-staged-signoff-support.mjs";
+
 const DEFAULT_ROOT = path.join("data", "private", "western-strings-round5");
 const DEFAULT_CONTRACT = path.join("config", "western-strings-round5-targeted-contract.json");
 const DEFAULT_MANIFEST = path.join(DEFAULT_ROOT, "manifest.csv");
@@ -12,6 +17,20 @@ const COMPLETED_CONTRACT = "western-truth-signoff-completed-v1";
 
 const sha256 = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
 const posixPath = (value) => value.replace(/\\/g, "/");
+const sameIds = (left, right) => (
+  JSON.stringify([...(left || [])].map(String).sort())
+    === JSON.stringify([...(right || [])].map(String).sort())
+);
+
+async function fileExists(absolutePath) {
+  try {
+    await fs.access(absolutePath);
+    return true;
+  } catch (error) {
+    if (error?.code === "ENOENT") return false;
+    throw error;
+  }
+}
 
 function parseCsv(text) {
   const rows = [];
@@ -61,6 +80,7 @@ function renderHtml({
   truthSha256,
   roundNumber = 5,
   scope = null,
+  stageAAuthorization = null,
 }) {
   const roundLabel = `Round ${roundNumber}`;
   const payload = JSON.stringify({
@@ -71,6 +91,7 @@ function renderHtml({
     truthSha256,
     roundNumber,
     scope,
+    stageAAuthorization,
   })
     .replace(/</g, "\\u003c");
   return `<!doctype html>
@@ -250,6 +271,7 @@ function validateAndBuild(){
     contractVersion:"${COMPLETED_CONTRACT}",
     roundNumber:PACK.roundNumber,
     ...(PACK.scope?{scope:PACK.scope}:{}),
+    ...(PACK.stageAAuthorization?{stageAAuthorization:PACK.stageAAuthorization}:{}),
     sourceContractSha256:PACK.contractSha256,
     sourceManifestSha256:PACK.manifestSha256,
     sourceTruthSha256:PACK.truthSha256,
@@ -286,6 +308,8 @@ export async function writeTruthSignoffPack({
   outDir = DEFAULT_OUT,
   roundNumber = 5,
   split,
+  stagedProtocolPath = DEFAULT_STAGED_PATHS.protocol,
+  stageAAuthorizationOptions = {},
 } = {}) {
   if (![5, 6].includes(Number(roundNumber))) {
     throw new Error(`unsupported round number: ${roundNumber}`);
@@ -306,8 +330,12 @@ export async function writeTruthSignoffPack({
   const blockers = [];
   const recordings = [];
   const selectedSplit = split ? String(split).trim() : "";
+  if (Number(roundNumber) === 6 && !selectedSplit) {
+    throw new Error("round6 truth-signoff split is required");
+  }
   if (selectedSplit && (
-    Number(roundNumber) !== 6 || selectedSplit !== "calibration"
+    Number(roundNumber) !== 6
+    || !["calibration", "fresh-blind"].includes(selectedSplit)
   )) {
     throw new Error(`unsupported truth-signoff split: ${selectedSplit}`);
   }
@@ -340,6 +368,44 @@ export async function writeTruthSignoffPack({
       }/6`,
     );
   }
+  let stageAAuthorization = null;
+  if (Number(roundNumber) === 6 && selectedSplit === "calibration") {
+    const stageALineagePath = (
+      stageAAuthorizationOptions.stageALineagePath
+      || DEFAULT_STAGED_PATHS.stageALineage
+    );
+    if (await fileExists(path.resolve(root, stageALineagePath))) {
+      blockers.push("round6-stage-a-signoff-already-applied");
+    }
+  }
+  if (Number(roundNumber) === 6 && selectedSplit === "fresh-blind") {
+    const authorization = await validateStageAAuthorization({
+      ...stageAAuthorizationOptions,
+      repoRoot: root,
+      protocolPath: stagedProtocolPath,
+      contractPath: selectedContractPath,
+      manifestPath,
+      truthPath,
+    });
+    if (!authorization.ready) {
+      blockers.push(...authorization.blockingReasons);
+    } else {
+      const selectedIds = selectedManifest.map((row) => row.recordingId);
+      if (!sameIds(selectedIds, authorization.stageBRecordingIds)) {
+        blockers.push("round6-stage-b-recording-set-mismatch");
+      } else {
+        stageAAuthorization = authorization.authorizationBinding;
+      }
+    }
+  }
+  if (blockers.length) {
+    return {
+      ok: false,
+      readyForSignoff: false,
+      freshAudioRead: false,
+      blockingReasons: [...new Set(blockers)].sort(),
+    };
+  }
   for (const row of selectedManifest) {
     if (!truth.recordings?.[row.recordingId]) continue;
     const audioPath = path.resolve(root, row.audioPath);
@@ -359,7 +425,12 @@ export async function writeTruthSignoffPack({
     }
   }
   if (blockers.length) {
-    return { ok: false, readyForSignoff: false, blockingReasons: blockers };
+    return {
+      ok: false,
+      readyForSignoff: false,
+      freshAudioRead: selectedSplit === "fresh-blind",
+      blockingReasons: [...new Set(blockers)].sort(),
+    };
   }
   const selectedRecordingIds = recordings.map((row) => row.recordingId);
   const scopedTruth = selectedSplit
@@ -384,6 +455,7 @@ export async function writeTruthSignoffPack({
     truthSha256: truthSource.sha256,
     roundNumber: Number(roundNumber),
     scope,
+    stageAAuthorization,
   });
   const pagePath = path.join(output, "index.html");
   await fs.writeFile(pagePath, html, "utf8");
@@ -401,6 +473,7 @@ export async function writeTruthSignoffPack({
     ),
     audioHashesBound: recordings.length,
     scope,
+    ...(stageAAuthorization ? { stageAAuthorization } : {}),
     machinePredictionsIncluded: false,
     blockingReasons: [],
   };
@@ -418,6 +491,7 @@ function parseArgs(argv) {
     else if (arg === "--out") args.outDir = argv[++index];
     else if (arg === "--round") args.roundNumber = Number(argv[++index]);
     else if (arg === "--split") args.split = argv[++index];
+    else if (arg === "--staged-protocol") args.stagedProtocolPath = argv[++index];
     else throw new Error(`unknown argument: ${arg}`);
   }
   return args;

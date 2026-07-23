@@ -3,6 +3,13 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import {
+  DEFAULT_STAGED_PATHS,
+  STAGE_A_LINEAGE_CONTRACT,
+  STAGE_B_LINEAGE_CONTRACT,
+  validateStageAAuthorization,
+} from "./western-round6-staged-signoff-support.mjs";
+
 const COMPLETED_CONTRACT = "western-truth-signoff-completed-v1";
 const STAGED_PROTOCOL_CONTRACT = "western-p3-staged-minimal-recording-protocol-v1";
 const DEFAULT_STAGED_PROTOCOL = path.join(
@@ -16,6 +23,7 @@ const DEFAULT_STAGE_A_LEDGER = path.join(
   "western-strings-round6-stage-a-signoff",
   "ledger.json",
 );
+const DEFAULT_STAGE_B_LEDGER = DEFAULT_STAGED_PATHS.stageBLineage;
 const REQUIRED_MANIFEST_FIELDS = [
   "recordingId",
   "pieceId",
@@ -102,9 +110,38 @@ async function readSource(repoRoot, sourcePath) {
   return { absolute, bytes, sha256: sha256(bytes) };
 }
 
+async function fileExists(absolutePath) {
+  try {
+    await fs.access(absolutePath);
+    return true;
+  } catch (error) {
+    if (error?.code === "ENOENT") return false;
+    throw error;
+  }
+}
+
 function sameIds(left, right) {
   return left.length === right.length
     && left.every((value, index) => value === right[index]);
+}
+
+function splitProjectionHashes(manifest, truth, split) {
+  const rows = manifest.rows
+    .filter((row) => clean(row.split) === split)
+    .map((row) => Object.fromEntries(
+      manifest.headers.map((header) => [header, row[header] ?? ""]),
+    ));
+  const recordingIds = rows.map((row) => clean(row.recordingId)).sort();
+  const recordings = Object.fromEntries(recordingIds.map(
+    (recordingId) => [
+      recordingId,
+      truth.recordings?.[recordingId],
+    ],
+  ));
+  return {
+    manifestProjectionSha256: sha256(Buffer.from(canonicalJson(rows), "utf8")),
+    truthProjectionSha256: sha256(Buffer.from(canonicalJson(recordings), "utf8")),
+  };
 }
 
 function validateTruth({
@@ -224,16 +261,26 @@ export async function applyTruthSignoff({
   apply = false,
   scopeSplit,
   stagedProtocolPath = DEFAULT_STAGED_PROTOCOL,
-  ledgerPath = DEFAULT_STAGE_A_LEDGER,
+  ledgerPath,
+  stageAAuthorizationOptions = {},
 } = {}) {
   if (!completedPath) throw new Error("--completed is required");
   const root = path.resolve(repoRoot);
   const selectedScope = clean(scopeSplit);
+  if (Number(roundNumber) === 6 && !selectedScope) {
+    throw new Error("round6 truth-signoff apply scope is required");
+  }
   if (selectedScope && (
-    Number(roundNumber) !== 6 || selectedScope !== "calibration"
+    Number(roundNumber) !== 6
+    || !["calibration", "fresh-blind"].includes(selectedScope)
   )) {
     throw new Error(`unsupported truth-signoff apply scope: ${selectedScope}`);
   }
+  const selectedLedgerPath = ledgerPath || (
+    selectedScope === "fresh-blind"
+      ? DEFAULT_STAGE_B_LEDGER
+      : DEFAULT_STAGE_A_LEDGER
+  );
   const [
     contractSource,
     manifestSource,
@@ -255,6 +302,7 @@ export async function applyTruthSignoff({
     ? JSON.parse(stagedProtocolSource.bytes.toString("utf8"))
     : null;
   const blockers = [];
+  let stageAAuthorization = null;
 
   if (completed.contractVersion !== COMPLETED_CONTRACT) blockers.push("completed-contract-invalid");
   if (Number(completed.roundNumber) !== Number(roundNumber)) blockers.push("completed-round-mismatch");
@@ -292,20 +340,42 @@ export async function applyTruthSignoff({
     ) {
       blockers.push("staged-protocol-semantic-sha-mismatch");
     }
-    const bindingByPath = new Map(
-      (stagedProtocol?.sourceBindings || []).map(
-        (binding) => [posixPath(clean(binding?.path)), clean(binding?.sha256)],
-      ),
-    );
-    for (const [sourcePath, source] of [
-      [contractPath, contractSource],
-      [manifestPath, manifestSource],
-      [truthPath, truthSource],
-    ]) {
-      if (bindingByPath.get(posixPath(clean(sourcePath))) !== source.sha256) {
-        blockers.push(`staged-protocol-source-binding-mismatch:${
-          posixPath(clean(sourcePath))
-        }`);
+    if (selectedScope === "calibration") {
+      const bindingByPath = new Map(
+        (stagedProtocol?.sourceBindings || []).map(
+          (binding) => [posixPath(clean(binding?.path)), clean(binding?.sha256)],
+        ),
+      );
+      for (const [sourcePath, source] of [
+        [contractPath, contractSource],
+        [manifestPath, manifestSource],
+        [truthPath, truthSource],
+      ]) {
+        if (bindingByPath.get(posixPath(clean(sourcePath))) !== source.sha256) {
+          blockers.push(`staged-protocol-source-binding-mismatch:${
+            posixPath(clean(sourcePath))
+          }`);
+        }
+      }
+    } else {
+      const authorization = await validateStageAAuthorization({
+        ...stageAAuthorizationOptions,
+        repoRoot: root,
+        protocolPath: stagedProtocolPath,
+        contractPath,
+        manifestPath,
+        truthPath,
+      });
+      if (!authorization.ready) {
+        blockers.push(...authorization.blockingReasons);
+      } else {
+        stageAAuthorization = authorization;
+        if (
+          canonicalJson(completed.stageAAuthorization)
+          !== canonicalJson(authorization.authorizationBinding)
+        ) {
+          blockers.push("completed-stage-a-authorization-mismatch");
+        }
       }
     }
   } else if (completedScope) {
@@ -327,11 +397,24 @@ export async function applyTruthSignoff({
     : manifest.rows;
   const recordingIds = scopedRows.map((row) => clean(row.recordingId)).sort();
   if (selectedScope) {
+    const protocolStage = selectedScope === "fresh-blind"
+      ? stagedProtocol?.stageB
+      : stagedProtocol?.stageA;
     const protocolRecordingIds = (
-      stagedProtocol?.stageA?.recordingIds || []
+      protocolStage?.recordingIds || []
     ).map(clean).sort();
     if (!sameIds(recordingIds, protocolRecordingIds)) {
       blockers.push("staged-protocol-recording-set-mismatch");
+    }
+    if (
+      selectedScope === "fresh-blind"
+      && stageAAuthorization
+      && !sameIds(
+        recordingIds,
+        [...stageAAuthorization.stageBRecordingIds].map(clean).sort(),
+      )
+    ) {
+      blockers.push("stage-a-authorization-recording-set-mismatch");
     }
     const completedScopeIds = (
       completedScope?.recordingIds || []
@@ -392,9 +475,21 @@ export async function applyTruthSignoff({
 
   const minimums = selectedScope
     ? {
-      performers: stagedProtocol?.stageA?.profile?.performerIds?.length,
-      devices: stagedProtocol?.stageA?.profile?.deviceIds?.length,
-      rooms: stagedProtocol?.stageA?.profile?.roomIds?.length,
+      performers: (
+        selectedScope === "fresh-blind"
+          ? stagedProtocol?.stageB
+          : stagedProtocol?.stageA
+      )?.profile?.performerIds?.length,
+      devices: (
+        selectedScope === "fresh-blind"
+          ? stagedProtocol?.stageB
+          : stagedProtocol?.stageA
+      )?.profile?.deviceIds?.length,
+      rooms: (
+        selectedScope === "fresh-blind"
+          ? stagedProtocol?.stageB
+          : stagedProtocol?.stageA
+      )?.profile?.roomIds?.length,
     }
     : contract.minimums || {};
   const coverageRows = selectedScope
@@ -410,14 +505,19 @@ export async function applyTruthSignoff({
     if (count < floor) blockers.push(`${floorKey}-below-floor:${count}/${floor}`);
   }
   if (
-    !selectedScope
+    (!selectedScope || selectedScope === "fresh-blind")
     && contract.splitDiscipline?.calibrationAndFreshPerformersDisjoint === true
   ) {
     const calibration = new Set(
-      updatedRows.filter((row) => clean(row.split) === "calibration").map((row) => row.performerId),
+      updatedRows
+        .filter((row) => clean(row.split) === "calibration")
+        .map((row) => clean(row.performerId))
+        .filter(Boolean),
     );
     for (const row of updatedRows.filter((item) => clean(item.split) === "fresh-blind")) {
-      if (calibration.has(row.performerId)) blockers.push(`performer-split-leak:${row.performerId}`);
+      if (calibration.has(clean(row.performerId))) {
+        blockers.push(`performer-split-leak:${clean(row.performerId)}`);
+      }
     }
   }
 
@@ -429,6 +529,14 @@ export async function applyTruthSignoff({
     allowedLabels: new Set(contract.allowedLabels || []),
     blockers,
   });
+  const absoluteLedgerPath = selectedScope
+    ? path.resolve(root, selectedLedgerPath)
+    : null;
+  if (absoluteLedgerPath && await fileExists(absoluteLedgerPath)) {
+    blockers.push(`round6-${selectedScope === "fresh-blind"
+      ? "stage-b"
+      : "stage-a"}-signoff-already-applied`);
+  }
 
   const uniqueBlockers = [...new Set(blockers)].sort();
   if (uniqueBlockers.length) {
@@ -449,6 +557,42 @@ export async function applyTruthSignoff({
       },
     }
     : completed.truth;
+  const calibrationBefore = selectedScope === "fresh-blind"
+    ? splitProjectionHashes(manifest, currentTruth, "calibration")
+    : null;
+  const calibrationAfter = selectedScope === "fresh-blind"
+    ? splitProjectionHashes(
+      { ...manifest, rows: updatedRows },
+      updatedTruth,
+      "calibration",
+    )
+    : null;
+  const calibrationPreservation = calibrationBefore
+    ? {
+      manifestProjectionBeforeSha256:
+        calibrationBefore.manifestProjectionSha256,
+      manifestProjectionAfterSha256:
+        calibrationAfter.manifestProjectionSha256,
+      truthProjectionBeforeSha256:
+        calibrationBefore.truthProjectionSha256,
+      truthProjectionAfterSha256:
+        calibrationAfter.truthProjectionSha256,
+      unchanged: (
+        calibrationBefore.manifestProjectionSha256
+          === calibrationAfter.manifestProjectionSha256
+        && calibrationBefore.truthProjectionSha256
+          === calibrationAfter.truthProjectionSha256
+      ),
+    }
+    : null;
+  if (calibrationPreservation?.unchanged === false) {
+    return {
+      ok: false,
+      readyToApply: false,
+      applied: false,
+      blockingReasons: ["round6-stage-b-calibration-mutated"],
+    };
+  }
   const manifestBytes = Buffer.from(serializeCsv({ ...manifest, rows: updatedRows }), "utf8");
   const truthBytes = Buffer.from(`${JSON.stringify(updatedTruth, null, 2)}\n`, "utf8");
   const proposedHashes = {
@@ -473,6 +617,7 @@ export async function applyTruthSignoff({
       completedSha256: completedSource.sha256,
     },
     proposedHashes,
+    ...(calibrationPreservation ? { calibrationPreservation } : {}),
     blockingReasons: [],
   };
   if (!apply) return result;
@@ -483,16 +628,16 @@ export async function applyTruthSignoff({
     manifestSource.sha256,
   );
   const truthBackup = await writeBackup(truthSource.absolute, truthSource.bytes, truthSource.sha256);
-  const absoluteLedgerPath = selectedScope
-    ? path.resolve(root, ledgerPath)
-    : null;
+  let ledgerCreated = false;
   try {
     await fs.writeFile(truthSource.absolute, truthBytes);
     await fs.writeFile(manifestSource.absolute, manifestBytes);
     if (absoluteLedgerPath) {
       const ledger = {
         schemaVersion: 1,
-        contract: "western-round6-stage-a-signoff-lineage-v1",
+        contract: selectedScope === "fresh-blind"
+          ? STAGE_B_LINEAGE_CONTRACT
+          : STAGE_A_LINEAGE_CONTRACT,
         scope: { split: selectedScope, recordingIds },
         stagedProtocol: {
           path: posixPath(clean(stagedProtocolPath)),
@@ -506,12 +651,19 @@ export async function applyTruthSignoff({
           truthSha256: truthSource.sha256,
           completedSha256: completedSource.sha256,
         },
+        ...(stageAAuthorization
+          ? {
+            stageAAuthorization:
+              stageAAuthorization.authorizationBinding,
+          }
+          : {}),
         audioSha256ByRecording: Object.fromEntries(
           recordingIds.map(
             (recordingId) => [recordingId, audioHashes[recordingId]],
           ),
         ),
         appliedHashes: proposedHashes,
+        ...(calibrationPreservation ? { calibrationPreservation } : {}),
         studentFacing: false,
         automaticAuthorizationGranted: false,
       };
@@ -519,15 +671,16 @@ export async function applyTruthSignoff({
       await fs.writeFile(
         absoluteLedgerPath,
         `${JSON.stringify(ledger, null, 2)}\n`,
-        "utf8",
+        { encoding: "utf8", flag: "wx" },
       );
+      ledgerCreated = true;
     }
   } catch (error) {
     await Promise.all([
       fs.writeFile(truthSource.absolute, truthSource.bytes),
       fs.writeFile(manifestSource.absolute, manifestSource.bytes),
     ]);
-    if (absoluteLedgerPath) {
+    if (absoluteLedgerPath && ledgerCreated) {
       await fs.rm(absoluteLedgerPath, { force: true });
     }
     throw error;

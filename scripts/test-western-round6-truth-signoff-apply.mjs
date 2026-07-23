@@ -17,7 +17,7 @@ const completedPath = "private/completed.json";
 try {
   await fs.mkdir(privateDir, { recursive: true });
   const contract = {
-    contractVersion: "western-round6-counterbalanced-diagnosis-v1",
+    contractVersion: "western-round5-targeted-diagnosis-intake-v1",
     allowedGates: ["merged_substitution", "missing", "extra", "drag"],
     allowedSplits: ["calibration", "fresh-blind"],
     allowedLabels: ["positive", "confusion_negative"],
@@ -91,7 +91,7 @@ try {
   }
   const completed = {
     contractVersion: "western-truth-signoff-completed-v1",
-    roundNumber: 6,
+    roundNumber: 5,
     sourceContractSha256: hash(contractBytes),
     sourceManifestSha256: hash(manifestBytes),
     sourceTruthSha256: hash(truthBytes),
@@ -109,11 +109,15 @@ try {
     manifestPath,
     truthPath,
     completedPath,
-    roundNumber: 6,
+    roundNumber: 5,
     ...extra,
   });
   await writeCompleted(completed);
 
+  await assert.rejects(
+    () => run({ roundNumber: 6 }),
+    /round6 truth-signoff apply scope is required/,
+  );
   const dryRun = await run();
   assert.equal(dryRun.ok, true);
   assert.equal(dryRun.readyToApply, true);
@@ -173,6 +177,7 @@ try {
     ok: true,
     checks: [
       "dry-run-does-not-write",
+      "round6-unscoped-apply-disabled",
       "source-hash-staleness-fails-closed",
       "consent-and-license-fail-closed",
       "complete-signoff-required",
