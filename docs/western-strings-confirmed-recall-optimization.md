@@ -86,10 +86,11 @@ npm run test:western-round5-temporal-operation-path
 
 `policyCReviewAssistRuntime.ready=true` 只表示最新物理批次的 Policy C 契约和安全边界可审计，不表示该批次一定有候选。状态现已拆为 `mechanismReady`、`candidateAvailable`、`readyForReview`；当前最新批次 `outputCount=0`，所以机制就绪但没有当前候选。冻结 Round 4 的候选工件生成早于 Policy C 持久化接线，不能伪称已有物理决策字段。
 
-为回收这批已知但尚未结构化的教师判断，新增本机复核包：它先验证冻结报告、manifest、position truth 与六份候选工件的 SHA-256，再用当前冻结 Policy C 函数逐行重算。当前导出 **9 个可播放候选 / 4 条录音**，覆盖 2 个 `confirmed_issue` 与 7 个 `self_check_hint`；已知评测构成为 6 个故意错误位置加 3 个非故意混淆位置，但页面不会把评测真值预填给复核人。下载结果只能生成 calibration 草稿，硬编码 `freshBlindEligible=false`，不能补 fresh-blind 分母。
+为回收这批已知但尚未结构化的教师判断，新增本机复核包：它先验证冻结报告、manifest、position truth 与六份候选工件的 SHA-256，再用当前冻结 Policy C 函数逐行重算。当前导出 **9 个可播放候选 / 4 条录音**，覆盖 2 个 `confirmed_issue` 与 7 个 `self_check_hint`；已知评测构成为 6 个故意错误位置加 3 个非故意混淆位置，但页面不会把评测真值预填给复核人。下载结果只能生成 calibration 草稿，硬编码 `freshBlindEligible=false`，不能补 fresh-blind 分母。项目状态中的 `ordinaryDynamicShadow.policyCReviewAssistCalibrationPack` 还会逐行重哈希冻结报告、候选工件、源/复制音频、源谱和页面内 ledger 绑定；当前 `sourceCurrent=true`、`readyForReview=true`、`completedReviewPresent=false`。该包不写 canonical batch，不会改变 M3+ 的最新物理批身份。
 
 ```powershell
 npm run western:round5-review-assist-calibration-pack
+npm run test:western-review-assist-project-status
 # 在 data/experiments/western-strings-round5-review-assist-calibration-pack/index.html 完成人工复核并下载 JSON
 npm run western:round5-review-assist-calibration-stage -- --completed data/experiments/western-strings-round5-review-assist-calibration-pack/round5-review-assist-calibration.completed.json
 ```
