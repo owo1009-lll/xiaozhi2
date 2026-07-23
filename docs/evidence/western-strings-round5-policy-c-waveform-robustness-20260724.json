@@ -1,0 +1,2083 @@
+{
+  "schemaVersion": 1,
+  "contract": "western-round5-policy-c-waveform-robustness-diagnostic-v1",
+  "evidenceDate": "2026-07-24",
+  "scope": "consumed-multi-device-room-diagnostic-only",
+  "evidenceRole": "diagnostic-only",
+  "studentFacing": false,
+  "automaticAccusationReady": false,
+  "reviewAssistPromotionReady": false,
+  "promotionEvidenceEligible": false,
+  "freshBlindPromotionEligible": false,
+  "round5Consumed": true,
+  "thresholdRetunedOnRound5": false,
+  "completeInventoryNegativesUsed": true,
+  "denominatorDefinition": "For the missing gate, the signed positive is positive and every other score position is a strict negative.",
+  "floors": {
+    "minPrecision": 0.9,
+    "minRecall": 0.5
+  },
+  "sample": {
+    "recordings": 12,
+    "scorePositions": 672,
+    "missingPositives": 12,
+    "missingConfusionNegatives": 24,
+    "performers": 2,
+    "devices": 3,
+    "rooms": 2
+  },
+  "independenceAudit": {
+    "thresholdSelectionUsesRound5": false,
+    "round5LabelsPreviouslyInspected": true,
+    "round5AudioPreviouslyEvaluated": true,
+    "samePerformersAcrossSplits": true,
+    "sameDevicesAcrossSplits": true,
+    "roomPerfectlyConfoundedWithSplit": true,
+    "positionTargetsScoreContextConfounded": true
+  },
+  "energyAbsence": {
+    "frozenThreshold": {
+      "feature": "relativeEnergyDb",
+      "threshold": -134.825302,
+      "selectionDomain": "r2-01 waveform-injection-v2 (3 seeds)",
+      "qualifyingDevelopmentThresholdCount": 4,
+      "syntheticDevelopment": {
+        "truePositive": 11,
+        "falsePositive": 0,
+        "falseNegative": 4,
+        "trueNegative": 186,
+        "precision": 1.0,
+        "recall": 0.733333,
+        "jointFloorReady": true
+      }
+    },
+    "round5Diagnostic": {
+      "pooled": {
+        "recordingCount": 12,
+        "scorePositionCount": 672,
+        "signedPositiveCount": 12,
+        "signedConfusionNegativeCount": 24,
+        "assignmentGapCount": 65,
+        "flagCount": 0,
+        "signedConfusionFalsePositiveCount": 0,
+        "truePositive": 0,
+        "falsePositive": 0,
+        "falseNegative": 12,
+        "trueNegative": 660,
+        "precision": 0.0,
+        "recall": 0.0,
+        "jointFloorReady": false,
+        "takes": [
+          {
+            "take": "r5-cal-01",
+            "assignmentGapCount": 7,
+            "truePositive": 0,
+            "falsePositive": 0,
+            "falseNegative": 1,
+            "trueNegative": 55,
+            "precision": 0.0,
+            "recall": 0.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-cal-02",
+            "assignmentGapCount": 7,
+            "truePositive": 0,
+            "falsePositive": 0,
+            "falseNegative": 1,
+            "trueNegative": 55,
+            "precision": 0.0,
+            "recall": 0.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-cal-03",
+            "assignmentGapCount": 7,
+            "truePositive": 0,
+            "falsePositive": 0,
+            "falseNegative": 1,
+            "trueNegative": 55,
+            "precision": 0.0,
+            "recall": 0.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-cal-04",
+            "assignmentGapCount": 5,
+            "truePositive": 0,
+            "falsePositive": 0,
+            "falseNegative": 1,
+            "trueNegative": 55,
+            "precision": 0.0,
+            "recall": 0.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-cal-05",
+            "assignmentGapCount": 7,
+            "truePositive": 0,
+            "falsePositive": 0,
+            "falseNegative": 1,
+            "trueNegative": 55,
+            "precision": 0.0,
+            "recall": 0.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-cal-06",
+            "assignmentGapCount": 5,
+            "truePositive": 0,
+            "falsePositive": 0,
+            "falseNegative": 1,
+            "trueNegative": 55,
+            "precision": 0.0,
+            "recall": 0.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-fresh-01",
+            "assignmentGapCount": 8,
+            "truePositive": 0,
+            "falsePositive": 0,
+            "falseNegative": 1,
+            "trueNegative": 55,
+            "precision": 0.0,
+            "recall": 0.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-fresh-02",
+            "assignmentGapCount": 4,
+            "truePositive": 0,
+            "falsePositive": 0,
+            "falseNegative": 1,
+            "trueNegative": 55,
+            "precision": 0.0,
+            "recall": 0.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-fresh-03",
+            "assignmentGapCount": 5,
+            "truePositive": 0,
+            "falsePositive": 0,
+            "falseNegative": 1,
+            "trueNegative": 55,
+            "precision": 0.0,
+            "recall": 0.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-fresh-04",
+            "assignmentGapCount": 4,
+            "truePositive": 0,
+            "falsePositive": 0,
+            "falseNegative": 1,
+            "trueNegative": 55,
+            "precision": 0.0,
+            "recall": 0.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-fresh-05",
+            "assignmentGapCount": 4,
+            "truePositive": 0,
+            "falsePositive": 0,
+            "falseNegative": 1,
+            "trueNegative": 55,
+            "precision": 0.0,
+            "recall": 0.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-fresh-06",
+            "assignmentGapCount": 2,
+            "truePositive": 0,
+            "falsePositive": 0,
+            "falseNegative": 1,
+            "trueNegative": 55,
+            "precision": 0.0,
+            "recall": 0.0,
+            "jointFloorReady": false
+          }
+        ]
+      },
+      "split": {
+        "calibration": {
+          "recordingCount": 6,
+          "scorePositionCount": 336,
+          "signedPositiveCount": 6,
+          "signedConfusionNegativeCount": 12,
+          "assignmentGapCount": 38,
+          "flagCount": 0,
+          "signedConfusionFalsePositiveCount": 0,
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 6,
+          "trueNegative": 330,
+          "precision": 0.0,
+          "recall": 0.0,
+          "jointFloorReady": false,
+          "takes": [
+            {
+              "take": "r5-cal-01",
+              "assignmentGapCount": 7,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-02",
+              "assignmentGapCount": 7,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-03",
+              "assignmentGapCount": 7,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-04",
+              "assignmentGapCount": 5,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-05",
+              "assignmentGapCount": 7,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-06",
+              "assignmentGapCount": 5,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            }
+          ]
+        },
+        "fresh-blind": {
+          "recordingCount": 6,
+          "scorePositionCount": 336,
+          "signedPositiveCount": 6,
+          "signedConfusionNegativeCount": 12,
+          "assignmentGapCount": 27,
+          "flagCount": 0,
+          "signedConfusionFalsePositiveCount": 0,
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 6,
+          "trueNegative": 330,
+          "precision": 0.0,
+          "recall": 0.0,
+          "jointFloorReady": false,
+          "takes": [
+            {
+              "take": "r5-fresh-01",
+              "assignmentGapCount": 8,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-02",
+              "assignmentGapCount": 4,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-03",
+              "assignmentGapCount": 5,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-04",
+              "assignmentGapCount": 4,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-05",
+              "assignmentGapCount": 4,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-06",
+              "assignmentGapCount": 2,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            }
+          ]
+        }
+      },
+      "performerId": {
+        "performer-1": {
+          "recordingCount": 6,
+          "scorePositionCount": 336,
+          "signedPositiveCount": 6,
+          "signedConfusionNegativeCount": 12,
+          "assignmentGapCount": 38,
+          "flagCount": 0,
+          "signedConfusionFalsePositiveCount": 0,
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 6,
+          "trueNegative": 330,
+          "precision": 0.0,
+          "recall": 0.0,
+          "jointFloorReady": false,
+          "takes": [
+            {
+              "take": "r5-cal-01",
+              "assignmentGapCount": 7,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-03",
+              "assignmentGapCount": 7,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-05",
+              "assignmentGapCount": 7,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-01",
+              "assignmentGapCount": 8,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-03",
+              "assignmentGapCount": 5,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-05",
+              "assignmentGapCount": 4,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            }
+          ]
+        },
+        "performer-2": {
+          "recordingCount": 6,
+          "scorePositionCount": 336,
+          "signedPositiveCount": 6,
+          "signedConfusionNegativeCount": 12,
+          "assignmentGapCount": 27,
+          "flagCount": 0,
+          "signedConfusionFalsePositiveCount": 0,
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 6,
+          "trueNegative": 330,
+          "precision": 0.0,
+          "recall": 0.0,
+          "jointFloorReady": false,
+          "takes": [
+            {
+              "take": "r5-cal-02",
+              "assignmentGapCount": 7,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-04",
+              "assignmentGapCount": 5,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-06",
+              "assignmentGapCount": 5,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-02",
+              "assignmentGapCount": 4,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-04",
+              "assignmentGapCount": 4,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-06",
+              "assignmentGapCount": 2,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            }
+          ]
+        }
+      },
+      "deviceId": {
+        "device-1": {
+          "recordingCount": 4,
+          "scorePositionCount": 224,
+          "signedPositiveCount": 4,
+          "signedConfusionNegativeCount": 8,
+          "assignmentGapCount": 26,
+          "flagCount": 0,
+          "signedConfusionFalsePositiveCount": 0,
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 4,
+          "trueNegative": 220,
+          "precision": 0.0,
+          "recall": 0.0,
+          "jointFloorReady": false,
+          "takes": [
+            {
+              "take": "r5-cal-01",
+              "assignmentGapCount": 7,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-02",
+              "assignmentGapCount": 7,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-01",
+              "assignmentGapCount": 8,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-02",
+              "assignmentGapCount": 4,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            }
+          ]
+        },
+        "device-2": {
+          "recordingCount": 4,
+          "scorePositionCount": 224,
+          "signedPositiveCount": 4,
+          "signedConfusionNegativeCount": 8,
+          "assignmentGapCount": 21,
+          "flagCount": 0,
+          "signedConfusionFalsePositiveCount": 0,
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 4,
+          "trueNegative": 220,
+          "precision": 0.0,
+          "recall": 0.0,
+          "jointFloorReady": false,
+          "takes": [
+            {
+              "take": "r5-cal-03",
+              "assignmentGapCount": 7,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-04",
+              "assignmentGapCount": 5,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-03",
+              "assignmentGapCount": 5,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-04",
+              "assignmentGapCount": 4,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            }
+          ]
+        },
+        "device-3": {
+          "recordingCount": 4,
+          "scorePositionCount": 224,
+          "signedPositiveCount": 4,
+          "signedConfusionNegativeCount": 8,
+          "assignmentGapCount": 18,
+          "flagCount": 0,
+          "signedConfusionFalsePositiveCount": 0,
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 4,
+          "trueNegative": 220,
+          "precision": 0.0,
+          "recall": 0.0,
+          "jointFloorReady": false,
+          "takes": [
+            {
+              "take": "r5-cal-05",
+              "assignmentGapCount": 7,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-06",
+              "assignmentGapCount": 5,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-05",
+              "assignmentGapCount": 4,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-06",
+              "assignmentGapCount": 2,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            }
+          ]
+        }
+      },
+      "roomId": {
+        "room-1": {
+          "recordingCount": 6,
+          "scorePositionCount": 336,
+          "signedPositiveCount": 6,
+          "signedConfusionNegativeCount": 12,
+          "assignmentGapCount": 38,
+          "flagCount": 0,
+          "signedConfusionFalsePositiveCount": 0,
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 6,
+          "trueNegative": 330,
+          "precision": 0.0,
+          "recall": 0.0,
+          "jointFloorReady": false,
+          "takes": [
+            {
+              "take": "r5-cal-01",
+              "assignmentGapCount": 7,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-02",
+              "assignmentGapCount": 7,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-03",
+              "assignmentGapCount": 7,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-04",
+              "assignmentGapCount": 5,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-05",
+              "assignmentGapCount": 7,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-06",
+              "assignmentGapCount": 5,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            }
+          ]
+        },
+        "room-2": {
+          "recordingCount": 6,
+          "scorePositionCount": 336,
+          "signedPositiveCount": 6,
+          "signedConfusionNegativeCount": 12,
+          "assignmentGapCount": 27,
+          "flagCount": 0,
+          "signedConfusionFalsePositiveCount": 0,
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 6,
+          "trueNegative": 330,
+          "precision": 0.0,
+          "recall": 0.0,
+          "jointFloorReady": false,
+          "takes": [
+            {
+              "take": "r5-fresh-01",
+              "assignmentGapCount": 8,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-02",
+              "assignmentGapCount": 4,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-03",
+              "assignmentGapCount": 5,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-04",
+              "assignmentGapCount": 4,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-05",
+              "assignmentGapCount": 4,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-06",
+              "assignmentGapCount": 2,
+              "truePositive": 0,
+              "falsePositive": 0,
+              "falseNegative": 1,
+              "trueNegative": 55,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            }
+          ]
+        }
+      }
+    },
+    "diagnosticJointFloor": {
+      "pooledJointFloorReady": false,
+      "allReportedStrataJointFloorReady": false,
+      "failedStratumCount": 10,
+      "failedStrata": [
+        {
+          "recordingCount": 12,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        {
+          "recordingCount": 6,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        {
+          "recordingCount": 6,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        {
+          "recordingCount": 6,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        {
+          "recordingCount": 6,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        {
+          "recordingCount": 4,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        {
+          "recordingCount": 4,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        {
+          "recordingCount": 4,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        {
+          "recordingCount": 6,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        {
+          "recordingCount": 6,
+          "precision": 0.0,
+          "recall": 0.0
+        }
+      ]
+    },
+    "energyRobustnessReady": false
+  },
+  "targetPitchAbsence": {
+    "frozenThreshold": {
+      "feature": "targetPitchFrameRatio",
+      "threshold": 0.0,
+      "selectionDomain": "r2-01 waveform-injection-v2 (3 seeds)",
+      "qualifyingDevelopmentThresholdCount": 1,
+      "syntheticDevelopment": {
+        "truePositive": 11,
+        "falsePositive": 0,
+        "falseNegative": 4,
+        "trueNegative": 186,
+        "precision": 1.0,
+        "recall": 0.733333,
+        "jointFloorReady": true
+      }
+    },
+    "round5Diagnostic": {
+      "pooled": {
+        "recordingCount": 12,
+        "scorePositionCount": 672,
+        "signedPositiveCount": 12,
+        "signedConfusionNegativeCount": 24,
+        "assignmentGapCount": 65,
+        "flagCount": 54,
+        "signedConfusionFalsePositiveCount": 1,
+        "truePositive": 5,
+        "falsePositive": 49,
+        "falseNegative": 7,
+        "trueNegative": 611,
+        "precision": 0.092593,
+        "recall": 0.416667,
+        "jointFloorReady": false,
+        "takes": [
+          {
+            "take": "r5-cal-01",
+            "assignmentGapCount": 7,
+            "truePositive": 1,
+            "falsePositive": 3,
+            "falseNegative": 0,
+            "trueNegative": 52,
+            "precision": 0.25,
+            "recall": 1.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-cal-02",
+            "assignmentGapCount": 7,
+            "truePositive": 1,
+            "falsePositive": 5,
+            "falseNegative": 0,
+            "trueNegative": 50,
+            "precision": 0.166667,
+            "recall": 1.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-cal-03",
+            "assignmentGapCount": 7,
+            "truePositive": 0,
+            "falsePositive": 7,
+            "falseNegative": 1,
+            "trueNegative": 48,
+            "precision": 0.0,
+            "recall": 0.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-cal-04",
+            "assignmentGapCount": 5,
+            "truePositive": 1,
+            "falsePositive": 3,
+            "falseNegative": 0,
+            "trueNegative": 52,
+            "precision": 0.25,
+            "recall": 1.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-cal-05",
+            "assignmentGapCount": 7,
+            "truePositive": 1,
+            "falsePositive": 4,
+            "falseNegative": 0,
+            "trueNegative": 51,
+            "precision": 0.2,
+            "recall": 1.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-cal-06",
+            "assignmentGapCount": 5,
+            "truePositive": 0,
+            "falsePositive": 4,
+            "falseNegative": 1,
+            "trueNegative": 51,
+            "precision": 0.0,
+            "recall": 0.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-fresh-01",
+            "assignmentGapCount": 8,
+            "truePositive": 0,
+            "falsePositive": 8,
+            "falseNegative": 1,
+            "trueNegative": 47,
+            "precision": 0.0,
+            "recall": 0.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-fresh-02",
+            "assignmentGapCount": 4,
+            "truePositive": 0,
+            "falsePositive": 3,
+            "falseNegative": 1,
+            "trueNegative": 52,
+            "precision": 0.0,
+            "recall": 0.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-fresh-03",
+            "assignmentGapCount": 5,
+            "truePositive": 0,
+            "falsePositive": 5,
+            "falseNegative": 1,
+            "trueNegative": 50,
+            "precision": 0.0,
+            "recall": 0.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-fresh-04",
+            "assignmentGapCount": 4,
+            "truePositive": 1,
+            "falsePositive": 2,
+            "falseNegative": 0,
+            "trueNegative": 53,
+            "precision": 0.333333,
+            "recall": 1.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-fresh-05",
+            "assignmentGapCount": 4,
+            "truePositive": 0,
+            "falsePositive": 4,
+            "falseNegative": 1,
+            "trueNegative": 51,
+            "precision": 0.0,
+            "recall": 0.0,
+            "jointFloorReady": false
+          },
+          {
+            "take": "r5-fresh-06",
+            "assignmentGapCount": 2,
+            "truePositive": 0,
+            "falsePositive": 1,
+            "falseNegative": 1,
+            "trueNegative": 54,
+            "precision": 0.0,
+            "recall": 0.0,
+            "jointFloorReady": false
+          }
+        ]
+      },
+      "split": {
+        "calibration": {
+          "recordingCount": 6,
+          "scorePositionCount": 336,
+          "signedPositiveCount": 6,
+          "signedConfusionNegativeCount": 12,
+          "assignmentGapCount": 38,
+          "flagCount": 30,
+          "signedConfusionFalsePositiveCount": 1,
+          "truePositive": 4,
+          "falsePositive": 26,
+          "falseNegative": 2,
+          "trueNegative": 304,
+          "precision": 0.133333,
+          "recall": 0.666667,
+          "jointFloorReady": false,
+          "takes": [
+            {
+              "take": "r5-cal-01",
+              "assignmentGapCount": 7,
+              "truePositive": 1,
+              "falsePositive": 3,
+              "falseNegative": 0,
+              "trueNegative": 52,
+              "precision": 0.25,
+              "recall": 1.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-02",
+              "assignmentGapCount": 7,
+              "truePositive": 1,
+              "falsePositive": 5,
+              "falseNegative": 0,
+              "trueNegative": 50,
+              "precision": 0.166667,
+              "recall": 1.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-03",
+              "assignmentGapCount": 7,
+              "truePositive": 0,
+              "falsePositive": 7,
+              "falseNegative": 1,
+              "trueNegative": 48,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-04",
+              "assignmentGapCount": 5,
+              "truePositive": 1,
+              "falsePositive": 3,
+              "falseNegative": 0,
+              "trueNegative": 52,
+              "precision": 0.25,
+              "recall": 1.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-05",
+              "assignmentGapCount": 7,
+              "truePositive": 1,
+              "falsePositive": 4,
+              "falseNegative": 0,
+              "trueNegative": 51,
+              "precision": 0.2,
+              "recall": 1.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-06",
+              "assignmentGapCount": 5,
+              "truePositive": 0,
+              "falsePositive": 4,
+              "falseNegative": 1,
+              "trueNegative": 51,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            }
+          ]
+        },
+        "fresh-blind": {
+          "recordingCount": 6,
+          "scorePositionCount": 336,
+          "signedPositiveCount": 6,
+          "signedConfusionNegativeCount": 12,
+          "assignmentGapCount": 27,
+          "flagCount": 24,
+          "signedConfusionFalsePositiveCount": 0,
+          "truePositive": 1,
+          "falsePositive": 23,
+          "falseNegative": 5,
+          "trueNegative": 307,
+          "precision": 0.041667,
+          "recall": 0.166667,
+          "jointFloorReady": false,
+          "takes": [
+            {
+              "take": "r5-fresh-01",
+              "assignmentGapCount": 8,
+              "truePositive": 0,
+              "falsePositive": 8,
+              "falseNegative": 1,
+              "trueNegative": 47,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-02",
+              "assignmentGapCount": 4,
+              "truePositive": 0,
+              "falsePositive": 3,
+              "falseNegative": 1,
+              "trueNegative": 52,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-03",
+              "assignmentGapCount": 5,
+              "truePositive": 0,
+              "falsePositive": 5,
+              "falseNegative": 1,
+              "trueNegative": 50,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-04",
+              "assignmentGapCount": 4,
+              "truePositive": 1,
+              "falsePositive": 2,
+              "falseNegative": 0,
+              "trueNegative": 53,
+              "precision": 0.333333,
+              "recall": 1.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-05",
+              "assignmentGapCount": 4,
+              "truePositive": 0,
+              "falsePositive": 4,
+              "falseNegative": 1,
+              "trueNegative": 51,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-06",
+              "assignmentGapCount": 2,
+              "truePositive": 0,
+              "falsePositive": 1,
+              "falseNegative": 1,
+              "trueNegative": 54,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            }
+          ]
+        }
+      },
+      "performerId": {
+        "performer-1": {
+          "recordingCount": 6,
+          "scorePositionCount": 336,
+          "signedPositiveCount": 6,
+          "signedConfusionNegativeCount": 12,
+          "assignmentGapCount": 38,
+          "flagCount": 33,
+          "signedConfusionFalsePositiveCount": 1,
+          "truePositive": 2,
+          "falsePositive": 31,
+          "falseNegative": 4,
+          "trueNegative": 299,
+          "precision": 0.060606,
+          "recall": 0.333333,
+          "jointFloorReady": false,
+          "takes": [
+            {
+              "take": "r5-cal-01",
+              "assignmentGapCount": 7,
+              "truePositive": 1,
+              "falsePositive": 3,
+              "falseNegative": 0,
+              "trueNegative": 52,
+              "precision": 0.25,
+              "recall": 1.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-03",
+              "assignmentGapCount": 7,
+              "truePositive": 0,
+              "falsePositive": 7,
+              "falseNegative": 1,
+              "trueNegative": 48,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-05",
+              "assignmentGapCount": 7,
+              "truePositive": 1,
+              "falsePositive": 4,
+              "falseNegative": 0,
+              "trueNegative": 51,
+              "precision": 0.2,
+              "recall": 1.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-01",
+              "assignmentGapCount": 8,
+              "truePositive": 0,
+              "falsePositive": 8,
+              "falseNegative": 1,
+              "trueNegative": 47,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-03",
+              "assignmentGapCount": 5,
+              "truePositive": 0,
+              "falsePositive": 5,
+              "falseNegative": 1,
+              "trueNegative": 50,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-05",
+              "assignmentGapCount": 4,
+              "truePositive": 0,
+              "falsePositive": 4,
+              "falseNegative": 1,
+              "trueNegative": 51,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            }
+          ]
+        },
+        "performer-2": {
+          "recordingCount": 6,
+          "scorePositionCount": 336,
+          "signedPositiveCount": 6,
+          "signedConfusionNegativeCount": 12,
+          "assignmentGapCount": 27,
+          "flagCount": 21,
+          "signedConfusionFalsePositiveCount": 0,
+          "truePositive": 3,
+          "falsePositive": 18,
+          "falseNegative": 3,
+          "trueNegative": 312,
+          "precision": 0.142857,
+          "recall": 0.5,
+          "jointFloorReady": false,
+          "takes": [
+            {
+              "take": "r5-cal-02",
+              "assignmentGapCount": 7,
+              "truePositive": 1,
+              "falsePositive": 5,
+              "falseNegative": 0,
+              "trueNegative": 50,
+              "precision": 0.166667,
+              "recall": 1.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-04",
+              "assignmentGapCount": 5,
+              "truePositive": 1,
+              "falsePositive": 3,
+              "falseNegative": 0,
+              "trueNegative": 52,
+              "precision": 0.25,
+              "recall": 1.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-06",
+              "assignmentGapCount": 5,
+              "truePositive": 0,
+              "falsePositive": 4,
+              "falseNegative": 1,
+              "trueNegative": 51,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-02",
+              "assignmentGapCount": 4,
+              "truePositive": 0,
+              "falsePositive": 3,
+              "falseNegative": 1,
+              "trueNegative": 52,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-04",
+              "assignmentGapCount": 4,
+              "truePositive": 1,
+              "falsePositive": 2,
+              "falseNegative": 0,
+              "trueNegative": 53,
+              "precision": 0.333333,
+              "recall": 1.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-06",
+              "assignmentGapCount": 2,
+              "truePositive": 0,
+              "falsePositive": 1,
+              "falseNegative": 1,
+              "trueNegative": 54,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            }
+          ]
+        }
+      },
+      "deviceId": {
+        "device-1": {
+          "recordingCount": 4,
+          "scorePositionCount": 224,
+          "signedPositiveCount": 4,
+          "signedConfusionNegativeCount": 8,
+          "assignmentGapCount": 26,
+          "flagCount": 21,
+          "signedConfusionFalsePositiveCount": 0,
+          "truePositive": 2,
+          "falsePositive": 19,
+          "falseNegative": 2,
+          "trueNegative": 201,
+          "precision": 0.095238,
+          "recall": 0.5,
+          "jointFloorReady": false,
+          "takes": [
+            {
+              "take": "r5-cal-01",
+              "assignmentGapCount": 7,
+              "truePositive": 1,
+              "falsePositive": 3,
+              "falseNegative": 0,
+              "trueNegative": 52,
+              "precision": 0.25,
+              "recall": 1.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-02",
+              "assignmentGapCount": 7,
+              "truePositive": 1,
+              "falsePositive": 5,
+              "falseNegative": 0,
+              "trueNegative": 50,
+              "precision": 0.166667,
+              "recall": 1.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-01",
+              "assignmentGapCount": 8,
+              "truePositive": 0,
+              "falsePositive": 8,
+              "falseNegative": 1,
+              "trueNegative": 47,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-02",
+              "assignmentGapCount": 4,
+              "truePositive": 0,
+              "falsePositive": 3,
+              "falseNegative": 1,
+              "trueNegative": 52,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            }
+          ]
+        },
+        "device-2": {
+          "recordingCount": 4,
+          "scorePositionCount": 224,
+          "signedPositiveCount": 4,
+          "signedConfusionNegativeCount": 8,
+          "assignmentGapCount": 21,
+          "flagCount": 19,
+          "signedConfusionFalsePositiveCount": 1,
+          "truePositive": 2,
+          "falsePositive": 17,
+          "falseNegative": 2,
+          "trueNegative": 203,
+          "precision": 0.105263,
+          "recall": 0.5,
+          "jointFloorReady": false,
+          "takes": [
+            {
+              "take": "r5-cal-03",
+              "assignmentGapCount": 7,
+              "truePositive": 0,
+              "falsePositive": 7,
+              "falseNegative": 1,
+              "trueNegative": 48,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-04",
+              "assignmentGapCount": 5,
+              "truePositive": 1,
+              "falsePositive": 3,
+              "falseNegative": 0,
+              "trueNegative": 52,
+              "precision": 0.25,
+              "recall": 1.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-03",
+              "assignmentGapCount": 5,
+              "truePositive": 0,
+              "falsePositive": 5,
+              "falseNegative": 1,
+              "trueNegative": 50,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-04",
+              "assignmentGapCount": 4,
+              "truePositive": 1,
+              "falsePositive": 2,
+              "falseNegative": 0,
+              "trueNegative": 53,
+              "precision": 0.333333,
+              "recall": 1.0,
+              "jointFloorReady": false
+            }
+          ]
+        },
+        "device-3": {
+          "recordingCount": 4,
+          "scorePositionCount": 224,
+          "signedPositiveCount": 4,
+          "signedConfusionNegativeCount": 8,
+          "assignmentGapCount": 18,
+          "flagCount": 14,
+          "signedConfusionFalsePositiveCount": 0,
+          "truePositive": 1,
+          "falsePositive": 13,
+          "falseNegative": 3,
+          "trueNegative": 207,
+          "precision": 0.071429,
+          "recall": 0.25,
+          "jointFloorReady": false,
+          "takes": [
+            {
+              "take": "r5-cal-05",
+              "assignmentGapCount": 7,
+              "truePositive": 1,
+              "falsePositive": 4,
+              "falseNegative": 0,
+              "trueNegative": 51,
+              "precision": 0.2,
+              "recall": 1.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-06",
+              "assignmentGapCount": 5,
+              "truePositive": 0,
+              "falsePositive": 4,
+              "falseNegative": 1,
+              "trueNegative": 51,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-05",
+              "assignmentGapCount": 4,
+              "truePositive": 0,
+              "falsePositive": 4,
+              "falseNegative": 1,
+              "trueNegative": 51,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-06",
+              "assignmentGapCount": 2,
+              "truePositive": 0,
+              "falsePositive": 1,
+              "falseNegative": 1,
+              "trueNegative": 54,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            }
+          ]
+        }
+      },
+      "roomId": {
+        "room-1": {
+          "recordingCount": 6,
+          "scorePositionCount": 336,
+          "signedPositiveCount": 6,
+          "signedConfusionNegativeCount": 12,
+          "assignmentGapCount": 38,
+          "flagCount": 30,
+          "signedConfusionFalsePositiveCount": 1,
+          "truePositive": 4,
+          "falsePositive": 26,
+          "falseNegative": 2,
+          "trueNegative": 304,
+          "precision": 0.133333,
+          "recall": 0.666667,
+          "jointFloorReady": false,
+          "takes": [
+            {
+              "take": "r5-cal-01",
+              "assignmentGapCount": 7,
+              "truePositive": 1,
+              "falsePositive": 3,
+              "falseNegative": 0,
+              "trueNegative": 52,
+              "precision": 0.25,
+              "recall": 1.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-02",
+              "assignmentGapCount": 7,
+              "truePositive": 1,
+              "falsePositive": 5,
+              "falseNegative": 0,
+              "trueNegative": 50,
+              "precision": 0.166667,
+              "recall": 1.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-03",
+              "assignmentGapCount": 7,
+              "truePositive": 0,
+              "falsePositive": 7,
+              "falseNegative": 1,
+              "trueNegative": 48,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-04",
+              "assignmentGapCount": 5,
+              "truePositive": 1,
+              "falsePositive": 3,
+              "falseNegative": 0,
+              "trueNegative": 52,
+              "precision": 0.25,
+              "recall": 1.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-05",
+              "assignmentGapCount": 7,
+              "truePositive": 1,
+              "falsePositive": 4,
+              "falseNegative": 0,
+              "trueNegative": 51,
+              "precision": 0.2,
+              "recall": 1.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-cal-06",
+              "assignmentGapCount": 5,
+              "truePositive": 0,
+              "falsePositive": 4,
+              "falseNegative": 1,
+              "trueNegative": 51,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            }
+          ]
+        },
+        "room-2": {
+          "recordingCount": 6,
+          "scorePositionCount": 336,
+          "signedPositiveCount": 6,
+          "signedConfusionNegativeCount": 12,
+          "assignmentGapCount": 27,
+          "flagCount": 24,
+          "signedConfusionFalsePositiveCount": 0,
+          "truePositive": 1,
+          "falsePositive": 23,
+          "falseNegative": 5,
+          "trueNegative": 307,
+          "precision": 0.041667,
+          "recall": 0.166667,
+          "jointFloorReady": false,
+          "takes": [
+            {
+              "take": "r5-fresh-01",
+              "assignmentGapCount": 8,
+              "truePositive": 0,
+              "falsePositive": 8,
+              "falseNegative": 1,
+              "trueNegative": 47,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-02",
+              "assignmentGapCount": 4,
+              "truePositive": 0,
+              "falsePositive": 3,
+              "falseNegative": 1,
+              "trueNegative": 52,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-03",
+              "assignmentGapCount": 5,
+              "truePositive": 0,
+              "falsePositive": 5,
+              "falseNegative": 1,
+              "trueNegative": 50,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-04",
+              "assignmentGapCount": 4,
+              "truePositive": 1,
+              "falsePositive": 2,
+              "falseNegative": 0,
+              "trueNegative": 53,
+              "precision": 0.333333,
+              "recall": 1.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-05",
+              "assignmentGapCount": 4,
+              "truePositive": 0,
+              "falsePositive": 4,
+              "falseNegative": 1,
+              "trueNegative": 51,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            },
+            {
+              "take": "r5-fresh-06",
+              "assignmentGapCount": 2,
+              "truePositive": 0,
+              "falsePositive": 1,
+              "falseNegative": 1,
+              "trueNegative": 54,
+              "precision": 0.0,
+              "recall": 0.0,
+              "jointFloorReady": false
+            }
+          ]
+        }
+      }
+    },
+    "diagnosticJointFloor": {
+      "pooledJointFloorReady": false,
+      "allReportedStrataJointFloorReady": false,
+      "failedStratumCount": 10,
+      "failedStrata": [
+        {
+          "recordingCount": 12,
+          "precision": 0.092593,
+          "recall": 0.416667
+        },
+        {
+          "recordingCount": 6,
+          "precision": 0.133333,
+          "recall": 0.666667
+        },
+        {
+          "recordingCount": 6,
+          "precision": 0.041667,
+          "recall": 0.166667
+        },
+        {
+          "recordingCount": 6,
+          "precision": 0.060606,
+          "recall": 0.333333
+        },
+        {
+          "recordingCount": 6,
+          "precision": 0.142857,
+          "recall": 0.5
+        },
+        {
+          "recordingCount": 4,
+          "precision": 0.095238,
+          "recall": 0.5
+        },
+        {
+          "recordingCount": 4,
+          "precision": 0.105263,
+          "recall": 0.5
+        },
+        {
+          "recordingCount": 4,
+          "precision": 0.071429,
+          "recall": 0.25
+        },
+        {
+          "recordingCount": 6,
+          "precision": 0.133333,
+          "recall": 0.666667
+        },
+        {
+          "recordingCount": 6,
+          "precision": 0.041667,
+          "recall": 0.166667
+        }
+      ]
+    },
+    "targetPitchRobustnessReady": false
+  },
+  "sourceBinding": {
+    "hashAlgorithm": "sha256",
+    "fileCount": 36,
+    "aggregateSha256": "8cccbebbb923766d532a0512c5f1e107102c3b2d63a86baf0162fa8c3851c365",
+    "files": [
+      {
+        "path": "data/experiments/western-strings-injected-errors/r2-01-injected-v2-20260717.labels.json",
+        "sha256": "5e794cf40116231968757269e38136cb51f0512ad385f265eb6cc49ff5b942ab",
+        "hashMode": "lf-normalized-sha256"
+      },
+      {
+        "path": "data/experiments/western-strings-injected-errors/r2-01-injected-v2-20260717.wav",
+        "sha256": "e2c46ccdee48f62c30f7d092eb3f0faa66259a5a68950dbd96b5882da728941c",
+        "hashMode": "raw-sha256"
+      },
+      {
+        "path": "data/experiments/western-strings-injected-errors/r2-01-injected-v2-20260718.labels.json",
+        "sha256": "c62295faa2a5fb392c2180b136a4bd7d77e47aeca4729d3d7ed7dfa99b87a1da",
+        "hashMode": "lf-normalized-sha256"
+      },
+      {
+        "path": "data/experiments/western-strings-injected-errors/r2-01-injected-v2-20260718.wav",
+        "sha256": "9ef4cec64c6a8dd8eac743209572e7a8249f7cdaa5eae564f32fb4eea7bf0d55",
+        "hashMode": "raw-sha256"
+      },
+      {
+        "path": "data/experiments/western-strings-injected-errors/r2-01-injected-v2-20260719.labels.json",
+        "sha256": "cd2525cacf507b77b0ecd2116afb1f33681d6ce82ee185a910100a379225e259",
+        "hashMode": "lf-normalized-sha256"
+      },
+      {
+        "path": "data/experiments/western-strings-injected-errors/r2-01-injected-v2-20260719.wav",
+        "sha256": "8ad36a2c617cfc344348d6ecfaccf946a683cef5700cee03a409d30d4f6e3b34",
+        "hashMode": "raw-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round2/r2-01.musicxml",
+        "sha256": "c8452070f5bc54c04cc86de128175a0acac5bfa176ccadb99fdf5f0c9a0edbf2",
+        "hashMode": "lf-normalized-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/manifest.csv",
+        "sha256": "c6ed88403a7d8b8231a4b06009b0b2edb5fbdb9ad8a583d5e119afaa96c02cfb",
+        "hashMode": "lf-normalized-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/position-truth.json",
+        "sha256": "74d5c522f7453b74ef4f9e9bfe67973530037fa02d90b36ae304b5ba33b065dd",
+        "hashMode": "lf-normalized-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-01.m4a",
+        "sha256": "13686f8b459ec15fc60e93aedecd44cd7c2ecfce0e7e8f9e0cd0c860bf913647",
+        "hashMode": "raw-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-01.musicxml",
+        "sha256": "b42a26978e403779e29bd9159c14032392a18a162b0edd8884857d85e95c4afc",
+        "hashMode": "lf-normalized-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-02.m4a",
+        "sha256": "9b002cc35da30be6f9bb6fae3a0fb4561e8ba99805e9c162b5ecd47f9b890d37",
+        "hashMode": "raw-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-02.musicxml",
+        "sha256": "241dc6a9ed7f0dfbce8393b1398755d368869387b21c610d75dc0b5de64dea7d",
+        "hashMode": "lf-normalized-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-03.m4a",
+        "sha256": "d2006c9b3e290fd112f0c573ebe42351f4804b98783507dfc2c13bc3fccf1907",
+        "hashMode": "raw-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-03.musicxml",
+        "sha256": "64e73bd06cbb761a201dd93ad45b94d4bf3d88e236c574fa45d82f90d8f83925",
+        "hashMode": "lf-normalized-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-04.m4a",
+        "sha256": "bec3933b2ac76617767098b21202222221dbaa9416f2e1aa101475192d9f943f",
+        "hashMode": "raw-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-04.musicxml",
+        "sha256": "bb38ed4e5498494f295d8ef2bc48998d1b00ae434fdbeedc37dbd76f3f812647",
+        "hashMode": "lf-normalized-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-05.m4a",
+        "sha256": "e36030eff68d46112f93eff2f91f6d5f3e4a065b28e6f5b4239c53052534a0da",
+        "hashMode": "raw-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-05.musicxml",
+        "sha256": "63298505a54c546b0a01490d742085964d23032bc5fbf197dc3f09c56f619c0a",
+        "hashMode": "lf-normalized-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-06.m4a",
+        "sha256": "94b04d1e7a4190d556d7c89bcd256286765866ead36402bf7e6e441d745d5104",
+        "hashMode": "raw-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-cal-06.musicxml",
+        "sha256": "e3bfea6a86a2c7ddad8e3803d3f6dd05437a36eaf086fd895023f74206f4f1da",
+        "hashMode": "lf-normalized-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-01.m4a",
+        "sha256": "6c4dc63cd92377bff4eb5ff1bd8a1a771da2cd8c0acf11c045bf45f9daeb0c6e",
+        "hashMode": "raw-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-01.musicxml",
+        "sha256": "677b955a95beee25f160bd4338f7ff8af4bf8c79d071f226242c6d6e4490fec1",
+        "hashMode": "lf-normalized-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-02.m4a",
+        "sha256": "9d0d87910d138c8f2aa2ee149b6765da18c9227238a51ef026e561436399598a",
+        "hashMode": "raw-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-02.musicxml",
+        "sha256": "804a244e102b23a3b7f569fc4ec8c6926caac0ea606fcdd4d3c1fc2d84a2d3a6",
+        "hashMode": "lf-normalized-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-03.m4a",
+        "sha256": "753d9899170854bf7146197b50ef1868f704355ae1b32c4af14b818e3cd0d587",
+        "hashMode": "raw-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-03.musicxml",
+        "sha256": "f7e2fa8d501e9652832f860d79088e2c5eccffa3303ff5eac0d65945c7c30f56",
+        "hashMode": "lf-normalized-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-04.m4a",
+        "sha256": "ccc03e241761697c4c787ec3374225ab322c8c0c76b56ba5e6101caf5d5239f9",
+        "hashMode": "raw-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-04.musicxml",
+        "sha256": "18a3da68f95cd99db4c94c50c06e7dc50a62383975183422994ef205bf1dee32",
+        "hashMode": "lf-normalized-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-05.m4a",
+        "sha256": "9fc6051ddfc8d61e775ad5911b9b73d24f83d99e2fe177aae5dcc6ab22d21ad7",
+        "hashMode": "raw-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-05.musicxml",
+        "sha256": "42c4ce95faece9a0f78df40e1fc427afb7ead79f33a421ac1044a9fc82f761c8",
+        "hashMode": "lf-normalized-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-06.m4a",
+        "sha256": "b8172db7135b4cc58393ca73ed2a498f6f9eefb6a8a270b8a8c2af08d3a034ec",
+        "hashMode": "raw-sha256"
+      },
+      {
+        "path": "data/private/western-strings-round5/r5-fresh-06.musicxml",
+        "sha256": "ead71987f2de087ab5e95bf72d3c08e574b4bb743240bb5805fbe1c5b339b0a4",
+        "hashMode": "lf-normalized-sha256"
+      },
+      {
+        "path": "scripts/experiments/audit_western_round5_policy_c_waveform_robustness.py",
+        "sha256": "1bf47deed1ec83d8d309063a152986f5f9dfce8ccf46bb2ac489be1d316a588b",
+        "hashMode": "lf-normalized-sha256"
+      },
+      {
+        "path": "scripts/experiments/eval_western_policy_c_waveform_absence.py",
+        "sha256": "7be9b6849544da8e712c8317ff8238ce92f004cf3a835323fb87d52672816d8a",
+        "hashMode": "lf-normalized-sha256"
+      },
+      {
+        "path": "scripts/experiments/train_western_round5_segment_edit_path.py",
+        "sha256": "145f7d744b65557e7d304926833e385ecc4bf867ad8e3cbc035a7903bc481f92",
+        "hashMode": "lf-normalized-sha256"
+      }
+    ]
+  },
+  "blockingReasons": [
+    "round5-consumed-diagnostic-not-promotion-evidence",
+    "round5-position-targets-score-context-confounded",
+    "round5-room-perfectly-confounded-with-split",
+    "independent-cross-performer-device-fresh-evidence-missing",
+    "frozen-waveform-energy-cross-domain-joint-floor-failed",
+    "frozen-target-pitch-cross-domain-joint-floor-failed"
+  ]
+}

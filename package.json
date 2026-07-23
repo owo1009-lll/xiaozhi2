@@ -270,6 +270,8 @@
     "test:western-segment-onset-candidate": "py -3.11 scripts\\test-western-segment-onset-candidate.py",
     "western:policy-c-waveform-absence": "py -3.11 scripts\\experiments\\eval_western_policy_c_waveform_absence.py",
     "test:western-policy-c-waveform-absence": "py -3.11 scripts\\test-western-policy-c-waveform-absence.py",
+    "western:round5-policy-c-waveform-robustness": "py -3.11 scripts\\experiments\\audit_western_round5_policy_c_waveform_robustness.py",
+    "test:western-round5-policy-c-waveform-robustness": "py -3.11 scripts\\test-western-round5-policy-c-waveform-robustness.py",
     "western:round5-targeted-intake": "py -3.11 scripts\\status_western_round5_targeted_intake.py",
     "test:western-round5-targeted-intake": "py -3.11 scripts\\test-western-round5-targeted-intake.py",
     "western:round5-capture-pack": "node scripts\\generate-western-round5-targeted-capture-pack.mjs",
