@@ -60,11 +60,14 @@
       <view class="rec-done">
         <view class="done-icon">✓</view>
         <view>
-          <view class="done-title">录音已保存</view>
-          <view class="done-meta">共 {{ recordSeconds }} 秒，可以提交了</view>
+          <view class="done-title">{{ audioSource === 'file' ? '录音文件已添加' : '录音已保存' }}</view>
+          <view class="done-meta">{{ audioSource === 'file' ? recordedName : '共 ' + recordSeconds + ' 秒，可以提交了' }}</view>
         </view>
       </view>
-      <view class="redo-button" bindtap="toggleRecord">重新录制</view>
+      <view class="record-actions">
+        <view class="redo-button" bindtap="toggleRecord">重新录制</view>
+        <view class="file-button" bindtap="chooseAudioFile">更换文件</view>
+      </view>
     </block>
 
     <block wx:else>
@@ -75,6 +78,14 @@
         <view class="rec-start-text">{{ recordStarting ? '正在请求麦克风权限…' : '点击红色按钮开始录音' }}</view>
         <view class="rec-tip">建议安静环境，完整演奏一遍</view>
         <view wx:if="{{ recordError }}" class="rec-error">{{ recordError }}</view>
+      </view>
+      <view class="audio-divider"><text>或</text></view>
+      <view class="audio-file-entry" bindtap="chooseAudioFile">
+        <text class="audio-file-icon">＋</text>
+        <view>
+          <view class="audio-file-title">添加录音文件</view>
+          <view class="audio-file-hint">从微信文件选择，支持 MP3 / M4A / WAV / AAC</view>
+        </view>
       </view>
     </block>
   </view>

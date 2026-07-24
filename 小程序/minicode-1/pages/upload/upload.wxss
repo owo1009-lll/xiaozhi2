@@ -133,7 +133,7 @@
 .rec-time { font-size: 58rpx; color: #FFFFFF; font-weight: 700; font-variant-numeric: tabular-nums; }
 .time-unit { font-size: 22rpx; color: #AAA197; font-weight: 400; }
 .rec-hint { color: #AAA197; font-size: 23rpx; margin-top: 2rpx; }
-.stop-button, .redo-button {
+.stop-button, .redo-button, .file-button {
   border: 1rpx solid rgba(255,255,255,.2);
   color: #F6F0E7;
   border-radius: 16rpx;
@@ -155,7 +155,56 @@
   font-size: 33rpx;
 }
 .done-title { color: #F8F4EC; font-size: 29rpx; font-weight: 700; }
-.done-meta { color: #AAA197; font-size: 22rpx; margin-top: 2rpx; }
+.done-meta {
+  max-width: 500rpx;
+  color: #AAA197;
+  font-size: 22rpx;
+  margin-top: 2rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.record-actions { display: flex; gap: 14rpx; }
+.record-actions .redo-button,
+.record-actions .file-button { flex: 1; }
+.audio-divider {
+  display: flex;
+  align-items: center;
+  gap: 15rpx;
+  color: #817A73;
+  font-size: 19rpx;
+  margin: 17rpx 0;
+}
+.audio-divider::before,
+.audio-divider::after {
+  content: "";
+  flex: 1;
+  height: 1rpx;
+  background: rgba(255,255,255,.12);
+}
+.audio-file-entry {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 20rpx;
+  border: 1rpx dashed rgba(255,255,255,.24);
+  border-radius: 16rpx;
+  background: rgba(255,255,255,.04);
+}
+.audio-file-icon {
+  width: 52rpx;
+  height: 52rpx;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #F8F4EC;
+  background: rgba(255,255,255,.1);
+  border-radius: 50%;
+  font-size: 32rpx;
+}
+.audio-file-title { color: #F8F4EC; font-size: 25rpx; font-weight: 650; }
+.audio-file-hint { color: #9F968D; font-size: 20rpx; margin-top: 2rpx; }
 
 .photo-card { padding: 26rpx 28rpx; }
 .optional-badge {

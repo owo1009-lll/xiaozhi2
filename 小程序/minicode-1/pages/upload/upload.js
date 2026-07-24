@@ -1,6 +1,13 @@
 const api = require("../../utils/api.js");
 const recorder = wx.getRecorderManager();
 const CONTENT_SAFETY_TICKETS_KEY = "pendingContentSafetyTickets";
+const AUDIO_FILE_MIME_TYPES = {
+  mp3: "audio/mpeg",
+  m4a: "audio/mp4",
+  wav: "audio/wav",
+  aac: "audio/aac"
+};
+const MAX_AUDIO_FILE_BYTES = 40 * 1024 * 1024;
 
 Page({
   data: {
@@ -13,6 +20,9 @@ Page({
     recording: false,
     recordStarting: false,
     recordedPath: "",
+    recordedName: "",
+    recordedMimeType: "",
+    audioSource: "",
     photoPath: "",
     recordSeconds: 0,
     recordError: "",
@@ -32,6 +42,9 @@ Page({
         recording: true,
         recordStarting: false,
         recordedPath: "",
+        recordedName: "",
+        recordedMimeType: "",
+        audioSource: "recording",
         recordSeconds: 0,
         recordError: ""
       });
@@ -53,6 +66,9 @@ Page({
         recording: false,
         recordStarting: false,
         recordedPath: res.tempFilePath,
+        recordedName: "practice.mp3",
+        recordedMimeType: "audio/mpeg",
+        audioSource: "recording",
         recordError: ""
       });
     });
@@ -222,6 +238,43 @@ Page({
     this.setData({ photoPath: "" });
   },
 
+  chooseAudioFile() {
+    if (this.data.recording || this.data.recordStarting) return;
+    wx.chooseMessageFile({
+      count: 1,
+      type: "file",
+      extension: Object.keys(AUDIO_FILE_MIME_TYPES),
+      success: (res) => {
+        const file = res.tempFiles && res.tempFiles[0];
+        const filePath = file && (file.path || file.tempFilePath);
+        const fileName = String((file && file.name) || "practice.mp3");
+        const extension = ((fileName.match(/\.([a-zA-Z0-9]+)$/) || [])[1] || "").toLowerCase();
+        if (!filePath || !AUDIO_FILE_MIME_TYPES[extension]) {
+          wx.showToast({ title: "请选择 MP3、M4A、WAV 或 AAC 文件", icon: "none" });
+          return;
+        }
+        if (Number(file.size) > MAX_AUDIO_FILE_BYTES) {
+          wx.showToast({ title: "录音文件不能超过 40MB", icon: "none" });
+          return;
+        }
+        this.setData({
+          recordedPath: filePath,
+          recordedName: fileName,
+          recordedMimeType: AUDIO_FILE_MIME_TYPES[extension],
+          audioSource: "file",
+          recordSeconds: 0,
+          recordError: ""
+        });
+      },
+      fail: (error) => {
+        const detail = String((error && error.errMsg) || "");
+        if (!/cancel/i.test(detail)) {
+          wx.showToast({ title: "录音文件选择失败", icon: "none" });
+        }
+      }
+    });
+  },
+
   pendingContentSafetyTickets() {
     const tickets = wx.getStorageSync(CONTENT_SAFETY_TICKETS_KEY);
     return Array.isArray(tickets) ? tickets.filter(Boolean) : [];
@@ -281,7 +334,10 @@ Page({
       piece: this.data.piece.trim(),
       pieceId: this.data.selectedPieceId,
       instrument: this.data.instrument,
-      audioSubmission: { name: "practice.mp3", mimeType: "audio/mpeg" }
+      audioSubmission: {
+        name: this.data.recordedName || "practice.mp3",
+        mimeType: this.data.recordedMimeType || "audio/mpeg"
+      }
     };
     if (this.data.photoPath) {
       try {
@@ -308,6 +364,9 @@ Page({
             submitting: false,
             notice: "内容安全审核中，审核通过后会出现在「记录」里。",
             recordedPath: "",
+            recordedName: "",
+            recordedMimeType: "",
+            audioSource: "",
             photoPath: "",
             piece: "",
             selectedPieceId: "",
@@ -319,6 +378,9 @@ Page({
             submitting: false,
             notice: "提交成功!老师复核后,反馈会出现在下面和「记录」里。",
             recordedPath: "",
+            recordedName: "",
+            recordedMimeType: "",
+            audioSource: "",
             photoPath: "",
             piece: "",
             selectedPieceId: "",
