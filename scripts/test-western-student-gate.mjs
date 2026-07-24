@@ -37,9 +37,11 @@ const parsed = parseStudentAnalysisPayload({
   studentRef: " stu-abc ",
   instrument: "violin",
   piece: "Kayser Op.20 No.3",
+  pieceId: "bwv1001-mov1",
 });
 assert.equal(parsed.studentRef, "stu-abc");
 assert.equal(parsed.instrument, "violin");
+assert.equal(parsed.pieceId, "bwv1001-mov1");
 
 // 4. End-to-end in a temp repo root: submit, triage, release, list.
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ws-student-gate-"));
@@ -51,6 +53,7 @@ const intake = await buildWesternStudentAnalysis({
   submissionPayload: {
     studentRef: "stu-abc",
     piece: "Kayser Op.20 No.3",
+    pieceId: "bwv1001-mov1",
     instrument: "violin",
     audioPath: sourceAudio,
     audioSubmission: { name: "take.wav", mimeType: "audio/wav" },
@@ -77,6 +80,7 @@ let listed = await listWesternStudentSubmissions({ repoRoot: tmp, studentRef: "s
 assert.equal(listed.total, 1, "student must only see their own submissions");
 assert.equal(listed.submissions[0].status, "queued");
 assert.equal(listed.submissions[0].teacherFeedback, "");
+assert.equal(listed.submissions[0].pieceId, "bwv1001-mov1");
 
 // The student view must stay a narrow projection — no analysis internals ever.
 const viewKeys = Object.keys(listed.submissions[0]).sort();
@@ -84,6 +88,7 @@ assert.deepEqual(viewKeys, [
   "instrument",
   "kind",
   "piece",
+  "pieceId",
   "status",
   "submissionId",
   "submittedAt",

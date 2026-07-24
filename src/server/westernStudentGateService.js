@@ -79,6 +79,7 @@ export function buildStudentSubmissionView(submission, latestReview = null) {
     submissionId: safeString(submission.submissionId).trim(),
     submittedAt: safeString(submission.submittedAt),
     piece: safeString(submission.piece),
+    pieceId: safeString(submission.pieceId),
     instrument: safeString(submission.instrument),
     kind: safeString(submission.kind, submission.scorePhotoPath ? "photo-score" : "clean-score"),
     status: studentStatusFrom(reviewAction, released),

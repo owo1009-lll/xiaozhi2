@@ -1809,6 +1809,7 @@ async function buildControlledSubmissionAnalysis(repoRoot, payload = {}) {
     scorePhotoSubmission: payload.scorePhotoSubmission || null,
     dataset: safeString(payload.dataset).trim(),
     piece: safeString(payload.piece).trim(),
+    pieceId: safeString(payload.pieceId).trim(),
     recordingId: safeString(payload.recordingId).trim(),
     instrument: safeString(payload.instrument).trim(),
     studentRef: safeString(payload.studentRef).trim(),
@@ -2764,6 +2765,7 @@ export function parseStudentAnalysisPayload(payload = {}) {
   return {
     dataset: safeString(payload.dataset).trim(),
     piece: safeString(payload.piece).trim(),
+    pieceId: safeString(payload.pieceId).trim(),
     limit: Math.max(0, Math.round(safeNumber(payload.limit, 0))),
     recordingId: safeString(payload.recordingId).trim(),
     instrument: safeString(payload.instrument).trim(),
