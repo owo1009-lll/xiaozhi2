@@ -49,6 +49,7 @@ export async function listSupportedEditions({ repoRoot = process.cwd() } = {}) {
     ok: true,
     editions: entries.map((entry) => ({
       pieceId: safeString(entry.pieceId),
+      scoreId: safeString(entry.scoreId),
       editionId: safeString(entry.editionId),
       title: safeString(entry.title),
       pageCount: Number(entry.pageCount) || 1,

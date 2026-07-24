@@ -43,6 +43,9 @@ assert.match(reviewScore, /"\/api\/strings\/score-editions"/);
 assert.match(reviewScore, /"\/api\/strings\/score-diagnosis"/);
 assert.match(reviewScore, /\bmeasureIssues\b/);
 assert.match(reviewScore, /\bnoteIssues\b/);
+assert.match(library, /edition\.scoreId/, "library must hide editions without an analyzable store score");
+assert.match(score, /setStorageSync\("selectedScoreId"/, "score selection must preserve the real store scoreId");
+assert.match(upload, /scoreId:\s*this\.data\.selectedScoreId/, "analyze payload must use the real store scoreId");
 
 const allowedPublicPaths = new Set([
   "/api/strings/analyze",

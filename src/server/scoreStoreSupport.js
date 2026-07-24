@@ -14,7 +14,7 @@ export function readScoreStoreLimits(env = process.env) {
     maxJobs: Math.max(50, Math.round(safeNumber(env.ERHU_SCORE_STORE_MAX_JOBS, 200))),
     maxDuplicateScores: Math.max(1, Math.round(safeNumber(env.ERHU_SCORE_STORE_MAX_DUPLICATE_SCORES, 2))),
     maxLegacyScoresPerTitle: Math.max(1, Math.round(safeNumber(env.ERHU_SCORE_STORE_MAX_LEGACY_SCORES_PER_TITLE, 1))),
-    maxTotalScores: Math.max(20, Math.round(safeNumber(env.ERHU_SCORE_STORE_MAX_TOTAL_SCORES, 40))),
+    maxTotalScores: Math.max(20, Math.round(safeNumber(env.ERHU_SCORE_STORE_MAX_TOTAL_SCORES, 100))),
   };
 }
 

@@ -13,6 +13,7 @@ Page({
   data: {
     piece: "",
     selectedPieceId: "",
+    selectedScoreId: "",
     instrument: "violin",
     instruments: ["小提琴", "中提琴", "大提琴"],
     instrumentIds: ["violin", "viola", "cello"],
@@ -81,10 +82,16 @@ Page({
   onShow() {
     const selected = wx.getStorageSync("selectedPiece");
     const selectedPieceId = wx.getStorageSync("selectedPieceId");
+    const selectedScoreId = wx.getStorageSync("selectedScoreId");
     if (selected) {
-      this.setData({ piece: selected, selectedPieceId: selectedPieceId || "" });
+      this.setData({
+        piece: selected,
+        selectedPieceId: selectedPieceId || "",
+        selectedScoreId: selectedScoreId || ""
+      });
       wx.removeStorageSync("selectedPiece");
       wx.removeStorageSync("selectedPieceId");
+      wx.removeStorageSync("selectedScoreId");
     }
     this.loadRecent();
     this.resumeContentSafetyChecks();
@@ -109,7 +116,7 @@ Page({
   },
 
   onPiece(e) {
-    this.setData({ piece: e.detail.value, selectedPieceId: "" });
+    this.setData({ piece: e.detail.value, selectedPieceId: "", selectedScoreId: "" });
   },
 
   onInstrument(e) {
@@ -328,12 +335,16 @@ Page({
     if (this.data.submitting) return;
     if (!this.data.piece.trim()) { wx.showToast({ title: "请先填曲名", icon: "none" }); return; }
     if (!this.data.recordedPath) { wx.showToast({ title: "请先录音", icon: "none" }); return; }
+    if (!this.data.selectedScoreId && !this.data.photoPath) {
+      wx.showToast({ title: "请从曲库选择可分析曲目或添加谱面照片", icon: "none" });
+      return;
+    }
     this.setData({ submitting: true, notice: "" });
     const payload = {
       studentRef: api.studentRef(),
       piece: this.data.piece.trim(),
       pieceId: this.data.selectedPieceId,
-      scoreId: this.data.selectedPieceId,
+      scoreId: this.data.selectedScoreId,
       instrument: this.data.instrument,
       audioSubmission: {
         name: this.data.recordedName || "practice.mp3",
@@ -371,6 +382,7 @@ Page({
             photoPath: "",
             piece: "",
             selectedPieceId: "",
+            selectedScoreId: "",
             recordSeconds: 0
           });
           this.checkContentSafetyTicket(res.moderationTicket, 0);
@@ -385,6 +397,7 @@ Page({
             photoPath: "",
             piece: "",
             selectedPieceId: "",
+            selectedScoreId: "",
             recordSeconds: 0
           });
           this.loadRecent();

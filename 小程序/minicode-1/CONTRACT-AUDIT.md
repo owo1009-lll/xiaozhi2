@@ -6,9 +6,9 @@
 
 | 学生接口 | 小程序请求/消费 | 后端契约 | 结论 |
 | --- | --- | --- | --- |
-| `POST /api/strings/analyze` | `multipart/form-data`；文件字段 `audio`；表单字段 `payload` 为 JSON。`utils/api.js` 在上传前写入 `clientPlatform="wechat-mini-program"` 和一次性 `wechatLoginCode`。业务字段包括 `studentRef`、`piece`、`pieceId`、`scoreId`、`instrument`、`audioSubmission`；内置曲目将同一标识同时作为 `pieceId`（学生展示/谱面定位）和 `scoreId`（后端受控分析选谱）；有谱图时附 `scorePhotoDataUrl`、`scorePhotoSubmission`。 | `parseIncomingPayload` 解析 `payload`；`parseStudentSubmission` 读取同名字段、持久化音频/谱图；微信来源调用内容安全。同步成功返回 `{ok, analysis}`，其中 `analysis.submissionAccepted=true`；异步图片审核返回 HTTP 202 与 `{moderationPending, moderationTicket}`。 | 一致。 |
+| `POST /api/strings/analyze` | `multipart/form-data`；文件字段 `audio`；表单字段 `payload` 为 JSON。`utils/api.js` 在上传前写入 `clientPlatform="wechat-mini-program"` 和一次性 `wechatLoginCode`。业务字段包括 `studentRef`、`piece`、`pieceId`、`scoreId`、`instrument`、`audioSubmission`；`pieceId` 用于学生展示/谱面定位，`scoreId` 使用 `score-editions` 返回的真实 `score-*` 存储标识，二者不得互相替代；有谱图时附 `scorePhotoDataUrl`、`scorePhotoSubmission`。 | `parseIncomingPayload` 解析 `payload`；`parseStudentSubmission` 读取同名字段、持久化音频/谱图；微信来源调用内容安全。同步成功返回 `{ok, analysis}`，其中 `analysis.submissionAccepted=true`；异步图片审核返回 HTTP 202 与 `{moderationPending, moderationTicket}`。 | 一致。 |
 | `GET /api/strings/student-submissions?studentRef=&limit=` | 上传页和记录页读取 `submissions`，使用 `submissionId`、`submittedAt`、`piece`、`pieceId`、`instrument`、`status`、`teacherFeedback`。 | `buildStudentSubmissionView` 返回上述字段，并额外返回 `kind`、`teacherFeedbackAt`。状态限定为 `queued`、`under_review`、`feedback_released`、`unsupported`。 | 一致；小程序不消费复核内部字段。 |
-| `GET /api/strings/score-editions` | 按 `pieceId` 选择 `editionId`、`title`、`meta`、`pageCount`。三首登记诊断谱面随包内置，其他曲目仍按接口字段读取。 | `listSupportedEditions` 返回 `{ok, editions[]}`，条目包含对应字段。 | 一致。 |
+| `GET /api/strings/score-editions` | 按 `pieceId` 选择 `scoreId`、`editionId`、`title`、`meta`、`pageCount`；曲库只展示 `scoreId` 非空的可分析条目，选曲时同时保存 `pieceId` 和真实 `scoreId`。 | `listSupportedEditions` 返回 `{ok, editions[]}`，条目包含对应字段；只有已导入后端谱库的登记项才具有 `scoreId`。 | 一致。 |
 | `GET /api/strings/score-diagnosis` | 发送 `pieceId`、`editionId`，合成测试附 `demo=1`；读取 `hasData`、`isDemo`、`measureIssues[].bbox/labels/measure`、`noteIssues[].bbox/label/verdict/measure`。 | `buildScoreDiagnosis` 返回相同形状；无数据时返回空数组并 `hasData=false`。 | 一致。 |
 
 内容安全状态轮询、只读谱面图片/坐标属于上述学生流程的配套公开资源。小程序源码不调用 `controlled-submissions`、`run-batch`、复核接口、ops 接口或 `/data`。

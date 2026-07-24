@@ -23,7 +23,7 @@ Page({
     api.get("/api/strings/score-editions")
       .then((result) => {
         const publicEditions = (result.editions || [])
-          .filter((edition) => edition.group !== "诊断练习曲");
+          .filter((edition) => edition.scoreId && edition.group !== "诊断练习曲");
         const repertoire = publicEditions.filter((edition) => edition.libraryCategory !== "exercise");
         const exercises = publicEditions.filter((edition) => edition.libraryCategory === "exercise");
         const groupEditions = (editions) => {

@@ -22,6 +22,7 @@ Page({
     editions: [],
     relatedEditions: [],
     currentId: "",
+    currentScoreId: "",
     currentEditionId: "",
     currentTitle: "",
     currentMeta: "",
@@ -71,6 +72,7 @@ Page({
         + "&page=" + (index + 1));
     this.setData({
       currentId: pieceId,
+      currentScoreId: edition.scoreId || "",
       currentEditionId: editionId,
       currentTitle: edition.title,
       currentMeta: edition.meta || (pageCount + "页"),
@@ -136,6 +138,7 @@ Page({
   chooseCurrent() {
     wx.setStorageSync("selectedPiece", this.data.currentTitle);
     wx.setStorageSync("selectedPieceId", this.data.currentId);
+    wx.setStorageSync("selectedScoreId", this.data.currentScoreId);
     wx.showToast({ title: "已选：" + this.data.currentTitle, icon: "none" });
     setTimeout(() => wx.switchTab({ url: "/pages/upload/upload" }), 500);
   },
