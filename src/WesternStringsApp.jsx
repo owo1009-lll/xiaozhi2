@@ -20,7 +20,12 @@ function fileTitle(file) {
   return file.name.replace(/\.(musicxml|xml|mxl|mid|midi)$/i, "");
 }
 
-function ReviewAssistPanel({ reviewAssist, rows = [] }) {
+function ReviewAssistPanel({
+  reviewAssist,
+  rows = [],
+  issueCategories = null,
+  onIssueCategoryChange = null,
+}) {
   if (!reviewAssist?.contract) return null;
   return (
     <div className="western-review-assist">
@@ -31,10 +36,29 @@ function ReviewAssistPanel({ reviewAssist, rows = [] }) {
       {rows.map((row) => (
         <span key={`${row.noteId}:${row.outputSemantic}`}>
           第 {row.measureIndex} 小节 · 拍位 {Number(row.beatStart || 0) + 1} · MIDI {row.midi ?? "?"} · {row.outputSemantic === "confirmed_issue" ? "机器确诊候选" : "建议自查"}
+          {onIssueCategoryChange ? (
+            <select
+              aria-label={`第 ${row.measureIndex} 小节问题类型`}
+              value={issueCategories?.[row.noteId] || ""}
+              onChange={(event) => onIssueCategoryChange(row, event.target.value)}
+            >
+              <option value="">不发布定位</option>
+              <option value="pitch">音准</option>
+              <option value="rhythm">节奏</option>
+              <option value="tone">音质</option>
+              <option value="missing">漏音 / 错音</option>
+            </select>
+          ) : null}
         </span>
       ))}
     </div>
   );
+}
+
+function getStudentIssueCandidateRows(submission) {
+  const distributedRows = submission?.latestAnalysis?.studentIssueCandidates;
+  if (Array.isArray(distributedRows) && distributedRows.length > 0) return distributedRows;
+  return submission?.latestAnalysis?.reviewAssistPreview || [];
 }
 
 export default function WesternStringsApp({ onBackToStudent }) {
@@ -62,6 +86,7 @@ export default function WesternStringsApp({ onBackToStudent }) {
   const [reviewSavingNoteId, setReviewSavingNoteId] = useState("");
   const [reviewMessage, setReviewMessage] = useState("");
   const [feedbackDrafts, setFeedbackDrafts] = useState({});
+  const [issueDrafts, setIssueDrafts] = useState({});
 
   const hasScoreInput = Boolean(job?.scoreId || scorePhotoFile);
 
@@ -228,14 +253,24 @@ export default function WesternStringsApp({ onBackToStudent }) {
     setReviewMessage("");
     setError("");
     try {
+      const categories = issueDrafts[submission.submissionId] || {};
+      const studentIssues = getStudentIssueCandidateRows(submission)
+        .filter((row) => categories[row.noteId])
+        .map((row) => ({
+          noteId: row.noteId,
+          noteIndex: row.noteIndex,
+          category: categories[row.noteId],
+        }));
       await saveWesternControlledSubmissionReview({
         submissionId: submission.submissionId,
         action: "feedback_released",
         studentMessage,
         releaseToStudent: true,
+        studentIssues,
       });
       setReviewMessage("Feedback released to the student page.");
       setFeedbackDrafts((drafts) => ({ ...drafts, [submission.submissionId]: "" }));
+      setIssueDrafts((drafts) => ({ ...drafts, [submission.submissionId]: {} }));
       await loadControlledSubmissionQueue();
     } catch (releaseError) {
       setError(releaseError?.message || "Feedback release failed.");
@@ -477,7 +512,17 @@ export default function WesternStringsApp({ onBackToStudent }) {
                     {submission.audioUrl ? <audio controls src={submission.audioUrl} /> : null}
                     <ReviewAssistPanel
                       reviewAssist={submission.latestAnalysis?.reviewAssist}
-                      rows={submission.latestAnalysis?.reviewAssistPreview}
+                      rows={getStudentIssueCandidateRows(submission)}
+                      issueCategories={issueDrafts[submission.submissionId] || {}}
+                      onIssueCategoryChange={(row, category) =>
+                        setIssueDrafts((drafts) => ({
+                          ...drafts,
+                          [submission.submissionId]: {
+                            ...(drafts[submission.submissionId] || {}),
+                            [row.noteId]: category,
+                          },
+                        }))
+                      }
                     />
                   </div>
                   <button

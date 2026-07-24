@@ -31,6 +31,7 @@ const ORDINARY_AUDIO_RUNTIME_CONFIG_SHA256 = "1f3a47f5cfe2b2d2e427be9a03ab43b4b4
 const ORDINARY_AUDIO_RUNTIME_LOCK_SHA256 = "4120a811da1ecb1aa93ceabcbb5aa0b45a37c08e5ee3138d2b793e38f2828d04";
 const ORDINARY_DYNAMIC_SHADOW_CACHE_ROOT = "data/experiments/western-strings-m3/offline-basic-pitch-cache/";
 export const ORDINARY_REVIEW_ASSIST_CONTRACT = "western-round4-policy-c-review-assist-v1";
+const STUDENT_SCORE_ISSUE_CATEGORIES = new Set(["pitch", "rhythm", "tone", "missing"]);
 const ORDINARY_DYNAMIC_SHADOW_POLICY = Object.freeze({
   deviationLimit: 0.15,
   minEventConfidence: 0.4,
@@ -123,6 +124,28 @@ function projectReviewAssistCandidate(candidate) {
       : Number(candidate.predictedOnsetSeconds),
     ...decision,
   };
+}
+
+function projectStudentIssueCandidates(candidates, limit = 100) {
+  const rows = Array.isArray(candidates) ? candidates : [];
+  if (rows.length <= limit) return rows.map(projectReviewAssistCandidate);
+  const selectedIndexes = new Set();
+  for (let index = 0; index < rows.length && selectedIndexes.size < limit; index += 1) {
+    if (rows[index]?.reviewAssistDecision?.outputSemantic === "confirmed_issue") {
+      selectedIndexes.add(index);
+    }
+  }
+  const remainingSlots = Math.max(0, limit - selectedIndexes.size);
+  for (let slot = 0; slot < remainingSlots; slot += 1) {
+    selectedIndexes.add(Math.round((slot * (rows.length - 1)) / Math.max(1, remainingSlots - 1)));
+  }
+  for (let index = 0; index < rows.length && selectedIndexes.size < limit; index += 1) {
+    selectedIndexes.add(index);
+  }
+  return [...selectedIndexes]
+    .sort((left, right) => left - right)
+    .slice(0, limit)
+    .map((index) => projectReviewAssistCandidate(rows[index]));
 }
 
 export const WESTERN_ALIGNMENT_METHOD_PREFERENCE = [
@@ -1883,6 +1906,9 @@ function decorateControlledSubmission(submission, latestReview = null, latestAna
         reviewAssistPreview: Array.isArray(latestAnalysis.item?.reviewAssistPreview)
           ? latestAnalysis.item.reviewAssistPreview
           : [],
+        studentIssueCandidates: Array.isArray(latestAnalysis.item?.studentIssueCandidates)
+          ? latestAnalysis.item.studentIssueCandidates
+          : [],
       }
       : null,
     audioUrl: submissionId ? `/api/strings/controlled-submissions/${encodeURIComponent(submissionId)}/audio` : "",
@@ -1956,6 +1982,28 @@ export async function recordWesternControlledSubmissionReview({ repoRoot = proce
   if (action === "feedback_released" && !safeString(payload.studentMessage).trim()) {
     throw new Error("feedback_released requires a studentMessage.");
   }
+  const requestedStudentIssues = action === "feedback_released" && Array.isArray(payload.studentIssues)
+    ? payload.studentIssues
+    : [];
+  if (requestedStudentIssues.length > 100) {
+    throw new Error("feedback_released accepts at most 100 studentIssues.");
+  }
+  const studentIssues = action === "feedback_released"
+    ? requestedStudentIssues
+      .map((issue) => ({
+        noteId: safeString(issue?.noteId).trim(),
+        noteIndex: Math.round(safeNumber(issue?.noteIndex, -1)),
+        category: safeString(issue?.category).trim(),
+      }))
+      .filter((issue) => (
+        /^xml-m-?\d+-n\d+$/i.test(issue.noteId)
+        && issue.noteIndex >= 0
+        && STUDENT_SCORE_ISSUE_CATEGORIES.has(issue.category)
+      ))
+    : [];
+  if (studentIssues.length !== requestedStudentIssues.length) {
+    throw new Error("studentIssues must contain a score noteId, noteIndex, and supported category.");
+  }
   const submission = await findWesternControlledSubmission({ repoRoot, submissionId });
   if (!submission) throw new Error("controlled submission not found.");
   const record = {
@@ -1969,6 +2017,7 @@ export async function recordWesternControlledSubmissionReview({ repoRoot = proce
     // reviewer explicitly releases it. Machine analysis never flows through.
     studentMessage: safeString(payload.studentMessage),
     releaseToStudent: payload.releaseToStudent === true,
+    studentIssues,
   };
   const outPath = controlledSubmissionReviewsPath(repoRoot);
   await fs.mkdir(path.dirname(outPath), { recursive: true });
@@ -2091,6 +2140,9 @@ async function buildControlledBatchItem(repoRoot, submission, gateSnapshot, {
     candidateGate: replay.candidateGate || null,
     candidatePreview: Array.isArray(replay.candidatePreview) ? replay.candidatePreview : [],
     reviewAssistPreview: Array.isArray(replay.reviewAssistPreview) ? replay.reviewAssistPreview : [],
+    studentIssueCandidates: Array.isArray(replay.studentIssueCandidates)
+      ? replay.studentIssueCandidates
+      : [],
     recordingDiagnosis: replay.recordingDiagnosis || null,
     photoScoreDecision: safeString(replay.photoScoreDecision),
     photoScoreAuditPath: safeString(replay.photoScoreAuditPath),
@@ -2384,6 +2436,7 @@ async function buildControlledBatchOfflineFeatureAnalysis(repoRoot, submission, 
       candidateGate,
       candidatePreview: gatedCandidateRows.slice(0, 5),
       reviewAssistPreview: reviewAssistRows.slice(0, 20).map(projectReviewAssistCandidate),
+      studentIssueCandidates: projectStudentIssueCandidates(reviewAssistRows),
       recordingDiagnosis: {
         mode: "offline_feature_dynamic_shadow_review_only",
         scoreId,

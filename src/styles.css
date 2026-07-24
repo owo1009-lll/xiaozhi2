@@ -211,7 +211,15 @@ button {
 }
 
 .western-review-assist span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 13px;
+}
+
+.western-review-assist select {
+  margin-left: auto;
+  min-width: 112px;
 }
 
 .western-diagnosis-row .western-feedback-release {

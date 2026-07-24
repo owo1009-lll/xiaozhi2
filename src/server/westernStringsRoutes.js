@@ -240,6 +240,10 @@ export function createWesternStringsRouter({
   router.get("/api/strings/score-editions", async (req, res) => {
     try {
       const result = await listSupportedEditions({ repoRoot });
+      const pieceId = safeString(req.query?.pieceId).trim();
+      if (pieceId) {
+        result.editions = result.editions.filter((edition) => edition.pieceId === pieceId);
+      }
       return res.json(result);
     } catch (error) {
       return res.status(500).json({ ok: false, error: safeString(error?.message, "failed to list supported score editions.") });
@@ -252,10 +256,12 @@ export function createWesternStringsRouter({
         repoRoot,
         pieceId: safeString(req.query?.pieceId),
         editionId: safeString(req.query?.editionId),
+        page: req.query?.page,
       });
       if (!renderPath) {
         return res.status(404).json({ ok: false, error: "score render not found for this piece." });
       }
+      res.set("Cache-Control", "public, max-age=86400, immutable");
       return res.sendFile(renderPath);
     } catch (error) {
       return res.status(500).json({ ok: false, error: safeString(error?.message, "failed to read score render.") });
@@ -284,6 +290,8 @@ export function createWesternStringsRouter({
         repoRoot,
         pieceId: safeString(req.query?.pieceId),
         editionId: safeString(req.query?.editionId),
+        submissionId: safeString(req.query?.submissionId),
+        demo: safeString(req.query?.demo) === "1",
       });
       return res.json(result);
     } catch (error) {

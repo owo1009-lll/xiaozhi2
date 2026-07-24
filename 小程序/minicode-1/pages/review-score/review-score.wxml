@@ -2,24 +2,25 @@
   <view wx:if="{{ loading }}" class="review-empty">正在加载问题谱面…</view>
   <swiper wx:elif="{{ pageUrls.length }}" class="score-swiper" current="{{ currentPage }}"
     disable-touch="{{ zoomPercent > 100 }}" bindchange="onPageChange">
-    <swiper-item wx:for="{{ pageUrls }}" wx:key="*this" class="score-slide">
+    <swiper-item wx:for="{{ scorePages }}" wx:key="url" wx:for-item="scorePage"
+      wx:for-index="pageIndex" class="score-slide">
       <view class="review-sheet">
-        <view class="sheet-page">PAGE {{ index + 1 }} / {{ pageUrls.length }}</view>
+        <view class="sheet-page">PAGE {{ pageIndex + 1 }} / {{ pageUrls.length }}</view>
         <movable-area class="zoom-area" scale-area="true">
           <movable-view class="zoom-view" direction="all" inertia="true" out-of-bounds="true"
             scale="true" scale-min="1" scale-max="4" scale-value="{{ zoomScale }}" bindscale="onScale">
             <view class="review-stage">
-              <image class="review-image" src="{{ item }}" mode="widthFix"
-                lazy-load="true" data-index="{{ index }}"
+              <image class="review-image" src="{{ scorePage.url }}" mode="widthFix"
+                lazy-load="true" data-index="{{ pageIndex }}"
                 bindload="onImageLoad" binderror="onImageError"></image>
-              <block wx:if="{{ index === 0 }}">
-                <view wx:for="{{ measureIssues }}" wx:key="key" class="measure-box {{ item.category }}"
-                  style="left:{{item.left}}%;top:{{item.top}}%;width:{{item.width}}%;height:{{item.height}}%;">
-                  <text class="issue-label {{ item.category }}">{{ item.label }}</text>
-                </view>
-                <view wx:for="{{ noteIssues }}" wx:key="key" class="note-box {{ item.category }}"
-                  style="left:{{item.left}}%;top:{{item.top}}%;width:{{item.width}}%;height:{{item.height}}%;"></view>
-              </block>
+              <view wx:for="{{ scorePage.measureIssues }}" wx:key="key" wx:for-item="issue"
+                class="measure-box {{ issue.category }}"
+                style="left:{{issue.left}}%;top:{{issue.top}}%;width:{{issue.width}}%;height:{{issue.height}}%;">
+                <text class="issue-label {{ issue.category }}">{{ issue.label }}</text>
+              </view>
+              <view wx:for="{{ scorePage.noteIssues }}" wx:key="key" wx:for-item="issue"
+                class="note-box {{ issue.category }}"
+                style="left:{{issue.left}}%;top:{{issue.top}}%;width:{{issue.width}}%;height:{{issue.height}}%;"></view>
             </view>
           </movable-view>
         </movable-area>

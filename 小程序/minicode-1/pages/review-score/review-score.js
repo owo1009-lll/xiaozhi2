@@ -53,6 +53,7 @@ Page({
     title: "",
     meta: "",
     pageUrls: [],
+    scorePages: [],
     measureIssues: [],
     noteIssues: [],
     issueCount: 0,
@@ -98,6 +99,12 @@ Page({
           title: CHINESE_TITLES[edition.pieceId] || edition.title || "问题谱面",
           meta: edition.meta || (pageCount + "页"),
           pageUrls,
+          scorePages: pageUrls.map((url, pageIndex) => ({
+            url,
+            pageNumber: pageIndex + 1,
+            measureIssues: [],
+            noteIssues: []
+          })),
           imageReady: false,
           imageError: "",
           loadedPages: []
@@ -105,6 +112,7 @@ Page({
         return api.get("/api/strings/score-diagnosis", {
           pieceId: this.pieceId,
           editionId,
+          submissionId: this.submissionId,
           demo: this.demo ? "1" : ""
         });
       })
@@ -112,20 +120,32 @@ Page({
         if (!diagnosis) return;
         const measureIssues = (diagnosis.measureIssues || []).map((issue) =>
           Object.assign(toBox(issue.bbox), {
-            key: "m" + issue.measure,
+            key: "m" + (issue.pageNumber || 1) + ":" + issue.measure,
+            pageNumber: Number(issue.pageNumber) || 1,
             label: (issue.labels || []).join(" · "),
             category: categoryForLabel((issue.labels || []).join(" "))
           }));
         const noteIssues = (diagnosis.noteIssues || []).map((issue, index) =>
           Object.assign(toBox(issue.bbox), {
-            key: "n" + index,
+            key: "n" + (issue.pageNumber || 1) + ":" + index,
+            pageNumber: Number(issue.pageNumber) || 1,
             label: issue.label || "问题音",
             category: categoryForLabel(issue.label)
           }));
+        const scorePages = this.data.pageUrls.map((url, pageIndex) => {
+          const pageNumber = pageIndex + 1;
+          return {
+            url,
+            pageNumber,
+            measureIssues: measureIssues.filter((issue) => issue.pageNumber === pageNumber),
+            noteIssues: noteIssues.filter((issue) => issue.pageNumber === pageNumber)
+          };
+        });
         const issueCount = noteIssues.length;
         this.setData({
           measureIssues,
           noteIssues,
+          scorePages,
           issueCount,
           hasDiagnosis: diagnosis.hasData === true,
           message: diagnosis.hasData === true
