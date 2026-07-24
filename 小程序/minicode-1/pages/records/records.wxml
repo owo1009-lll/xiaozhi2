@@ -1,0 +1,39 @@
+<view class="page-wrap">
+  <view class="hero">
+    <view class="hero-eyebrow">练习记录</view>
+    <view class="hero-title">我的练习</view>
+    <view class="hero-sub">每一次提交与老师反馈都在这里,也看得见自己的积累。</view>
+  </view>
+
+  <view class="stat-grid">
+    <view class="stat">
+      <view class="stat-num">{{ stats.total }}</view>
+      <view class="stat-label">累计练习</view>
+    </view>
+    <view class="stat">
+      <view class="stat-num">{{ stats.done }}</view>
+      <view class="stat-label">已获反馈</view>
+    </view>
+    <view class="stat">
+      <view class="stat-num">{{ stats.review }}</view>
+      <view class="stat-label">复核中</view>
+    </view>
+  </view>
+
+  <view class="section-title">
+    <view class="st-text">全部记录</view>
+  </view>
+
+  <block wx:if="{{ list.length }}">
+    <view wx:for="{{ list }}" wx:key="submissionId" class="rec" data-item="{{ item }}" bindtap="openItem">
+      <view class="rec-dot">♪</view>
+      <view class="rec-body">
+        <view class="rec-title">{{ item.piece || '未命名曲目' }}</view>
+        <view class="rec-meta">{{ item.submittedAtText }}</view>
+      </view>
+      <view class="pill {{ item.pillClass }}">{{ item.statusText }}</view>
+    </view>
+  </block>
+  <view wx:elif="{{ loading }}" class="empty">加载中…</view>
+  <view wx:else class="empty">还没有提交记录,去「练习」上传第一条吧。</view>
+</view>

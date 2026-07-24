@@ -1,0 +1,74 @@
+<view class="page-wrap">
+  <view class="hero">
+    <view class="hero-topline">
+      <view class="hero-eyebrow">弦乐曲库</view>
+      <view class="hero-mark">{{ pieceCount || '—' }} 首/乐章</view>
+    </view>
+    <view class="hero-title serif">曲目与谱面</view>
+    <view class="hero-sub">乐曲与练习教材分开展示。打开完整谱面后，可以直接设为本次练习。</view>
+  </view>
+
+  <view class="library-note">
+    <view class="note-mark">𝄞</view>
+    <view>
+      <view class="note-title">内置曲库</view>
+    </view>
+  </view>
+
+  <view class="category-tabs">
+    <view class="category-tab {{ activeCategory === 'repertoire' ? 'on' : '' }}"
+      data-category="repertoire" bindtap="selectCategory">
+      <view class="category-name">乐曲</view>
+      <view class="category-count">{{ repertoireCount }} 个乐章</view>
+    </view>
+    <view class="category-tab {{ activeCategory === 'exercise' ? 'on' : '' }}"
+      data-category="exercise" bindtap="selectCategory">
+      <view class="category-name">练习教材</view>
+      <view class="category-count">{{ exerciseCount }} 首</view>
+    </view>
+  </view>
+
+  <view wx:if="{{ !loading && !error && groups.length }}" class="group-tools">
+    <view class="group-total">共 {{ groups.length }} 个分组</view>
+    <view class="collapse-action" bindtap="toggleAllGroups">{{ collapseActionText }}</view>
+  </view>
+
+  <view wx:if="{{ loading }}" class="library-loading">
+    <view class="loading-disc"></view>
+    <view>正在整理曲库…</view>
+  </view>
+  <view wx:elif="{{ error }}" class="library-error" bindtap="load">{{ error }} 点击重试</view>
+
+  <block wx:else>
+    <block wx:for="{{ groups }}" wx:key="level" wx:for-item="group">
+      <view class="group-block {{ group.collapsed ? 'collapsed' : '' }}">
+        <view class="group-heading" data-level="{{ group.level }}" bindtap="toggleGroup">
+          <view>
+            <view class="group-kicker">{{ activeCategory === 'repertoire' ? '乐曲集' : '练习教材' }}</view>
+            <view class="group-title serif">{{ group.level }}</view>
+          </view>
+          <view class="group-heading-side">
+            <view class="st-count">{{ group.items.length }} 首</view>
+            <view class="collapse-chevron {{ group.collapsed ? '' : 'open' }}">⌄</view>
+          </view>
+        </view>
+        <view wx:if="{{ !group.collapsed }}">
+          <view wx:for="{{ group.items }}" wx:key="title" wx:for-item="piece" wx:for-index="pieceIndex"
+            class="piece-row" data-id="{{ piece.pieceId }}" bindtap="openScore">
+            <view class="piece-index">{{ pieceIndex < 9 ? '0' + (pieceIndex + 1) : pieceIndex + 1 }}</view>
+            <view class="piece-body">
+              <view class="piece-title serif">{{ piece.title }}</view>
+              <view class="piece-meta">{{ piece.meta || '已收录完整谱面' }}</view>
+            </view>
+            <view class="page-badge">{{ piece.pageCount || 1 }}页</view>
+            <view class="piece-arrow">›</view>
+          </view>
+        </view>
+      </view>
+    </block>
+  </block>
+
+  <view wx:if="{{ pieceCount }}" class="library-foot">
+    公开曲库共 {{ pieceCount }} 首/乐章<br/>内部诊断素材不会在曲库展示
+  </view>
+</view>

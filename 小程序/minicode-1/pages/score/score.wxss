@@ -1,0 +1,169 @@
+.diag-summary {
+  background: #F2E7D4;
+  border: 1rpx solid #E0CBA6;
+  border-radius: 16rpx;
+  padding: 20rpx 24rpx;
+  color: #3D5873;
+  font-size: 24rpx;
+  margin-bottom: 22rpx;
+}
+
+.ed-tabs { white-space: nowrap; margin-bottom: 22rpx; }
+.ed-tab {
+  display: inline-block;
+  padding: 14rpx 26rpx;
+  margin-right: 14rpx;
+  border-radius: 999rpx;
+  font-size: 25rpx;
+  color: #66717C;
+  background: rgba(255,255,255,.62);
+  border: 1rpx solid #DDD5CB;
+}
+.ed-tab.on {
+  color: #FFFFFF;
+  background: #17202A;
+  border-color: #17202A;
+  font-weight: 700;
+}
+
+.reader-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 4rpx 3rpx 14rpx;
+}
+.reader-label { color: #202832; font-size: 24rpx; font-weight: 700; }
+.reader-dot {
+  width: 12rpx;
+  height: 12rpx;
+  display: inline-block;
+  border-radius: 50%;
+  background: #244A73;
+  margin-right: 9rpx;
+}
+.reader-tip { color: #7A8590; font-size: 20rpx; }
+.score-card {
+  background: #FFFFFF;
+  border-radius: 18rpx;
+  overflow: hidden;
+  border: 1rpx solid #D8D0C6;
+  margin-bottom: 20rpx;
+  box-shadow: 0 18rpx 44rpx rgba(61,49,36,.08);
+}
+.score-stage { position: relative; font-size: 0; }
+.score-img { width: 100%; display: block; }
+.page-number {
+  color: #8C847B;
+  background: #F8F5F0;
+  font-size: 19rpx;
+  padding: 11rpx 18rpx;
+  display: flex;
+  justify-content: space-between;
+  letter-spacing: 1rpx;
+  border-bottom: 1rpx solid #E8E2D9;
+}
+
+.score-error {
+  color: #8C4139;
+  background: #F2DFDC;
+  border: 1rpx solid #DEBBB6;
+  border-radius: 14rpx;
+  padding: 20rpx 24rpx;
+  margin-bottom: 22rpx;
+  font-size: 23rpx;
+  line-height: 1.55;
+}
+
+.score-actions {
+  margin-top: 28rpx;
+  background: #17202A;
+  border-radius: 24rpx;
+  padding: 30rpx 28rpx 27rpx;
+  text-align: center;
+}
+.action-kicker { color: #AFC8E1; font-size: 19rpx; letter-spacing: 4rpx; font-weight: 700; }
+.action-title { color: #F8F4EC; font-size: 30rpx; font-weight: 700; margin: 7rpx 0 21rpx; }
+.choose-button {
+  color: #FFFFFF;
+  background: #244A73;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  text-align: center;
+  font-size: 27rpx;
+  font-weight: 700;
+}
+.share-button {
+  color: #E9E1D7;
+  background: transparent;
+  border: 1rpx solid rgba(255,255,255,.18);
+  border-radius: 16rpx;
+  padding: 3rpx 0;
+  margin-top: 13rpx;
+  font-size: 25rpx;
+  line-height: 2.5;
+}
+.share-button::after { border: none; }
+.mbox {
+  position: absolute;
+  border: 1rpx solid rgba(60, 120, 200, .55);
+  border-radius: 3rpx;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+.mbox.err {
+  border: 3rpx solid #D6453E;
+  background: rgba(214, 69, 62, .14);
+}
+.mbox.err.rhythm { border-color: #D28A24; background: rgba(210, 138, 36, .15); }
+.mbox.err.tone { border-color: #7656A7; background: rgba(118, 86, 167, .15); }
+.mbox.err.missing { border-color: #2F6FA3; background: rgba(47, 111, 163, .14); }
+.mlabel {
+  position: absolute;
+  top: -30rpx;
+  left: 0;
+  background: #D6453E;
+  color: #fff;
+  font-size: 18rpx;
+  line-height: 1;
+  padding: 5rpx 10rpx;
+  border-radius: 6rpx;
+  white-space: nowrap;
+}
+.mlabel.rhythm { background: #D28A24; }
+.mlabel.tone { background: #7656A7; }
+.mlabel.missing { background: #2F6FA3; }
+.nbox {
+  position: absolute;
+  border: 3rpx solid #D6453E;
+  border-radius: 50%;
+  box-sizing: border-box;
+  box-shadow: 0 0 0 3rpx rgba(214, 69, 62, .25);
+  pointer-events: none;
+}
+.nbox.rhythm { border-color: #D28A24; box-shadow: 0 0 0 3rpx rgba(210, 138, 36, .24); }
+.nbox.tone { border-color: #7656A7; box-shadow: 0 0 0 3rpx rgba(118, 86, 167, .24); }
+.nbox.missing { border-color: #2F6FA3; box-shadow: 0 0 0 3rpx rgba(47, 111, 163, .24); }
+
+.legend { display: flex; align-items: center; gap: 24rpx; margin-top: 22rpx; flex-wrap: wrap; }
+.lg { display: flex; align-items: center; gap: 10rpx; font-size: 23rpx; color: #817970; }
+.lg-swatch { width: 26rpx; height: 26rpx; border-radius: 5rpx; }
+.lg-swatch.pitch { background: #D6453E; }
+.lg-swatch.rhythm { background: #D28A24; }
+.lg-swatch.tone { background: #7656A7; }
+.lg-swatch.missing { background: #2F6FA3; }
+.lg-toggle {
+  margin-left: auto;
+  font-size: 23rpx;
+  color: #244A73;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid #CDB6A8;
+}
+.lg-toggle.on { background: #E8EEF4; }
+.note-foot {
+  color: #77828D;
+  font-size: 20rpx;
+  line-height: 1.6;
+  padding: 25rpx 6rpx 0;
+  text-align: center;
+}

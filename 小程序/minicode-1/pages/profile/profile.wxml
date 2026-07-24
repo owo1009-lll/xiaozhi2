@@ -1,0 +1,61 @@
+<view class="page-wrap">
+  <view class="hero">
+    <view class="hero-eyebrow">个人中心</view>
+  </view>
+
+  <view class="profile-head">
+    <view class="avatar">♪</view>
+    <view class="p-id">
+      <view class="p-name serif">{{ nickname }}</view>
+      <view class="p-ref">练习号 · {{ refTail }}</view>
+      <view class="p-bio">{{ bio }}</view>
+    </view>
+    <view class="edit-profile" bindtap="startEdit">编辑资料</view>
+  </view>
+
+  <view wx:if="{{ editing }}" class="profile-editor">
+    <view class="edit-label">昵称</view>
+    <input class="edit-input" maxlength="12" value="{{ draftNickname }}"
+      placeholder="请输入昵称" bindinput="onNicknameInput"></input>
+    <view class="edit-label edit-label-bio">个人介绍</view>
+    <textarea class="edit-textarea" maxlength="40" value="{{ draftBio }}"
+      placeholder="写一句自己的练习目标" bindinput="onBioInput"></textarea>
+    <view class="edit-actions">
+      <view class="edit-cancel" bindtap="cancelEdit">取消</view>
+      <view class="edit-save" bindtap="saveProfile">保存</view>
+    </view>
+  </view>
+
+  <view class="stat-grid">
+    <view class="stat">
+      <view class="stat-num">{{ total }}</view>
+      <view class="stat-label">累计练习</view>
+    </view>
+    <view class="stat">
+      <view class="stat-num">{{ streak }}</view>
+      <view class="stat-label">连续天数</view>
+    </view>
+    <view class="stat">
+      <view class="stat-num">{{ feedbackCount }}</view>
+      <view class="stat-label">获得反馈</view>
+    </view>
+  </view>
+
+  <view class="section-title">
+    <view class="st-text">练习成就</view>
+  </view>
+
+  <view class="badge-grid">
+    <view wx:for="{{ badges }}" wx:key="name" class="badge {{ item.got ? 'got' : 'locked' }}">
+      <view class="badge-ic">{{ item.icon }}</view>
+      <view class="badge-name">{{ item.name }}</view>
+      <view class="badge-desc">{{ item.desc }}</view>
+    </view>
+  </view>
+
+  <view class="hairline"></view>
+  <view class="p-foot">
+    <view>弦乐练习诊断 · 受控试点版</view>
+    <view>练习记录仅本人可见,提交后由老师复核给出反馈。</view>
+  </view>
+</view>

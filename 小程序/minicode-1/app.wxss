@@ -1,0 +1,195 @@
+/* Clear studio: neutral paper, graphite text and a restrained ink-blue accent. */
+page {
+  background: #F6F7F9;
+  color: #171B21;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 28rpx;
+  line-height: 1.6;
+}
+
+.serif {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  letter-spacing: 0;
+}
+
+.page-wrap {
+  min-height: 100vh;
+  padding: 18rpx 32rpx calc(70rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+.hero { padding: 26rpx 4rpx 28rpx; }
+.hero-topline { display: flex; align-items: center; justify-content: space-between; }
+.hero-eyebrow {
+  font-size: 19rpx;
+  letter-spacing: 5rpx;
+  color: #244A73;
+  font-weight: 700;
+}
+.hero-mark {
+  color: #68717C;
+  font-size: 21rpx;
+  padding: 7rpx 16rpx;
+  border: 1rpx solid #DCE1E6;
+  border-radius: 999rpx;
+  background: rgba(255,255,255,.45);
+}
+.hero-title {
+  font-size: 52rpx;
+  line-height: 1.16;
+  color: #171B21;
+  margin: 15rpx 0 11rpx;
+  font-weight: 760;
+  letter-spacing: -1rpx;
+}
+.hero-sub {
+  color: #626B75;
+  font-size: 25rpx;
+  line-height: 1.65;
+  max-width: 620rpx;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  margin: 48rpx 4rpx 20rpx;
+}
+.section-title::before {
+  content: "";
+  width: 26rpx;
+  height: 3rpx;
+  border-radius: 3rpx;
+  background: #244A73;
+}
+.section-title .st-text { font-size: 32rpx; color: #171B21; font-weight: 700; flex: 1; }
+.section-title .st-more { font-size: 24rpx; color: #244A73; }
+
+.card {
+  background: rgba(255,255,255,.82);
+  border-radius: 24rpx;
+  padding: 30rpx 28rpx;
+  margin-bottom: 20rpx;
+  border: 1rpx solid #DEE3E8;
+  box-shadow: 0 14rpx 40rpx rgba(25, 36, 48, .045);
+}
+.field-label {
+  font-size: 20rpx;
+  letter-spacing: 3rpx;
+  color: #76808B;
+  margin-bottom: 14rpx;
+  font-weight: 650;
+}
+
+.btn-gold {
+  background: #244A73;
+  color: #FFFFFF;
+  border-radius: 18rpx;
+  text-align: center;
+  padding: 29rpx;
+  font-size: 29rpx;
+  font-weight: 700;
+  letter-spacing: 1rpx;
+  box-shadow: 0 13rpx 26rpx rgba(36, 74, 115, .18);
+}
+.btn-gold.is-disabled {
+  background: #D2CCC3;
+  color: #8D867E;
+  box-shadow: none;
+}
+.btn-ghost {
+  border: 1rpx solid #C9B9AA;
+  color: #42566B;
+  background: rgba(255,255,255,.55);
+  border-radius: 16rpx;
+  text-align: center;
+  padding: 24rpx;
+  font-size: 27rpx;
+}
+
+.rec {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  background: rgba(255,255,255,.74);
+  border-radius: 18rpx;
+  padding: 22rpx;
+  margin-bottom: 12rpx;
+  border: 1rpx solid #E1DBD2;
+}
+.rec-dot {
+  width: 62rpx;
+  height: 62rpx;
+  border-radius: 16rpx;
+  flex-shrink: 0;
+  background: #E8EEF4;
+  color: #244A73;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+.rec-body { flex: 1; min-width: 0; }
+.rec-title {
+  font-size: 29rpx;
+  color: #1C2128;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rec-meta { font-size: 22rpx; color: #747E89; margin-top: 3rpx; }
+.rec-arrow { color: #A9A198; font-size: 30rpx; flex-shrink: 0; }
+
+.pill {
+  font-size: 20rpx;
+  padding: 7rpx 16rpx;
+  border-radius: 999rpx;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.pill.rev { background: #F1E4C8; color: #8B641E; }
+.pill.done { background: #DCE9DD; color: #47704D; }
+.pill.queued { background: #EAE6E0; color: #777068; }
+.pill.unsupported { background: #F1DDDA; color: #985149; }
+
+.notice {
+  background: #F5E8CE;
+  border: 1rpx solid #E4CEA3;
+  border-radius: 16rpx;
+  padding: 22rpx 24rpx;
+  color: #6F5425;
+  font-size: 25rpx;
+  margin: 18rpx 0;
+}
+
+.stat-grid { display: flex; gap: 12rpx; margin-bottom: 6rpx; }
+.stat {
+  flex: 1;
+  background: rgba(255,255,255,.76);
+  border: 1rpx solid #E0D9CF;
+  border-radius: 20rpx;
+  padding: 26rpx 16rpx;
+  text-align: center;
+}
+.stat-num {
+  font-size: 50rpx;
+  color: #1C2128;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.stat-label { font-size: 21rpx; color: #747E89; margin-top: 11rpx; }
+
+.chip {
+  display: inline-block;
+  font-size: 20rpx;
+  padding: 5rpx 15rpx;
+  border-radius: 999rpx;
+  background: #E8EEF4;
+  color: #244A73;
+}
+.empty { color: #747E89; font-size: 25rpx; text-align: center; padding: 64rpx 28rpx; line-height: 1.65; }
+.hairline { height: 1rpx; background: #DEE3E8; margin: 30rpx 0; }

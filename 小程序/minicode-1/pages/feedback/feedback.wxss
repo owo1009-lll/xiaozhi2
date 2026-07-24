@@ -1,0 +1,77 @@
+.status-card { display: flex; align-items: center; justify-content: space-between; }
+
+.fb {
+  background: #EDF3F8;
+  border: 1rpx solid #CCDCE9;
+  border-left: 5rpx solid #244A73;
+  border-radius: 16rpx;
+  padding: 32rpx 30rpx;
+  margin-bottom: 8rpx;
+}
+.fb-label {
+  font-size: 20rpx;
+  letter-spacing: 4rpx;
+  color: #244A73;
+  font-weight: 700;
+  margin-bottom: 18rpx;
+}
+.fb-text { font-size: 34rpx; line-height: 1.75; color: #1C2229; }
+
+.waiting { text-align: center; padding: 70rpx 0 40rpx; }
+.wait-ic {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 50%;
+  margin: 0 auto 26rpx;
+  background: #E8EEF4;
+  border: 1rpx solid #D5DEE7;
+  color: #244A73;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44rpx;
+}
+.wait-text { color: #6F7A85; font-size: 27rpx; }
+
+.problem-score-card {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  margin: 24rpx 0 8rpx;
+  padding: 24rpx;
+  background: #17202A;
+  border-radius: 20rpx;
+  color: #FFFFFF;
+}
+.problem-score-icon {
+  width: 68rpx;
+  height: 68rpx;
+  border-radius: 17rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #244A73;
+  font-size: 36rpx;
+}
+.problem-score-copy { flex: 1; min-width: 0; }
+.problem-score-title { font-size: 28rpx; font-weight: 700; }
+.problem-score-sub { color: #AEB9C4; font-size: 21rpx; margin-top: 2rpx; }
+.problem-score-arrow { color: #91A0AE; font-size: 36rpx; }
+
+.diag {
+  background: rgba(255,255,255,.76);
+  border: 1rpx solid #E0D9CF;
+  border-radius: 18rpx;
+  overflow: hidden;
+}
+.diag-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 26rpx 30rpx;
+  border-bottom: 1rpx solid #E4DDD4;
+}
+.diag-row:last-child { border-bottom: none; }
+.diag-name { font-size: 30rpx; color: #232A31; }
+.diag-val { font-size: 25rpx; color: #244A73; }
+.diag-note { color: #77828D; font-size: 22rpx; line-height: 1.6; padding: 20rpx 6rpx 0; }

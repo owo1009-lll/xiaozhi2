@@ -1,0 +1,73 @@
+<view class="page-wrap">
+  <view class="hero">
+    <view class="hero-topline">
+      <view class="hero-eyebrow">SCORE READER</view>
+      <view class="hero-mark">{{ pageUrls.length || '—' }} 页</view>
+    </view>
+    <view class="hero-title serif">{{ currentTitle || "内置谱面" }}</view>
+    <view class="hero-sub">{{ currentMeta || "选择曲目后查看谱面" }}</view>
+  </view>
+
+  <view wx:if="{{ hasDiag && diagSummary }}" class="diag-summary">{{ diagSummary }}</view>
+
+  <scroll-view class="ed-tabs" scroll-x="true" enhanced="true" show-scrollbar="false" wx:if="{{ relatedEditions.length > 1 }}">
+    <view
+      wx:for="{{ relatedEditions }}" wx:key="pieceId"
+      class="ed-tab {{ currentId === item.pieceId ? 'on' : '' }}"
+      data-id="{{ item.pieceId }}"
+      bindtap="select">{{ item.title }}</view>
+  </scroll-view>
+
+  <view wx:if="{{ imageError }}" class="score-error">{{ imageError }}</view>
+
+  <block wx:if="{{ pageUrls.length }}">
+    <view class="reader-bar">
+      <view class="reader-label"><text class="reader-dot"></text>乐谱阅读</view>
+      <view class="reader-tip">点击谱面可全屏放大</view>
+    </view>
+    <view wx:for="{{ pageUrls }}" wx:key="*this" class="score-card">
+      <view class="page-number">
+        <text>PAGE {{ index + 1 }}</text>
+        <text>{{ index + 1 }} / {{ pageUrls.length }}</text>
+      </view>
+      <view class="score-stage">
+        <image class="score-img" src="{{ item }}" mode="widthFix" show-menu-by-longpress="true"
+          data-url="{{ item }}" bindtap="previewPage" binderror="onImageError"></image>
+
+        <block wx:if="{{ index === 0 }}">
+          <block wx:if="{{ showAll }}">
+            <view wx:for="{{ allBoxes }}" wx:key="k" class="mbox"
+              style="left:{{item.left}}%;top:{{item.top}}%;width:{{item.w}}%;height:{{item.h}}%;"></view>
+          </block>
+
+          <view wx:for="{{ errBoxes }}" wx:key="k" class="mbox err {{ item.category }}"
+            style="left:{{item.left}}%;top:{{item.top}}%;width:{{item.w}}%;height:{{item.h}}%;">
+            <text class="mlabel {{ item.category }}">{{ item.label }}</text>
+          </view>
+
+          <view wx:for="{{ noteBoxes }}" wx:key="k" class="nbox {{ item.category }}"
+            style="left:{{item.left}}%;top:{{item.top}}%;width:{{item.w}}%;height:{{item.h}}%;"></view>
+        </block>
+      </view>
+    </view>
+  </block>
+  <view wx:elif="{{ loading }}" class="empty">正在加载谱面…</view>
+  <view wx:else class="empty">暂无可显示谱面。</view>
+
+  <view wx:if="{{ pageUrls.length }}" class="score-actions">
+    <view class="action-kicker">准备开始？</view>
+    <view class="action-title serif">把这首曲目加入今日练习</view>
+    <view class="choose-button" bindtap="chooseCurrent">用这首开始练习</view>
+    <button class="share-button" open-type="share">分享这份谱面</button>
+  </view>
+
+  <view wx:if="{{ hasDiag }}" class="legend">
+    <view class="lg"><view class="lg-swatch pitch"></view>音准</view>
+    <view class="lg"><view class="lg-swatch rhythm"></view>节奏</view>
+    <view class="lg"><view class="lg-swatch tone"></view>音质</view>
+    <view class="lg"><view class="lg-swatch missing"></view>漏音/错音</view>
+    <view class="lg-toggle {{ showAll ? 'on' : '' }}" bindtap="toggleAll">{{ showAll ? '隐藏小节网格' : '显示小节网格' }}</view>
+  </view>
+
+  <view class="note-foot">公版与开放许可谱面仅作研究和练习；带红框/红圈的诊断谱面使用现有研究级定位结果。</view>
+</view>

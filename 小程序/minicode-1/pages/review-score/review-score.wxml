@@ -1,0 +1,54 @@
+<view class="review-page">
+  <view wx:if="{{ loading }}" class="review-empty">正在加载问题谱面…</view>
+  <swiper wx:elif="{{ pageUrls.length }}" class="score-swiper" current="{{ currentPage }}"
+    disable-touch="{{ zoomPercent > 100 }}" bindchange="onPageChange">
+    <swiper-item wx:for="{{ pageUrls }}" wx:key="*this" class="score-slide">
+      <view class="review-sheet">
+        <view class="sheet-page">PAGE {{ index + 1 }} / {{ pageUrls.length }}</view>
+        <movable-area class="zoom-area" scale-area="true">
+          <movable-view class="zoom-view" direction="all" inertia="true" out-of-bounds="true"
+            scale="true" scale-min="1" scale-max="4" scale-value="{{ zoomScale }}" bindscale="onScale">
+            <view class="review-stage">
+              <image class="review-image" src="{{ item }}" mode="widthFix"
+                lazy-load="true" data-index="{{ index }}"
+                bindload="onImageLoad" binderror="onImageError"></image>
+              <block wx:if="{{ index === 0 }}">
+                <view wx:for="{{ measureIssues }}" wx:key="key" class="measure-box {{ item.category }}"
+                  style="left:{{item.left}}%;top:{{item.top}}%;width:{{item.width}}%;height:{{item.height}}%;">
+                  <text class="issue-label {{ item.category }}">{{ item.label }}</text>
+                </view>
+                <view wx:for="{{ noteIssues }}" wx:key="key" class="note-box {{ item.category }}"
+                  style="left:{{item.left}}%;top:{{item.top}}%;width:{{item.width}}%;height:{{item.height}}%;"></view>
+              </block>
+            </view>
+          </movable-view>
+        </movable-area>
+      </view>
+    </swiper-item>
+  </swiper>
+  <view wx:else class="review-empty">{{ message || '暂无可显示谱面' }}</view>
+
+  <view class="score-loading" wx:if="{{ pageUrls.length && !imageReady }}">
+    <view class="loading-ring"></view>
+    <view>{{ imageError || '谱面加载中…' }}</view>
+  </view>
+  <view class="back-button" bindtap="goBack">‹</view>
+  <view class="score-hud" wx:if="{{ pageUrls.length }}">
+    <view class="hud-title">{{ title || '问题谱面' }}</view>
+    <view class="hud-meta">{{ hasDiagnosis ? issueCount + ' 处问题' : message }}</view>
+  </view>
+  <view class="issue-legend" wx:if="{{ hasDiagnosis }}">
+    <view class="legend-item"><text class="legend-dot pitch"></text>音准</view>
+    <view class="legend-item"><text class="legend-dot rhythm"></text>节奏</view>
+    <view class="legend-item"><text class="legend-dot tone"></text>音质</view>
+    <view class="legend-item"><text class="legend-dot missing"></text>漏音/错音</view>
+  </view>
+  <view class="zoom-controls" wx:if="{{ pageUrls.length }}">
+    <view class="zoom-button" bindtap="zoomOut">−</view>
+    <view class="zoom-value" bindtap="resetZoom">{{ zoomPercent }}%</view>
+    <view class="zoom-button" bindtap="zoomIn">＋</view>
+  </view>
+  <view class="page-indicator" wx:if="{{ pageUrls.length > 1 }}">
+    {{ currentPage + 1 }} / {{ pageUrls.length }}
+  </view>
+</view>

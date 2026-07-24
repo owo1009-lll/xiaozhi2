@@ -1,0 +1,5 @@
+project.private.config.json
+*.private.config.json
+.env
+.env.*
+!.env.example

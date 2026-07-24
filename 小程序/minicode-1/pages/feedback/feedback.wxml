@@ -1,0 +1,56 @@
+<view class="page-wrap" wx:if="{{ item }}">
+  <view class="hero">
+    <view class="hero-eyebrow">练习反馈</view>
+    <view class="hero-title">{{ item.piece || '未命名曲目' }}</view>
+    <view class="hero-sub">{{ item.submittedAtText }} · {{ item.instrumentText }}</view>
+  </view>
+
+  <view class="card status-card">
+    <view class="field-label">当前状态</view>
+    <view class="pill {{ item.pillClass }}">{{ item.statusText }}</view>
+  </view>
+
+  <block wx:if="{{ item.teacherFeedback }}">
+    <view class="fb">
+      <view class="fb-label">老师反馈</view>
+      <view class="fb-text serif">{{ item.teacherFeedback }}</view>
+    </view>
+  </block>
+  <view wx:else class="waiting">
+    <view class="wait-ic">♪</view>
+    <view class="wait-text">老师还在复核这次练习,反馈稍后就到。</view>
+  </view>
+
+  <view wx:if="{{ canViewScore }}" class="problem-score-card" bindtap="openProblemScore">
+    <view class="problem-score-icon">⌁</view>
+    <view class="problem-score-copy">
+      <view class="problem-score-title">查看问题谱面</view>
+      <view class="problem-score-sub">横屏查看老师复核后的问题位置</view>
+    </view>
+    <view class="problem-score-arrow">›</view>
+  </view>
+
+  <view class="section-title">
+    <view class="st-text">诊断维度</view>
+  </view>
+  <view class="diag">
+    <view class="diag-row">
+      <view class="diag-name">音准</view>
+      <view class="diag-val">{{ item.isDemo ? '红色标记' : (item.isDone ? '见上方反馈' : '复核中') }}</view>
+    </view>
+    <view class="diag-row">
+      <view class="diag-name">节奏</view>
+      <view class="diag-val">{{ item.isDemo ? '橙色标记' : (item.isDone ? '见上方反馈' : '复核中') }}</view>
+    </view>
+    <view class="diag-row">
+      <view class="diag-name">错音 / 漏音</view>
+      <view class="diag-val">{{ item.isDemo ? '蓝色标记' : (item.isDone ? '见上方反馈' : '复核中') }}</view>
+    </view>
+  </view>
+  <view class="diag-note" wx:if="{{ item.isDemo }}">这是带已知注入位置的功能测试录音，用于核对三类标记，不代表真实学生录音的自动诊断。</view>
+  <view class="diag-note" wx:else>当前为老师复核给出反馈。逐音自动诊断将在通过验证后开放。</view>
+</view>
+
+<view class="page-wrap" wx:else>
+  <view class="empty">没有找到这条练习记录。</view>
+</view>

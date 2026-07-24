@@ -1,0 +1,115 @@
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 26rpx;
+  padding: 10rpx 4rpx 30rpx;
+}
+.p-id { flex: 1; min-width: 0; }
+.avatar {
+  width: 116rpx;
+  height: 116rpx;
+  border-radius: 32rpx;
+  flex-shrink: 0;
+  background: #E8EEF4;
+  border: 1rpx solid #D5DEE7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #244A73;
+  font-size: 54rpx;
+}
+.p-name { font-size: 40rpx; color: #1C2128; font-weight: 700; }
+.p-ref { font-size: 23rpx; color: #727D88; letter-spacing: 2rpx; margin-top: 6rpx; }
+.p-bio {
+  max-width: 390rpx;
+  color: #58636F;
+  font-size: 23rpx;
+  margin-top: 7rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.edit-profile {
+  flex-shrink: 0;
+  color: #244A73;
+  background: #FFFFFF;
+  border: 1rpx solid #CED8E2;
+  border-radius: 999rpx;
+  padding: 10rpx 19rpx;
+  font-size: 22rpx;
+  font-weight: 650;
+}
+.profile-editor {
+  margin: -8rpx 4rpx 28rpx;
+  padding: 26rpx;
+  background: #FFFFFF;
+  border: 1rpx solid #DEE3E8;
+  border-radius: 20rpx;
+  box-shadow: 0 12rpx 30rpx rgba(25, 36, 48, .05);
+}
+.edit-label {
+  color: #4F5964;
+  font-size: 22rpx;
+  font-weight: 650;
+  margin-bottom: 10rpx;
+}
+.edit-label-bio { margin-top: 22rpx; }
+.edit-input,
+.edit-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  color: #1C2128;
+  background: #F6F7F9;
+  border: 1rpx solid #DDE3E8;
+  border-radius: 14rpx;
+  font-size: 27rpx;
+}
+.edit-input {
+  height: 76rpx;
+  padding: 0 20rpx;
+}
+.edit-textarea {
+  height: 132rpx;
+  padding: 16rpx 20rpx;
+  line-height: 1.5;
+}
+.edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16rpx;
+  margin-top: 24rpx;
+}
+.edit-cancel,
+.edit-save {
+  min-width: 116rpx;
+  padding: 15rpx 24rpx;
+  border-radius: 14rpx;
+  text-align: center;
+  font-size: 24rpx;
+  font-weight: 650;
+}
+.edit-cancel {
+  color: #59636E;
+  background: #EFF2F5;
+}
+.edit-save {
+  color: #FFFFFF;
+  background: #244A73;
+}
+
+.badge-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16rpx; }
+.badge {
+  background: rgba(255,255,255,.76);
+  border: 1rpx solid #E0D9CF;
+  border-radius: 18rpx;
+  padding: 30rpx 26rpx;
+  text-align: center;
+}
+.badge-ic { font-size: 50rpx; line-height: 1; margin-bottom: 14rpx; }
+.badge.got .badge-ic { color: #244A73; }
+.badge.locked { opacity: .4; }
+.badge.locked .badge-ic { color: #A39B92; }
+.badge-name { font-size: 28rpx; color: #2F3740; font-weight: 700; }
+.badge.got .badge-name { color: #1C2128; }
+.badge-desc { font-size: 21rpx; color: #727D88; margin-top: 6rpx; }
+.p-foot { color: #77828D; font-size: 23rpx; text-align: center; line-height: 1.7; padding: 10rpx 20rpx; }

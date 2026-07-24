@@ -1,0 +1,134 @@
+<view class="page-wrap">
+  <view class="hero">
+    <view class="hero-topline">
+      <view class="hero-eyebrow">AI STRING STUDIO</view>
+      <view class="hero-mark">今日练习</view>
+    </view>
+    <view class="hero-title serif">留下今天的琴声</view>
+    <view class="hero-sub">选一首曲子，录下完整演奏。老师复核后，反馈会出现在「记录」里。</view>
+  </view>
+
+  <view class="practice-flow">
+    <view class="flow-item is-active"><text class="flow-no">1</text><text>选曲</text></view>
+    <view class="flow-line"></view>
+    <view class="flow-item"><text class="flow-no">2</text><text>录音</text></view>
+    <view class="flow-line"></view>
+    <view class="flow-item"><text class="flow-no">3</text><text>提交</text></view>
+  </view>
+
+  <view class="card piece-card">
+    <view class="card-heading">
+      <view>
+        <view class="field-label">STEP 01 · 本次曲目</view>
+        <view class="card-title">先告诉我们你在练什么</view>
+      </view>
+      <picker mode="selector" range="{{ instruments }}" value="{{ instrumentIndex }}" bindchange="onInstrument">
+        <view class="instrument-chip">{{ instruments[instrumentIndex] }} <text class="caret">⌄</text></view>
+      </picker>
+    </view>
+    <input class="piece-input serif" placeholder="输入曲名，或从曲库选择" placeholder-class="ph"
+      value="{{ piece }}" bindinput="onPiece" />
+    <view class="library-entry" bindtap="goLibrary">
+      <view class="library-icon">𝄞</view>
+      <view class="library-copy">
+        <view class="library-title">从内置曲库选择</view>
+        <view class="library-sub">浏览教材、曲目和完整谱面</view>
+      </view>
+      <view class="entry-arrow">›</view>
+    </view>
+  </view>
+
+  <view class="record-panel">
+    <view class="record-head">
+      <view>
+        <view class="field-label">STEP 02 · 演奏录音</view>
+        <view class="record-title">准备好后，点一下开始</view>
+      </view>
+      <view class="record-format">原声 · MP3</view>
+    </view>
+
+    <block wx:if="{{ recording }}">
+      <view class="rec-live">
+        <view class="pulse"></view>
+        <view class="rec-time">{{ recordSeconds }}<text class="time-unit"> 秒</text></view>
+        <view class="rec-hint">正在聆听你的演奏</view>
+      </view>
+      <view class="stop-button" bindtap="toggleRecord">停止并保存</view>
+    </block>
+
+    <block wx:elif="{{ recordedPath }}">
+      <view class="rec-done">
+        <view class="done-icon">✓</view>
+        <view>
+          <view class="done-title">录音已保存</view>
+          <view class="done-meta">共 {{ recordSeconds }} 秒，可以提交了</view>
+        </view>
+      </view>
+      <view class="redo-button" bindtap="toggleRecord">重新录制</view>
+    </block>
+
+    <block wx:else>
+      <view class="rec-start">
+        <view class="rec-ring" bindtap="toggleRecord">
+          <view class="rec-inner"></view>
+        </view>
+        <view class="rec-start-text">{{ recordStarting ? '正在请求麦克风权限…' : '点击红色按钮开始录音' }}</view>
+        <view class="rec-tip">建议安静环境，完整演奏一遍</view>
+        <view wx:if="{{ recordError }}" class="rec-error">{{ recordError }}</view>
+      </view>
+    </block>
+  </view>
+
+  <view class="card photo-card">
+    <view class="optional-head">
+      <view>
+        <view class="field-label">辅助材料</view>
+        <view class="optional-title">添加谱面照片</view>
+      </view>
+      <view class="optional-badge">可选</view>
+    </view>
+    <block wx:if="{{ photoPath }}">
+      <view class="photo-add">
+        <text class="pa-ic">✓</text> 图片已选择，提交后会进行内容安全审核
+      </view>
+      <view class="photo-actions">
+        <view class="btn-ghost photo-btn" bindtap="choosePhoto">重拍</view>
+        <view class="btn-ghost photo-btn" bindtap="removePhoto">移除</view>
+      </view>
+    </block>
+    <view wx:else class="photo-add" bindtap="choosePhoto">
+      <text class="pa-ic">＋</text>
+      <view>
+        <view class="photo-main">拍照或从相册选择</view>
+        <view class="photo-hint">方便老师对照你本次使用的谱面</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="submit-section">
+    <view class="submit-label">STEP 03 · 完成练习</view>
+    <view class="btn-gold {{ (submitting || !recordedPath || !piece) ? 'is-disabled' : '' }}" bindtap="submit">
+      {{ submitting ? '提交中…' : '提交本次练习' }}
+    </view>
+    <view class="submit-hint">{{ !piece ? '请先填写或选择曲目' : (!recordedPath ? '录音完成后即可提交' : '内容已准备好') }}</view>
+  </view>
+
+  <view wx:if="{{ notice }}" class="notice">{{ notice }}</view>
+
+  <view class="section-title">
+    <view class="st-text">最近练习</view>
+    <view class="st-more" bindtap="goRecords">查看全部 ›</view>
+  </view>
+
+  <block wx:if="{{ recent.length }}">
+    <view wx:for="{{ recent }}" wx:key="submissionId" class="rec" data-item="{{ item }}" bindtap="openItem">
+      <view class="rec-dot">♪</view>
+      <view class="rec-body">
+        <view class="rec-title">{{ item.piece || '未命名曲目' }}</view>
+        <view class="rec-meta">{{ item.submittedAtText }}</view>
+      </view>
+      <view class="pill {{ item.pillClass }}">{{ item.statusText }}</view>
+    </view>
+  </block>
+  <view wx:else class="empty">还没有练习记录。<br/>从上面录下第一段琴声吧。</view>
+</view>
