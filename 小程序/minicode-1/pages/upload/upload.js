@@ -333,6 +333,7 @@ Page({
       studentRef: api.studentRef(),
       piece: this.data.piece.trim(),
       pieceId: this.data.selectedPieceId,
+      scoreId: this.data.selectedPieceId,
       instrument: this.data.instrument,
       audioSubmission: {
         name: this.data.recordedName || "practice.mp3",

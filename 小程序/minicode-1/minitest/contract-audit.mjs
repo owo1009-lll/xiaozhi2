@@ -31,7 +31,7 @@ assert.match(api, /name:\s*"audio"/);
 assert.match(api, /payload\.clientPlatform\s*=\s*"wechat-mini-program"/);
 assert.match(api, /payload\.wechatLoginCode\s*=\s*loginCode/);
 
-for (const field of ["studentRef", "piece", "pieceId", "instrument", "audioSubmission"]) {
+for (const field of ["studentRef", "piece", "pieceId", "scoreId", "instrument", "audioSubmission"]) {
   assert.match(upload, new RegExp(`\\b${field}\\s*:`), `analyze payload must include ${field}`);
 }
 
