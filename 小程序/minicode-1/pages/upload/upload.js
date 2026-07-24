@@ -184,7 +184,7 @@ Page({
           this.failRecording("录音未能启动，请检查微信和系统的麦克风权限");
         }
       }, 4000);
-      recorder.start({ format: "mp3", duration: 600000, sampleRate: 44100, numberOfChannels: 1 });
+      recorder.start({ format: "mp3", duration: 600000, sampleRate: 44100, numberOfChannels: 1, encodeBitRate: 128000 });
     } catch (error) {
       const detail = String((error && error.message) || "");
       this.failRecording(detail ? "录音启动失败：" + detail : "录音启动失败，请重试");
