@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { DatabaseSync } from "node:sqlite";
+import { ORDINARY_DYNAMIC_SCORE_BINDING_MODE } from "./audit-western-ordinary-dynamic-shadow-acceptance.mjs";
 
 function safeString(value, fallback = "") {
   return typeof value === "string" ? value : fallback;
@@ -335,9 +336,10 @@ function auditPhysicalScoreBinding(sourceRoot, scoreProvenance, candidateRows) {
   } catch {
     return { ready: false, blockingReasons: ["feature-review-score-store-unreadable"] };
   }
-  if (storeSha256 !== safeString(scoreProvenance?.scoreStoreArtifactSha256).trim().toLowerCase()) {
-    blockingReasons.push("feature-review-score-store-artifact-sha-mismatch");
-  }
+  const recordedStoreSha256 = safeString(scoreProvenance?.scoreStoreArtifactSha256).trim().toLowerCase();
+  // The container hash remains provenance only. Unrelated score imports may
+  // change it; freshness is decided by the cited score payload and note
+  // identities below.
   const scoreId = safeString(scoreProvenance?.scoreId).trim();
   const score = (Array.isArray(store?.scores) ? store.scores : [])
     .find((item) => safeString(item?.scoreId).trim() === scoreId);
@@ -388,6 +390,10 @@ function auditPhysicalScoreBinding(sourceRoot, scoreProvenance, candidateRows) {
     expectedM3PlusNotes,
     candidateM3PlusNotes,
     noteCount: expectedNotes.length,
+    scoreBindingMode: ORDINARY_DYNAMIC_SCORE_BINDING_MODE,
+    storeArtifactChanged: storeSha256 !== recordedStoreSha256,
+    observedStoreSha256: storeSha256,
+    recordedStoreSha256,
   };
 }
 
@@ -1263,6 +1269,7 @@ export function auditControlledBatchRuns(runs = [], options = {}) {
 
   return {
     ok: failures.length === 0,
+    scoreBindingMode: ORDINARY_DYNAMIC_SCORE_BINDING_MODE,
     runCount,
     auditedRunMode: latestOnly ? "latest" : "all",
     m3plusRuntimeRequired: requireM3PlusRuntime,

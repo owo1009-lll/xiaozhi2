@@ -1324,7 +1324,7 @@ assert.equal(status.controlledPilotDecision?.liveEvidenceBindingCurrent, true, "
 assert.equal(status.controlledPilotDecision?.authorizationSuperseded, false, "current red evidence is blocked, not stale authority");
 
 const currentAuthorityBinding = {
-  contract: "western-controlled-pilot-live-evidence-v1",
+  contract: "western-controlled-pilot-live-evidence-v2",
   sha256: "e".repeat(64),
   evidence: {
     runtimeFailClosed: true,

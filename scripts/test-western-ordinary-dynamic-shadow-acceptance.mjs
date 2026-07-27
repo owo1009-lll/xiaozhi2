@@ -17,6 +17,7 @@ import {
   ORDINARY_DYNAMIC_CONTRACT_VERSION,
   ORDINARY_DYNAMIC_GATE_VERSION,
   ORDINARY_DYNAMIC_POLICY_VERSION,
+  ORDINARY_DYNAMIC_SCORE_BINDING_MODE,
   ORDINARY_DYNAMIC_TIMING_MODE,
   auditCandidateRunPayload,
   auditOrdinaryDynamicShadowAcceptanceLiveArtifacts,
@@ -265,8 +266,9 @@ function buildFixture(root) {
   }
 
   const acceptance = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     contractVersion: ORDINARY_DYNAMIC_ACCEPTANCE_VERSION,
+    scoreBindingMode: ORDINARY_DYNAMIC_SCORE_BINDING_MODE,
     candidateContractVersion: ORDINARY_DYNAMIC_CONTRACT_VERSION,
     policyVersion: ORDINARY_DYNAMIC_POLICY_VERSION,
     gateVersion: ORDINARY_DYNAMIC_GATE_VERSION,
@@ -422,21 +424,37 @@ try {
     `swapped audio must fail the binding: ${audioSwapped.blockingReasons}`,
   );
 
-  // 9. Editing the score in the store fails the score payload re-computation.
+  // 9. Adding an unrelated score changes the store artifact hash but must not
+  // invalidate evidence that is scoped to the two cited score payloads.
   buildFixture(root);
   const storePath = path.join(root, "data", "erhu-score-imports.json");
+  const expandedStore = JSON.parse(fs.readFileSync(storePath, "utf8"));
+  expandedStore.scores.push({
+    scoreId: "score-unrelated",
+    title: "unrelated",
+    sections: [],
+  });
+  fs.writeFileSync(storePath, `${JSON.stringify(expandedStore, null, 2)}\n`, "utf8");
+  const unrelatedScoreAdded = audit(root);
+  assert.equal(
+    unrelatedScoreAdded.ready,
+    true,
+    `an unrelated score must not stale cited-score evidence: ${unrelatedScoreAdded.blockingReasons}`,
+  );
+
+  // 10. Editing a cited score still fails the score payload re-computation.
+  buildFixture(root);
   const store = JSON.parse(fs.readFileSync(storePath, "utf8"));
   store.scores[0].sections[0].notes[0].midiPitch = 70;
   fs.writeFileSync(storePath, `${JSON.stringify(store, null, 2)}\n`, "utf8");
   const scoreEdited = audit(root);
   assert.equal(scoreEdited.ready, false);
   assert(
-    scoreEdited.blockingReasons.some((reason) => reason.includes("score-store-artifact-stale"))
-      && scoreEdited.blockingReasons.some((reason) => reason.includes("score-payload-stale")),
-    `an edited score must fail both store and payload bindings: ${scoreEdited.blockingReasons}`,
+    scoreEdited.blockingReasons.some((reason) => reason.includes("score-payload-stale")),
+    `an edited cited score must fail its payload binding: ${scoreEdited.blockingReasons}`,
   );
 
-  // 10. A failed runtime preflight closes the audit regardless of artifacts.
+  // 11. A failed runtime preflight closes the audit regardless of artifacts.
   buildFixture(root);
   const runtimeDown = auditOrdinaryDynamicShadowAcceptanceLiveArtifacts({
     repoRoot: root,
@@ -445,7 +463,7 @@ try {
   assert.equal(runtimeDown.ready, false);
   assert(runtimeDown.blockingReasons.includes("ordinary-dynamic-shadow-r3-live-runtime-preflight-failed"));
 
-  // 11. A missing acceptance report fails closed.
+  // 12. A missing acceptance report fails closed.
   fs.rmSync(path.join(root, ACCEPTANCE_REPORT_RELATIVE_PATH));
   const reportMissing = audit(root);
   assert.equal(reportMissing.ready, false);

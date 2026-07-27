@@ -993,6 +993,56 @@ async function testControlledSubmissionOfflineFeatureReviewBatch() {
     assert.equal(audit.ok, true, JSON.stringify(audit.failures));
     assert.equal(audit.featureReviewItemCount, 1);
     assert.equal(audit.candidateRowCount, 3);
+    const physicalScoreStorePath = path.join(tempRoot, "data", "erhu-score-imports.json");
+    const originalScoreStoreBytes = await fs.readFile(physicalScoreStorePath);
+    try {
+      const expandedStore = JSON.parse(originalScoreStoreBytes.toString("utf8"));
+      expandedStore.scores.push({
+        scoreId: "score-unrelated",
+        title: "Unrelated score",
+        sections: [],
+      });
+      await fs.writeFile(physicalScoreStorePath, `${JSON.stringify(expandedStore, null, 2)}\n`, "utf8");
+      const unrelatedScoreAudit = auditControlledBatchRuns(
+        savedBatchRun.trim().split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line)),
+        {
+          requireFeatureReview: true,
+          sourceRoot: tempRoot,
+          latestOnly: true,
+        },
+      );
+      assert.equal(
+        unrelatedScoreAudit.ok,
+        true,
+        `an unrelated score must not stale the cited physical score binding: ${JSON.stringify(unrelatedScoreAudit.failures)}`,
+      );
+    } finally {
+      await fs.writeFile(physicalScoreStorePath, originalScoreStoreBytes);
+    }
+    try {
+      const editedStore = JSON.parse(originalScoreStoreBytes.toString("utf8"));
+      editedStore.scores
+        .find((score) => score.scoreId === "score-test-clean")
+        .sections[0].notes[0].midiPitch = 70;
+      await fs.writeFile(physicalScoreStorePath, `${JSON.stringify(editedStore, null, 2)}\n`, "utf8");
+      const citedScoreEditedAudit = auditControlledBatchRuns(
+        savedBatchRun.trim().split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line)),
+        {
+          requireFeatureReview: true,
+          sourceRoot: tempRoot,
+          latestOnly: true,
+        },
+      );
+      assert.equal(citedScoreEditedAudit.ok, false);
+      assert(
+        citedScoreEditedAudit.failures.some(
+          (failure) => failure.code === "feature-review-score-payload-sha-mismatch",
+        ),
+        "editing the cited score payload must remain fail-closed",
+      );
+    } finally {
+      await fs.writeFile(physicalScoreStorePath, originalScoreStoreBytes);
+    }
     const emptyRequiredAudit = auditControlledBatchRuns([], {
       requireFeatureReview: true,
       sourceRoot: tempRoot,

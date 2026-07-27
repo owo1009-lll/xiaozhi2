@@ -12,7 +12,12 @@ import {
   summarizeControlledCandidateConfidencePilot,
 } from "./status-western-controlled-candidate-review.mjs";
 import { evaluateOrdinaryAudioRuntime } from "./run-western-ordinary-audio-python.mjs";
-import { auditOrdinaryDynamicShadowAcceptanceLiveArtifacts } from "./audit-western-ordinary-dynamic-shadow-acceptance.mjs";
+import {
+  ORDINARY_DYNAMIC_ACCEPTANCE_VERSION,
+  ORDINARY_DYNAMIC_LIVE_VERIFIER_CONTRACT,
+  ORDINARY_DYNAMIC_SCORE_BINDING_MODE,
+  auditOrdinaryDynamicShadowAcceptanceLiveArtifacts,
+} from "./audit-western-ordinary-dynamic-shadow-acceptance.mjs";
 import {
   FRESH_BLIND_CONTRACT,
   FRESH_BLIND_REPORT_RELATIVE_PATH,
@@ -261,7 +266,6 @@ const ROUND5_SEGMENT_GATES = Object.freeze([
 const ORDINARY_DYNAMIC_CONTRACT_VERSION = "western-ordinary-dynamic-shadow-candidate-v1";
 const ORDINARY_DYNAMIC_POLICY_VERSION = "western-ordinary-dynamic-shadow-policy-v1";
 const ORDINARY_DYNAMIC_GATE_VERSION = "western-ordinary-dynamic-shadow-gate-v1-review-only";
-const ORDINARY_DYNAMIC_ACCEPTANCE_VERSION = "western-ordinary-dynamic-shadow-r3-acceptance-v1";
 const ORDINARY_DYNAMIC_TIMING_MODE = "basic-pitch-dtw";
 const ORDINARY_DYNAMIC_RUNTIME_ID = "western-ordinary-dynamic-shadow-audio-py311";
 const ORDINARY_DYNAMIC_MODEL_SHA256 = "c6595f299ff83c52e89555789f7e3e829a6a0f25b6a88f7e99073af5a2470dc4";
@@ -271,7 +275,7 @@ const ORDINARY_REVIEW_ASSIST_CONTRACT = "western-round4-policy-c-review-assist-v
 const M3PLUS_RESCOPE_SCHEMA_VERSION = 2;
 const M3PLUS_RESCOPE_CONTRACT = "m3plus-rescope-four-zone-v2";
 const M3PLUS_RUNTIME_CONTRACT = "m3plus-gold-free-runtime-v1";
-export const CONTROLLED_PILOT_LIVE_EVIDENCE_CONTRACT = "western-controlled-pilot-live-evidence-v1";
+export const CONTROLLED_PILOT_LIVE_EVIDENCE_CONTRACT = "western-controlled-pilot-live-evidence-v2";
 const CONTROLLED_PILOT_ORDINARY_AUTHORIZATION_CONTRACT = "western-ordinary-dynamic-shadow-release-v1";
 const CONTROLLED_PILOT_SCOPE_CONTRACT = "western-ordinary-dynamic-shadow-release-v1+m3plus-rescope-four-zone-v2";
 const CONTROLLED_PILOT_REQUIRED_TRACKS = Object.freeze(["m3plus", "ordinary"]);
@@ -359,6 +363,8 @@ export function buildControlledPilotLiveEvidenceProjection(status = {}) {
       timingMode: ordinary.timingMode || null,
       foundationReady: ordinary.foundationReady === true,
       liveArtifactVerifierReady: ordinary.liveArtifactVerifierReady === true,
+      liveArtifactVerifierContract: ordinary.liveArtifactVerifierContract || null,
+      scoreBindingMode: ordinary.scoreBindingMode || null,
       r3AcceptanceReady: ordinary.r3AcceptanceReady === true,
       freshBlindEvidenceReady: ordinary.freshBlindEvidence?.ready === true,
       authorizationReady: ordinary.authorizationReady === true,
@@ -428,9 +434,12 @@ export function controlledPilotLiveEvidenceReady(liveEvidenceBinding = {}) {
   const ordinaryAcceptance = ordinary.acceptanceIdentity || {};
   const m3plus = live.m3plus || {};
   const physical = m3plus.physicalEvidence || {};
-  return live.runtimeFailClosed === true
+  return live.contract === CONTROLLED_PILOT_LIVE_EVIDENCE_CONTRACT
+    && live.runtimeFailClosed === true
     && ordinary.foundationReady === true
     && ordinary.liveArtifactVerifierReady === true
+    && ordinary.liveArtifactVerifierContract === ORDINARY_DYNAMIC_LIVE_VERIFIER_CONTRACT
+    && ordinary.scoreBindingMode === ORDINARY_DYNAMIC_SCORE_BINDING_MODE
     && ordinary.r3AcceptanceReady === true
     && ordinary.freshBlindEvidenceReady === true
     && ordinary.authorizationReady === true
@@ -685,8 +694,11 @@ export function validateOrdinaryDynamicShadowAcceptance(acceptance) {
   if (!acceptance || typeof acceptance !== "object" || Array.isArray(acceptance)) {
     return { ready: false, blockingReasons: ["ordinary-dynamic-shadow-r3-acceptance-missing"] };
   }
-  if (acceptance.schemaVersion !== 1) fail("ordinary-dynamic-shadow-r3-acceptance-schema-invalid");
+  if (acceptance.schemaVersion !== 2) fail("ordinary-dynamic-shadow-r3-acceptance-schema-invalid");
   if (acceptance.contractVersion !== ORDINARY_DYNAMIC_ACCEPTANCE_VERSION) fail("ordinary-dynamic-shadow-r3-acceptance-contract-invalid");
+  if (acceptance.scoreBindingMode !== ORDINARY_DYNAMIC_SCORE_BINDING_MODE) {
+    fail("ordinary-dynamic-shadow-r3-score-binding-mode-invalid");
+  }
   if (acceptance.candidateContractVersion !== ORDINARY_DYNAMIC_CONTRACT_VERSION) fail("ordinary-dynamic-shadow-r3-candidate-contract-invalid");
   if (acceptance.policyVersion !== ORDINARY_DYNAMIC_POLICY_VERSION) fail("ordinary-dynamic-shadow-r3-policy-invalid");
   if (acceptance.gateVersion !== ORDINARY_DYNAMIC_GATE_VERSION) fail("ordinary-dynamic-shadow-r3-gate-invalid");
@@ -4955,6 +4967,8 @@ async function buildOrdinaryDynamicShadowStatus() {
     foundationReady: runtime.runtimeReady === true,
     foundationScope: "implementation-and-live-runtime-preflight-only",
     liveArtifactVerifierReady: ORDINARY_DYNAMIC_ACCEPTANCE_LIVE_VERIFIER_IMPLEMENTED,
+    liveArtifactVerifierContract: ORDINARY_DYNAMIC_LIVE_VERIFIER_CONTRACT,
+    scoreBindingMode: ORDINARY_DYNAMIC_SCORE_BINDING_MODE,
     r3AcceptanceReady,
     freshBlindEvidence: {
       contract: FRESH_BLIND_CONTRACT,
@@ -5042,6 +5056,8 @@ async function buildOrdinaryDynamicShadowStatus() {
           recordings: acceptance.recordings || [],
           blockingReasons: acceptanceValidation.blockingReasons,
           liveArtifactAudit: {
+            contract: liveArtifactAudit.contract || "",
+            scoreBindingMode: liveArtifactAudit.scoreBindingMode || "",
             ready: liveArtifactAudit.ready === true,
             blockingReasons: liveArtifactAudit.blockingReasons || [],
           },

@@ -50,6 +50,8 @@ const PASSING_PROJECT_STATUS = {
         timingMode: "basic-pitch-dtw",
         foundationReady: true,
         liveArtifactVerifierReady: true,
+        liveArtifactVerifierContract: "western-ordinary-dynamic-shadow-live-artifact-verifier-v2",
+        scoreBindingMode: "referenced-score-payload-and-note-identity-v1",
         r3AcceptanceReady: true,
         freshBlindEvidence: { ready: true },
         authorizationReady: true,
@@ -111,6 +113,14 @@ assert.equal(
   controlledPilotLiveEvidenceReady(PASSING_LIVE_BINDING),
   true,
   "passing fixture must include the complete ordinary runtime and acceptance identity",
+);
+const legacyLiveContractBinding = structuredClone(PASSING_LIVE_BINDING);
+legacyLiveContractBinding.contract = "western-controlled-pilot-live-evidence-v1";
+legacyLiveContractBinding.evidence.contract = "western-controlled-pilot-live-evidence-v1";
+assert.equal(
+  controlledPilotLiveEvidenceReady(legacyLiveContractBinding),
+  false,
+  "the superseded whole-store live-evidence contract must fail closed",
 );
 for (const [section, field] of [
   ["runtime", "runtimeId"],

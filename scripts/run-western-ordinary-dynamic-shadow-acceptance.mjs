@@ -16,6 +16,7 @@ import {
   ORDINARY_DYNAMIC_CONTRACT_VERSION,
   ORDINARY_DYNAMIC_GATE_VERSION,
   ORDINARY_DYNAMIC_POLICY_VERSION,
+  ORDINARY_DYNAMIC_SCORE_BINDING_MODE,
   ORDINARY_DYNAMIC_TIMING_MODE,
   auditCandidateRunPayload,
   auditOrdinaryDynamicShadowAcceptanceLiveArtifacts,
@@ -223,8 +224,9 @@ export async function runOrdinaryDynamicShadowAcceptance({ repoRoot = process.cw
   }
 
   const acceptance = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     contractVersion: ORDINARY_DYNAMIC_ACCEPTANCE_VERSION,
+    scoreBindingMode: ORDINARY_DYNAMIC_SCORE_BINDING_MODE,
     candidateContractVersion: ORDINARY_DYNAMIC_CONTRACT_VERSION,
     policyVersion: ORDINARY_DYNAMIC_POLICY_VERSION,
     gateVersion: ORDINARY_DYNAMIC_GATE_VERSION,

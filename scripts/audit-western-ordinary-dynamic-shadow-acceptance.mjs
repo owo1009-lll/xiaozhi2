@@ -22,10 +22,12 @@ import {
 export const ORDINARY_DYNAMIC_CONTRACT_VERSION = "western-ordinary-dynamic-shadow-candidate-v1";
 export const ORDINARY_DYNAMIC_POLICY_VERSION = "western-ordinary-dynamic-shadow-policy-v1";
 export const ORDINARY_DYNAMIC_GATE_VERSION = "western-ordinary-dynamic-shadow-gate-v1-review-only";
-export const ORDINARY_DYNAMIC_ACCEPTANCE_VERSION = "western-ordinary-dynamic-shadow-r3-acceptance-v1";
+export const ORDINARY_DYNAMIC_ACCEPTANCE_VERSION = "western-ordinary-dynamic-shadow-r3-acceptance-v2";
 export const ORDINARY_DYNAMIC_TIMING_MODE = "basic-pitch-dtw";
 export const ORDINARY_DYNAMIC_LIVE_VERIFIER_CONTRACT =
-  "western-ordinary-dynamic-shadow-live-artifact-verifier-v1";
+  "western-ordinary-dynamic-shadow-live-artifact-verifier-v2";
+export const ORDINARY_DYNAMIC_SCORE_BINDING_MODE =
+  "referenced-score-payload-and-note-identity-v1";
 export const ORDINARY_DYNAMIC_CANDIDATE_EVIDENCE_CONTRACT =
   "western-ordinary-dynamic-shadow-candidate-evidence-v1";
 export const ORDINARY_DYNAMIC_ANALYSIS_MODE = "basic-pitch-dtw-pyin-review-v1";
@@ -155,6 +157,14 @@ export function loadScoreStore(repoRoot) {
     }
   } catch {
     return { ok: false, status: "store-parse-failed", path: relativePath.replace(/\\/g, "/") };
+  }
+  const afterArtifact = readWorkspaceArtifactSync(repoRoot, relativePath);
+  if (afterArtifact.status !== "ok" || afterArtifact.sha256 !== artifact.sha256) {
+    return {
+      ok: false,
+      status: "changed-during-audit",
+      path: relativePath.replace(/\\/g, "/"),
+    };
   }
   return {
     ok: true,
@@ -423,6 +433,9 @@ export function auditOrdinaryDynamicShadowAcceptanceLiveArtifacts({
       blockingReasons: ["ordinary-dynamic-shadow-r3-live-acceptance-invalid"],
     };
   }
+  if (report.scoreBindingMode !== ORDINARY_DYNAMIC_SCORE_BINDING_MODE) {
+    fail("ordinary-dynamic-shadow-r3-live-score-binding-mode-invalid");
+  }
 
   const digestPayload = structuredClone(report);
   delete digestPayload.evidenceDigestSha256;
@@ -462,9 +475,8 @@ export function auditOrdinaryDynamicShadowAcceptanceLiveArtifacts({
     if (!store.ok) {
       fail(`${prefix}:score-store-${store.status}`);
     } else {
-      if (store.sha256 !== String(recording?.scoreStoreArtifactSha256 || "").toLowerCase()) {
-        fail(`${prefix}:score-store-artifact-stale`);
-      }
+      // Do not bind freshness to the whole mutable library container. The
+      // cited score payload and note count remain the fail-closed boundary.
       const score = store.scores.find(
         (item) => String(item?.scoreId || "").trim() === String(recording?.scoreId || "").trim(),
       );
@@ -485,6 +497,7 @@ export function auditOrdinaryDynamicShadowAcceptanceLiveArtifacts({
 
   return {
     contract: ORDINARY_DYNAMIC_LIVE_VERIFIER_CONTRACT,
+    scoreBindingMode: ORDINARY_DYNAMIC_SCORE_BINDING_MODE,
     ready: blockingReasons.length === 0,
     blockingReasons: [...new Set(blockingReasons)].sort(),
     recordingCount: recordings.length,
