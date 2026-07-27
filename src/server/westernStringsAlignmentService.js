@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 
 import { clamp, createId, nowIso, safeBoolean, safeNumber, safeString } from "./baseUtils.js";
 import { readScoreStoreFromSqlite } from "./scoreStoreSqlite.js";
+import { appendTrainingLedgerRecord } from "./westernStringsTrainingLedger.js";
 
 const execFileAsync = promisify(execFile);
 const SOURCE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -1972,6 +1973,48 @@ export async function findWesternControlledSubmission({ repoRoot = process.cwd()
   return submissions.find((submission) => safeString(submission.submissionId).trim() === targetId) || null;
 }
 
+async function findLatestAnalysisItem(repoRoot, submissionId) {
+  const runs = await readJsonlRecords(controlledSubmissionBatchRunsPath(repoRoot));
+  let latest = null;
+  for (const run of runs) {
+    for (const item of run?.items || []) {
+      if (safeString(item?.submissionId).trim() === submissionId) latest = { run, item };
+    }
+  }
+  return latest;
+}
+
+// The teacher already listens note by note to write feedback; when they also
+// sign a complete error inventory the same pass becomes a training sample.
+// A ledger problem must never block the review itself, so every failure is
+// reported back as data instead of thrown.
+async function appendTrainingLedgerSample({ repoRoot, submission, review, payload }) {
+  if (payload?.completeErrorInventory !== true) {
+    return { recorded: false, reason: "complete-error-inventory-not-signed" };
+  }
+  try {
+    const latest = await findLatestAnalysisItem(repoRoot, safeString(submission.submissionId).trim());
+    const item = latest?.item || {};
+    const result = await appendTrainingLedgerRecord({
+      repoRoot,
+      submission,
+      review,
+      payload,
+      machineSnapshot: {
+        batchRunId: safeString(latest?.run?.batchRunId),
+        candidateRowsPath: safeString(item.candidateRowsPath),
+        candidateRowsSha256: safeString(item.candidateRowsSha256),
+        scorePayloadSha256: safeString(item.candidateGate?.scoreProvenance?.scorePayloadSha256),
+        gateVersion: safeString(item.candidateGate?.gateVersion),
+        modelVersion: safeString(item.candidateGate?.basicPitchCacheProvenance?.modelVersion),
+      },
+    });
+    return { recorded: true, ...result };
+  } catch (error) {
+    return { recorded: false, reason: safeString(error?.message || error) };
+  }
+}
+
 export async function recordWesternControlledSubmissionReview({ repoRoot = process.cwd(), payload = {} } = {}) {
   const submissionId = safeString(payload.submissionId).trim();
   const action = safeString(payload.action).trim();
@@ -2022,7 +2065,41 @@ export async function recordWesternControlledSubmissionReview({ repoRoot = proce
   const outPath = controlledSubmissionReviewsPath(repoRoot);
   await fs.mkdir(path.dirname(outPath), { recursive: true });
   await fs.appendFile(outPath, `${JSON.stringify(record)}\n`, "utf8");
-  return { ok: true, review: record };
+  const trainingLedger = await appendTrainingLedgerSample({ repoRoot, submission, review: record, payload });
+  return { ok: true, review: record, trainingLedger };
+}
+
+// Reviewer-only: the queue payload carries at most 20 review-assist rows, so the
+// console needs the full note list to label a note the machine never flagged.
+// Reads the analysis artifact this repo wrote; it never re-runs analysis.
+export async function listWesternControlledSubmissionScoreNotes({
+  repoRoot = process.cwd(),
+  submissionId = "",
+} = {}) {
+  const targetId = safeString(submissionId).trim();
+  if (!targetId) throw new Error("submissionId is required.");
+  const latest = await findLatestAnalysisItem(repoRoot, targetId);
+  const relativePath = safeString(latest?.item?.candidateRowsPath).trim();
+  if (!relativePath) {
+    return { ok: true, submissionId: targetId, batchRunId: "", candidateRowsSha256: "", noteCount: 0, notes: [] };
+  }
+  const artifactPath = path.resolve(repoRoot, relativePath);
+  if (!pathIsInside(path.join(repoRoot, "data"), artifactPath)) {
+    throw new Error("candidate rows artifact resolved outside the data directory.");
+  }
+  // The sha is returned so the console can prove, at signing time, that it
+  // reviewed exactly this artifact; the training ledger refuses any mismatch.
+  const bytes = await fs.readFile(artifactPath);
+  const parsed = JSON.parse(bytes.toString("utf8"));
+  const notes = buildCandidateNoteIdentityRows(parsed?.candidateRows);
+  return {
+    ok: true,
+    submissionId: targetId,
+    batchRunId: safeString(latest?.run?.batchRunId),
+    candidateRowsSha256: crypto.createHash("sha256").update(bytes).digest("hex"),
+    noteCount: notes.length,
+    notes,
+  };
 }
 
 async function fileExists(targetPath) {

@@ -10,6 +10,7 @@ import {
   listWesternControlledSubmissions,
   parsePreviewQuery,
   parseStudentAnalysisPayload,
+  listWesternControlledSubmissionScoreNotes,
   recordWesternControlledSubmissionReview,
   recordWesternAlignmentPreviewReview,
   recordWesternStudentReview,
@@ -348,6 +349,18 @@ export function createWesternStringsRouter({
       return res.sendFile(scorePhotoPath);
     } catch (error) {
       return res.status(500).json({ ok: false, error: safeString(error?.message, "failed to read controlled submission score photo.") });
+    }
+  });
+
+  router.get("/api/strings/controlled-submissions/:submissionId/score-notes", async (req, res) => {
+    try {
+      const result = await listWesternControlledSubmissionScoreNotes({
+        repoRoot,
+        submissionId: req.params.submissionId,
+      });
+      return res.json(result);
+    } catch (error) {
+      return res.status(400).json({ ok: false, error: safeString(error?.message, "failed to read controlled submission score notes.") });
     }
   });
 

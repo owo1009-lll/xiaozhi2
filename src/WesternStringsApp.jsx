@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  fetchWesternControlledSubmissionScoreNotes,
   fetchWesternControlledSubmissions,
   fetchWesternStudentAnalysis,
   importScoreMidi,
@@ -61,6 +62,219 @@ function getStudentIssueCandidateRows(submission) {
   return submission?.latestAnalysis?.reviewAssistPreview || [];
 }
 
+// Training vocabulary from docs/western-strings-training-ledger-spec.md. It is
+// deliberately different from the student-facing issue categories: this one
+// feeds a future training corpus, the other one is what a student reads.
+// `extra` is absent on purpose: an extra performed event has no score note, so
+// it is recorded through the separate extra-event control below.
+const TRAINING_LABEL_OPTIONS = [
+  { value: "", label: "不标（默认正确）" },
+  { value: "correct", label: "正确（否掉机器）" },
+  { value: "wrong_pitch", label: "错音" },
+  { value: "missing", label: "漏音" },
+  { value: "drag", label: "拖拍" },
+  { value: "uncertain", label: "拿不准" },
+];
+
+function describeScoreNote(note) {
+  const measure = Number.isInteger(note?.measureIndex) ? `第 ${note.measureIndex} 小节` : "小节未知";
+  const midi = Number.isInteger(note?.midi) ? ` · midi ${note.midi}` : "";
+  return `${measure}${midi} · ${note?.noteId || ""}`;
+}
+
+function TrainingLabelPanel({
+  machineRows,
+  scoreNotesMeta,
+  scoreNotesLoading,
+  draft,
+  onDraftChange,
+  onLabelChange,
+  onAddExtraEvent,
+  onExtraEventChange,
+  onRemoveExtraEvent,
+  onLoadScoreNotes,
+}) {
+  const labels = draft.labels || {};
+  const scoreNotes = scoreNotesMeta?.notes || [];
+  const extraEvents = draft.extraEvents || [];
+  const machineNoteIds = new Set(machineRows.map((row) => row.noteId));
+  const extraLabeled = Object.keys(labels).filter((noteId) => labels[noteId] && !machineNoteIds.has(noteId));
+  const labeledCount = Object.values(labels).filter(Boolean).length;
+  // Signing asserts every score note was swept, so it stays disabled until the
+  // full score is actually loaded and a reviewer identifies themselves.
+  const fullScoreLoaded = Boolean(scoreNotesMeta?.candidateRowsSha256) && scoreNotes.length > 0;
+  const canSign = fullScoreLoaded && Boolean((draft.reviewerId || "").trim()) && Boolean((draft.performerId || "").trim());
+
+  return (
+    <details className="western-training-ledger">
+      <summary>训练打标（{labeledCount} 条已标{draft.signed ? " · 已签署" : ""}）</summary>
+      <p className="muted-copy">
+        逐音打标只进本机训练账本，不改学生端、不翻任何开关、不参与冻结候选调参。未显式打标的谱音按「正确」计入，
+        因此必须先载入全谱、逐音巡检完毕，再勾选「完整错误清单」才会入账；账本只追加，重复复核不会覆盖旧签署。
+      </p>
+
+      <div className={fullScoreLoaded ? "status-banner" : "muted-copy"}>
+        {fullScoreLoaded
+          ? `全谱已载入：共 ${scoreNotesMeta.noteCount} 个谱音，工件 ${String(scoreNotesMeta.candidateRowsSha256).slice(0, 12)}…`
+          : "尚未载入全谱——未载入前无法签署完整错误清单。"}
+      </div>
+
+      {machineRows.length ? (
+        <div className="western-training-rows">
+          {machineRows.map((row) => (
+            <label key={row.noteId}>
+              <span>{describeScoreNote({ measureIndex: row.measureIndex, midi: row.midi, noteId: row.noteId })}</span>
+              <select
+                value={labels[row.noteId] || ""}
+                onChange={(event) => onLabelChange(row.noteId, event.target.value)}
+              >
+                {TRAINING_LABEL_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+          ))}
+        </div>
+      ) : (
+        <p className="muted-copy">本次分析没有机器候选行。</p>
+      )}
+
+      <div className="western-training-add">
+        <button type="button" className="secondary-button" disabled={scoreNotesLoading} onClick={onLoadScoreNotes}>
+          {scoreNotes.length ? `补机器漏掉的（${scoreNotes.length} 个谱音）` : "载入全谱音符"}
+        </button>
+        {scoreNotes.length ? (
+          <select
+            value=""
+            onChange={(event) => {
+              if (event.target.value) onLabelChange(event.target.value, "wrong_pitch");
+            }}
+          >
+            <option value="">选择一个机器没标的谱音…</option>
+            {scoreNotes
+              .filter((note) => !machineNoteIds.has(note.noteId))
+              .map((note) => (
+                <option key={note.noteId} value={note.noteId}>{describeScoreNote(note)}</option>
+              ))}
+          </select>
+        ) : null}
+        <button type="button" className="secondary-button" disabled={!fullScoreLoaded} onClick={onAddExtraEvent}>
+          补一个多余演奏事件
+        </button>
+      </div>
+
+      {extraEvents.length ? (
+        <div className="western-training-rows">
+          {extraEvents.map((event, index) => (
+            // Extra events carry their own identity (performed pitch + time),
+            // and only optionally name the score note they followed.
+            <div key={`extra-${index}`} className="western-training-extra">
+              <select
+                value={event.afterNoteId || ""}
+                onChange={(e) => onExtraEventChange(index, { afterNoteId: e.target.value })}
+              >
+                <option value="">（不指定紧跟在哪个谱音后）</option>
+                {scoreNotes.map((note) => (
+                  <option key={note.noteId} value={note.noteId}>{describeScoreNote(note)}</option>
+                ))}
+              </select>
+              <input
+                type="number"
+                value={event.performedMidi ?? ""}
+                placeholder="实际音高 MIDI（可空）"
+                onChange={(e) => onExtraEventChange(index, {
+                  performedMidi: e.target.value === "" ? null : Number(e.target.value),
+                })}
+              />
+              <input
+                type="number"
+                step="0.01"
+                value={event.startSeconds ?? ""}
+                placeholder="起始秒"
+                onChange={(e) => onExtraEventChange(index, {
+                  startSeconds: e.target.value === "" ? null : Number(e.target.value),
+                })}
+              />
+              <input
+                type="number"
+                step="0.01"
+                value={event.endSeconds ?? ""}
+                placeholder="结束秒（可空）"
+                onChange={(e) => onExtraEventChange(index, {
+                  endSeconds: e.target.value === "" ? null : Number(e.target.value),
+                })}
+              />
+              <button type="button" className="secondary-button" onClick={() => onRemoveExtraEvent(index)}>删除</button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {extraLabeled.length ? (
+        <div className="western-training-rows">
+          {extraLabeled.map((noteId) => {
+            const note = scoreNotes.find((item) => item.noteId === noteId);
+            return (
+              <label key={noteId}>
+                <span>补标 · {note ? describeScoreNote(note) : noteId}</span>
+                <select value={labels[noteId]} onChange={(event) => onLabelChange(noteId, event.target.value)}>
+                  {TRAINING_LABEL_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+            );
+          })}
+        </div>
+      ) : null}
+
+      <div className="western-training-meta">
+        <input
+          type="text"
+          value={draft.reviewerId || ""}
+          placeholder="复核人编号（必填；同一录音换人再签即成为双人复核样本）"
+          onChange={(event) => onDraftChange({ reviewerId: event.target.value })}
+        />
+        <input
+          type="text"
+          value={draft.performerId || ""}
+          placeholder="演奏者匿名编号（必填，用于将来按人切分）"
+          onChange={(event) => onDraftChange({ performerId: event.target.value })}
+        />
+        <input
+          type="text"
+          value={draft.deviceHint || ""}
+          placeholder="录音设备（可空）"
+          onChange={(event) => onDraftChange({ deviceHint: event.target.value })}
+        />
+        <input
+          type="text"
+          value={draft.levelHint || ""}
+          placeholder="程度（可空）"
+          onChange={(event) => onDraftChange({ levelHint: event.target.value })}
+        />
+        <label>
+          <input
+            type="checkbox"
+            checked={draft.consent === true}
+            onChange={(event) => onDraftChange({ consent: event.target.checked })}
+          />
+          已获得知情同意
+        </label>
+        <label title={canSign ? "" : "需先载入全谱并填写复核人与演奏者编号"}>
+          <input
+            type="checkbox"
+            disabled={!canSign}
+            checked={draft.signed === true && canSign}
+            onChange={(event) => onDraftChange({ signed: event.target.checked })}
+          />
+          完整错误清单：全谱 {scoreNotesMeta?.noteCount || 0} 个音我已逐一巡检，未标记的即为正确
+        </label>
+      </div>
+    </details>
+  );
+}
+
 export default function WesternStringsApp({ onBackToStudent }) {
   const musicXmlInputRef = useRef(null);
   const midiInputRef = useRef(null);
@@ -87,6 +301,9 @@ export default function WesternStringsApp({ onBackToStudent }) {
   const [reviewMessage, setReviewMessage] = useState("");
   const [feedbackDrafts, setFeedbackDrafts] = useState({});
   const [issueDrafts, setIssueDrafts] = useState({});
+  const [trainingDrafts, setTrainingDrafts] = useState({});
+  const [scoreNotesBySubmission, setScoreNotesBySubmission] = useState({});
+  const [scoreNotesLoadingId, setScoreNotesLoadingId] = useState("");
 
   const hasScoreInput = Boolean(job?.scoreId || scorePhotoFile);
 
@@ -226,15 +443,125 @@ export default function WesternStringsApp({ onBackToStudent }) {
     }
   }
 
+  function updateTrainingDraft(submissionId, patch) {
+    setTrainingDrafts((drafts) => ({
+      ...drafts,
+      [submissionId]: { ...(drafts[submissionId] || {}), ...patch },
+    }));
+  }
+
+  function updateTrainingLabel(submissionId, noteId, label) {
+    setTrainingDrafts((drafts) => {
+      const current = drafts[submissionId] || {};
+      return {
+        ...drafts,
+        [submissionId]: {
+          ...current,
+          labels: { ...(current.labels || {}), [noteId]: label },
+        },
+      };
+    });
+  }
+
+  async function loadSubmissionScoreNotes(submission) {
+    setScoreNotesLoadingId(submission.submissionId);
+    try {
+      const result = await fetchWesternControlledSubmissionScoreNotes(submission.submissionId);
+      setScoreNotesBySubmission((notes) => ({
+        ...notes,
+        [submission.submissionId]: {
+          notes: result.notes || [],
+          candidateRowsSha256: result.candidateRowsSha256 || "",
+          noteCount: result.noteCount || 0,
+        },
+      }));
+    } catch (notesError) {
+      setError(notesError?.message || "Score notes failed to load.");
+    } finally {
+      setScoreNotesLoadingId("");
+    }
+  }
+
+  function addExtraEvent(submissionId) {
+    setTrainingDrafts((drafts) => {
+      const current = drafts[submissionId] || {};
+      return {
+        ...drafts,
+        [submissionId]: {
+          ...current,
+          extraEvents: [
+            ...(current.extraEvents || []),
+            { afterNoteId: "", performedMidi: null, startSeconds: null, endSeconds: null, note: "" },
+          ],
+        },
+      };
+    });
+  }
+
+  function updateExtraEvent(submissionId, index, patch) {
+    setTrainingDrafts((drafts) => {
+      const current = drafts[submissionId] || {};
+      const events = [...(current.extraEvents || [])];
+      events[index] = { ...events[index], ...patch };
+      return { ...drafts, [submissionId]: { ...current, extraEvents: events } };
+    });
+  }
+
+  function removeExtraEvent(submissionId, index) {
+    setTrainingDrafts((drafts) => {
+      const current = drafts[submissionId] || {};
+      const events = (current.extraEvents || []).filter((_, position) => position !== index);
+      return { ...drafts, [submissionId]: { ...current, extraEvents: events } };
+    });
+  }
+
+  // Only a signed complete error inventory becomes a training sample; an
+  // ordinary review keeps sending exactly what it sent before.
+  // Only a signed complete error inventory over a fully loaded score becomes a
+  // training sample. The artifact sha and note count travel with the signature
+  // so the server can refuse anything the reviewer did not actually see.
+  function buildTrainingPayload(submission) {
+    const draft = trainingDrafts[submission.submissionId];
+    const meta = scoreNotesBySubmission[submission.submissionId];
+    if (!draft?.signed || !meta?.candidateRowsSha256) return {};
+    const labels = draft.labels || {};
+    return {
+      completeErrorInventory: true,
+      fullScoreReviewed: true,
+      candidateRowsSha256: meta.candidateRowsSha256,
+      scoreNoteCount: meta.noteCount,
+      reviewerId: (draft.reviewerId || "").trim(),
+      performerId: (draft.performerId || "").trim(),
+      deviceHint: draft.deviceHint || "",
+      levelHint: draft.levelHint || "",
+      consent: draft.consent ? "yes" : "no",
+      noteLabels: Object.entries(labels)
+        .filter(([, label]) => label)
+        .map(([noteId, label]) => ({ noteId, label })),
+      extraEvents: (draft.extraEvents || []).filter(
+        (event) => event.afterNoteId || event.startSeconds !== null,
+      ),
+    };
+  }
+
+  function describeTrainingLedgerResult(result) {
+    const ledger = result?.trainingLedger;
+    if (!ledger) return "";
+    if (ledger.recorded) return ` 训练账本已记录 ${ledger.noteLabelCount} 条标签（rev ${ledger.revision}）。`;
+    if (ledger.reason === "complete-error-inventory-not-signed") return "";
+    return ` 训练账本未记录：${ledger.reason}`;
+  }
+
   async function saveSubmissionReview(submission, action) {
     setSubmissionReviewSavingId(submission.submissionId);
     setReviewMessage("");
     try {
-      await saveWesternControlledSubmissionReview({
+      const result = await saveWesternControlledSubmissionReview({
         submissionId: submission.submissionId,
         action,
+        ...buildTrainingPayload(submission),
       });
-      setReviewMessage("Controlled submission review saved.");
+      setReviewMessage(`Controlled submission review saved.${describeTrainingLedgerResult(result)}`);
       await loadControlledSubmissionQueue();
     } catch (queueError) {
       setError(queueError?.message || "Controlled submission review failed.");
@@ -261,14 +588,15 @@ export default function WesternStringsApp({ onBackToStudent }) {
           noteIndex: row.noteIndex,
           category: categories[row.noteId],
         }));
-      await saveWesternControlledSubmissionReview({
+      const result = await saveWesternControlledSubmissionReview({
         submissionId: submission.submissionId,
         action: "feedback_released",
         studentMessage,
         releaseToStudent: true,
         studentIssues,
+        ...buildTrainingPayload(submission),
       });
-      setReviewMessage("Feedback released to the student page.");
+      setReviewMessage(`Feedback released to the student page.${describeTrainingLedgerResult(result)}`);
       setFeedbackDrafts((drafts) => ({ ...drafts, [submission.submissionId]: "" }));
       setIssueDrafts((drafts) => ({ ...drafts, [submission.submissionId]: {} }));
       await loadControlledSubmissionQueue();
@@ -523,6 +851,18 @@ export default function WesternStringsApp({ onBackToStudent }) {
                           },
                         }))
                       }
+                    />
+                    <TrainingLabelPanel
+                      machineRows={getStudentIssueCandidateRows(submission)}
+                      scoreNotesMeta={scoreNotesBySubmission[submission.submissionId] || null}
+                      scoreNotesLoading={scoreNotesLoadingId === submission.submissionId}
+                      draft={trainingDrafts[submission.submissionId] || {}}
+                      onDraftChange={(patch) => updateTrainingDraft(submission.submissionId, patch)}
+                      onLabelChange={(noteId, label) => updateTrainingLabel(submission.submissionId, noteId, label)}
+                      onAddExtraEvent={() => addExtraEvent(submission.submissionId)}
+                      onExtraEventChange={(index, patch) => updateExtraEvent(submission.submissionId, index, patch)}
+                      onRemoveExtraEvent={(index) => removeExtraEvent(submission.submissionId, index)}
+                      onLoadScoreNotes={() => loadSubmissionScoreNotes(submission)}
                     />
                   </div>
                   <button

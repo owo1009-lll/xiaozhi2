@@ -355,6 +355,15 @@ export async function fetchWesternControlledSubmissions(params = {}) {
   return readJson(await fetch(`/api/strings/controlled-submissions${suffix}`, NO_STORE_REQUEST));
 }
 
+export async function fetchWesternControlledSubmissionScoreNotes(submissionId = "") {
+  return readJson(
+    await fetch(
+      `/api/strings/controlled-submissions/${encodeURIComponent(submissionId)}/score-notes`,
+      NO_STORE_REQUEST,
+    ),
+  );
+}
+
 export async function saveWesternControlledSubmissionReview(payload = {}) {
   return readJson(
     await fetch("/api/strings/controlled-submissions/reviews", {
