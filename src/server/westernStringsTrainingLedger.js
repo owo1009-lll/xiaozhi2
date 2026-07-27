@@ -40,6 +40,7 @@ export const TRAINING_LEDGER_ERROR_LABELS = Object.freeze(["wrong_pitch", "missi
 
 const LABEL_SET = new Set(TRAINING_LEDGER_LABELS);
 const NOTE_ID_PATTERN = /^xml-m-?\d+-n\d+$/i;
+const SHA1_PATTERN = /^[a-f0-9]{40}$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 
 export function trainingLedgerDir(repoRoot = process.cwd()) {
@@ -67,6 +68,10 @@ function canonicalJson(value) {
 
 function sha256Buffer(buffer) {
   return crypto.createHash("sha256").update(buffer).digest("hex");
+}
+
+function sha1Buffer(buffer) {
+  return crypto.createHash("sha1").update(buffer).digest("hex");
 }
 
 export function recordSha256(record) {
@@ -271,24 +276,42 @@ export async function buildTrainingLedgerRecord({
   // Audio provenance is re-checked against the file on disk right now; the
   // score payload sha is the analysis-time value carried by the artifact's run,
   // because the shared score store legitimately changes after an analysis.
-  const audioSha256 = safeString(submission.audioHash).trim().toLowerCase();
-  if (!SHA256_PATTERN.test(audioSha256)) {
-    throw new Error("training ledger requires the submission audio sha256.");
+  const submittedAudioHash = safeString(submission.audioHash).trim().toLowerCase();
+  if (!SHA1_PATTERN.test(submittedAudioHash) && !SHA256_PATTERN.test(submittedAudioHash)) {
+    throw new Error("training ledger requires a submission audio hash (sha1 or sha256).");
   }
   const audioPath = safeString(submission.audioPath || submission.audioSubmission?.storedPath);
+  let audioSha256 = "";
   let audioVerified = false;
+  let submittedAudioHashVerified = false;
+  let submittedAudioHashAlgorithm = "";
   if (audioPath) {
     const resolvedAudio = path.resolve(repoRoot, audioPath);
     try {
       const audioBytes = await fs.readFile(resolvedAudio);
-      if (sha256Buffer(audioBytes) !== audioSha256) {
-        throw new Error("training ledger audio file no longer matches the submitted audio sha256.");
+      audioSha256 = sha256Buffer(audioBytes);
+      const observedSubmittedHash = SHA256_PATTERN.test(submittedAudioHash)
+        ? audioSha256
+        : SHA1_PATTERN.test(submittedAudioHash)
+          ? sha1Buffer(audioBytes)
+          : "";
+      submittedAudioHashAlgorithm = SHA256_PATTERN.test(submittedAudioHash) ? "sha256" : "sha1";
+      if (!observedSubmittedHash || observedSubmittedHash !== submittedAudioHash) {
+        throw new Error("training ledger audio file no longer matches the submitted audio hash.");
       }
       audioVerified = true;
+      submittedAudioHashVerified = true;
     } catch (error) {
       if (String(error?.message || "").includes("no longer matches")) throw error;
       audioVerified = false;
     }
+  }
+  if (!audioSha256) {
+    if (!SHA256_PATTERN.test(submittedAudioHash)) {
+      throw new Error("training ledger requires an on-disk audio file to derive audio sha256.");
+    }
+    audioSha256 = submittedAudioHash;
+    submittedAudioHashAlgorithm = "sha256";
   }
 
   const scorePayloadSha256 = safeString(machineSnapshot.scorePayloadSha256).trim().toLowerCase();
@@ -331,6 +354,8 @@ export async function buildTrainingLedgerRecord({
       reviewerSawSameArtifact: true,
       noteIdentitiesResolvedFromArtifact: true,
       audioRehashed: audioVerified,
+      submissionAudioHashAlgorithm: submittedAudioHashAlgorithm,
+      submissionAudioHashVerified: submittedAudioHashVerified,
       verifiedAt: nowIso(),
     },
     consent: "yes",

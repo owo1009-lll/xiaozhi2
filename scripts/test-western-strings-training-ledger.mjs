@@ -59,6 +59,7 @@ async function writeFixture(rows) {
   return {
     artifactSha: crypto.createHash("sha256").update(bytes).digest("hex"),
     audioSha: crypto.createHash("sha256").update(audioBytes).digest("hex"),
+    audioLegacySha1: crypto.createHash("sha1").update(audioBytes).digest("hex"),
   };
 }
 
@@ -67,7 +68,7 @@ const rows = [
   { noteId: "xml-m7-n2", noteIndex: 1, measureIndex: 7, midi: 69 },
   { noteId: "xml-m9-n3", noteIndex: 2, measureIndex: 9, midi: 71 },
 ];
-const { artifactSha, audioSha } = await writeFixture(rows);
+const { artifactSha, audioSha, audioLegacySha1 } = await writeFixture(rows);
 
 const submission = {
   submissionId: "strings-submit-test-0001",
@@ -113,8 +114,21 @@ try {
   assert.equal(record.extraEvents[0].kind, "extra");
   assert.equal(record.extraEvents[0].performedMidi, 70);
   assert.equal(record.verification.audioRehashed, true, "audio must be re-hashed from disk");
+  assert.equal(record.verification.submissionAudioHashAlgorithm, "sha256");
+  assert.equal(record.verification.submissionAudioHashVerified, true);
   assert.equal(record.verification.candidateArtifactRehashed, true);
   assert.equal(record.performerKey, "anon-01");
+
+  // The live upload path still identifies cached audio with SHA-1. The ledger
+  // must verify that identity, then derive and store its own SHA-256.
+  const uploadedRecord = await buildTrainingLedgerRecord({
+    ...base,
+    submission: { ...submission, audioHash: audioLegacySha1 },
+    payload: signedPayload,
+  });
+  assert.equal(uploadedRecord.audioSha256, audioSha);
+  assert.equal(uploadedRecord.verification.submissionAudioHashAlgorithm, "sha1");
+  assert.equal(uploadedRecord.verification.submissionAudioHashVerified, true);
 
   async function rejects(payload, expected, message, overrides = {}) {
     await assert.rejects(
@@ -190,7 +204,7 @@ try {
   await rejects(signedPayload, "scorePayloadSha256", "the analysis-time score sha is required", {
     machineSnapshot: { ...machineSnapshot, scorePayloadSha256: "" },
   });
-  await rejects(signedPayload, "audio sha256", "the audio sha is required", {
+  await rejects(signedPayload, "submission audio hash", "the audio hash is required", {
     submission: { ...submission, audioHash: "" },
   });
 
