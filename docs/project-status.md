@@ -1,6 +1,6 @@
 # 西洋弦乐练习诊断项目状态快照
 
-更新时间: 2026-07-24
+更新时间: 2026-07-27
 
 本文件是当前主线状态快照。实时判断仍以命令为准:
 
@@ -11,6 +11,12 @@
 - `npm run build`
 
 二胡线已经冻结为论文证据、困难案例和共享模块来源。当前产品主线是西洋弓弦乐, 小提琴优先, 大提琴后续独立验证。
+
+## 2026-07-27 P0 曲库指纹漂移与证据重绑
+
+- **回归已确认，不是运行时代码故障:** `data/erhu-score-imports.sqlite` 的 SHA-256 已由 r3 验收记录的 `6cb6a8ef9cee1cf460927adeec2ce250476fab77aa0835ca905099dada3270c4` 变为 `ffe02154240f198bcde7e9198615c3f48d2f7af42bd73235bcd649746613c3b4`。数据库现场审计显示 2026-07-24 08:35–08:36Z 新增 32 个 Bach movement，当前活动曲谱为 72 首。旧 r3 报告的两条音频、单曲 score payload、音符数、候选工件、模型和策略锚点均保持一致；live audit 只报 `r3-02/r3-03:score-store-artifact-stale`。最新物理批也只报 `feature-review-score-store-artifact-sha-mismatch`，以及由同一个 `scoreBinding.ready=false` 连带产生的 `feature-review-m3plus-score-safety-identity-mismatch`，没有第二个独立漂移。故障边界在证据/门禁层；`self_check_hint` 的现场生成路径和学生端 fail-closed 开关没有损坏。
+- **生命周期重绑已完成:** 旧 canonical 审计先归档到 gitignored `data/experiments/superseded-score-store-rebind-20260727/`；随后按当前曲库重跑 r3 cold/warm 验收，覆盖率保持 `35/45=0.777778` 与 `48/51=0.941176`，仍为 0 auto-pass、全行 review-only。再以历史 Round3 基础设施样本生成单项物理批 `strings-batch-ms3d4f6x-r6v1cp`，candidate audit 为 `59/59`、0 failure；M3+ physical audit、release review、decision 和 start preflight 依次重绑。当前 `r3AcceptanceReady=true`、`policyCReviewAssistRuntime.ready=true`、`physicalEvidenceCurrent=true`、`readyForControlledPilot=true`、`readyToStartControlledPilot=true`、`okToStartControlledPilot=true`，对应 blocker 均为空。
+- **发布边界未放宽:** 本次只更新证据身份，没有修改阈值、策略或运行时代码，也没有消费 Round6 fresh 录音。`ordinaryUploadAutoFeedbackReady=false`、`m3plusAutoFeedbackReady=false`、`m4OmrAutoScoreReady=false` 保持不变。`western:project-gate` 仍按设计非零退出，当前只剩 `ordinary-dynamic-shadow-student-gate-closed` 与 `m3plus-student-gate-closed` 两个结构性学生门，不得把受控试点就绪误写为默认学生发布就绪。
 
 ## 2026-07-19 当前分支刷新
 
