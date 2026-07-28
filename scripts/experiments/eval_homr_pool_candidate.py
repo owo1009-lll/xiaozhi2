@@ -29,8 +29,8 @@ sys.path.insert(0, str(REPO / "scripts" / "experiments"))
 
 import proto_western_strings_score_anchored_feedback as anchor  # noqa: E402
 
-HOMR_EXE = (REPO / "data" / "experiments" / "western-strings-m4"
-            / "homr-compat-venv" / "Scripts" / "homr.exe")
+HOMR_EXE = (REPO / "data" / "tools" / "homr-0.7.0-ort1.27.0"
+            / "Scripts" / "homr.exe")
 PRIVATE = REPO / "data" / "private" / "western-strings-m2"
 AUDITS = REPO / "data" / "analysis-photo-score"
 DEFAULT_OUT = REPO / "data" / "experiments" / "western-strings-m4" / "homr-pool-candidate"
