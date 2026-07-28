@@ -30,6 +30,15 @@ import {
   findEditionRenderPath,
   listSupportedEditions,
 } from "./westernScoreEditions.js";
+import { isTunnelRequest } from "./publicAccessGuard.js";
+
+const WEB_STUDENT_CAPABILITY_PATTERN = /^stu-v2-[a-f0-9]{32}$/;
+
+function secureStudentCapabilityError() {
+  const error = new Error("A secure student access token is required.");
+  error.statusCode = 401;
+  return error;
+}
 
 function defaultParseIncomingPayload(req) {
   return req.body || {};
@@ -43,13 +52,7 @@ async function defaultPersistScorePhoto() {
   return { scorePhotoPath: "", scorePhotoHash: "" };
 }
 
-function defaultAudioSubmissionFromUpload(file, fallback = {}) {
-  if (!file) return fallback || null;
-  return fallback || null;
-}
-
-function defaultScorePhotoSubmissionFromUpload(file, fallback = {}) {
-  if (!file) return fallback || null;
+function defaultSubmissionFromUpload(file, fallback = {}) {
   return fallback || null;
 }
 
@@ -64,8 +67,8 @@ export function createWesternStringsRouter({
   audioCacheDir = "",
   scorePhotoCacheDir = "",
   parseIncomingPayload = defaultParseIncomingPayload,
-  buildAudioSubmissionFromUpload = defaultAudioSubmissionFromUpload,
-  buildScorePhotoSubmissionFromUpload = defaultScorePhotoSubmissionFromUpload,
+  buildAudioSubmissionFromUpload = defaultSubmissionFromUpload,
+  buildScorePhotoSubmissionFromUpload = defaultSubmissionFromUpload,
   persistUploadedAudioFile = defaultPersistAudio,
   persistPayloadAudio = defaultPersistAudio,
   persistUploadedScorePhotoFile = defaultPersistScorePhoto,
@@ -84,6 +87,14 @@ export function createWesternStringsRouter({
       recordingId: submissionPayload.recordingId,
       submissionPayload,
     });
+  }
+
+  function buildPublicAnalysisView(analysis = {}) {
+    return {
+      studentReady: false,
+      submissionAccepted: analysis?.submissionAccepted === true,
+      blockingReasons: Array.isArray(analysis?.blockingReasons) ? analysis.blockingReasons : [],
+    };
   }
 
   if (typeof contentSafety?.setReleaseSubmission === "function") {
@@ -128,6 +139,12 @@ export function createWesternStringsRouter({
   async function parseStudentSubmission(req) {
     const payload = parseIncomingPayload(req);
     const parsed = parseStudentAnalysisPayload(payload || {});
+    const isWechatMiniProgram = safeString(payload?.clientPlatform).trim() === "wechat-mini-program";
+    if (isTunnelRequest(req)
+      && !isWechatMiniProgram
+      && !WEB_STUDENT_CAPABILITY_PATTERN.test(parsed.studentRef)) {
+      throw secureStudentCapabilityError();
+    }
     const uploadedAudio = req.files?.audio?.[0] || req.file || null;
     const uploadedScorePhoto = req.files?.scorePhoto?.[0] || null;
     const persistedAudio = uploadedAudio
@@ -148,7 +165,7 @@ export function createWesternStringsRouter({
     }
     return {
       ...parsed,
-      isWechatMiniProgram: safeString(payload?.clientPlatform).trim() === "wechat-mini-program",
+      isWechatMiniProgram,
       wechatLoginCode: safeString(payload?.wechatLoginCode).trim(),
       audioPath: persistedAudio.audioPath || parsed.audioPath,
       audioHash: persistedAudio.audioHash || parsed.audioHash,
@@ -214,6 +231,8 @@ export function createWesternStringsRouter({
             return submission;
           })(),
         });
+        parsed.studentRef = safeString(moderation.studentRef).trim();
+        if (!parsed.studentRef) throw new ContentSafetyError(CONTENT_SAFETY_UNAVAILABLE_MESSAGE);
         if (moderation.status === "pending") {
           return res.status(202).json({
             ok: true,
@@ -223,7 +242,10 @@ export function createWesternStringsRouter({
         }
       }
       const analysis = await buildStudentAnalysis(parsed);
-      return res.json({ ok: true, analysis });
+      return res.json({
+        ok: true,
+        analysis: isTunnelRequest(req) ? buildPublicAnalysisView(analysis) : analysis,
+      });
     } catch (error) {
       return sendAnalyzeError(res, error);
     }
@@ -303,9 +325,21 @@ export function createWesternStringsRouter({
   router.get("/api/strings/student-submissions", async (req, res) => {
     try {
       const limit = Math.max(0, Math.round(Number(req.query?.limit || 20)));
+      const isWechatMiniProgram = safeString(req.query?.clientPlatform).trim() === "wechat-mini-program";
+      let studentRef = safeString(req.query?.studentRef).trim();
+      if (isWechatMiniProgram) {
+        if (typeof contentSafety?.resolveMiniProgramStudentRef !== "function") {
+          throw new ContentSafetyError(CONTENT_SAFETY_UNAVAILABLE_MESSAGE);
+        }
+        studentRef = await contentSafety.resolveMiniProgramStudentRef(
+          safeString(req.query?.wechatLoginCode).trim(),
+        );
+      } else if (isTunnelRequest(req) && !WEB_STUDENT_CAPABILITY_PATTERN.test(studentRef)) {
+        throw secureStudentCapabilityError();
+      }
       const result = await listWesternStudentSubmissions({
         repoRoot,
-        studentRef: safeString(req.query?.studentRef),
+        studentRef,
         limit,
       });
       return res.json(result);

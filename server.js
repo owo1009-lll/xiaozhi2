@@ -5,7 +5,6 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import multer from "multer";
 import { getErhuPiece, getErhuPieceSummaries, getErhuSection } from "./src/erhuStudyPieces.js";
 import {
   clamp,
@@ -81,7 +80,15 @@ import { createScoreRouter } from "./src/server/scoreRoutes.js";
 import { createTeacherValidationService } from "./src/server/teacherValidationService.js";
 import { createTeacherValidationRouter } from "./src/server/teacherValidationRoutes.js";
 import { createWesternStringsRouter } from "./src/server/westernStringsRoutes.js";
-import { createPublicAccessGuard } from "./src/server/publicAccessGuard.js";
+import {
+  createMemoryUploadProfiles,
+  uploadErrorHandler,
+} from "./src/server/uploadProfiles.js";
+import {
+  assertSafePublicBindHost,
+  createPublicAccessGuard,
+  createPublicRateLimiter,
+} from "./src/server/publicAccessGuard.js";
 import { createWechatContentSafetyService } from "./src/server/wechatContentSafety.js";
 import {
   appendAnalysisToParticipant,
@@ -99,6 +106,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
 const port = Number(process.env.PORT || 3000);
+const WESTERN_PUBLIC_MODE = safeBoolean(process.env.WESTERN_PUBLIC_MODE, false);
 const DATA_DIR = process.env.ERHU_DATA_DIR ? path.resolve(process.env.ERHU_DATA_DIR) : path.join(__dirname, "data");
 const STUDY_STORE_FILE = path.join(DATA_DIR, "erhu-study-records.json");
 const SCORE_STORE_FILE = path.join(DATA_DIR, "erhu-score-imports.json");
@@ -124,12 +132,7 @@ const ASCII_RUNTIME_ROOT = path.join(path.dirname(__dirname), "ai_erhu_runtime")
 const DIST_DIR = path.join(__dirname, "dist");
 const STORE_ARCHIVE_DIR = path.join(DATA_DIR, "store-archive");
 const SCORE_STORE_LIMITS = readScoreStoreLimits(process.env);
-const upload = multer({
-  storage: multer.memoryStorage(),
-  // A 10 MB image becomes about 13.4 MB when the Mini Program sends it as a
-  // base64 field alongside the audio multipart upload.
-  limits: { fileSize: 40 * 1024 * 1024, fieldSize: 14 * 1024 * 1024 },
-});
+const uploads = createMemoryUploadProfiles();
 const SCORE_IMPORT_TASK_GATE = createTaskGate({
   name: "score-import",
   concurrency: safeNumber(process.env.ERHU_SCORE_IMPORT_CONCURRENCY, 1),
@@ -158,14 +161,20 @@ const teacherValidationService = createTeacherValidationService({
   buildValidationSummary,
 });
 
-app.use(express.json({ limit: "120mb" }));
-
 // When exposed to the internet through the Cloudflare tunnel, only the student
 // endpoints may answer public traffic; the full backend stays local-only.
 app.use(createPublicAccessGuard({
-  publicMode: safeBoolean(process.env.WESTERN_PUBLIC_MODE, false),
+  publicMode: WESTERN_PUBLIC_MODE,
   allowOrigins: safeString(process.env.WESTERN_PUBLIC_ORIGIN),
 }));
+
+// Limit expensive tunnel requests before JSON parsing or multipart buffering.
+// Header-less local operator traffic is deliberately unaffected.
+app.use(createPublicRateLimiter({ publicMode: WESTERN_PUBLIC_MODE }));
+
+// Reject non-public tunnel traffic before spending memory and CPU parsing its
+// body. Public student endpoints and trusted local requests continue normally.
+app.use(express.json({ limit: "120mb" }));
 
 function scoreStoreUsesSqlite() {
   if (SCORE_STORE_BACKEND === "sqlite" || SCORE_STORE_BACKEND === "sqlite3") return true;
@@ -4198,7 +4207,7 @@ app.use(createOpsRouter({
 }));
 
 app.use(createScoreRouter({
-  upload,
+  upload: uploads.scoreImport,
   repoRoot: __dirname,
   SCORE_IMPORT_TASK_GATE,
   SCORE_STORE_FILE,
@@ -4222,7 +4231,7 @@ app.use(createScoreRouter({
 }));
 
 app.use(createAnalysisRouter({
-  upload,
+  upload: uploads.analysisAudio,
   AUDIO_CACHE_DIR,
   ANALYSIS_TASK_GATE,
   PIECE_PASS_TASK_GATE,
@@ -4589,7 +4598,7 @@ app.use("/api/erhu", createResearchRouter({ readStudyStore, writeStudyStore, fet
 app.use("/api/erhu/teacher-validation", createTeacherValidationRouter(teacherValidationService));
 app.use(createWesternStringsRouter({
   repoRoot: __dirname,
-  upload,
+  upload: uploads.westernStudent,
   audioCacheDir: AUDIO_CACHE_DIR,
   scorePhotoCacheDir: SCORE_PHOTO_CACHE_DIR,
   parseIncomingPayload,
@@ -4601,6 +4610,8 @@ app.use(createWesternStringsRouter({
   persistPayloadScorePhoto,
   contentSafety: wechatContentSafetyService,
 }));
+
+app.use(uploadErrorHandler);
 
 const noStoreStaticOptions = {
   etag: false,
@@ -4627,6 +4638,7 @@ app.get(/.*/, async (req, res) => {
 // header-less (local) requests. Default (unset) keeps the prior all-interfaces
 // behaviour for local/LAN development.
 const bindHost = safeString(process.env.ERHU_BIND_HOST).trim();
+assertSafePublicBindHost({ publicMode: WESTERN_PUBLIC_MODE, bindHost });
 const listenArgs = bindHost ? [port, bindHost] : [port];
 app.listen(...listenArgs, () => {
   console.log(`AI Erhu prototype listening on http://${bindHost || "localhost"}:${port}`);

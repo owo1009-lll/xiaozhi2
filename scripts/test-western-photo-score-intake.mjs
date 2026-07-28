@@ -3,7 +3,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import express from "express";
-import multer from "multer";
 
 import {
   buildAudioSubmissionFromUpload,
@@ -16,6 +15,7 @@ import {
   persistPayloadScorePhoto,
   persistUploadedScorePhotoFile,
 } from "../src/server/scorePhotoPayload.js";
+import { createMemoryUploadProfiles } from "../src/server/uploadProfiles.js";
 import {
   buildWesternStudentAnalysis,
   parseStudentAnalysisPayload,
@@ -28,6 +28,7 @@ const validPng = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
   "base64",
 );
+const webStudentRef = `stu-v2-${"a".repeat(32)}`;
 
 const parsed = parseStudentAnalysisPayload({
   scorePhotoPath: "data/private/x.jpg",
@@ -131,7 +132,7 @@ const app = express();
 app.use(express.json({ limit: "2mb" }));
 app.use(createWesternStringsRouter({
   repoRoot: httpRoot,
-  upload: multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } }),
+  upload: createMemoryUploadProfiles().westernStudent,
   audioCacheDir,
   scorePhotoCacheDir,
   parseIncomingPayload,
@@ -149,13 +150,29 @@ const server = await new Promise((resolve) => {
 try {
   const port = server.address().port;
   const form = new FormData();
-  form.append("payload", JSON.stringify({ instrument: "violin" }));
+  form.append("payload", JSON.stringify({ instrument: "violin", studentRef: webStudentRef }));
   form.append("audio", new Blob([Buffer.from("browser-audio")], { type: "audio/wav" }), "browser.wav");
   form.append("scorePhoto", new Blob([validPng], { type: "image/png" }), "browser.png");
-  const response = await fetch(`http://127.0.0.1:${port}/api/strings/analyze`, { method: "POST", body: form });
+  const response = await fetch(`http://127.0.0.1:${port}/api/strings/analyze`, {
+    method: "POST",
+    headers: { "cf-connecting-ip": "203.0.113.7", "cf-ray": "test-ray" },
+    body: form,
+  });
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.equal(body.analysis.submissionAccepted, true);
+  assert.equal(body.analysis.submission, undefined, "public analysis response must not expose internal submission paths");
+  assert.equal(JSON.stringify(body.analysis).includes("audioPath"), false);
+
+  const weakIdentityForm = new FormData();
+  weakIdentityForm.append("payload", JSON.stringify({ instrument: "violin", studentRef: "stu-guessable" }));
+  weakIdentityForm.append("audio", new Blob([Buffer.from("weak-id-audio")], { type: "audio/wav" }), "weak.wav");
+  const weakIdentityResponse = await fetch(`http://127.0.0.1:${port}/api/strings/analyze`, {
+    method: "POST",
+    headers: { "cf-connecting-ip": "203.0.113.7", "cf-ray": "weak-id-ray" },
+    body: weakIdentityForm,
+  });
+  assert.equal(weakIdentityResponse.status, 401, "public web submissions must use an unguessable capability");
 
   const queueResponse = await fetch(`http://127.0.0.1:${port}/api/strings/controlled-submissions`);
   const queue = await queueResponse.json();
@@ -186,6 +203,18 @@ try {
   spoofedForm.append("scorePhoto", new Blob([Buffer.from("not-a-png")], { type: "image/png" }), "spoofed.png");
   const spoofedResponse = await fetch(`http://127.0.0.1:${port}/api/strings/analyze`, { method: "POST", body: spoofedForm });
   assert.equal(spoofedResponse.status, 400, "a spoofed image MIME type must fail content validation");
+
+  const localAudioPathResponse = await fetch(`http://127.0.0.1:${port}/api/strings/analyze`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      instrument: "violin",
+      scoreId: "score-test-clean",
+      audioPath: sourceAudio,
+      audioSubmission: { name: "outside-cache.wav", mimeType: "audio/wav" },
+    }),
+  });
+  assert.equal(localAudioPathResponse.status, 400, "HTTP payloads must not read audio outside the managed cache");
 
   const outsideCachePhoto = path.join(httpRoot, "outside-cache.png");
   fs.writeFileSync(outsideCachePhoto, validPng);

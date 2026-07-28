@@ -96,7 +96,7 @@ Page({
   },
 
   load() {
-    api.get("/api/strings/student-submissions", { studentRef: api.studentRef(), limit: 100 })
+    api.getStudentSubmissions(100)
       .then((r) => {
         const list = r.submissions || [];
         const total = list.length;

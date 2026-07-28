@@ -5,7 +5,7 @@ App({
     studentRef: ""
   },
   onLaunch() {
-    // 匿名学生标识,存在本地,和网页版同一套思路:一台设备一个 ref。
+    // 仅用于本机资料页的匿名尾号；服务端授权使用 wx.login 换取的 OpenID 绑定。
     let ref = wx.getStorageSync("studentRef");
     if (!ref) {
       ref = "stu-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);

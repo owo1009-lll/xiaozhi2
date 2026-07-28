@@ -2,8 +2,8 @@ import fs from "node:fs/promises";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
+import nodeAssert from "node:assert/strict";
 import express from "express";
-import multer from "multer";
 
 import {
   buildAudioSubmissionFromUpload,
@@ -18,6 +18,10 @@ import {
 import { createAnalyzerClient } from "../src/server/analyzerClient.js";
 import { sha1 } from "../src/server/baseUtils.js";
 import { createScoreRouter } from "../src/server/scoreRoutes.js";
+import {
+  createMemoryUploadProfiles,
+  uploadErrorHandler,
+} from "../src/server/uploadProfiles.js";
 import {
   annotateImportedSectionsScoreLineRoles,
   buildScoreLineStatsFromSections,
@@ -62,6 +66,14 @@ async function testAudioPayload() {
 
   const existing = await persistPayloadAudio({ audioPath: persisted.audioPath }, { audioCacheDir: tempDir });
   assert(existing.audioHash === persisted.audioHash, "existing cached path should reuse hash");
+  const outsidePath = path.join(path.dirname(tempDir), `${path.basename(tempDir)}-outside.wav`);
+  await fs.writeFile(outsidePath, audioBuffer);
+  await nodeAssert.rejects(
+    persistPayloadAudio({ audioPath: outsidePath }, { audioCacheDir: tempDir }),
+    /managed audio cache/,
+    "HTTP audio payloads must not read a path outside the managed cache",
+  );
+  await fs.rm(outsidePath, { force: true });
 
   const upload = await persistUploadedAudioFile(
     { originalname: "upload.m4a", mimetype: "audio/mp4", size: audioBuffer.length, buffer: audioBuffer },
@@ -150,7 +162,7 @@ async function testWesternMusicXmlRouteMetadata() {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "ai-erhu-western-score-route-"));
   let store = { jobs: [], scores: [] };
   let analyzerPayload = null;
-  const upload = multer({ storage: multer.memoryStorage() });
+  const upload = createMemoryUploadProfiles().scoreImport;
   const app = express();
   app.use(createScoreRouter({
     upload,
@@ -219,6 +231,7 @@ async function testWesternMusicXmlRouteMetadata() {
     getImportedScore: () => null,
     activeScoreImportTasks: new Map(),
   }));
+  app.use(uploadErrorHandler);
   const server = http.createServer(app);
   const port = await listen(server);
   try {
@@ -245,6 +258,23 @@ async function testWesternMusicXmlRouteMetadata() {
     assert(store.scores[0].scoreSource === "musicxml", "persisted score should keep scoreSource");
     assert(store.scores[0].tempoKnown === false, "persisted score should keep tempoKnown=false");
     assert(store.scores[0].tempoSource === "unknown", "persisted score should keep tempoSource");
+
+    const overLimitForm = new FormData();
+    overLimitForm.set(
+      "musicxml",
+      new Blob(
+        ["<score-partwise version=\"3.1\"></score-partwise>"],
+        { type: "application/vnd.recordare.musicxml+xml" },
+      ),
+      "over-limit.musicxml",
+    );
+    for (let index = 0; index < 7; index += 1) overLimitForm.set(`field-${index}`, "x");
+    const overLimitResponse = await fetch(`http://127.0.0.1:${port}/api/erhu/scores/import-musicxml`, {
+      method: "POST",
+      body: overLimitForm,
+    });
+    assert(overLimitResponse.status === 413, "an over-limit multipart request must fail as 413 JSON");
+    assert((await overLimitResponse.json()).ok === false);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     await fs.rm(tempDir, { recursive: true, force: true });
@@ -255,7 +285,7 @@ async function testWesternMidiRouteMetadata() {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "ai-erhu-western-midi-route-"));
   let store = { jobs: [], scores: [] };
   let analyzerPayload = null;
-  const upload = multer({ storage: multer.memoryStorage() });
+  const upload = createMemoryUploadProfiles().scoreImport;
   const app = express();
   app.use(createScoreRouter({
     upload,

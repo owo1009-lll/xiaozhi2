@@ -113,7 +113,6 @@ export async function listWesternStudentSubmissions({ repoRoot = process.cwd(), 
   const capped = limit > 0 ? mine.slice(0, limit) : mine;
   return {
     ok: true,
-    studentRef: targetRef,
     gateView: buildWesternStudentGateView(),
     total: mine.length,
     submissions: capped,

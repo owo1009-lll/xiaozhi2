@@ -105,6 +105,23 @@ listed = await listWesternStudentSubmissions({ repoRoot: tmp, studentRef: "stu-a
 assert.equal(listed.submissions[0].status, "under_review");
 assert.equal(listed.submissions[0].teacherFeedback, "");
 
+await assert.rejects(
+  recordWesternControlledSubmissionReview({
+    repoRoot: tmp,
+    payload: { submissionId, action: "accepted_for_batch", releaseToStudent: true },
+  }),
+  /feedback_released/,
+  "non-release actions must not carry a student release flag",
+);
+await assert.rejects(
+  recordWesternControlledSubmissionReview({
+    repoRoot: tmp,
+    payload: { submissionId, action: "review_required", completeErrorInventory: true },
+  }),
+  /reviewerId/,
+  "a signed complete inventory must identify its reviewer explicitly",
+);
+
 // feedback_released requires a human-authored message.
 await assert.rejects(
   recordWesternControlledSubmissionReview({
@@ -155,9 +172,23 @@ assert.equal(guarded.teacherFeedback, "");
 assert.equal(guarded.status, "under_review");
 
 // 5. Router wiring: gate endpoint serves the view; the list requires studentRef.
+const miniProgramStudentRef = `wx-v1-${"b".repeat(64)}`;
 const app = express();
 app.use(express.json());
-app.use(createWesternStringsRouter({ repoRoot: tmp }));
+app.use(createWesternStringsRouter({
+  repoRoot: tmp,
+  contentSafety: {
+    setReleaseSubmission() {},
+    async resolveMiniProgramStudentRef(loginCode) {
+      assert.equal(loginCode, "fresh-wechat-code");
+      return miniProgramStudentRef;
+    },
+    async moderateMiniProgramSubmission({ loginCode }) {
+      assert.equal(loginCode, "submit-wechat-code");
+      return { status: "pass", studentRef: miniProgramStudentRef };
+    },
+  },
+}));
 const server = app.listen(0);
 const port = server.address().port;
 try {
@@ -174,7 +205,49 @@ try {
   assert.equal(ownList.status, 200);
   const ownBody = await ownList.json();
   assert.equal(ownBody.total, 1);
+  assert.equal(ownBody.studentRef, undefined, "the record response must not echo its bearer capability");
   assert.equal(ownBody.submissions[0].status, "unsupported");
+
+  const tunnelHeaders = { "cf-connecting-ip": "203.0.113.8", "cf-ray": "student-auth-ray" };
+  const weakPublicList = await fetch(
+    `http://127.0.0.1:${port}/api/strings/student-submissions?studentRef=stu-abc`,
+    { headers: tunnelHeaders },
+  );
+  assert.equal(weakPublicList.status, 401, "a guessable public studentRef must not authorize record access");
+
+  const strongWebRef = `stu-v2-${"c".repeat(32)}`;
+  const strongPublicList = await fetch(
+    `http://127.0.0.1:${port}/api/strings/student-submissions?studentRef=${strongWebRef}`,
+    { headers: tunnelHeaders },
+  );
+  assert.equal(strongPublicList.status, 200, "a high-entropy web capability may authorize its own empty namespace");
+  assert.equal((await strongPublicList.json()).total, 0);
+
+  const miniSubmit = await fetch(`http://127.0.0.1:${port}/api/strings/analyze`, {
+    method: "POST",
+    headers: { ...tunnelHeaders, "content-type": "application/json" },
+    body: JSON.stringify({
+      clientPlatform: "wechat-mini-program",
+      wechatLoginCode: "submit-wechat-code",
+      piece: "WeChat-bound take",
+      audioPath: sourceAudio,
+      audioSubmission: { name: "wechat.wav", mimeType: "audio/wav" },
+    }),
+  });
+  assert.equal(miniSubmit.status, 200, "a verified Mini Program submission must be accepted");
+
+  const miniParams = new URLSearchParams({
+    clientPlatform: "wechat-mini-program",
+    wechatLoginCode: "fresh-wechat-code",
+  });
+  const miniList = await fetch(
+    `http://127.0.0.1:${port}/api/strings/student-submissions?${miniParams}`,
+    { headers: tunnelHeaders },
+  );
+  assert.equal(miniList.status, 200, "a fresh WeChat login code must resolve the server-bound student identity");
+  const miniBody = await miniList.json();
+  assert.equal(miniBody.total, 1);
+  assert.equal(miniBody.submissions[0].piece, "WeChat-bound take");
 } finally {
   server.close();
 }

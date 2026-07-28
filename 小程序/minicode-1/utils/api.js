@@ -1,5 +1,5 @@
-// Thin wrapper around the already-live student endpoints. Only the four public
-// endpoints exist here; the review console stays on the operator's machine.
+// Thin wrapper around the explicitly allowlisted student endpoints. The review
+// console and private media stay on the operator's machine.
 
 const STATUS_LABELS = {
   queued: "排队中",
@@ -81,6 +81,14 @@ function uploadAudio(filePath, formData) {
   }));
 }
 
+function getStudentSubmissions(limit) {
+  return getWechatLoginCode().then((loginCode) => get("/api/strings/student-submissions", {
+    clientPlatform: "wechat-mini-program",
+    wechatLoginCode: loginCode,
+    limit: limit || 20
+  }));
+}
+
 // Student-side projection helpers: turn a raw submission into what the UI shows.
 function decorate(submission) {
   const status = submission.status || "queued";
@@ -96,4 +104,12 @@ function decorateList(list) {
   return (list || []).map(decorate);
 }
 
-module.exports = { get, uploadAudio, studentRef, decorate, decorateList, STATUS_LABELS };
+module.exports = {
+  get,
+  getStudentSubmissions,
+  uploadAudio,
+  studentRef,
+  decorate,
+  decorateList,
+  STATUS_LABELS
+};

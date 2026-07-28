@@ -13,7 +13,7 @@ Page({
 
   load() {
     this.setData({ loading: true });
-    api.get("/api/strings/student-submissions", { studentRef: api.studentRef(), limit: 50 })
+    api.getStudentSubmissions(50)
       .then((r) => {
         const realList = api.decorateList(r.submissions);
         const demo = api.decorate({

@@ -20,17 +20,26 @@ const STATUS_LABELS = {
 };
 
 const STUDENT_REF_STORAGE_KEY = "western-strings-student-ref";
+const STUDENT_REF_PATTERN = /^stu-v2-[a-f0-9]{32}$/;
+
+function createStudentCapability() {
+  const cryptoApi = globalThis.crypto;
+  if (!cryptoApi?.getRandomValues) return "";
+  const bytes = new Uint8Array(16);
+  cryptoApi.getRandomValues(bytes);
+  return `stu-v2-${Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("")}`;
+}
 
 function getOrCreateStudentRef() {
   if (typeof window === "undefined") return "";
   try {
     const existing = window.localStorage.getItem(STUDENT_REF_STORAGE_KEY);
-    if (existing) return existing;
-    const created = `stu-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-    window.localStorage.setItem(STUDENT_REF_STORAGE_KEY, created);
+    if (STUDENT_REF_PATTERN.test(existing || "")) return existing;
+    const created = createStudentCapability();
+    if (created) window.localStorage.setItem(STUDENT_REF_STORAGE_KEY, created);
     return created;
   } catch {
-    return `stu-session-${Math.random().toString(36).slice(2, 8)}`;
+    return createStudentCapability();
   }
 }
 
@@ -85,6 +94,10 @@ export default function WesternStudentApp() {
   }, [studentRef]);
 
   async function submitRecording() {
+    if (!studentRef) {
+      setError("当前浏览器无法创建安全的学生访问标识，请升级浏览器后重试。");
+      return;
+    }
     if (!piece.trim()) {
       setError("请先填写曲名。");
       return;

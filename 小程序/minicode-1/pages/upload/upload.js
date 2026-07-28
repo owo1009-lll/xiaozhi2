@@ -110,7 +110,7 @@ Page({
   },
 
   loadRecent() {
-    api.get("/api/strings/student-submissions", { studentRef: api.studentRef(), limit: 3 })
+    api.getStudentSubmissions(3)
       .then((r) => this.setData({ recent: api.decorateList(r.submissions) }))
       .catch(() => {});
   },
@@ -341,7 +341,6 @@ Page({
     }
     this.setData({ submitting: true, notice: "" });
     const payload = {
-      studentRef: api.studentRef(),
       piece: this.data.piece.trim(),
       pieceId: this.data.selectedPieceId,
       scoreId: this.data.selectedScoreId,

@@ -13,6 +13,19 @@ async function fileExists(targetPath) {
   }
 }
 
+function pathIsInsideOrEqual(parentPath, childPath) {
+  const parent = path.resolve(parentPath);
+  const child = path.resolve(childPath);
+  const relative = path.relative(parent, child);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+function unsafeSourcePathError() {
+  const error = new Error("audio source path must be inside the managed audio cache.");
+  error.statusCode = 400;
+  return error;
+}
+
 export function parseDataUrlToBuffer(dataUrl) {
   const raw = safeString(dataUrl);
   if (!raw.includes(",")) {
@@ -46,6 +59,9 @@ export function inferAudioExtension(audioSubmission = {}, mimeType = "") {
 export async function persistPayloadAudio(payload = {}, { audioCacheDir = "" } = {}) {
   const existingPath = safeString(payload.audioPath).trim();
   if (existingPath && await fileExists(existingPath)) {
+    if (!audioCacheDir || !pathIsInsideOrEqual(audioCacheDir, existingPath)) {
+      throw unsafeSourcePathError();
+    }
     const baseName = path.basename(existingPath);
     const hashedName = baseName.match(/^([a-f0-9]{40})/i)?.[1] || "";
     const audioHash = hashedName || sha1(await fs.readFile(existingPath));

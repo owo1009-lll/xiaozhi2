@@ -3,7 +3,9 @@ import express from "express";
 
 import {
   STUDENT_PUBLIC_ALLOWLIST,
+  assertSafePublicBindHost,
   createPublicAccessGuard,
+  createPublicRateLimiter,
 } from "../src/server/publicAccessGuard.js";
 
 const PUBLIC_ORIGIN = "https://stringinstrumentdiagnosis.icu";
@@ -13,8 +15,18 @@ const TUNNEL_HEADERS = { "cf-connecting-ip": "203.0.113.7", "cf-ray": "abc123-SJ
 // the student allowlist and the /data static leak surface.
 function buildApp({ publicMode }) {
   const app = express();
-  app.use(express.json());
   app.use(createPublicAccessGuard({ publicMode, allowOrigins: PUBLIC_ORIGIN }));
+  app.use(createPublicRateLimiter({
+    publicMode,
+    rules: [{
+      method: "POST",
+      path: "/api/strings/analyze",
+      windowMs: 60_000,
+      maxRequests: 2,
+      maxConcurrent: 1,
+    }],
+  }));
+  app.use(express.json());
   app.get("/api/health", (req, res) => res.json({ ok: true, route: "health" }));
   app.get("/api/strings/student-gate", (req, res) => res.json({ ok: true, route: "student-gate" }));
   app.get("/api/strings/student-submissions", (req, res) => res.json({ ok: true, route: "student-submissions" }));
@@ -31,16 +43,20 @@ function buildApp({ publicMode }) {
   return app;
 }
 
-async function call(server, { method = "GET", path, headers = {} }) {
+async function call(server, { method = "GET", path, headers = {}, body }) {
   const port = server.address().port;
-  const response = await fetch(`http://127.0.0.1:${port}${path}`, { method, headers });
-  let body = null;
+  const response = await fetch(`http://127.0.0.1:${port}${path}`, {
+    method,
+    headers,
+    body,
+  });
+  let responseBody = null;
   try {
-    body = await response.json();
+    responseBody = await response.json();
   } catch {
-    body = null;
+    responseBody = null;
   }
-  return { status: response.status, body, headers: response.headers };
+  return { status: response.status, body: responseBody, headers: response.headers };
 }
 
 async function withServer(app, run) {
@@ -52,7 +68,7 @@ async function withServer(app, run) {
   }
 }
 
-// The allowlist must be exactly the four student endpoints — a guard against
+// The allowlist must stay an explicit set of student/content-safety endpoints — a guard against
 // someone widening the public surface by editing the list.
 assert.deepEqual(
   STUDENT_PUBLIC_ALLOWLIST.map((entry) => `${entry.method} ${entry.path}`).sort(),
@@ -70,6 +86,19 @@ assert.deepEqual(
     "POST /api/wechat/content-safety-callback",
   ],
   "public allowlist drifted",
+);
+assert.doesNotThrow(() => assertSafePublicBindHost({ publicMode: false, bindHost: "" }));
+assert.doesNotThrow(() => assertSafePublicBindHost({ publicMode: true, bindHost: "127.0.0.1" }));
+assert.doesNotThrow(() => assertSafePublicBindHost({ publicMode: true, bindHost: "::1" }));
+assert.throws(
+  () => assertSafePublicBindHost({ publicMode: true, bindHost: "" }),
+  /loopback/,
+  "public mode must fail closed when ERHU_BIND_HOST is missing",
+);
+assert.throws(
+  () => assertSafePublicBindHost({ publicMode: true, bindHost: "0.0.0.0" }),
+  /loopback/,
+  "public mode must reject an all-interface bind",
 );
 
 // 1. Public mode OFF: every route answers regardless of headers (local dev).
@@ -89,6 +118,19 @@ await withServer(buildApp({ publicMode: true }), async (server) => {
 
   const analyze = await call(server, { method: "POST", path: "/api/strings/analyze", headers: TUNNEL_HEADERS });
   assert.equal(analyze.status, 200, "analyze must pass on the public site");
+  const analyzeSecond = await call(server, {
+    method: "POST",
+    path: "/api/strings/analyze",
+    headers: TUNNEL_HEADERS,
+  });
+  assert.equal(analyzeSecond.status, 200, "the configured request budget must permit its second request");
+  const analyzeRateLimited = await call(server, {
+    method: "POST",
+    path: "/api/strings/analyze",
+    headers: TUNNEL_HEADERS,
+  });
+  assert.equal(analyzeRateLimited.status, 429, "the public request budget must fail closed before the route runs");
+  assert.equal(analyzeRateLimited.headers.get("retry-after"), "60");
 
   const health = await call(server, { path: "/api/health", headers: TUNNEL_HEADERS });
   assert.equal(health.status, 200, "health must pass on the public site");
@@ -115,6 +157,18 @@ await withServer(buildApp({ publicMode: true }), async (server) => {
     assert.equal(res.status, 403, `tunnel traffic must be blocked from ${probe.path}`);
     assert.equal(res.body?.route, undefined, `blocked route must not execute for ${probe.path}`);
   }
+
+  const malformedJson = await call(server, {
+    method: "POST",
+    path: "/api/strings/controlled-submissions/run-batch",
+    headers: { ...TUNNEL_HEADERS, "content-type": "application/json" },
+    body: "{not-json",
+  });
+  assert.equal(
+    malformedJson.status,
+    403,
+    "the public guard must reject a private route before parsing its body",
+  );
 
   // Preflight is answered without reaching a route.
   const preflight = await call(server, {

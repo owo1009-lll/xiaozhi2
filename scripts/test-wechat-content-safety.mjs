@@ -55,6 +55,12 @@ try {
   });
   assert.equal(started.status, "pending");
   assert.ok(started.ticket);
+  assert.match(started.studentRef, /^wx-v1-[a-f0-9]{64}$/);
+  assert.equal(
+    await service.resolveMiniProgramStudentRef("fresh-login-code"),
+    started.studentRef,
+    "the same OpenID must resolve to one stable server-side student identity",
+  );
   assert.equal(calls.some((call) => call.url.includes("msg_sec_check")), true);
   const mediaCall = calls.find((call) => call.url.includes("media_check_async"));
   assert.match(mediaCall.request.body.media_url, /^https:\/\/api\.example\.test\/api\/wechat\/content-safety-media\//);
@@ -89,7 +95,7 @@ try {
     },
   });
   assert.equal(callbackResult.ok, true);
-  assert.deepEqual(releasedSubmission, submission);
+  assert.deepEqual(releasedSubmission, { ...submission, studentRef: started.studentRef });
   assert.equal((await service.getPublicStatus(started.ticket)).status, "released");
 
   const blocked = await service.moderateMiniProgramSubmission({

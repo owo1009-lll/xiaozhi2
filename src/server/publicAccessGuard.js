@@ -25,6 +25,23 @@ export const STUDENT_PUBLIC_ALLOWLIST = Object.freeze([
   { method: "GET", path: "/api/strings/score-diagnosis" },
 ]);
 
+export const DEFAULT_PUBLIC_RATE_LIMITS = Object.freeze([
+  Object.freeze({
+    method: "POST",
+    path: "/api/strings/analyze",
+    windowMs: 10 * 60 * 1000,
+    maxRequests: 8,
+    maxConcurrent: 2,
+  }),
+  Object.freeze({
+    method: "GET",
+    path: "/api/strings/student-submissions",
+    windowMs: 10 * 60 * 1000,
+    maxRequests: 30,
+    maxConcurrent: 4,
+  }),
+]);
+
 // Trust model: the backend must bind 127.0.0.1 in public mode so the ONLY way
 // in from the internet is cloudflared, which always stamps `cf-connecting-ip` /
 // `cf-ray`. A request without those headers therefore came from this machine
@@ -32,8 +49,75 @@ export const STUDENT_PUBLIC_ALLOWLIST = Object.freeze([
 // through the tunnel and is limited to the allowlist. If the port were bound to
 // 0.0.0.0 this assumption would break, so the production launcher sets the bind
 // host explicitly and this guard documents the dependency.
-function isTunnelRequest(req) {
+export function isTunnelRequest(req) {
   return Boolean(safeString(req.get("cf-connecting-ip")).trim() || safeString(req.get("cf-ray")).trim());
+}
+
+export function assertSafePublicBindHost({ publicMode = false, bindHost = "" } = {}) {
+  if (!publicMode) return;
+  const normalized = safeString(bindHost).trim().toLowerCase();
+  if (!["127.0.0.1", "::1", "localhost"].includes(normalized)) {
+    throw new Error("WESTERN_PUBLIC_MODE requires ERHU_BIND_HOST to be a loopback address.");
+  }
+}
+
+export function createPublicRateLimiter({
+  publicMode = false,
+  rules = DEFAULT_PUBLIC_RATE_LIMITS,
+  now = () => Date.now(),
+} = {}) {
+  const ruleByRoute = new Map(rules.map((rule) => [`${rule.method} ${rule.path}`, rule]));
+  const clients = new Map();
+  let lastSweepAt = 0;
+
+  function sweepExpired(currentTime) {
+    if (currentTime - lastSweepAt < 60_000) return;
+    lastSweepAt = currentTime;
+    for (const [key, entry] of clients.entries()) {
+      const rule = ruleByRoute.get(entry.route);
+      const cutoff = currentTime - Number(rule?.windowMs || 0);
+      entry.requests = entry.requests.filter((timestamp) => timestamp > cutoff);
+      if (!entry.requests.length && entry.active === 0) clients.delete(key);
+    }
+  }
+
+  return function publicRateLimiter(req, res, next) {
+    if (!publicMode || !isTunnelRequest(req)) return next();
+    const route = `${req.method} ${req.path}`;
+    const rule = ruleByRoute.get(route);
+    if (!rule) return next();
+
+    const currentTime = now();
+    sweepExpired(currentTime);
+    const clientIp = safeString(req.get("cf-connecting-ip")).trim() || "tunnel-unknown";
+    const key = `${route}\0${clientIp}`;
+    const entry = clients.get(key) || { route, requests: [], active: 0 };
+    const cutoff = currentTime - Number(rule.windowMs);
+    entry.requests = entry.requests.filter((timestamp) => timestamp > cutoff);
+    clients.set(key, entry);
+
+    if (entry.requests.length >= Number(rule.maxRequests)) {
+      const retryAt = entry.requests[0] + Number(rule.windowMs);
+      res.set("Retry-After", String(Math.max(1, Math.ceil((retryAt - currentTime) / 1000))));
+      return res.status(429).json({ ok: false, error: "Too many public requests. Please try again later." });
+    }
+    if (entry.active >= Number(rule.maxConcurrent)) {
+      res.set("Retry-After", "1");
+      return res.status(429).json({ ok: false, error: "Too many public requests are already running." });
+    }
+
+    entry.requests.push(currentTime);
+    entry.active += 1;
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      entry.active = Math.max(0, entry.active - 1);
+    };
+    res.once("finish", release);
+    res.once("close", release);
+    return next();
+  };
 }
 
 export function createPublicAccessGuard({

@@ -49,6 +49,13 @@ function sha1(value) {
   return crypto.createHash("sha1").update(value).digest("hex");
 }
 
+function studentRefFromOpenId(appId, openid) {
+  const digest = crypto.createHash("sha256")
+    .update(`${safeString(appId)}\0${safeString(openid)}`, "utf8")
+    .digest("hex");
+  return `wx-v1-${digest}`;
+}
+
 function normalizedBaseUrl(value) {
   const raw = safeString(value).trim().replace(/\/+$/, "");
   if (!raw) return "";
@@ -255,6 +262,11 @@ export function createWechatContentSafetyService({
     return safeString(payload.openid).trim();
   }
 
+  async function resolveMiniProgramStudentRef(loginCode) {
+    const openid = await getOpenId(loginCode);
+    return studentRefFromOpenId(config.appId, openid);
+  }
+
   async function checkText({ content, openid }) {
     const value = safeString(content).trim();
     if (!value) return;
@@ -327,9 +339,15 @@ export function createWechatContentSafetyService({
   async function moderateMiniProgramSubmission({ loginCode, content, submission }) {
     ensureConfigured();
     const openid = await getOpenId(loginCode);
+    const studentRef = studentRefFromOpenId(config.appId, openid);
+    const boundSubmission = { ...(submission || {}), studentRef };
     await checkText({ content, openid });
-    if (!safeString(submission?.scorePhotoPath).trim()) return { status: "pass" };
-    return { status: "pending", ...(await startPhotoCheck({ openid, submission })) };
+    if (!safeString(boundSubmission.scorePhotoPath).trim()) return { status: "pass", studentRef };
+    return {
+      status: "pending",
+      studentRef,
+      ...(await startPhotoCheck({ openid, submission: boundSubmission })),
+    };
   }
 
   async function releasePassedSubmission(record) {
@@ -459,6 +477,7 @@ export function createWechatContentSafetyService({
   return {
     isConfigured,
     moderateMiniProgramSubmission,
+    resolveMiniProgramStudentRef,
     receiveCallback,
     sendPendingMedia,
     getPublicStatus,
