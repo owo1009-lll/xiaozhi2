@@ -1,6 +1,6 @@
 # 西洋弦乐练习诊断项目状态快照
 
-更新时间: 2026-07-28
+更新时间: 2026-07-29
 
 本文件是当前主线状态快照。实时判断仍以命令为准:
 
@@ -9,6 +9,13 @@
 - `npm run western:project-gate`
 - `npm run test:western-project-gate`
 - `npm run build`
+
+## 2026-07-29 LadderSym 真实录音架构筛查止损
+
+- 补测 ICLR 2026 的开源 score-conditioned 错误检测器 LadderSym，使用 MIT 仓库 `381179754cf6bcb435f9decf0d5e24eada6c68ec` 与官方 CocoChorales-E prompted checkpoint（SHA-256=`c28b4e43cb9dbf56e0fd68c9d647c24decbc6a89d08ded022bd704751109ef33`）。输入是整条真人演奏、完整参考谱音频和符号谱 prompt，输出 MIDI 的 extra/missing/correct 三条语义轨；这次是对前一轮遗漏候选的实际推理，不是纸面合同淘汰。
+- 上游推理入口遗漏了训练时的随机 seed，而 prompt 预处理会随机重排同一时刻 token；隔离环境补回配置已有的 seed 后，`r5-cal-01` 重复推理 SHA-256 完全一致。随后在已消费 Round 5 的全部 12 条、672 个全谱位置上分别跑 seed 365/366。标准参考谱 fresh 结果稳定失败：seed 365 的 wrong=`0/6 @ 2 FP`、missing=`1/6 @ 52 FP`、extra=`1/6 @ 57 FP`、drag=`0/6 @ 0 FP`；seed 366 分别为 `0/6 @ 4 FP`、`1/6 @ 54 FP`、`1/6 @ 59 FP`、`0/6 @ 0 FP`。语义轨在个别录音会整轨塌成 missing 或 extra，失败裁决不依赖单一 seed。
+- 为排除参考谱比真人演奏快 `1.22–1.68x` 的输入错配，又用项目现有对齐时间轴生成逐音局部配准的小提琴参考音频和 prompt；fresh 仍为 wrong=`0/6 @ 22 FP`、missing=`1/6 @ 63 FP`、extra=`0/6 @ 30 FP`、drag=`0/6 @ 0 FP`。因此问题不能归咎于单纯的全局/局部速度错配；没有任何 gate 通过冻结门槛 `P>=90% / R>=50% / strict FP=0`，checkpoint 本身也不表达 drag。
+- 结论为 `remove-laddersym-candidate`：不接生产、不保留实验集成，外部 clone/venv/checkpoint 与生成物共清理 `2668.04 MiB`，只保留审计摘要；生产运行时、Round 6、学生开关均未改动，严格确诊仍为 `2/12`。这否定的是该公开 checkpoint 在当前小提琴域的可用性，不是否定 score-conditioned 架构方向；下一份可改变资格的证据仍来自人工签署的真实逐音账本与 untouched Round 6。证据见 [`western-strings-laddersym-bakeoff-20260729.json`](evidence/western-strings-laddersym-bakeoff-20260729.json)。
 
 二胡线已经冻结为论文证据、困难案例和共享模块来源。当前产品主线是西洋弓弦乐, 小提琴优先, 大提琴后续独立验证。
 
