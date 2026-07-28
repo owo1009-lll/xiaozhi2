@@ -20,6 +20,20 @@ function Resolve-SafeTarget {
       $resolved.StartsWith($paperPrefix, [StringComparison]::OrdinalIgnoreCase)) {
     throw "Refusing paper target: $resolved"
   }
+  $cursor = $resolved
+  while (-not $cursor.Equals($repoRoot, [StringComparison]::OrdinalIgnoreCase)) {
+    if (Test-Path -LiteralPath $cursor) {
+      $item = Get-Item -LiteralPath $cursor -Force
+      if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Refusing reparse-point target or ancestor: $cursor"
+      }
+    }
+    $parent = Split-Path -Parent $cursor
+    if (-not $parent -or $parent.Equals($cursor, [StringComparison]::OrdinalIgnoreCase)) {
+      throw "Unable to prove target ancestry: $resolved"
+    }
+    $cursor = $parent
+  }
   return $resolved
 }
 
@@ -45,6 +59,7 @@ $targets = @(
   (Join-Path $repoRoot "data\experiments\western-strings-m4\homr-smoke"),
   (Join-Path $repoRoot "data\experiments\western-strings-m4\clarity-smoke"),
   (Join-Path $repoRoot "data\experiments\western-strings-m4\clarity-adaptation-photo-smoke"),
+  (Join-Path $repoRoot "node_modules\.vite"),
   (Join-Path $repoRoot "dist")
 )
 

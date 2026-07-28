@@ -19,6 +19,13 @@ python-service/*.pyc
 python-service/.env
 research-analysis/output/
 research-analysis/__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage/
+htmlcov/
 exports/
 scripts/__pycache__/
 __pycache__/
