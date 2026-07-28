@@ -1,0 +1,251 @@
+{
+  "schemaVersion": "western-strings-multimodal-audio-bakeoff-v1",
+  "decisionDate": "2026-07-28",
+  "decision": "retain-current-round5-baseline-and-remove-all-new-candidates",
+  "scope": {
+    "dataset": "consumed Round 5 diagnostic set",
+    "recordings": 12,
+    "scorePositions": 672,
+    "calibrationPositions": 336,
+    "freshBlindPositions": 336,
+    "releaseEvidenceEligible": false,
+    "studentFacing": false,
+    "reason": "Round 5 has already been inspected; this run is architecture screening and cannot replace untouched Round 6 evidence."
+  },
+  "frozenGate": {
+    "minPrecision": 0.9,
+    "minRecall": 0.5,
+    "maxStrictFalsePositives": 0
+  },
+  "currentBaseline": {
+    "source": "data/experiments/western-strings-round5-segment-edit-path/report.json",
+    "strictConfirmedRecall": "2/12",
+    "gates": {
+      "merged_substitution": {
+        "truePositive": 1,
+        "falsePositive": 1,
+        "falseNegative": 5,
+        "precision": 0.5,
+        "recall": 0.166667
+      },
+      "missing": {
+        "truePositive": 0,
+        "falsePositive": 0,
+        "falseNegative": 6,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "extra": {
+        "truePositive": 3,
+        "falsePositive": 0,
+        "falseNegative": 3,
+        "precision": 1.0,
+        "recall": 0.5,
+        "evidenceCaveat": "numerically promoted but invalidated as performance evidence by score-position confounding"
+      },
+      "drag": {
+        "truePositive": 3,
+        "falsePositive": 1,
+        "falseNegative": 3,
+        "precision": 0.75,
+        "recall": 0.5
+      }
+    }
+  },
+  "candidates": [
+    {
+      "name": "MERT-v1-95M plus logistic heads",
+      "upstreamCommit": "391062e4c384aaad4e5a992be339ef70769dbd6f",
+      "testType": "measured-full-score",
+      "method": "layers 3/6/9/12; mean-plus-standard-deviation pooling; calibration leave-one-recording-out threshold selection; fresh evaluation",
+      "result": {
+        "calibrationReadyGates": [],
+        "retainedGates": [],
+        "architectureCandidateRetained": false
+      },
+      "resultSha256": "d5cc1d494a50926aaed8b878e3c8e0eb8d31314091f7ff2dab8f56213143eac1",
+      "decision": "remove",
+      "reason": "No layer passed the calibration gate. Zero-false-positive fresh choices detected 0/6; relaxed choices produced up to 20 false positives."
+    },
+    {
+      "name": "MuQ-large-msd-iter plus logistic heads",
+      "upstreamCommit": "28847ea50cd31ac4b8b6a7dacc051ad7d1c7606a",
+      "testType": "measured-full-score",
+      "method": "layers 3/6/9/12; mean-plus-standard-deviation pooling; calibration leave-one-recording-out threshold selection; fresh evaluation",
+      "result": {
+        "merged_substitution": "no calibration-ready layer",
+        "missing": {
+          "selectedLayer": 12,
+          "truePositive": 5,
+          "falsePositive": 7,
+          "falseNegative": 1,
+          "precision": 0.416667,
+          "recall": 0.833333
+        },
+        "extra": "no calibration-ready layer",
+        "drag": {
+          "selectedLayer": 12,
+          "truePositive": 0,
+          "falsePositive": 1,
+          "falseNegative": 6,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        "retainedGates": [],
+        "architectureCandidateRetained": false
+      },
+      "weightsLicense": "CC-BY-NC",
+      "resultSha256": "f3e55b502cb6550593e6b97279d8f735543ce318860c78a8275567e43ae939fa",
+      "decision": "remove",
+      "reason": "Missing recall increased but violated both precision and strict false-positive limits; no gate beat the current baseline safely."
+    },
+    {
+      "name": "Polytune robust-piano-v3",
+      "upstreamCommit": "d2055bb21759d457c8f21c1cf2e47c79af6248f5",
+      "checkpointSha256": "83259ea35ce8bc598978d66c073fb6c675a7d44d500480c239571fccddf8599d",
+      "testType": "measured-full-score-dual-audio",
+      "input": "whole violin performance plus a violin reference render warped to the existing score-alignment timeline",
+      "freshResult": {
+        "merged_substitution": {
+          "truePositive": 1,
+          "falsePositive": 13,
+          "falseNegative": 5,
+          "precision": 0.071429,
+          "recall": 0.166667
+        },
+        "missing": {
+          "truePositive": 0,
+          "falsePositive": 19,
+          "falseNegative": 6,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        "extra": {
+          "truePositive": 2,
+          "falsePositive": 102,
+          "falseNegative": 4,
+          "precision": 0.019231,
+          "recall": 0.333333
+        },
+        "drag": {
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 6,
+          "precision": 0.0,
+          "recall": 0.0
+        }
+      },
+      "domain": "piano-only checkpoint",
+      "repositoryLicense": "BSD-3-Clause with non-commercial-use restriction",
+      "resultSha256": "efc278ea518c28c75b071ae31483f1869a2b7d6d4f55020f70d4af44df078921",
+      "decision": "remove",
+      "reason": "All four gates failed and the false-positive rate was catastrophic in the violin domain; the repository license also blocks ordinary commercial production use."
+    },
+    {
+      "name": "pyAMPACT alignment layer",
+      "upstreamCommit": "2a30ea27facd5caddeffb9638de6866f30e03a67",
+      "testType": "runtime-contract",
+      "recording": "r5-cal-01",
+      "result": {
+        "parts": [
+          "Piano"
+        ],
+        "alignedRows": 61,
+        "columns": [
+          "DURATION",
+          "MEASURE",
+          "MIDI",
+          "OFFSET_SEC",
+          "ONSET",
+          "ONSET_SEC",
+          "PART",
+          "TEMPO"
+        ],
+        "spectrogramShape": [
+          257,
+          3255
+        ],
+        "structuredErrorLabels": false
+      },
+      "decision": "remove-as-detector-candidate",
+      "reason": "The runtime succeeds as a score-note timing and descriptor layer, but it emits every score note and has no wrong/missing/extra/drag decision contract. Existing Parangonar alignment already covers this role."
+    },
+    {
+      "name": "Qwen2.5-Omni-3B",
+      "upstreamCommit": "d8a31ca56c0456b6edfcbcbf4bdbb6ae2200ef42",
+      "testType": "mandatory-output-and-resource-contract",
+      "officialCheckpointBytes": 11989103936,
+      "availableGpuMemoryBytes": 8589934592,
+      "result": {
+        "acceptsAudioAndVisualPrompt": true,
+        "acceptsStructuredReferenceScore": false,
+        "emitsDeterministicNoteLevelErrorTimeline": false,
+        "fitsCurrentGpuWithoutOffloadOrUnverifiedQuantization": false
+      },
+      "runtimeMetricProduced": false,
+      "decision": "remove",
+      "reason": "It fails the mandatory deterministic note-level output and current-hardware contracts before inference; downloading and prompting a general text generator would not produce a comparable gate metric."
+    },
+    {
+      "name": "MOSS-Audio-4B-Instruct",
+      "upstreamCommit": "5cbb1d823937cd5b5de3d8fa4d3a7253ebd3b883",
+      "testType": "mandatory-output-and-resource-contract",
+      "officialCheckpointBytes": 10458835308,
+      "availableGpuMemoryBytes": 8589934592,
+      "result": {
+        "defaultOutput": "autoregressive natural-language audio description",
+        "acceptsStructuredReferenceScore": false,
+        "emitsDeterministicNoteLevelErrorTimeline": false,
+        "encoderFrameRateHz": 12.5,
+        "fitsCurrentGpuWithoutOffloadOrUnverifiedQuantization": false
+      },
+      "runtimeMetricProduced": false,
+      "decision": "remove",
+      "reason": "It fails the reference-score, 50 ms localization, deterministic output, and current-hardware contracts before inference."
+    },
+    {
+      "name": "CCOM-HuQin",
+      "upstreamCommit": "f6837f7654a77d554f325545d666689d4d196fff",
+      "testType": "runnable-artifact-contract",
+      "result": {
+        "datasetPresent": true,
+        "inferenceEntrypointPresent": false,
+        "modelDefinitionPresent": false,
+        "checkpointPresent": false
+      },
+      "runtimeMetricProduced": false,
+      "decision": "remove-as-model-candidate",
+      "reason": "This is a dataset/parser repository, not a runnable detector. Its license metadata also needs reconciliation before any training use."
+    },
+    {
+      "name": "YourMT3 plus instrument-aware checkpoint",
+      "testType": "previously-measured-public-audio-baseline",
+      "source": "docs/evidence/western-strings-musicnet-yourmt3-20260720.json",
+      "result": {
+        "fiftyMillisecondPrecision": 0.8642,
+        "fiftyMillisecondRecall": 0.7035,
+        "hundredMillisecondPrecision": 0.963,
+        "hundredMillisecondRecall": 0.7839
+      },
+      "decision": "keep-historical-evidence-only",
+      "reason": "It remains the strongest public accompanied-violin architecture diagnostic, but still fails the frozen recall gates and has checkpoint-license and MusicNet-overlap limitations."
+    }
+  ],
+  "cleanup": {
+    "failedCandidateIntegrationRetained": false,
+    "historicalEvidenceRetained": true,
+    "workspaceRemovedMiB": 2935.45,
+    "modelCacheRemovedMiB": 1632.13,
+    "totalRemovedMiB": 4567.58,
+    "round6Touched": false,
+    "productionRuntimeChanged": false,
+    "studentGatesChanged": false
+  },
+  "conclusion": {
+    "newCandidateRetained": false,
+    "currentStrictConfirmedRecallChanged": false,
+    "currentStrictConfirmedRecall": "2/12",
+    "nextEvidenceSource": "new human-signed training-ledger audio and untouched counterbalanced Round 6",
+    "multimodalDirection": "A score-conditioned model remains the right architecture class, but available public checkpoints did not meet the safety gate. A future experiment should train a compact score-conditioned edit model on real signed note-level data, not use a general audio-language model as an automatic accuser."
+  }
+}
