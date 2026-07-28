@@ -12,6 +12,13 @@
 
 二胡线已经冻结为论文证据、困难案例和共享模块来源。当前产品主线是西洋弓弦乐, 小提琴优先, 大提琴后续独立验证。
 
+## 2026-07-28 训练音频多模态候选止损
+
+- 在已经消费、不得再充当发布 fresh-blind 的 Round 5 上，用 12 条录音和每条 56 个完整谱面位置统一筛查新架构；冻结门槛仍为 `precision>=90% / recall>=50% / strict FP=0`。MERT-95M 的四层固定嵌入没有一个 gate 通过 calibration 留一录音；MuQ 仅在 missing 上达到 fresh `5/6`，但同时产生 `7 FP`，P=`41.67%`，drag 为 `0/6 @ 1 FP`；两者均无可保留 gate。
+- 双音频、参考谱条件化的 Polytune 已用现有对齐结果生成等长小提琴参考音轨并跑满 12 条。fresh 结果为 wrong `1/6 @ 13 FP`、missing `0/6 @ 19 FP`、extra `2/6 @ 102 FP`、drag `0/6 @ 0 FP`，显著差于当前基线；其公开 checkpoint 还是钢琴域，仓库许可证附带非商业限制。pyAMPACT 实跑能返回 61 行谱音时间和描述特征，但没有 wrong/missing/extra/drag 输出，只是与现有 Parangonar 重叠的对齐层。
+- Qwen2.5-Omni-3B 与 MOSS-Audio-4B-Instruct 在下载权重前即未通过强制合同：官方权重分别约 `11.99 GB`、`10.46 GB`，超过本机 8 GB GPU 的直接部署预算；两者是自然语言生成器，没有确定性的逐音错误时间线，MOSS 还不接参考谱且 12.5 Hz 表征低于 50 ms 定位要求。CCOM-HuQin 是数据集/解析器，不含模型、checkpoint 或推理入口。它们没有被伪造为性能分数，而是按输入、输出、资源和可运行工件合同淘汰。
+- 本轮 `newCandidateRetained=false`，失败候选的实验接线、外部 clone、venv、checkpoint、模型缓存和派生产物全部删除，共清理 `4567.58 MiB`，只保留可审计摘要；没有改生产运行时、Round 6 或学生开关，严格确诊仍为 `2/12`。YourMT3 继续只作历史公开伴奏域最强诊断，不因本轮复活。证据见 [`western-strings-multimodal-audio-bakeoff-20260728.json`](evidence/western-strings-multimodal-audio-bakeoff-20260728.json)。
+
 ## 2026-07-28 代码、依赖与工作区审计
 
 - **安全清理已完成:** 先用正式部署预检确认生产 HOMR 固定在 `data/tools/homr-0.7.0-ort1.27.0` 且版本、模型、wheel/RECORD 哈希和 AGPL 审查均通过，再删除旧 HOMR/Clarity 实验 venv、已拒绝候选源码、具名 smoke、源码树 Python 缓存、Vite 缓存和旧 `dist`，实际清理 `521.90 MiB`；随后重建 `dist`。正式数据集、benchmark、模型、训练账本、私密录音、人工 gold、教师包、论文和用户未跟踪文件均保留。清理器新增工作区/`paper/` 边界之外的 reparse-point 祖先拒绝，防止 junction/symlink 把递归删除引出工作区。
