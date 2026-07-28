@@ -42,13 +42,21 @@ const LABEL_SET = new Set(TRAINING_LEDGER_LABELS);
 const NOTE_ID_PATTERN = /^xml-m-?\d+-n\d+$/i;
 const SHA1_PATTERN = /^[a-f0-9]{40}$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
+const RECORDING_ID_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9_.-]*[A-Za-z0-9])?$/;
+const CHAIN_IDENTITY_FIELDS = ["recordingId", "submissionId", "audioSha256", "scorePayloadSha256"];
+const ledgerAppendQueues = new Map();
 
 export function trainingLedgerDir(repoRoot = process.cwd()) {
   return path.join(repoRoot, "data", "private", "western-strings-training-ledger");
 }
 
 export function trainingLedgerFile(repoRoot, recordingId) {
-  const safeId = safeString(recordingId).replace(/[^A-Za-z0-9_.-]/g, "_");
+  const safeId = safeString(recordingId).trim();
+  if (!RECORDING_ID_PATTERN.test(safeId)) {
+    throw new Error(
+      "training ledger recordingId must start and end with a letter or digit and contain only letters, digits, dot, underscore, or hyphen.",
+    );
+  }
   return path.join(trainingLedgerDir(repoRoot), `${safeId}.jsonl`);
 }
 
@@ -88,8 +96,9 @@ async function readJsonlLines(filePath) {
   try {
     const raw = await fs.readFile(filePath, "utf8");
     return raw.split(/\r?\n/).filter((line) => line.trim());
-  } catch {
-    return [];
+  } catch (error) {
+    if (error?.code === "ENOENT") return [];
+    throw error;
   }
 }
 
@@ -106,8 +115,16 @@ async function loadVerifiedCandidateArtifact(repoRoot, machineSnapshot, payload)
   }
   let bytes = null;
   try {
-    bytes = await fs.readFile(artifactPath);
-  } catch {
+    const [realDataRoot, realArtifactPath] = await Promise.all([
+      fs.realpath(path.join(repoRoot, "data")),
+      fs.realpath(artifactPath),
+    ]);
+    if (!pathIsInside(realDataRoot, realArtifactPath)) {
+      throw new Error("training ledger candidate artifact resolved outside the data directory.");
+    }
+    bytes = await fs.readFile(realArtifactPath);
+  } catch (error) {
+    if (String(error?.message || "").includes("outside the data directory")) throw error;
     throw new Error(`training ledger candidate artifact is missing on disk: ${relativePath}.`);
   }
   const observedSha256 = sha256Buffer(bytes);
@@ -214,23 +231,35 @@ function normalizeExtraEvent(entry, artifact) {
   }
   const startSeconds = entry?.startSeconds === null || entry?.startSeconds === undefined
     ? null
-    : safeNumber(entry.startSeconds, 0);
+    : Number(entry.startSeconds);
   const endSeconds = entry?.endSeconds === null || entry?.endSeconds === undefined
     ? null
-    : safeNumber(entry.endSeconds, 0);
+    : Number(entry.endSeconds);
+  if ((startSeconds !== null && (!Number.isFinite(startSeconds) || startSeconds < 0))
+    || (endSeconds !== null && (!Number.isFinite(endSeconds) || endSeconds < 0))) {
+    throw new Error("training ledger extra event times must be finite and non-negative.");
+  }
   if (startSeconds !== null && endSeconds !== null && endSeconds < startSeconds) {
     throw new Error("training ledger extra event ends before it starts.");
   }
   if (anchorNoteId === "" && startSeconds === null) {
     throw new Error("training ledger extra event needs either an anchor score note or a start time.");
   }
+  const performedMidi = entry?.performedMidi === null || entry?.performedMidi === undefined
+    ? null
+    : Number(entry.performedMidi);
+  if (performedMidi !== null && (!Number.isInteger(performedMidi) || performedMidi < 0 || performedMidi > 127)) {
+    throw new Error("training ledger extra event performedMidi must be an integer from 0 to 127.");
+  }
+  const note = safeString(entry?.note);
+  if (note.length > 500) throw new Error("training ledger extra event note exceeds 500 characters.");
   return {
     kind: "extra",
     afterNoteId: anchorNoteId,
-    performedMidi: Number.isInteger(entry?.performedMidi) ? entry.performedMidi : null,
+    performedMidi,
     startSeconds,
     endSeconds,
-    note: safeString(entry?.note),
+    note,
   };
 }
 
@@ -270,7 +299,11 @@ export async function buildTrainingLedgerRecord({
     if (seen.has(entry.noteId)) throw new Error(`training ledger noteLabels repeat ${entry.noteId}.`);
     seen.add(entry.noteId);
   }
-  const extraEvents = (Array.isArray(payload.extraEvents) ? payload.extraEvents : [])
+  const requestedExtraEvents = Array.isArray(payload.extraEvents) ? payload.extraEvents : [];
+  if (requestedExtraEvents.length > 100) {
+    throw new Error("training ledger accepts at most 100 extra events per review.");
+  }
+  const extraEvents = requestedExtraEvents
     .map((entry) => normalizeExtraEvent(entry, artifact));
 
   // Audio provenance is re-checked against the file on disk right now; the
@@ -280,38 +313,36 @@ export async function buildTrainingLedgerRecord({
   if (!SHA1_PATTERN.test(submittedAudioHash) && !SHA256_PATTERN.test(submittedAudioHash)) {
     throw new Error("training ledger requires a submission audio hash (sha1 or sha256).");
   }
-  const audioPath = safeString(submission.audioPath || submission.audioSubmission?.storedPath);
-  let audioSha256 = "";
-  let audioVerified = false;
-  let submittedAudioHashVerified = false;
-  let submittedAudioHashAlgorithm = "";
-  if (audioPath) {
-    const resolvedAudio = path.resolve(repoRoot, audioPath);
-    try {
-      const audioBytes = await fs.readFile(resolvedAudio);
-      audioSha256 = sha256Buffer(audioBytes);
-      const observedSubmittedHash = SHA256_PATTERN.test(submittedAudioHash)
-        ? audioSha256
-        : SHA1_PATTERN.test(submittedAudioHash)
-          ? sha1Buffer(audioBytes)
-          : "";
-      submittedAudioHashAlgorithm = SHA256_PATTERN.test(submittedAudioHash) ? "sha256" : "sha1";
-      if (!observedSubmittedHash || observedSubmittedHash !== submittedAudioHash) {
-        throw new Error("training ledger audio file no longer matches the submitted audio hash.");
-      }
-      audioVerified = true;
-      submittedAudioHashVerified = true;
-    } catch (error) {
-      if (String(error?.message || "").includes("no longer matches")) throw error;
-      audioVerified = false;
-    }
+  const audioPath = safeString(submission.audioPath || submission.audioSubmission?.storedPath).trim();
+  if (!audioPath) {
+    throw new Error("training ledger requires an on-disk audio file.");
   }
-  if (!audioSha256) {
-    if (!SHA256_PATTERN.test(submittedAudioHash)) {
-      throw new Error("training ledger requires an on-disk audio file to derive audio sha256.");
+  const dataRoot = path.join(repoRoot, "data");
+  const resolvedAudio = path.resolve(repoRoot, audioPath);
+  if (!pathIsInside(dataRoot, resolvedAudio)) {
+    throw new Error("training ledger audio file resolved outside the data directory.");
+  }
+  let audioBytes = null;
+  try {
+    const [realDataRoot, realAudioPath] = await Promise.all([
+      fs.realpath(dataRoot),
+      fs.realpath(resolvedAudio),
+    ]);
+    if (!pathIsInside(realDataRoot, realAudioPath)) {
+      throw new Error("training ledger audio file resolved outside the data directory.");
     }
-    audioSha256 = submittedAudioHash;
-    submittedAudioHashAlgorithm = "sha256";
+    audioBytes = await fs.readFile(realAudioPath);
+  } catch (error) {
+    if (String(error?.message || "").includes("outside the data directory")) throw error;
+    throw new Error(`training ledger audio file is missing on disk: ${audioPath}.`);
+  }
+  const audioSha256 = sha256Buffer(audioBytes);
+  const submittedAudioHashAlgorithm = SHA256_PATTERN.test(submittedAudioHash) ? "sha256" : "sha1";
+  const observedSubmittedHash = submittedAudioHashAlgorithm === "sha256"
+    ? audioSha256
+    : sha1Buffer(audioBytes);
+  if (observedSubmittedHash !== submittedAudioHash) {
+    throw new Error("training ledger audio file no longer matches the submitted audio hash.");
   }
 
   const scorePayloadSha256 = safeString(machineSnapshot.scorePayloadSha256).trim().toLowerCase();
@@ -353,14 +384,62 @@ export async function buildTrainingLedgerRecord({
       candidateArtifactRehashed: true,
       reviewerSawSameArtifact: true,
       noteIdentitiesResolvedFromArtifact: true,
-      audioRehashed: audioVerified,
+      audioRehashed: true,
       submissionAudioHashAlgorithm: submittedAudioHashAlgorithm,
-      submissionAudioHashVerified: submittedAudioHashVerified,
+      submissionAudioHashVerified: true,
       verifiedAt: nowIso(),
     },
     consent: "yes",
     licenseStatus: safeString(payload.licenseStatus, "local-only"),
   };
+}
+
+function verifiedLedgerTail(existing, record) {
+  let previousRecordSha256 = "";
+  let first = null;
+  for (const [index, line] of existing.entries()) {
+    let parsed = null;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      throw new Error(`training ledger record ${index + 1} is unreadable; refusing to append onto a broken chain.`);
+    }
+    if (parsed?.revision !== index + 1
+      || safeString(parsed?.previousRecordSha256) !== previousRecordSha256
+      || recordSha256(parsed) !== parsed?.recordSha256) {
+      throw new Error(`training ledger record ${index + 1} breaks the hash chain; refusing to append.`);
+    }
+    if (!first) {
+      first = parsed;
+    } else {
+      for (const field of CHAIN_IDENTITY_FIELDS) {
+        if (safeString(first[field]) !== safeString(parsed[field])) {
+          throw new Error(`training ledger ${field} changed within one recording chain.`);
+        }
+      }
+    }
+    previousRecordSha256 = parsed.recordSha256;
+  }
+  if (first) {
+    for (const field of CHAIN_IDENTITY_FIELDS) {
+      if (safeString(first[field]) !== safeString(record[field])) {
+        throw new Error(`training ledger ${field} changed within one recording chain.`);
+      }
+    }
+  }
+  return previousRecordSha256;
+}
+
+async function withLedgerAppendQueue(outPath, operation) {
+  const queueKey = process.platform === "win32" ? outPath.toLowerCase() : outPath;
+  const previous = ledgerAppendQueues.get(queueKey) || Promise.resolve();
+  const queued = previous.catch(() => {}).then(operation);
+  ledgerAppendQueues.set(queueKey, queued);
+  try {
+    return await queued;
+  } finally {
+    if (ledgerAppendQueues.get(queueKey) === queued) ledgerAppendQueues.delete(queueKey);
+  }
 }
 
 export async function appendTrainingLedgerRecord({
@@ -374,27 +453,22 @@ export async function appendTrainingLedgerRecord({
   const outPath = trainingLedgerFile(repoRoot, record.recordingId);
   await fs.mkdir(path.dirname(outPath), { recursive: true });
 
-  // Append only: a re-review is a NEW immutable record chained to the previous
-  // one. Earlier labels, signer and timestamp stay readable forever.
-  const existing = await readJsonlLines(outPath);
-  let previousRecordSha256 = "";
-  if (existing.length) {
-    try {
-      previousRecordSha256 = safeString(JSON.parse(existing[existing.length - 1])?.recordSha256);
-    } catch {
-      throw new Error("training ledger tail record is unreadable; refusing to append onto a broken chain.");
-    }
-  }
-  const chained = { ...record, revision: existing.length + 1, previousRecordSha256 };
-  const stored = { ...chained, recordSha256: recordSha256(chained) };
-  await fs.appendFile(outPath, `${JSON.stringify(stored)}\n`, "utf8");
-  return {
-    path: path.relative(repoRoot, outPath).replace(/\\/g, "/"),
-    recordingId: stored.recordingId,
-    revision: stored.revision,
-    noteLabelCount: stored.noteLabels.length,
-    extraEventCount: stored.extraEvents.length,
-    scoreNoteCount: stored.scoreNoteCount,
-    reviewedBy: stored.reviewedBy,
-  };
+  return withLedgerAppendQueue(outPath, async () => {
+    // Append only: a re-review is a NEW immutable record chained to the previous
+    // one. Earlier labels, signer and timestamp stay readable forever.
+    const existing = await readJsonlLines(outPath);
+    const previousRecordSha256 = verifiedLedgerTail(existing, record);
+    const chained = { ...record, revision: existing.length + 1, previousRecordSha256 };
+    const stored = { ...chained, recordSha256: recordSha256(chained) };
+    await fs.appendFile(outPath, `${JSON.stringify(stored)}\n`, "utf8");
+    return {
+      path: path.relative(repoRoot, outPath).replace(/\\/g, "/"),
+      recordingId: stored.recordingId,
+      revision: stored.revision,
+      noteLabelCount: stored.noteLabels.length,
+      extraEventCount: stored.extraEvents.length,
+      scoreNoteCount: stored.scoreNoteCount,
+      reviewedBy: stored.reviewedBy,
+    };
+  });
 }

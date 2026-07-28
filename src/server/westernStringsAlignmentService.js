@@ -2025,6 +2025,13 @@ export async function recordWesternControlledSubmissionReview({ repoRoot = proce
   if (action === "feedback_released" && !safeString(payload.studentMessage).trim()) {
     throw new Error("feedback_released requires a studentMessage.");
   }
+  if (action !== "feedback_released" && payload.releaseToStudent === true) {
+    throw new Error("releaseToStudent=true requires action=feedback_released.");
+  }
+  const reviewerId = safeString(payload.reviewerId).trim();
+  if (payload.completeErrorInventory === true && !reviewerId) {
+    throw new Error("a signed completeErrorInventory requires an explicit reviewerId.");
+  }
   const requestedStudentIssues = action === "feedback_released" && Array.isArray(payload.studentIssues)
     ? payload.studentIssues
     : [];
@@ -2054,12 +2061,12 @@ export async function recordWesternControlledSubmissionReview({ repoRoot = proce
     submissionId,
     action,
     reason: safeString(payload.reason),
-    reviewerId: safeString(payload.reviewerId, "reviewer-1"),
+    reviewerId,
     comments: safeString(payload.comments),
     // Human-authored feedback for the student page; shown there only when the
     // reviewer explicitly releases it. Machine analysis never flows through.
     studentMessage: safeString(payload.studentMessage),
-    releaseToStudent: payload.releaseToStudent === true,
+    releaseToStudent: action === "feedback_released" && payload.releaseToStudent === true,
     studentIssues,
   };
   const outPath = controlledSubmissionReviewsPath(repoRoot);

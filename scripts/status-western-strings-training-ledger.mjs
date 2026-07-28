@@ -24,24 +24,43 @@ const MILESTONE_PERFORMERS = 30;
 const MILESTONE_DRAG_POSITIVES = 200;
 const MILESTONE_MIN_PER_ERROR_LABEL = 50;
 const MILESTONE_DOUBLE_REVIEW_RATE = 0.1;
+const CHAIN_IDENTITY_FIELDS = ["recordingId", "submissionId", "audioSha256", "scorePayloadSha256"];
 
 const repoRoot = process.cwd();
 const ledgerDir = trainingLedgerDir(repoRoot);
+const dataRoot = path.resolve(repoRoot, "data");
 const files = fs.existsSync(ledgerDir)
   ? fs.readdirSync(ledgerDir).filter((name) => name.endsWith(".jsonl")).sort()
   : [];
 
 const artifactShaCache = new Map();
-function artifactSha256(relativePath) {
+function managedArtifact(relativePath) {
   if (artifactShaCache.has(relativePath)) return artifactShaCache.get(relativePath);
-  let sha = "";
-  try {
-    sha = crypto.createHash("sha256").update(fs.readFileSync(path.resolve(repoRoot, relativePath))).digest("hex");
-  } catch {
-    sha = "";
+  const resolved = path.resolve(repoRoot, relativePath);
+  const lexicalRelative = path.relative(dataRoot, resolved);
+  if (!lexicalRelative || lexicalRelative.startsWith("..") || path.isAbsolute(lexicalRelative)) {
+    const result = { sha256: "", status: "outside-data" };
+    artifactShaCache.set(relativePath, result);
+    return result;
   }
-  artifactShaCache.set(relativePath, sha);
-  return sha;
+  let result = null;
+  try {
+    const realDataRoot = fs.realpathSync(dataRoot);
+    const realTarget = fs.realpathSync(resolved);
+    const realRelative = path.relative(realDataRoot, realTarget);
+    if (!realRelative || realRelative.startsWith("..") || path.isAbsolute(realRelative)) {
+      result = { sha256: "", status: "outside-data" };
+    } else {
+      result = {
+        sha256: crypto.createHash("sha256").update(fs.readFileSync(realTarget)).digest("hex"),
+        status: "ok",
+      };
+    }
+  } catch {
+    result = { sha256: "", status: "missing" };
+  }
+  artifactShaCache.set(relativePath, result);
+  return result;
 }
 
 function verifyRecord(record, previousSha) {
@@ -62,9 +81,23 @@ function verifyRecord(record, previousSha) {
   const artifactPath = record?.machineSnapshot?.candidateRowsPath || "";
   if (!artifactPath) problems.push("analysis-snapshot-missing");
   else {
-    const observed = artifactSha256(artifactPath);
-    if (!observed) problems.push("analysis-artifact-missing-on-disk");
-    else if (observed !== record?.machineSnapshot?.candidateRowsSha256) problems.push("analysis-artifact-changed");
+    const observed = managedArtifact(artifactPath);
+    if (observed.status === "outside-data") problems.push("analysis-artifact-outside-data");
+    else if (observed.status === "missing") problems.push("analysis-artifact-missing-on-disk");
+    else if (observed.sha256 !== record?.machineSnapshot?.candidateRowsSha256) problems.push("analysis-artifact-changed");
+  }
+
+  const audioPath = record?.audioPath || "";
+  if (!audioPath) problems.push("audio-path-missing");
+  else {
+    const observed = managedArtifact(audioPath);
+    if (observed.status === "outside-data") problems.push("audio-path-outside-data");
+    else if (observed.status === "missing") problems.push("audio-artifact-missing-on-disk");
+    else if (observed.sha256 !== record?.audioSha256) problems.push("audio-artifact-changed");
+  }
+  if (record?.verification?.audioRehashed !== true
+    || record?.verification?.submissionAudioHashVerified !== true) {
+    problems.push("audio-provenance-unverified");
   }
 
   const labels = Array.isArray(record?.noteLabels) ? record.noteLabels : [];
@@ -80,6 +113,7 @@ for (const name of files) {
   const filePath = path.join(ledgerDir, name);
   const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/).filter((line) => line.trim());
   let previousSha = "";
+  let firstRecord = null;
   for (const [index, line] of lines.entries()) {
     let record = null;
     try {
@@ -89,6 +123,15 @@ for (const name of files) {
       break;
     }
     const problems = verifyRecord(record, previousSha);
+    if (!firstRecord) {
+      firstRecord = record;
+    } else {
+      for (const field of CHAIN_IDENTITY_FIELDS) {
+        if (String(firstRecord?.[field] || "") !== String(record?.[field] || "")) {
+          problems.push(`chain-${field}-changed`);
+        }
+      }
+    }
     previousSha = record?.recordSha256 || "";
     if (problems.length) {
       invalid.push({ file: name, line: index + 1, problems });
@@ -213,7 +256,7 @@ const status = {
     disagreementSamples,
   },
   dataQuality: {
-    verifiedAgainstDisk: true,
+    verifiedAgainstDisk: invalid.length === 0,
     invalidRecords: invalid,
     suspiciousPerformerPairs,
   },

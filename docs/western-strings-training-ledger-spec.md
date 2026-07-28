@@ -6,7 +6,7 @@
 复核台加一层逐音打标控件 → 复核提交时把「逐音金标 + 机器特征快照 + 匿名 performer 元数据」写进一个**只追加、私有、gitignore** 的训练账本。结构 = Round 5 `position-truth.json` 那套(`completeErrorInventory` + 逐音标签),数据来源从"专门录"变成"复核白捡"。
 
 ## 1. 训练样本 schema(一次复核 = 一条记录)
-写入 `data/private/western-strings-training-ledger/<recordingId>.json`:
+以 JSONL 只追加方式写入 `data/private/western-strings-training-ledger/<recordingId>.jsonl`:
 ```json
 {
   "ledgerContract": "western-strings-training-ledger-v1",
@@ -17,8 +17,12 @@
   "reviewedBy": "guanxingzhi", "reviewedAt": "2026-07-...Z",
   "completeErrorInventory": true,
   "noteLabels": [
-    {"noteId": "xml-m5-n1", "measure": 5, "beat": 1, "scoreMidi": 66,
-     "label": "wrong_pitch", "asPerformedNote": ""}
+    {"noteId": "xml-m5-n1", "noteIndex": 0, "measure": 5,
+     "scoreMidi": 66, "label": "wrong_pitch"}
+  ],
+  "extraEvents": [
+    {"kind": "extra", "afterNoteId": "xml-m5-n1", "performedMidi": 68,
+     "startSeconds": 12.4, "endSeconds": 12.7, "note": ""}
   ],
   "machineSnapshot": {
     "candidateRowsPath": "data/experiments/.../offline-feature-candidates/<batch>/<submission>.json",
@@ -27,15 +31,16 @@
   "consent": "yes", "licenseStatus": "local-only"
 }
 ```
-- `label ∈ {correct, wrong_pitch, missing, extra, drag, uncertain}`(与 Round5 gate 命名一致:merged_substitution 归 `wrong_pitch`)。
-- `noteLabels` 覆盖**每个谱音**;未显式标 = `correct`(靠 `completeErrorInventory` 背书)。
+- `label ∈ {correct, wrong_pitch, missing, drag, uncertain}`(与 Round5 gate 命名一致:merged_substitution 归 `wrong_pitch`)；`extra` 没有对应谱音，必须进入独立的 `extraEvents`，不得伪挂到某个 noteId。
+- `noteLabels` 可只写显式判断；未显式标的谱音在 `completeErrorInventory=true` 背书下计为隐式 `correct`。
 - `machineSnapshot` 只存**指针 + SHA + 版本**,不复制特征本体(账本轻、可追溯)。`x`(逐音特征)在 candidateRows 里,`y`(标签)在 noteLabels 里,按 noteId 对齐。
 
 ## 2. UI 扩展(复核台逐音打标)
 复核台已把两层 Policy C 输出(`confirmed_issue` / `self_check_hint`)画在谱面上。地基已有逐音复核原语 `action ∈ {confirm, correct, review_required}`(`src/server/westernStringsAlignmentService.js:2788`)——在其上加错误类型即可。每个谱音四种一键操作:
 - **确认机器的标** → label = 机器判定的错误类型(确诊候选转正)。
 - **否掉机器的标** → label = `correct`(← 宝贵的假阳负例)。
-- **补机器漏掉的** → 点谱上任一音,选 `wrong_pitch/missing/extra/drag`(← 更宝贵的假阴正例)。
+- **补机器漏掉的谱音错误** → 点谱上任一音,选 `wrong_pitch/missing/drag`(← 更宝贵的假阴正例)。
+- **补多拉事件** → 在时间轴登记 `extraEvents`，可附相邻谱音锚点，但不把 `extra` 写成谱音标签。
 - **拿不准** → `uncertain`(不进正/负,只标记)。
 - 复核结束勾 **`completeErrorInventory`**(= 老师签"这条每个错误都标了"),未勾不入账本。
 
@@ -44,10 +49,10 @@
 ## 3. 落盘接入点
 在现有复核写入流(`/api/strings/controlled-submissions/reviews`、`writeControlledSubmissionReview` 附近,`westernStringsAlignmentService.js:~1954-1973`)**之后**追加一步:若该复核带完整逐音标签且 `completeErrorInventory=true`,组装 §1 记录写训练账本。
 - 训练账本与复核反馈流(`controlledSubmissionReviewsPath`)**分开存**:反馈给学生,账本攒数据,互不干扰。
-- performer/device/level 元数据从提交 metadata 取;缺失填空但记录,别阻断。
+- performer/device/level 元数据从提交 metadata 取；`performerId` 为防止未来按人切分泄漏而必填，device/level 可为空。
 
 ## 4. 统计脚本(盯里程碑)
-`npm run western:training-ledger-status` 实时报:
+冻结 `package.json` 期间直接运行 `node scripts/status-western-strings-training-ledger.mjs` 实时报:
 - 总条数、**不同 performer 数**、各 `label` 计数、类别均衡度、最稀有类(拖拍)正例数。
 - 里程碑判定:`≥300 条 / ≥30 人 / 拖拍正例 ≥200`。到点才提示"可做预注册从零训练实验"。
 
@@ -61,7 +66,7 @@
 ## 6. 要建的东西(清单)
 1. 复核台 UI:逐音四态打标控件 + `completeErrorInventory` 签署(建在现有 `confirm/correct/review_required` 原语上)。
 2. 复核写入流追加训练账本落盘(§1 schema,§3 接入点)。
-3. `western:training-ledger-status` 统计脚本(§4)。
+3. `scripts/status-western-strings-training-ledger.mjs` 统计脚本(§4)。
 4. 纪律测试:账本模块零开关/零闸依赖断言(§5.1);schema 校验;performerId 必填断言。
 
 ## 7. 明确不做

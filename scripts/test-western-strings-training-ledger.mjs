@@ -207,6 +207,26 @@ try {
   await rejects(signedPayload, "submission audio hash", "the audio hash is required", {
     submission: { ...submission, audioHash: "" },
   });
+  await rejects(signedPayload, "missing on disk", "a missing audio file must be refused", {
+    submission: {
+      ...submission,
+      audioPath: "data/private/test/missing.m4a",
+      audioHash: "a".repeat(64),
+    },
+  });
+  const outsideAudio = path.join(tempRoot, "outside-data.m4a");
+  const outsideAudioBytes = Buffer.from("outside-audio");
+  await fsp.writeFile(outsideAudio, outsideAudioBytes);
+  await rejects(signedPayload, "outside the data directory", "an outside audio path must be refused", {
+    submission: {
+      ...submission,
+      audioPath: outsideAudio,
+      audioHash: crypto.createHash("sha256").update(outsideAudioBytes).digest("hex"),
+    },
+  });
+  await rejects(signedPayload, "no longer matches", "an altered audio identity must be refused", {
+    submission: { ...submission, audioHash: "a".repeat(64) },
+  });
 
   // Extra events carry their own identity
   await rejects(
@@ -223,6 +243,16 @@ try {
     { ...signedPayload, extraEvents: [{ performedMidi: 70 }] },
     "needs either an anchor",
     "an unlocatable extra event must be refused",
+  );
+  await rejects(
+    { ...signedPayload, extraEvents: [{ afterNoteId: "xml-m5-n1", startSeconds: -1 }] },
+    "finite and non-negative",
+    "negative extra-event times must be refused",
+  );
+  await rejects(
+    { ...signedPayload, extraEvents: [{ afterNoteId: "xml-m5-n1", performedMidi: 128 }] },
+    "0 to 127",
+    "out-of-range extra-event MIDI must be refused",
   );
 
   // -------------------------------------------------------------------------
@@ -252,9 +282,76 @@ try {
   assert.equal(recordSha256(older), older.recordSha256, "each record must carry a verifiable self hash");
   assert.equal(recordSha256(newer), newer.recordSha256);
 
+  newer.submissionId = "strings-submit-spliced";
+  newer.recordSha256 = recordSha256(newer);
+  await fsp.writeFile(ledgerPath, `${JSON.stringify(older)}\n${JSON.stringify(newer)}\n`, "utf8");
+  await assert.rejects(
+    () => appendTrainingLedgerRecord({ ...base, payload: signedPayload }),
+    /submissionId changed/,
+    "a self-consistent hash chain must still reject an identity splice",
+  );
+
+  const concurrentSubmission = {
+    ...submission,
+    submissionId: "strings-submit-concurrent",
+    recordingId: "r-concurrent",
+  };
+  const concurrentWrites = await Promise.all(
+    Array.from({ length: 8 }, (_, index) => appendTrainingLedgerRecord({
+      ...base,
+      submission: concurrentSubmission,
+      review: { reviewerId: `reviewer-${index}`, submittedAt: `2026-07-28T03:00:0${index}.000Z` },
+      payload: signedPayload,
+    })),
+  );
+  assert.deepEqual(
+    concurrentWrites.map((entry) => entry.revision).sort((left, right) => left - right),
+    [1, 2, 3, 4, 5, 6, 7, 8],
+    "concurrent reviews must serialize into unique revisions",
+  );
+  const concurrentPath = trainingLedgerFile(tempRoot, "r-concurrent");
+  const concurrentRecords = (await fsp.readFile(concurrentPath, "utf8"))
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+  let previousSha = "";
+  for (const [index, entry] of concurrentRecords.entries()) {
+    assert.equal(entry.revision, index + 1);
+    assert.equal(entry.previousRecordSha256, previousSha);
+    assert.equal(recordSha256(entry), entry.recordSha256);
+    previousSha = entry.recordSha256;
+  }
+
+  concurrentRecords[0].reviewedBy = "tampered";
+  await fsp.writeFile(
+    concurrentPath,
+    `${concurrentRecords.map((entry) => JSON.stringify(entry)).join("\n")}\n`,
+    "utf8",
+  );
+  await assert.rejects(
+    () => appendTrainingLedgerRecord({
+      ...base,
+      submission: concurrentSubmission,
+      review: { reviewerId: "reviewer-9", submittedAt: "2026-07-28T03:00:09.000Z" },
+      payload: signedPayload,
+    }),
+    /breaks the hash chain/,
+    "append must refuse a damaged earlier record, not only a damaged tail",
+  );
+
   assert(
     trainingLedgerFile(tempRoot, "x").replace(/\\/g, "/").includes("data/private/western-strings-training-ledger"),
     "ledger must be written under data/private",
+  );
+  assert.throws(
+    () => trainingLedgerFile(tempRoot, "x/y"),
+    /recordingId/,
+    "recording ids that would collide after filename sanitization must be refused",
+  );
+  assert.throws(
+    () => trainingLedgerFile(tempRoot, "x."),
+    /recordingId/,
+    "recording ids with Windows-normalized trailing punctuation must be refused",
   );
 } finally {
   await fsp.rm(tempRoot, { recursive: true, force: true });
@@ -268,6 +365,11 @@ for (const needle of [
   "chain-broken",
   "analysis-artifact-changed",
   "analysis-artifact-missing-on-disk",
+  "analysis-artifact-outside-data",
+  "audio-artifact-missing-on-disk",
+  "audio-artifact-changed",
+  "audio-path-outside-data",
+  "audio-provenance-unverified",
   "consent-missing",
   "full-score-sweep-not-confirmed",
   "label-out-of-vocabulary",
