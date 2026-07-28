@@ -1,0 +1,208 @@
+{
+  "schemaVersion": "western-strings-laddersym-bakeoff-v1",
+  "decisionDate": "2026-07-29",
+  "decision": "remove-laddersym-candidate",
+  "scope": {
+    "dataset": "consumed Round 5 diagnostic set",
+    "recordings": 12,
+    "scorePositions": 672,
+    "calibrationPositions": 336,
+    "freshBlindPositions": 336,
+    "releaseEvidenceEligible": false,
+    "studentFacing": false,
+    "round6Touched": false,
+    "reason": "Round 5 has already been inspected; this is architecture screening and cannot authorize promotion."
+  },
+  "candidate": {
+    "name": "LadderSym CocoChorales-E prompted",
+    "paperVenue": "ICLR 2026",
+    "repository": "https://github.com/ben2002chou/LadderSYM",
+    "upstreamCommit": "381179754cf6bcb435f9decf0d5e24eada6c68ec",
+    "repositoryLicense": "MIT",
+    "checkpointRepository": "https://huggingface.co/ben2002chou/laddersym-checkpoints",
+    "checkpointPath": "checkpoints/cocochorales/prompted/model.ckpt",
+    "checkpointBytes": 2070131837,
+    "checkpointSha256": "c28b4e43cb9dbf56e0fd68c9d647c24decbc6a89d08ded022bd704751109ef33",
+    "parameterCount": 172434640,
+    "inputContract": "whole performance audio plus whole reference-score audio plus symbolic score MIDI prompt",
+    "outputContract": {
+      "midiChannel1": "extra",
+      "midiChannel2": "missing",
+      "midiChannel3": "correct",
+      "drag": "not represented by the checkpoint"
+    }
+  },
+  "runtime": {
+    "gpu": "NVIDIA GeForce RTX 5060 8 GB",
+    "torch": "2.11.0+cu128",
+    "transformers": "4.40.1",
+    "pytorchLightning": "2.2.3",
+    "numpy": "1.26.4",
+    "protobuf": "3.20.3",
+    "prettyMidi": "0.2.10",
+    "compatibilityNotes": [
+      "The repository requirement pretty-midi 0.2.9 is incompatible with NumPy 1.26 because it still uses np.int; the isolated diagnostic environment used pretty-midi 0.2.10.",
+      "The machine-wide transformers 4.57.6 changed the T5 cache API and failed before prediction; the isolated diagnostic environment used transformers 4.40.1.",
+      "The repository inference entrypoint omitted the seed call used by training while randomly reordering simultaneous symbolic-prompt tokens. The diagnostic entrypoint fixed NumPy and Torch seeds from cfg.seed before inference."
+    ]
+  },
+  "evaluationAdapter": {
+    "scoreCoverage": "all 56 score positions per recording",
+    "alignment": "fixed monotonic edit-distance alignment of missing+correct semantic notes to every score position",
+    "extraAssignment": "every extra semantic note assigned to the nearest aligned score position by a fixed time-plus-pitch cost; an all-extra output falls back to monotonic full-score alignment",
+    "mergedSubstitution": "missing target plus a same-position extra note one or two semitones from the target",
+    "drag": "always false because the checkpoint has no duration-error class",
+    "falsePositiveAccounting": "predictions on ordinary-correct positions count as strict false positives; predictions on another known positive gate are reported as off-scope and excluded from FP, matching the existing Round 5 refinement accounting",
+    "frozenGate": {
+      "minPrecision": 0.9,
+      "minRecall": 0.5,
+      "maxStrictFalsePositives": 0
+    }
+  },
+  "experiments": [
+    {
+      "id": "standard-score-render-seed-365",
+      "reference": "MuseScore render and MIDI from the authoritative MusicXML; performance/reference duration ratio 1.22x to 1.68x",
+      "seed": 365,
+      "resultSha256": "a1f54aef99130cd5964e5a67db26b20cb01b53b0b2357e98731290346191fd19",
+      "freshResult": {
+        "merged_substitution": {
+          "truePositive": 0,
+          "falsePositive": 2,
+          "falseNegative": 6,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        "missing": {
+          "truePositive": 1,
+          "falsePositive": 52,
+          "falseNegative": 5,
+          "precision": 0.018868,
+          "recall": 0.166667
+        },
+        "extra": {
+          "truePositive": 1,
+          "falsePositive": 57,
+          "falseNegative": 5,
+          "precision": 0.017241,
+          "recall": 0.166667
+        },
+        "drag": {
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 6,
+          "precision": 0.0,
+          "recall": 0.0
+        }
+      }
+    },
+    {
+      "id": "standard-score-render-seed-366",
+      "reference": "same standard score render; independent fixed prompt-order seed",
+      "seed": 366,
+      "resultSha256": "b5aeef9b0b727efc760c125599d67680ec8a7c652e95557394986be8c2c80739",
+      "freshResult": {
+        "merged_substitution": {
+          "truePositive": 0,
+          "falsePositive": 4,
+          "falseNegative": 6,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        "missing": {
+          "truePositive": 1,
+          "falsePositive": 54,
+          "falseNegative": 5,
+          "precision": 0.018182,
+          "recall": 0.166667
+        },
+        "extra": {
+          "truePositive": 1,
+          "falsePositive": 59,
+          "falseNegative": 5,
+          "precision": 0.016667,
+          "recall": 0.166667
+        },
+        "drag": {
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 6,
+          "precision": 0.0,
+          "recall": 0.0
+        }
+      }
+    },
+    {
+      "id": "locally-aligned-score-render-seed-365",
+      "reference": "violin score MIDI locally warped to the existing score-alignment note timeline, then rendered and duration-corrected without reading Round 5 truth labels",
+      "seed": 365,
+      "resultSha256": "3074d33ffa9a7a5bc8e417697fba22cd438303a8e26d081432df445a4c0166ff",
+      "freshResult": {
+        "merged_substitution": {
+          "truePositive": 0,
+          "falsePositive": 22,
+          "falseNegative": 6,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        "missing": {
+          "truePositive": 1,
+          "falsePositive": 63,
+          "falseNegative": 5,
+          "precision": 0.015625,
+          "recall": 0.166667
+        },
+        "extra": {
+          "truePositive": 0,
+          "falsePositive": 30,
+          "falseNegative": 6,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        "drag": {
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 6,
+          "precision": 0.0,
+          "recall": 0.0
+        }
+      }
+    }
+  ],
+  "reproducibility": {
+    "fixedSeedRepeatRecording": "r5-cal-01",
+    "firstRunOutputSha256": "533da2f27a1b9096d01b485f7807dac668ba9681383d5c316f98876b4d6ecd02",
+    "repeatOutputSha256": "533da2f27a1b9096d01b485f7807dac668ba9681383d5c316f98876b4d6ecd02",
+    "byteIdentical": true,
+    "crossSeedStableConclusion": true,
+    "crossSeedStableConclusionMeaning": "Both fixed seeds fail every frozen gate with catastrophic strict false positives; individual semantic-track collapse patterns vary with prompt token order."
+  },
+  "comparison": {
+    "currentRound5BaselineStrictConfirmedRecall": "2/12",
+    "retainedGate": null,
+    "candidateBeatsCurrentBaselineSafely": false,
+    "reasons": [
+      "No gate passes precision >= 0.90, recall >= 0.50, and strict FP = 0.",
+      "Both standard-reference seeds produce more than 50 fresh strict false positives for missing and extra.",
+      "Local score-time alignment does not rescue the result.",
+      "The checkpoint cannot represent the project drag gate.",
+      "Semantic-track collapse depends on symbolic prompt token ordering even though the fail decision is stable."
+    ]
+  },
+  "cleanup": {
+    "candidateIntegrationRetained": false,
+    "historicalEvidenceRetained": true,
+    "externalCloneVenvCheckpointRemovedMiB": 2255.87,
+    "generatedInputsOutputsLogsRemovedMiB": 412.17,
+    "totalRemovedMiB": 2668.04,
+    "productionRuntimeChanged": false,
+    "studentGatesChanged": false,
+    "round6Touched": false
+  },
+  "conclusion": {
+    "decision": "remove",
+    "currentStrictConfirmedRecallChanged": false,
+    "currentStrictConfirmedRecall": "2/12",
+    "direction": "The score-conditioned architecture class remains relevant, but this public checkpoint is not a safe violin detector. Continue with signed real note-level training data and untouched Round 6 rather than integrating LadderSym."
+  }
+}
