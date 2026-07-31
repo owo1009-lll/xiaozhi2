@@ -828,13 +828,17 @@ assert.equal(round6CounterbalancedCapture?.intakeReady, false);
 assert.equal(round6CounterbalancedCapture?.recordingComplete, false);
 assert.equal(round6CounterbalancedCapture?.counts?.recordings, 12);
 assert.equal(round6CounterbalancedCapture?.counts?.truthEvents, 144);
-assert.equal(round6CounterbalancedCapture?.counts?.audioFiles, 0);
+// Stage A was recorded and signed on 2026-07-31, so six takes are now present
+// and the remaining external input is the six fresh takes only. Those stay
+// unauthorised: the Stage A safety evaluation failed, which under the staged
+// protocol ends the round rather than unlocking Stage B.
+assert.equal(round6CounterbalancedCapture?.counts?.audioFiles, 6);
   assert.deepEqual(round6CounterbalancedCapture?.remainingExternalInput, {
-  audioFiles: 12,
-  consentRows: 12,
-  licenseRows: 12,
-  signedEvents: 144,
-    completeInventories: 12,
+  audioFiles: 6,
+  consentRows: 6,
+  licenseRows: 6,
+  signedEvents: 72,
+    completeInventories: 6,
   });
   const round6Schedule = round6CounterbalancedCapture?.recordingSchedule;
   assert.equal(
@@ -852,16 +856,15 @@ assert.equal(round6CounterbalancedCapture?.counts?.audioFiles, 0);
     round6Schedule?.observedProtocolSemanticSha256,
     round6Schedule?.protocolSemanticSha256,
   );
-  assert.equal(
-    round6Schedule?.currentAuthorizedRecordingScope,
-    "stage-a-calibration-six-only",
-  );
+  // Stage A is done and its safety evaluation failed, so the staged protocol
+  // ends the round: no recording scope remains open and Stage B never unlocks.
+  assert.equal(round6Schedule?.currentAuthorizedRecordingScope, "none");
   assert.equal(round6Schedule?.minimumUnavoidableRecordingsNow, 6);
   assert.equal(round6Schedule?.conditionalAdditionalFreshRecordings, 6);
   assert.equal(round6Schedule?.maximumConditionalTotal, 12);
   assert.equal(round6Schedule?.recordAllTwelveNow, false);
   assert.equal(round6Schedule?.allTwelveRecordingAuthorizedNow, false);
-  assert.equal(round6Schedule?.stageARecordingAuthorizedNow, true);
+  assert.equal(round6Schedule?.stageARecordingAuthorizedNow, false);
   assert.deepEqual(round6Schedule?.stageARecordingIds, [
     "r6-cal-a-01",
     "r6-cal-a-02",
@@ -870,21 +873,27 @@ assert.equal(round6CounterbalancedCapture?.counts?.audioFiles, 0);
     "r6-cal-b-02",
     "r6-cal-b-03",
   ]);
-  assert.equal(round6Schedule?.stageARecordingComplete, false);
+  assert.equal(round6Schedule?.stageARecordingComplete, true);
   assert.equal(round6Schedule?.stageASafetyEvaluationPassed, false);
   assert.equal(round6Schedule?.stageBFreshRecordingAuthorizedNow, false);
+  // Nothing further is owed by the owner: Stage A consumed its six takes and
+  // the round closed, so no stage is waiting on external input.
   assert.deepEqual(round6Schedule?.currentStageExternalInput, {
-    audioFiles: 6,
-    consentRows: 6,
-    licenseRows: 6,
-    signedEvents: 72,
-    completeInventories: 6,
+    audioFiles: 0,
+    consentRows: 0,
+    licenseRows: 0,
+    signedEvents: 0,
+    completeInventories: 0,
   });
   assert.deepEqual(round6Schedule?.stopLines, {
     m4Omr: "no-further-investment",
     waveformEnergyMissingNote: "no-further-investment",
   });
-  assert.deepEqual(round6Schedule?.blockingReasons, []);
+  // Not a fault: this is the staged protocol's stop line firing exactly as
+  // designed after the Stage A clean-domain safety evaluation failed.
+  assert.deepEqual(round6Schedule?.blockingReasons, [
+    "round6-stage-a-clean-safety-failed-stop",
+  ]);
 assert.deepEqual(
   round6CounterbalancedCapture?.positionBalance?.confoundedSplitGates,
   [],
@@ -904,9 +913,12 @@ assert.equal(
   true,
 );
 assert.equal(round6CounterbalancedCapture?.evaluationProtocol?.runnerReady, true);
+// Stale by design and permanently so: the Stage B protocol was bound to the
+// manifest and truth as they stood before the Stage A signoff rewrote them,
+// and Stage B can no longer run, so the binding will never be refreshed.
 assert.equal(
   round6CounterbalancedCapture?.evaluationProtocol?.reportBindingCurrent,
-  true,
+  false,
 );
 assert.equal(
   round6CounterbalancedCapture?.evaluationProtocol?.evaluationPerformed,
@@ -1080,15 +1092,15 @@ const temporalPath = round5TargetedIntake?.segmentEditPathCandidate?.temporalOpe
 const ordinaryRecallAction = status.nextActions.find(
   (action) => action.track === "Ordinary diagnosis recall",
 );
+// Stage A ran on 2026-07-31 and its clean-domain safety gate failed, so the
+// handoff is no longer "go record six takes" but the stop line: no Stage B
+// fresh recording, recall unchanged, student switches still closed.
 assert(
-  ordinaryRecallAction?.action.includes("P0–P2 已全部榨完")
-    && ordinaryRecallAction?.action.includes("Stage A 的 6 条 calibration")
-    && ordinaryRecallAction?.action.includes("不要录 6 条 fresh")
-    && ordinaryRecallAction?.action.includes("western:round6-stage-a-truth-signoff-pack")
-    && ordinaryRecallAction?.action.includes("western:round6-stage-a-safety-preflight")
-    && ordinaryRecallAction?.action.includes("western:round6-stage-a-safety-eval")
-    && ordinaryRecallAction?.action.includes("2/12"),
-  "the recall handoff must expose the exhausted zero-recording work and six-take Stage-A plan",
+  ordinaryRecallAction?.action.includes("Stage A 干净域安全闸已失败")
+    && ordinaryRecallAction?.action.includes("不要录 Stage B fresh")
+    && ordinaryRecallAction?.action.includes("2/12")
+    && ordinaryRecallAction?.action.includes("学生三开关保持 false"),
+  "the recall handoff must expose the Stage-A stop line and the unchanged recall",
 );
 assert.equal(
   ordinaryRecallAction?.artifact,
@@ -1096,6 +1108,7 @@ assert.equal(
 );
 assert.deepEqual(ordinaryRecallAction?.reason, [
   "policy-c-auto-accusation-closed",
+  "round6-stage-a-clean-safety-failed-stop",
 ]);
 assert.equal(
   status.nextActions.some((action) => String(action.track || "").startsWith("M4 OMR")),
