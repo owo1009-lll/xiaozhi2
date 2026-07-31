@@ -97,6 +97,14 @@ const signedPayload = {
   extraEvents: [{ afterNoteId: "xml-m7-n2", performedMidi: 70, startSeconds: 12.5, endSeconds: 12.9 }],
 };
 
+// Training consent now comes from the subject's own grant, so the fixture has
+// to record one. A payload consent string is deliberately no longer enough.
+const { appendTrainingConsent } = await import("../src/server/westernStringsTrainingConsent.js");
+await appendTrainingConsent({
+  repoRoot: tempRoot,
+  payload: { subjectRef: "anon-01", subjectType: "adult", decision: "granted", capturedVia: "test-fixture" },
+});
+
 const base = { repoRoot: tempRoot, submission, review, machineSnapshot };
 
 try {
@@ -140,7 +148,13 @@ try {
 
   // Identity / consent / signature
   await rejects({ ...signedPayload, performerId: "" }, "performerId", "performerId must be required");
-  await rejects({ ...signedPayload, consent: "no" }, "consent", "consent must be required");
+  // Consent is no longer something the review payload can assert. A subject
+  // with no recorded grant must be refused however the payload is filled in.
+  await rejects(
+    { ...signedPayload, performerId: "anon-no-consent", consent: "yes" },
+    "requires a granted training consent",
+    "a subject without a recorded grant must be refused even when the payload claims consent",
+  );
   await rejects({ ...signedPayload, completeErrorInventory: false }, "completeErrorInventory", "unsigned inventory refused");
   await rejects(
     signedPayload,

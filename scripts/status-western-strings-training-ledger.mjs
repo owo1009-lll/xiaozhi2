@@ -100,6 +100,13 @@ function verifyRecord(record, previousSha) {
     problems.push("audio-provenance-unverified");
   }
 
+  // A record written before training consent was collected separately proves a
+  // teacher ticked a box, not that the subject agreed to training use. It stays
+  // in the ledger as history but must never be counted as trainable.
+  if (!record?.trainingConsent?.consentId || record?.trainingEligible !== true) {
+    problems.push("legacy-consent-unverified");
+  }
+
   const labels = Array.isArray(record?.noteLabels) ? record.noteLabels : [];
   if (labels.some((entry) => !TRAINING_LEDGER_LABELS.includes(entry?.label))) problems.push("label-out-of-vocabulary");
   if (labels.length > record?.scoreNoteCount) problems.push("more-labels-than-score-notes");
@@ -235,7 +242,16 @@ const status = {
   generatedAt: new Date().toISOString(),
   source: path.relative(repoRoot, ledgerDir).replace(/\\/g, "/"),
   counts: {
+    // Two different numbers on purpose. A physical record only shows a file was
+    // written; only a record carrying the subject's own consent grant may be
+    // counted toward a training corpus, and conflating them is how an
+    // unusable corpus looks ready.
+    physicalRecordFiles: files.length,
     recordings,
+    trainingEligibleRecordings: recordings,
+    legacyConsentUnverified: invalid.filter(
+      (row) => (row.problems || []).includes("legacy-consent-unverified"),
+    ).length,
     signatures: [...validByRecording.values()].reduce((total, history) => total + history.length, 0),
     performers: performerKeys.size,
     extraEvents: extraEventCount,

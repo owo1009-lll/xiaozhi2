@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { nowIso, safeNumber, safeString } from "./baseUtils.js";
+import { resolveTrainingConsent } from "./westernStringsTrainingConsent.js";
 
 // Training data ledger (docs/western-strings-training-ledger-spec.md).
 //
@@ -278,9 +279,13 @@ export async function buildTrainingLedgerRecord({
   const performerId = safeString(payload.performerId).trim();
   if (!performerId) throw new Error("training ledger requires a performerId.");
 
-  // Spec section 5.4: consent gates entry, same as the existing review flow.
-  if (safeString(payload.consent).trim().toLowerCase() !== "yes") {
-    throw new Error("training ledger requires consent=yes.");
+  // Consent is resolved from the subject's own auditable grant, not from a
+  // teacher's checkbox. A ticked box proves the teacher ticked a box; it cannot
+  // show who agreed, to what wording, when, or whether a guardian was involved,
+  // and a corpus that cannot show that is not usable for training later.
+  const consent = await resolveTrainingConsent({ repoRoot, subjectRef: performerId });
+  if (!consent.eligible) {
+    throw new Error(`training ledger requires a granted training consent for ${performerId}: ${consent.reason}.`);
   }
   if (payload.completeErrorInventory !== true) {
     throw new Error("training ledger requires a signed completeErrorInventory.");
@@ -389,7 +394,20 @@ export async function buildTrainingLedgerRecord({
       submissionAudioHashVerified: true,
       verifiedAt: nowIso(),
     },
+    // The grant itself, not a yes/no: an auditor must be able to see who
+    // agreed, to which wording, when, and whether a guardian was involved.
     consent: "yes",
+    trainingConsent: {
+      consentId: consent.consent.consentId,
+      consentVersion: consent.consent.consentVersion,
+      purpose: consent.consent.purpose,
+      subjectRef: consent.consent.subjectRef,
+      subjectType: consent.consent.subjectType,
+      guardianStatus: consent.consent.guardianStatus,
+      signedAt: consent.consent.signedAt,
+      capturedVia: consent.consent.capturedVia,
+    },
+    trainingEligible: true,
     licenseStatus: safeString(payload.licenseStatus, "local-only"),
   };
 }
