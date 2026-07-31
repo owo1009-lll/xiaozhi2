@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 
 import { clamp, createId, nowIso, safeBoolean, safeNumber, safeString } from "./baseUtils.js";
 import { readScoreStoreFromSqlite } from "./scoreStoreSqlite.js";
-import { appendTrainingLedgerRecord } from "./westernStringsTrainingLedger.js";
+import { appendTrainingLedgerRecord, trainingLedgerFile } from "./westernStringsTrainingLedger.js";
 
 const execFileAsync = promisify(execFile);
 const SOURCE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -2074,6 +2074,62 @@ export async function recordWesternControlledSubmissionReview({ repoRoot = proce
   await fs.appendFile(outPath, `${JSON.stringify(record)}\n`, "utf8");
   const trainingLedger = await appendTrainingLedgerSample({ repoRoot, submission, review: record, payload });
   return { ok: true, review: record, trainingLedger };
+}
+
+// Reviewer-only, and withheld until the teacher has signed their own labels.
+//
+// These suggestions come from the Round 6 Stage A model, which FAILED its
+// clean-domain safety gate (about one false positive per hundred notes), so it
+// can never accuse a student. Its only use is widening what a listening teacher
+// considers.
+//
+// Showing it before the teacher signs would quietly destroy the training
+// ledger's value: the teacher would drift from "what did I hear" to "is the
+// machine right", and the resulting gold would be the model's own output
+// wearing a human signature — undetectable later, and useless for the
+// from-scratch training it is being collected for.
+export async function listWesternControlledSubmissionModelSuggestions({
+  repoRoot = process.cwd(),
+  submissionId = "",
+} = {}) {
+  const targetId = safeString(submissionId).trim();
+  if (!targetId) throw new Error("submissionId is required.");
+  const submission = await findWesternControlledSubmission({ repoRoot, submissionId: targetId });
+  if (!submission) throw new Error("controlled submission not found.");
+
+  const recordingId = safeString(submission.recordingId).trim() || targetId;
+  const ledgerPath = trainingLedgerFile(repoRoot, recordingId);
+  const signed = await fileExists(ledgerPath);
+  if (!signed) {
+    return {
+      ok: true,
+      submissionId: targetId,
+      withheld: true,
+      withheldReason: "teacher-signoff-pending",
+      suggestions: [],
+      studentFacing: false,
+    };
+  }
+
+  const reportPath = path.join(
+    repoRoot, "data", "experiments", "western-strings-stage-a-model-suggestions", `${targetId}.json`,
+  );
+  if (!await fileExists(reportPath)) {
+    return { ok: true, submissionId: targetId, withheld: false, suggestions: [], studentFacing: false };
+  }
+  const report = JSON.parse(await fs.readFile(reportPath, "utf8"));
+  return {
+    ok: true,
+    submissionId: targetId,
+    withheld: false,
+    // Carried through so the console can label the panel honestly rather than
+    // presenting a failed candidate as a verdict.
+    stageAPassed: report?.provenance?.stageAPassed === true,
+    modelSha256: safeString(report?.provenance?.modelSha256),
+    suggestions: Array.isArray(report?.suggestions) ? report.suggestions : [],
+    studentFacing: false,
+    automaticAccusationAuthorized: false,
+  };
 }
 
 // Reviewer-only: the queue payload carries at most 20 review-assist rows, so the

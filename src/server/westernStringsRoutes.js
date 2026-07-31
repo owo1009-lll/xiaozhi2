@@ -10,6 +10,7 @@ import {
   listWesternControlledSubmissions,
   parsePreviewQuery,
   parseStudentAnalysisPayload,
+  listWesternControlledSubmissionModelSuggestions,
   listWesternControlledSubmissionScoreNotes,
   recordWesternControlledSubmissionReview,
   recordWesternAlignmentPreviewReview,
@@ -395,6 +396,18 @@ export function createWesternStringsRouter({
       return res.json(result);
     } catch (error) {
       return res.status(400).json({ ok: false, error: safeString(error?.message, "failed to read controlled submission score notes.") });
+    }
+  });
+
+  router.get("/api/strings/controlled-submissions/:submissionId/model-suggestions", async (req, res) => {
+    try {
+      const result = await listWesternControlledSubmissionModelSuggestions({
+        repoRoot,
+        submissionId: req.params.submissionId,
+      });
+      return res.json(result);
+    } catch (error) {
+      return res.status(400).json({ ok: false, error: safeString(error?.message, "failed to read model suggestions.") });
     }
   });
 
