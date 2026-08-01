@@ -36,6 +36,11 @@ function canonical(value) {
   return JSON.stringify(value === undefined ? null : value);
 }
 
+export function trainingConsentRecordId(record = {}) {
+  const { consentId: _ignored, ...unsigned } = record;
+  return crypto.createHash("sha256").update(canonical(unsigned)).digest("hex").slice(0, 32);
+}
+
 export function buildTrainingConsentRecord({ payload = {} } = {}) {
   const subjectRef = safeString(payload.subjectRef).trim();
   if (!subjectRef) throw new Error("training consent requires a subjectRef.");
@@ -61,13 +66,19 @@ export function buildTrainingConsentRecord({ payload = {} } = {}) {
   }
 
   const version = safeString(payload.consentVersion, TRAINING_CONSENT_VERSION).trim();
+  const guardianRefHash = guardianRef
+    ? crypto.createHash("sha256").update(`guardian-ref:${guardianRef}`).digest("hex")
+    : "";
   const record = {
     consentContract: TRAINING_CONSENT_CONTRACT,
     consentVersion: version,
     purpose: TRAINING_CONSENT_PURPOSE,
     subjectRef,
     subjectType,
-    guardianRef,
+    // The confirmation identifier proves a distinct guardian assertion was
+    // supplied; the raw identifier is not needed after capture and is never
+    // persisted alongside the child's recording identity.
+    guardianRefHash,
     guardianStatus: subjectType === "minor"
       ? (guardianRef ? "guardian-confirmed" : "guardian-absent")
       : "not-required",
@@ -77,7 +88,7 @@ export function buildTrainingConsentRecord({ payload = {} } = {}) {
     // back-filled assertion; never used to authorise anything by itself.
     capturedVia: safeString(payload.capturedVia, "unknown"),
   };
-  return { ...record, consentId: crypto.createHash("sha256").update(canonical(record)).digest("hex").slice(0, 32) };
+  return { ...record, consentId: trainingConsentRecordId(record) };
 }
 
 export async function appendTrainingConsent({ repoRoot = process.cwd(), payload = {} } = {}) {
@@ -109,10 +120,13 @@ export async function resolveTrainingConsent({ repoRoot = process.cwd(), subject
     try {
       record = JSON.parse(line);
     } catch {
-      continue;
+      return { eligible: false, reason: "consent-ledger-unreadable" };
     }
     if (safeString(record?.subjectRef).trim() !== target) continue;
     if (record?.consentContract !== TRAINING_CONSENT_CONTRACT) continue;
+    if (trainingConsentRecordId(record) !== record?.consentId) {
+      return { eligible: false, reason: "consent-record-hash-mismatch" };
+    }
     latest = record;
   }
   if (!latest) return { eligible: false, reason: "no-consent-record" };

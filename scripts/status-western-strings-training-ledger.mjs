@@ -10,6 +10,12 @@ import {
   recordSha256,
   trainingLedgerDir,
 } from "../src/server/westernStringsTrainingLedger.js";
+import {
+  TRAINING_CONSENT_CONTRACT,
+  TRAINING_CONSENT_VERSION,
+  trainingConsentRecordId,
+  trainingConsentPath,
+} from "../src/server/westernStringsTrainingConsent.js";
 
 // Milestones from docs/western-strings-training-ledger-spec.md section 4. They
 // gate only ONE thing: whether it is worth PROPOSING a preregistered
@@ -32,6 +38,25 @@ const dataRoot = path.resolve(repoRoot, "data");
 const files = fs.existsSync(ledgerDir)
   ? fs.readdirSync(ledgerDir).filter((name) => name.endsWith(".jsonl")).sort()
   : [];
+const latestConsentBySubject = new Map();
+const invalidConsentRecords = [];
+const consentFile = trainingConsentPath(repoRoot);
+if (fs.existsSync(consentFile)) {
+  for (const line of fs.readFileSync(consentFile, "utf8").split(/\r?\n/).filter((item) => item.trim())) {
+    try {
+      const record = JSON.parse(line);
+      if (record?.consentContract === TRAINING_CONSENT_CONTRACT && record?.subjectRef) {
+        if (trainingConsentRecordId(record) !== record.consentId) {
+          invalidConsentRecords.push({ problems: ["consent-record-hash-mismatch"] });
+        } else {
+          latestConsentBySubject.set(record.subjectRef, record);
+        }
+      }
+    } catch {
+      invalidConsentRecords.push({ problems: ["consent-record-unreadable"] });
+    }
+  }
+}
 
 const artifactShaCache = new Map();
 function managedArtifact(relativePath) {
@@ -105,6 +130,13 @@ function verifyRecord(record, previousSha) {
   // in the ledger as history but must never be counted as trainable.
   if (!record?.trainingConsent?.consentId || record?.trainingEligible !== true) {
     problems.push("legacy-consent-unverified");
+  } else {
+    const subjectRef = record.trainingConsent.subjectRef;
+    const currentConsent = latestConsentBySubject.get(subjectRef);
+    if (subjectRef !== record.performerId) problems.push("consent-subject-mismatch");
+    if (!currentConsent) problems.push("current-consent-missing");
+    else if (currentConsent.decision !== "granted") problems.push(`current-consent-${currentConsent.decision}`);
+    else if (currentConsent.consentVersion !== TRAINING_CONSENT_VERSION) problems.push("current-consent-version-superseded");
   }
 
   const labels = Array.isArray(record?.noteLabels) ? record.noteLabels : [];
@@ -115,6 +147,7 @@ function verifyRecord(record, previousSha) {
 }
 
 const invalid = [];
+const consentQuarantined = [];
 const validByRecording = new Map();
 for (const name of files) {
   const filePath = path.join(ledgerDir, name);
@@ -141,7 +174,14 @@ for (const name of files) {
     }
     previousSha = record?.recordSha256 || "";
     if (problems.length) {
-      invalid.push({ file: name, line: index + 1, problems });
+      const consentOnly = problems.every((problem) => (
+        problem === "legacy-consent-unverified"
+        || problem === "current-consent-missing"
+        || problem === "consent-subject-mismatch"
+        || problem === "current-consent-version-superseded"
+        || problem.startsWith("current-consent-")
+      ));
+      (consentOnly ? consentQuarantined : invalid).push({ file: name, line: index + 1, problems });
       continue;
     }
     const key = record.recordingId;
@@ -233,11 +273,15 @@ const milestones = {
     actual: Number(doubleReviewRate.toFixed(4)),
     met: doubleReviewRate >= MILESTONE_DOUBLE_REVIEW_RATE,
   },
-  noInvalidRecords: { required: 0, actual: invalid.length, met: invalid.length === 0 },
+  noInvalidRecords: {
+    required: 0,
+    actual: invalid.length + invalidConsentRecords.length,
+    met: invalid.length === 0 && invalidConsentRecords.length === 0,
+  },
 };
 
 const status = {
-  ok: invalid.length === 0 && suspiciousPerformerPairs.length === 0,
+  ok: invalid.length === 0 && invalidConsentRecords.length === 0 && suspiciousPerformerPairs.length === 0,
   contract: TRAINING_LEDGER_CONTRACT,
   generatedAt: new Date().toISOString(),
   source: path.relative(repoRoot, ledgerDir).replace(/\\/g, "/"),
@@ -249,9 +293,10 @@ const status = {
     physicalRecordFiles: files.length,
     recordings,
     trainingEligibleRecordings: recordings,
-    legacyConsentUnverified: invalid.filter(
+    legacyConsentUnverified: consentQuarantined.filter(
       (row) => (row.problems || []).includes("legacy-consent-unverified"),
     ).length,
+    consentQuarantined: consentQuarantined.length,
     signatures: [...validByRecording.values()].reduce((total, history) => total + history.length, 0),
     performers: performerKeys.size,
     extraEvents: extraEventCount,
@@ -272,8 +317,10 @@ const status = {
     disagreementSamples,
   },
   dataQuality: {
-    verifiedAgainstDisk: invalid.length === 0,
+    verifiedAgainstDisk: invalid.length === 0 && invalidConsentRecords.length === 0,
     invalidRecords: invalid,
+    invalidConsentRecords,
+    consentQuarantinedRecords: consentQuarantined,
     suspiciousPerformerPairs,
   },
   milestones,

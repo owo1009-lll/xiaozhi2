@@ -15,6 +15,7 @@ import {
   recordWesternControlledSubmissionReview,
   recordWesternAlignmentPreviewReview,
   recordWesternStudentReview,
+  resumeWesternStageAModelSuggestionJobs,
   runWesternControlledSubmissionBatch,
 } from "./westernStringsAlignmentService.js";
 import {
@@ -32,6 +33,7 @@ import {
   listSupportedEditions,
 } from "./westernScoreEditions.js";
 import { isTunnelRequest } from "./publicAccessGuard.js";
+import { appendTrainingConsent } from "./westernStringsTrainingConsent.js";
 
 const WEB_STUDENT_CAPABILITY_PATTERN = /^stu-v2-[a-f0-9]{32}$/;
 
@@ -77,6 +79,9 @@ export function createWesternStringsRouter({
   contentSafety = null,
 } = {}) {
   const router = express.Router();
+  // Queue state is persisted on disk. A server restart re-enqueues work that
+  // was queued/running instead of leaving a permanently empty teacher panel.
+  Promise.resolve().then(() => resumeWesternStageAModelSuggestionJobs({ repoRoot })).catch(() => {});
 
   async function buildStudentAnalysis(parsed) {
     const { isWechatMiniProgram, wechatLoginCode, ...submissionPayload } = parsed || {};
@@ -252,6 +257,46 @@ export function createWesternStringsRouter({
     }
   });
   router.post("/api/strings/analyze", ...analyzeHandlers);
+
+  router.post("/api/strings/training-consent", async (req, res) => {
+    try {
+      const payload = req.body || {};
+      const isWechatMiniProgram = safeString(payload.clientPlatform).trim() === "wechat-mini-program";
+      let studentRef = safeString(payload.studentRef).trim();
+      if (isWechatMiniProgram) {
+        if (typeof contentSafety?.resolveMiniProgramStudentRef !== "function") {
+          throw new ContentSafetyError(CONTENT_SAFETY_UNAVAILABLE_MESSAGE);
+        }
+        studentRef = await contentSafety.resolveMiniProgramStudentRef(safeString(payload.wechatLoginCode).trim());
+      } else if (isTunnelRequest(req) && !WEB_STUDENT_CAPABILITY_PATTERN.test(studentRef)) {
+        throw secureStudentCapabilityError();
+      }
+      const record = await appendTrainingConsent({
+        repoRoot,
+        payload: {
+          subjectRef: studentRef,
+          subjectType: payload.subjectType,
+          guardianRef: payload.guardianRef,
+          decision: payload.decision,
+          signedAt: new Date().toISOString(),
+          capturedVia: isWechatMiniProgram ? "wechat-mini-program" : "western-student-web",
+        },
+      });
+      return res.json({
+        ok: true,
+        consent: {
+          consentId: record.consentId,
+          consentVersion: record.consentVersion,
+          decision: record.decision,
+          subjectType: record.subjectType,
+          guardianStatus: record.guardianStatus,
+          signedAt: record.signedAt,
+        },
+      });
+    } catch (error) {
+      return res.status(Number(error?.statusCode) || 400).json({ ok: false, error: safeString(error?.message, "failed to save training consent.") });
+    }
+  });
 
   router.get("/api/strings/student-gate", (req, res) => {
     try {

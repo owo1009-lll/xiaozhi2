@@ -7,7 +7,12 @@ import { promisify } from "node:util";
 
 import { clamp, createId, nowIso, safeBoolean, safeNumber, safeString } from "./baseUtils.js";
 import { readScoreStoreFromSqlite } from "./scoreStoreSqlite.js";
-import { appendTrainingLedgerRecord, trainingLedgerFile } from "./westernStringsTrainingLedger.js";
+import { appendTrainingLedgerRecord } from "./westernStringsTrainingLedger.js";
+import { appendTrainingConsent, resolveTrainingConsent } from "./westernStringsTrainingConsent.js";
+import {
+  enqueueWesternStageAModelSuggestionJob,
+  readWesternStageAModelSuggestionJob,
+} from "./westernStringsStageAModelSuggestions.js";
 
 const execFileAsync = promisify(execFile);
 const SOURCE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -1823,8 +1828,27 @@ async function buildControlledSubmissionAnalysis(repoRoot, payload = {}) {
       ? (isPhotoScore ? "photo-score-requires-offline-pipeline" : "controlled-submission-requires-offline-analysis")
       : "",
   ].filter(Boolean);
+  const submissionId = createId("strings-submit");
+  const studentRef = safeString(payload.studentRef).trim();
+  let trainingConsent = null;
+  if (payload.trainingConsent && typeof payload.trainingConsent === "object") {
+    trainingConsent = await appendTrainingConsent({
+      repoRoot,
+      payload: {
+        subjectRef: studentRef,
+        subjectType: payload.trainingConsent.subjectType,
+        guardianRef: payload.trainingConsent.guardianRef,
+        decision: payload.trainingConsent.decision,
+        // Identity and time are server-bound. The client can choose, but it
+        // cannot claim another student, backdate a grant, or impersonate a
+        // teacher/guardian capture channel.
+        signedAt: nowIso(),
+        capturedVia: safeString(payload.clientPlatform, "western-student-web"),
+      },
+    });
+  }
   const submission = {
-    submissionId: createId("strings-submit"),
+    submissionId,
     submittedAt: nowIso(),
     scoreId,
     kind: isPhotoScore ? "photo-score" : "clean-score",
@@ -1836,7 +1860,15 @@ async function buildControlledSubmissionAnalysis(repoRoot, payload = {}) {
     pieceId: safeString(payload.pieceId).trim(),
     recordingId: safeString(payload.recordingId).trim(),
     instrument: safeString(payload.instrument).trim(),
-    studentRef: safeString(payload.studentRef).trim(),
+    studentRef,
+    trainingConsent: trainingConsent ? {
+      consentId: trainingConsent.consentId,
+      consentVersion: trainingConsent.consentVersion,
+      decision: trainingConsent.decision,
+      subjectType: trainingConsent.subjectType,
+      guardianStatus: trainingConsent.guardianStatus,
+      signedAt: trainingConsent.signedAt,
+    } : null,
     limit: Math.max(0, Math.round(safeNumber(payload.limit, 20))),
     audioHash,
     audioPath,
@@ -1878,7 +1910,7 @@ function latestReviewBySubmissionId(reviews) {
   return latest;
 }
 
-function decorateControlledSubmission(submission, latestReview = null, latestAnalysis = null) {
+function decorateControlledSubmission(submission, latestReview = null, latestAnalysis = null, consent = null) {
   const submissionId = safeString(submission.submissionId).trim();
   const reviewAction = safeString(latestReview?.action).trim();
   const kind = safeString(submission.kind, submission.scorePhotoPath ? "photo-score" : "clean-score");
@@ -1893,6 +1925,15 @@ function decorateControlledSubmission(submission, latestReview = null, latestAna
     piece: safeString(submission.piece),
     recordingId: safeString(submission.recordingId),
     instrument: safeString(submission.instrument),
+    trainingSubjectRef: safeString(submission.studentRef),
+    trainingConsent: {
+      eligible: consent?.eligible === true,
+      reason: safeString(consent?.reason, consent?.eligible === true ? "granted" : "no-consent-record"),
+      consentVersion: safeString(consent?.consent?.consentVersion),
+      subjectType: safeString(consent?.consent?.subjectType),
+      guardianStatus: safeString(consent?.consent?.guardianStatus),
+      signedAt: safeString(consent?.consent?.signedAt),
+    },
     audioHash: safeString(submission.audioHash),
     audioSubmission: submission.audioSubmission || null,
     status: reviewAction || safeString(submission.status, "review_required"),
@@ -1937,15 +1978,20 @@ export async function listWesternControlledSubmissions({ repoRoot = process.cwd(
       });
     }
   }
-  const decorated = submissions
-    .map((submission) => {
+  const decorated = (await Promise.all(submissions
+    .map(async (submission) => {
       const submissionId = safeString(submission.submissionId).trim();
+      const consent = await resolveTrainingConsent({
+        repoRoot,
+        subjectRef: safeString(submission.studentRef).trim(),
+      });
       return decorateControlledSubmission(
         submission,
         latest.get(submissionId) || null,
         latestAnalysis.get(submissionId) || null,
+        consent,
       );
-    })
+    })))
     .filter((submission) => submission.submissionId)
     .sort((left, right) => safeString(right.submittedAt).localeCompare(safeString(left.submittedAt)));
   const capped = limit > 0 ? decorated.slice(0, limit) : decorated;
@@ -2015,6 +2061,51 @@ async function appendTrainingLedgerSample({ repoRoot, submission, review, payloa
   }
 }
 
+async function verifyTeacherInventorySignoff({ repoRoot, submission, payload, reviewerId }) {
+  if (payload?.completeErrorInventory !== true) return null;
+  if (payload?.fullScoreReviewed !== true) {
+    throw new Error("a complete error inventory requires a full-score sweep.");
+  }
+  const latest = await findLatestAnalysisItem(repoRoot, safeString(submission.submissionId).trim());
+  const relativePath = safeString(latest?.item?.candidateRowsPath).trim();
+  if (!relativePath) throw new Error("a complete error inventory requires a candidate rows artifact.");
+  const artifactPath = path.resolve(repoRoot, relativePath);
+  if (!pathIsInside(path.join(repoRoot, "data"), artifactPath)) {
+    throw new Error("candidate rows artifact resolved outside the data directory.");
+  }
+  const bytes = await fs.readFile(artifactPath);
+  const observedSha256 = crypto.createHash("sha256").update(bytes).digest("hex");
+  const expectedSha256 = safeString(latest?.item?.candidateRowsSha256).trim().toLowerCase();
+  const reviewerSha256 = safeString(payload.candidateRowsSha256).trim().toLowerCase();
+  if (!expectedSha256 || observedSha256 !== expectedSha256 || reviewerSha256 !== expectedSha256) {
+    throw new Error("complete error inventory is not bound to the current analysis artifact.");
+  }
+  const notes = buildCandidateNoteIdentityRows(JSON.parse(bytes.toString("utf8"))?.candidateRows);
+  if (Math.round(safeNumber(payload.scoreNoteCount, -1)) !== notes.length) {
+    throw new Error("complete error inventory scoreNoteCount does not match the analysis artifact.");
+  }
+  const validNoteIds = new Set(notes.map((note) => note.noteId));
+  const labels = Array.isArray(payload.noteLabels) ? payload.noteLabels : [];
+  const seen = new Set();
+  for (const label of labels) {
+    const noteId = safeString(label?.noteId).trim();
+    if (!validNoteIds.has(noteId)) throw new Error(`complete error inventory contains unknown note ${noteId}.`);
+    if (seen.has(noteId)) throw new Error(`complete error inventory repeats note ${noteId}.`);
+    seen.add(noteId);
+  }
+  return {
+    contract: "western-teacher-complete-inventory-signoff-v1",
+    submissionId: safeString(submission.submissionId).trim(),
+    reviewerId,
+    candidateRowsSha256: observedSha256,
+    scoreNoteCount: notes.length,
+    explicitLabelCount: labels.length,
+    labelInventorySha256: crypto.createHash("sha256").update(JSON.stringify(labels)).digest("hex"),
+    signedAt: nowIso(),
+    trainingUseAuthorized: false,
+  };
+}
+
 export async function recordWesternControlledSubmissionReview({ repoRoot = process.cwd(), payload = {} } = {}) {
   const submissionId = safeString(payload.submissionId).trim();
   const action = safeString(payload.action).trim();
@@ -2056,6 +2147,12 @@ export async function recordWesternControlledSubmissionReview({ repoRoot = proce
   }
   const submission = await findWesternControlledSubmission({ repoRoot, submissionId });
   if (!submission) throw new Error("controlled submission not found.");
+  const teacherInventorySignoff = await verifyTeacherInventorySignoff({
+    repoRoot,
+    submission,
+    payload,
+    reviewerId,
+  });
   const record = {
     submittedAt: nowIso(),
     submissionId,
@@ -2068,6 +2165,7 @@ export async function recordWesternControlledSubmissionReview({ repoRoot = proce
     studentMessage: safeString(payload.studentMessage),
     releaseToStudent: action === "feedback_released" && payload.releaseToStudent === true,
     studentIssues,
+    teacherInventorySignoff,
   };
   const outPath = controlledSubmissionReviewsPath(repoRoot);
   await fs.mkdir(path.dirname(outPath), { recursive: true });
@@ -2097,9 +2195,13 @@ export async function listWesternControlledSubmissionModelSuggestions({
   const submission = await findWesternControlledSubmission({ repoRoot, submissionId: targetId });
   if (!submission) throw new Error("controlled submission not found.");
 
-  const recordingId = safeString(submission.recordingId).trim() || targetId;
-  const ledgerPath = trainingLedgerFile(repoRoot, recordingId);
-  const signed = await fileExists(ledgerPath);
+  const reviews = await readJsonlRecords(controlledSubmissionReviewsPath(repoRoot));
+  const signedReview = [...reviews].reverse().find((review) => (
+    safeString(review?.submissionId).trim() === targetId
+    && review?.teacherInventorySignoff?.contract === "western-teacher-complete-inventory-signoff-v1"
+    && safeString(review?.teacherInventorySignoff?.submissionId).trim() === targetId
+  ));
+  const signed = Boolean(signedReview);
   if (!signed) {
     return {
       ok: true,
@@ -2111,17 +2213,29 @@ export async function listWesternControlledSubmissionModelSuggestions({
     };
   }
 
-  const reportPath = path.join(
-    repoRoot, "data", "experiments", "western-strings-stage-a-model-suggestions", `${targetId}.json`,
-  );
-  if (!await fileExists(reportPath)) {
-    return { ok: true, submissionId: targetId, withheld: false, suggestions: [], studentFacing: false };
+  const suggestionJob = await readWesternStageAModelSuggestionJob({
+    repoRoot,
+    submissionId: targetId,
+    submission,
+  });
+  const report = suggestionJob.report;
+  if (!report) {
+    return {
+      ok: true,
+      submissionId: targetId,
+      withheld: false,
+      status: suggestionJob.status,
+      error: safeString(suggestionJob?.job?.error),
+      suggestions: [],
+      studentFacing: false,
+      automaticAccusationAuthorized: false,
+    };
   }
-  const report = JSON.parse(await fs.readFile(reportPath, "utf8"));
   return {
     ok: true,
     submissionId: targetId,
     withheld: false,
+    status: suggestionJob.status,
     // Carried through so the console can label the panel honestly rather than
     // presenting a failed candidate as a verdict.
     stageAPassed: report?.provenance?.stageAPassed === true,
@@ -2731,12 +2845,48 @@ export async function runWesternControlledSubmissionBatch({
     gateSnapshot,
     items,
   };
+  const suggestionJobs = [];
   if (items.length > 0) {
     const outPath = controlledSubmissionBatchRunsPath(repoRoot);
     await fs.mkdir(path.dirname(outPath), { recursive: true });
     await fs.appendFile(outPath, `${JSON.stringify(run)}\n`, "utf8");
+    for (const item of items) {
+      const raw = rawById.get(safeString(item?.submissionId).trim());
+      if (!raw || safeString(raw.kind, raw.scorePhotoPath ? "photo-score" : "clean-score") !== "clean-score") continue;
+      try {
+        suggestionJobs.push({
+          submissionId: raw.submissionId,
+          ...(await enqueueWesternStageAModelSuggestionJob({ repoRoot, submission: raw })),
+        });
+      } catch (error) {
+        suggestionJobs.push({ submissionId: raw.submissionId, queued: false, status: "queue-failed", error: safeString(error?.message || error) });
+      }
+    }
   }
-  return { ok: true, batch: run };
+  return { ok: true, batch: run, suggestionJobs };
+}
+
+export async function resumeWesternStageAModelSuggestionJobs({ repoRoot = process.cwd() } = {}) {
+  const submissions = await readJsonlRecords(controlledSubmissionsPath(repoRoot));
+  const resumed = [];
+  for (const submission of submissions) {
+    const kind = safeString(submission.kind, submission.scorePhotoPath ? "photo-score" : "clean-score");
+    if (kind !== "clean-score" || !safeString(submission.scoreId).trim()) continue;
+    const state = await readWesternStageAModelSuggestionJob({
+      repoRoot,
+      submissionId: submission.submissionId,
+    });
+    if (!["queued", "running"].includes(state.status)) continue;
+    try {
+      resumed.push({
+        submissionId: submission.submissionId,
+        ...(await enqueueWesternStageAModelSuggestionJob({ repoRoot, submission })),
+      });
+    } catch (error) {
+      resumed.push({ submissionId: submission.submissionId, queued: false, status: "resume-failed", error: safeString(error?.message || error) });
+    }
+  }
+  return resumed;
 }
 
 function buildCategoryDiagnosis(row, category, { required = false } = {}) {
@@ -2955,6 +3105,14 @@ export function parsePreviewQuery(query = {}) {
 }
 
 export function parseStudentAnalysisPayload(payload = {}) {
+  let trainingConsent = null;
+  if (payload.trainingConsent && typeof payload.trainingConsent === "object") {
+    trainingConsent = {
+      subjectType: safeString(payload.trainingConsent.subjectType).trim(),
+      guardianRef: safeString(payload.trainingConsent.guardianRef).trim(),
+      decision: safeString(payload.trainingConsent.decision).trim(),
+    };
+  }
   return {
     dataset: safeString(payload.dataset).trim(),
     piece: safeString(payload.piece).trim(),
@@ -2963,6 +3121,8 @@ export function parseStudentAnalysisPayload(payload = {}) {
     recordingId: safeString(payload.recordingId).trim(),
     instrument: safeString(payload.instrument).trim(),
     studentRef: safeString(payload.studentRef).trim(),
+    clientPlatform: safeString(payload.clientPlatform, "western-student-web").trim(),
+    trainingConsent,
     scoreId: safeString(payload.scoreId).trim(),
     scorePhotoPath: safeString(payload.scorePhotoPath).trim(),
     scorePhotoHash: safeString(payload.scorePhotoHash).trim(),

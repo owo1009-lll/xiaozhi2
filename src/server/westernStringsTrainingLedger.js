@@ -276,7 +276,12 @@ export async function buildTrainingLedgerRecord({
 
   // Spec section 5.3: without a performer id a future split cannot be cut by
   // person, so the sample is refused rather than silently stored unusable.
-  const performerId = safeString(payload.performerId).trim();
+  const boundSubjectRef = safeString(submission.studentRef).trim();
+  const requestedPerformerId = safeString(payload.performerId).trim();
+  if (boundSubjectRef && requestedPerformerId && requestedPerformerId !== boundSubjectRef) {
+    throw new Error("training ledger performerId conflicts with the submission student identity.");
+  }
+  const performerId = boundSubjectRef || requestedPerformerId;
   if (!performerId) throw new Error("training ledger requires a performerId.");
 
   // Consent is resolved from the subject's own auditable grant, not from a

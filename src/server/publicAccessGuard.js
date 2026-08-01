@@ -14,6 +14,7 @@ export const STUDENT_PUBLIC_ALLOWLIST = Object.freeze([
   // image safety callback. It never returns user media or moderation details.
   { method: "GET", path: "/api/strings/content-safety-status" },
   { method: "POST", path: "/api/strings/analyze" },
+  { method: "POST", path: "/api/strings/training-consent" },
   // WeChat verifies this URL and posts `mediaCheckAsync` results here.
   { method: "GET", path: "/api/wechat/content-safety-callback" },
   { method: "POST", path: "/api/wechat/content-safety-callback" },
@@ -29,6 +30,13 @@ export const DEFAULT_PUBLIC_RATE_LIMITS = Object.freeze([
   Object.freeze({
     method: "POST",
     path: "/api/strings/analyze",
+    windowMs: 10 * 60 * 1000,
+    maxRequests: 8,
+    maxConcurrent: 2,
+  }),
+  Object.freeze({
+    method: "POST",
+    path: "/api/strings/training-consent",
     windowMs: 10 * 60 * 1000,
     maxRequests: 8,
     maxConcurrent: 2,

@@ -114,6 +114,7 @@ def main() -> int:
     report = {
         "contract": "western-round6-stage-a-model-teacher-suggestions-v1",
         "score": str(score_path.relative_to(REPO_ROOT)).replace("\\", "/"),
+        "scoreSha256": sha256(score_path),
         "audioSha256": sha256(audio_path),
         "decisionPoint": DECISION_POINT,
         "provenance": provenance,
