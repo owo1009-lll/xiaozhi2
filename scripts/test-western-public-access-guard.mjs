@@ -83,6 +83,7 @@ assert.deepEqual(
     "GET /api/strings/student-submissions",
     "GET /api/wechat/content-safety-callback",
     "POST /api/strings/analyze",
+    "POST /api/strings/training-consent",
     "POST /api/wechat/content-safety-callback",
   ],
   "public allowlist drifted",

@@ -118,6 +118,19 @@
 
   <view class="submit-section">
     <view class="submit-label">STEP 03 · 完成练习</view>
+    <view class="training-consent-card">
+      <radio-group bindchange="onTrainingUseChange">
+        <label><radio value="granted" checked="{{ trainingConsentDecision === 'granted' }}" />同意用于改进演奏诊断模型</label>
+        <label><radio value="declined" checked="{{ trainingConsentDecision === 'declined' }}" />不同意（仍可正常获得老师反馈）</label>
+      </radio-group>
+      <view class="submit-hint">这与上传隐私授权相互独立；不同意也能正常提交并获得老师反馈。</view>
+      <block wx:if="{{ trainingConsentDecision === 'granted' }}">
+        <picker mode="selector" range="{{ consentSubjectLabels }}" bindchange="onConsentSubjectType">
+          <view class="instrument-chip">{{ consentSubjectType === 'minor' ? '未成年人，由监护人同意' : '本人已成年，由本人同意' }} <text class="caret">⌄</text></view>
+        </picker>
+        <input wx:if="{{ consentSubjectType === 'minor' }}" class="piece-input" placeholder="监护人确认编号（必填）" value="{{ guardianRef }}" bindinput="onGuardianRef" />
+      </block>
+    </view>
     <view class="btn-gold {{ (submitting || !recordedPath || !piece) ? 'is-disabled' : '' }}" bindtap="submit">
       {{ submitting ? '提交中…' : '提交本次练习' }}
     </view>

@@ -1,6 +1,6 @@
 # 西洋弦乐练习诊断项目状态快照
 
-更新时间: 2026-07-29
+更新时间: 2026-08-01
 
 本文件是当前主线状态快照。实时判断仍以命令为准:
 
@@ -9,6 +9,13 @@
 - `npm run western:project-gate`
 - `npm run test:western-project-gate`
 - `npm run build`
+
+## 2026-08-01 半自动复核链补全
+
+- **训练授权不再由老师代签。** 学生网页与微信小程序把“上传/获得反馈的隐私授权”和“用于模型训练”拆成两个决定；不同意训练仍可正常提交并接受老师诊断。成年人由本人明确授权，未成年人选择授权时必须提供监护人确认编号。服务端用已认证的 `studentRef` 覆盖客户端主体和时间，授权以私有 append-only JSONL 留痕，并支持后续 `declined/withdrawn` 覆盖旧 grant。复核台已删除“已获得知情同意”代签框和老师手填 performer 身份，训练账本强制绑定 submission 的学生身份；当前授权撤回会在统计时让历史记录退出可训练计数。
+- **教师完整复核与训练资格已解耦。** 老师即使面对未授权训练的学生，仍可载入全谱、逐音标注、签署完整错误清单并放行人工反馈；服务端会重哈希 candidate artifact、核对全谱音符数与 noteId 后写 submission-bound 的教师签署。只有当前独立训练授权有效时，同一份标注才另行写入训练账本。原 2026-07-28 首条账本记录只有旧教师 checkbox 口径，因此保留为物理历史但不再计作 training-eligible；里程碑须从新合同下重新累计。
+- **Stage A 模型建议已有真实生产端。** clean-score 批处理在落盘主分析后立即写 `queued` 状态并异步运行冻结 Python 3.11 scorer，不阻塞 batch；状态按 submission 持久化为 `queued/running/succeeded/failed`，服务重启会重新排队未完成任务。报告同时绑定 submissionId、scoreId、MusicXML SHA-256、音频 SHA-256 和冻结模型 SHA，任一输入漂移即标 `stale`。建议只有在同一 submission 的教师完整清单签署后才显示，始终 `studentFacing=false / automaticAccusationAuthorized=false / isEvidence=false`。真实 `round4-r4-06` 链已现场完成，耗时约 4 秒，任务 `succeeded`、建议数 0；零建议与“任务没运行”现在是两个明确状态。
+- 针对性验证入口（不改冻结 `package.json`）：`node scripts/test-western-training-consent-flow.mjs`、`node scripts/test-western-strings-training-ledger.mjs`、`node scripts/test-western-stage-a-model-suggestions.mjs`、`node scripts/test-western-public-access-guard.mjs`。学生三个自动开关未改变，本轮只补半自动教师复核和未来训练数据治理。
 
 ## 2026-07-29 LadderSym 真实录音架构筛查止损
 

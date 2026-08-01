@@ -28,7 +28,12 @@
     "candidateRowsPath": "data/experiments/.../offline-feature-candidates/<batch>/<submission>.json",
     "candidateRowsSha256": "...", "modelVersion": "...", "gateVersion": "..."
   },
-  "consent": "yes", "licenseStatus": "local-only"
+  "trainingConsent": {
+    "consentId": "...", "consentVersion": "2026-07-31.1",
+    "subjectRef": "stu-v2-...", "subjectType": "adult",
+    "guardianStatus": "not-required", "signedAt": "..."
+  },
+  "trainingEligible": true, "licenseStatus": "local-only"
 }
 ```
 - `label ∈ {correct, wrong_pitch, missing, drag, uncertain}`(与 Round5 gate 命名一致:merged_substitution 归 `wrong_pitch`)；`extra` 没有对应谱音，必须进入独立的 `extraEvents`，不得伪挂到某个 noteId。
@@ -47,9 +52,10 @@
 老师本来就要逐音听才能写反馈——这只把判断结构化,不加实质负担。
 
 ## 3. 落盘接入点
-在现有复核写入流(`/api/strings/controlled-submissions/reviews`、`writeControlledSubmissionReview` 附近,`westernStringsAlignmentService.js:~1954-1973`)**之后**追加一步:若该复核带完整逐音标签且 `completeErrorInventory=true`,组装 §1 记录写训练账本。
+在现有复核写入流(`/api/strings/controlled-submissions/reviews`)中先验证教师完整清单:必须重哈希当前 candidate artifact、核对全谱音符数与 noteId，并写入与本 submission 绑定的 `teacherInventorySignoff`。若该复核带完整逐音标签且 `completeErrorInventory=true`，再尝试组装 §1 记录写训练账本。
 - 训练账本与复核反馈流(`controlledSubmissionReviewsPath`)**分开存**:反馈给学生,账本攒数据,互不干扰。
-- performer/device/level 元数据从提交 metadata 取；`performerId` 为防止未来按人切分泄漏而必填，device/level 可为空。
+- `performerId` 必须由 submission 的已认证 `studentRef` 派生，老师不得手填或替换；历史本机导入没有 studentRef 时才允许显式匿名 performer 作为兼容入口。device/level 可为空。
+- 教师完整签署与训练资格分开：学生拒绝训练时，复核、诊断和人工反馈照常进行，但训练账本拒收；教师签署仍可用于解除“先独立判断、后看模型建议”的防偏置遮罩。
 
 ## 4. 统计脚本(盯里程碑)
 冻结 `package.json` 期间直接运行 `node scripts/status-western-strings-training-ledger.mjs` 实时报:
@@ -60,7 +66,7 @@
 1. **账本只攒、不当闸**:它永不翻 `WESTERN_STUDENT_RUNTIME_GATE`、不授权、不自动采纳、不进 `project-status` 任何 ready/gate。加一条测试断言账本模块不 import 任何开关/闸。
 2. **绝不拿账本调现有冻结候选**(Policy C / Round5/6 候选)——那是滚动数据调参。账本**专供将来"从零训练"**。
 3. **按人切分**:训练前必须 `performerId` 维度切 train/val/test(不是按录音),并冻一份盲测、预注册门槛。故账本**现在就记 performerId**,否则将来切不动、泄漏。
-4. **consent/隐私**同现有流程:有同意才入账;音频只在本机 `data/private`;`performerId` 匿名;账本 gitignore。
+4. **consent/隐私不是上传授权**:训练必须有学生本人单独 grant；未成年人 grant 必须带监护人确认，老师不能代签。拒绝不阻断诊断；最新的 `declined/withdrawn` 会让旧记录退出训练统计。音频只在本机受管 `data/`；账本与授权记录均为私有 append-only 数据。
 5. **标签质量**:对一小部分(如 10%)启用**双人复核**记 inter-rater,别默认单人金标绝对。
 
 ## 6. 要建的东西(清单)
@@ -68,6 +74,7 @@
 2. 复核写入流追加训练账本落盘(§1 schema,§3 接入点)。
 3. `scripts/status-western-strings-training-ledger.mjs` 统计脚本(§4)。
 4. 纪律测试:账本模块零开关/零闸依赖断言(§5.1);schema 校验;performerId 必填断言。
+5. Stage A 教师建议生产器:批处理后持久化排队、后台推理、失败状态和重启续跑；报告绑定 score/audio/submission 身份，只在同 submission 教师完整签署后展示。
 
 ## 7. 明确不做
 - 不用账本训练任何东西(现在只攒;训练是到量后另一个预注册实验)。

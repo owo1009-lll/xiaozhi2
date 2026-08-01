@@ -148,6 +148,18 @@ try {
 
   // Identity / consent / signature
   await rejects({ ...signedPayload, performerId: "" }, "performerId", "performerId must be required");
+  await rejects(
+    { ...signedPayload, performerId: "another-subject" },
+    "conflicts with the submission student identity",
+    "a teacher-supplied performer must not override the authenticated submission subject",
+    { submission: { ...submission, studentRef: "anon-01" } },
+  );
+  const boundSubjectRecord = await buildTrainingLedgerRecord({
+    ...base,
+    submission: { ...submission, studentRef: "anon-01" },
+    payload: { ...signedPayload, performerId: "" },
+  });
+  assert.equal(boundSubjectRecord.performerId, "anon-01", "submission identity must supply the performer split key");
   // Consent is no longer something the review payload can assert. A subject
   // with no recorded grant must be refused however the payload is filled in.
   await rejects(

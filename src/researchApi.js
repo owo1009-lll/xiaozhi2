@@ -364,6 +364,25 @@ export async function fetchWesternControlledSubmissionScoreNotes(submissionId = 
   );
 }
 
+export async function saveWesternTrainingConsent(payload = {}) {
+  return readJson(
+    await fetch(studentApiUrl("/api/strings/training-consent"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  );
+}
+
+export async function fetchWesternControlledSubmissionModelSuggestions(submissionId = "") {
+  return readJson(
+    await fetch(
+      `/api/strings/controlled-submissions/${encodeURIComponent(submissionId)}/model-suggestions`,
+      NO_STORE_REQUEST,
+    ),
+  );
+}
+
 export async function saveWesternControlledSubmissionReview(payload = {}) {
   return readJson(
     await fetch("/api/strings/controlled-submissions/reviews", {

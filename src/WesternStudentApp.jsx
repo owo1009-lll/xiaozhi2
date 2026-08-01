@@ -20,6 +20,7 @@ const STATUS_LABELS = {
 };
 
 const STUDENT_REF_STORAGE_KEY = "western-strings-student-ref";
+const TRAINING_CONSENT_DECISION_STORAGE_KEY = "western-strings-training-consent-decision";
 const STUDENT_REF_PATTERN = /^stu-v2-[a-f0-9]{32}$/;
 
 function createStudentCapability() {
@@ -43,6 +44,16 @@ function getOrCreateStudentRef() {
   }
 }
 
+function getStoredTrainingConsentDecision() {
+  if (typeof window === "undefined") return "";
+  try {
+    const decision = window.localStorage.getItem(TRAINING_CONSENT_DECISION_STORAGE_KEY) || "";
+    return ["granted", "declined"].includes(decision) ? decision : "";
+  } catch {
+    return "";
+  }
+}
+
 export default function WesternStudentApp() {
   const audioInputRef = useRef(null);
   const photoInputRef = useRef(null);
@@ -53,6 +64,9 @@ export default function WesternStudentApp() {
   const [audioFile, setAudioFile] = useState(null);
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState("");
+  const [trainingConsentDecision, setTrainingConsentDecision] = useState(getStoredTrainingConsentDecision);
+  const [consentSubjectType, setConsentSubjectType] = useState("adult");
+  const [guardianRef, setGuardianRef] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -106,6 +120,14 @@ export default function WesternStudentApp() {
       setError("请选择你的演奏录音。");
       return;
     }
+    if (!trainingConsentDecision) {
+      setError("请明确选择是否同意录音用于模型训练；不同意不会影响提交和老师反馈。");
+      return;
+    }
+    if (trainingConsentDecision === "granted" && consentSubjectType === "minor" && !guardianRef.trim()) {
+      setError("未成年人同意用于训练时，需要由监护人填写监护人确认编号。");
+      return;
+    }
     setSubmitting(true);
     setError("");
     setMessage("");
@@ -114,6 +136,12 @@ export default function WesternStudentApp() {
         studentRef,
         piece: piece.trim(),
         instrument,
+        clientPlatform: "western-student-web",
+        trainingConsent: {
+          decision: trainingConsentDecision,
+          subjectType: consentSubjectType,
+          guardianRef: consentSubjectType === "minor" ? guardianRef.trim() : "",
+        },
         audioFile,
         audioSubmission: {
           name: audioFile.name,
@@ -242,6 +270,49 @@ export default function WesternStudentApp() {
           >
             {submitting ? "提交中..." : "提交"}
           </button>
+        </div>
+        <div className="western-training-consent">
+          <select
+            value={trainingConsentDecision}
+            aria-label="是否同意用于模型训练"
+            onChange={(event) => {
+              const decision = event.target.value;
+              setTrainingConsentDecision(decision);
+              try {
+                window.localStorage.setItem(TRAINING_CONSENT_DECISION_STORAGE_KEY, decision);
+              } catch {
+                // The server still records the explicit choice for this upload.
+              }
+            }}
+          >
+            <option value="">请选择是否同意用于模型训练（必选）</option>
+            <option value="granted">同意本次及后续录音和老师标注用于改进模型</option>
+            <option value="declined">不同意用于模型训练（仍可正常获得老师反馈）</option>
+          </select>
+          <p className="muted-copy">
+            这与上传和获得老师反馈的隐私授权相互独立；不同意也可以正常提交并获得诊断。
+          </p>
+          {trainingConsentDecision === "granted" ? (
+            <>
+              <select
+                value={consentSubjectType}
+                onChange={(event) => setConsentSubjectType(event.target.value)}
+                aria-label="训练授权主体"
+              >
+                <option value="adult">本人已成年，由本人同意</option>
+                <option value="minor">未成年人，由监护人同意</option>
+              </select>
+              {consentSubjectType === "minor" ? (
+                <input
+                  type="text"
+                  value={guardianRef}
+                  placeholder="监护人确认编号（必填）"
+                  onChange={(event) => setGuardianRef(event.target.value)}
+                  aria-label="监护人确认编号"
+                />
+              ) : null}
+            </>
+          ) : null}
         </div>
         {message ? <div className="status-banner" aria-live="polite">{message}</div> : null}
         {error ? <div className="error-banner">{error}</div> : null}

@@ -8,6 +8,7 @@ const AUDIO_FILE_MIME_TYPES = {
   aac: "audio/aac"
 };
 const MAX_AUDIO_FILE_BYTES = 40 * 1024 * 1024;
+const TRAINING_CONSENT_DECISION_KEY = "westernStringsTrainingConsentDecision";
 
 Page({
   data: {
@@ -16,6 +17,7 @@ Page({
     selectedScoreId: "",
     instrument: "violin",
     instruments: ["小提琴", "中提琴", "大提琴"],
+    consentSubjectLabels: ["本人已成年，由本人同意", "未成年人，由监护人同意"],
     instrumentIds: ["violin", "viola", "cello"],
     instrumentIndex: 0,
     recording: false,
@@ -28,11 +30,18 @@ Page({
     recordSeconds: 0,
     recordError: "",
     submitting: false,
+    trainingConsentDecision: "",
+    consentSubjectType: "adult",
+    guardianRef: "",
     notice: "",
     recent: []
   },
 
   onLoad() {
+    const storedTrainingDecision = wx.getStorageSync(TRAINING_CONSENT_DECISION_KEY);
+    if (storedTrainingDecision === "granted" || storedTrainingDecision === "declined") {
+      this.setData({ trainingConsentDecision: storedTrainingDecision });
+    }
     recorder.onStart(() => {
       if (this._recordStartWatchdog) {
         clearTimeout(this._recordStartWatchdog);
@@ -122,6 +131,23 @@ Page({
   onInstrument(e) {
     const i = Number(e.detail.value);
     this.setData({ instrumentIndex: i, instrument: this.data.instrumentIds[i] });
+  },
+
+  onTrainingUseChange(e) {
+    const values = (e.detail && e.detail.value) || [];
+    const decision = String(values);
+    if (decision === "granted" || decision === "declined") {
+      wx.setStorageSync(TRAINING_CONSENT_DECISION_KEY, decision);
+      this.setData({ trainingConsentDecision: decision });
+    }
+  },
+
+  onConsentSubjectType(e) {
+    this.setData({ consentSubjectType: Number(e.detail.value) === 1 ? "minor" : "adult" });
+  },
+
+  onGuardianRef(e) {
+    this.setData({ guardianRef: String(e.detail.value || "") });
   },
 
   toggleRecord() {
@@ -339,12 +365,25 @@ Page({
       wx.showToast({ title: "请从曲库选择可分析曲目或添加谱面照片", icon: "none" });
       return;
     }
+    if (!this.data.trainingConsentDecision) {
+      wx.showToast({ title: "请选择是否同意用于模型训练", icon: "none" });
+      return;
+    }
+    if (this.data.trainingConsentDecision === "granted" && this.data.consentSubjectType === "minor" && !this.data.guardianRef.trim()) {
+      wx.showToast({ title: "请填写监护人确认编号", icon: "none" });
+      return;
+    }
     this.setData({ submitting: true, notice: "" });
     const payload = {
       piece: this.data.piece.trim(),
       pieceId: this.data.selectedPieceId,
       scoreId: this.data.selectedScoreId,
       instrument: this.data.instrument,
+      trainingConsent: {
+        decision: this.data.trainingConsentDecision,
+        subjectType: this.data.consentSubjectType,
+        guardianRef: this.data.consentSubjectType === "minor" ? this.data.guardianRef.trim() : ""
+      },
       audioSubmission: {
         name: this.data.recordedName || "practice.mp3",
         mimeType: this.data.recordedMimeType || "audio/mpeg"

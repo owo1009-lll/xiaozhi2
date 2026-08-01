@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  fetchWesternControlledSubmissionModelSuggestions,
   fetchWesternControlledSubmissionScoreNotes,
   fetchWesternControlledSubmissions,
   fetchWesternStudentAnalysis,
@@ -62,6 +63,36 @@ function getStudentIssueCandidateRows(submission) {
   return submission?.latestAnalysis?.reviewAssistPreview || [];
 }
 
+function ModelSuggestionPanel({ result, loading, onRefresh }) {
+  if (!result) {
+    return <button type="button" className="secondary-button" disabled={loading} onClick={onRefresh}>查看签署后的模型复核建议</button>;
+  }
+  if (result.withheld) {
+    return <p className="muted-copy">模型建议暂不显示：请先独立完成并签署全谱逐音复核。</p>;
+  }
+  if (result.status !== "succeeded") {
+    return (
+      <div className="western-review-assist">
+        <strong>模型复核建议 · {result.status || "unknown"}</strong>
+        <span>{result.error || "后台推理尚未完成。可稍后刷新；这不会阻塞教师反馈。"}</span>
+        <button type="button" className="secondary-button" disabled={loading} onClick={onRefresh}>刷新建议状态</button>
+      </div>
+    );
+  }
+  return (
+    <div className="western-review-assist">
+      <strong>失败的 Stage A 候选 · 仅供老师二次复听（{result.suggestions?.length || 0}）</strong>
+      <span>它不是诊断证据，不会发给学生，也不授权自动指控。</span>
+      {(result.suggestions || []).map((item, index) => (
+        <span key={`${item.noteIndex}:${item.gate}:${index}`}>
+          第 {item.measure ?? "?"} 小节 · 拍位 {item.beat ?? "?"} · MIDI {item.scoreMidi ?? "?"} · {item.gate} · {Math.round(Number(item.probability || 0) * 100)}%
+        </span>
+      ))}
+      <button type="button" className="secondary-button" disabled={loading} onClick={onRefresh}>刷新建议</button>
+    </div>
+  );
+}
+
 // Training vocabulary from docs/western-strings-training-ledger-spec.md. It is
 // deliberately different from the student-facing issue categories: this one
 // feeds a future training corpus, the other one is what a student reads.
@@ -83,6 +114,7 @@ function describeScoreNote(note) {
 }
 
 function TrainingLabelPanel({
+  submission,
   machineRows,
   scoreNotesMeta,
   scoreNotesLoading,
@@ -103,15 +135,22 @@ function TrainingLabelPanel({
   // Signing asserts every score note was swept, so it stays disabled until the
   // full score is actually loaded and a reviewer identifies themselves.
   const fullScoreLoaded = Boolean(scoreNotesMeta?.candidateRowsSha256) && scoreNotes.length > 0;
-  const canSign = fullScoreLoaded && Boolean((draft.reviewerId || "").trim()) && Boolean((draft.performerId || "").trim());
+  const canSign = fullScoreLoaded && Boolean((draft.reviewerId || "").trim());
+  const trainingEligible = submission?.trainingConsent?.eligible === true;
 
   return (
     <details className="western-training-ledger">
-      <summary>训练打标（{labeledCount} 条已标{draft.signed ? " · 已签署" : ""}）</summary>
+      <summary>逐音复核（{labeledCount} 条已标{draft.signed ? " · 已签署" : ""}）</summary>
       <p className="muted-copy">
-        逐音打标只进本机训练账本，不改学生端、不翻任何开关、不参与冻结候选调参。未显式打标的谱音按「正确」计入，
-        因此必须先载入全谱、逐音巡检完毕，再勾选「完整错误清单」才会入账；账本只追加，重复复核不会覆盖旧签署。
+        逐音结果先作为本次教师复核记录；只有学生本人或监护人已单独授权时才进入训练账本。
+        它不改学生端、不翻任何开关、不参与冻结候选调参。未显式打标的谱音按「正确」计入，
+        因此必须先载入全谱、逐音巡检完毕，再签署完整错误清单。
       </p>
+      <div className={trainingEligible ? "status-banner" : "muted-copy"}>
+        {trainingEligible
+          ? `训练授权有效 · 主体 ${submission.trainingSubjectRef || "已绑定"} · ${submission.trainingConsent.subjectType === "minor" ? "监护人已确认" : "成年人本人授权"}`
+          : `未取得独立训练授权（${submission?.trainingConsent?.reason || "no-consent-record"}）：仍可复核和反馈，但不会进入训练账本。`}
+      </div>
 
       <div className={fullScoreLoaded ? "status-banner" : "muted-copy"}>
         {fullScoreLoaded
@@ -237,12 +276,6 @@ function TrainingLabelPanel({
         />
         <input
           type="text"
-          value={draft.performerId || ""}
-          placeholder="演奏者匿名编号（必填，用于将来按人切分）"
-          onChange={(event) => onDraftChange({ performerId: event.target.value })}
-        />
-        <input
-          type="text"
           value={draft.deviceHint || ""}
           placeholder="录音设备（可空）"
           onChange={(event) => onDraftChange({ deviceHint: event.target.value })}
@@ -253,15 +286,7 @@ function TrainingLabelPanel({
           placeholder="程度（可空）"
           onChange={(event) => onDraftChange({ levelHint: event.target.value })}
         />
-        <label>
-          <input
-            type="checkbox"
-            checked={draft.consent === true}
-            onChange={(event) => onDraftChange({ consent: event.target.checked })}
-          />
-          已获得知情同意
-        </label>
-        <label title={canSign ? "" : "需先载入全谱并填写复核人与演奏者编号"}>
+        <label title={canSign ? "" : "需先载入全谱并填写复核人编号"}>
           <input
             type="checkbox"
             disabled={!canSign}
@@ -304,6 +329,8 @@ export default function WesternStringsApp({ onBackToStudent }) {
   const [trainingDrafts, setTrainingDrafts] = useState({});
   const [scoreNotesBySubmission, setScoreNotesBySubmission] = useState({});
   const [scoreNotesLoadingId, setScoreNotesLoadingId] = useState("");
+  const [modelSuggestionsBySubmission, setModelSuggestionsBySubmission] = useState({});
+  const [modelSuggestionsLoadingId, setModelSuggestionsLoadingId] = useState("");
 
   const hasScoreInput = Boolean(job?.scoreId || scorePhotoFile);
 
@@ -482,6 +509,18 @@ export default function WesternStringsApp({ onBackToStudent }) {
     }
   }
 
+  async function loadSubmissionModelSuggestions(submission) {
+    setModelSuggestionsLoadingId(submission.submissionId);
+    try {
+      const result = await fetchWesternControlledSubmissionModelSuggestions(submission.submissionId);
+      setModelSuggestionsBySubmission((current) => ({ ...current, [submission.submissionId]: result }));
+    } catch (suggestionError) {
+      setError(suggestionError?.message || "Model suggestions failed to load.");
+    } finally {
+      setModelSuggestionsLoadingId("");
+    }
+  }
+
   function addExtraEvent(submissionId) {
     setTrainingDrafts((drafts) => {
       const current = drafts[submissionId] || {};
@@ -531,10 +570,8 @@ export default function WesternStringsApp({ onBackToStudent }) {
       candidateRowsSha256: meta.candidateRowsSha256,
       scoreNoteCount: meta.noteCount,
       reviewerId: (draft.reviewerId || "").trim(),
-      performerId: (draft.performerId || "").trim(),
       deviceHint: draft.deviceHint || "",
       levelHint: draft.levelHint || "",
-      consent: draft.consent ? "yes" : "no",
       noteLabels: Object.entries(labels)
         .filter(([, label]) => label)
         .map(([noteId, label]) => ({ noteId, label })),
@@ -563,6 +600,7 @@ export default function WesternStringsApp({ onBackToStudent }) {
       });
       setReviewMessage(`Controlled submission review saved.${describeTrainingLedgerResult(result)}`);
       await loadControlledSubmissionQueue();
+      if (buildTrainingPayload(submission).completeErrorInventory) await loadSubmissionModelSuggestions(submission);
     } catch (queueError) {
       setError(queueError?.message || "Controlled submission review failed.");
     } finally {
@@ -600,6 +638,7 @@ export default function WesternStringsApp({ onBackToStudent }) {
       setFeedbackDrafts((drafts) => ({ ...drafts, [submission.submissionId]: "" }));
       setIssueDrafts((drafts) => ({ ...drafts, [submission.submissionId]: {} }));
       await loadControlledSubmissionQueue();
+      if (buildTrainingPayload(submission).completeErrorInventory) await loadSubmissionModelSuggestions(submission);
     } catch (releaseError) {
       setError(releaseError?.message || "Feedback release failed.");
     } finally {
@@ -853,6 +892,7 @@ export default function WesternStringsApp({ onBackToStudent }) {
                       }
                     />
                     <TrainingLabelPanel
+                      submission={submission}
                       machineRows={getStudentIssueCandidateRows(submission)}
                       scoreNotesMeta={scoreNotesBySubmission[submission.submissionId] || null}
                       scoreNotesLoading={scoreNotesLoadingId === submission.submissionId}
@@ -863,6 +903,11 @@ export default function WesternStringsApp({ onBackToStudent }) {
                       onExtraEventChange={(index, patch) => updateExtraEvent(submission.submissionId, index, patch)}
                       onRemoveExtraEvent={(index) => removeExtraEvent(submission.submissionId, index)}
                       onLoadScoreNotes={() => loadSubmissionScoreNotes(submission)}
+                    />
+                    <ModelSuggestionPanel
+                      result={modelSuggestionsBySubmission[submission.submissionId] || null}
+                      loading={modelSuggestionsLoadingId === submission.submissionId}
+                      onRefresh={() => loadSubmissionModelSuggestions(submission)}
                     />
                   </div>
                   <button
