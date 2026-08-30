@@ -1,0 +1,71 @@
+name: Render Yunxia no-watermark video
+
+on:
+  push:
+    branches:
+      - oai-render-yunxia-20260831
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          python -m pip install --quiet edge-tts
+
+      - name: Download clean no-watermark animation
+        run: |
+          curl -L --fail --retry 5 --retry-delay 2 \
+            "https://at.adobe.com/hHFMpzp3kmeb8d6N" \
+            -o clean_animation.mp4
+          ffprobe -v error -show_entries format=duration,size -of default=nw=1 clean_animation.mp4
+
+      - name: Generate natural Mandarin boy voice
+        run: |
+          python - <<'PY'
+          import asyncio
+          import edge_tts
+
+          TEXT = "任何了不起的成就，都是由无数个平凡的坚持，一点一点积累而成的。"
+
+          async def main():
+              communicate = edge_tts.Communicate(
+                  text=TEXT,
+                  voice="zh-CN-YunxiaNeural",
+                  rate="-5%",
+                  volume="+0%",
+                  pitch="+0Hz",
+              )
+              await communicate.save("yunxia_voice.mp3")
+
+          asyncio.run(main())
+          PY
+          ffprobe -v error -show_entries format=duration,size -of default=nw=1 yunxia_voice.mp3
+
+      - name: Combine into one complete MP4
+        run: |
+          DURATION=$(ffprobe -v error -show_entries format=duration -of csv=p=0 clean_animation.mp4)
+          ffmpeg -y \
+            -i clean_animation.mp4 \
+            -i yunxia_voice.mp3 \
+            -filter_complex "[1:a]adelay=220|220,apad[a]" \
+            -map 0:v:0 -map "[a]" \
+            -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p \
+            -c:a aac -b:a 160k -ar 44100 \
+            -t "$DURATION" -movflags +faststart \
+            yunxia_child_voice_no_watermark_final.mp4
+          ffprobe -v error -show_entries format=duration,size -of default=nw=1 yunxia_child_voice_no_watermark_final.mp4
+
+      - name: Upload finished video
+        uses: actions/upload-artifact@v4
+        with:
+          name: yunxia-child-voice-no-watermark-final
+          path: yunxia_child_voice_no_watermark_final.mp4
+          if-no-files-found: error
+          retention-days: 1
